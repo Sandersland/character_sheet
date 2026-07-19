@@ -138,6 +138,20 @@ describe("MobileSheetHeader", () => {
     expect(screen.queryByRole("menuitem", { name: "End Session" })).not.toBeInTheDocument();
   });
 
+  it("adds 'Campaign settings…' to the overflow menu and fires its handler", () => {
+    const onOpenCampaignSettings = vi.fn();
+    renderHeader({ onOpenCampaignSettings });
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /campaign settings/i }));
+    expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits 'Campaign settings…' when no handler is provided", () => {
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
+  });
+
   it("exposes Note / Sessions / Activity / Delete in the overflow menu", () => {
     const onOpenCapture = vi.fn();
     renderHeader({ onOpenCapture });

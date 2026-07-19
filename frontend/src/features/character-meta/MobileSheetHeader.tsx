@@ -16,6 +16,16 @@ type HeaderVariant = "expanded" | "collapsed";
 
 type SheetMenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; separatorBefore?: boolean };
 
+// Shared shape for the two breakpoint sub-headers (CollapsedBar / ExpandedSheetHeader):
+// identity + HP readout + the live pill + the "Sheet actions" ⋯ menu.
+interface SubHeaderProps {
+  character: Character;
+  onUpdate?: (character: Character) => void;
+  pill: React.ReactNode;
+  menuItems: SheetMenuItem[];
+  onOpenSwitcher: () => void;
+}
+
 interface MobileSheetHeaderProps {
   character: Character;
   /** Opens the shared HP sheet from the HP readout; omit for a read-only row. */
@@ -34,6 +44,9 @@ interface MobileSheetHeaderProps {
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  /** Opens the Campaign settings sheet (#1087); the ⋮ item shows only when the
+   *  caller passes a handler (gated on campaign attachment upstream). */
+  onOpenCampaignSettings?: () => void;
 }
 
 /** Pulsing garnet live pill — the single live-state indicator (#1026), replacing
@@ -88,7 +101,7 @@ function HpNumbers({ current, max, temp }: { current: number; max: number; temp:
 // Activity/All characters (above Delete). "All characters" (#1027) is the ⋮
 // discoverability fallback for the identity-tap switcher.
 function buildMenuItems(
-  handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete">,
+  handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete" | "onOpenCampaignSettings">,
   onAllCharacters: () => void,
   sessionActions: MobileSheetHeaderProps["sessionActions"],
 ): SheetMenuItem[] {
@@ -96,6 +109,9 @@ function buildMenuItems(
     { label: "＋ Note", onSelect: handlers.onOpenCapture },
     { label: "Sessions", onSelect: handlers.onOpenSessions },
     { label: "Activity", onSelect: handlers.onOpenActivity },
+    ...(handlers.onOpenCampaignSettings
+      ? [{ label: "Campaign settings…", onSelect: handlers.onOpenCampaignSettings }]
+      : []),
     { label: "All characters", onSelect: onAllCharacters, separatorBefore: true },
     ...(sessionActions
       ? [
@@ -125,13 +141,14 @@ export default function MobileSheetHeader({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: MobileSheetHeaderProps) {
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
   const menuItems = buildMenuItems(
-    { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete },
+    { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete, onOpenCampaignSettings },
     () => navigate("/"),
     sessionActions,
   );
@@ -254,19 +271,7 @@ function CollapseAnimator({
  * · ⋯. The scroll-collapsed default — calm paper chrome so the panel below stays
  * the subject. Tapping the identity region opens the character switcher (#1027).
  */
-function CollapsedBar({
-  character,
-  onUpdate,
-  pill,
-  menuItems,
-  onOpenSwitcher,
-}: {
-  character: Character;
-  onUpdate?: (character: Character) => void;
-  pill: React.ReactNode;
-  menuItems: SheetMenuItem[];
-  onOpenSwitcher: () => void;
-}) {
+function CollapsedBar({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
   const hp = (
     <>
@@ -318,19 +323,7 @@ function CollapsedBar({
  * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. The identity
  * (avatar + name + subtitle) is a button opening the character switcher (#1027).
  */
-function ExpandedSheetHeader({
-  character,
-  onUpdate,
-  pill,
-  menuItems,
-  onOpenSwitcher,
-}: {
-  character: Character;
-  onUpdate?: (character: Character) => void;
-  pill: React.ReactNode;
-  menuItems: SheetMenuItem[];
-  onOpenSwitcher: () => void;
-}) {
+function ExpandedSheetHeader({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
 
   // "Race · Class Level" — classSummary carries per-class levels for multiclass;

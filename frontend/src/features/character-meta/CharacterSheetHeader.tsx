@@ -41,6 +41,9 @@ interface CharacterSheetHeaderProps {
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  /** Opens the Campaign settings sheet (#1087); the ⋮ item shows only when set
+   *  AND the character is campaign-attached. */
+  onOpenCampaignSettings?: () => void;
 }
 
 /** The mobile header's folded-in Leave/End controls (#979), present only while
@@ -54,6 +57,16 @@ function buildSessionActions(
 ): { busy: boolean; onLeave: () => void; onEnd: () => void } | null {
   if (!isLiveJoined || !onLeave || !onEnd) return null;
   return { busy, onLeave, onEnd };
+}
+
+/** Gate the Campaign-settings ⋮ item once (#1087): only campaign-attached
+ *  characters with a wired handler get it. Extracted so both breakpoints agree
+ *  and the header component stays under the cognitive ceiling. */
+function campaignSettingsHandler(
+  campaignId: string | undefined,
+  onOpen?: () => void,
+): (() => void) | undefined {
+  return campaignId ? onOpen : undefined;
 }
 
 /** Annotate the Combat tab with a gold "session live" pip (#961/#964); every
@@ -104,7 +117,9 @@ export default function CharacterSheetHeader({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: CharacterSheetHeaderProps) {
+  const campaignSettings = campaignSettingsHandler(character.campaignId, onOpenCampaignSettings);
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
@@ -124,6 +139,7 @@ export default function CharacterSheetHeader({
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
         onOpenDelete={onOpenDelete}
+        onOpenCampaignSettings={campaignSettings}
       />
       <DesktopBanner
         character={character}
@@ -140,6 +156,7 @@ export default function CharacterSheetHeader({
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
         onOpenDelete={onOpenDelete}
+        onOpenCampaignSettings={campaignSettings}
       />
     </>
   );
@@ -167,6 +184,7 @@ function DesktopBanner({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat" | "onUpdate">) {
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
@@ -227,6 +245,7 @@ function DesktopBanner({
               onOpenSessions={onOpenSessions}
               onOpenActivity={onOpenActivity}
               onOpenDelete={onOpenDelete}
+              onOpenCampaignSettings={onOpenCampaignSettings}
               onLeaveSession={onLeaveSession}
               onEndSession={onEndSession}
             />
@@ -274,6 +293,7 @@ function BannerActions({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
   onLeaveSession,
   onEndSession,
 }: {
@@ -286,9 +306,19 @@ function BannerActions({
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  onOpenCampaignSettings?: () => void;
   onLeaveSession?: () => void;
   onEndSession?: () => void;
 }) {
+  // Caller already gates on campaign attachment (#1087). separatorBefore rides on
+  // the settings item so a lone Delete never grows a stray divider.
+  const showSettings = Boolean(onOpenCampaignSettings);
+  const menuItems = [
+    ...(showSettings
+      ? [{ label: "Campaign settings…", onSelect: onOpenCampaignSettings! }]
+      : []),
+    { label: "Delete", onSelect: onOpenDelete, danger: true, separatorBefore: showSettings },
+  ];
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
       {isLive && (
@@ -336,11 +366,7 @@ function BannerActions({
           End Session
         </button>
       )}
-      <OverflowMenu
-        label="Sheet actions"
-        triggerClassName={BANNER_KEBAB}
-        items={[{ label: "Delete", onSelect: onOpenDelete, danger: true }]}
-      />
+      <OverflowMenu label="Sheet actions" triggerClassName={BANNER_KEBAB} items={menuItems} />
     </div>
   );
 }
