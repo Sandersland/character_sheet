@@ -70,7 +70,8 @@ function useLevelUpSubmit(characterId: string, classEntryId: string | null, draf
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // kind:"new" (multiclass-into) targets are deferred to the entry wiring (#892).
+      // The ceremony only advances an existing class; multiclassing-into a new
+      // class stays on the interim AddClassPanel path until kind:"new" is wired here.
       await submitLevelUp(characterId, { ...draft, target: { kind: "existing", classEntryId }, hp: draft.hp });
       onDone();
     } catch (e: unknown) {
