@@ -407,10 +407,12 @@ describe("rest/level-up branch pins (#684)", () => {
       },
     });
     // longRest (unlike shortRest) carries resources in BOTH before and after.
+    // The Wizard's Arcane Recovery pool (recharge longRest, #904) resets here,
+    // so its use counter appears zeroed in the after snapshot.
     expect(ev.after).toEqual({
       hitPoints: { ...BASE_HP, current: 44 },
       hitDice: { ...BASE_HD, spent: 1 },
-      resources: EMPTY_RESOURCES,
+      resources: { ...EMPTY_RESOURCES, used: { arcaneRecovery: 0 } },
       spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
     });
   });

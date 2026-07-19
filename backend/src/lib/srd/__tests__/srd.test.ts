@@ -423,10 +423,10 @@ describe("deriveResources — features-only classes", () => {
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
-  it("Wizard has features but no resource pools", () => {
+  it("Wizard has features and the Arcane Recovery pool (#904)", () => {
     const result = deriveResources("wizard", undefined, 5, ABILITY_SCORES, PROF_3);
     expect(result).not.toBeNull();
-    expect(result!.resources).toHaveLength(0);
+    expect(result!.resources.map((r) => r.key)).toEqual(["arcaneRecovery"]);
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
