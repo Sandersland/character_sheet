@@ -56,6 +56,11 @@ export const createCharacterSchema = z
      *  fixed grants from background/class/race are applied server-side). */
     toolChoices: z.array(z.string()).optional(),
     startingEquipment: startingEquipmentSchema.optional(),
+    // #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids).
+    // Optional for back-compat; strictly count/list/level-validated when present.
+    spells: z
+      .object({ cantripIds: z.array(z.string()), spellIds: z.array(z.string()) })
+      .optional(),
   })
   .strict();
 

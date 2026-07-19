@@ -150,4 +150,6 @@ export interface CreateCharacterInput {
   /** Tool names chosen by the player (from class toolChoices). */
   toolChoices?: string[];
   startingEquipment?: StartingEquipmentInput;
+  /** #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids). */
+  spells?: { cantripIds: string[]; spellIds: string[] };
 }
