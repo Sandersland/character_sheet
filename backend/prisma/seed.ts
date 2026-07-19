@@ -316,17 +316,24 @@ async function seedBackgrounds(prisma: PrismaClient) {
   }
 }
 
-// Coalesce a spell's boolean-default flags so a toggled-OFF flag actually resets
-// on re-seed (#1132): a bare partial update leaves an absent optional column at
-// its prior value, which stranded Barkskin at concentration=true when SRD 5.2
-// dropped its concentration.
+// Every optional Spell column at its reset value (booleans → false, nullable
+// scalars → null). `components` (a Json column) is omitted — Prisma rejects a raw
+// null there, and no spell ever drops it.
+const SPELL_COLUMN_DEFAULTS = {
+  concentration: false, ritual: false, cantripScaling: false,
+  effectKind: null, effectDiceCount: null, effectDiceFaces: null,
+  effectModifier: null, damageType: null, attackType: null,
+  saveAbility: null, saveEffect: null, upcastDicePerLevel: null,
+  buffTarget: null, buffModifier: null,
+} as const;
+
+// Layer the spell over the reset defaults so a toggled-OFF/removed optional
+// actually resets on re-seed (#1132): a bare partial update leaves an absent
+// optional column at its prior value (this stranded Barkskin at
+// concentration=true when SRD 5.2 dropped its concentration). Spread order —
+// defaults first — means any field the spell declares still wins.
 function spellSeedData(spell: CatalogSpell) {
-  return {
-    ...spell,
-    concentration: spell.concentration ?? false,
-    ritual: spell.ritual ?? false,
-    cantripScaling: spell.cantripScaling ?? false,
-  };
+  return { ...SPELL_COLUMN_DEFAULTS, ...spell };
 }
 
 // Seed spell catalog — apply in-place renames FIRST (so the upsert matches the
@@ -335,6 +342,7 @@ function spellSeedData(spell: CatalogSpell) {
 // unaffected by a catalog drop (no FK); a one-time resync script refreshes them.
 async function seedSpells(prisma: PrismaClient) {
   await applySpellRenames(prisma, SPELL_RENAMES);
+  const seededNames = SPELLS.map((s) => s.name);
   for (const spell of SPELLS) {
     const data = spellSeedData(spell);
     await prisma.spell.upsert({
@@ -344,11 +352,11 @@ async function seedSpells(prisma: PrismaClient) {
     });
   }
   const stale = await prisma.spell.findMany({
-    where: { name: { notIn: SPELLS.map((s) => s.name) } },
+    where: { name: { notIn: seededNames } },
     select: { name: true },
   });
   if (stale.length) console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => s.name).join(", ")}`);
-  await prisma.spell.deleteMany({ where: { name: { notIn: SPELLS.map((s) => s.name) } } });
+  await prisma.spell.deleteMany({ where: { name: { notIn: seededNames } } });
 }
 
 // Returns itemName → id so packs can resolve their contents.

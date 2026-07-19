@@ -84,6 +84,10 @@ export async function resyncSpellSnapshots(prisma: PrismaClient = defaultPrisma)
   for (const character of characters) {
     const state = normalizeSpellcastingMutable(character.spellcasting);
     const spells = resyncEntries(state.spells, byId);
+    // Order-sensitive equality: a pre-existing snapshot whose components keys sit
+    // in a different order than the catalog emits would report a diff and get a
+    // spurious (harmless, same-data) write. The first resync normalizes order;
+    // subsequent runs are idempotent.
     if (JSON.stringify(spells) === JSON.stringify(state.spells)) continue;
 
     await prisma.character.update({
