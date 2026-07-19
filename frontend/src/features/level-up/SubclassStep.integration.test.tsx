@@ -16,10 +16,14 @@ vi.mock("@/api/client", () => ({
 const planMock = vi.mocked(fetchLevelUpPlan);
 const refMock = vi.mocked(fetchReference);
 
+// hitPoints/hitDice/abilityScores present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
   pendingLevelUps: 1,
   classes: [{ id: "entry-1", name: "Fighter", level: 2 }],
+  abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
+  hitPoints: { current: 20, max: 20 },
+  hitDice: { die: "d10", total: 2 },
 } as unknown as Character;
 
 const fighterReference = {
@@ -77,6 +81,7 @@ describe("SubclassStep in the ceremony", () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     expect(await screen.findByRole("radio", { name: "Battle Master" })).toBeInTheDocument();
@@ -89,6 +94,7 @@ describe("SubclassStep in the ceremony", () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await screen.findByRole("radio", { name: "Battle Master" });
 
@@ -100,6 +106,7 @@ describe("SubclassStep in the ceremony", () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(await screen.findByRole("radio", { name: "Battle Master" }));
 

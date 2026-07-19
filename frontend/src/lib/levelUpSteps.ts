@@ -5,8 +5,12 @@ import type { LevelUpPlanResponse, LevelUpStep, LevelUpStepKind, LevelUpSubmissi
 
 export type LevelUpStepState = "done" | "active" | "pending";
 
-/** The in-progress submission minus its target (owned by useLevelUpCeremony). */
-export type LevelUpDraft = Omit<LevelUpSubmission, "target">;
+// The in-progress submission minus its target (owned by useLevelUpCeremony). hp
+// is optional here because the ceremony starts before the player picks it — the
+// HitPointsStep (#887) sets it, and draftSatisfies gates Continue until it does.
+export type LevelUpDraft = Omit<LevelUpSubmission, "target" | "hp"> & {
+  hp?: LevelUpSubmission["hp"];
+};
 
 /**
  * Stable identity for a step across re-plans: kind, plus meta.key for the

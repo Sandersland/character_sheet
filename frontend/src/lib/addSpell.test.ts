@@ -85,6 +85,10 @@ describe("catalogEffectLine", () => {
     expect(catalogEffectLine(catalogSpell({ effectKind: "heal", effectDiceCount: 2, effectDiceFaces: 4 })))
       .toBe("Healing — 2d4");
   });
+
+  it("returns null when the effect has no dice (Mage Armor-style buffs)", () => {
+    expect(catalogEffectLine(catalogSpell({ effectKind: "damage" }))).toBeNull();
+  });
 });
 
 describe("buildCustomSpellPayload", () => {

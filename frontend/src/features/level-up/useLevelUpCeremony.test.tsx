@@ -52,8 +52,8 @@ describe("useLevelUpCeremony", () => {
     expect(planMock).toHaveBeenCalledWith("c1", { kind: "existing", classEntryId: "entry-1" }, undefined);
     expect(result.current.stepIndex).toBe(0);
     expect(result.current.currentStep?.kind).toBe("hitPoints");
-    // Seeded hp draft satisfies the first step, so Continue is armed.
-    expect(result.current.canContinue).toBe(true);
+    // The draft starts empty — the HP step (#887) must record a choice before Continue arms.
+    expect(result.current.canContinue).toBe(false);
   });
 
   it("honors the ?entry= override for the target entry", async () => {
@@ -139,6 +139,7 @@ describe("useLevelUpCeremony", () => {
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
 
+    act(() => result.current.setDraft((d) => ({ ...d, hp: { method: "average" } })));
     act(() => result.current.next());
     expect(result.current.isLast).toBe(true);
     await act(() => result.current.confirm());
@@ -156,6 +157,7 @@ describe("useLevelUpCeremony", () => {
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
 
+    act(() => result.current.setDraft((d) => ({ ...d, hp: { method: "average" } })));
     await act(() => result.current.confirm());
     expect(result.current.submitError).toBe("expected 1 advancement for this level-up, got 0");
   });

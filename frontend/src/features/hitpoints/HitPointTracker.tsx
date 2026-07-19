@@ -1,36 +1,29 @@
 import { activeResistedDamageTypes } from "@/lib/damageTypes";
-import type { Character, ClassOption } from "@/types/character";
+import type { Character } from "@/types/character";
 import Card from "@/components/ui/Card";
 import AutoRollConcentrationToggle from "@/features/hitpoints/AutoRollConcentrationToggle";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
 import HpDeathSaveBlock from "@/features/hitpoints/HpDeathSaveBlock";
 import HpMeter from "@/features/hitpoints/HpMeter";
+import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import HpNotices from "@/features/hitpoints/HpNotices";
-import HpTrackerModals from "@/features/hitpoints/HpTrackerModals";
 import RestControls from "@/features/hitpoints/RestControls";
 import { useDeathSaves } from "@/features/hitpoints/useDeathSaves";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
-import { useHitPointTrackerActions } from "@/features/hitpoints/useHitPointTrackerActions";
+import { useRestActions } from "@/features/hitpoints/useRestActions";
 
 interface HitPointTrackerProps {
   character: Character;
-  /** Reference class list (for the level-up new-class picker); defaults to none. */
-  referenceClasses?: ClassOption[];
   onUpdate: (character: Character) => void;
 }
 
-export default function HitPointTracker({
-  character,
-  referenceClasses = [],
-  onUpdate,
-}: HitPointTrackerProps) {
-  const { hitPoints, hitDice, abilityScores, pendingLevelUps } = character;
-  const conMod = Math.floor((abilityScores.constitution - 10) / 2);
+export default function HitPointTracker({ character, onUpdate }: HitPointTrackerProps) {
+  const { hitPoints, hitDice } = character;
 
-  // Shared HP-apply engine, death-save controls (#736), and rest/level-up actions.
+  // Shared HP-apply engine, death-save controls (#736), and rest actions.
   const hp = useHitPointApply(character, onUpdate);
   const deathSaveCtl = useDeathSaves(character, onUpdate);
-  const actions = useHitPointTrackerActions(character, referenceClasses, hp.submit);
+  const rest = useRestActions(character, hp.submit);
 
   return (
     <Card title="Hit Points">
@@ -39,7 +32,7 @@ export default function HitPointTracker({
           current={hitPoints.current}
           max={hitPoints.max}
           temp={hitPoints.temp}
-          availableDice={actions.availableDice}
+          availableDice={rest.availableDice}
           hitDiceTotal={hitDice.total}
           die={hitDice.die}
         />
@@ -63,35 +56,22 @@ export default function HitPointTracker({
         )}
 
         <RestControls
-          availableDice={actions.availableDice}
+          availableDice={rest.availableDice}
           pending={hp.pending}
-          onShortRest={actions.shortRest}
-          onLongRest={actions.longRest}
+          onShortRest={rest.shortRest}
+          onLongRest={rest.longRest}
         />
 
-        <HpNotices
-          pendingLevelUps={pendingLevelUps}
-          pending={hp.pending}
-          onLevelUp={() => actions.setLevelUpOpen(true)}
-          showAdvancement={actions.advancementCallout}
-          onGoToAdvancements={actions.dismissAdvancement}
-          concentrationNote={hp.concentrationNote}
-          error={hp.error}
-        />
+        <HpNotices concentrationNote={hp.concentrationNote} error={hp.error} />
       </div>
 
-      <HpTrackerModals
-        character={character}
-        referenceClasses={referenceClasses}
-        conMod={conMod}
-        pending={hp.pending}
-        levelUpOpen={actions.levelUpOpen}
-        onConfirmLevelUp={actions.levelUp}
-        onCloseLevelUp={() => actions.setLevelUpOpen(false)}
-        pendingSave={hp.pendingSave}
-        onResolveSave={hp.resolveConcentrationSave}
-        onCloseSave={() => hp.setPendingSave(null)}
-      />
+      {hp.pendingSave && (
+        <ConcentrationSaveModal
+          save={hp.pendingSave}
+          onResolve={hp.resolveConcentrationSave}
+          onClose={() => hp.setPendingSave(null)}
+        />
+      )}
     </Card>
   );
 }

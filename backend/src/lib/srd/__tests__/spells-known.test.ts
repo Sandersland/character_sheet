@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   BARD_MAGICAL_SECRETS_LEVELS,
   SPELLS_KNOWN_BY_CLASS,
+  maxSpellLevelForClass,
   spellsGainedAtLevel,
   learnsNewSpellsOnLevelUp,
 } from "@/lib/srd/spellcasting-tables.js";
@@ -69,6 +70,33 @@ describe("spellsGainedAtLevel", () => {
     for (const cls of ["cleric", "druid", "paladin", "fighter", "barbarian"]) {
       for (let lvl = 1; lvl <= 20; lvl++) expect(spellsGainedAtLevel(cls, lvl)).toBe(0);
     }
+  });
+});
+
+describe("maxSpellLevelForClass", () => {
+  it("derives the highest slot level a full caster has (ceiling climbs every other level)", () => {
+    expect(maxSpellLevelForClass("wizard", 1)).toBe(1);
+    expect(maxSpellLevelForClass("wizard", 3)).toBe(2);
+    expect(maxSpellLevelForClass("wizard", 8)).toBe(4);
+    expect(maxSpellLevelForClass("wizard", 9)).toBe(5);
+    expect(maxSpellLevelForClass("Bard", 10)).toBe(5);
+  });
+
+  it("returns 0 before a half-caster has spellcasting, then the half-caster ceiling", () => {
+    expect(maxSpellLevelForClass("ranger", 1)).toBe(0);
+    expect(maxSpellLevelForClass("ranger", 2)).toBe(1);
+    expect(maxSpellLevelForClass("ranger", 5)).toBe(2);
+  });
+
+  it("reads Pact Magic's single slot level for a Warlock", () => {
+    expect(maxSpellLevelForClass("warlock", 1)).toBe(1);
+    expect(maxSpellLevelForClass("warlock", 3)).toBe(2);
+    expect(maxSpellLevelForClass("warlock", 9)).toBe(5);
+  });
+
+  it("is 0 for a non-caster (no derived slots)", () => {
+    expect(maxSpellLevelForClass("fighter", 5)).toBe(0);
+    expect(maxSpellLevelForClass("barbarian", 20)).toBe(0);
   });
 });
 

@@ -18,7 +18,7 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
  * Drawer (desktop) or BottomSheet (mobile). When a session goes live this panel
  * is replaced by CombatLivePanel (CharacterSheetBody gating, untouched).
  */
-export default function CombatPanel({ character, reference, onUpdate }: SheetPanelProps) {
+export default function CombatPanel({ character, onUpdate }: SheetPanelProps) {
   const [logSessionId, setLogSessionId] = useState<string | null>(null);
   const isBelowMd = useIsBelowMd();
 
@@ -27,13 +27,7 @@ export default function CombatPanel({ character, reference, onUpdate }: SheetPan
       <CombatColumn
         character={character}
         turnSlot={<SessionDoorwayCard characterId={character.id} />}
-        hpSlot={
-          <HitPointTracker
-            character={character}
-            referenceClasses={reference?.classes ?? []}
-            onUpdate={onUpdate}
-          />
-        }
+        hpSlot={<HitPointTracker character={character} onUpdate={onUpdate} />}
         conditionsSlot={<ConditionsStrip character={character} onUpdate={onUpdate} />}
         logRow={<CombatLogRow mode="idle" characterId={character.id} onOpen={setLogSessionId} />}
       />

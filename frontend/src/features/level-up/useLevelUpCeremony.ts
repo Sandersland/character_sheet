@@ -66,12 +66,13 @@ function useLevelUpSubmit(characterId: string, classEntryId: string | null, draf
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function confirm(): Promise<void> {
-    if (!classEntryId) return;
+    if (!classEntryId || !draft.hp) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // kind:"new" (multiclass-into) targets are deferred to the entry wiring (#892).
-      await submitLevelUp(characterId, { target: { kind: "existing", classEntryId }, ...draft });
+      // The ceremony only advances an existing class; multiclassing-into a new
+      // class stays on the interim AddClassPanel path until kind:"new" is wired here.
+      await submitLevelUp(characterId, { ...draft, target: { kind: "existing", classEntryId }, hp: draft.hp });
       onDone();
     } catch (e: unknown) {
       setSubmitError(errorMessage(e, "Failed to apply level-up"));
@@ -89,9 +90,7 @@ export function useLevelUpCeremony(character: Character): LevelUpCeremony {
   // `?entry=` targets a specific class entry (multiclass); default is primary.
   const classEntryId = searchParams.get("entry") ?? character.classes?.[0]?.id ?? null;
 
-  // hp seeded so a bare [hitPoints, review] plan confirms end-to-end; the real
-  // HP step (#887) replaces this seed with the player's actual choice.
-  const [draft, setDraft] = useState<LevelUpDraft>({ hp: { method: "average" } });
+  const [draft, setDraft] = useState<LevelUpDraft>({});
   const [currentKey, setCurrentKey] = useState("hitPoints");
 
   const { plan, planError } = useLevelUpPlan(character.id, classEntryId, draft.subclassId);
