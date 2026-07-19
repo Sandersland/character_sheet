@@ -133,6 +133,17 @@ export interface DismissBuffOperation {
   entryId: string;
 }
 
+/**
+ * Sorcerer Font of Magic (#903): convert sorcery points into a spell slot at the
+ * 5e cost table, or expend a spell slot to gain SP equal to its level. Mutates
+ * the SP pool (resources) and the slot state (spellcasting) atomically.
+ */
+export interface ConvertSorceryPointsOperation {
+  type: "convertSorceryPoints";
+  direction: "toSlot" | "toSorceryPoints";
+  slotLevel: number;
+}
+
 export type SpellcastingOperation =
   | CastSpellOperation
   | CastItemSpellOperation
@@ -143,4 +154,5 @@ export type SpellcastingOperation =
   | PrepareSpellOperation
   | UnprepareSpellOperation
   | DropConcentrationOperation
-  | DismissBuffOperation;
+  | DismissBuffOperation
+  | ConvertSorceryPointsOperation;
