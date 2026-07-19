@@ -159,6 +159,12 @@ export function buildLevelUpLedger(
     draft.subclassId ? { label: "Subclass", after: plan.target.subclass ?? "New subclass", variant: "delta" } : null,
     draft.fightingStyle ? { label: "Fighting Style", after: fightingStyleLabel(draft.fightingStyle), variant: "delta" } : null,
     ...learnedListRows(draft, plan, resolvers, character),
+    // Auto-granted subclass spells are derived on the plan, not the draft — surface
+    // them so Review's "applied together" claim covers them too (#1139).
+    listRow(
+      plan.target.subclass ? `Granted by ${plan.target.subclass}` : "Granted Spells",
+      (plan.grantedSpells ?? []).map((g) => g.name),
+    ),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);
 }

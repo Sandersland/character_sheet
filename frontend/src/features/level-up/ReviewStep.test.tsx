@@ -139,6 +139,16 @@ describe("ReviewStep", () => {
     expect(screen.getByText("Charm Person")).toBeInTheDocument();
   });
 
+  it("lists incoming granted spells from the plan under the granting subclass (#1139)", () => {
+    renderReview(
+      { hp: { method: "average" } },
+      { plan: { ...plan, grantedSpells: [{ name: "Lesser Restoration", level: 2 }, { name: "Zone of Truth", level: 2 }] } },
+    );
+    expect(screen.getByText("Granted by Champion")).toBeInTheDocument();
+    expect(screen.getByText("Lesser Restoration")).toBeInTheDocument();
+    expect(screen.getByText("Zone of Truth")).toBeInTheDocument();
+  });
+
   it("has no axe violations", async () => {
     const { container } = renderReview({
       hp: { method: "average" },
