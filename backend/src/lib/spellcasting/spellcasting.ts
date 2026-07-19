@@ -19,10 +19,12 @@ import { randomUUID } from "node:crypto";
 
 
 import { Prisma, type Spell } from "@/generated/prisma/client.js";
-import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
+import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
 import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
+import { applyResourceOpInTx } from "@/lib/classes/resources.js";
+import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/classes/sorcerer.js";
 import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
@@ -43,6 +45,21 @@ import {
   snapshotResources,
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
+import type {
+  ArcaneRecoveryOperation,
+  CastItemSpellOperation,
+  CastSpellOperation,
+  ConvertSorceryPointsOperation,
+  CustomSpellInput,
+  DismissBuffOperation,
+  ExpendSlotOperation,
+  ForgetSpellOperation,
+  LearnSpellOperation,
+  PrepareSpellOperation,
+  RestoreSlotOperation,
+  SpellcastingOperation,
+  UnprepareSpellOperation,
+} from "@character-sheet/shared-types";
 
 // Defined in ability-cost.ts (one-directional dep graph); re-exported so
 // existing importers (spellcastingRouter) keep resolving it here unchanged.
@@ -53,129 +70,13 @@ export { InvalidSpellcastingOperationError };
 // here so this module's public surface stays stable.
 export { normalizeSpellcastingMutable };
 
-export interface CustomSpellInput {
-  name: string;
-  level: number;
-  school: string;
-  castingTime: string;
-  range: string;
-  duration: string;
-  description: string;
-  concentration?: boolean;
-  ritual?: boolean;
-  components?: SpellComponents;
-  saveEffect?: string;
-  effectKind?: string;
-  effectDiceCount?: number;
-  effectDiceFaces?: number;
-  effectModifier?: number;
-  damageType?: string;
-  attackType?: string;
-  saveAbility?: string;
-  upcastDicePerLevel?: number;
-  cantripScaling?: boolean;
-}
-
-/**
- * Cast a spell. For leveled spells, `slotLevel` must be >= spell.level and a
- * slot of that level must be available. Cantrips (spell.level === 0) skip slot
- * expenditure. `roll` is the client-computed effect total (0 for utility spells
- * with no dice); the server validates and logs it but does not recompute.
- */
-export interface CastSpellOperation {
-  type: "castSpell";
-  entryId: string;
-  slotLevel?: number; // required for leveled spells, omit/ignore for cantrips
-  roll: number;       // client-rolled total (0 for utility)
-  /**
-   * Optionally apply the rolled effect in the same atomic batch. `target: "self"`
-   * hits the caster's own HP; `target: { characterId }` heals a consenting ally's
-   * sheet (#462, healing only). Omitted when targeting an enemy (no enemy entities
-   * exist; the player relays damage to the DM).
-   */
-  apply?: { target: CastTarget; kind: "heal" | "damage"; amount: number };
-}
-
-/**
- * Cast a spell granted by a held magic item (#528). `entryId` is the derived
- * `item:<inventoryItemId>:<spellId>` seam. Spends the item's own resource (its
- * per-capability `used` counter), never a character spell slot. `roll` is the
- * client-computed effect total (0 for utility). Blocked when the item is inactive
- * (not equipped/attuned) or its uses are exhausted until the matching rest.
- */
-export interface CastItemSpellOperation {
-  type: "castItemSpell";
-  entryId: string;
-  roll: number;
-  apply?: { target: CastTarget; kind: "heal" | "damage"; amount: number };
-}
-
-/** Expend one slot of a given level without associating it with a specific spell. */
-export interface ExpendSlotOperation {
-  type: "expendSlot";
-  level: number;
-}
-
-/** Restore one previously-expended slot (undo mis-click; not Arcane Recovery). */
-export interface RestoreSlotOperation {
-  type: "restoreSlot";
-  level: number;
-}
-
-/** Wizard Arcane Recovery: recover expended slots on a short rest, once per long rest (#904). */
-export interface ArcaneRecoveryOperation {
-  type: "arcaneRecovery";
-  slots: { level: number; count: number }[];
-}
-
-/** Learn a spell from the catalog (spellId) or add a custom one. Exactly one of spellId/custom. */
-export interface LearnSpellOperation {
-  type: "learnSpell";
-  spellId?: string;
-  custom?: CustomSpellInput;
-}
-
-/** Remove a learned spell by its per-character entry id. */
-export interface ForgetSpellOperation {
-  type: "forgetSpell";
-  entryId: string;
-}
-
-/** Mark a non-cantrip spell as prepared. */
-export interface PrepareSpellOperation {
-  type: "prepareSpell";
-  entryId: string;
-}
-
-/** Mark a non-cantrip spell as unprepared. */
-export interface UnprepareSpellOperation {
-  type: "unprepareSpell";
-  entryId: string;
-}
-
-/** End the active concentration spell manually (player ends it / it was countered). */
-export interface DropConcentrationOperation {
-  type: "dropConcentration";
-}
-
-/** Dismiss an active while-active spell buff by its spell entry id (#363). */
-export interface DismissBuffOperation {
-  type: "dismissBuff";
-  entryId: string;
-}
-
-export type SpellcastingOperation =
-  | CastSpellOperation
-  | CastItemSpellOperation
-  | ExpendSlotOperation
-  | RestoreSlotOperation
-  | ArcaneRecoveryOperation
-  | LearnSpellOperation
-  | ForgetSpellOperation
-  | PrepareSpellOperation
-  | UnprepareSpellOperation
-  | DropConcentrationOperation
-  | DismissBuffOperation;
+// Spell transaction-op wire types now live in shared-types (#820); the ops the
+// dispatcher references are imported above, and the ones other backend modules
+// import from here are re-exported so their import paths stay unchanged. The
+// shared CastSpell/CastItemSpell ops type `apply.target` as the same structural
+// union CastTarget aliases, so the dispatcher forwards it to castAbilityInTx
+// unchanged.
+export type { ForgetSpellOperation, LearnSpellOperation, SpellcastingOperation };
 
 // Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
 // no-op (which skips both the state write-back and the logEvent in the dispatcher).
@@ -739,6 +640,54 @@ async function applyDismissBuffOp(ctx: SpellOpContext, op: DismissBuffOperation)
   return null;
 }
 
+// Font of Magic (#903). Composes with the resources handler for the SP pool
+// (validates the pool exists + bounds, logs its own resources event under this
+// batch) and mutates the slot state here (logged as the spellcasting event) —
+// both revert on one LIFO undo of the batch.
+async function applyConvertSorceryPointsOp(
+  ctx: SpellOpContext,
+  op: ConvertSorceryPointsOperation,
+): Promise<OpOutcome> {
+  const { state, slotTotals, tx, characterId, batchId, sessionId } = ctx;
+  const level = op.slotLevel;
+  const key = String(level);
+
+  if (op.direction === "toSlot") {
+    const cost = sorceryPointCostForSlot(level);
+    if (cost == null) {
+      throw new InvalidSpellcastingOperationError(
+        `Font of Magic can only create spell slots of level 1-${FONT_OF_MAGIC_MAX_SLOT_LEVEL}`,
+      );
+    }
+    if ((slotTotals[level] ?? 0) === 0) {
+      throw new InvalidSpellcastingOperationError(`You have no level-${level} spell slots`);
+    }
+    // Spend the SP first — validates the pool exists and enough points remain.
+    await applyResourceOpInTx(tx, characterId, { type: "spendResource", key: "sorceryPoints", amount: cost }, batchId, sessionId);
+    // Creating a slot = one more available; `used` may go negative (extra slot).
+    state.slotsUsed[key] = (state.slotsUsed[key] ?? 0) - 1;
+    return {
+      eventType: "convertSorceryPoints",
+      summary: `Converted ${cost} sorcery points into a level-${level} spell slot`,
+      eventData: { direction: "toSlot", slotLevel: level, sorceryPointCost: cost },
+    };
+  }
+
+  const used = state.slotsUsed[key] ?? 0;
+  if ((slotTotals[level] ?? 0) - used <= 0) {
+    throw new InvalidSpellcastingOperationError(`No level-${level} spell slots remaining to convert`);
+  }
+  state.slotsUsed[key] = used + 1;
+  // Gain SP = slot level; restoreResource throws if this would exceed the max,
+  // rejecting the whole conversion (slot stays unspent) — it does not clamp.
+  await applyResourceOpInTx(tx, characterId, { type: "restoreResource", key: "sorceryPoints", amount: level }, batchId, sessionId);
+  return {
+    eventType: "convertSorceryPoints",
+    summary: `Converted a level-${level} spell slot into ${level} sorcery points`,
+    eventData: { direction: "toSorceryPoints", slotLevel: level, sorceryPointsGained: level },
+  };
+}
+
 type DerivedSpellcasting = ReturnType<typeof deriveSpellcasting>;
 
 // Build the slot/arcana level→total maps from derived spellcasting, falling back
@@ -830,6 +779,7 @@ const SPELL_OP_HANDLERS: {
   unprepareSpell: applyPrepareSpellOp,
   dropConcentration: applyDropConcentrationOp,
   dismissBuff: applyDismissBuffOp,
+  convertSorceryPoints: applyConvertSorceryPointsOp,
 };
 
 function dispatchSpellOp(ctx: SpellOpContext, op: SpellcastingOperation): SpellOpResult {
@@ -946,6 +896,27 @@ const SPELLCASTING_SELECT = {
 
 type SpellcastingRow = Prisma.CharacterGetPayload<{ select: typeof SPELLCASTING_SELECT }>;
 
+// Arcane Recovery (#904): the pool comes from the primary class's derived
+// resources — present only for a wizard — so usage and the long-rest refresh
+// (resetRestResources, also primary-class-scoped) key off the same fact.
+// Single-class uses the XP-derived level; multiclass uses the primary entry's.
+function resolveArcaneRecoveryContext(
+  row: SpellcastingRow,
+  className: string,
+  level: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): { resources: ResourcesMutableState; available: boolean; wizardLevel: number } {
+  const primary = row.classEntries[0];
+  const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
+  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus);
+  return {
+    resources: normalizeResourcesMutable(row.resources),
+    available: Boolean(resourceInfo?.resources.some((r) => r.key === "arcaneRecovery")),
+    wizardLevel,
+  };
+}
+
 // Read fresh state and assemble the per-op context + before-snapshot. Split out
 // of applySpellcastingOpInTx to keep that seam under the unit-size gate.
 function buildSpellcastingOp(
@@ -967,18 +938,7 @@ function buildSpellcastingOp(
 
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
-  // Arcane Recovery (#904): the pool comes from the primary class's derived
-  // resources — present only for a wizard — so usage and the long-rest refresh
-  // (resetRestResources, also primary-class-scoped) key off the same fact.
-  // Single-class uses the XP-derived level; multiclass uses the primary entry's.
-  const primary = row.classEntries[0];
-  const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
-  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus);
-  const arcaneRecovery = {
-    resources: normalizeResourcesMutable(row.resources),
-    available: Boolean(resourceInfo?.resources.some((r) => r.key === "arcaneRecovery")),
-    wizardLevel,
-  };
+  const arcaneRecovery = resolveArcaneRecoveryContext(row, className, level, abilityScores, profBonus);
 
   const state = normalizeSpellcastingMutable(row.spellcasting);
   const beforeState = cloneSpellState(state);

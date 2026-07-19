@@ -128,14 +128,25 @@ const CIRCLE_OF_THE_MOON_FEATURES: DerivedFeature[] = [
   },
 ];
 
+// Circle of the Moon's Circle Forms raise the Wild Shape CR cap: CR 1 at L2,
+// then level÷3 (min 1) from L6. Other circles use the base druid table.
+function wildShapeCrCap(level: number, subclassKey: string | undefined): string {
+  if (subclassKey === "circle of the moon") {
+    return String(level >= 6 ? Math.max(1, Math.floor(level / 3)) : 1);
+  }
+  return level >= 8 ? "1" : level >= 4 ? "1/2" : "1/4";
+}
+
+// Base Wild Shape speed restrictions lift with level, regardless of subclass.
+function wildShapeSpeedNote(level: number): string {
+  return level >= 8 ? "" : level >= 4 ? " (no flying speed)" : " (no flying or swimming speed)";
+}
+
 export const druid: ClassDefinition = {
   features: DRUID_FEATURES,
-  resourceFn: (level) => {
+  resourceFn: (level, _abilityScores, _profBonus, subclassKey) => {
     if (level < 2) return [];
-    const crCap =
-      level >= 8 ? "1" :
-      level >= 4 ? "1/2 (no flying speed)" :
-      "1/4 (no flying or swimming speed)";
+    const crCap = `${wildShapeCrCap(level, subclassKey)}${wildShapeSpeedNote(level)}`;
     return [
       {
         key: "wildShape",

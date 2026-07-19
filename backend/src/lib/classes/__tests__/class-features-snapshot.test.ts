@@ -16,7 +16,7 @@ const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
   monk: [undefined, "way of the open hand", "way of shadow", "way of the four elements"],
   paladin: [undefined, "oath of devotion", "oath of the ancients", "oath of vengeance"],
   ranger: [undefined, "hunter", "beast master"],
-  rogue: [undefined, "arcane trickster", "assassin"],
+  rogue: [undefined, "arcane trickster", "assassin", "thief"],
   sorcerer: [undefined, "draconic bloodline", "wild magic"],
   warlock: [undefined, "the fiend", "the archfey", "the great old one"],
   wizard: [undefined, "school of evocation", "school of abjuration", "school of illusion"],
