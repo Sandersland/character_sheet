@@ -20,7 +20,7 @@ const BRANCH_ON = "bg-garnet-700 text-parchment-50 shadow-raised";
 const BRANCH_OFF = "text-parchment-600 hover:text-parchment-800";
 
 export default function AbilityScoreStep() {
-  const { character, setDraft } = useLevelUpStepContext();
+  const { character, setDraft, plan } = useLevelUpStepContext();
   const [branch, setBranch] = useState<Branch>("asi");
 
   const currentScores = (character.abilityScores ?? {}) as unknown as Record<string, number>;
@@ -28,7 +28,8 @@ export default function AbilityScoreStep() {
 
   const asi = useAsiDraft();
 
-  const feats = useFeatCatalog(branch === "feat");
+  // Gate the feat picker on the level being reached, not the current one.
+  const feats = useFeatCatalog(branch === "feat", plan.target.newLevel);
   const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
   const custom = useCustomFeatDraft();
 

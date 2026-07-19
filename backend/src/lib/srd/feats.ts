@@ -1,4 +1,31 @@
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
+import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+
+/** PHB'24 feat categories (local union keeps srd/ a dependency leaf). */
+export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
+
+/**
+ * Whether a feat may be taken via an Ability Score Improvement slot at `level`
+ * (PHB'24 pp. 87-88). Origin feats come from backgrounds and Fighting Style from
+ * class features, so neither is ever offered here; General unlocks at level 4 and
+ * Epic Boon at level 19 unless the feat overrides levelPrerequisite.
+ */
+export function featOfferedForAsiSlot(
+  feat: { category: FeatCategory; levelPrerequisite?: number | null },
+  level: number,
+): boolean {
+  switch (feat.category) {
+    case "origin":
+    case "fighting_style":
+      return false;
+    case "general":
+      return level >= (feat.levelPrerequisite ?? 4);
+    case "epic_boon":
+      return level >= (feat.levelPrerequisite ?? 19);
+    default:
+      return false; // unknown future category — fail safe-closed, never leak feats
+  }
+}
 
 /**
  * Numeric stat targets: summed by deriveFeatBonuses and applied as additive
@@ -72,7 +99,12 @@ export function deriveFeatBonuses(
     for (const imp of (entry.improvements ?? [])) {
       const target = imp.target as NumericFeatImprovementTarget;
       if (!(target in totals)) continue; // unknown / proficiency target — skip gracefully
-      totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
+      // PHB'24: some bonuses (e.g. Alert's initiative) scale with proficiency bonus.
+      if (imp.scaling === "proficiencyBonus") {
+        totals[target] += imp.amount * proficiencyBonusForLevel(appliedLevel);
+      } else {
+        totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
+      }
     }
   }
 

@@ -33,6 +33,7 @@ import {
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
 import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
+import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
 import { normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 
 export class InvalidAdvancementOperationError extends Error {}
@@ -42,6 +43,8 @@ const ABILITY_NAMES = new Set([
 ]);
 
 const ABILITY_CAP = 20;
+// PHB'24: Epic Boon feats raise an ability score to a maximum of 30, not 20.
+const ABILITY_CAP_EPIC_BOON = 30;
 
 /**
  * Computes the effect of applying `abilityDeltas` to `scores`.
@@ -106,6 +109,7 @@ export function reverseAdvancementEffects(
   return { scores: newScores, hitPoints: newHp, initiativeBonus: newInit };
 }
 
+// fallow-ignore-next-line code-duplication -- advancement operation types intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
 export interface TakeAsiOperation {
   type: "takeAsi";
   /** One or two increases summing to exactly 2, each capped at 1 or 2. */
@@ -212,8 +216,11 @@ function resolveHalfFeatBump(args: {
   abilityChoice: string | undefined;
   scores: Record<string, number>;
   missingChoiceMessage: string;
+  /** Score ceiling — 20 for General/custom half-feats, 30 for Epic Boons (PHB'24). */
+  cap?: number;
 }): Record<string, number> {
   const { featName, abilityOptions, abilityIncrease, abilityChoice, scores, missingChoiceMessage } = args;
+  const cap = args.cap ?? ABILITY_CAP;
   const abilityDeltas: Record<string, number> = {};
   if (abilityOptions.length === 0) return abilityDeltas;
 
@@ -226,9 +233,9 @@ function resolveHalfFeatBump(args: {
     );
   }
   const current = scores[abilityChoice] ?? 10;
-  if (current + abilityIncrease > ABILITY_CAP) {
+  if (current + abilityIncrease > cap) {
     throw new InvalidAdvancementOperationError(
-      `takeFeat: ${abilityChoice} would exceed ${ABILITY_CAP} with +${abilityIncrease}`,
+      `takeFeat: ${abilityChoice} would exceed ${cap} with +${abilityIncrease}`,
     );
   }
   abilityDeltas[abilityChoice] = abilityIncrease;
@@ -317,11 +324,20 @@ async function resolveCatalogFeat(
   tx: Prisma.TransactionClient,
   op: TakeFeatOperation,
   scores: Record<string, number>,
+  level: number,
 ): Promise<ResolvedFeat> {
   const catalogFeat = await tx.feat.findUnique({ where: { id: op.featId } });
   if (!catalogFeat) {
     throw new InvalidAdvancementOperationError(
       `Feat not found in catalog: ${op.featId}`,
+    );
+  }
+  const category = catalogFeat.category as FeatCategory;
+  // PHB'24: only General/Epic Boon feats the character's level satisfies may be
+  // taken via an ASI slot — Origin (backgrounds) and Fighting Style (class) can't.
+  if (!featOfferedForAsiSlot({ category, levelPrerequisite: catalogFeat.levelPrerequisite }, level)) {
+    throw new InvalidAdvancementOperationError(
+      `takeFeat: "${catalogFeat.name}" (${category}) is not available at level ${level}`,
     );
   }
   return {
@@ -337,6 +353,7 @@ async function resolveCatalogFeat(
       abilityIncrease: catalogFeat.abilityIncrease,
       abilityChoice: op.abilityChoice,
       scores,
+      cap: category === "epic_boon" ? ABILITY_CAP_EPIC_BOON : ABILITY_CAP,
       missingChoiceMessage: `takeFeat: "${catalogFeat.name}" is a half-feat — provide abilityChoice from: ${catalogFeat.abilityOptions.join(", ")}`,
     }),
   };
@@ -378,7 +395,7 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
   }
 
   const { featName, featDescription, featId: resolvedFeatId, improvements: featImprovements, abilityDeltas } =
-    op.featId ? await resolveCatalogFeat(tx, op, scores) : resolveCustomFeat(op, scores);
+    op.featId ? await resolveCatalogFeat(tx, op, scores, level) : resolveCustomFeat(op, scores);
 
   const { newScores, hpDelta, initDelta } = computeAdvancementEffect(scores, hitDice.total, abilityDeltas);
 
