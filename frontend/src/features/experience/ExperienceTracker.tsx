@@ -99,6 +99,12 @@ export default function ExperienceTracker({
           }
         />
 
+        {!isMaxed && (
+          <p className="text-xs font-semibold text-parchment-600">
+            {(nextLevelThreshold - experiencePoints).toLocaleString()} XP to Level {level + 1}
+          </p>
+        )}
+
         {/* Award XP — primary action */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <input
