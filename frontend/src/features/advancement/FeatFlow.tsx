@@ -122,7 +122,7 @@ export default function FeatFlow({
             </p>
           )}
           {filteredCatalog.length > 0 && (
-            <ul className="max-h-64 overflow-y-auto">
+            <ul className="max-h-64 overflow-y-auto pr-3">
               {filteredCatalog.map((feat) => (
                 <li
                   key={feat.id}
