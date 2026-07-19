@@ -134,3 +134,15 @@ describe("solo session event tagging", () => {
     expect(res.body.journal[0].sessionId).toBe(session.id);
   });
 });
+
+describe("solo session doorway", () => {
+  it("reports liveJoined with campaignId null after a solo start", async () => {
+    const session = await startSoloSession(CHAR_SOLO, "Lone Road");
+
+    const res = await agent().get(`/api/characters/${CHAR_SOLO}/sessions/doorway`);
+    expect(res.status).toBe(200);
+    expect(res.body.campaignId).toBeNull();
+    expect(res.body.kind).toBe("liveJoined");
+    expect(res.body.session).toMatchObject({ id: session.id, joined: true, title: "Lone Road" });
+  });
+});
