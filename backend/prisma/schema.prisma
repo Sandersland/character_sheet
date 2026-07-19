@@ -1505,11 +1505,13 @@ model CharacterEvent {
 }
 
 // One shared play session per campaign sitting; participants join/leave it (#245).
-// At most one `active` session per campaign (enforced in lib, not a DB partial-unique).
+// At most one `active` session per campaign, and at most one `active` solo session
+// per character (campaignId null, #1080) — both enforced in lib, not a DB partial-unique.
 model Session {
   id          String        @id @default(uuid())
-  campaignId  String
-  campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // Null for a character-scoped solo session (#1080).
+  campaignId  String?
+  campaign    Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   status      SessionStatus @default(active)
   startedAt   DateTime      @default(now())
   endedAt     DateTime?

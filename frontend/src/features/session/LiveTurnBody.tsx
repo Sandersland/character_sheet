@@ -60,8 +60,9 @@ export default function LiveTurnBody({
         onOpenLog={onOpenLog}
       />
 
-      {/* Quiet one-line vitals strip below the hero: conditions + exhaustion +
-          rest. HP lives in the sheet header now, so it's not repeated here. */}
+      {/* Quiet one-line vitals strip below the hero: HP (desktop) + conditions +
+          exhaustion + rest. Desktop carries HP here since the header dropped it
+          (#1085); mobile keeps HP in its header, so its strip stays HP-free. */}
       <CombatUtilityStrip character={character} onUpdate={onUpdate} />
     </>
   );

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
+import { enterLiveCombat } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // Tap-to-manage HP sheet (#768): the always-visible session HP strip opens a
@@ -10,7 +11,7 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   const bar = page.getByRole("button", { name: /manage hit points/i });

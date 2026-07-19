@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
@@ -244,5 +244,110 @@ describe("MobileSheetHeader character switcher (#1027)", () => {
     renderHeader();
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
     expect(screen.getByRole("menuitem", { name: /all characters/i })).toBeInTheDocument();
+  });
+});
+
+// #1083: the expanded⇄collapsed swap is animated — the outgoing variant lingers
+// as an inert (aria-hidden) crossfading overlay until the height transition (or a
+// 250ms fallback) finalizes. Reduced-motion + first mount take the instant swap.
+describe("MobileSheetHeader animated collapse (#1083)", () => {
+  // Both raw DOM buttons (in-flow + overlay) vs only the accessible ones.
+  const allSwitchButtons = (c: HTMLElement) =>
+    c.querySelectorAll('button[aria-label="Switch character"]');
+
+  function stubReducedMotion(reduce: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: reduce && query.includes("reduce"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+  }
+
+  function renderToggle(scrolled: boolean) {
+    const tree = (s: boolean) => (
+      <MemoryRouter>
+        <RollProvider>
+          <MobileSheetHeader
+            character={makeCharacter()}
+            scrolled={s}
+            onOpenCapture={vi.fn()}
+            onOpenSessions={vi.fn()}
+            onOpenActivity={vi.fn()}
+            onOpenDelete={vi.fn()}
+          />
+        </RollProvider>
+      </MemoryRouter>
+    );
+    const utils = render(tree(scrolled));
+    return { ...utils, toggle: (s: boolean) => act(() => utils.rerender(tree(s))) };
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reduced motion: swaps to the collapsed bar instantly, with no overlay", () => {
+    stubReducedMotion(true);
+    const { container, toggle } = renderToggle(false);
+    expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
+    toggle(true);
+    expect(allSwitchButtons(container)).toHaveLength(1);
+    expect(screen.queryByText("Human · Fighter 7")).not.toBeInTheDocument();
+  });
+
+  describe("with motion allowed (fake timers)", () => {
+    beforeEach(() => {
+      stubReducedMotion(false);
+      vi.useFakeTimers();
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("mounts an inert overlay during collapse, then finalizes to just the bar", () => {
+      const { container, toggle } = renderToggle(false);
+      toggle(true);
+      // Both variants are in the DOM (in-flow collapsed + outgoing expanded overlay)…
+      expect(allSwitchButtons(container)).toHaveLength(2);
+      // …but the overlay is inert/aria-hidden, so only one is accessible.
+      expect(screen.getAllByRole("button", { name: /switch character/i })).toHaveLength(1);
+      // The outgoing expanded subtitle is still mounted (in the overlay).
+      expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(260));
+      expect(allSwitchButtons(container)).toHaveLength(1);
+      expect(screen.queryByText("Human · Fighter 7")).not.toBeInTheDocument();
+    });
+
+    it("animates the reverse (expand) the same way, settling on the full header", () => {
+      const { container, toggle } = renderToggle(true);
+      // First mount collapsed ⇒ no overlay.
+      expect(allSwitchButtons(container)).toHaveLength(1);
+      toggle(false);
+      expect(allSwitchButtons(container)).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /switch character/i })).toHaveLength(1);
+
+      act(() => vi.advanceTimersByTime(260));
+      expect(allSwitchButtons(container)).toHaveLength(1);
+      expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
+    });
+
+    it("first mount while scrolled shows no overlay (instant)", () => {
+      const { container } = renderToggle(true);
+      expect(allSwitchButtons(container)).toHaveLength(1);
+      expect(screen.queryByText("Human · Fighter 7")).not.toBeInTheDocument();
+    });
+
+    it("a rapid double-toggle keeps at most one overlay and settles correctly", () => {
+      const { container, toggle } = renderToggle(false);
+      toggle(true);
+      toggle(false);
+      // Never more than one outgoing overlay (2 = in-flow + a single overlay).
+      expect(allSwitchButtons(container).length).toBeLessThanOrEqual(2);
+      act(() => vi.advanceTimersByTime(260));
+      expect(allSwitchButtons(container)).toHaveLength(1);
+      expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
+    });
   });
 });

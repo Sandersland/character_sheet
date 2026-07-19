@@ -1,5 +1,5 @@
 import { ChevronDown, Shield } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import MeterBar from "@/components/ui/MeterBar";
@@ -8,8 +8,11 @@ import Popover from "@/components/ui/Popover";
 import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import CharacterSwitcherSheet from "@/features/character-meta/CharacterSwitcherSheet";
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
 import type { Character } from "@/types/character";
+
+type HeaderVariant = "expanded" | "collapsed";
 
 type SheetMenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; separatorBefore?: boolean };
 
@@ -142,6 +145,7 @@ export default function MobileSheetHeader({
 }: MobileSheetHeaderProps) {
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
   const menuItems = buildMenuItems(
     { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete, onOpenCampaignSettings },
@@ -152,15 +156,113 @@ export default function MobileSheetHeader({
   const pill = live ? <LivePill round={liveRound} onGoToCombat={onGoToCombat} /> : null;
   const openSwitcher = () => setSwitcherOpen(true);
 
+  const renderVariant = (variant: HeaderVariant) => {
+    const shared = { character, onUpdate, pill, menuItems, onOpenSwitcher: openSwitcher };
+    return variant === "collapsed" ? <CollapsedBar {...shared} /> : <ExpandedSheetHeader {...shared} />;
+  };
+
   return (
     <>
-      {scrolled ? (
-        <CollapsedBar character={character} onUpdate={onUpdate} pill={pill} menuItems={menuItems} onOpenSwitcher={openSwitcher} />
-      ) : (
-        <ExpandedSheetHeader character={character} onUpdate={onUpdate} pill={pill} menuItems={menuItems} onOpenSwitcher={openSwitcher} />
-      )}
+      <CollapseAnimator
+        variant={scrolled ? "collapsed" : "expanded"}
+        render={renderVariant}
+        reducedMotion={reducedMotion}
+      />
       {switcherOpen && <CharacterSwitcherSheet currentId={character.id} onClose={() => setSwitcherOpen(false)} />}
     </>
+  );
+}
+
+/**
+ * Animates the expanded⇄collapsed swap (#1083): pins the wrapper to the outgoing
+ * height, eases it to the incoming height over 200ms, and crossfades the outgoing
+ * variant out as an inert overlay (kept in normal a11y-hidden until it unmounts).
+ * First mount and reduced-motion take the plain swap. transitionend finalizes,
+ * with a 250ms fallback because that event is swallowed when the md breakpoint is
+ * crossed or the tab is backgrounded (would otherwise leave height pinned).
+ */
+function CollapseAnimator({
+  variant,
+  render,
+  reducedMotion,
+}: {
+  variant: HeaderVariant;
+  render: (v: HeaderVariant) => React.ReactNode;
+  reducedMotion: boolean;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const incomingRef = useRef<HTMLDivElement>(null);
+  const [current, setCurrent] = useState<HeaderVariant>(variant);
+  const [outgoing, setOutgoing] = useState<HeaderVariant | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  const finalize = useCallback(() => {
+    setOutgoing(null);
+    setHeight(null);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (variant === current) return;
+    if (reducedMotion) {
+      setCurrent(variant);
+      return;
+    }
+    // Capture the outgoing height BEFORE the swap so the wrapper can hold it,
+    // then (next effect) ease to the incoming height.
+    setHeight(wrapperRef.current?.offsetHeight ?? null);
+    setOutgoing(current);
+    setCurrent(variant);
+  }, [variant, current, reducedMotion]);
+
+  useLayoutEffect(() => {
+    if (outgoing === null) return;
+    const target = incomingRef.current?.offsetHeight ?? null;
+    const raf = requestAnimationFrame(() => {
+      if (target !== null) setHeight(target);
+    });
+    const fallback = setTimeout(finalize, 250);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(fallback);
+    };
+  }, [outgoing, current, finalize]);
+
+  const animating = outgoing !== null;
+  return (
+    <div
+      ref={wrapperRef}
+      className={
+        animating
+          ? "relative overflow-hidden transition-[height] duration-200 ease-out motion-reduce:transition-none"
+          : "relative"
+      }
+      style={height !== null ? { height } : undefined}
+      onTransitionEnd={(e) => {
+        if (e.propertyName === "height" && e.target === wrapperRef.current) finalize();
+      }}
+    >
+      <div
+        key={`in-${current}`}
+        ref={incomingRef}
+        className={animating ? "animate-[header-in_200ms_ease-out] motion-reduce:animate-none" : undefined}
+      >
+        {render(current)}
+      </div>
+      {outgoing !== null && (
+        <div
+          key={`out-${outgoing}`}
+          // React 18 has no typed `inert` prop; set it imperatively so the
+          // fading-out overlay is untabbable while it lingers.
+          ref={(el) => {
+            el?.setAttribute("inert", "");
+          }}
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 animate-[header-out_200ms_ease-out_forwards] motion-reduce:animate-none"
+        >
+          {render(outgoing)}
+        </div>
+      )}
+    </div>
   );
 }
 

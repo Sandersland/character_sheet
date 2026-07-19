@@ -41,7 +41,7 @@ export default function CharacterSheetBody({
     // <main> keeps the page's main landmark; the inner tabpanel carries the
     // WAI-ARIA tab↔panel wiring (id + aria-labelledby back to the Tabs button,
     // which uses the same `sheet-tab-*` / `sheet-panel-*` id scheme).
-    <main className="mx-auto max-w-6xl px-0 py-0 md:px-6 md:py-8">
+    <main className="mx-auto max-w-6xl px-0 pt-4 pb-0 md:px-6 md:py-8">
       <div
         id={`sheet-panel-${activeTab}`}
         role="tabpanel"

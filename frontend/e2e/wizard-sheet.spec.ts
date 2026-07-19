@@ -10,9 +10,13 @@ test("wizard sheet shows core vitals and derived spell slots", async ({ page }) 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Wizard L5/ }).click();
 
-  // Core vitals live in the always-on banner (AC / HP readouts), visible on any tab.
+  // Core stat cards live in the always-on banner (AC / Initiative / Speed /
+  // Proficiency), visible on any tab; HP moved to the Combat tab (#1085).
   await expect(page.getByRole("heading", { name: "Wizard L5", level: 1 })).toBeVisible();
   await expect(page.getByText("Armor Class")).toBeVisible();
+
+  // HP lives on the Combat tab now, not the header.
+  await page.getByRole("tab", { name: "Combat" }).click();
   await expect(page.getByText("Hit Points")).toBeVisible();
 
   // Slots are derived from class+level+ability scores, so a L5 wizard must show
