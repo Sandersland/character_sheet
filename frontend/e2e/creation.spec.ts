@@ -25,6 +25,12 @@ test("creation: guided flow lands on the sheet with the chosen class", async ({ 
   await page.getByLabel(/^Class/).selectOption({ label: "Fighter" });
   await page.getByLabel("Background").selectOption({ label: "Soldier" });
 
+  // 2024 background ability spread (#1130): Soldier draws from Str/Dex/Con and
+  // grants the Savage Attacker Origin feat. Assign +2 Strength / +1 Dexterity.
+  await expect(page.getByText("Origin feat: Savage Attacker")).toBeVisible();
+  await page.getByLabel(/\+2 to/).selectOption({ label: "Strength" });
+  await page.getByLabel(/\+1 to/).selectOption({ label: "Dexterity" });
+
   // Equipment: choose the starting-gold option and roll a valid amount. The gold
   // roll label carries a ×N multiplier, distinguishing it from the ability "Roll 4d6".
   await page.getByRole("button", { name: /Starting gold/ }).click();
@@ -37,6 +43,8 @@ test("creation: guided flow lands on the sheet with the chosen class", async ({ 
   // The mobile mini-header also carries the class line but is display:none at the
   // desktop test viewport — scope to the visible (banner) copy.
   await expect(page.getByText("Fighter").and(page.locator(":visible")).first()).toBeVisible();
+  // The granted Origin feat rides the Advancements card as a slot-exempt entry.
+  await expect(page.getByText("Savage Attacker").first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
