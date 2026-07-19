@@ -270,6 +270,48 @@ describe("SRD 5.2 catalog values — CHUNK 1 cantrips + L1 (#1132)", () => {
   });
 });
 
+describe("SRD 5.2 catalog values — CHUNK 2 L2 + L3 (#1132)", () => {
+  it("Barkskin becomes a non-concentration bonus-action floor-17 buff", () => {
+    const bark = get("Barkskin");
+    expect(bark.castingTime).toBe("1 bonus action");
+    expect(bark.concentration).toBeFalsy();
+    expect(bark.duration).toBe("1 hour");
+    expect(bark.buffModifier).toBe(17);
+  });
+
+  it("makes Spiritual Weapon concentration with upcast scaling", () => {
+    const sw = get("Spiritual Weapon");
+    expect(sw.concentration).toBe(true);
+    expect(sw.duration).toBe("Concentration, up to 1 minute");
+    expect(sw.upcastDicePerLevel).toBe(1);
+  });
+
+  it("applies L2 class-list + field deltas", () => {
+    expect(get("Misty Step").classes).toEqual(expect.arrayContaining(["warlock"]));
+    expect(get("Misty Step").classes).not.toContain("bard");
+    expect(get("Shatter").classes).not.toContain("cleric");
+    expect(get("Hold Person").classes).toEqual(expect.arrayContaining(["sorcerer", "warlock"]));
+    expect(get("Mirror Image").classes).toContain("bard");
+    const bd = get("Blindness/Deafness");
+    expect(bd.school).toBe("transmutation");
+    expect(bd.range).toBe("120 ft");
+    expect(get("Lesser Restoration").castingTime).toBe("1 bonus action");
+    expect(get("Phantasmal Force").description).toContain("2d8");
+  });
+
+  it("applies L3 class-list + field deltas", () => {
+    expect(get("Counterspell").classes).toEqual(["sorcerer", "warlock", "wizard"]);
+    const mhw = get("Mass Healing Word");
+    expect([mhw.effectDiceCount, mhw.school]).toEqual([2, "abjuration"]);
+    expect(get("Gaseous Form").classes).toContain("warlock");
+    expect(get("Dispel Magic").classes.length).toBe(8);
+    expect(get("Blink").description).toContain("d6");
+    const sending = get("Sending");
+    expect(sending.school).toBe("divination");
+    expect(sending.duration).toBe("Instantaneous");
+  });
+});
+
 describe("global GrantedAbility name-uniqueness", () => {
   // All four sources upsert into GrantedAbility, whose `name` is globally
   // unique — a cross-source collision would make one row silently overwrite

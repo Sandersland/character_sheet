@@ -1013,7 +1013,7 @@ model Spell {
   // Passive-modifier (buff) effect (#363) while active. `buffModifier` is the
   // ABSOLUTE value the AC target reads, never a delta over the base: "ac" is a
   // flat +N add (Shield of Faith 2), "acUnarmoredBase" is the full unarmored base
-  // (Mage Armor 13 → 13+Dex, NOT 3), "acFloor" is the floor (Barkskin 16).
+  // (Mage Armor 13 → 13+Dex, NOT 3), "acFloor" is the floor (Barkskin 17).
   // Duration derives from `concentration` (true → concentration, else
   // while-active). null = not a buff.
   buffTarget         String?

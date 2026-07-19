@@ -37,7 +37,7 @@ export interface CatalogSpell {
   // AC-buff effect (#363): target consumed at the AC-assembly seam. buffModifier
   // is the ABSOLUTE value the target reads, not a delta — a flat add for "ac"
   // (Shield of Faith 2), the full unarmored base for "acUnarmoredBase" (Mage Armor
-  // 13, not 3), the floor for "acFloor" (Barkskin 16).
+  // 13, not 3), the floor for "acFloor" (Barkskin 17).
   buffTarget?: "ac" | "acUnarmoredBase" | "acFloor";
   buffModifier?: number;
 }
@@ -584,18 +584,18 @@ export const SPELLS: CatalogSpell[] = [
     name: "Barkskin",
     level: 2,
     school: "transmutation",
-    castingTime: "1 action",
+    castingTime: "1 bonus action",
     range: "Touch",
-    duration: "Concentration, up to 1 hour",
-    description: "You touch a willing creature. Until the spell ends, the target's skin has a rough, bark-like appearance, and the target's AC can't be less than 16, regardless of what kind of armor it is wearing.",
-    concentration: true,
+    duration: "1 hour",
+    description: "You touch a willing creature. Until the spell ends, the target's skin has a rough, bark-like appearance, and the target's AC can't be less than 17, regardless of what kind of armor it is wearing.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a handful of oak bark" },
-    // AC floor 16 — applied last at the AC-assembly seam, stacking as a floor
-    // over armor/Dex; drops when concentration breaks.
+    // SRD 5.2: floor 17, non-concentration (while-active, ends on long rest /
+    // dismiss). Applied last at the AC-assembly seam, stacking as a floor over
+    // armor/Dex.
     effectKind: "buff",
     buffTarget: "acFloor",
-    buffModifier: 16,
+    buffModifier: 17,
   },
   {
     name: "Scorching Ray",
@@ -636,7 +636,7 @@ export const SPELLS: CatalogSpell[] = [
     range: "Self",
     duration: "Instantaneous",
     description: "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see.",
-    classes: ["wizard", "sorcerer", "bard"],
+    classes: ["wizard", "sorcerer", "warlock"],
     components: { verbal: true, somatic: false, material: false },
   },
   {
@@ -647,7 +647,7 @@ export const SPELLS: CatalogSpell[] = [
     range: "60 ft",
     duration: "Instantaneous",
     description: "A sudden loud ringing noise causes creatures and objects in a 10-ft-radius sphere to take 3d8 thunder damage on a failed Constitution save, half on a success. Inorganic material has disadvantage. At higher levels: +1d8 per slot above 2nd.",
-    classes: ["bard", "sorcerer", "wizard", "cleric"],
+    classes: ["bard", "sorcerer", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a chip of mica" },
     effectKind: "damage",
     effectDiceCount: 3,
@@ -666,7 +666,7 @@ export const SPELLS: CatalogSpell[] = [
     range: "60 ft",
     duration: "Concentration, up to 1 minute",
     description: "Choose a humanoid within range. It must succeed on a Wisdom saving throw or be paralyzed for the duration. At the end of each of its turns, it can repeat the save.",
-    classes: ["bard", "cleric", "druid", "wizard"],
+    classes: ["bard", "cleric", "druid", "sorcerer", "warlock", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a small straight piece of iron" },
     concentration: true,
     attackType: "save",
@@ -676,9 +676,9 @@ export const SPELLS: CatalogSpell[] = [
   {
     name: "Blindness/Deafness",
     level: 2,
-    school: "necromancy",
+    school: "transmutation",
     castingTime: "1 action",
-    range: "30 ft",
+    range: "120 ft",
     duration: "1 minute",
     description: "One creature you can see must succeed on a Constitution save or be blinded or deafened (your choice) for the duration. It repeats the save at the end of each of its turns. At higher levels: +1 target per slot level above 2nd.",
     classes: ["bard", "cleric", "sorcerer", "wizard"],
@@ -712,7 +712,7 @@ export const SPELLS: CatalogSpell[] = [
     name: "Lesser Restoration",
     level: 2,
     school: "abjuration",
-    castingTime: "1 action",
+    castingTime: "1 bonus action",
     range: "Touch",
     duration: "Instantaneous",
     description: "You touch a creature and end one disease or one condition afflicting it: blinded, deafened, paralyzed, or poisoned.",
@@ -727,7 +727,7 @@ export const SPELLS: CatalogSpell[] = [
     range: "Self",
     duration: "1 minute",
     description: "Three illusory duplicates of yourself appear in your space. Each time a creature targets you with an attack, roll to see whether it targets a duplicate (destroyed on a hit) instead.",
-    classes: ["sorcerer", "warlock", "wizard"],
+    classes: ["bard", "sorcerer", "warlock", "wizard"],
     components: { verbal: true, somatic: true, material: false },
   },
   {
@@ -769,7 +769,7 @@ export const SPELLS: CatalogSpell[] = [
     castingTime: "1 action",
     range: "60 ft",
     duration: "Concentration, up to 1 minute",
-    description: "You craft an illusion in the mind of a creature that fails an Intelligence save. It rationalizes the illusion as real; if the illusion can cause harm, it deals 1d6 psychic damage each turn the target believes it real.",
+    description: "You craft an illusion in the mind of a creature that fails an Intelligence save. It rationalizes the illusion as real; if the illusion can cause harm, it deals 2d8 psychic damage each turn the target believes it real.",
     concentration: true,
     classes: ["bard", "sorcerer", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of fleece" },
@@ -780,8 +780,9 @@ export const SPELLS: CatalogSpell[] = [
     school: "evocation",
     castingTime: "1 bonus action",
     range: "60 ft",
-    duration: "1 minute",
-    description: "You create a floating spectral weapon. As a bonus action you can move it and make a melee spell attack, dealing 1d8 + your spellcasting modifier force damage on a hit. At higher levels: +1d8 per two slot levels above 2nd.",
+    duration: "Concentration, up to 1 minute",
+    description: "You create a floating spectral weapon. As a bonus action you can move it and make a melee spell attack, dealing 1d8 + your spellcasting modifier force damage on a hit. At higher levels: +1d8 per slot level above 2nd.",
+    concentration: true,
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
@@ -789,6 +790,7 @@ export const SPELLS: CatalogSpell[] = [
     effectDiceFaces: 8,
     damageType: "force",
     attackType: "attack",
+    upcastDicePerLevel: 1,
   },
   {
     name: "Zone of Truth",
@@ -847,22 +849,22 @@ export const SPELLS: CatalogSpell[] = [
     castingTime: "1 reaction",
     range: "60 ft",
     duration: "Instantaneous",
-    description: "Attempt to interrupt a creature in the process of casting a spell. If the spell is 3rd level or lower, it fails automatically. If it's 4th level or higher, make an ability check (DC = 10 + spell's level).",
-    classes: ["wizard", "sorcerer", "bard", "cleric"],
+    description: "You attempt to interrupt a creature in the process of casting a spell. The target must succeed on a Constitution saving throw (DC 10 + the level of the spell it is casting) or its spell fails and has no effect.",
+    classes: ["sorcerer", "warlock", "wizard"],
     components: { verbal: false, somatic: true, material: false },
   },
   {
     name: "Mass Healing Word",
     level: 3,
-    school: "evocation",
+    school: "abjuration",
     castingTime: "1 bonus action",
     range: "60 ft",
     duration: "Instantaneous",
-    description: "As you call out words of restoration, up to six creatures you choose within range each regain 1d4 + spellcasting modifier HP. At higher levels: +1d4 per slot level above 3rd.",
+    description: "As you call out words of restoration, up to six creatures you choose within range each regain 2d4 + spellcasting modifier HP. At higher levels: +1d4 per slot level above 3rd.",
     classes: ["cleric", "bard"],
     components: { verbal: true, somatic: false, material: false },
     effectKind: "heal",
-    effectDiceCount: 1,
+    effectDiceCount: 2,
     effectDiceFaces: 4,
     upcastDicePerLevel: 1,
   },
@@ -874,7 +876,7 @@ export const SPELLS: CatalogSpell[] = [
     range: "Touch",
     duration: "Concentration, up to 1 hour",
     description: "A willing creature you touch, along with everything it's wearing and carrying, becomes a misty cloud for the duration. It has a flying speed of 10 ft, can pass through small holes, and has resistance to nonmagical damage, but can't attack or cast spells.",
-    classes: ["wizard", "sorcerer"],
+    classes: ["wizard", "sorcerer", "warlock"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of gauze and a wisp of smoke" },
     concentration: true,
   },
@@ -910,7 +912,7 @@ export const SPELLS: CatalogSpell[] = [
     castingTime: "1 action",
     range: "Self",
     duration: "1 minute",
-    description: "At the end of each of your turns, roll a d20. On an 11 or higher, you vanish to the Ethereal Plane until the start of your next turn, then reappear in an unoccupied space you can see within 10 ft.",
+    description: "At the end of each of your turns, roll a d6. On a 4-6, you vanish to the Ethereal Plane until the start of your next turn, then reappear in an unoccupied space you can see within 10 ft.",
     classes: ["sorcerer", "wizard"],
     components: { verbal: true, somatic: true, material: false },
   },
@@ -934,7 +936,7 @@ export const SPELLS: CatalogSpell[] = [
     range: "120 ft",
     duration: "Instantaneous",
     description: "Choose one creature, object, or magical effect. Any spell of 3rd level or lower on it ends. For a higher-level spell, make an ability check using your spellcasting ability (DC 10 + the spell's level). At higher levels: automatically end spells of the slot level or lower.",
-    classes: ["bard", "cleric", "druid", "paladin", "sorcerer", "warlock", "wizard"],
+    classes: ["bard", "cleric", "druid", "paladin", "ranger", "sorcerer", "warlock", "wizard"],
     components: { verbal: true, somatic: true, material: false },
   },
   {
@@ -986,10 +988,10 @@ export const SPELLS: CatalogSpell[] = [
   {
     name: "Sending",
     level: 3,
-    school: "evocation",
+    school: "divination",
     castingTime: "1 action",
     range: "Unlimited",
-    duration: "1 round",
+    duration: "Instantaneous",
     description: "You send a short message of 25 words or less to a creature you are familiar with. It hears the message in its mind, recognizes you, and can reply in kind immediately.",
     classes: ["bard", "cleric", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a short piece of fine copper wire" },

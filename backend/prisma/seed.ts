@@ -14,7 +14,7 @@ import { SHADOW_ARTS } from "./seed/shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
-import { SPELLS, SPELL_RENAMES } from "./seed/spells.js";
+import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
@@ -316,6 +316,19 @@ async function seedBackgrounds(prisma: PrismaClient) {
   }
 }
 
+// Coalesce a spell's boolean-default flags so a toggled-OFF flag actually resets
+// on re-seed (#1132): a bare partial update leaves an absent optional column at
+// its prior value, which stranded Barkskin at concentration=true when SRD 5.2
+// dropped its concentration.
+function spellSeedData(spell: CatalogSpell) {
+  return {
+    ...spell,
+    concentration: spell.concentration ?? false,
+    ritual: spell.ritual ?? false,
+    cantripScaling: spell.cantripScaling ?? false,
+  };
+}
+
 // Seed spell catalog — apply in-place renames FIRST (so the upsert matches the
 // renamed row, not a stranded twin), upsert by unique name, then drop stale rows
 // (2024-removed spells like Toll the Dead). Learned SpellEntry snapshots are
@@ -323,10 +336,11 @@ async function seedBackgrounds(prisma: PrismaClient) {
 async function seedSpells(prisma: PrismaClient) {
   await applySpellRenames(prisma, SPELL_RENAMES);
   for (const spell of SPELLS) {
+    const data = spellSeedData(spell);
     await prisma.spell.upsert({
       where: { name: spell.name },
-      create: spell,
-      update: spell,
+      create: data,
+      update: data,
     });
   }
   const stale = await prisma.spell.findMany({
