@@ -145,8 +145,8 @@ export interface LevelUpPlanResponse {
     isPrimary: boolean;
   };
   steps: LevelUpStep[];
-  /** Subclass spells this level newly grants — shown in Review, applied automatically (#1139). */
-  grantedSpells?: { name: string; level: number }[];
+  /** Subclass spells this level newly grants — always present ([] when none); shown in Review (#1139). */
+  grantedSpells: { name: string; level: number }[];
 }
 
 /**

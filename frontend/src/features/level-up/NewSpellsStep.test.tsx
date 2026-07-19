@@ -56,6 +56,7 @@ function Harness({ step, character }: { step: LevelUpStep; character: Character 
   const plan: LevelUpPlanResponse = {
     target: { className: "wizard", subclass: null, newLevel: 3, isPrimary: true },
     steps: [step],
+    grantedSpells: [],
   };
   return (
     <LevelUpStepContext.Provider value={{ character, draft, setDraft, plan }}>

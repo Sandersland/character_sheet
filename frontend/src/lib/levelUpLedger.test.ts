@@ -24,7 +24,7 @@ function makeCharacter(over?: Partial<Character>): Character {
 }
 
 function makePlan(steps: LevelUpStep[] = [], subclass: string | null = "Champion"): LevelUpPlanResponse {
-  return { target: { className: "Fighter", subclass, newLevel: 8, isPrimary: true }, steps };
+  return { target: { className: "Fighter", subclass, newLevel: 8, isPrimary: true }, steps, grantedSpells: [] };
 }
 
 function rowFor(rows: LedgerRow[], label: string): LedgerRow | undefined {

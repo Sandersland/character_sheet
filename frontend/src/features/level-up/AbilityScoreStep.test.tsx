@@ -36,6 +36,7 @@ const character = {
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: null, newLevel: 8, isPrimary: true },
   steps: [{ kind: "advancement", count: 1 }, { kind: "review" }],
+  grantedSpells: [],
 };
 
 function renderStep(draft: LevelUpDraft = {} as LevelUpDraft) {

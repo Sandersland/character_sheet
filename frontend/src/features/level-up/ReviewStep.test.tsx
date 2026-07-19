@@ -38,6 +38,7 @@ const character = {
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Champion", newLevel: 8, isPrimary: true },
   steps: [],
+  grantedSpells: [],
 };
 
 function renderReview(draft: LevelUpDraft, over?: { character?: Character; plan?: LevelUpPlanResponse }) {

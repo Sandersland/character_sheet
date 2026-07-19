@@ -163,7 +163,7 @@ export function buildLevelUpLedger(
     // them so Review's "applied together" claim covers them too (#1139).
     listRow(
       plan.target.subclass ? `Granted by ${plan.target.subclass}` : "Granted Spells",
-      (plan.grantedSpells ?? []).map((g) => g.name),
+      plan.grantedSpells.map((g) => g.name),
     ),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);
