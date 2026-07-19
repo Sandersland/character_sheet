@@ -31,6 +31,9 @@ interface MobileSheetHeaderProps {
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  /** Opens the Campaign settings sheet (#1087); the ⋮ item shows only when the
+   *  caller passes a handler (gated on campaign attachment upstream). */
+  onOpenCampaignSettings?: () => void;
 }
 
 /** Pulsing garnet live pill — the single live-state indicator (#1026), replacing
@@ -85,7 +88,7 @@ function HpNumbers({ current, max, temp }: { current: number; max: number; temp:
 // Activity/All characters (above Delete). "All characters" (#1027) is the ⋮
 // discoverability fallback for the identity-tap switcher.
 function buildMenuItems(
-  handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete">,
+  handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete" | "onOpenCampaignSettings">,
   onAllCharacters: () => void,
   sessionActions: MobileSheetHeaderProps["sessionActions"],
 ): SheetMenuItem[] {
@@ -93,6 +96,9 @@ function buildMenuItems(
     { label: "＋ Note", onSelect: handlers.onOpenCapture },
     { label: "Sessions", onSelect: handlers.onOpenSessions },
     { label: "Activity", onSelect: handlers.onOpenActivity },
+    ...(handlers.onOpenCampaignSettings
+      ? [{ label: "Campaign settings…", onSelect: handlers.onOpenCampaignSettings }]
+      : []),
     { label: "All characters", onSelect: onAllCharacters, separatorBefore: true },
     ...(sessionActions
       ? [
@@ -122,12 +128,13 @@ export default function MobileSheetHeader({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: MobileSheetHeaderProps) {
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
   const menuItems = buildMenuItems(
-    { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete },
+    { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete, onOpenCampaignSettings },
     () => navigate("/"),
     sessionActions,
   );
