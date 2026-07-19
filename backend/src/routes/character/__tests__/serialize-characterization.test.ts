@@ -248,7 +248,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     // Derive-don't-persist scalars.
     expect(a.level).toBe(5);
     expect(a.proficiencyBonus).toBe(3);
-    expect(a.speed).toBe(30);
+    expect(a.speed).toBe(25); // base 30 − exhaustion 1 (−5 ft×level, SRD 5.2 / #1136)
     expect(a.attacksPerAction).toBe(1); // Extra Attack not until fighter 5? locked as current
     // Unarmored AC = 10 + Dex(+2).
     expect(a.armorClass).toBe(12);
@@ -268,7 +268,6 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     ]);
     expect(a.resources.toolProficienciesKnown).toEqual([{ id: "tp1", name: "Smith's Tools" }]);
     expect(a.resources.disciplinesKnown).toEqual([]);
-    expect(a.resources.fightingStyle).toBeNull();
 
     expect(a.conditions).toEqual({ active: [], exhaustion: 1 });
     expect(a.advancementSlots).toEqual({ total: 1, used: 0 });
@@ -297,13 +296,43 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     ]);
     expect(b.spellcasting.arcana).toEqual([]);
     expect(b.spellcasting.concentratingOn).toBeNull();
-    // Prepared-spell cap (#883): INT mod 3 + level 5 = 8; empty spellbook → 0 prepared.
-    expect(b.spellcasting.preparedSpellLimit).toBe(8);
+    // Prepared-spell cap (SRD 5.2): Wizard L5 table column = 9; empty spellbook → 0 prepared.
+    expect(b.spellcasting.preparedSpellLimit).toBe(9);
     expect(b.spellcasting.preparedSpellCount).toBe(0);
 
     // Single class, no subclass.
     expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5 }]);
     expect(b.conditions).toEqual({ active: [], exhaustion: 0 });
+  });
+
+  // Clamp-on-read (#1127): an over-cap prepared blob renders exactly `limit`
+  // prepared leveled runes (the reconciler trims on write; this is the read-side
+  // safety net for a blob that got ahead of the cap).
+  it("wizard: over-cap prepared blob clamps to exactly the limit on read", async () => {
+    await prisma.character.create({
+      data: {
+        id: "serial-char-overcap", name: "SerialChar Overcap", ownerId: OWNER_ID, alignment: "Neutral",
+        experiencePoints: 6500, initiativeBonus: 0, speed: 30, // Wizard L5 → prepared cap 9
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: ["intelligence"], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        hitPoints: { current: 22, max: 22, temp: 0 }, hitDice: { total: 5, die: "d6" },
+        spellcasting: {
+          slotsUsed: {}, arcanumUsed: {}, concentratingOn: null,
+          spells: Array.from({ length: 12 }, (_, i) => ({
+            id: `oc-${i + 1}`, name: `Overcap ${i + 1}`, level: 1, school: "evocation", prepared: true,
+            castingTime: "1 action", range: "60 ft", duration: "Instantaneous", description: "x",
+          })),
+        },
+        classEntries: { create: [{ name: "wizard", position: 0, level: 5 }] },
+      },
+    });
+    const oc = (await getChar("serial-char-overcap")).body;
+    expect(oc.spellcasting.preparedSpellLimit).toBe(9);
+    expect(oc.spellcasting.preparedSpellCount).toBe(9);
+    // The first 9 stay prepared; entries beyond the cap remain in the book, unprepared.
+    expect(oc.spellcasting.spells.filter((s: { prepared: boolean }) => s.prepared)).toHaveLength(9);
+    expect(oc.spellcasting.spells).toHaveLength(12);
   });
 
   // ── Char C: Warlock 11 / Fighter 1 — multiclass Pact Magic branch ───────────
@@ -324,8 +353,8 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     });
     expect(c.spellcasting.spells).toEqual([]);
     expect(c.spellcasting.concentratingOn).toBeNull();
-    // Known/pact caster only (warlock + non-caster fighter) → no prepared cap.
-    expect(c.spellcasting.preparedSpellLimit).toBeNull();
+    // SRD 5.2: Warlock is now a prepared caster (L11 table = 11); Fighter contributes 0.
+    expect(c.spellcasting.preparedSpellLimit).toBe(11);
     expect(c.spellcasting.preparedSpellCount).toBe(0);
     expect(c.classes).toHaveLength(2);
   });

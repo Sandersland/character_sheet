@@ -58,11 +58,40 @@ interface Persona {
   disciplineName?: string;
   // A dedicated solo campaign to attach to (name); enables live sessions.
   campaignName?: string;
+  // #1131: a caster's level-1 creation picks, by spell name. Counts must match the
+  // class's SRD 5.2 level-1 loadout (resolved to ids in the create body). Every
+  // caster persona must be created legal from #1131 on — omitting yields an empty
+  // book, so realistic casters list their picks here.
+  spells?: { cantripNames: string[]; spellNames: string[] };
 }
 
 const ROSTER: Persona[] = [
   { name: "Smoke Fighter", race: "Human", background: "Soldier", className: "Fighter" },
-  { name: "Wizard L5", race: "Human", background: "Sage", className: "Wizard", experiencePoints: LEVEL_5_XP },
+  {
+    name: "Wizard L5",
+    race: "Human",
+    background: "Sage",
+    className: "Wizard",
+    experiencePoints: LEVEL_5_XP,
+    // Wizard level-1 loadout: 3 cantrips + 4 spells (SRD 5.2).
+    spells: {
+      cantripNames: ["Fire Bolt", "Mage Hand", "Light"],
+      spellNames: ["Magic Missile", "Shield", "Mage Armor", "Burning Hands"],
+    },
+  },
+  {
+    name: "Warlock L1",
+    race: "Human",
+    background: "Sage",
+    className: "Warlock",
+    // Warlock level-1 loadout: 2 cantrips (incl. Eldritch Blast) + 2 spells.
+    // Hideous Laughter (SRD 5.2 name) is warlock-legal; Dissonant Whispers is
+    // now bard-only (#1132), so it can no longer be a Warlock pick.
+    spells: {
+      cantripNames: ["Eldritch Blast", "Chill Touch"],
+      spellNames: ["Charm Person", "Hideous Laughter"],
+    },
+  },
   {
     name: "Battle Master",
     race: "Human",
@@ -182,10 +211,33 @@ async function ensureCampaign(cookie: string, name: string): Promise<string> {
   return id;
 }
 
+// Resolve spell names → catalog ids via GET /api/spells (#1131 create-body picks).
+async function resolveSpellIds(cookie: string, names: string[]): Promise<string[]> {
+  const response = await api(cookie, "/api/spells");
+  if (!response.ok) throw new Error(`Failed to load spells: ${response.status}`);
+  const catalog = (await response.json()) as { id: string; name: string }[];
+  const byName = new Map(catalog.map((s) => [s.name, s.id]));
+  return names.map((n) => {
+    const id = byName.get(n);
+    if (!id) throw new Error(`Spell not found in catalog: ${n}`);
+    return id;
+  });
+}
+
+// The #1131 creation spell/cantrip picks for a caster persona, resolved to ids.
+async function creationSpellPicks(cookie: string, persona: Persona): Promise<{ cantripIds: string[]; spellIds: string[] } | undefined> {
+  if (!persona.spells) return undefined;
+  return {
+    cantripIds: await resolveSpellIds(cookie, persona.spells.cantripNames),
+    spellIds: await resolveSpellIds(cookie, persona.spells.spellNames),
+  };
+}
+
 // Create the base character and return its id. Ability scores are fixed; every
 // level-gated extra is layered on afterward through the same transaction
 // endpoints the app uses, so derived state (slots, subclass eligibility) is exact.
 async function seedCharacterShell(cookie: string, persona: Persona): Promise<string> {
+  const spells = await creationSpellPicks(cookie, persona);
   const response = await api(cookie, "/api/characters", {
     method: "POST",
     body: JSON.stringify({
@@ -195,6 +247,7 @@ async function seedCharacterShell(cookie: string, persona: Persona): Promise<str
       background: persona.background,
       classes: [{ name: persona.className }],
       abilityScores: ABILITY_SCORES,
+      ...(spells ? { spells } : {}),
     }),
   });
   if (!response.ok) {

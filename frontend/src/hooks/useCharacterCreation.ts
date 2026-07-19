@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { createCharacter, fetchItems } from "@/api/client";
@@ -7,11 +7,13 @@ import type { ToolProficiencyChoices } from "@/features/character-create/useTool
 import {
   buildCreatePayload,
   creationMissing,
+  deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
   resolveSelections,
 } from "@/lib/characterCreation";
 import type {
+  CreationBackgroundBonuses,
   CreationPreview,
   CreationSelections,
   CreationSkillChoices,
@@ -36,6 +38,7 @@ export interface CharacterCreation {
   selections: CreationSelections;
   skills: CharacterCreationSkills;
   toolChoices: ToolProficiencyChoices;
+  backgroundBonuses: CreationBackgroundBonuses;
   catalog: Item[];
   preview: CreationPreview;
   missing: string[];
@@ -61,8 +64,22 @@ export function useCharacterCreation(): CharacterCreation {
     fetchItems().then(setCatalog).catch(() => {});
   }, []);
 
+  // #1131: switching class invalidates the chosen spells (different list + counts),
+  // so clear them on an actual change — the ref guards against the initial mount
+  // (and a restored draft), which must keep the persisted picks.
+  const prevClassName = useRef(draft.className);
+  useEffect(() => {
+    if (prevClassName.current !== draft.className) {
+      prevClassName.current = draft.className;
+      if (draft.cantripIds.length > 0 || draft.spellIds.length > 0) {
+        update({ cantripIds: [], spellIds: [] });
+      }
+    }
+  }, [draft.className, draft.cantripIds.length, draft.spellIds.length, update]);
+
   const selections = resolveSelections(reference, draft);
   const skillChoices = deriveSkillChoices(draft, selections);
+  const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   const toolChoices = useToolProficiencyChoices({
     draft,
     selectedClass: selections.class,
@@ -113,6 +130,7 @@ export function useCharacterCreation(): CharacterCreation {
     selections,
     skills: { ...skillChoices, toggle: toggleSkill },
     toolChoices,
+    backgroundBonuses,
     catalog,
     preview: derivePreview(draft, selections),
     missing,

@@ -1,9 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 import AddClassPanel from "@/features/class/AddClassPanel";
 import type { Character, ClassOption } from "@/types/character";
+
+// #1131: picking a class routes into the shared level-up ceremony, so the panel
+// navigates rather than committing an addClass op inline.
+const navigateMock = vi.fn();
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return { ...actual, useNavigate: () => navigateMock };
+});
 
 function makeClass(over: Partial<ClassOption>): ClassOption {
   return {
@@ -50,95 +59,57 @@ const referenceClasses = [
   }),
 ];
 
+function renderPanel(character: Character) {
+  return render(
+    <MemoryRouter>
+      <AddClassPanel character={character} referenceClasses={referenceClasses} busy={false} />
+    </MemoryRouter>,
+  );
+}
+
+beforeEach(() => {
+  navigateMock.mockClear();
+});
+
 describe("AddClassPanel", () => {
   it("gates behind a pending level-up (no trigger, shows a hint) when none is available", () => {
-    render(
-      <AddClassPanel
-        character={makeCharacter({ pendingLevelUps: 0 } as Partial<Character>)}
-        referenceClasses={referenceClasses}
-        busy={false}
-        onAddClass={vi.fn()}
-      />,
-    );
+    renderPanel(makeCharacter({ pendingLevelUps: 0 } as Partial<Character>));
     expect(screen.queryByRole("button", { name: /add a class/i })).not.toBeInTheDocument();
     expect(screen.getByText(/level up to add a class/i)).toBeInTheDocument();
   });
 
   it("collapsed: shows the add-a-class trigger", () => {
-    render(
-      <AddClassPanel
-        character={makeCharacter()}
-        referenceClasses={referenceClasses}
-        busy={false}
-        onAddClass={vi.fn()}
-      />,
-    );
+    renderPanel(makeCharacter());
     expect(screen.getByRole("button", { name: /add a class/i })).toBeInTheDocument();
   });
 
   it("excludes classes the character already has", async () => {
     const user = userEvent.setup();
-    render(
-      <AddClassPanel
-        character={makeCharacter()}
-        referenceClasses={referenceClasses}
-        busy={false}
-        onAddClass={vi.fn()}
-      />,
-    );
+    renderPanel(makeCharacter());
     await user.click(screen.getByRole("button", { name: /add a class/i }));
-    // Fighter is already owned — not offered.
     expect(screen.queryByRole("option", { name: /^Fighter/ })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Wizard/ })).toBeInTheDocument();
   });
 
   it("disables an ineligible class and surfaces its prerequisite", async () => {
     const user = userEvent.setup();
-    render(
-      <AddClassPanel
-        character={makeCharacter()}
-        referenceClasses={referenceClasses}
-        busy={false}
-        onAddClass={vi.fn()}
-      />,
-    );
+    renderPanel(makeCharacter());
     await user.click(screen.getByRole("button", { name: /add a class/i }));
-    // Wisdom/Int/Dex all below 13 here except none — Wizard needs Int 13 (has 10).
     const wizardOption = screen.getByRole("option", { name: /Wizard/ }) as HTMLOptionElement;
     expect(wizardOption.disabled).toBe(true);
     expect(wizardOption.textContent).toMatch(/requires Intelligence 13/i);
   });
 
-  it("adds an eligible class with the average HP method", async () => {
+  it("navigates into the level-up ceremony with ?classId= for an eligible class (#1131)", async () => {
     const user = userEvent.setup();
-    const onAddClass = vi.fn();
     // Dexterity 13 → Rogue is eligible.
     const character = makeCharacter({
-      abilityScores: {
-        strength: 15,
-        dexterity: 13,
-        constitution: 12,
-        intelligence: 10,
-        wisdom: 8,
-        charisma: 10,
-      },
+      abilityScores: { strength: 15, dexterity: 13, constitution: 12, intelligence: 10, wisdom: 8, charisma: 10 },
     } as Partial<Character>);
-    render(
-      <AddClassPanel
-        character={character}
-        referenceClasses={referenceClasses}
-        busy={false}
-        onAddClass={onAddClass}
-      />,
-    );
+    renderPanel(character);
     await user.click(screen.getByRole("button", { name: /add a class/i }));
     await user.selectOptions(screen.getByRole("combobox"), "cls-rogue");
     await user.click(screen.getByRole("button", { name: /^Add class$/i }));
-    expect(onAddClass).toHaveBeenCalledWith({
-      type: "addClass",
-      classId: "cls-rogue",
-      method: "average",
-      roll: undefined,
-    });
+    expect(navigateMock).toHaveBeenCalledWith("/characters/char-1/level-up?classId=cls-rogue");
   });
 });

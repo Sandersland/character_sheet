@@ -49,7 +49,7 @@ const swapCaster = {
 } as unknown as Character;
 
 function plan(steps: LevelUpStep[], className = "wizard"): LevelUpPlanResponse {
-  return { target: { className, subclass: null, newLevel: 3, isPrimary: true }, steps };
+  return { target: { className, subclass: null, newLevel: 3, isPrimary: true }, steps, grantedSpells: [] };
 }
 
 function renderCeremony(c: Character = character) {
@@ -117,7 +117,7 @@ describe("NewSpellsStep in the ceremony", () => {
     await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    expect(await screen.findByText(/No new spells at this level, but you may swap one known spell/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No new spells at this level, but you may swap one prepared spell/i)).toBeInTheDocument();
     // Swap is optional — Continue is enabled with nothing chosen.
     expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
   });

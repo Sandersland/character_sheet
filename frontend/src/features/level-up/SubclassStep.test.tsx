@@ -33,6 +33,7 @@ const fighterReference = {
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: null, newLevel: 3, isPrimary: true },
   steps: [{ kind: "subclass" }],
+  grantedSpells: [],
 };
 
 // Live harness: a real useState draft so aria-checked reflects clicks. Pass a

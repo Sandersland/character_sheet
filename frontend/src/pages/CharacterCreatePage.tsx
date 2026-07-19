@@ -2,12 +2,14 @@ import { Link } from "react-router-dom";
 
 import AbilityScoresSection from "@/features/character-create/AbilityScoresSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
+import BackgroundBonusesSection from "@/features/character-create/BackgroundBonusesSection";
 import Card from "@/components/ui/Card";
 import CreateActions from "@/features/character-create/CreateActions";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import PreviewSection from "@/features/character-create/PreviewSection";
 import SkillSection from "@/features/character-create/SkillSection";
 import Spinner from "@/components/ui/Spinner";
+import SpellSelectionSection from "@/features/character-create/SpellSelectionSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
 import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
 import { useCharacterCreation } from "@/hooks/useCharacterCreation";
@@ -24,6 +26,7 @@ export default function CharacterCreatePage() {
     selections,
     skills,
     toolChoices,
+    backgroundBonuses,
     catalog,
     preview,
     missing,
@@ -75,6 +78,16 @@ export default function CharacterCreatePage() {
 
             <AbilityScoresSection draft={draft} update={update} />
 
+            {backgroundBonuses.applicable ? (
+              <BackgroundBonusesSection
+                // Remount on background switch so the local spread-mode state can't
+                // outlive the cleared assignment and mislead the user (#1130).
+                key={draft.background}
+                bonuses={backgroundBonuses}
+                onChange={(assignment) => update({ backgroundAbilities: assignment })}
+              />
+            ) : null}
+
             <SkillSection
               hasClass={Boolean(selections.class)}
               grantedSkills={skills.granted}
@@ -91,6 +104,16 @@ export default function CharacterCreatePage() {
               selectedToolChoices={toolChoices.selectedToolChoices}
               toggleToolChoice={toolChoices.toggleToolChoice}
             />
+
+            {selections.class?.level1SpellPicks && (
+              <SpellSelectionSection
+                className={draft.className}
+                counts={selections.class.level1SpellPicks}
+                cantripIds={draft.cantripIds}
+                spellIds={draft.spellIds}
+                onChange={update}
+              />
+            )}
 
             <StartingEquipmentSection
               startingEquipment={selections.class?.startingEquipment}

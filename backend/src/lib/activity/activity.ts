@@ -100,7 +100,8 @@ type RevertHandler = (ctx: RevertContext) => Promise<void>;
 
 // Restore hitPoints/hitDice/experiencePoints from before snapshot. Long/short
 // rest also snapshot spellcasting + resources — restore them so undoing a
-// rest re-expends the slots/dice that were cleared.
+// rest re-expends the slots/dice that were cleared. A long rest that recovered
+// exhaustion also snapshots conditions (#1136) — restore the cleared level.
 async function restoreHitPointColumns(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -112,6 +113,7 @@ async function restoreHitPointColumns(
   if (before.experiencePoints !== undefined) updateData.experiencePoints = before.experiencePoints;
   if (before.spellcasting !== undefined) updateData.spellcasting = before.spellcasting;
   if (before.resources !== undefined) updateData.resources = before.resources;
+  if (before.conditions !== undefined) updateData.conditions = before.conditions;
   if (Object.keys(updateData).length === 0) return;
   await tx.character.update({
     where: { id: characterId },

@@ -896,180 +896,67 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
   });
 });
 
-// ── Fighting Style reconciliation suite ───────────────────────────────────────
-// Tests reconcileFightingStyle in level-reconciliation.ts and the read-clamp in
-// serializeCharacter. A pure Fighter keeps its style at every level >= 1, so the
-// reconciler only clears it on a class change (fightingStyleChoiceCount -> 0).
+// ── Fighting Style FEAT reconciliation (#1137) ────────────────────────────────
+// Fighting Style feats live in advancements[] tagged slot:"fightingStyle" and
+// reconcile through reconcileAdvancements' fs partition — independently of the
+// ASI partition and exempt origin feats.
+describe("POST /api/characters/:id/experience — Fighting Style feat reconciliation", () => {
+  const XP_L1 = 0, XP_L2 = 300, XP_L4 = 2700, XP_L5 = 6500;
 
-describe("POST /api/characters/:id/experience — fighting style reconciled on class change", () => {
-  const XP_LVL_5 = 6500;
-
-  let fsFighterClassId: string;
-  let fsWizardClassId: string;
-
-  const FS_FIGHTER_NAME = "Test Fighter (FS Recon Suite)";
-  const FS_WIZARD_NAME = "Test Wizard (FS Recon Suite)";
-
-  beforeAll(async () => {
-    const fc = await prisma.characterClass.upsert({
-      where: { name: FS_FIGHTER_NAME },
-      create: {
-        name: FS_FIGHTER_NAME,
-        hitDie: "d10",
-        savingThrows: ["strength", "constitution"],
-        skillChoiceCount: 2,
-        skillChoices: ["athletics"],
-        isSpellcaster: false,
-      },
-      update: {},
-    });
-    fsFighterClassId = fc.id;
-
-    const wc = await prisma.characterClass.upsert({
-      where: { name: FS_WIZARD_NAME },
-      create: {
-        name: FS_WIZARD_NAME,
-        hitDie: "d6",
-        savingThrows: ["intelligence", "wisdom"],
-        skillChoiceCount: 2,
-        skillChoices: ["arcana"],
-        isSpellcaster: true,
-      },
-      update: {},
-    });
-    fsWizardClassId = wc.id;
+  const fsFeat = () => ({
+    id: "fs-recon-feat", level: 2, kind: "feat" as const, slot: "fightingStyle" as const,
+    abilityDeltas: {}, hpDelta: 0, initDelta: 0,
+    featName: "Defense", featDescription: "d", improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
   });
-
-  afterAll(async () => {
-    await prisma.characterClass.deleteMany({
-      where: { name: { in: [FS_FIGHTER_NAME, FS_WIZARD_NAME] } },
-    });
-  });
+  const resourcesWith = (advancements: unknown[]) => ({
+    used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {},
+    advancements, fightingStyle: null,
+  } as unknown as Prisma.InputJsonValue);
 
   afterEach(async () => {
-    await prisma.character.deleteMany({ where: { name: { startsWith: "FSRecon" } } });
+    await prisma.character.deleteMany({ where: { name: { startsWith: "FSFeatRecon" } } });
   });
 
-  /** Creates a level-5 Fighter (entry name "fighter") with a chosen Defense style. */
-  async function createFighterWithStyle(id: string) {
+  async function create(id: string, entries: { name: string; position: number; level: number }[], xp: number, advancements: unknown[]) {
     await ensureTestOwner(OWNER_ID);
     return prisma.character.create({
       data: {
-        ...BASE_CHARACTER,
-        ownerId: OWNER_ID,
-        id,
-        name: `FSRecon ${id}`,
-        experiencePoints: XP_LVL_5,
-        hitDice: { total: 5, die: "d10", spent: 0 },
-        hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-        spellcasting: Prisma.JsonNull,
-        resources: {
-          used: {},
-          maneuversKnown: [],
-          toolProficienciesKnown: [],
-          advancements: [],
-          fightingStyle: "defense",
-        },
-        classEntries: {
-          create: [{ name: "fighter", classId: fsFighterClassId, position: 0, level: 5 }],
-        },
+        ...BASE_CHARACTER, ownerId: OWNER_ID, id, name: `FSFeatRecon ${id}`,
+        experiencePoints: xp, hitDice: { total: entries.reduce((s, e) => s + e.level, 0), die: "d10", spent: 0 },
+        spellcasting: Prisma.JsonNull, resources: resourcesWith(advancements),
+        classEntries: { create: entries },
       },
     });
   }
 
-  it("clears fightingStyle + emits fightingStyleRemoved when the class is no longer Fighter", async () => {
-    await createFighterWithStyle("test-fs-clear");
-    // Change the class entry to a non-fighter (simulates a class change).
-    await prisma.characterClassEntry.updateMany({
-      where: { characterId: "test-fs-clear" },
-      data: { name: "wizard", classId: fsWizardClassId },
-    });
-
-    // Any XP op fires reconciliation (level unchanged at 5).
-    const res = await postXp("test-fs-clear", { operations: [{ type: "set", value: XP_LVL_5 }] });
+  it("removes a Paladin's Fighting Style feat when it drops below level 2", async () => {
+    await create("fsr-pal21", [{ name: "Paladin", position: 0, level: 2 }], XP_L2, [fsFeat()]);
+    const res = await postXp("fsr-pal21", { operations: [{ type: "set", value: XP_L1 }] });
     expect(res.status).toBe(200);
-    expect(res.body.resources?.fightingStyle ?? null).toBeNull();
-
-    // Persisted state cleared.
-    const row = await prisma.character.findUnique({
-      where: { id: "test-fs-clear" },
-      select: { resources: true },
-    });
-    const stored = row?.resources as { fightingStyle?: string | null } | null;
-    expect(stored?.fightingStyle ?? null).toBeNull();
-
-    // Event emitted under the resources category.
-    const actRes = await getActivity("test-fs-clear");
-    const ev = actRes.body.find((e: { type: string }) => e.type === "fightingStyleRemoved");
-    expect(ev).toBeDefined();
-    expect(ev.category).toBe("resources");
+    expect(res.body.advancements.some((a: { slot?: string }) => a.slot === "fightingStyle")).toBe(false);
+    const act = await getActivity("fsr-pal21");
+    expect(act.body.some((e: { type: string }) => e.type === "advancementsReconciled")).toBe(true);
   });
 
-  it("keeps fightingStyle on an XP op while the character is still a Fighter", async () => {
-    await createFighterWithStyle("test-fs-keep");
-    const res = await postXp("test-fs-keep", { operations: [{ type: "set", value: XP_LVL_5 }] });
+  it("trims the ASI partition on level-down while keeping the fs feat and origin feats", async () => {
+    const asi = { id: "asi-x", level: 4, kind: "asi" as const, abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 };
+    const origin = { id: "origin-x", level: 1, kind: "feat" as const, origin: true as const, abilityDeltas: {}, hpDelta: 0, initDelta: 0, featName: "Tough", featDescription: "o", improvements: [] };
+    await create("fsr-pal42", [{ name: "Paladin", position: 0, level: 4 }], XP_L4, [origin, asi, fsFeat()]);
+    const res = await postXp("fsr-pal42", { operations: [{ type: "set", value: XP_L2 }] });
     expect(res.status).toBe(200);
-    expect(res.body.resources?.fightingStyle).toBe("defense");
+    const adv = res.body.advancements as { kind: string; slot?: string; origin?: boolean }[];
+    expect(adv.some((a) => a.kind === "asi")).toBe(false);          // ASI over cap removed
+    expect(adv.some((a) => a.slot === "fightingStyle")).toBe(true); // fs kept (fs cap 1 at L2)
+    expect(adv.some((a) => a.origin)).toBe(true);                    // origin exempt
   });
 
-  it("undo restores the cleared fighting style", async () => {
-    await createFighterWithStyle("test-fs-undo");
-    await prisma.characterClassEntry.updateMany({
-      where: { characterId: "test-fs-undo" },
-      data: { name: "wizard", classId: fsWizardClassId },
-    });
-    const resetRes = await postXp("test-fs-undo", { operations: [{ type: "set", value: XP_LVL_5 }] });
-    expect(resetRes.status).toBe(200);
-
-    const activityRes = await getActivity("test-fs-undo");
-    const batchId: string = activityRes.body[0]?.batchId;
-    expect(batchId).toBeTruthy();
-
-    const undoRes = await postUndo("test-fs-undo", batchId);
-    expect(undoRes.status).toBe(200);
-
-    const row = await prisma.character.findUnique({
-      where: { id: "test-fs-undo" },
-      select: { resources: true },
-    });
-    const stored = row?.resources as { fightingStyle?: string | null } | null;
-    expect(stored?.fightingStyle).toBe("defense");
-  });
-
-  it("read-clamp serves null fightingStyle for a non-Fighter with a stored style (no XP op)", async () => {
-    await ensureTestOwner(OWNER_ID);
-    await prisma.character.create({
-      data: {
-        ...BASE_CHARACTER,
-        ownerId: OWNER_ID,
-        id: "test-fs-clamp",
-        name: "FSRecon test-fs-clamp",
-        experiencePoints: XP_LVL_5,
-        hitDice: { total: 5, die: "d6", spent: 0 },
-        hitPoints: { current: 25, max: 25, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-        spellcasting: Prisma.JsonNull,
-        resources: {
-          used: {},
-          maneuversKnown: [],
-          toolProficienciesKnown: [],
-          advancements: [],
-          fightingStyle: "defense",
-        },
-        classEntries: {
-          create: [{ name: "wizard", classId: fsWizardClassId, position: 0, level: 5 }],
-        },
-      },
-    });
-
-    const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/characters/test-fs-clamp");
+  it("removes the fs feat when the multiclass Fighter entry vanishes on level-down", async () => {
+    await create("fsr-mc", [
+      { name: "Wizard", position: 0, level: 4 },
+      { name: "Fighter", position: 1, level: 1 },
+    ], XP_L5, [fsFeat()]);
+    const res = await postXp("fsr-mc", { operations: [{ type: "set", value: XP_L4 }] });
     expect(res.status).toBe(200);
-    expect(res.body.resources?.fightingStyle ?? null).toBeNull();
-    // DB still holds the stale value (write-side reconcile has not run).
-    const row = await prisma.character.findUnique({
-      where: { id: "test-fs-clamp" },
-      select: { resources: true },
-    });
-    const stored = row?.resources as { fightingStyle?: string | null } | null;
-    expect(stored?.fightingStyle).toBe("defense");
+    expect(res.body.advancements.some((a: { slot?: string }) => a.slot === "fightingStyle")).toBe(false);
   });
 });

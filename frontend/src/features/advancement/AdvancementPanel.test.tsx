@@ -29,6 +29,7 @@ describe("AdvancementPanel accessibility", () => {
         currentScores={SCORES}
         slotsRemaining={2}
         busy={false}
+        characterLevel={4}
         skillNames={[]}
         onSubmit={noop}
       />

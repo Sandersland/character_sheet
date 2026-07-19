@@ -18,7 +18,14 @@ export interface RollCategory {
 
 export interface ResolvedRollMode {
   mode: RollMode;
-  /** The modifiers that applied to this roll — drives the source chip. Empty on a manual override. */
+  /**
+   * Sum of the flat d20 modifiers that applied to this roll (#1136, e.g.
+   * exhaustion's −2×level). Folded into the rolled spec's modifier by the roll
+   * surface; deliberately OUTSIDE the adv/dis cancel math — a flat penalty
+   * survives a manual override, which only flips the adv/dis axis.
+   */
+  modifier: number;
+  /** The modifiers that applied to this roll — drives the source chip. On a manual override, only the flat sources survive. */
   sources: RollModifier[];
 }
 
@@ -29,17 +36,26 @@ function applies(mod: RollModifier, category: RollCategory): boolean {
   return true;
 }
 
+function sumFlat(mods: RollModifier[]): number {
+  return mods.reduce((sum, m) => (m.mode === "flat" ? sum + m.modifier : sum), 0);
+}
+
 export function resolveRollMode(
   rollModifiers: RollModifier[],
   category: RollCategory,
   manualMode: RollMode = "normal",
 ): ResolvedRollMode {
-  // The manual toggle short-circuits every auto grant (acceptance criterion #4).
-  if (manualMode !== "normal") return { mode: manualMode, sources: [] };
+  const applicable = rollModifiers.filter((m) => applies(m, category));
+  const flat = applicable.filter((m) => m.mode === "flat");
+  const modifier = sumFlat(flat);
 
-  const sources = rollModifiers.filter((m) => applies(m, category));
-  const hasAdvantage = sources.some((m) => m.mode === "advantage");
-  const hasDisadvantage = sources.some((m) => m.mode === "disadvantage");
+  // The manual toggle short-circuits the auto adv/dis grants (acceptance
+  // criterion #4) but NOT the flat penalty — an override picks a die-count axis,
+  // not a bonus. Only the flat sources survive.
+  if (manualMode !== "normal") return { mode: manualMode, modifier, sources: flat };
+
+  const hasAdvantage = applicable.some((m) => m.mode === "advantage");
+  const hasDisadvantage = applicable.some((m) => m.mode === "disadvantage");
   const mode: RollMode =
     hasAdvantage && hasDisadvantage
       ? "normal"
@@ -48,13 +64,25 @@ export function resolveRollMode(
         : hasDisadvantage
           ? "disadvantage"
           : "normal";
-  return { mode, sources };
+  return { mode, modifier, sources: applicable };
 }
 
-// Short "why" text for the resolved chip, e.g. "disadvantage — Poisoned" or,
-// when adv + disadv cancel, "normal — Rage, Poisoned". Empty when nothing applied.
+// Signed display for a flat modifier, e.g. "+2" / "−4" (Unicode minus).
+function formatSigned(n: number): string {
+  return n >= 0 ? `+${n}` : `−${Math.abs(n)}`;
+}
+
+// Short "why" text for the resolved chip: an adv/dis word and/or a flat modifier,
+// then the source names — e.g. "disadvantage — Poisoned", "−4 — Exhaustion",
+// "disadvantage −4 — Poisoned, Exhaustion", or "normal — Rage, Poisoned" when
+// adv + disadv cancel. Empty when nothing applied.
 export function rollModeChip(resolved: ResolvedRollMode): string {
   if (resolved.sources.length === 0) return "";
   const names = [...new Set(resolved.sources.map((s) => s.source))].join(", ");
-  return `${resolved.mode} — ${names}`;
+  const parts = [
+    ...(resolved.mode !== "normal" ? [resolved.mode] : []),
+    ...(resolved.modifier !== 0 ? [formatSigned(resolved.modifier)] : []),
+  ];
+  const prefix = parts.length > 0 ? parts.join(" ") : resolved.mode;
+  return `${prefix} — ${names}`;
 }

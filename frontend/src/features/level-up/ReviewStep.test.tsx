@@ -38,6 +38,7 @@ const character = {
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Champion", newLevel: 8, isPrimary: true },
   steps: [],
+  grantedSpells: [],
 };
 
 function renderReview(draft: LevelUpDraft, over?: { character?: Character; plan?: LevelUpPlanResponse }) {
@@ -94,14 +95,17 @@ describe("ReviewStep", () => {
     expect(await screen.findByText("Homebrew Strike")).toBeInTheDocument();
   });
 
-  it("lists tool proficiencies by name and the fighting-style label", () => {
+  it("lists tool proficiencies by name and resolves the fighting-style feat name", async () => {
+    vi.mocked(fetchFeats).mockResolvedValue([
+      { id: "archery", name: "Archery", description: "" },
+    ] as unknown as Awaited<ReturnType<typeof fetchFeats>>);
     renderReview({
       hp: { method: "average" },
       toolProficiencies: [{ type: "learnToolProficiency", name: "Smith's Tools" }],
-      fightingStyle: "archery",
+      fightingStyleFeat: { type: "takeFeat", featId: "archery", slot: "fightingStyle" },
     });
     expect(screen.getByText("Smith's Tools")).toBeInTheDocument();
-    expect(screen.getByText("Archery")).toBeInTheDocument();
+    expect(await screen.findByText("Archery")).toBeInTheDocument();
   });
 
   it("fetches nothing for a plain HP + ASI draft", () => {
@@ -137,6 +141,16 @@ describe("ReviewStep", () => {
     );
     expect(screen.getByText("Forgotten")).toBeInTheDocument();
     expect(screen.getByText("Charm Person")).toBeInTheDocument();
+  });
+
+  it("lists incoming granted spells from the plan under the granting subclass (#1139)", () => {
+    renderReview(
+      { hp: { method: "average" } },
+      { plan: { ...plan, grantedSpells: [{ name: "Lesser Restoration", level: 2 }, { name: "Zone of Truth", level: 2 }] } },
+    );
+    expect(screen.getByText("Granted by Champion")).toBeInTheDocument();
+    expect(screen.getByText("Lesser Restoration")).toBeInTheDocument();
+    expect(screen.getByText("Zone of Truth")).toBeInTheDocument();
   });
 
   it("has no axe violations", async () => {

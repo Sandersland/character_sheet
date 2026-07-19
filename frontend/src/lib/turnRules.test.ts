@@ -52,31 +52,32 @@ describe("canTwoWeaponFight", () => {
     expect(canTwoWeaponFight([noDetail, noDetail])).toBe(false);
   });
 
-  // Two-Weapon Fighting style relaxes the light restriction (#732).
-  it("non-light pair → false without the Two-Weapon Fighting style", () => {
+  // The Two-Weapon Fighting feat's offhandAbilityDamage improvement (#1137, was a
+  // style scalar in #732) relaxes the light restriction — passed as a boolean now.
+  it("non-light pair → false without the Two-Weapon Fighting improvement", () => {
     expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)])).toBe(false);
-    // An unrelated style does not relax it either.
-    expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], "dueling")).toBe(false);
+    // An unrelated feat (no offhand-ability-damage improvement) does not relax it.
+    expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], false)).toBe(false);
   });
 
-  it("non-light pair → true WITH the Two-Weapon Fighting style", () => {
+  it("non-light pair → true WITH the Two-Weapon Fighting improvement", () => {
     expect(
-      canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], "twoWeaponFighting"),
+      canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], true),
     ).toBe(true);
-    // A mixed pair also qualifies with the style.
+    // A mixed pair also qualifies with the improvement.
     expect(
-      canTwoWeaponFight([makeWeapon(true), makeWeapon(false)], "twoWeaponFighting"),
+      canTwoWeaponFight([makeWeapon(true), makeWeapon(false)], true),
     ).toBe(true);
   });
 
-  it("the style still requires ≥2 equipped weapons", () => {
-    expect(canTwoWeaponFight([makeWeapon(false)], "twoWeaponFighting")).toBe(false);
-    expect(canTwoWeaponFight([], "twoWeaponFighting")).toBe(false);
+  it("the improvement still requires ≥2 equipped weapons", () => {
+    expect(canTwoWeaponFight([makeWeapon(false)], true)).toBe(false);
+    expect(canTwoWeaponFight([], true)).toBe(false);
   });
 
-  it("two light weapons stay valid regardless of style (null / present)", () => {
-    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], null)).toBe(true);
-    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], "twoWeaponFighting")).toBe(true);
+  it("two light weapons stay valid regardless of the improvement", () => {
+    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], false)).toBe(true);
+    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], true)).toBe(true);
   });
 });
 

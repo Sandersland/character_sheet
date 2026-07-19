@@ -33,13 +33,17 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
   return { lookup: (id) => map?.[id], pending: !!fetcher && map === null };
 }
 
+// fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/disciplines/tools/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
 function useLedgerResolvers(draft: LevelUpDraft): { resolvers: LedgerResolvers; resolving: boolean } {
   const maneuvers = useCatalogNames(draft.maneuvers?.length ? fetchManeuvers : undefined);
   const disciplines = useCatalogNames(draft.disciplines?.length ? fetchDisciplines : undefined);
   const spells = useCatalogNames(draft.spellsLearned?.length ? fetchSpells : undefined);
   // Any taken feat fetches the catalog — a custom feat resolves by its own name,
-  // so this needs no second (featId) guard.
-  const feats = useCatalogNames(draft.advancement?.type === "takeFeat" ? fetchFeats : undefined);
+  // so this needs no second (featId) guard. A Fighting Style feat (#1137) resolves
+  // through the same catalog.
+  const feats = useCatalogNames(
+    draft.advancement?.type === "takeFeat" || draft.fightingStyleFeat ? fetchFeats : undefined,
+  );
   return {
     resolvers: { maneuver: maneuvers.lookup, discipline: disciplines.lookup, spell: spells.lookup, feat: feats.lookup },
     resolving: [maneuvers, disciplines, spells, feats].some((c) => c.pending),

@@ -25,22 +25,22 @@ export const CONDITION_LABELS: Record<ConditionKey, string> = {
   unconscious: "Unconscious",
 };
 
-/** Short effect summaries for the picker (shortened from PHB Appendix A). */
+/** Short effect summaries for the picker (shortened from SRD 5.2). */
 export const CONDITION_DESCRIPTIONS: Record<ConditionKey, string> = {
   blinded: "Can't see; auto-fail sight checks. Attacks against have advantage; its attacks have disadvantage.",
-  charmed: "Can't attack the charmer; charmer has advantage on social checks.",
+  charmed: "Can't attack the charmer or target it with damaging abilities/effects; charmer has advantage on social checks.",
   deafened: "Can't hear; auto-fail hearing checks.",
   frightened: "Disadvantage on checks/attacks while the source is in sight; can't move closer to it.",
-  grappled: "Speed becomes 0; ends if grappler is incapacitated or moved away.",
-  incapacitated: "Can't take actions or reactions.",
-  invisible: "Can't be seen unaided. Attacks against have disadvantage; its attacks have advantage.",
-  paralyzed: "Incapacitated, can't move/speak; auto-fail STR/DEX saves; melee hits are crits.",
-  petrified: "Turned to stone; incapacitated, unaware; resists all damage; immune to poison/disease.",
+  grappled: "Speed 0 (can't increase); disadvantage on attacks against targets other than the grappler; grappler can drag/carry it.",
+  incapacitated: "No action, Bonus Action, or Reaction; Concentration is broken; can't speak; disadvantage on Initiative.",
+  invisible: "Can't be seen unaided; equipment concealed. Advantage on Initiative and its attacks; attacks against have disadvantage.",
+  paralyzed: "Incapacitated, Speed 0; auto-fail STR/DEX saves; attacks against have advantage; melee hits are crits.",
+  petrified: "Turned to stone; incapacitated, Speed 0; auto-fail STR/DEX saves; resists all damage; immune to the Poisoned condition.",
   poisoned: "Disadvantage on attack rolls and ability checks.",
-  prone: "Disadvantage on attacks. Melee against has advantage; ranged has disadvantage.",
+  prone: "Can only crawl or spend half Speed to stand. Disadvantage on attacks; melee against has advantage, ranged has disadvantage.",
   restrained: "Speed 0; disadvantage on attacks & DEX saves; attacks against have advantage.",
-  stunned: "Incapacitated, can't move; auto-fail STR/DEX saves; attacks against have advantage.",
-  unconscious: "Incapacitated, unaware, drops items, falls prone; auto-fail STR/DEX saves; melee hits are crits.",
+  stunned: "Incapacitated; auto-fail STR/DEX saves; attacks against have advantage.",
+  unconscious: "Incapacitated & prone, drops items, unaware; Speed 0; auto-fail STR/DEX saves; attacks against have advantage; melee hits are crits.",
 };
 
 /** Canonical alphabetical order for iterating conditions in pickers/strips. */
@@ -66,25 +66,20 @@ export function conditionLabel(key: string): string {
 /** Maximum exhaustion level (6 = death). */
 export const EXHAUSTION_MAX = 6;
 
-/** Cumulative effect text per exhaustion level (index 0 = no exhaustion). */
-const EXHAUSTION_EFFECTS: readonly string[] = [
-  "No exhaustion.",
-  "Disadvantage on ability checks.",
-  "Speed halved.",
-  "Disadvantage on attack rolls and saving throws.",
-  "Hit point maximum halved.",
-  "Speed reduced to 0.",
-  "Death.",
-];
-
 /** Short label for an exhaustion level, e.g. "Exhaustion 3". */
 export function exhaustionLabel(level: number): string {
   const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
   return `Exhaustion ${clamped}`;
 }
 
-/** Cumulative effect text for an exhaustion level, clamped to 0–6. */
+/**
+ * Effect text for an exhaustion level, clamped to 0–6 (SRD 5.2 / #1136). Each
+ * level is a flat −2 on d20 Tests and −5 ft Speed; level 6 is death. The rules
+ * themselves live in backend lib/srd — this is the presentation string.
+ */
 export function exhaustionEffect(level: number): string {
   const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
-  return EXHAUSTION_EFFECTS[clamped];
+  if (clamped === 0) return "No exhaustion.";
+  if (clamped === EXHAUSTION_MAX) return "Death.";
+  return `−${2 * clamped} on d20 Tests; Speed −${5 * clamped} ft.`;
 }

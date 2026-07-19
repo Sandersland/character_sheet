@@ -16,11 +16,7 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";
-import {
-  toolsByCategory,
-  isKnownFightingStyle,
-  type FightingStyleKey,
-} from "@/lib/srd/srd.js";
+import { toolsByCategory } from "@/lib/srd/srd.js";
 
 // status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidResourceOperationError extends Error {
@@ -101,6 +97,8 @@ export interface FeatImprovement {
   perLevel?: boolean;
   /** Required for keyed targets (skillProficiency, savingThrowProficiency). */
   key?: string;
+  /** PHB'24: "proficiencyBonus" multiplies amount by PB at read time (e.g. Alert). */
+  scaling?: "proficiencyBonus";
 }
 
 /**
@@ -108,10 +106,17 @@ export interface FeatImprovement {
  * Stores the deltas applied so reversal subtracts exactly what was added —
  * never recomputes from ability scores, which may have changed since.
  */
+// fallow-ignore-next-line code-duplication -- FeatImprovement/AdvancementEntry intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
 export interface AdvancementEntry {
   id: string;                            // per-character entry UUID (operation target)
   level: number;                         // character level when taken (informational)
   kind: "asi" | "feat";
+  /** PHB'24 Origin feat granted by a background (#1130): exempt from the ASI
+   *  slot cap and never reversed on level-down; can't be removed via the route. */
+  origin?: true;
+  /** Fighting Style feat (#1137): consumes a `fightingStyle` slot, not an ASI
+   *  slot. Absent ⇒ ASI-slot feat/ASI. Both partitions live in this one array. */
+  slot?: "fightingStyle";
   /** The raw score increases applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
   abilityDeltas: Record<string, number>;
   /** HP added to hitPoints.max/current (CON-mod change × hitDice.total). */
@@ -147,16 +152,9 @@ export interface ResourcesMutableState {
    * adds a subclass declaration + seed rows — no new state key here.
    */
   choicesKnown: Record<string, ChoiceEntry[]>;
-  /** Ability Score Improvements and feats taken, in the order chosen. */
+  /** Ability Score Improvements and feats taken, in the order chosen. Fighting
+   *  Style feats (#1137) live here tagged slot:"fightingStyle" — no separate key. */
   advancements: AdvancementEntry[];
-  /**
-   * The chosen Fighting Style key (Fighter L1 feature), or null if unchosen /
-   * not entitled. Only the key is persisted — the mechanical effect (Defense
-   * +1 AC, Archery +2 ranged attack) is derived at read time in
-   * serializeCharacter. Level-gated: reconciled to null on level-down via
-   * reconcileFightingStyle when the character can no longer choose a style.
-   */
-  fightingStyle: FightingStyleKey | null;
 }
 
 // Subclass "choose N" cap policy: single-sourced level-gating for choicesKnown, shared by reconcile-on-write
@@ -178,6 +176,45 @@ export function clampChoicesToCaps(
   return { clamped, removedCount };
 }
 
+// Single source of the ASI-slot cap policy (#1130/#1137), shared by every
+// clamp-on-read and reconcile-on-write site. Three partitions in one array:
+// Origin feats (background grants) are always kept and consume no slot; Fighting
+// Style feats (slot "fightingStyle", #1137) keep the earliest `fightingStyleSlotTotal`
+// against their OWN cap; every other ASI/feat keeps the earliest `slotTotal`. Each
+// partition trims LIFO (the tail beyond its cap becomes `excess`). `kept` preserves
+// the original order; `usedSlots`/`usedFightingStyleSlots` count the kept
+// slot-consuming entries of each partition. fightingStyleSlotTotal defaults to
+// Infinity so non-reconcile callers (HP/concentration feat-bonus reads) keep every
+// fs feat without trimming — only the serialize clamp + reconciler pass the real cap.
+export function splitAdvancementsBySlotCap(
+  advancements: AdvancementEntry[],
+  slotTotal: number,
+  fightingStyleSlotTotal = Number.POSITIVE_INFINITY,
+): { kept: AdvancementEntry[]; excess: AdvancementEntry[]; usedSlots: number; usedFightingStyleSlots: number } {
+  const kept: AdvancementEntry[] = [];
+  const excess: AdvancementEntry[] = [];
+  let usedSlots = 0;
+  let usedFightingStyleSlots = 0;
+  for (const entry of advancements) {
+    if (entry.origin) {
+      kept.push(entry);
+    } else if (entry.slot === "fightingStyle") {
+      if (usedFightingStyleSlots < fightingStyleSlotTotal) {
+        kept.push(entry);
+        usedFightingStyleSlots++;
+      } else {
+        excess.push(entry);
+      }
+    } else if (usedSlots < slotTotal) {
+      kept.push(entry);
+      usedSlots++;
+    } else {
+      excess.push(entry);
+    }
+  }
+  return { kept, excess, usedSlots, usedFightingStyleSlots };
+}
+
 // Normalizer: tolerant of null (character has never used any resources) and future schema
 // additions. Mirror of normalizeSpellcastingMutable.
 
@@ -190,14 +227,9 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
       toolProficienciesKnown: [],
       choicesKnown: {},
       advancements: [],
-      fightingStyle: null,
     };
   }
   const obj = json as Record<string, unknown>;
-  // Tolerate null/unknown: drop a persisted fighting style that isn't a known key.
-  const rawStyle = obj.fightingStyle;
-  const fightingStyle: FightingStyleKey | null =
-    typeof rawStyle === "string" && isKnownFightingStyle(rawStyle) ? rawStyle : null;
   const rawChoices = obj.choicesKnown;
   const choicesKnown: Record<string, ChoiceEntry[]> =
     rawChoices && typeof rawChoices === "object" && !Array.isArray(rawChoices)
@@ -210,7 +242,6 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
     toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
     choicesKnown,
     advancements: (obj.advancements as AdvancementEntry[]) ?? [],
-    fightingStyle,
   };
 }
 
@@ -227,7 +258,6 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
     toolProficienciesKnown: state.toolProficienciesKnown,
     choicesKnown: state.choicesKnown,
     advancements: state.advancements,
-    fightingStyle: state.fightingStyle,
   } as unknown as Prisma.InputJsonValue;
 }
 
@@ -255,7 +285,6 @@ export function snapshotResources(state: ResourcesMutableState): ResourcesMutabl
       // treated as immutable snapshots.
       improvements: a.improvements ? [...a.improvements] : undefined,
     })),
-    fightingStyle: state.fightingStyle,
   };
 }
 
@@ -433,6 +462,7 @@ function applyRestoreResourceOp(
   };
 }
 
+// fallow-ignore-next-line complexity -- pre-existing maneuver-validation branches (dedup/catalog/count); unchanged by #1137, CRAP re-estimated after the fightingStyle-scalar export removal
 async function applyLearnManeuverOp(
   tx: Prisma.TransactionClient,
   state: ResourcesMutableState,

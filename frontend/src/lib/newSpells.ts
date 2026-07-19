@@ -9,25 +9,34 @@ export interface NewSpellsMeta {
   count: number;
   maxSpellLevel: number;
   magicalSecrets: boolean;
-  /** #1101: this known caster may swap one known spell this level-up. */
+  /** #1101/#1127: an onLevelUp-cadence caster may swap one prepared spell this level-up. */
   canSwap: boolean;
+  /** #1131: new cantrips to pick this level (0 when the cantrips-known column is flat). */
+  cantrips: number;
 }
 
-/** Safe reads of the newSpells step: count, the derived ceiling, secrets, and swap flags. */
+/** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, and cantrip count. */
 export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
   const max = step.meta?.maxSpellLevel;
+  const cantrips = step.meta?.cantrips;
   return {
     count: step.count ?? 0,
     maxSpellLevel: typeof max === "number" ? max : 0,
     magicalSecrets: step.meta?.magicalSecrets === true,
     canSwap: step.meta?.canSwap === true,
+    cantrips: typeof cantrips === "number" ? cantrips : 0,
   };
 }
 
-/** Known-spell swap targets (#1101): a user-learned (source null) leveled spell — not a cantrip or granted/item spell. */
+/** Swappable prepared spells (#1101/#1127): a user-learned (source null) leveled spell — not a cantrip or granted/item spell. */
 export function swappableKnownSpells(spells: Spell[]): Spell[] {
   return spells.filter((s) => s.source == null && s.level > 0);
 }
+
+// Bard Magical Secrets (SRD 5.2): from level 10, picks may come from any of these
+// spell lists (not the whole multiverse as in 2014). The backend flags the level;
+// this is the display filter for the picker, mirroring the class-list filter below.
+const MAGICAL_SECRETS_LISTS = ["bard", "cleric", "druid", "wizard"];
 
 /**
  * Toggle the single optional swap forget (#1101). Selecting sets/replaces the one
@@ -49,20 +58,23 @@ export function toggleForgetSpell(
 
 /**
  * Catalog spells learnable at this level: a leveled spell (cantrips excluded) at
- * or below the ceiling, on the class's list — unless Magical Secrets waives the
- * class filter (any list, still level-gated).
+ * or below the ceiling, on the class's list — unless Magical Secrets broadens the
+ * filter to the Bard/Cleric/Druid/Wizard lists (still level-gated).
  */
 export function eligibleNewSpells(
   catalog: CatalogSpell[] | null,
   opts: { className: string; maxSpellLevel: number; magicalSecrets: boolean },
 ): CatalogSpell[] {
   const className = opts.className.toLowerCase();
-  return (catalog ?? []).filter(
-    (s) =>
-      s.level >= 1 &&
-      s.level <= opts.maxSpellLevel &&
-      (opts.magicalSecrets || s.classes.includes(className)),
-  );
+  const onList = (s: CatalogSpell) =>
+    opts.magicalSecrets ? s.classes.some((c) => MAGICAL_SECRETS_LISTS.includes(c)) : s.classes.includes(className);
+  return (catalog ?? []).filter((s) => s.level >= 1 && s.level <= opts.maxSpellLevel && onList(s));
+}
+
+/** Catalog cantrips (level 0) on the class's list — the level-up cantrip picks (#1131). */
+export function eligibleNewCantrips(catalog: CatalogSpell[] | null, className: string): CatalogSpell[] {
+  const cls = className.toLowerCase();
+  return (catalog ?? []).filter((s) => s.level === 0 && s.classes.includes(cls));
 }
 
 /** Toggle a catalog spell in the draft's learnSpell ops; refuses to add past `cap`. */

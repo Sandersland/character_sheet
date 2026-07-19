@@ -9,7 +9,7 @@ import {
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { normalizeResourcesMutable } from "@/lib/classes/resources.js";
+import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 
 // Concentration-on-damage (issue #41).
@@ -65,7 +65,9 @@ function computeConcentrationSave(
   const profBonus = proficiencyBonusForLevel(level);
   const advState = normalizeResourcesMutable(row.resources);
   const featSlotCap = advancementSlotsForLevel(row.classEntries[0]?.name ?? "", level);
-  const featProf = deriveFeatProficiencies(advState.advancements.slice(0, featSlotCap));
+  // Origin feats are kept regardless of the slot cap (#1130).
+  const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advState.advancements, featSlotCap);
+  const featProf = deriveFeatProficiencies(inCapAdvancements);
   const proficientInCon =
     row.savingThrowProficiencies.includes("constitution") ||
     featProf.savingThrows.has("constitution");

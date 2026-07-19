@@ -35,6 +35,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolProficiencies: [],
     toolChoices: [],
     toolChoiceCount: 0,
+    level1SpellPicks: null,
     ...overrides,
   };
 }
@@ -43,7 +44,7 @@ const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
   classes: [makeClass()],
   backgrounds: [
-    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [] },
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null },
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
@@ -79,8 +80,11 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
       wisdom: 10,
       charisma: 10,
     },
+    backgroundAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
+    cantripIds: [],
+    spellIds: [],
     equipmentDraft: null,
   };
   localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...base, ...overrides }));
@@ -250,5 +254,31 @@ describe("useCharacterCreation", () => {
     expect(result.current.submitError).toBe(true);
     expect(navigate).not.toHaveBeenCalled();
     expect(result.current.submitting).toBe(false);
+  });
+
+  // #1131: a class switch invalidates the chosen spells (different list + counts).
+  it("clears chosen spells when the class changes", async () => {
+    seedDraft({ className: "Rogue", cantripIds: ["c1"], spellIds: ["s1"] });
+    const { result } = await mount();
+    expect(result.current.draft.cantripIds).toEqual(["c1"]);
+
+    act(() => result.current.update({ className: "Sorcerer" }));
+
+    await waitFor(() => {
+      expect(result.current.draft.cantripIds).toEqual([]);
+      expect(result.current.draft.spellIds).toEqual([]);
+    });
+    expect(result.current.draft.className).toBe("Sorcerer");
+  });
+
+  it("keeps chosen spells across an unrelated draft change", async () => {
+    seedDraft({ className: "Rogue", cantripIds: ["c1"], spellIds: ["s1"] });
+    const { result } = await mount();
+
+    act(() => result.current.update({ name: "Renamed" }));
+
+    await waitFor(() => expect(result.current.draft.name).toBe("Renamed"));
+    expect(result.current.draft.cantripIds).toEqual(["c1"]);
+    expect(result.current.draft.spellIds).toEqual(["s1"]);
   });
 });

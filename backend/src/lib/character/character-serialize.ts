@@ -1,6 +1,6 @@
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
-import { deriveAttacksPerAction } from "@/lib/srd/srd.js";
+import { deriveAttacksPerAction, deriveRangedAttackRollBonus } from "@/lib/srd/srd.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
@@ -133,7 +133,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     abilityScoresMap,
     progress.proficiencyBonus,
   );
-  const { resources, fightingStyle } = buildResourcesView(
+  const { resources } = buildResourcesView(
     row,
     primaryClass,
     progress.level,
@@ -142,8 +142,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
   );
 
   // 3. Advancement clamp → effective scores/HP/initiative, then the feat layer
-  //    summed over the surviving in-cap advancements.
-  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal } =
+  //    summed over the kept advancements (origin feats + slot-bounded entries).
+  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots } =
     applyAdvancementClamp(row, primaryClass, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
     clampedAdvancements,
@@ -164,12 +164,15 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const conditions = normalizeConditionsMutable(row.conditions);
   const buffTargets = buildTargetModifiers(row, activeEffects);
   const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
+  // Archery Fighting Style feat (#1137): +2 to ranged attack rolls, summed from
+  // the kept advancements' rangedAttackRoll improvements.
+  const rangedAttackRollBonus = deriveRangedAttackRollBonus(clampedAdvancements);
   const inventoryContext = buildInventoryContext(
     row,
     effectiveScores,
     progress.proficiencyBonus,
     weaponGrants,
-    fightingStyle,
+    rangedAttackRollBonus,
     buffTargets,
   );
 
@@ -181,11 +184,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
     effectiveScores,
     bestArmor,
     hasShield,
-    fightingStyle,
+    clampedAdvancements,
     featBonuses,
     buffTargets,
   );
-  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets);
+  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion);
   const { unarmedStrike, improvisedWeapon } = buildUnarmedAttacksView(
     row,
     effectiveScores,
@@ -289,7 +292,15 @@ export function serializeCharacter(row: CharacterWithRelations) {
     advancements: clampedAdvancements,
     advancementSlots: {
       total: advSlotTotal,
-      used: clampedAdvancements.length,
+      // Origin feats + Fighting Style feats don't consume an ASI slot (#1130/#1137)
+      // — count only ASI-partition entries.
+      used: usedSlots,
+    },
+    // Fighting Style feat slots (#1137): a partition separate from ASI slots
+    // (Fighter L1, Paladin/Ranger L2). The sheet gates its style picker on total.
+    fightingStyleSlots: {
+      total: fightingStyleSlotTotal,
+      used: usedFightingStyleSlots,
     },
 
     // Class-specific available actions for the turn tracker (universal ones

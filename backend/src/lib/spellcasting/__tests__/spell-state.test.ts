@@ -1,6 +1,44 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { clampPreparedToLimit, normalizeSpellcastingMutable, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
+
+function spell(over: Partial<SpellEntry> & { id: string }): SpellEntry {
+  return {
+    name: over.id, level: 1, school: "evocation", prepared: true, castingTime: "1 action",
+    range: "60 ft", duration: "Instantaneous", description: "", ...over,
+  } as SpellEntry;
+}
+
+describe("clampPreparedToLimit (#1127)", () => {
+  it("keeps the first N user-learned leveled prepared spells and unprepares the rest", () => {
+    const spells = [spell({ id: "a" }), spell({ id: "b" }), spell({ id: "c" })];
+    const { spells: out, trimmedCount } = clampPreparedToLimit(spells, 2);
+    expect(trimmedCount).toBe(1);
+    expect(out.map((s) => s.prepared)).toEqual([true, true, false]);
+  });
+
+  it("never counts cantrips or granted/item spells against the cap", () => {
+    const spells = [
+      spell({ id: "cantrip", level: 0 }),
+      spell({ id: "granted", source: "subclass" }),
+      spell({ id: "item", source: "item" }),
+      spell({ id: "learned1" }),
+      spell({ id: "learned2" }),
+    ];
+    const { spells: out, trimmedCount } = clampPreparedToLimit(spells, 1);
+    expect(trimmedCount).toBe(1); // only learned2 trimmed
+    expect(out.find((s) => s.id === "learned2")?.prepared).toBe(false);
+    expect(out.find((s) => s.id === "cantrip")?.prepared).toBe(true);
+    expect(out.find((s) => s.id === "granted")?.prepared).toBe(true);
+  });
+
+  it("is a no-op (same array ref) when within the cap or the limit is null", () => {
+    const spells = [spell({ id: "a" }), spell({ id: "b" })];
+    expect(clampPreparedToLimit(spells, 5)).toEqual({ spells, trimmedCount: 0 });
+    expect(clampPreparedToLimit(spells, 5).spells).toBe(spells);
+    expect(clampPreparedToLimit(spells, null).spells).toBe(spells);
+  });
+});
 
 describe("normalizeSpellcastingMutable", () => {
   it("returns an empty mutable state for null / non-object blobs", () => {

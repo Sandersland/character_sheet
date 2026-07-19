@@ -36,7 +36,7 @@ describe("stepLabel", () => {
   it("maps kinds to display names, never the raw key", () => {
     expect(stepLabel({ kind: "hitPoints" })).toBe("Hit Points");
     expect(stepLabel({ kind: "advancement" })).toBe("Ability Score / Feat");
-    expect(stepLabel({ kind: "fightingStyle" })).toBe("Fighting Style");
+    expect(stepLabel({ kind: "fightingStyleFeat" })).toBe("Fighting Style");
     expect(stepLabel({ kind: "toolProficiency" })).toBe("Tool Proficiency");
     expect(stepLabel({ kind: "newSpells" })).toBe("New Spells");
     expect(stepLabel({ kind: "review" })).toBe("Review");
@@ -72,7 +72,7 @@ describe("stepPosition", () => {
 
 describe("ceremonyBlocked", () => {
   function plan(steps: LevelUpStep[], isPrimary: boolean): LevelUpPlanResponse {
-    return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps };
+    return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps, grantedSpells: [] };
   }
 
   it("blocks a non-primary plan containing a resource-backed step (#1065)", () => {
@@ -86,7 +86,7 @@ describe("ceremonyBlocked", () => {
 
   it("does not block subclass/fightingStyle steps (entry-aware since #1065), primary plans, or a missing plan", () => {
     expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], false))).toBe(false);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyle", count: 1 }], false))).toBe(false);
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyleFeat", count: 1 }], false))).toBe(false);
     expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], true))).toBe(false);
     expect(ceremonyBlocked(null)).toBe(false);
   });
@@ -101,7 +101,7 @@ describe("draftSatisfies", () => {
     expect(draftSatisfies({ kind: "hitPoints" }, { hp: { method: "roll", roll: 7 } })).toBe(true);
   });
 
-  it("advancement / subclass / fightingStyle need their single field", () => {
+  it("advancement / subclass / fightingStyleFeat need their single field", () => {
     expect(draftSatisfies({ kind: "advancement" }, empty)).toBe(false);
     expect(
       draftSatisfies(
@@ -111,8 +111,13 @@ describe("draftSatisfies", () => {
     ).toBe(true);
     expect(draftSatisfies({ kind: "subclass" }, empty)).toBe(false);
     expect(draftSatisfies({ kind: "subclass" }, { ...empty, subclassId: "sub-1" })).toBe(true);
-    expect(draftSatisfies({ kind: "fightingStyle" }, empty)).toBe(false);
-    expect(draftSatisfies({ kind: "fightingStyle" }, { ...empty, fightingStyle: "defense" })).toBe(true);
+    expect(draftSatisfies({ kind: "fightingStyleFeat" }, empty)).toBe(false);
+    expect(
+      draftSatisfies(
+        { kind: "fightingStyleFeat" },
+        { ...empty, fightingStyleFeat: { type: "takeFeat", featId: "defense", slot: "fightingStyle" } },
+      ),
+    ).toBe(true);
   });
 
   it("list steps need at least `count` entries", () => {
@@ -160,6 +165,28 @@ describe("draftSatisfies", () => {
       }),
     ).toBe(true);
     expect(draftSatisfies({ kind: "review" }, empty)).toBe(true);
+  });
+
+  it("newSpells also requires the meta.cantrips count of cantripsLearned (#1131)", () => {
+    // Cleric 3→4: count 0, cantrips 1 — needs one cantrip and nothing else.
+    const cantripOnly: LevelUpStep = { kind: "newSpells", count: 0, meta: { cantrips: 1 } };
+    expect(draftSatisfies(cantripOnly, empty)).toBe(false);
+    expect(
+      draftSatisfies(cantripOnly, { ...empty, cantripsLearned: [{ type: "learnSpell", spellId: "c1" }] }),
+    ).toBe(true);
+
+    // Warlock 3→4: 1 spell AND 1 cantrip — the spell alone is not enough.
+    const both: LevelUpStep = { kind: "newSpells", count: 1, meta: { cantrips: 1, canSwap: true } };
+    expect(
+      draftSatisfies(both, { ...empty, spellsLearned: [{ type: "learnSpell", spellId: "s1" }] }),
+    ).toBe(false);
+    expect(
+      draftSatisfies(both, {
+        ...empty,
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+        cantripsLearned: [{ type: "learnSpell", spellId: "c1" }],
+      }),
+    ).toBe(true);
   });
 
   it("newSpells swap: a count-0 step needs a replacement learn per forget (#1101)", () => {

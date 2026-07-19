@@ -1,11 +1,11 @@
 // Pure gating/derivation for ClassFeaturesSection — no JSX.
 
 import type {
+  AdvancementEntry,
   Character,
   CharacterResources,
   ClassEntry,
   ClassOption,
-  FightingStyleKey,
 } from "@/types/character";
 
 export interface ClassFeatureFlags {
@@ -17,7 +17,8 @@ export interface ClassFeatureFlags {
   hasCloakOfShadows: boolean;
   hasFeatures: boolean;
   hasFightingStyle: boolean;
-  fightingStyle: FightingStyleKey | null;
+  /** Fighting Style feats taken (#1137) — the fightingStyle-slot advancements. */
+  fightingStyleFeats: AdvancementEntry[];
 }
 
 export interface ClassFeatureView extends ClassFeatureFlags {
@@ -46,7 +47,13 @@ function deriveManeuverIds(resources: CharacterResources | undefined): string[] 
     .map((m) => m.maneuverId as string);
 }
 
-function deriveFlags(resources: CharacterResources | undefined): ClassFeatureFlags {
+function deriveFlags(character: Character): ClassFeatureFlags {
+  // Fighting Style is a feat partition (#1137): entitlement follows the slot
+  // total, and the taken feats are the fightingStyle-slot advancements — both
+  // independent of the resources block.
+  const hasFightingStyle = (character.fightingStyleSlots?.total ?? 0) > 0;
+  const fightingStyleFeats = (character.advancements ?? []).filter((a) => a.slot === "fightingStyle");
+  const resources: CharacterResources | undefined = character.resources;
   if (!resources) {
     return {
       hasPools: false,
@@ -56,8 +63,8 @@ function deriveFlags(resources: CharacterResources | undefined): ClassFeatureFla
       hasChannelDivinity: false,
       hasCloakOfShadows: false,
       hasFeatures: false,
-      hasFightingStyle: false,
-      fightingStyle: null,
+      hasFightingStyle,
+      fightingStyleFeats,
     };
   }
   return {
@@ -68,8 +75,8 @@ function deriveFlags(resources: CharacterResources | undefined): ClassFeatureFla
     hasChannelDivinity: resources.pools.some((p) => p.key === "channelDivinity"),
     hasCloakOfShadows: resources.cloakOfShadowsAvailable === true,
     hasFeatures: resources.features.length > 0,
-    hasFightingStyle: (resources.fightingStyleChoiceCount ?? 0) > 0,
-    fightingStyle: resources.fightingStyle ?? null,
+    hasFightingStyle,
+    fightingStyleFeats,
   };
 }
 
@@ -97,7 +104,7 @@ export function deriveClassFeatureView(
 ): ClassFeatureView {
   const classDef = referenceClasses.find((c) => c.name === character.class);
   const needsSubclass = deriveNeedsSubclass(character, classDef);
-  const flags = deriveFlags(character.resources);
+  const flags = deriveFlags(character);
 
   return {
     classDef,

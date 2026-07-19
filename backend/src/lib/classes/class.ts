@@ -18,18 +18,9 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
-  characterFightingStyleChoiceCount,
   hitDieFace,
-  isKnownFightingStyle,
   multiclassPrerequisitesMet,
-  FIGHTING_STYLES,
-  type FightingStyleKey,
 } from "@/lib/srd/srd.js";
-import {
-  normalizeResourcesMutable,
-  serializeResourcesState,
-  snapshotResources,
-} from "./resources.js";
 
 export class InvalidClassOperationError extends Error {}
 
@@ -37,12 +28,6 @@ export class InvalidClassOperationError extends Error {}
 export interface SetSubclassOperation {
   type: "setSubclass";
   subclassId: string;
-}
-
-/** Choose the character's Fighting Style (Fighter L1 feature). */
-export interface SetFightingStyleOperation {
-  type: "setFightingStyle";
-  key: FightingStyleKey;
 }
 
 /** Multiclass into a new class by catalog id — creates a level-1 entry. */
@@ -55,7 +40,6 @@ export interface AddClassOperation {
 
 export type ClassOperation =
   | SetSubclassOperation
-  | SetFightingStyleOperation
   | AddClassOperation;
 
 // Transaction handler. Per-op context: the transaction client plus the batch/session ids stable
@@ -150,74 +134,6 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     before: { ...beforeData },
     after: { ...afterData },
     data: { classEntryId: entry.id, subclassId: subclass.id, subclassName: subclass.name },
-    batchId,
-    sessionId,
-  });
-}
-
-// setFightingStyle: record the Fighting Style choice (Fighter L1 feature) in
-// resources state (resources-category event so activity.ts reverts it wholesale).
-// Entitlement is judged across EVERY class entry at its own class level (#1065:
-// a wizard/Fighter multiclass qualifies via the Fighter entry).
-async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOperation): Promise<void> {
-  const { tx, characterId, batchId, sessionId } = ctx;
-
-  // Re-read per-op so a batch sees each previous op's result.
-  const character = await tx.character.findUnique({
-    where: { id: characterId },
-    select: {
-      experiencePoints: true,
-      resources: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        select: { name: true, level: true },
-      },
-    },
-  });
-  if (!character) {
-    throw new InvalidClassOperationError(`Character not found: ${characterId}`);
-  }
-
-  // Validate the requested key is a known fighting style.
-  if (!isKnownFightingStyle(op.key)) {
-    throw new InvalidClassOperationError(`Unknown fighting style: ${op.key}`);
-  }
-
-  // Validate some class entry entitles the character to a fighting style.
-  const level = levelForExperience(character.experiencePoints);
-  if (characterFightingStyleChoiceCount(character.classEntries, level) === 0) {
-    const classNames = character.classEntries.map((e) => e.name).join("/");
-    throw new InvalidClassOperationError(
-      `Character (${classNames || "no class"}, level ${level}) cannot choose a Fighting Style`,
-    );
-  }
-
-  const state = normalizeResourcesMutable(character.resources);
-  // Deep-copy the full resources state for before/after snapshots so the
-  // `resources` undo branch in activity.ts restores everything wholesale.
-  const snapshot = (s: typeof state) => ({ resources: snapshotResources(s) });
-
-  const beforeFs = snapshot(state);
-  state.fightingStyle = op.key;
-  await tx.character.update({
-    where: { id: characterId },
-    data: { resources: serializeResourcesState(state) },
-  });
-  const afterFs = snapshot(state);
-
-  const styleLabel = FIGHTING_STYLES.find((s) => s.key === op.key)?.label ?? op.key;
-
-  await logEvent(tx, {
-    characterId,
-    // `resources` category so the existing resources revert branch in
-    // activityRouter's undo restores before.resources (incl. fightingStyle)
-    // with zero new undo code.
-    category: "resources",
-    type: "fightingStyleChosen",
-    summary: `Chose fighting style: ${styleLabel}`,
-    before: beforeFs,
-    after: afterFs,
-    data: { fightingStyle: op.key },
     batchId,
     sessionId,
   });
@@ -353,18 +269,6 @@ export async function setSubclassInTx(
   await applySetSubclass({ tx, characterId, batchId, sessionId }, op);
 }
 
-// Applies one setFightingStyle inside a caller-supplied tx/batchId so the unified
-// level-up endpoint (#885) can compose it with other domains (#895).
-export async function setFightingStyleInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  op: SetFightingStyleOperation,
-  batchId: string,
-  sessionId: string | null,
-): Promise<void> {
-  await applySetFightingStyle({ tx, characterId, batchId, sessionId }, op);
-}
-
 export async function applyClassOperations(
   characterId: string,
   operations: ClassOperation[]
@@ -380,9 +284,6 @@ export async function applyClassOperations(
       switch (op.type) {
         case "setSubclass":
           await applySetSubclass(ctx, op);
-          break;
-        case "setFightingStyle":
-          await setFightingStyleInTx(tx, id, op, batchId, sessionId);
           break;
         case "addClass":
           await applyAddClass(ctx, op);

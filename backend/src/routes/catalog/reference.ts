@@ -3,7 +3,9 @@ import { Router } from "express";
 import {
   ALIGNMENTS,
   MULTICLASS_PREREQUISITES,
+  cantripsKnownAtLevel,
   multiclassPrerequisitesMet,
+  preparedSpellCountAt,
   toolsByCategory,
 } from "@/lib/srd/srd.js";
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
@@ -24,7 +26,10 @@ referenceRouter.get("/reference", async (_req, res) => {
     orderBy: { name: "asc" },
     include: { subclasses: { orderBy: { name: "asc" } } },
   });
-  const backgrounds = await prisma.background.findMany({ orderBy: { name: "asc" } });
+  const backgrounds = await prisma.background.findMany({
+    orderBy: { name: "asc" },
+    include: { originFeat: { select: { id: true, name: true, description: true, category: true } } },
+  });
 
   const classes = rawClasses.map((c) => ({
     id: c.id,
@@ -41,6 +46,12 @@ referenceRouter.get("/reference", async (_req, res) => {
     toolChoiceCount: c.toolChoiceCount,
     subclasses: c.subclasses.map((s) => ({ id: s.id, name: s.name, description: s.description })),
     startingEquipment: STARTING_EQUIPMENT[c.name] ?? null,
+    // #1131: level-1 creation pick counts from the SRD 5.2 tables (null for a
+    // non-caster) so the creation picker never re-encodes the rules.
+    level1SpellPicks:
+      preparedSpellCountAt(c.name, 1) != null
+        ? { cantrips: cantripsKnownAtLevel(c.name, 1), spells: preparedSpellCountAt(c.name, 1)! }
+        : null,
     // 5e multiclass ability prerequisite (PHB p. 163): the option thresholds plus
     // a rendered description. Lets the add-class picker gate + explain eligibility
     // without duplicating the rules table on the frontend. Null for homebrew classes.
@@ -64,6 +75,9 @@ referenceRouter.get("/reference", async (_req, res) => {
     name: b.name,
     skillProficiencies: b.skillProficiencies,
     toolProficiencies: b.toolProficiencies,
+    // PHB'24 ability spread + Origin feat; empty/null for spec-less legacy rows (#1130).
+    abilityChoices: b.abilityChoices,
+    originFeat: b.originFeat,
   }));
 
   // Artisan tools for the sheet's Proficiencies-card dropdown (the only category consumed).

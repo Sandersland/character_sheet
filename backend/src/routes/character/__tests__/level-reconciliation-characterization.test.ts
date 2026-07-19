@@ -32,6 +32,7 @@ const app = createApp();
 // XP thresholds (levelForExperience): L1=0, L3=900, L6=14000, L7=23000, L17=225000.
 const XP_LVL_1 = 0;
 const XP_LVL_3 = 900;
+const XP_LVL_5 = 6500;
 const XP_LVL_6 = 14000;
 const XP_LVL_7 = 23000;
 const XP_LVL_17 = 225000;
@@ -246,7 +247,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: oneToolProf(),
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
     expect(ev.after).toEqual({
@@ -257,7 +257,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: oneToolProf(),
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
     // Tool profs untouched at level 3 (Student of War still grants 1).
@@ -274,10 +273,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(man.summary).toBe("All 5 maneuvers removed — subclass no longer available");
     expect(man.data).toEqual({ removedCount: 5, allowed: 0 });
     expect(man.before).toEqual({
-      resources: { used: {}, maneuversKnown: fiveManeuvers(), disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: fiveManeuvers(), disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
     expect(man.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
 
     const [tool] = await eventsByType("recon-full", "toolProficienciesReconciled");
@@ -286,10 +285,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(tool.data).toEqual({ removedCount: 1, allowed: 0 });
     // Ordering interaction: maneuvers already trimmed → maneuversKnown is [] here.
     expect(tool.before).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
     expect(tool.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
     });
 
     // Registry order: maneuvers event precedes toolProfs event within the batch.
@@ -322,7 +321,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: [],
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
     expect(ev.after).toEqual({
@@ -333,7 +331,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: [],
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
   });
@@ -355,7 +352,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: [],
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
   });
@@ -402,5 +398,84 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(after.abilityScores).toMatchObject({ strength: 10, dexterity: 10 });
     expect(after.initiativeBonus).toBe(0);
     expect(after.resources.advancements).toEqual([]);
+  });
+});
+
+// ── prepared-spell clamp (#1127): the prepared cap is a per-class table count, so
+//    a level-down trims over-cap prepared spells to the new limit (oldest kept). ──
+function sixPreparedWarlockSpells() {
+  return Array.from({ length: 6 }, (_, i) => ({
+    id: `wl-spell-${i + 1}`,
+    name: `Warlock Spell ${i + 1}`,
+    level: 1,
+    school: "evocation",
+    prepared: true,
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Placeholder.",
+  }));
+}
+
+async function revertBatchRoute(characterId: string, batchId: string) {
+  return supertest(app).post(`/api/characters/${characterId}/events/${batchId}/revert`).set("Cookie", COOKIE).send({});
+}
+
+describe("prepared-spell reconciliation (#1127)", () => {
+  let warlockClassId: string;
+
+  beforeAll(async () => {
+    warlockClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } })).id;
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "ReconPrep" } } });
+  });
+
+  async function createWarlock(id: string) {
+    return prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id,
+        name: `ReconPrep ${id}`,
+        experiencePoints: XP_LVL_5, // Warlock 5 → prepared cap 6 (all 6 legal)
+        hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d8", spent: 0 },
+        abilityScores: { ...BASE_ABILITY_SCORES, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, concentratingOn: null, spells: sixPreparedWarlockSpells() },
+        classEntries: { create: [{ name: "warlock", classId: warlockClassId, position: 0, level: 5 }] },
+      },
+    });
+  }
+
+  it("trims 6 prepared → 4 on Warlock 5→3, oldest kept, one unprepareSpell event", async () => {
+    await createWarlock("recon-prep");
+    const res = await postXp("recon-prep", { operations: [{ type: "set", value: XP_LVL_3 }] });
+    expect(res.status).toBe(200);
+    // Warlock 3 prepared cap = 4; over-cap read clamps to exactly 4.
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(4);
+    expect(res.body.spellcasting.preparedSpellCount).toBe(4);
+
+    const [ev] = await eventsByType("recon-prep", "unprepareSpell" as ReconEventType);
+    expect(ev.category).toBe("spellcasting");
+    expect(ev.data).toMatchObject({ trimmedCount: 2, limit: 4 });
+    const before = ev.before as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
+    const after = ev.after as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
+    expect(before.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(6);
+    // Oldest 4 (first in array order) stay prepared; the last 2 are unprepared.
+    expect(after.spellcasting.spells.filter((s) => s.prepared).map((s) => s.id)).toEqual(
+      ["wl-spell-1", "wl-spell-2", "wl-spell-3", "wl-spell-4"],
+    );
+    expect(after.spellcasting.spells).toHaveLength(6); // entries kept, just unprepared
+  });
+
+  it("a revert restores all 6 prepared", async () => {
+    await createWarlock("recon-prep-undo");
+    await postXp("recon-prep-undo", { operations: [{ type: "set", value: XP_LVL_3 }] });
+    const batchId = (await eventsByType("recon-prep-undo", "unprepareSpell" as ReconEventType))[0].batchId!;
+    const res = await revertBatchRoute("recon-prep-undo", batchId);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellCount).toBe(6);
   });
 });

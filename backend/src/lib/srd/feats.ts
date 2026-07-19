@@ -1,4 +1,31 @@
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
+import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+
+/** PHB'24 feat categories (local union keeps srd/ a dependency leaf). */
+export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
+
+/**
+ * Whether a feat may be taken via an Ability Score Improvement slot at `level`
+ * (PHB'24 pp. 87-88). Origin feats come from backgrounds and Fighting Style from
+ * class features, so neither is ever offered here; General unlocks at level 4 and
+ * Epic Boon at level 19 unless the feat overrides levelPrerequisite.
+ */
+export function featOfferedForAsiSlot(
+  feat: { category: FeatCategory; levelPrerequisite?: number | null },
+  level: number,
+): boolean {
+  switch (feat.category) {
+    case "origin":
+    case "fighting_style":
+      return false;
+    case "general":
+      return level >= (feat.levelPrerequisite ?? 4);
+    case "epic_boon":
+      return level >= (feat.levelPrerequisite ?? 19);
+    default:
+      return false; // unknown future category — fail safe-closed, never leak feats
+  }
+}
 
 /**
  * Numeric stat targets: summed by deriveFeatBonuses and applied as additive
@@ -33,7 +60,11 @@ const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
  * the max across all active advancements rather than summing them.
  */
 const COMBAT_FEAT_IMPROVEMENT_TARGETS = [
-  "unarmedDamageDie", // amount = die face count (e.g. 4 for d4); max across feats
+  "unarmedDamageDie",       // amount = die face count (e.g. 4 for d4); max across feats
+  // Fighting Style feats (#1137) — situational, applied per-read, not summed as flat bonuses:
+  "rangedAttackRoll",       // Archery: +amount to ranged weapon attack rolls (deriveRangedAttackRollBonus)
+  "armorClassWhileArmored", // Defense: +amount to AC only while wearing body armor (buildArmorClassView)
+  "offhandAbilityDamage",   // Two-Weapon Fighting: marker — add ability mod to the off-hand attack's damage
 ] as const;
 
 /**
@@ -72,11 +103,52 @@ export function deriveFeatBonuses(
     for (const imp of (entry.improvements ?? [])) {
       const target = imp.target as NumericFeatImprovementTarget;
       if (!(target in totals)) continue; // unknown / proficiency target — skip gracefully
-      totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
+      // PHB'24: some bonuses (e.g. Alert's initiative) scale with proficiency bonus.
+      if (imp.scaling === "proficiencyBonus") {
+        totals[target] += imp.amount * proficiencyBonusForLevel(appliedLevel);
+      } else {
+        totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
+      }
     }
   }
 
   return totals;
+}
+
+/**
+ * Labeled AC addends from the Defense Fighting Style feat's `armorClassWhileArmored`
+ * improvement (#1137) — one part per contributing feat, labeled with its snapshot
+ * name. The caller (buildArmorClassView) applies these only while body armor is
+ * worn. Callers pass the already-clamped slice so an over-cap fs feat is excluded.
+ */
+export function deriveArmoredArmorClassParts(
+  advancements: AdvancementEntry[],
+): { label: string; value: number }[] {
+  const parts: { label: string; value: number }[] = [];
+  for (const entry of advancements) {
+    for (const imp of entry.improvements ?? []) {
+      if (imp.target === "armorClassWhileArmored" && imp.amount !== 0) {
+        parts.push({ label: entry.featName ?? "Fighting Style", value: imp.amount });
+      }
+    }
+  }
+  return parts;
+}
+
+/**
+ * Sums the Archery Fighting Style feat's `rangedAttackRoll` improvement (#1137)
+ * across a set of advancements — the +2 added to ranged weapon attack rolls in
+ * deriveWeaponAttackBonus. Callers pass the already-clamped slice so an over-cap
+ * fs feat is excluded automatically.
+ */
+export function deriveRangedAttackRollBonus(advancements: AdvancementEntry[]): number {
+  let total = 0;
+  for (const entry of advancements) {
+    for (const imp of entry.improvements ?? []) {
+      if (imp.target === "rangedAttackRoll") total += imp.amount;
+    }
+  }
+  return total;
 }
 
 /**

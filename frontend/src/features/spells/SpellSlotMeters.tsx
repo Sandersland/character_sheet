@@ -38,12 +38,12 @@ interface GroupSpec {
   meters: MeterSpec[];
 }
 
-function pactMagicSlotsHeading() {
+function pactMagicSlotsHeading(slotLevel: number) {
   return (
     <>
       Pact Magic{" "}
       <span className="font-normal normal-case tracking-normal text-parchment-600">
-        — recharges on a short rest
+        — level {slotLevel}, recharges on a short rest
       </span>
     </>
   );
@@ -58,7 +58,7 @@ function slotsGroup(
 ): GroupSpec {
   return {
     key: "slots",
-    heading: slotsArePactMagic ? pactMagicSlotsHeading() : "Spell Slots",
+    heading: slotsArePactMagic ? pactMagicSlotsHeading(slots[0]?.level ?? 1) : "Spell Slots",
     meters: slots.map((slot) => ({
       level: slot.level,
       remaining: slot.total - slot.used,

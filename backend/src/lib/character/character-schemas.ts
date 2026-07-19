@@ -51,11 +51,21 @@ export const createCharacterSchema = z
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,
+    // PHB'24 background ability spread (#1130): a partial ability→bump map
+    // (2+1 or 1+1+1 over the background's three abilityChoices). Shape/legality
+    // is validated in resolveBackgroundGrants; optional here so a custom or
+    // spec-less background can omit it (the frontend requires it when specced).
+    backgroundAbilities: z.record(z.string(), z.number().int().positive()).optional(),
     skillProficiencies: z.array(z.string()).optional(),
     /** Tool names chosen by the player at creation (class choices only —
      *  fixed grants from background/class/race are applied server-side). */
     toolChoices: z.array(z.string()).optional(),
     startingEquipment: startingEquipmentSchema.optional(),
+    // #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids).
+    // Optional for back-compat; strictly count/list/level-validated when present.
+    spells: z
+      .object({ cantripIds: z.array(z.string()), spellIds: z.array(z.string()) })
+      .optional(),
   })
   .strict();
 

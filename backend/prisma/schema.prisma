@@ -631,6 +631,11 @@ model Background {
   name               String   @unique
   skillProficiencies String[]
   toolProficiencies  String[] @default([])
+  // PHB'24: each background grants +3 ability points across these three abilities
+  // (2+1 or 1+1+1) plus one Origin feat. Empty/null for spec-less 2014 legacy rows.
+  abilityChoices     String[] @default([])
+  originFeatId       String?
+  originFeat         Feat?    @relation(fields: [originFeatId], references: [id], onDelete: SetNull)
 
   selections CharacterBackground[]
 }
@@ -947,14 +952,29 @@ model GrantedAbility {
 // AdvancementEntry.featId (nullable so custom feats have no catalog row).
 // abilityOptions/abilityIncrease drive the half-feat ability bump (e.g.
 // Resilient: +1 to one chosen ability). Empty abilityOptions = not a half-feat.
+// PHB'24 feat categories: Origin (background-granted, no level req), General
+// (level 4+, +1 ability), Fighting Style, and Epic Boon (level 19+).
+enum FeatCategory {
+  origin
+  general
+  fighting_style
+  epic_boon
+}
+
 model Feat {
-  id              String   @id @default(uuid())
-  name            String   @unique
-  description     String
-  prerequisite    String?
-  abilityOptions  String[] @default([]) // abilities the player may raise by abilityIncrease
-  abilityIncrease Int      @default(0)  // usually 1 for half-feats
-  improvements    Json     @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
+  id                String       @id @default(uuid())
+  name              String       @unique
+  description       String
+  prerequisite      String?
+  category          FeatCategory @default(general)
+  levelPrerequisite Int?         // General ⇒ 4, Epic Boon ⇒ 19 (PHB'24)
+  repeatable        Boolean      @default(false)
+  abilityOptions    String[]     @default([]) // abilities the player may raise by abilityIncrease
+  abilityIncrease   Int          @default(0)  // usually 1 for half-feats
+  improvements      Json         @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
+
+  // Backgrounds that grant this feat as their Origin feat (PHB'24).
+  originForBackgrounds Background[]
 }
 
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from
@@ -993,7 +1013,7 @@ model Spell {
   // Passive-modifier (buff) effect (#363) while active. `buffModifier` is the
   // ABSOLUTE value the AC target reads, never a delta over the base: "ac" is a
   // flat +N add (Shield of Faith 2), "acUnarmoredBase" is the full unarmored base
-  // (Mage Armor 13 → 13+Dex, NOT 3), "acFloor" is the floor (Barkskin 16).
+  // (Mage Armor 13 → 13+Dex, NOT 3), "acFloor" is the floor (Barkskin 17).
   // Duration derives from `concentration` (true → concentration, else
   // while-active). null = not a buff.
   buffTarget         String?

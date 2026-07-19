@@ -47,11 +47,30 @@ describe("GET /api/reference", () => {
     expect(Array.isArray(fighter.toolChoices)).toBe(true);
     expect(typeof fighter.toolChoiceCount).toBe("number");
 
-    // Backgrounds expose granted tool profs.
+    // Backgrounds expose granted tool profs + the 2024 ability spread + Origin feat (#1130).
     const criminal = response.body.backgrounds.find((b: { name: string }) => b.name === "Criminal");
     expect(criminal).toBeDefined();
-    expect(criminal.toolProficiencies).toEqual(
-      expect.arrayContaining(["Thieves' Tools"])
-    );
+    expect(criminal.toolProficiencies).toEqual(["Thieves' Tools"]);
+    expect(criminal.abilityChoices).toEqual(["dexterity", "constitution", "intelligence"]);
+    expect(criminal.skillProficiencies).toEqual(["sleightOfHand", "stealth"]);
+    expect(criminal.originFeat).toMatchObject({ name: "Alert", category: "origin" });
+
+    // Folk Hero has no 2024 spec — spec-less legacy row kept (#1130).
+    const folkHero = response.body.backgrounds.find((b: { name: string }) => b.name === "Folk Hero");
+    expect(folkHero).toBeDefined();
+    expect(folkHero.abilityChoices).toEqual([]);
+    expect(folkHero.originFeat).toBeNull();
+  });
+
+  // #1131: each class carries its level-1 creation pick counts (or null for a
+  // non-caster) so the frontend never re-encodes the SRD 5.2 tables.
+  it("ships level1SpellPicks per class (cantrips + spells, null for non-casters)", async () => {
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
+
+    expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2 });
+    expect(byName("Paladin").level1SpellPicks).toEqual({ cantrips: 0, spells: 2 });
+    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 4 });
+    expect(byName("Fighter").level1SpellPicks).toBeNull();
   });
 });

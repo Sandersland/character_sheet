@@ -2,6 +2,8 @@
 // Fighter gets two extras (levels 6 and 14); Rogue gets one extra (level 10).
 // Returns the *total* number of slots the character has earned at `level`.
 
+import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+
 const BASE_ASI_LEVELS = [4, 8, 12, 16, 19];
 const EXTRA_ASI_LEVELS: Record<string, number[]> = {
   fighter: [6, 14],
@@ -16,6 +18,32 @@ const EXTRA_ASI_LEVELS: Record<string, number[]> = {
 export function advancementSlotsForLevel(className: string, level: number): number {
   const extra = EXTRA_ASI_LEVELS[className.toLowerCase()] ?? [];
   return [...BASE_ASI_LEVELS, ...extra].filter((l) => level >= l).length;
+}
+
+// SRD 5.2: the Fighting Style feature grants a Fighting Style feat — Fighter at
+// level 1, Paladin and Ranger at level 2. Returns the cumulative number of such
+// feat slots the class has earned at `level`. Champion's second style at L7 is a
+// follow-up (#1148): add a `subclass` param here and one subclass-keyed branch.
+export function fightingStyleFeatSlots(className: string, level: number): number {
+  const c = className.toLowerCase();
+  if (c === "fighter") return level >= 1 ? 1 : 0;
+  if (c === "paladin" || c === "ranger") return level >= 2 ? 1 : 0;
+  return 0;
+}
+
+// Total Fighting Style feat entitlement across every class entry, each judged at
+// its own effective class level (#1065: a wizard/Fighter multiclass IS entitled
+// via the Fighter entry). The single shared rule for the takeFeat slot channel,
+// reconcileAdvancements' fs partition, and the serializeCharacter fightingStyleSlots
+// read — never inline a per-entry copy at those sites.
+export function characterFightingStyleFeatSlots(
+  entries: readonly { name: string; level: number }[],
+  derivedLevel: number,
+): number {
+  return entries.reduce(
+    (sum, e) => sum + fightingStyleFeatSlots(e.name, effectiveEntryLevel(e.level, entries.length, derivedLevel)),
+    0,
+  );
 }
 
 // Adding a level in a NEW class via multiclassing requires a minimum ability

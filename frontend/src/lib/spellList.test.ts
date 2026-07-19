@@ -4,6 +4,7 @@ import {
   canPrepare,
   deriveSpellList,
   filterSpellbook,
+  pactMagicNote,
   preparedBudget,
   swapCandidates,
 } from "@/lib/spellList";
@@ -159,6 +160,12 @@ describe("deriveSpellList — buffs & pact labeling", () => {
   });
 });
 
+describe("pactMagicNote", () => {
+  it("states the fixed cast level and short-rest recharge", () => {
+    expect(pactMagicNote(3)).toBe("All slots are cast at level 3 and return on a short rest.");
+  });
+});
+
 describe("preparedBudget", () => {
   it("prefers the server-derived count and limit", () => {
     expect(preparedBudget(sc({ preparedSpellCount: 11, preparedSpellLimit: 12 }))).toEqual({
@@ -170,10 +177,14 @@ describe("preparedBudget", () => {
     expect(preparedBudget(sc({ preparedSpellCount: 12, preparedSpellLimit: 12 })).atLimit).toBe(true);
   });
 
-  it("is unbounded for a known caster (null limit)", () => {
+  it("is unbounded only for a non-caster (null limit); every caster now has a cap", () => {
     expect(preparedBudget(sc({ preparedSpellLimit: null }))).toEqual({
       count: 0, limit: null, atLimit: false,
     });
+  });
+
+  it("flags a warlock at its cap (2024: warlocks now prepare)", () => {
+    expect(preparedBudget(sc({ preparedSpellCount: 6, preparedSpellLimit: 6 })).atLimit).toBe(true);
   });
 
   it("falls back to counting prepared leveled spells when no server count", () => {

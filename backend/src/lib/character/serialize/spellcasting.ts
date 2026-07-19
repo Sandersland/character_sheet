@@ -5,7 +5,7 @@ import {
   derivePreparedSpellLimit,
 } from "@/lib/srd/srd.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
-import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
+import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import {
   deriveGrantedSpells,
   deriveGrantedCastingAbility,
@@ -166,7 +166,13 @@ export function buildSpellcastingView(
 ): object | undefined {
   const view = buildSpellcastingViewBase(row, primaryClass, level, abilityScores, proficiencyBonus);
   if (view === undefined) return undefined;
-  return { ...view, ...derivePreparedFields(view, preparedLimitEntries(row, primaryClass, level), abilityScores) };
+  // Clamp-on-read (#1127): trim any over-cap prepared spells to the derived limit
+  // (the reconciler is the write-side; this is the non-destructive read fallback).
+  const limit = derivePreparedSpellLimit(preparedLimitEntries(row, primaryClass, level));
+  const raw = (view as { spells?: unknown }).spells;
+  const clamped = clampPreparedToLimit(Array.isArray(raw) ? (raw as SpellEntry[]) : [], limit).spells;
+  const clampedView = { ...view, spells: clamped };
+  return { ...clampedView, ...derivePreparedFields(clampedView, limit) };
 }
 
 // Class entries feeding the prepared-cap sum: single-class uses the XP-derived
@@ -186,17 +192,17 @@ function preparedLimitEntries(
   }));
 }
 
-// Derived prepared-spell cap fields (#883): the limit plus the current count.
-// source==null excludes granted spells; level>0 excludes always-prepared cantrips.
+// Derived prepared-spell cap fields (#883): the limit plus the current count,
+// counted from the already-clamped view. source==null excludes granted spells;
+// level>0 excludes always-prepared cantrips.
 function derivePreparedFields(
   view: object,
-  entries: Array<{ name: string; level: number; subclass: string | null }>,
-  abilityScores: Record<string, number>,
+  limit: number | null,
 ): { preparedSpellLimit: number | null; preparedSpellCount: number } {
   const raw = (view as { spells?: unknown }).spells;
   const spells: SpellEntry[] = Array.isArray(raw) ? raw : [];
   return {
-    preparedSpellLimit: derivePreparedSpellLimit(entries, abilityScores),
+    preparedSpellLimit: limit,
     preparedSpellCount: spells.filter((s) => s.prepared && s.level > 0 && s.source == null).length,
   };
 }

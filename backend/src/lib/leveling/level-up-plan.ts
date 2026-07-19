@@ -4,13 +4,13 @@
 // and validated against by the transaction endpoint (#885).
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
-import { advancementSlotsForLevel, fightingStyleChoiceCount } from "@/lib/srd/srd.js";
+import { advancementSlotsForLevel, fightingStyleFeatSlots } from "@/lib/srd/srd.js";
 import {
-  BARD_MAGICAL_SECRETS_LEVELS,
-  isKnownCaster,
-  learnsNewSpellsOnLevelUp,
+  bardMagicalSecretsAt,
+  levelUpCantripPicks,
+  levelUpSpellPicks,
   maxSpellLevelForClass,
-  spellsGainedAtLevel,
+  swapCadenceFor,
 } from "@/lib/srd/spellcasting-tables.js";
 
 export type LevelUpStepKind =
@@ -18,7 +18,7 @@ export type LevelUpStepKind =
   | "advancement"
   | "subclass"
   | "maneuvers"
-  | "fightingStyle"
+  | "fightingStyleFeat"
   | "disciplines"
   | "toolProficiency"
   | "subclassChoice"
@@ -74,9 +74,11 @@ function subclassStep({ target }: PlanContext): LevelUpStep | null {
   return target.newLevel === subclassLevel && !target.subclass ? { kind: "subclass" } : null;
 }
 
-function fightingStyleStep({ target }: PlanContext): LevelUpStep | null {
-  const delta = fightingStyleChoiceCount(target.name, target.newLevel) - fightingStyleChoiceCount(target.name, target.newLevel - 1);
-  return delta > 0 ? { kind: "fightingStyle", count: delta } : null;
+// A Fighting Style feat pick (#1137): Fighter's arrives with a new level-1 entry,
+// Paladin's and Ranger's at level 2. Derived from the fightingStyleFeatSlots delta.
+function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
+  const delta = fightingStyleFeatSlots(target.name, target.newLevel) - fightingStyleFeatSlots(target.name, target.newLevel - 1);
+  return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 
 // Diff one bespoke choose-N count (maneuvers/disciplines/tools) across N vs N-1.
@@ -102,20 +104,30 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
     }));
 }
 
-// Known casters + Wizard's spellbook; Bard's Magical Secrets levels are tagged.
-// #1101: known casters may swap one known spell EVERY level-up, so a swap-only
-// step (count 0, canSwap) is emitted even on a no-new-spells level.
+// 2024: onLevelUp-cadence casters (Bard/Sorcerer/Warlock + EK/AT) offer the
+// prepared-count delta plus one optional swap (#1101), so a swap-only step
+// (count 0, canSwap) is emitted even on a no-new-spells level; the Wizard scribes
+// a flat 2 with no swap. #1131: every caster also picks new cantrips on a
+// cantrips-known growth level (so Cleric/Druid get a cantrips-only step at 4/10),
+// and a fresh level-1 entry offers its full initial spell+cantrip picks with no
+// swap (a new entry may not swap other classes' spells). Bard picks from level 10
+// are Magical Secrets.
 function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
-  if (!learnsNewSpellsOnLevelUp(target.name, target.subclass)) return null;
-  const count = spellsGainedAtLevel(target.name, target.newLevel);
-  const canSwap = isKnownCaster(target.name, target.subclass);
-  if (count <= 0 && !canSwap) return null;
-  const magicalSecrets = target.name.toLowerCase() === "bard" && BARD_MAGICAL_SECRETS_LEVELS.has(target.newLevel);
+  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass);
+  const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
+  const canSwap = swapCadenceFor(target.name, target.subclass) === "onLevelUp" && target.newLevel >= 2;
+  if (count <= 0 && cantrips <= 0 && !canSwap) return null;
+  const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass);
   return {
     kind: "newSpells",
     count,
-    meta: { maxSpellLevel, ...(magicalSecrets ? { magicalSecrets: true } : {}), ...(canSwap ? { canSwap: true } : {}) },
+    meta: {
+      maxSpellLevel,
+      ...(magicalSecrets ? { magicalSecrets: true } : {}),
+      ...(canSwap ? { canSwap: true } : {}),
+      ...(cantrips > 0 ? { cantrips } : {}),
+    },
   };
 }
 
@@ -141,7 +153,7 @@ export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: Target
     advancementStep(ctx),
     subclassStep(ctx),
     choiceCountStep(ctx, "maneuvers", "maneuverChoiceCount"),
-    fightingStyleStep(ctx),
+    fightingStyleFeatStep(ctx),
     choiceCountStep(ctx, "disciplines", "disciplineChoiceCount"),
     choiceCountStep(ctx, "toolProficiency", "toolProfChoiceCount"),
     ...subclassChoiceSteps(ctx),

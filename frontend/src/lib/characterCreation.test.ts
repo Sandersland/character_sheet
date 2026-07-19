@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildCreatePayload,
   creationMissing,
+  deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
   resolveBackgroundName,
@@ -28,6 +29,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolProficiencies: [],
     toolChoices: [],
     toolChoiceCount: 0,
+    level1SpellPicks: null,
     ...overrides,
   };
 }
@@ -36,7 +38,15 @@ const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
   classes: [makeClass()],
   backgrounds: [
-    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [] },
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null },
+    {
+      id: "bg-crim",
+      name: "Criminal",
+      skillProficiencies: ["stealth"],
+      toolProficiencies: ["Thieves' Tools"],
+      abilityChoices: ["dexterity", "constitution", "intelligence"],
+      originFeat: { id: "feat-alert", name: "Alert", description: "Bonus to initiative.", category: "origin" },
+    },
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
@@ -72,8 +82,11 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
       wisdom: 10,
       charisma: 10,
     },
+    backgroundAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
+    cantripIds: [],
+    spellIds: [],
     equipmentDraft: null,
     ...overrides,
   };
@@ -187,7 +200,108 @@ describe("creationMissing", () => {
   });
 });
 
+describe("deriveBackgroundBonuses (#1130)", () => {
+  it("is inert for a custom background", () => {
+    const draft = makeDraft({ background: "Criminal", useCustomBackground: true });
+    const bonuses = deriveBackgroundBonuses(draft, resolveSelections(reference, draft));
+    expect(bonuses.applicable).toBe(false);
+    expect(bonuses.abilities).toEqual([]);
+    expect(bonuses.originFeat).toBeNull();
+  });
+
+  it("is inert for a spec-less (legacy) background", () => {
+    const draft = makeDraft({ background: "Sage" });
+    const bonuses = deriveBackgroundBonuses(draft, resolveSelections(reference, draft));
+    expect(bonuses.applicable).toBe(false);
+  });
+
+  it("surfaces the three abilities + origin feat for a specced background", () => {
+    const draft = makeDraft({ background: "Criminal" });
+    const bonuses = deriveBackgroundBonuses(draft, resolveSelections(reference, draft));
+    expect(bonuses.applicable).toBe(true);
+    expect(bonuses.abilities).toEqual(["dexterity", "constitution", "intelligence"]);
+    expect(bonuses.originFeat?.name).toBe("Alert");
+    expect(bonuses.complete).toBe(false); // nothing assigned yet
+  });
+
+  it("is complete for a valid +2/+1 and incomplete for an illegal shape", () => {
+    const valid = makeDraft({ background: "Criminal", backgroundAbilities: { dexterity: 2, intelligence: 1 } });
+    expect(deriveBackgroundBonuses(valid, resolveSelections(reference, valid)).complete).toBe(true);
+
+    const oneOneOne = makeDraft({ background: "Criminal", backgroundAbilities: { dexterity: 1, constitution: 1, intelligence: 1 } });
+    expect(deriveBackgroundBonuses(oneOneOne, resolveSelections(reference, oneOneOne)).complete).toBe(true);
+
+    const bad = makeDraft({ background: "Criminal", backgroundAbilities: { dexterity: 2, constitution: 2 } });
+    expect(deriveBackgroundBonuses(bad, resolveSelections(reference, bad)).complete).toBe(false);
+  });
+
+  it("ignores bumps on abilities outside the background's three", () => {
+    const draft = makeDraft({ background: "Criminal", backgroundAbilities: { strength: 2, dexterity: 1 } });
+    const bonuses = deriveBackgroundBonuses(draft, resolveSelections(reference, draft));
+    expect(bonuses.assignment).toEqual({ dexterity: 1 });
+    expect(bonuses.complete).toBe(false);
+  });
+});
+
+describe("derivePreview with background bonuses", () => {
+  it("folds the spread into the effective HP/AC preview", () => {
+    const draft = makeDraft({
+      race: "Elf",
+      className: "Rogue",
+      background: "Criminal",
+      backgroundAbilities: { constitution: 2, dexterity: 1 }, // CON 10→12 (+1), DEX 10→11 (+0)
+    });
+    const preview = derivePreview(draft, resolveSelections(reference, draft));
+    // Rogue d8 (8) + CON mod +1 = 9.
+    expect(preview.maxHp).toBe(9);
+  });
+});
+
+describe("creationMissing with background bonuses", () => {
+  it("blocks save until a specced background's spread is complete", () => {
+    const draft = makeDraft({
+      name: "Lidda",
+      alignment: "Neutral Good",
+      race: "Elf",
+      className: "Rogue",
+      background: "Criminal",
+    });
+    expect(creationMissing(draft, resolveSelections(reference, draft))).toContain("Background ability scores");
+
+    const assigned = makeDraft({ ...draft, backgroundAbilities: { dexterity: 2, constitution: 1 } });
+    expect(creationMissing(assigned, resolveSelections(reference, assigned))).not.toContain("Background ability scores");
+  });
+
+  it("does not list the spread for a spec-less background", () => {
+    const draft = makeDraft({
+      name: "Lidda",
+      alignment: "Neutral Good",
+      race: "Elf",
+      className: "Rogue",
+      background: "Sage",
+    });
+    expect(creationMissing(draft, resolveSelections(reference, draft))).toEqual([]);
+  });
+});
+
 describe("buildCreatePayload", () => {
+  it("sends backgroundAbilities only when the spread is complete", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue", background: "Criminal", backgroundAbilities: { dexterity: 2, intelligence: 1 } });
+    const selections = resolveSelections(reference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.backgroundAbilities).toEqual({ dexterity: 2, intelligence: 1 });
+  });
+
+  it("omits backgroundAbilities when incomplete or inert", () => {
+    const incomplete = makeDraft({ name: "X", className: "Rogue", background: "Criminal", backgroundAbilities: { dexterity: 2 } });
+    const sel1 = resolveSelections(reference, incomplete);
+    expect(buildCreatePayload(incomplete, sel1, deriveSkillChoices(incomplete, sel1), []).backgroundAbilities).toBeUndefined();
+
+    const inert = makeDraft({ name: "X", className: "Rogue", background: "Sage" });
+    const sel2 = resolveSelections(reference, inert);
+    expect(buildCreatePayload(inert, sel2, deriveSkillChoices(inert, sel2), []).backgroundAbilities).toBeUndefined();
+  });
+
   it("merges granted + selected skills and omits empty optionals", () => {
     const draft = makeDraft({
       name: " Lidda ",
@@ -214,5 +328,43 @@ describe("buildCreatePayload", () => {
     const skills = deriveSkillChoices(draft, selections);
     const payload = buildCreatePayload(draft, selections, skills, ["Thieves' Tools"]);
     expect(payload.toolChoices).toEqual(["Thieves' Tools"]);
+  });
+});
+
+describe("creation spells (#1131)", () => {
+  const caster = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4 } });
+  const casterSelections = { race: undefined, class: caster, background: undefined };
+  const completeCaster = {
+    name: "Mo", alignment: "Neutral Good", race: "Elf", className: "Wizard", background: "Sage",
+  };
+
+  it("creationMissing blocks an incomplete caster's spell picks", () => {
+    const draft = makeDraft({ ...completeCaster, cantripIds: ["c1"], spellIds: [] });
+    expect(creationMissing(draft, casterSelections)).toEqual(["Cantrips: choose 3", "Spells: choose 4"]);
+  });
+
+  it("creationMissing passes a complete caster", () => {
+    const draft = makeDraft({ ...completeCaster, cantripIds: ["c1", "c2", "c3"], spellIds: ["s1", "s2", "s3", "s4"] });
+    expect(creationMissing(draft, casterSelections)).toEqual([]);
+  });
+
+  it("creationMissing never blocks a non-caster on spells", () => {
+    const draft = makeDraft({ name: "F", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Sage" });
+    expect(creationMissing(draft, resolveSelections(reference, draft))).toEqual([]);
+  });
+
+  it("buildCreatePayload includes spells for a caster", () => {
+    const draft = makeDraft({ name: "Mo", className: "Wizard", cantripIds: ["c1"], spellIds: ["s1"] });
+    const skills = deriveSkillChoices(draft, casterSelections);
+    const payload = buildCreatePayload(draft, casterSelections, skills, []);
+    expect(payload.spells).toEqual({ cantripIds: ["c1"], spellIds: ["s1"] });
+  });
+
+  it("buildCreatePayload omits spells for a non-caster", () => {
+    const draft = makeDraft({ name: "F", className: "Rogue" });
+    const selections = resolveSelections(reference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.spells).toBeUndefined();
   });
 });

@@ -74,6 +74,31 @@ describe("useAttackRolls state-driven roll mode (#486)", () => {
   });
 });
 
+const exhaustion2: RollModifier[] = [
+  { mode: "flat", modifier: -4, kind: "attack", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "check", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "save", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "initiative", source: "Exhaustion" },
+];
+
+describe("useAttackRolls flat exhaustion penalty (#1136)", () => {
+  it("folds the flat penalty into the rolled spec's modifier and surfaces it in the chip", () => {
+    const { result, roll } = setup(exhaustion2);
+    expect(result.current.viewFor(entry).attackChip).toBe("−4 — Exhaustion");
+    expect(result.current.viewFor(entry).attackMode).toBe("normal");
+
+    result.current.viewFor(entry).onAttack();
+    // Base attack bonus +5 plus exhaustion −4 → +1 on the wire.
+    expect(roll.mock.calls[0][0]).toMatchObject({ modifier: 1, mode: "normal" });
+  });
+
+  it("keeps the flat penalty even when a manual advantage is chosen", () => {
+    const { result, roll } = setup(exhaustion2, "advantage");
+    result.current.viewFor(entry).onAttack();
+    expect(roll.mock.calls[0][0]).toMatchObject({ modifier: 1, mode: "advantage" });
+  });
+});
+
 describe("useAttackRolls manual roll mode (#958)", () => {
   it("applies the sheet's manual advantage and lets it override a state disadvantage", () => {
     // Manual advantage short-circuits the Poisoned disadvantage (resolveRollMode #4).

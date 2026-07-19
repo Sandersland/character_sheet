@@ -107,9 +107,9 @@ describe("Life Domain granted spells (#913)", () => {
     expect(granted.every((s) => s.prepared === true && s.source === "subclass")).toBe(true);
   });
 
-  it("gates the higher-tier grants out at cleric level 1", async () => {
+  it("gates all grants out at cleric level 1 (subclass grants at 3, #1128)", async () => {
     await createLifeCleric(XP_LVL_1);
     const names = (await grantedSpells()).map((s) => s.name).sort();
-    expect(names).toEqual(["Bless", "Cure Wounds"]);
+    expect(names).toEqual([]);
   });
 });

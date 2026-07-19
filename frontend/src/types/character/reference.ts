@@ -98,6 +98,16 @@ export interface ClassOption {
   toolChoices: string[];
   /** Number of tool choices the player may make. */
   toolChoiceCount: number;
+  /** #1131: level-1 creation pick counts (SRD 5.2); null for a non-caster. */
+  level1SpellPicks: { cantrips: number; spells: number } | null;
+}
+
+/** A background's Origin feat (PHB'24), served by GET /api/reference. */
+export interface OriginFeatOption {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
 }
 
 export interface BackgroundOption {
@@ -105,6 +115,10 @@ export interface BackgroundOption {
   name: string;
   skillProficiencies: SkillName[];
   toolProficiencies: string[];
+  /** The three abilities the +2/+1 (or 1/1/1) spread draws from; empty for spec-less legacy rows. */
+  abilityChoices: AbilityName[];
+  /** The Origin feat granted at creation; null for spec-less legacy rows. */
+  originFeat: OriginFeatOption | null;
 }
 
 /** One tool from the SRD TOOLS constant, served by GET /api/reference. */
@@ -146,8 +160,13 @@ export interface CreateCharacterInput {
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;
+  /** PHB'24 background ability spread (2+1 or 1+1+1 over the background's three
+   *  abilityChoices); omitted for custom/spec-less backgrounds (#1130). */
+  backgroundAbilities?: Partial<Record<AbilityName, number>>;
   skillProficiencies?: SkillName[];
   /** Tool names chosen by the player (from class toolChoices). */
   toolChoices?: string[];
   startingEquipment?: StartingEquipmentInput;
+  /** #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids). */
+  spells?: { cantripIds: string[]; spellIds: string[] };
 }

@@ -8,6 +8,7 @@ import type { Character, LevelUpPlanResponse } from "@/types/character";
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: null, newLevel: 8, isPrimary: true },
   steps: [{ kind: "hitPoints" }, { kind: "review" }],
+  grantedSpells: [],
 };
 
 function Probe() {
