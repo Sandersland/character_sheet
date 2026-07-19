@@ -129,7 +129,6 @@ export default function CharacterSheetHeader({
       />
       <DesktopBanner
         character={character}
-        onUpdate={onUpdate}
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={onTabChange}
@@ -157,7 +156,6 @@ export default function CharacterSheetHeader({
  */
 function DesktopBanner({
   character,
-  onUpdate,
   tabs,
   activeTab,
   onTabChange,
@@ -172,7 +170,7 @@ function DesktopBanner({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
-}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat">) {
+}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat" | "onUpdate">) {
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
@@ -246,7 +244,7 @@ function DesktopBanner({
 
         {/* Always-on vitals */}
         <div className="mt-4">
-          <BannerVitals character={character} onUpdate={onUpdate} />
+          <BannerVitals character={character} />
         </div>
 
         {/* Workspace tab bar (desktop only; mobile uses the docked SheetBottomNav) */}
