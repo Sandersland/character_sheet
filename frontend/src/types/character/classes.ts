@@ -231,15 +231,10 @@ export interface SetSubclassOperation { type: "setSubclass"; subclassId: string 
 
 export interface SetFightingStyleOperation { type: "setFightingStyle"; key: FightingStyleKey }
 
-/** Multiclass into a new class by catalog id — creates a level-1 entry (prereqs enforced server-side). */
-export interface AddClassOperation {
-  type: "addClass";
-  classId: string;
-  method?: "average" | "roll";
-  roll?: number;
-}
-
-export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation | AddClassOperation;
+// #1131: the frontend no longer dispatches an addClass op — AddClassPanel routes a
+// multiclass-add through the level-up ceremony (?classId=). The backend addClass op
+// stays for its other callers; the frontend mirror was dead and is dropped.
+export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation;
 
 /**
  * Resource operation types — mirror of `applyResourceOperations`. Sent as

@@ -508,7 +508,7 @@ function creationPickError(
     return { ok: false, status: 400, error: `${row.name} is not a cantrip` };
   }
   if (kind === "spell" && (row.level < 1 || row.level > maxLevel)) {
-    return { ok: false, status: 400, error: `${row.name} is not a level-1 spell ${classDisplay} can learn` };
+    return { ok: false, status: 400, error: `${row.name} is not a spell ${classDisplay} can learn at level 1 (max spell level: ${maxLevel})` };
   }
   if (!row.classes.includes(className)) {
     return { ok: false, status: 400, error: `${row.name} is not on the ${classDisplay} spell list` };

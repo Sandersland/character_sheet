@@ -1061,14 +1061,15 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
 
   it("rejects a cantrip submitted as a leveled spell (400)", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 0 }, select: { id: true } });
-    const validCantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 0 }, select: { id: true } });
+    // Two distinct cantrips: one misplaced in the leveled slot, one valid in the cantrip slot.
+    const [misplaced, validCantrip] = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 0 }, take: 2, select: { id: true } });
+    expect(misplaced.id).not.toBe(validCantrip.id);
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
       hp: { method: "average" },
       advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
-      spellsLearned: [{ type: "learnSpell", spellId: cantrip.id }], // level-0 spell in the leveled slot
+      spellsLearned: [{ type: "learnSpell", spellId: misplaced.id }], // level-0 spell in the leveled slot
       cantripsLearned: [{ type: "learnSpell", spellId: validCantrip.id }],
     });
     expect(res.status).toBe(400);
