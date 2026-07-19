@@ -64,16 +64,19 @@ export async function getActiveSessionId(
 }
 
 /**
- * Returns the character's campaign's active session (row + participants), or
- * null. Runs maybeAutoClose so a stale session never reports as active.
+ * Returns the character's active session (row + participants), or null. A
+ * character in a campaign resolves the campaign's active session; a campaign-less
+ * character resolves its own active solo session (#1080). Runs maybeAutoClose so
+ * a stale session never reports as active.
  */
 export async function getActiveSession(characterId: string) {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
     select: { campaignId: true },
   });
-  if (!character?.campaignId) return null;
-  return activeSessionForCampaign(character.campaignId);
+  if (!character) return null;
+  if (character.campaignId) return activeSessionForCampaign(character.campaignId);
+  return activeSoloSessionForCharacter(characterId);
 }
 
 /**
@@ -91,6 +94,16 @@ export async function autoCloseIfStale(sessionId: string): Promise<void> {
 async function activeSessionForCampaign(campaignId: string) {
   const session = await prisma.session.findFirst({
     where: { campaignId, status: "active" },
+    include: sessionWithParticipants,
+  });
+  if (!session) return null;
+  const checked = await maybeAutoClose(session);
+  return checked.status === "active" ? checked : null;
+}
+
+async function activeSoloSessionForCharacter(characterId: string) {
+  const session = await prisma.session.findFirst({
+    where: { campaignId: null, status: "active", participants: { some: { characterId } } },
     include: sessionWithParticipants,
   });
   if (!session) return null;
@@ -247,6 +260,66 @@ export async function startCampaignSession(
     const session = await tx.session.create({
       data: {
         campaignId,
+        title: title ?? null,
+        participants: { create: { characterId } },
+      },
+      include: sessionWithParticipants,
+    });
+
+    await logEvent(tx, {
+      characterId,
+      category: "session",
+      type: "sessionStarted",
+      summary: title ? `Session started: ${title}` : "Session started",
+      batchId,
+      sessionId: session.id,
+    });
+
+    return session;
+  });
+}
+
+/**
+ * Starts a character-scoped solo session (campaignId null) with `characterId` as
+ * its sole participant (#1080). Rejects a character that belongs to a campaign
+ * (use startCampaignSession) and a character that already has an active solo
+ * session. Invariant: at most one active solo session per character.
+ */
+export async function startSoloSession(characterId: string, title?: string) {
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: { campaignId: true },
+  });
+  if (!character) throw new SessionError(`Character not found: ${characterId}`, 404);
+  if (character.campaignId) {
+    throw new SessionError(
+      "Character belongs to a campaign; start a campaign session instead.",
+    );
+  }
+
+  const existing = await activeSoloSessionForCharacter(characterId);
+  if (existing) {
+    throw new SessionError(
+      `A solo session is already active (id: ${existing.id}). End it before starting a new one.`,
+    );
+  }
+
+  const batchId = randomUUID();
+  return prisma.$transaction(async (tx) => {
+    // Authoritative guard: re-check inside the tx so two concurrent starts can't
+    // both pass the pre-check above and create rival solo sessions.
+    const conflict = await tx.session.findFirst({
+      where: { campaignId: null, status: "active", participants: { some: { characterId } } },
+      select: { id: true },
+    });
+    if (conflict) {
+      throw new SessionError(
+        `A solo session is already active (id: ${conflict.id}). End it before starting a new one.`,
+      );
+    }
+
+    const session = await tx.session.create({
+      data: {
         title: title ?? null,
         participants: { create: { characterId } },
       },
