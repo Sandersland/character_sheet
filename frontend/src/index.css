@@ -210,6 +210,23 @@
   display: none;
 }
 
+/* Slim scrollbar for scrolling picker lists (#1104): keeps a discreet track so
+   the gutter reads as scrollable without the heavy native bar. */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-parchment-300) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-parchment-300);
+  border-radius: 3px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* Faint card-surface grain (#228); overlay layer, never tints interaction. */
 .surface-grain::after {
   content: "";
