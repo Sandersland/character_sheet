@@ -7,7 +7,7 @@
 
 import { useCallback, useRef, useState, type MutableRefObject } from "react";
 
-import { applyExperienceOperations, endSession, leaveSession } from "@/api/client";
+import { applyExperienceOperations, endSession, endSoloSession, leaveSession } from "@/api/client";
 import { clearTurnState } from "@/features/session/turnStatePersistence";
 import { errorMessage } from "@/lib/errorMessage";
 import type { Session } from "@/types/character";
@@ -51,12 +51,21 @@ async function awardXpThenEndSession(
     awardedRef.current = true;
   }
   clearTurnState(session.id);
-  const { session: ended } = await endSession(session.campaignId, session.id);
+  // A solo session (campaignId null, #1082) ends through the character-scoped
+  // route; a campaign session through the campaign route.
+  const { session: ended } =
+    session.campaignId === null
+      ? await endSoloSession(characterId, session.id)
+      : await endSession(session.campaignId, session.id);
   return ended;
 }
 
-/** Leave the session and drop this browser's local turn state for it. */
+/** Leave the campaign session and drop this browser's local turn state for it.
+ *  Leaving is campaign-only — a solo session has no party to leave behind — so a
+ *  null campaignId fails loud rather than silently no-op, in case a future
+ *  refactor re-exposes Leave for solo (the UI gates it out via canLeave). */
 export async function leaveAndClearTurnState(session: Session, characterId: string): Promise<void> {
+  if (session.campaignId === null) throw new Error("Cannot leave a solo (campaign-less) session");
   await leaveSession(session.campaignId, session.id, characterId);
   clearTurnState(session.id);
 }

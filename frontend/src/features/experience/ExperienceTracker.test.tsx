@@ -67,9 +67,16 @@ describe("ExperienceTracker (issue #225)", () => {
     expect(ops[0]).toEqual({ type: "set", value: 1000 });
   });
 
-  it("shows Max level when at the cap", () => {
+  it("captions the XP remaining to the next level", () => {
+    render(<ExperienceTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    // 2700 next − 900 current = 1800 to Level 4.
+    expect(screen.getByText(/1,800 XP to Level 4/i)).toBeInTheDocument();
+  });
+
+  it("shows Max level and hides the caption at the cap", () => {
     const maxed = { ...makeCharacter(), nextLevelThreshold: null } as unknown as Character;
     render(<ExperienceTracker character={maxed} onUpdate={vi.fn()} />);
     expect(screen.getByText(/max level/i)).toBeInTheDocument();
+    expect(screen.queryByText(/XP to Level/i)).not.toBeInTheDocument();
   });
 });

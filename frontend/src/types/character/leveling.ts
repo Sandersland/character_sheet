@@ -1,6 +1,14 @@
 /**
- * Advancement / feat / XP wire types and their operations.
+ * Advancement / feat / XP / level-up-ceremony wire types and their operations.
  */
+import type {
+  LearnDisciplineOperation,
+  LearnManeuverOperation,
+  LearnSubclassChoiceOperation,
+  LearnToolProficiencyOperation,
+} from "./classes";
+import type { LevelUpTarget } from "./combat";
+import type { ForgetSpellOperation, LearnSpellOperation } from "./spells";
 
 /**
  * A structured mechanical effect defined on a catalog or custom feat.
@@ -105,3 +113,56 @@ export interface XpAwardOperation { type: "award"; amount: number }
 export interface XpSetOperation { type: "set"; value: number }
 
 export type ExperienceOperation = XpAwardOperation | XpSetOperation;
+
+/** Mirror of the backend `LevelUpStepKind` (buildLevelUpPlan). */
+export type LevelUpStepKind =
+  | "hitPoints"
+  | "advancement"
+  | "subclass"
+  | "maneuvers"
+  | "fightingStyle"
+  | "disciplines"
+  | "toolProficiency"
+  | "subclassChoice"
+  | "newSpells"
+  | "review";
+
+/** One ceremony step. `meta.key`/`meta.label` identify a subclassChoice step. */
+export interface LevelUpStep {
+  kind: LevelUpStepKind;
+  count?: number;
+  meta?: Record<string, unknown>;
+}
+
+/** GET /api/characters/:id/level-up/plan — the derived ceremony plan (#886). */
+export interface LevelUpPlanResponse {
+  target: {
+    className: string;
+    /** Effective subclass: the pending pick when a subclassId query was sent, else the persisted one. */
+    subclass: string | null;
+    newLevel: number;
+    /** False for a non-primary multiclass target — subclass/fightingStyle steps can't commit yet (#1065). */
+    isPrimary: boolean;
+  };
+  steps: LevelUpStep[];
+}
+
+/**
+ * POST /api/characters/:id/level-up/transactions body — sent as-is, NOT wrapped
+ * in { operations }. Every field must exactly satisfy the plan's steps; the
+ * server validates the match and applies the whole ceremony atomically.
+ */
+export interface LevelUpSubmission {
+  target: LevelUpTarget;
+  hp: { method: "average" | "roll"; roll?: number };
+  advancement?: TakeAsiOperation | TakeFeatOperation;
+  subclassId?: string;
+  fightingStyle?: string;
+  maneuvers?: LearnManeuverOperation[];
+  disciplines?: LearnDisciplineOperation[];
+  toolProficiencies?: LearnToolProficiencyOperation[];
+  subclassChoices?: LearnSubclassChoiceOperation[];
+  spellsLearned?: LearnSpellOperation[];
+  /** #1101: the one optional known-spell swap forget, offset by an extra learn. */
+  spellsForgotten?: ForgetSpellOperation[];
+}

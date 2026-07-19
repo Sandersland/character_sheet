@@ -10,10 +10,14 @@ import ChipGroup from "@/components/ui/ChipGroup";
 import ChipToggle from "@/components/ui/ChipToggle";
 import Select from "@/components/ui/Select";
 import SpellRow from "@/features/spells/SpellRow";
+import SpellSwapBar from "@/features/spells/SpellSwapBar";
 import { LEVEL_OPTIONS, SPELL_SCHOOLS } from "@/lib/addSpell";
 import { schoolLabel } from "@/lib/spellMeta";
+import { runeState } from "@/lib/spellRow";
 import {
+  canPrepare,
   filterSpellbook,
+  swapCandidates,
   type PreparedBudget,
   type SpellbookFilter,
 } from "@/lib/spellList";
@@ -29,6 +33,7 @@ interface SpellbookListProps {
   concentratingOnEntryId: string | null;
   onCast: (spell: Spell, slotLevel?: number) => void;
   onPrepare: (spell: Spell) => void;
+  onSwap: (dropId: string, addId: string) => void;
   onForget: (spell: Spell) => void;
   availableSlotsFor: (spell: Spell) => number[];
   onAddSpell: () => void;
@@ -81,12 +86,29 @@ function SpellLevelGroup({
 const EMPTY_FILTER: SpellbookFilter = { level: null, school: null, prepared: false, ritual: false };
 
 export default function SpellbookList({
-  spells, sortedSpells, budget, onAddSpell, ...rest
+  spells, sortedSpells, budget, onAddSpell, onPrepare, onSwap, ...rest
 }: SpellbookListProps) {
   const [filter, setFilter] = useState<SpellbookFilter>(EMPTY_FILTER);
+  const [swapForId, setSwapForId] = useState<string | null>(null);
 
   const visible = filterSpellbook(sortedSpells, filter);
   const levels = [...new Set(visible.map((s) => s.level))].sort((a, b) => a - b);
+
+  const candidates = swapCandidates(sortedSpells);
+  // Derived, so the bar auto-closes if its target got prepared or left the book.
+  const swapFor = sortedSpells.find(
+    (s) => s.id === swapForId && runeState(s) === "unprepared",
+  );
+
+  // Intercept a cap-blocked prepare tap into swap mode when there's something to drop;
+  // otherwise fall through to handlePrepare's existing error path (#938).
+  function handlePrepareIntent(spell: Spell) {
+    if (!canPrepare(spell, budget) && candidates.length > 0) {
+      setSwapForId(spell.id);
+      return;
+    }
+    onPrepare(spell);
+  }
 
   return (
     <div>
@@ -114,6 +136,21 @@ export default function SpellbookList({
           </div>
         )}
       </div>
+
+      {swapFor && budget.limit != null && (
+        <SpellSwapBar
+          addSpell={swapFor}
+          candidates={candidates}
+          limit={budget.limit}
+          busy={rest.busy}
+          onPick={(dropId) => {
+            // Clear optimistically; a server rejection surfaces via the section error strip.
+            setSwapForId(null);
+            onSwap(dropId, swapFor.id);
+          }}
+          onCancel={() => setSwapForId(null)}
+        />
+      )}
 
       {spells.length === 0 ? (
         <EmptyState
@@ -166,6 +203,7 @@ export default function SpellbookList({
                   level={level}
                   levelSpells={visible.filter((s) => s.level === level)}
                   budget={budget}
+                  onPrepare={handlePrepareIntent}
                   {...rest}
                 />
               ))}

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, createSessionCharacter, gotoSheet, uniqueName } from "./helpers/api";
+import { enterLiveCombat, createCharacter, createSessionCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // A fresh, session-ready character keeps the inventory (and thus the in-session
 // attack-form selector) unambiguous: exactly one weapon exists, so its equipped
@@ -38,7 +38,7 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   await expect(page.getByRole("button", { name: "Equipped" })).toBeVisible();
 
   // ── Into the live session, where the attack row reflects equipped weapons ────
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();

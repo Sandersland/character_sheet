@@ -28,13 +28,13 @@ export function useDieFaceData(faces: number) {
   const groups = useMemo(() => {
     const computed = computeFaceGroups(logicGeometry);
     // Only trust the grouping if it found exactly one face per rolled value
-    // (true for the supported platonic dice; false for the box fallback).
+    // (true for every supported die; false for the d100 box fallback).
     return computed.length === faces ? computed : [];
   }, [logicGeometry, faces]);
 
   // Smooth-shade every recognized polyhedral die (those with a clean per-face
   // grouping) so edges read as soft resin rather than hard CG facets — matching
-  // the d6's look. The d10/d100 box fallback (no face groups) stays flat-shaded.
+  // the d6's look. Only the d100 box fallback (no face groups) stays flat-shaded.
   const rounded = groups.length > 0;
 
   return { visualGeometry, groups, rounded };

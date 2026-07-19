@@ -92,7 +92,7 @@ const DieMesh = forwardRef<THREE.Group, DieMeshProps>(function DieMesh(
               {`${index + 1}`}
             </Text>
           ))}
-        {/* Fallback for die types with no matching geometry (e.g. d10): no
+        {/* Fallback for die types with no matching geometry (only the d100): no
             per-face mapping is possible, so just surface the settled value. */}
         {!showFaceLabels && !rolling && value !== null && (
           <Text font={faceLabelFont} position={[0, 1.1, 0]} fontSize={0.4} color={labelColor} anchorX="center" anchorY="middle">

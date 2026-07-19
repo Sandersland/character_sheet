@@ -210,6 +210,23 @@
   display: none;
 }
 
+/* Slim scrollbar for scrolling picker lists (#1104): keeps a discreet track so
+   the gutter reads as scrollable without the heavy native bar. */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-parchment-300) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-parchment-300);
+  border-radius: 3px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* Faint card-surface grain (#228); overlay layer, never tints interaction. */
 .surface-grain::after {
   content: "";
@@ -312,6 +329,35 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-\[score-pop_0\.45s_ease-out\] {
+    animation: none;
+  }
+}
+
+/* Mobile sheet-header collapse crossfade (#1083): incoming variant fades up into
+   place while the outgoing one fades/slides out as an inert overlay. */
+@keyframes header-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes header-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[header-in_200ms_ease-out\],
+  .animate-\[header-out_200ms_ease-out_forwards\] {
     animation: none;
   }
 }

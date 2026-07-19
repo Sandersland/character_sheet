@@ -63,9 +63,9 @@ export function summarizeSessionDoorway(
   state: SessionDoorwayState,
   now: Date = new Date(),
 ): SessionDoorwaySummary {
-  // Solo / no campaign — the bar is absent, not disabled.
-  if (state.campaignId === null) return HIDDEN;
-
+  // A null campaignId is a solo character (#1082), not a hidden bar: it still
+  // gets Start (canStart) / Resume off the same kind switch — the only
+  // campaign-specific paths (join/schedule) are unreachable for it server-side.
   const round = state.session?.round ?? null;
 
   switch (state.kind) {

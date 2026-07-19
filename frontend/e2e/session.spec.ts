@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
+import { enterLiveCombat } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // #962: the legacy /session route redirects to the sheet's Combat tab (bookmarks).
@@ -17,15 +18,14 @@ test("session: /characters/:id/session redirects to the Combat tab", async ({ pa
 // live session can be started/resumed here). The session button resolves to
 // Start/Resume/Join depending on leftover state — any of them lands on /session.
 // #963: the doorway lands on the Combat tab in-workspace (?tab=combat), where
-// the live turn tracker runs. (The Session Log lives on /session's reference
-// tabs; its move to a Turn/Log sub-nav under Combat is #962, so the log
-// assertion returns then.)
+// the live turn tracker runs. The session log is an on-demand overlay now (#1086,
+// see the dedicated test below), not a persistent rail.
 test("session: start combat and take an action from the Combat tab", async ({ page }) => {
   await login(page);
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
@@ -40,31 +40,42 @@ test("session: start combat and take an action from the Combat tab", async ({ pa
   expect(errors).toEqual([]);
 });
 
-// #964: on desktop (md+, the default e2e viewport) live Combat is a three-column
-// view — roll rails · turn tracker · session log. A skill rolled from the LEFT
-// rail must land in the RIGHT-rail session log without any tab switch, and the
-// banner + Combat tab must carry the live signal.
-test("session: desktop three-column live Combat — left-rail roll lands in the right-rail log", async ({ page }) => {
+// #1086: the #964 three-column live view is gone — no abilities/skills rail, no
+// persistent session-log rail. The log is a one-line row that opens an on-demand
+// overlay (a right-side Drawer on desktop). A roll made from the turn tracker
+// must land in that log without any tab switch.
+test("session: desktop live Combat has no rails; a roll lands in the on-demand log overlay", async ({ page }) => {
   await login(page);
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  // Both rails are present alongside the center tracker (desktop only).
-  const rollRail = page.getByRole("complementary", { name: /Ability checks, saves, and skills/i });
-  const logRail = page.getByRole("complementary", { name: /Session log/i });
-  await expect(rollRail).toBeVisible();
-  await expect(logRail).toBeVisible();
+  // The old rails are gone (#1086).
+  await expect(
+    page.getByRole("complementary", { name: /Ability checks, saves, and skills/i }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: /Session log/i })).toHaveCount(0);
 
   // The persistent banner shows the live state; the Combat tab carries the pip.
   await expect(page.getByRole("tab", { name: /Combat \(session live\)/i })).toBeVisible();
 
-  // Roll a skill from the left rail → it logs to the right-rail session log, no
-  // tab switch (there is no mobile Turn/Log sub-nav at this breakpoint).
-  await rollRail.getByRole("button", { name: /Arcana/ }).click();
-  await expect(logRail.getByText(/Arcana check:/)).toBeVisible();
+  // Start combat + roll an attack from the turn tracker.
+  await page.getByRole("button", { name: /Start combat/i }).click();
+  await page.getByRole("button", { name: "Start my turn" }).click();
+  await page.getByRole("button", { name: /Use Action/ }).click();
+  await page.getByRole("button", { name: "Attack", exact: true }).click();
+  const attackSheet = page.getByRole("dialog");
+  await attackSheet.getByRole("button", { name: /Roll to hit/ }).first().click();
+  await attackSheet.getByRole("button", { name: /^Done$/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // Open the on-demand log overlay (a right Drawer) — the attack roll landed in it
+  // without any tab switch.
+  await page.getByRole("button", { name: /open session log/i }).click();
+  const logDrawer = page.getByRole("dialog", { name: "Session Log" });
+  await expect(logDrawer.getByText("attack").first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -76,7 +87,7 @@ test("session: opening Use-an-item then closing leaves the action available", as
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
@@ -106,7 +117,7 @@ test("session: the global roll-mode footer is retired (mobile)", async ({ page }
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   // No docked footer and no global "Roll mode" group anywhere.
@@ -134,7 +145,7 @@ test("session: the result seal shows over the open attack sheet (mobile)", async
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
@@ -166,7 +177,7 @@ test("session: Change weapons in the Action sheet opens the per-hand picker on m
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();

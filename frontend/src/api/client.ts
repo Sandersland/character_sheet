@@ -37,6 +37,9 @@ import type {
   JournalEntryKind,
   InventoryOperation,
   Item,
+  LevelUpPlanResponse,
+  LevelUpSubmission,
+  LevelUpTarget,
   ManeuverOperation,
   ManeuverCastResult,
   ReferenceData,
@@ -101,7 +104,9 @@ const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
 // full updated Character. Every uniform domain funnels through here — the only
 // per-domain differences are the URL segment and the error label. (applyHitPoint-
 // Operations and applyExperienceOperations deliberately don't use this: HP unwraps
-// { character, concentrationChecks } and XP threads an optional sessionId.)
+// { character, concentrationChecks } and XP threads an optional sessionId.
+// submitLevelUp doesn't either: its body is the structured LevelUpSubmission
+// itself, not an { operations } batch.)
 async function postTransactions<TOp>(
   characterId: string,
   domain: string,
@@ -455,6 +460,38 @@ export async function applyAdvancementTransactions(
   return postTransactions(characterId, "advancement", operations, "Failed to apply advancement operations");
 }
 
+// The derived level-up ceremony plan (#886): resolved target + ordered steps.
+// `subclassId` triggers the server-side re-plan for a not-yet-committed subclass
+// pick. Read-only — nothing is mutated.
+export async function fetchLevelUpPlan(
+  characterId: string,
+  target: LevelUpTarget,
+  subclassId?: string,
+): Promise<LevelUpPlanResponse> {
+  const params = new URLSearchParams();
+  if (target.kind === "existing") params.set("classEntryId", target.classEntryId);
+  else params.set("classId", target.classId);
+  if (subclassId) params.set("subclassId", subclassId);
+  return request<LevelUpPlanResponse>(
+    `/characters/${characterId}/level-up/plan?${params.toString()}`,
+    undefined,
+    "Failed to fetch level-up plan",
+  );
+}
+
+// Commits one whole level-up ceremony atomically. The submission is the body
+// verbatim (see the postTransactions note above); returns the leveled Character.
+export async function submitLevelUp(
+  characterId: string,
+  submission: LevelUpSubmission,
+): Promise<Character> {
+  return request<Character>(
+    `/characters/${characterId}/level-up/transactions`,
+    jsonBody(submission),
+    "Failed to apply level-up",
+  );
+}
+
 // Reverts the most-recent non-reverted batch (LIFO undo). Returns the updated
 // character if the revert succeeds, or throws with a human-readable message
 // (409 if the batch isn't the most recent, or it's already reverted).
@@ -745,6 +782,35 @@ export async function startCampaignSession(
     `/campaigns/${campaignId}/sessions`,
     jsonBody({ characterId, title }),
     "Failed to start session",
+  );
+}
+
+// Solo sessions (#1082) live on the character, not a campaign — a campaign-less
+// character starts/ends its own private session through these character-scoped
+// routes (#1081). Same response shapes as the campaign start/end so the shared
+// doorway + lifecycle plumbing branches only on which call to make.
+
+/** Start a solo (campaign-less) session for a character. */
+export async function startSoloSession(
+  characterId: string,
+  title?: string,
+): Promise<{ session: Session; character: Character }> {
+  return request<{ session: Session; character: Character }>(
+    `/characters/${characterId}/sessions`,
+    jsonBody({ title }),
+    "Failed to start session",
+  );
+}
+
+/** End a solo session by id. */
+export async function endSoloSession(
+  characterId: string,
+  sessionId: string,
+): Promise<{ session: Session }> {
+  return request<{ session: Session }>(
+    `/characters/${characterId}/sessions/${sessionId}/end`,
+    { method: "POST" },
+    "Failed to end session",
   );
 }
 

@@ -260,6 +260,15 @@ export interface LearnToolProficiencyOperation { type: "learnToolProficiency"; n
 /** Undo a subclass-granted tool proficiency choice. */
 export interface ForgetToolProficiencyOperation { type: "forgetToolProficiency"; entryId: string }
 
+/** Pick one option for a generic subclass "choose N" (e.g. Hunter's Prey). */
+export interface LearnSubclassChoiceOperation {
+  type: "learnSubclassChoice";
+  choiceKey: string;
+  /** Catalog GrantedAbility id; omit for a custom (homebrew) option. */
+  optionId?: string;
+  custom?: { name: string; description: string };
+}
+
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
@@ -269,7 +278,8 @@ export type ResourceOperation =
   | ForgetDisciplineOperation
   | SwapDisciplineOperation
   | LearnToolProficiencyOperation
-  | ForgetToolProficiencyOperation;
+  | ForgetToolProficiencyOperation
+  | LearnSubclassChoiceOperation;
 
 /**
  * Discipline operation types — mirror of `applyDisciplineOperations`. Sent as

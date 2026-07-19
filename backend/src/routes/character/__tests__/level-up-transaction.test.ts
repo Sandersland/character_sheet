@@ -270,6 +270,169 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
   });
 });
 
+// Known-caster spell swap (#1101): a Sorcerer may forget one known spell and
+// learn an extra one in the same level-up. Forget must apply BEFORE learn.
+describe("POST …/level-up/transactions — known-spell swap (Sorcerer 4→5, #1101)", () => {
+  const CHAR_ID = "lvtx-sorcerer-swap";
+  let seeded: Array<{ id: string; name: string }>; // catalog spells seeded as known
+  let fresh: Array<{ id: string; name: string }>;   // catalog spells to learn new
+
+  // Minimal known-spell entry snapshot; only id/spellId/level/source matter for
+  // the swap, but the serializer reads the descriptive fields too.
+  function entryFor(spell: { id: string; name: string; level: number; school: string; castingTime: string; range: string; duration: string; description: string }, entryId: string) {
+    return {
+      id: entryId,
+      spellId: spell.id,
+      name: spell.name,
+      level: spell.level,
+      school: spell.school,
+      prepared: false,
+      castingTime: spell.castingTime,
+      range: spell.range,
+      duration: spell.duration,
+      description: spell.description,
+    };
+  }
+
+  beforeEach(async () => {
+    const sorcerer = await prisma.characterClass.findFirstOrThrow({ where: { name: "Sorcerer" } });
+    const pool = await prisma.spell.findMany({ where: { classes: { has: "sorcerer" }, level: 1 }, take: 5 });
+    expect(pool.length).toBe(5);
+    seeded = [pool[0], pool[1]];
+    fresh = [pool[2], pool[3], pool[4]];
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Sorcerer Swap",
+        experiencePoints: 6500, // level 5 threshold; hitDice.total 4 → 1 pending
+        hitPoints: { current: 22, max: 22, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 4, die: "d6", spent: 0 },
+        abilityScores: { strength: 8, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: {
+          slotsUsed: {}, arcanumUsed: {}, concentratingOn: null,
+          spells: [entryFor(pool[0], "known-a"), entryFor(pool[1], "known-b")],
+        },
+        classEntries: { create: [{ name: "sorcerer", subclass: "Draconic Bloodline", classId: sorcerer.id, position: 0, level: 4 }] },
+      },
+    });
+  });
+
+  it("forgets one known spell and learns two new ones under one batchId", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "known-a" }],
+      spellsLearned: fresh.slice(0, 2).map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).not.toContain(seeded[0].name); // forgotten
+    expect(names).toContain(seeded[1].name);     // kept
+    for (const s of fresh.slice(0, 2)) expect(names).toContain(s.name); // learned
+    expect(await distinctBatchIds(CHAR_ID)).toHaveLength(1);
+  });
+
+  it("swap-to-same-spellId works ONLY because forget applies before learn", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // Re-learn the very spellId being forgotten (known-a → seeded[0].id), plus one
+    // genuinely new spell. A learn-first order would 409 on the duplicate spellId.
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "known-a" }],
+      spellsLearned: [
+        { type: "learnSpell", spellId: seeded[0].id },
+        { type: "learnSpell", spellId: fresh[0].id },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain(seeded[0].name);
+    expect(names).toContain(fresh[0].name);
+  });
+
+  it("a single revert restores the forgotten spell and removes the learned ones", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const ceremony = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "known-a" }],
+      spellsLearned: fresh.slice(0, 2).map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(ceremony.status).toBe(200);
+
+    const res = await revert(CHAR_ID, await latestBatchId(CHAR_ID));
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain(seeded[0].name); // restored
+    for (const s of fresh.slice(0, 2)) expect(names).not.toContain(s.name); // learns undone
+    expect(res.body.pendingLevelUps).toBe(1);
+  });
+
+  it("400: two forgets are rejected", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      // Net stays at the step count (1): 2 forgets offset by 3 learns, so
+      // assertCounts passes and the ≤1-forget guard is what rejects.
+      spellsForgotten: [
+        { type: "forgetSpell", entryId: "known-a" },
+        { type: "forgetSpell", entryId: "known-b" },
+      ],
+      spellsLearned: fresh.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/at most one/i);
+  });
+
+  it("400: malformed forget op (missing entryId) → Invalid request body", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsForgotten: [{ type: "forgetSpell" }],
+      spellsLearned: fresh.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid request body/i);
+  });
+});
+
+// A Fighter has no newSpells step, so any forget is rejected up front (#1101).
+describe("POST …/level-up/transactions — swap rejected for a non-caster (#1101)", () => {
+  it("400: a Fighter 7→8 forget is rejected (does not allow swapping)", async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: "lvtx-fighter-swap",
+        name: "LevelUpTx Fighter Swap",
+        experiencePoints: 34000,
+        hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 7, die: "d10", spent: 0 },
+        abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ name: "fighter", subclass: "Champion", classId: fighter.id, position: 0, level: 7 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-fighter-swap" } });
+    const res = await post("lvtx-fighter-swap", {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "whatever" }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not allow swapping/i);
+  });
+});
+
 // HP applies first in-tx, so a failure in the last (spell) op proves the whole
 // ceremony rolls back — the core #885 acceptance criterion.
 describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls back everything)", () => {
@@ -586,6 +749,172 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
         advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
       });
     expect(res.status).toBe(403);
+  });
+});
+
+// Non-primary ceremonies (#1065): multiclass-into-Fighter is the canonical case —
+// its plan is [hitPoints, fightingStyle, review], so without generalized class
+// appliers no valid submission exists at all.
+describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () => {
+  const WIZARD_FIXTURE = {
+    ...BASE,
+    ownerId: OWNER_ID,
+    // STR 14 satisfies the Fighter multiclass prerequisite (STR 13 or DEX 13).
+    abilityScores: { strength: 14, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
+    spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+  };
+
+  it("multiclass INTO Fighter applies hp + fighting style under one batchId, and the style survives serialization", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-mc-into-fighter";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC Into Fighter",
+        experiencePoints: 2700, // level 4 threshold; hitDice.total 3 → 1 pending
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d6", spent: 0 },
+        classEntries: {
+          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+        },
+      },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "new", classId: fighter.id },
+      hp: { method: "average" },
+      fightingStyle: "defense",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.hitDice.total).toBe(4);
+    // The new level-1 Fighter entry exists and the chosen style is VISIBLE on the
+    // wire — the read-side clamp must not null it just because the primary class
+    // (wizard) grants no style.
+    expect(res.body.classes).toHaveLength(2);
+    // The created entry snapshots the catalog's display name ("Fighter").
+    expect(res.body.classes[1]).toMatchObject({ name: "Fighter", level: 1 });
+    expect(res.body.resources.fightingStyle).toBe("defense");
+
+    const batchIds = await distinctBatchIds(CHAR_ID);
+    expect(batchIds).toHaveLength(1);
+
+    // Persisted, not just serialized.
+    const after = await prisma.character.findUniqueOrThrow({ where: { id: CHAR_ID } });
+    expect((after.resources as { fightingStyle?: string }).fightingStyle).toBe("defense");
+  });
+
+  it("single revert undoes the whole multiclass ceremony: entry gone, style cleared", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-mc-undo";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC Undo",
+        experiencePoints: 2700,
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d6", spent: 0 },
+        classEntries: {
+          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+        },
+      },
+    });
+
+    const ceremony = await post(CHAR_ID, {
+      target: { kind: "new", classId: fighter.id },
+      hp: { method: "average" },
+      fightingStyle: "defense",
+    });
+    expect(ceremony.status).toBe(200);
+
+    const res = await revert(CHAR_ID, await latestBatchId(CHAR_ID));
+    expect(res.status).toBe(200);
+    expect(res.body.classes).toHaveLength(1);
+    expect(res.body.hitDice.total).toBe(3);
+    expect(res.body.resources.fightingStyle ?? null).toBeNull();
+    expect(res.body.pendingLevelUps).toBe(1);
+  });
+
+  it("an EXISTING non-primary Fighter 2→3 can choose a subclass with no resource choices (Champion)", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const champion = await prisma.subclass.findFirstOrThrow({ where: { name: "Champion", classId: fighter.id } });
+    const CHAR_ID = "lvtx-mc-champion";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC Champion",
+        experiencePoints: 14000, // level 6 threshold; entries sum 5 → 1 pending
+        hitPoints: { current: 34, max: 34, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d6", spent: 0 },
+        classEntries: {
+          create: [
+            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
+            { name: "fighter", subclass: null, classId: fighter.id, position: 1, level: 2 },
+          ],
+        },
+      },
+    });
+    const secondary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: secondary.id },
+      hp: { method: "average" },
+      subclassId: champion.id,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.hitDice.total).toBe(6);
+    expect(res.body.classes[1].subclass).toBe("Champion");
+
+    // The subclass landed on the SECONDARY entry, not the primary.
+    const persisted = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: secondary.id } });
+    expect(persisted.subclass).toBe("Champion");
+    const primary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 0 } });
+    expect(primary.subclass).toBe("School of Evocation");
+  });
+
+  // Pins the RESOURCE_BACKED guard for an ALREADY-subclassed non-primary entry:
+  // Battle Master Fighter 6→7 grants only maneuvers (no subclass step), so this
+  // is the path a subclass-step-only guard would miss (#886 review).
+  it("400: a non-primary Battle Master 6→7 (maneuvers-only plan) is rejected by the resource-backed guard", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-mc-bm-maneuvers";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC BM Maneuvers",
+        experiencePoints: 64000, // level 10 threshold; entries sum 9 → 1 pending
+        hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 9, die: "d6", spent: 0 },
+        classEntries: {
+          create: [
+            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
+            { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 6 },
+          ],
+        },
+      },
+    });
+    const secondary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+    const maneuvers = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 2, select: { id: true } });
+    expect(maneuvers).toHaveLength(2);
+
+    // Complete, count-valid submission — the rejection must come from the
+    // non-primary guard, not a validation mismatch.
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: secondary.id },
+      hp: { method: "average" },
+      maneuvers: maneuvers.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not supported for a non-primary class/i);
   });
 });
 

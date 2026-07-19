@@ -29,9 +29,23 @@ function state(over: Partial<SessionDoorwayState>): SessionDoorwayState {
 }
 
 describe("summarizeSessionDoorway", () => {
-  it("is hidden for a solo character (no campaign)", () => {
-    const s = summarizeSessionDoorway(state({ campaignId: null, canStart: false }));
-    expect(s.visible).toBe(false);
+  describe("solo (no campaign, #1082)", () => {
+    it("offers the Start invite to a campaign-less character that can start", () => {
+      const s = summarizeSessionDoorway(state({ campaignId: null, canStart: true, kind: "none" }));
+      expect(s).toMatchObject({ visible: true, tone: "invite", label: "Start session", action: "start" });
+    });
+
+    it("resumes a live solo session, carrying the round", () => {
+      const s = summarizeSessionDoorway(
+        state({ campaignId: null, canStart: true, kind: "liveJoined", session: activeSession({ round: 2 }) }),
+      );
+      expect(s).toMatchObject({ visible: true, tone: "live", label: "Resume session", sub: "Round 2", action: "resume" });
+    });
+
+    it("stays hidden when a solo character cannot start", () => {
+      const s = summarizeSessionDoorway(state({ campaignId: null, canStart: false, kind: "none" }));
+      expect(s.visible).toBe(false);
+    });
   });
 
   describe("none", () => {

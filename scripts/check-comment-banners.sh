@@ -13,9 +13,11 @@
 # Flags two divider shapes: box-drawing runs (U+2500 "──", distinct from the
 # em-dash U+2014 "—" used throughout prose, so prose never trips) and ASCII/"~"
 # rule comments ("// ----", "* ===="). Bare em-dashes and "-->" don't match.
+# Box runs must sit on a comment line — rendered glyph content is legal UI
+# (LevelUpCeremony's ✦───✦ ornament), not a banner (#886).
 set -eu
 
-matches=$(git grep -nP '\x{2500}{2,}|(?://|\*)\s*[-=~]{3,}' -- \
+matches=$(git grep -nP '^\s*(?://|/?\*).*\x{2500}{2,}|(?://|\*)\s*[-=~]{3,}' -- \
   ':(glob)frontend/src/**/*.ts' ':(glob)frontend/src/**/*.tsx' \
   ':(glob)frontend/src/**/*.js' ':(glob)frontend/src/**/*.mjs' \
   ':(glob)frontend/src/**/*.cjs' || true)

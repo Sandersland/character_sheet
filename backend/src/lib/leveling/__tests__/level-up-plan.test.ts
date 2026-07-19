@@ -127,6 +127,15 @@ describe("buildLevelUpPlan — newSpells", () => {
     expect(plan.find((s) => s.kind === "newSpells")?.count).toBe(2);
   });
 
+  it("carries the derived spell-level ceiling in meta.maxSpellLevel", () => {
+    expect(buildLevelUpPlan(char("wizard", 2), target("wizard", 3)).find((s) => s.kind === "newSpells")?.meta?.maxSpellLevel).toBe(2);
+    expect(buildLevelUpPlan(char("wizard", 8), target("wizard", 9)).find((s) => s.kind === "newSpells")?.meta?.maxSpellLevel).toBe(5);
+    // Sorcerer learn level: ceiling present, no Magical Secrets flag.
+    const sorc = buildLevelUpPlan(char("sorcerer", 4), target("sorcerer", 5)).find((s) => s.kind === "newSpells");
+    expect(sorc?.meta?.maxSpellLevel).toBe(3);
+    expect(sorc?.meta?.magicalSecrets).toBeUndefined();
+  });
+
   it("Ranger 1→2 gains its first spells known", () => {
     const plan = buildLevelUpPlan(char("ranger", 1), target("ranger", 2));
     expect(kinds(plan)).toEqual(["hitPoints", "newSpells", "review"]);
@@ -139,24 +148,47 @@ describe("buildLevelUpPlan — newSpells", () => {
     expect(kinds(buildLevelUpPlan(char("paladin", 4), target("paladin", 5)))).not.toContain("newSpells");
   });
 
-  it("omits newSpells on a flat known level (Sorcerer 11→12)", () => {
-    const plan = buildLevelUpPlan(char("sorcerer", 11), target("sorcerer", 12));
-    expect(kinds(plan)).not.toContain("newSpells");
+  it("emits a swap-only newSpells step on a flat known level (Sorcerer 11→12, #1101)", () => {
+    const step = buildLevelUpPlan(char("sorcerer", 11), target("sorcerer", 12)).find((s) => s.kind === "newSpells");
+    expect(step?.count).toBe(0);
+    expect(step?.meta?.canSwap).toBe(true);
+  });
+
+  it("known casters carry meta.canSwap on a normal learn level (Bard 2→3, #1101)", () => {
+    const step = buildLevelUpPlan(char("bard", 2), target("bard", 3)).find((s) => s.kind === "newSpells");
+    expect(step?.count).toBe(1);
+    expect(step?.meta?.canSwap).toBe(true);
+  });
+
+  it("Wizard (a spellbook caster, not a known caster) never carries canSwap (#1101)", () => {
+    const step = buildLevelUpPlan(char("wizard", 3), target("wizard", 4)).find((s) => s.kind === "newSpells");
+    expect(step?.count).toBe(2);
+    expect(step?.meta?.canSwap).toBeUndefined();
+  });
+
+  it("a plain Fighter 1→2 (non-caster) still emits no newSpells step (#1101)", () => {
+    expect(kinds(buildLevelUpPlan(char("fighter", 1), target("fighter", 2)))).not.toContain("newSpells");
   });
 
   it("tags a Bard Magical Secrets level (9→10) but not a normal learn level", () => {
     const secrets = buildLevelUpPlan(char("bard", 9), target("bard", 10)).find((s) => s.kind === "newSpells");
     expect(secrets?.count).toBe(2);
     expect(secrets?.meta?.magicalSecrets).toBe(true);
+    expect(secrets?.meta?.maxSpellLevel).toBe(5);
 
     const normal = buildLevelUpPlan(char("bard", 2), target("bard", 3)).find((s) => s.kind === "newSpells");
     expect(normal?.count).toBe(1);
     expect(normal?.meta?.magicalSecrets).toBeUndefined();
+    expect(normal?.meta?.maxSpellLevel).toBe(2);
   });
 
-  it("third-caster subclasses (Eldritch Knight / Arcane Trickster) emit no newSpells step", () => {
-    expect(kinds(buildLevelUpPlan(char("fighter", 7, "eldritch knight"), target("fighter", 8, "eldritch knight")))).not.toContain("newSpells");
-    expect(kinds(buildLevelUpPlan(char("rogue", 7, "arcane trickster"), target("rogue", 8, "arcane trickster")))).not.toContain("newSpells");
+  it("third-caster subclasses (Eldritch Knight / Arcane Trickster) resolve as known → swap-only step (#1101)", () => {
+    const ek = buildLevelUpPlan(char("fighter", 7, "eldritch knight"), target("fighter", 8, "eldritch knight")).find((s) => s.kind === "newSpells");
+    expect(ek?.count).toBe(0);
+    expect(ek?.meta?.canSwap).toBe(true);
+    const at = buildLevelUpPlan(char("rogue", 7, "arcane trickster"), target("rogue", 8, "arcane trickster")).find((s) => s.kind === "newSpells");
+    expect(at?.count).toBe(0);
+    expect(at?.meta?.canSwap).toBe(true);
   });
 });
 

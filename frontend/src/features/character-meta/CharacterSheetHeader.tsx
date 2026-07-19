@@ -12,8 +12,9 @@ import type { Character } from "@/types/character";
 
 interface CharacterSheetHeaderProps {
   character: Character;
-  /** Applies HP edits from the header's tappable HP readout (#982) — routed to
-   *  `handleCharacterUpdate` so damage/heal also bumps the session log. */
+  /** Propagates HP edits so damage/heal also bumps the session log (#982).
+   *  Used by the mobile header's tappable HP readout; desktop live-play HP
+   *  lives in CombatUtilityStrip (#1085). */
   onUpdate: (c: Character) => void;
   tabs: SheetTab[];
   activeTab: SheetTabId;
@@ -21,13 +22,11 @@ interface CharacterSheetHeaderProps {
   /** A session is live (joined or joinable) — drives the banner live badge + the
    *  Combat tab pip on the desktop tab bar (#964, mirrors the mobile nav pip). */
   isLive?: boolean;
-  /** The active combat round to show in the live strip pill (null = live but not
-   *  in combat, or not joined). */
+  /** The active combat round to show in the live pill (null = live but not in
+   *  combat, or not joined). */
   liveRound?: number | null;
-  /** The live session's title, shown on the slim live strip / mobile fight bar. */
-  sessionName?: string | null;
   /** This character is in the live session — surfaces Leave/End Session in the
-   *  sheet header's own menu (there's no separate in-panel strip, #979). */
+   *  banner cluster (desktop) / ⋯ menu (mobile), #979. */
   isLiveJoined?: boolean;
   /** A leave/end is in flight — disables those items. */
   sessionActionBusy?: boolean;
@@ -42,19 +41,33 @@ interface CharacterSheetHeaderProps {
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  /** Opens the Campaign settings sheet (#1087); the ⋮ item shows only when set
+   *  AND the character is campaign-attached. */
+  onOpenCampaignSettings?: () => void;
 }
 
 /** The mobile header's folded-in Leave/End controls (#979), present only while
  *  this character is in a live session. Extracted so the header render stays
- *  under the cognitive ceiling. */
+ *  under the cognitive ceiling. onLeave is optional — a solo session (#1082)
+ *  omits it (Leave is campaign-only), so the group hinges on End, not Leave. */
 function buildSessionActions(
   isLiveJoined: boolean,
   busy: boolean,
   onLeave?: () => void,
   onEnd?: () => void,
-): { busy: boolean; onLeave: () => void; onEnd: () => void } | null {
-  if (!isLiveJoined || !onLeave || !onEnd) return null;
+): { busy: boolean; onLeave?: () => void; onEnd: () => void } | null {
+  if (!isLiveJoined || !onEnd) return null;
   return { busy, onLeave, onEnd };
+}
+
+/** Gate the Campaign-settings ⋮ item once (#1087): only campaign-attached
+ *  characters with a wired handler get it. Extracted so both breakpoints agree
+ *  and the header component stays under the cognitive ceiling. */
+function campaignSettingsHandler(
+  campaignId: string | undefined,
+  onOpen?: () => void,
+): (() => void) | undefined {
+  return campaignId ? onOpen : undefined;
 }
 
 /** Annotate the Combat tab with a gold "session live" pip (#961/#964); every
@@ -95,7 +108,6 @@ export default function CharacterSheetHeader({
   onTabChange,
   isLive = false,
   liveRound = null,
-  sessionName = null,
   isLiveJoined = false,
   sessionActionBusy = false,
   onLeaveSession,
@@ -106,7 +118,9 @@ export default function CharacterSheetHeader({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: CharacterSheetHeaderProps) {
+  const campaignSettings = campaignSettingsHandler(character.campaignId, onOpenCampaignSettings);
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
@@ -126,16 +140,15 @@ export default function CharacterSheetHeader({
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
         onOpenDelete={onOpenDelete}
+        onOpenCampaignSettings={campaignSettings}
       />
       <DesktopBanner
         character={character}
-        onUpdate={onUpdate}
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={onTabChange}
         isLive={isLive}
         liveRound={liveRound}
-        sessionName={sessionName}
         isLiveJoined={isLiveJoined}
         sessionActionBusy={sessionActionBusy}
         onLeaveSession={onLeaveSession}
@@ -144,26 +157,26 @@ export default function CharacterSheetHeader({
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
         onOpenDelete={onOpenDelete}
+        onOpenCampaignSettings={campaignSettings}
       />
     </>
   );
 }
 
 /**
- * The desktop garnet banner (`hidden md:block`): level crest + identity + the
- * always-on vitals + workspace tab bar, with the slim live strip while a session
- * is live. Extracted from CharacterSheetHeader so each render function stays
- * shallow; the mobile counterpart is MobileSheetHeader.
+ * The desktop banner (`hidden md:block`): level crest + identity + the always-on
+ * vitals + workspace tab bar. The right-hand action cluster is the sole live-state
+ * indicator while a session is live (#1085 — the old under-tabs strip is gone).
+ * Extracted from CharacterSheetHeader so each render function stays shallow; the
+ * mobile counterpart is MobileSheetHeader.
  */
 function DesktopBanner({
   character,
-  onUpdate,
   tabs,
   activeTab,
   onTabChange,
   isLive = false,
   liveRound = null,
-  sessionName = null,
   isLiveJoined = false,
   sessionActionBusy = false,
   onLeaveSession,
@@ -172,34 +185,40 @@ function DesktopBanner({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
-}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat">) {
+  onOpenCampaignSettings,
+}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat" | "onUpdate">) {
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
-    <header className="hidden bg-gradient-to-br from-garnet-800 via-garnet-700 to-garnet-900 text-parchment-50 md:block">
+    <header className="hidden border-b border-parchment-200 bg-parchment-50 text-parchment-900 md:block">
+      {/* Thin garnet top rule — the one saturated accent on the light surface. */}
+      <div
+        aria-hidden
+        className="h-[5px] bg-gradient-to-r from-garnet-800 via-garnet-600 to-garnet-800"
+      />
       <div className="mx-auto max-w-6xl px-6 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             {/* Level crest */}
-            <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-full border-2 border-garnet-200 bg-garnet-900/50 shadow-raised">
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-garnet-100">
+            <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-full border-2 border-garnet-600 bg-parchment-50 shadow-raised">
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-garnet-700">
                 Lvl
               </span>
-              <span className="font-display text-2xl font-semibold leading-none text-parchment-50">
+              <span className="font-display text-2xl font-semibold leading-none text-garnet-700">
                 {character.level}
               </span>
             </div>
             <div>
               <Link
                 to="/"
-                className="text-xs font-semibold text-garnet-100 transition-colors hover:text-parchment-50"
+                className="text-xs font-semibold text-parchment-700 transition-colors hover:text-garnet-700"
               >
                 ← All characters
               </Link>
-              <h1 className="mt-1 font-display text-3xl font-semibold text-parchment-50">
+              <h1 className="mt-1 font-display text-3xl font-semibold text-parchment-900">
                 {character.name}
               </h1>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-garnet-100">
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-parchment-700">
                 <span>
                   {character.race}{" "}
                   {classSummary(character.classes, {
@@ -219,80 +238,95 @@ function DesktopBanner({
             <BackendStatus />
             <BannerActions
               uncampaigned={!character.campaignId}
+              isLive={isLive}
+              liveRound={liveRound}
               isLiveJoined={isLiveJoined}
+              sessionActionBusy={sessionActionBusy}
               onOpenCapture={onOpenCapture}
               onOpenSessions={onOpenSessions}
               onOpenActivity={onOpenActivity}
               onOpenDelete={onOpenDelete}
+              onOpenCampaignSettings={onOpenCampaignSettings}
+              onLeaveSession={onLeaveSession}
+              onEndSession={onEndSession}
             />
           </div>
         </div>
 
-        {/* Slim live strip (#985): the one place carrying session identity +
-            controls while live. Full-bleed garnet band under the hero; replaces
-            the scattered banner-nav session links + the old floating round badge
-            (exactly one round indicator). */}
-        {isLive && (
-          <DesktopLiveStrip
-            sessionName={sessionName}
-            liveRound={liveRound}
-            isLiveJoined={isLiveJoined}
-            sessionActionBusy={sessionActionBusy}
-            onOpenCapture={onOpenCapture}
-            onLeaveSession={onLeaveSession}
-            onEndSession={onEndSession}
-          />
-        )}
-
-        {/* Always-on vitals */}
-        <div className="mt-4">
-          <BannerVitals character={character} onUpdate={onUpdate} />
-        </div>
-
-        {/* Workspace tab bar (desktop only; mobile uses the docked SheetBottomNav) */}
-        <div className="mt-4 hidden pb-4 md:block">
+        {/* Bottom row: workspace tabs (left) + always-on stat cards (right).
+            Mobile uses the docked SheetBottomNav for tabs. */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 pb-4">
           <Tabs
             tabs={bannerTabs}
             active={activeTab}
             onChange={(id) => onTabChange(id as SheetTabId)}
             idBase="sheet"
           />
+          <BannerVitals character={character} />
         </div>
       </div>
     </header>
   );
 }
 
-// Shared banner-button styles: a bordered "chip", a plain garnet-text link, and
-// a light kebab trigger for the garnet surface.
+// Shared banner-button styles for the light surface: a bordered "chip", a solid
+// garnet End-session accent, a garnet-text link, and a muted-ink kebab trigger.
 const BANNER_CHIP =
-  "rounded-control border border-parchment-50/60 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-white/10 disabled:opacity-50";
+  "rounded-control border border-parchment-300 px-3 py-1.5 text-xs font-semibold text-parchment-800 transition-colors hover:bg-parchment-100 disabled:opacity-50";
+const BANNER_CHIP_SOLID =
+  "rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-700 disabled:opacity-50";
 const BANNER_LINK =
-  "text-xs font-semibold text-garnet-100 transition-colors hover:text-parchment-50 disabled:opacity-50";
+  "text-xs font-semibold text-garnet-700 transition-colors hover:text-garnet-900 disabled:opacity-50";
 const BANNER_KEBAB =
-  "flex h-7 w-7 items-center justify-center rounded-control text-parchment-100 transition-colors hover:bg-white/10 hover:text-parchment-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-parchment-50/60";
+  "flex h-7 w-7 items-center justify-center rounded-control text-parchment-700 transition-colors hover:bg-parchment-100 hover:text-parchment-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600";
 
-/** The desktop banner's right-hand action cluster (#985). Sheet-level chrome
- *  only — the session controls (Note/Leave/End) live on the live strip while
- *  joined, so the ＋ Note quick-capture chip stays here only when NOT joined.
- *  Delete is demoted behind the ⋯ overflow so it never sits next to End session. */
+/** The desktop banner's right-hand action cluster (#985/#1085) — the sole live
+ *  indicator now the under-tabs strip is gone: a `Live · Round N` pill + ＋ Note,
+ *  plus Leave/End Session while joined. Delete is demoted behind the ⋯ overflow so
+ *  it never sits next to End session. */
 function BannerActions({
   uncampaigned,
+  isLive,
+  liveRound,
   isLiveJoined,
+  sessionActionBusy,
   onOpenCapture,
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
+  onLeaveSession,
+  onEndSession,
 }: {
   uncampaigned: boolean;
+  isLive: boolean;
+  liveRound: number | null;
   isLiveJoined: boolean;
+  sessionActionBusy: boolean;
   onOpenCapture: () => void;
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  onOpenCampaignSettings?: () => void;
+  onLeaveSession?: () => void;
+  onEndSession?: () => void;
 }) {
+  // Caller already gates on campaign attachment (#1087). separatorBefore rides on
+  // the settings item so a lone Delete never grows a stray divider.
+  const showSettings = Boolean(onOpenCampaignSettings);
+  const menuItems = [
+    ...(showSettings
+      ? [{ label: "Campaign settings…", onSelect: onOpenCampaignSettings! }]
+      : []),
+    { label: "Delete", onSelect: onOpenDelete, danger: true, separatorBefore: showSettings },
+  ];
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
+      {isLive && (
+        <span className="rounded-full bg-garnet-600 px-3 py-1 text-xs font-bold text-parchment-50">
+          {liveRound != null ? `Live · Round ${liveRound}` : "Live"}
+        </span>
+      )}
       {/* Campaign-less characters have no doorway, so keep the invite here (#942). */}
       {uncampaigned && (
         <Link
@@ -303,100 +337,37 @@ function BannerActions({
           Join a campaign
         </Link>
       )}
-      {/* Cmd/Ctrl+J quick-capture. While joined this affordance moves onto the
-          live strip alongside Leave/End, so it isn't duplicated here. */}
-      {!isLiveJoined && (
-        <button type="button" onClick={onOpenCapture} className={BANNER_CHIP}>
-          ＋ Note
-        </button>
-      )}
+      {/* Cmd/Ctrl+J quick-capture. */}
+      <button type="button" onClick={onOpenCapture} className={BANNER_CHIP}>
+        ＋ Note
+      </button>
       <button type="button" onClick={onOpenSessions} className={BANNER_LINK}>
         Sessions
       </button>
       <button type="button" onClick={onOpenActivity} className={BANNER_LINK}>
         Activity
       </button>
-      <OverflowMenu
-        label="Sheet actions"
-        triggerClassName={BANNER_KEBAB}
-        items={[{ label: "Delete", onSelect: onOpenDelete, danger: true }]}
-      />
-    </div>
-  );
-}
-
-// Live-strip control styles: a ghost-outlined button vs the one solid End-session.
-const STRIP_BTN =
-  "rounded-control border border-parchment-50/30 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-white/10 disabled:opacity-50";
-const STRIP_BTN_SOLID =
-  "rounded-control bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-garnet-800 transition-colors hover:bg-parchment-100 disabled:opacity-50";
-
-/** The slim garnet live strip (#985): pip · session identity · Round/Live pill ·
- *  Note / Leave / End session. Full-bleed band under the hero (the `-mx-6 px-6`
- *  bleeds it past the container padding). Calm chrome — flat, one solid accent
- *  (End session) — so it never competes with the elevated turn tracker. */
-function DesktopLiveStrip({
-  sessionName,
-  liveRound,
-  isLiveJoined,
-  sessionActionBusy,
-  onOpenCapture,
-  onLeaveSession,
-  onEndSession,
-}: {
-  sessionName: string | null;
-  liveRound: number | null;
-  isLiveJoined: boolean;
-  sessionActionBusy: boolean;
-  onOpenCapture: () => void;
-  onLeaveSession?: () => void;
-  onEndSession?: () => void;
-}) {
-  return (
-    <div className="-mx-6 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-parchment-50/15 bg-garnet-900/60 px-6 py-2">
-      <span
-        aria-hidden
-        className="h-2.5 w-2.5 shrink-0 rounded-full bg-vitality-100 ring-4 ring-vitality-500/30"
-      />
-      <span className="min-w-0 truncate text-sm font-bold text-parchment-50">
-        Live session
-        {sessionName && (
-          <span className="font-semibold text-garnet-100">
-            {" "}
-            · {sessionName}
-          </span>
-        )}
-      </span>
-      <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-bold text-parchment-50">
-        {liveRound != null ? `Round ${liveRound}` : "Live"}
-      </span>
-      {isLiveJoined && (
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <button type="button" onClick={onOpenCapture} className={STRIP_BTN}>
-            ＋ Note
-          </button>
-          {onLeaveSession && (
-            <button
-              type="button"
-              disabled={sessionActionBusy}
-              onClick={onLeaveSession}
-              className={STRIP_BTN}
-            >
-              Leave Session
-            </button>
-          )}
-          {onEndSession && (
-            <button
-              type="button"
-              disabled={sessionActionBusy}
-              onClick={onEndSession}
-              className={STRIP_BTN_SOLID}
-            >
-              End Session
-            </button>
-          )}
-        </div>
+      {isLiveJoined && onLeaveSession && (
+        <button
+          type="button"
+          disabled={sessionActionBusy}
+          onClick={onLeaveSession}
+          className={BANNER_CHIP}
+        >
+          Leave Session
+        </button>
       )}
+      {isLiveJoined && onEndSession && (
+        <button
+          type="button"
+          disabled={sessionActionBusy}
+          onClick={onEndSession}
+          className={BANNER_CHIP_SOLID}
+        >
+          End Session
+        </button>
+      )}
+      <OverflowMenu label="Sheet actions" triggerClassName={BANNER_KEBAB} items={menuItems} />
     </div>
   );
 }

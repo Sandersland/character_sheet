@@ -158,8 +158,8 @@ function ScriptedDie({
     // The pose the spin unwinds onto. Keep the result face up, but rotate
     // the die a random amount about the vertical axis so its final resting
     // angle varies from roll to roll. Die types with no per-face mapping
-    // (e.g. d10) have no real face to land on, but should still tumble to a
-    // definite stop rather than spinning forever — give them an arbitrary
+    // (only the d100) have no real face to land on, but should still tumble to
+    // a definite stop rather than spinning forever — give them an arbitrary
     // random orientation to unwind onto instead.
     if (targetQuaternion) {
       const yaw = new THREE.Quaternion().setFromAxisAngle(UP_AXIS, Math.random() * Math.PI * 2);

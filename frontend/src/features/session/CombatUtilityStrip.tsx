@@ -3,7 +3,9 @@
  * the live Combat tab (#982). It collapses what used to be a full-height "No
  * active conditions" card into conditions + exhaustion + rest.
  *
- * Desktop keeps the one-line summary (DesktopUtilityLine). Mobile (#1028) breaks
+ * Desktop keeps the one-line summary (DesktopUtilityLine); HP no longer rides here
+ * (#1086) — desktop live play's canonical HP affordance is CombatLivePanel's
+ * compact HP card, and mobile keeps HP in its header. Mobile (#1028) breaks
  * it into full-bleed utility rows (MobileUtilityRows): a Conditions header + Add,
  * wrapping chips beside a big-hit exhaustion stepper, then a Rest row with the
  * hit-dice count inline. Both share the state/handlers here so the transaction

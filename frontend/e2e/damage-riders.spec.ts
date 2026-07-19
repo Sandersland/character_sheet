@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { enterLiveCombat, createCharacter, uniqueName } from "./helpers/api";
 
 // A Flame Tongue-style weapon (dice-valued passiveBonus damage cap, requires
 // attunement) adds a typed +2d6 fire rider to its damage roll in the attack
@@ -61,7 +61,7 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   const errors = collectConsoleErrors(page);
   await page.goto(`/characters/${characterId}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
@@ -82,10 +82,11 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   // The attack picker is a modal bottom sheet (#729) — dismiss it before reading.
   await page.keyboard.press("Escape");
-  // The rider damage lands on the session log — the always-visible right rail on
-  // desktop (#964; the Turn/Log sub-nav is mobile-only).
+  // The rider damage lands on the session log — opened on demand from the one-line
+  // log row (#1086; the always-visible rail is gone).
+  await page.getByRole("button", { name: /open session log/i }).click();
   await expect(
-    page.getByRole("complementary", { name: /Session log/i }).getByText(/fire/i).first(),
+    page.getByRole("dialog", { name: "Session Log" }).getByText(/fire/i).first(),
   ).toBeVisible();
 
   expect(errors).toEqual([]);

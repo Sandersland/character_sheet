@@ -45,7 +45,7 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
-import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } from "@/lib/srd/srd.js";
+import { advancementSlotsForLevel, characterFightingStyleChoiceCount, FIGHTING_STYLES } from "@/lib/srd/srd.js";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -433,10 +433,11 @@ async function reconcileSubclassChoices(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// Clears the persisted fighting style when the character is no longer entitled
-// to one at the new level (e.g. a class change away from Fighter via the data —
-// fightingStyleChoiceCount drops to 0). Fighter keeps its choice at every level
-// >= 1, so for a pure single-class Fighter this only fires on a class change.
+// Clears the persisted fighting style when NO class entry entitles the character
+// to one anymore (a multiclass Fighter entry deleted by reconcileClassEntryLevels
+// — which runs first — or a class change away from Fighter via the data). Fighter
+// keeps its choice at every level >= 1, so for a pure single-class Fighter this
+// only fires on a class change.
 //
 // Uses a `resources`-category event so the undo branch in activity.ts restores
 // before.resources wholesale (incl. fightingStyle) — no new undo code. The
@@ -451,8 +452,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
       resources: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true },
+        select: { name: true, level: true },
       },
     },
   });
@@ -461,8 +461,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
   const state = normalizeResourcesMutable(row.resources);
   if (state.fightingStyle === null) return; // nothing chosen
 
-  const className = row.classEntries[0]?.name ?? "";
-  const allowed = fightingStyleChoiceCount(className, newDerivedLevel);
+  const allowed = characterFightingStyleChoiceCount(row.classEntries, newDerivedLevel);
   if (allowed > 0) return; // still entitled — keep the choice
 
   const before = { resources: snapshotResources(state) };

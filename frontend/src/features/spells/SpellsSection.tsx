@@ -36,7 +36,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   const {
     busy, error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
-    handleCast, handlePrepare, handleForget, handleLearn,
+    handleCast, handlePrepare, handleForget, handleLearn, handleSwap,
   } = useSpellcasting(character, onUpdate);
 
   // The grimoire (prepare/swap/learn) is a distinct view reached from the record's
@@ -54,6 +54,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
           concentratingOnEntryId={concentratingOn?.entryId ?? null}
           onCast={handleCast}
           onPrepare={handlePrepare}
+          onSwap={handleSwap}
           onForget={handleForget}
           availableSlotsFor={(spell: Spell) =>
             availableSlotsForSpell(spell, derived.availableSlotLevels, derived.availableArcanaLevels)

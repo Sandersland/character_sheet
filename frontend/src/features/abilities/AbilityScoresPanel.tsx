@@ -4,31 +4,16 @@ import type { Character } from "@/types/character";
 
 interface AbilityScoresPanelProps {
   character: Character;
-  /**
-   * Grid template for the boxes. Defaults to the Overview's wide row
-   * (`grid-cols-3 sm:grid-cols-6`); a narrow host (the desktop Combat left rail,
-   * #964) passes `grid-cols-3` so the boxes stay legible in ~18rem.
-   */
-  gridClassName?: string;
-  /**
-   * Render the boxes in the calmer reference-rail style (#986) — flat, softer
-   * save chips — so the desktop live-Combat left rail recedes behind the tracker.
-   */
-  muted?: boolean;
 }
 
 // The abilities + saves row across the top of the Overview tab. Skills are NOT
 // here — the inline all-18 AllSkillsCard owns them.
-export default function AbilityScoresPanel({
-  character,
-  gridClassName = "grid-cols-3 sm:grid-cols-6",
-  muted = false,
-}: AbilityScoresPanelProps) {
+export default function AbilityScoresPanel({ character }: AbilityScoresPanelProps) {
   // orderedAbilityEntries gives canonical 5e order (STR-DEX-CON-INT-WIS-CHA), not arbitrary key order.
   const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
   return (
-    <div className={`grid gap-3 ${gridClassName}`}>
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
       {abilityEntries.map(([key, score]) => (
         <AbilityScoreBox
           key={key}
@@ -37,7 +22,6 @@ export default function AbilityScoresPanel({
           score={score}
           saveProficient={character.savingThrowProficiencies.includes(key)}
           proficiencyBonus={character.proficiencyBonus}
-          muted={muted}
         />
       ))}
     </div>

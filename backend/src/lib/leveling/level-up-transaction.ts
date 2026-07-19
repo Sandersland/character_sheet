@@ -19,11 +19,12 @@ import {
 import type { FightingStyleKey } from "@/lib/srd/fighting-styles.js";
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
 import { applySpellcastingOpInTx, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   applyLevelUpHpInTx,
   normalizeHitDice,
 } from "@/lib/combat/hitpoints.js";
-import type { LevelUpOperation } from "@/lib/combat/hp-operations.js";
+import type { LevelUpOperation, LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import {
   validateLevelUpSubmission,
   InvalidLevelUpError,
@@ -47,12 +48,13 @@ type LevelUpTxOp =
   | { domain: "spellcasting"; op: SpellcastingOperation };
 
 // Everything resolveLevelUpContext hands to validation + op-building.
-interface LevelUpContext {
+export interface LevelUpContext {
   planCharacter: LevelUpPlanCharacter;
   targetEntry: TargetClassEntry;
   chosenSubclassName: string | null;
-  // subclass/fightingStyle seams write the position-0 entry only, so those steps
-  // are only legal when the target IS the primary entry.
+  // applyResourceOpInTx derives choice caps from the position-0 entry only, so
+  // resource-backed steps are only legal when the target IS the primary entry
+  // (the subclass/fightingStyle seams are entry-aware since #1065).
   targetIsPrimary: boolean;
 }
 
@@ -77,16 +79,22 @@ async function subclassLevelFor(classId: string | null, className: string): Prom
   return row?.subclassLevel ?? 3;
 }
 
-// Reads the character + resolves submission.target into the validator inputs. The
+// Reads the character + resolves a level-up target into the validator inputs
+// (shared by applyLevelUpTransaction and the GET plan route, #886). The
 // per-entry `level` column can lag hitDice.total for a single-class character, so
 // a single-class existing target derives newLevel from hitDice.total (precedent:
 // the prepared-cap re-read in applySpellcastingOpInTx).
-async function resolveLevelUpContext(characterId: string, submission: LevelUpSubmission): Promise<LevelUpContext> {
+export async function resolveLevelUpContext(
+  characterId: string,
+  target: LevelUpTarget,
+  subclassId?: string,
+): Promise<LevelUpContext> {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
     select: {
       abilityScores: true,
       hitDice: true,
+      spellcasting: true,
       classEntries: { orderBy: { position: "asc" }, select: TARGET_ENTRY_SELECT },
     },
   });
@@ -99,7 +107,6 @@ async function resolveLevelUpContext(characterId: string, submission: LevelUpSub
   let classId: string | null;
   let targetIsPrimary: boolean;
 
-  const target = submission.target;
   if (target.kind === "existing") {
     const entry = character.classEntries.find((e) => e.id === target.classEntryId);
     if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
@@ -124,11 +131,11 @@ async function resolveLevelUpContext(characterId: string, submission: LevelUpSub
   const subclassLevel = await subclassLevelFor(classId, targetClassName);
 
   let chosenSubclassName: string | null = null;
-  if (submission.subclassId) {
+  if (subclassId) {
     // applySetSubclass re-validates subclass-belongs-to-class in-tx; here we only
     // resolve id → name for the pure validator (one copy of the membership rule).
-    const sub = await prisma.subclass.findUnique({ where: { id: submission.subclassId }, select: { name: true } });
-    if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${submission.subclassId}`);
+    const sub = await prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true } });
+    if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
     chosenSubclassName = sub.name;
   }
 
@@ -136,6 +143,8 @@ async function resolveLevelUpContext(characterId: string, submission: LevelUpSub
     planCharacter: {
       abilityScores: character.abilityScores as Record<string, number>,
       classEntries: character.classEntries.map((e) => ({ name: e.name, subclass: e.subclass, level: e.level })),
+      // #1101: the known-spell list the validator checks a swap forget against.
+      spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
     },
     targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel },
     chosenSubclassName,
@@ -159,7 +168,10 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
     (s.subclassChoices ?? [])
       .filter((c) => c.choiceKey === step.meta?.key)
       .map((op) => ({ domain: "resources", op })),
-  newSpells: (s) => (s.spellsLearned ?? []).map((op) => ({ domain: "spellcasting", op })),
+  // #1101: forgets apply BEFORE learns (ops run sequentially in tx order), so a
+  // swap can re-learn the just-forgotten spellId without tripping the dup guard.
+  newSpells: (s) =>
+    [...(s.spellsForgotten ?? []), ...(s.spellsLearned ?? [])].map((op) => ({ domain: "spellcasting", op })),
   review: () => [],
 };
 
@@ -186,6 +198,14 @@ const LEVEL_UP_OP_APPLIERS: Record<
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),
 };
 
+// applyResourceOpInTx derives choice caps from the primary entry only, and the
+// resource-pool read-clamp mirrors that — a non-primary pick would be written
+// uncapped and then hidden on read, so reject these steps up front until that
+// seam is entry-aware.
+const RESOURCE_BACKED: ReadonlySet<LevelUpStepKind> = new Set([
+  "maneuvers", "disciplines", "toolProficiency", "subclassChoice",
+]);
+
 /**
  * Validate `submission` against the character's derived level-up plan and apply
  * every resulting choice (hit points, advancement, subclass, subclass-derived
@@ -199,13 +219,14 @@ export async function applyLevelUpTransaction(
   userId: string,
 ): Promise<void> {
   const { planCharacter, targetEntry, chosenSubclassName, targetIsPrimary } =
-    await resolveLevelUpContext(characterId, submission);
+    await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
 
-  // setSubclass / setFightingStyle write the primary (position-0) entry only.
-  if (!targetIsPrimary && steps.some((s) => s.kind === "subclass" || s.kind === "fightingStyle")) {
-    throw new InvalidLevelUpError("Subclass and fighting-style choices are not supported for a non-primary class yet");
+  if (!targetIsPrimary && steps.some((s) => RESOURCE_BACKED.has(s.kind))) {
+    throw new InvalidLevelUpError(
+      "Subclass features that grant maneuvers, disciplines, or other picks are not supported for a non-primary class yet",
+    );
   }
 
   const ops = buildLevelUpOps(steps, submission);

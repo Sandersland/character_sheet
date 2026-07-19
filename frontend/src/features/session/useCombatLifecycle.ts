@@ -61,6 +61,9 @@ export function useCombatLifecycle({
     dismissLeaveError: () => leave.setError(null),
     /** A leave or end is in flight — disables the header's Leave/End affordances. */
     sessionActionBusy: end.pending || leave.pending,
+    /** Leaving is campaign-only: a solo session (campaignId null, #1082) has no
+     *  party to leave, so the header hides Leave while keeping End. */
+    canLeave: session !== null && session.campaignId !== null,
     openEndPrompt: endFlow.openEndPrompt,
     closeEndPrompt: endFlow.closeEndPrompt,
     handleCharacterUpdate,

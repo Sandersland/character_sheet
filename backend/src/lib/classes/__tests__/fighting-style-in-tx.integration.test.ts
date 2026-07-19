@@ -64,6 +64,50 @@ describe("setFightingStyleInTx (#885 seam)", () => {
     expect(events[0].data).toMatchObject({ fightingStyle: "defense" });
   });
 
+  // #1065: entitlement is judged per class entry — a NON-primary Fighter counts.
+  it("records the style when only a non-primary Fighter entry grants one", async () => {
+    const character = await prisma.character.create({
+      data: {
+        ...BASE_CHAR,
+        experiencePoints: 2700, // derived total 4; multiclass uses per-entry levels
+        ownerId: OWNER_ID,
+        spellcasting: Prisma.JsonNull,
+        classEntries: {
+          create: [
+            { name: "Wizard", level: 3, position: 0 },
+            { name: "Fighter", level: 1, position: 1 },
+          ],
+        },
+      },
+    });
+    created.push(character.id);
+
+    await prisma.$transaction((tx) =>
+      setFightingStyleInTx(tx, character.id, { type: "setFightingStyle", key: "archery" }, BATCH, null),
+    );
+
+    const row = await prisma.character.findUniqueOrThrow({ where: { id: character.id } });
+    expect((row.resources as { fightingStyle?: string }).fightingStyle).toBe("archery");
+  });
+
+  it("throws when no class entry grants a fighting style", async () => {
+    const character = await prisma.character.create({
+      data: {
+        ...BASE_CHAR,
+        ownerId: OWNER_ID,
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: { name: "Wizard", level: 1, position: 0 } },
+      },
+    });
+    created.push(character.id);
+
+    await expect(
+      prisma.$transaction((tx) =>
+        setFightingStyleInTx(tx, character.id, { type: "setFightingStyle", key: "defense" }, BATCH, null),
+      ),
+    ).rejects.toThrowError(InvalidClassOperationError);
+  });
+
   it("throws Character not found for an unknown id", async () => {
     await expect(
       prisma.$transaction((tx) =>

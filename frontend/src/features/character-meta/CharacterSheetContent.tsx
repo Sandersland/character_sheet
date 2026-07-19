@@ -6,6 +6,7 @@ import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
 import SheetBottomNav from "@/features/character-meta/SheetBottomNav";
 import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals";
+import LevelUpBanner from "@/features/level-up/LevelUpBanner";
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
 import { useScrollCollapse } from "@/features/character-meta/useScrollCollapse";
@@ -15,7 +16,6 @@ import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnS
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
 import { useLiveRound } from "@/features/session/useLiveRound";
 import SessionDoorway from "@/features/session/SessionDoorway";
-import LiveSessionStrip from "@/features/session/LiveSessionStrip";
 import CombatLivePanel from "@/features/session/CombatLivePanel";
 import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
@@ -46,12 +46,6 @@ export default function CharacterSheetContent(props: CharacterSheetContentProps)
   );
 }
 
-/** The live session's title for the header strip/fight bar — hoisted to module
- *  scope so the workspace's JSX stays a plain call (no added branch complexity). */
-function sessionTitle(session: ReturnType<typeof useSessionDoorway>): string | null {
-  return session.activeSession?.title ?? null;
-}
-
 /**
  * The sheet body: banner + tab panels + the roll/modal chrome. Split from
  * CharacterSheetPage so the page holds only load/error/guard states and this
@@ -80,20 +74,16 @@ function CharacterSheetWorkspace({
   const collapse = useScrollCollapse();
   const goToCombat = () => onTabChange("combat");
 
-  // #961/#1026: while a session is live + joined, off-Combat tabs show a "Go to
-  // fight" strip (an in-workspace jump to Combat) instead of the doorway — but
-  // only on DESKTOP. On mobile the header live pill carries live state, so
-  // SessionCue returns null there (no strip). The Combat nav item carries a live
-  // pip. On the Combat tab, no strip (D4) — the panel is the context.
-  // Non-joined/starting states keep the existing doorway.
+  // #1085: while live + joined the header cluster is the sole live indicator —
+  // SessionCue renders nothing on either breakpoint (the Combat nav item still
+  // carries a live pip). Non-joined/starting states keep the existing doorway;
+  // on the Combat tab nothing renders (D4) — the panel is the context.
   const isLiveJoined = live.status === "liveJoined";
   const isLive = isLiveJoined || live.status === "liveNotJoined";
   const cueProps = {
     activeTab,
     isLiveJoined,
     session,
-    liveRound,
-    onGoToCombat: goToCombat,
   };
 
   // The End/Leave-session lifecycle lifts here (#979) so the persistent sheet
@@ -128,10 +118,11 @@ function CharacterSheetWorkspace({
           onTabChange={onTabChange}
           isLive={isLive}
           liveRound={liveRound}
-          sessionName={sessionTitle(session)}
           isLiveJoined={isLiveJoined}
           sessionActionBusy={life.sessionActionBusy}
-          onLeaveSession={life.handleLeave}
+          // Leave is campaign-only (#1082): omit the handler for a solo session
+          // so the header hides Leave while keeping End.
+          onLeaveSession={life.canLeave ? life.handleLeave : undefined}
           onEndSession={life.openEndPrompt}
           scrolled={collapse.collapsed}
           onGoToCombat={goToCombat}
@@ -139,10 +130,15 @@ function CharacterSheetWorkspace({
           onOpenSessions={modals.openSessions}
           onOpenActivity={modals.openActivity}
           onOpenDelete={modals.openDelete}
+          onOpenCampaignSettings={modals.openCampaignSettings}
         />
 
-        {/* Desktop: the session cue (live-strip when joined, else doorway),
-            pinned under the garnet banner; absent on the Combat tab (#961). */}
+        {/* Armed level-up entry (#892): pinned under the header on every tab,
+            above the mobile scroller so it can't scroll away. */}
+        <LevelUpBanner character={character} />
+
+        {/* Desktop: session doorway for non-joined states, pinned under the
+            header; absent on the Combat tab and while joined (#1085). */}
         <SessionCue placement="desktop" {...cueProps} />
 
         <CharacterSheetModals
@@ -153,10 +149,12 @@ function CharacterSheetWorkspace({
           deleteOpen={modals.deleteOpen}
           activityOpen={modals.activityOpen}
           sessionsOpen={modals.sessionsOpen}
+          campaignSettingsOpen={modals.campaignSettingsOpen}
           captureOpen={captureOpen}
           onCloseDelete={modals.closeDelete}
           onCloseActivity={modals.closeActivity}
           onCloseSessions={modals.closeSessions}
+          onCloseCampaignSettings={modals.closeCampaignSettings}
           onCloseCapture={closeCapture}
         />
 
@@ -273,40 +271,24 @@ function renderLivePanel(
 }
 
 /**
- * The off-Combat session cue (#961): the live-joined "Go to fight" strip (an
- * in-workspace jump to Combat) when live+joined, else the existing doorway
- * (start / join / scheduled). Renders nothing on the Combat tab (D4), and
- * nothing when live+joined on mobile — the header pill carries live state there
- * (#1026), so only desktop shows the strip.
+ * The off-Combat session cue (#961): the existing doorway (start / join /
+ * scheduled) for characters not yet in the session. Live-joined state now lives
+ * only in the sheet header cluster (#1085), so a joined character sees no cue
+ * here on either breakpoint; also nothing on the Combat tab (D4).
  */
 function SessionCue({
   placement,
   activeTab,
   isLiveJoined,
   session,
-  liveRound,
-  onGoToCombat,
 }: {
   placement: "desktop" | "mobile";
   activeTab: SheetTabId;
   isLiveJoined: boolean;
   session: ReturnType<typeof useSessionDoorway>;
-  liveRound: number | null;
-  onGoToCombat: () => void;
 }) {
   if (activeTab === "combat") return null;
-  if (isLiveJoined) {
-    // Mobile carries live state via the header pill now (#1026); only desktop
-    // keeps the full-width live strip.
-    if (placement === "mobile") return null;
-    return (
-      <LiveSessionStrip
-        title={session.activeSession?.title ?? null}
-        round={liveRound}
-        onGoToCombat={onGoToCombat}
-      />
-    );
-  }
+  if (isLiveJoined) return null;
   return (
     <SessionDoorway
       placement={placement}
@@ -319,21 +301,26 @@ function SessionCue({
   );
 }
 
-/** The sheet's modal open-state + toggles (delete / activity / sessions),
- *  factored out so the workspace body stays free of inline handler closures. */
+/** The sheet's modal open-state + toggles (delete / activity / sessions /
+ *  campaign settings), factored out so the workspace body stays free of inline
+ *  handler closures. */
 function useSheetModals() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [campaignSettingsOpen, setCampaignSettingsOpen] = useState(false);
   return {
     deleteOpen,
     activityOpen,
     sessionsOpen,
+    campaignSettingsOpen,
     openDelete: () => setDeleteOpen(true),
     closeDelete: () => setDeleteOpen(false),
     openActivity: () => setActivityOpen(true),
     closeActivity: () => setActivityOpen(false),
     openSessions: () => setSessionsOpen(true),
     closeSessions: () => setSessionsOpen(false),
+    openCampaignSettings: () => setCampaignSettingsOpen(true),
+    closeCampaignSettings: () => setCampaignSettingsOpen(false),
   };
 }

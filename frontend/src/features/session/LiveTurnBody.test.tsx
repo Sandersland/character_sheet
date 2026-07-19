@@ -1,32 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import LiveTurnBody from "@/features/session/LiveTurnBody";
 import type { Character, Session } from "@/types/character";
 import type { TurnStateView } from "@/features/session/useTurnState";
 
-// The turn engine is out of scope for this composition test (#982): stub the hub
-// so we assert *ordering*, not turn machinery. The real TurnHub carries its own
-// dice/roll providers — mocking it keeps this test to LiveTurnBody's layout.
+// The turn engine is out of scope (#1086): stub the hub so we assert only that
+// LiveTurnBody renders it and forwards the log opener. HP / conditions / rest are
+// no longer nested here — they're sibling CombatColumn slots.
 vi.mock("@/features/session/TurnHub", () => ({
-  default: () => <div data-testid="turn-hub">Turn Hub</div>,
-}));
-
-// No API call fires on render; mock the client so the vitals + conditions
-// surfaces mount without hitting the network.
-vi.mock("@/api/client", () => ({
-  applyConditionTransactions: vi.fn(),
-  applyHitPointOperations: vi.fn(),
+  default: ({ onOpenLog }: { onOpenLog?: () => void }) => (
+    <div data-testid="turn-hub">
+      <button type="button" onClick={onOpenLog}>
+        open-log
+      </button>
+    </div>
+  ),
 }));
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
-  return {
-    id: "char-1",
-    conditions: { active: [], exhaustion: 0 },
-    hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-    hitDice: { total: 5, spent: 0, die: "d10" },
-    ...overrides,
-  } as unknown as Character;
+  return { id: "char-1", ...overrides } as unknown as Character;
 }
 
 const session = { id: "sess-1", participants: [] } as unknown as Session;
@@ -36,8 +30,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("LiveTurnBody composition (#982)", () => {
-  it("renders the turn tracker (hero) before the conditions/utility strip", () => {
+describe("LiveTurnBody (#1086)", () => {
+  it("renders the turn hub", () => {
     render(
       <LiveTurnBody
         character={makeCharacter()}
@@ -47,14 +41,10 @@ describe("LiveTurnBody composition (#982)", () => {
         onLogChanged={vi.fn()}
       />,
     );
-
-    const hub = screen.getByTestId("turn-hub");
-    const conditionsLabel = screen.getByText("Conditions");
-    // conditionsLabel must FOLLOW the hub in document order (4 = FOLLOWING).
-    expect(hub.compareDocumentPosition(conditionsLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("turn-hub")).toBeInTheDocument();
   });
 
-  it("no longer renders the CompactHpBar (HP lives in the sheet header)", () => {
+  it("no longer nests conditions or a rest control (moved to sibling slots)", () => {
     render(
       <LiveTurnBody
         character={makeCharacter()}
@@ -64,11 +54,13 @@ describe("LiveTurnBody composition (#982)", () => {
         onLogChanged={vi.fn()}
       />,
     );
-
-    expect(screen.queryByRole("button", { name: /manage hit points/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Conditions")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rest" })).not.toBeInTheDocument();
   });
 
-  it("collapses the empty conditions state to a single compact line, not a full card", () => {
+  it("forwards onOpenLog to the hub", async () => {
+    const onOpenLog = vi.fn();
+    const user = userEvent.setup();
     render(
       <LiveTurnBody
         character={makeCharacter()}
@@ -76,25 +68,10 @@ describe("LiveTurnBody composition (#982)", () => {
         turnState={turnState}
         onUpdate={vi.fn()}
         onLogChanged={vi.fn()}
+        onOpenLog={onOpenLog}
       />,
     );
-
-    // The quiet one-line strip shows "none" — not the full-height empty-state card.
-    expect(screen.getByText("none")).toBeInTheDocument();
-    expect(screen.queryByText(/no active conditions/i)).not.toBeInTheDocument();
-  });
-
-  it("keeps Rest reachable from the utility strip", () => {
-    render(
-      <LiveTurnBody
-        character={makeCharacter()}
-        session={session}
-        turnState={turnState}
-        onUpdate={vi.fn()}
-        onLogChanged={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Rest" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "open-log" }));
+    expect(onOpenLog).toHaveBeenCalledTimes(1);
   });
 });

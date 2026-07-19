@@ -6,6 +6,8 @@
 // rendering a raw style key. Mirrors the CONDITIONS data block + isKnownCondition
 // guard in condition-data.ts.
 
+import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+
 export type FightingStyleKey =
   | "archery"
   | "defense"
@@ -70,6 +72,23 @@ export function isKnownFightingStyle(key: string): key is FightingStyleKey {
  */
 export function fightingStyleChoiceCount(className: string, level: number): number {
   return className.toLowerCase() === "fighter" && level >= 1 ? 1 : 0;
+}
+
+/**
+ * Total Fighting Style entitlement across every class entry, each judged at its
+ * own effective class level (#1065: a wizard/Fighter multiclass IS entitled via
+ * the Fighter entry). The single shared rule for setFightingStyle,
+ * reconcileFightingStyle, and the serializeCharacter read-clamp — never inline
+ * a per-entry copy at those sites.
+ */
+export function characterFightingStyleChoiceCount(
+  entries: readonly { name: string; level: number }[],
+  derivedLevel: number,
+): number {
+  return entries.reduce(
+    (sum, e) => sum + fightingStyleChoiceCount(e.name, effectiveEntryLevel(e.level, entries.length, derivedLevel)),
+    0,
+  );
 }
 
 /**

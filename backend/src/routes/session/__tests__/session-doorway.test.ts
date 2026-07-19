@@ -86,10 +86,16 @@ afterEach(async () => {
 });
 
 describe("GET /api/characters/:id/sessions/doorway", () => {
-  it("renders nothing for a solo character (campaignId null)", async () => {
+  it("returns none + canStart for a solo character with no active session (#1080)", async () => {
     const res = await agent(cookieOwner).get(doorwayUrl(CHAR_SOLO));
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ campaignId: null, canStart: false, kind: "none", session: null });
+    expect(res.body).toMatchObject({
+      campaignId: null,
+      role: "PLAYER",
+      canStart: true,
+      kind: "none",
+      session: null,
+    });
   });
 
   it("returns none + canStart for a member with no active session (OWNER)", async () => {
