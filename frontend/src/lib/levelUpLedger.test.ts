@@ -13,7 +13,9 @@ const resolvers: LedgerResolvers = {
 
 function makeCharacter(over?: Partial<Character>): Character {
   return {
-    level: 7,
+    // XP-derived level is already the post-up value (8) while a level-up is
+    // pending; the ledger's "before" must come from the plan target, not this.
+    level: 8,
     hitPoints: { max: 52 },
     hitDice: { total: 7, die: "d10" },
     abilityScores: { strength: 16, dexterity: 14, constitution: 15, intelligence: 10, wisdom: 12, charisma: 8 },

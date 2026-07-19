@@ -134,7 +134,9 @@ export function buildLevelUpLedger(
   const max = character.hitPoints.max;
   const { total, die } = character.hitDice;
   const rows: (LedgerRow | null)[] = [
-    { label: "Level", before: String(character.level), after: String(plan.target.newLevel), variant: "delta" },
+    // `character.level` is the XP-derived level (already the post-up value while a
+    // level-up is pending); the applied "before" is one below the target.
+    { label: "Level", before: String(plan.target.newLevel - 1), after: String(plan.target.newLevel), variant: "delta" },
     draft.hp
       ? { label: "Maximum HP", before: String(max), after: String(max + hpGain(draft.hp, character)), variant: "delta" }
       : null,
