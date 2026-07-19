@@ -100,17 +100,17 @@ describe("FeatFlow — catalog list (frame A)", () => {
     render(<Harness onSubmit={vi.fn()} />);
     const alertRow = row("Alert");
     const desc = within(alertRow).getByText(/Always on your guard/);
-    const toggle = within(alertRow).getByRole("button", { name: /more/i });
+    const toggle = within(alertRow).getByRole("button", { name: "Show more about Alert" });
 
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(desc).toHaveClass("line-clamp-2");
 
     await user.click(toggle);
-    expect(within(alertRow).getByRole("button", { name: /less/i })).toHaveAttribute("aria-expanded", "true");
+    expect(within(alertRow).getByRole("button", { name: "Show less about Alert" })).toHaveAttribute("aria-expanded", "true");
     expect(desc).not.toHaveClass("line-clamp-2");
 
-    await user.click(within(alertRow).getByRole("button", { name: /less/i }));
-    expect(within(alertRow).getByRole("button", { name: /more/i })).toHaveAttribute("aria-expanded", "false");
+    await user.click(within(alertRow).getByRole("button", { name: "Show less about Alert" }));
+    expect(within(alertRow).getByRole("button", { name: "Show more about Alert" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("selecting a feat opens the detail view", async () => {

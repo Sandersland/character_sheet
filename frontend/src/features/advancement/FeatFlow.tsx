@@ -151,6 +151,7 @@ function FeatListRow({
         <button
           type="button"
           aria-expanded={expanded}
+          aria-label={expanded ? `Show less about ${feat.name}` : `Show more about ${feat.name}`}
           onClick={() => setExpanded((v) => !v)}
           className="mt-0.5 text-[11px] font-semibold text-gold-800 hover:text-gold-900"
         >
