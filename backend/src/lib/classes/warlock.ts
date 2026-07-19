@@ -44,7 +44,7 @@ const THE_FIEND_FEATURES: DerivedFeature[] = [
     level: 1,
     source: "subclass",
     description:
-      "Add fiend spells to your warlock list: Burning Hands, Command (L1); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+      "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
   },
   {
     name: "Dark One's Blessing",
@@ -82,7 +82,7 @@ const THE_ARCHFEY_FEATURES: DerivedFeature[] = [
     level: 1,
     source: "subclass",
     description:
-      "Add archfey spells to your warlock list: Faerie Fire, Sleep (L1); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+      "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
   },
   {
     name: "Fey Presence",
@@ -120,7 +120,7 @@ const THE_GREAT_OLD_ONE_FEATURES: DerivedFeature[] = [
     level: 1,
     source: "subclass",
     description:
-      "Add Great Old One spells to your warlock list: Dissonant Whispers, Tasha's Hideous Laughter (L1); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Evard's Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+      "Add Great Old One spells to your warlock list: Dissonant Whispers, Tasha's Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Evard's Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
   },
   {
     name: "Awakened Mind",
@@ -156,7 +156,7 @@ export const warlock: ClassDefinition = {
   features: WARLOCK_FEATURES,
   subclasses: {
     "the fiend": {
-      grantLevel: 1,
+      grantLevel: 3,
       features: THE_FIEND_FEATURES,
       resourceFn: (level) => {
         if (level < 6) return [];
@@ -182,7 +182,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the archfey": {
-      grantLevel: 1,
+      grantLevel: 3,
       features: THE_ARCHFEY_FEATURES,
       resourceFn: (level) => {
         const pools: DerivedResource[] = [
@@ -216,7 +216,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the great old one": {
-      grantLevel: 1,
+      grantLevel: 3,
       features: THE_GREAT_OLD_ONE_FEATURES,
       resourceFn: (level) => {
         if (level < 6) return [];

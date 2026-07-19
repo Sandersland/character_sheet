@@ -160,10 +160,10 @@ export const wizard: ClassDefinition = {
     },
   ],
   subclasses: {
-    "school of evocation": { grantLevel: 2, features: SCHOOL_OF_EVOCATION_FEATURES },
-    "school of abjuration": { grantLevel: 2, features: SCHOOL_OF_ABJURATION_FEATURES },
+    "school of evocation": { grantLevel: 3, features: SCHOOL_OF_EVOCATION_FEATURES },
+    "school of abjuration": { grantLevel: 3, features: SCHOOL_OF_ABJURATION_FEATURES },
     "school of illusion": {
-      grantLevel: 2,
+      grantLevel: 3,
       features: SCHOOL_OF_ILLUSION_FEATURES,
       resourceFn: (level) => {
         if (level < 10) return [];

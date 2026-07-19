@@ -51,6 +51,26 @@ async function makeFighter(opts: { id: string; xp: number; hitDiceTotal: number;
   return entry.id;
 }
 
+async function makeCleric(opts: { id: string; xp: number; entryLevel: number }): Promise<void> {
+  const cleric = await prisma.characterClass.findFirstOrThrow({ where: { name: "Cleric" } });
+  await prisma.character.create({
+    data: {
+      ...BASE,
+      ownerId: OWNER_ID,
+      id: opts.id,
+      name: `LevelUpPlan ${opts.id}`,
+      experiencePoints: opts.xp,
+      hitPoints: { current: 20, max: 20, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+      hitDice: { total: opts.entryLevel, die: "d8", spent: 0 },
+      abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 8 },
+      spellcasting: { slotsUsed: {}, spells: [] } as Prisma.InputJsonValue,
+      classEntries: {
+        create: [{ name: "cleric", subclass: null, classId: cleric.id, position: 0, level: opts.entryLevel }],
+      },
+    },
+  });
+}
+
 async function makePaladin(opts: { id: string; hitDiceTotal: number; entryLevel: number; subclass: string | null }): Promise<string> {
   const paladin = await prisma.characterClass.findFirstOrThrow({ where: { name: "Paladin" } });
   const subclassId = opts.subclass
@@ -112,6 +132,21 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(replanned.body.steps.map((s: { kind: string }) => s.kind)).toEqual([
       "hitPoints", "subclass", "maneuvers", "toolProficiency", "review",
     ]);
+  });
+
+  it("offers the cleric subclass step at level 3 but not at level 2 (2024 grant, #1128)", async () => {
+    // The primary plan targets entry.level + 1, so entryLevel 2 plans the 2→3 step.
+    await makeCleric({ id: "lvplan-cleric-3", xp: 900, entryLevel: 2 });
+    const atThree = await getPlan("lvplan-cleric-3");
+    expect(atThree.status).toBe(200);
+    expect(atThree.body.target).toMatchObject({ className: "cleric", subclass: null, newLevel: 3 });
+    expect(atThree.body.steps.map((s: { kind: string }) => s.kind)).toContain("subclass");
+
+    await makeCleric({ id: "lvplan-cleric-2", xp: 300, entryLevel: 1 });
+    const atTwo = await getPlan("lvplan-cleric-2");
+    expect(atTwo.status).toBe(200);
+    expect(atTwo.body.target.newLevel).toBe(2);
+    expect(atTwo.body.steps.map((s: { kind: string }) => s.kind)).not.toContain("subclass");
   });
 
   it("kind:new (?classId) plans a fresh multiclass entry: newLevel 1, not primary", async () => {

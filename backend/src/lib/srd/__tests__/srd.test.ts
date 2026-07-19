@@ -113,8 +113,8 @@ describe("deriveResources — Druid Wild Shape", () => {
     expect(wsPools.length).toBe(1); // exactly one — no duplicate from subclass
   });
 
-  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms)", () => {
-    const result = deriveResources("druid", "circle of the moon", 2, ABILITY_SCORES, PROF_2);
+  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) at its level-3 grant (#1128)", () => {
+    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2);
     const featureNames = result!.features.map((f) => f.name);
     expect(featureNames).toContain("Combat Wild Shape");
     expect(featureNames).toContain("Circle Forms");

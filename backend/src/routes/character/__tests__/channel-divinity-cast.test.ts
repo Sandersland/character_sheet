@@ -97,6 +97,7 @@ describe("Channel Divinity cast endpoint", () => {
     await Promise.all([
       "Channel Divinity: Turn Undead",
       "Channel Divinity: Preserve Life",
+      "Channel Divinity: Invoke Duplicity",
       "Channel Divinity: Sacred Weapon",
       "Channel Divinity: Cloak of Shadows",
       "Channel Divinity: Vow of Enmity",
@@ -169,25 +170,47 @@ describe("Channel Divinity cast endpoint", () => {
   });
 
   it("Life Domain Preserve Life carries the derived HP pool (5× level) in its reminder", async () => {
-    await createCharacter(XP_L2, "cleric", "life domain");
+    await createCharacter(XP_L3, "cleric", "life domain");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
     expect(res.status).toBe(200);
     const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
-    // Level 2 → 10 HP pool.
-    expect(cd.data!.reminder).toMatch(/10 HP/);
+    // Level 3 (first grant level, #1128) → 15 HP pool.
+    expect(cd.data!.reminder).toMatch(/15 HP/);
+  });
+
+  it("Trickery Invoke Duplicity is available at its level-3 grant", async () => {
+    await createCharacter(XP_L3, "cleric", "trickery domain");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Invoke Duplicity"] }]);
+    expect(res.status).toBe(200);
+    const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
+    expect(cd.data!.reminder).toMatch(/duplicate/i);
+  });
+
+  it("rejects Preserve Life at level 2 (2024 grant is 3, #1128)", async () => {
+    await createCharacter(XP_L2, "cleric", "life domain");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/level 3/);
+  });
+
+  it("rejects Invoke Duplicity at level 2 (2024 grant is 3, #1128)", async () => {
+    await createCharacter(XP_L2, "cleric", "trickery domain");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Invoke Duplicity"] }]);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/level 3/);
   });
 
   // ── Gating (the non-happy paths) ────────────────────────────────────────────
 
   it("rejects a domain option the cleric's subclass doesn't grant", async () => {
-    await createCharacter(XP_L2, "cleric", "trickery domain");
+    await createCharacter(XP_L3, "cleric", "trickery domain");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/life domain/i);
   });
 
   it("rejects an oath option below the granting level (Cloak of Shadows needs L6)", async () => {
-    await createCharacter(XP_L2, "cleric", "trickery domain");
+    await createCharacter(XP_L3, "cleric", "trickery domain");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows"] }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/level 6/);

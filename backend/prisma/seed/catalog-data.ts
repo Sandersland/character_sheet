@@ -55,7 +55,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "history", "insight", "investigation", "medicine", "religion"],
     isSpellcaster: true,
-    subclassLevel: 2,
+    subclassLevel: 3,
   },
   {
     name: "Fighter",
@@ -104,7 +104,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["history", "insight", "medicine", "persuasion", "religion"],
     isSpellcaster: true,
-    subclassLevel: 1,
+    subclassLevel: 3,
   },
   {
     name: "Barbarian",
@@ -156,7 +156,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "animalHandling", "insight", "medicine", "nature", "perception", "religion", "survival"],
     isSpellcaster: true,
-    subclassLevel: 2,
+    subclassLevel: 3,
   },
   {
     name: "Monk",
@@ -204,7 +204,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"],
     isSpellcaster: true,
-    subclassLevel: 1,
+    subclassLevel: 3,
   },
   {
     name: "Warlock",
@@ -213,7 +213,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "deception", "history", "intimidation", "investigation", "nature", "religion"],
     isSpellcaster: true,
-    subclassLevel: 1,
+    subclassLevel: 3,
   },
 ];
 
