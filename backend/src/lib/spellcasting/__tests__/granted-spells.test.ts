@@ -4,6 +4,7 @@ import {
   deriveGrantedSpells,
   deriveGrantedCastingAbility,
   deriveItemSpells,
+  grantedSpellsGained,
   type GrantedSpellSource,
   type GrantedSpellCatalogSpell,
   type ItemSpellSourceItem,
@@ -125,6 +126,37 @@ describe("deriveGrantedSpells", () => {
     expect(spell.id).toBe("granted:oath-of-vengeance:haste");
     expect(spell.concentration).toBe(true);
     expect(spell.effectKind).toBe("buff");
+  });
+});
+
+describe("grantedSpellsGained (#1139)", () => {
+  // Gates at 1/3/5 — the Archfey shape, enough to cover crossing vs. non-crossing.
+  const archfey: GrantedSpellSource = {
+    name: "The Archfey",
+    grantedSpells: [
+      { gateLevel: 1, castingAbility: "charisma", spell: catalogSpell({ name: "Faerie Fire", level: 1 }) },
+      { gateLevel: 3, castingAbility: "charisma", spell: catalogSpell({ name: "Calm Emotions", level: 2 }) },
+      { gateLevel: 5, castingAbility: "charisma", spell: catalogSpell({ name: "Blink", level: 3 }) },
+    ],
+  };
+
+  it("returns exactly the spells newly gated when a level-up crosses a gate", () => {
+    const gained = grantedSpellsGained(archfey, 4, archfey, 5);
+    expect(gained.map((s) => s.name)).toEqual(["Blink"]);
+  });
+
+  it("returns nothing for a level-up that crosses no gate", () => {
+    expect(grantedSpellsGained(archfey, 3, archfey, 4)).toEqual([]);
+  });
+
+  it("counts every ≤-level grant as incoming for a fresh subclass pick (null prev)", () => {
+    const gained = grantedSpellsGained(null, 4, archfey, 5);
+    expect(gained.map((s) => s.name)).toEqual(["Faerie Fire", "Calm Emotions", "Blink"]);
+  });
+
+  it("returns nothing when there is no next source", () => {
+    expect(grantedSpellsGained(archfey, 4, null, 5)).toEqual([]);
+    expect(grantedSpellsGained(archfey, 4, undefined, 5)).toEqual([]);
   });
 });
 

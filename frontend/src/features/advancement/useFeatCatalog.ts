@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchFeats } from "@/api/client";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { featOfferedForAsiSlot } from "@/lib/featDisplay";
 import type { CatalogFeat } from "@/types/character";
 
 export interface FeatCatalog {
@@ -12,7 +13,9 @@ export interface FeatCatalog {
   filter: (search: string) => CatalogFeat[];
 }
 
-export function useFeatCatalog(active: boolean): FeatCatalog {
+// `level` is the single seam that hides Origin/Fighting Style and level-gated
+// feats from the ASI picker (mirrors the server's featOfferedForAsiSlot gate).
+export function useFeatCatalog(active: boolean, level: number): FeatCatalog {
   const [catalog, setCatalog] = useState<CatalogFeat[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasFetched = useRef(false);
@@ -37,6 +40,7 @@ export function useFeatCatalog(active: boolean): FeatCatalog {
     ensureFetched,
     filter: (search) =>
       (catalog ?? []).filter((f) => {
+        if (!featOfferedForAsiSlot(f, level)) return false;
         if (!search) return true;
         const q = search.toLowerCase();
         return f.name.toLowerCase().includes(q) || f.description.toLowerCase().includes(q);

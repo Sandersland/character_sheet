@@ -343,10 +343,53 @@ describe("SpellsSection slot labelling", () => {
     } as unknown as Character;
   }
 
+  // Warlock 5: a level-3 pact slot pool and a level-3 spell, so the grimoire
+  // renders a Level 3 group whose slot line carries the Pact Magic label.
+  function warlockGrimoire(): Character {
+    return {
+      id: "char-wl3",
+      level: 5,
+      abilityScores: {
+        strength: 10, dexterity: 10, constitution: 10,
+        intelligence: 10, wisdom: 10, charisma: 16,
+      },
+      classes: [{ id: "e1", name: "Warlock", level: 5 }],
+      spellcasting: {
+        ability: "charisma",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        slots: [{ level: 3, total: 2, used: 0 }],
+        arcana: [],
+        pact: null,
+        preparedSpellLimit: null,
+        spells: [{
+          id: "s1", name: "Fly", level: 3, school: "transmutation", prepared: true,
+          castingTime: "1 action", range: "Touch", duration: "Concentration", description: "",
+        }],
+        concentratingOn: null,
+      },
+    } as unknown as Character;
+  }
+
   it("labels a single-class warlock's merged slots as Pact Magic", () => {
     render(<SpellsSection character={warlockOnly()} onUpdate={vi.fn()} />);
     expect(screen.getByRole("heading", { name: /Pact Magic/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /^Spell Slots$/i })).not.toBeInTheDocument();
+  });
+
+  it("labels a warlock's grimoire slot group Pact Magic with the fixed-level note", async () => {
+    const user = userEvent.setup();
+    render(<SpellsSection character={warlockGrimoire()} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
+    expect(screen.getByText(/Pact Magic — 2\/2 slots/i)).toBeInTheDocument();
+    expect(screen.getByText(/All slots are cast at level 3 and return on a short rest\./i)).toBeInTheDocument();
+  });
+
+  it("does not label a non-warlock's grimoire slot group as Pact Magic", async () => {
+    const user = userEvent.setup();
+    render(<SpellsSection character={makeCharacter(null)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
+    expect(screen.queryByText(/Pact Magic/i)).not.toBeInTheDocument();
   });
 
   it("labels a multiclass warlock's merged pool 'Spell Slots' with one dedicated Pact Magic block", () => {

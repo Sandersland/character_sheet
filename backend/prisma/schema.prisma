@@ -947,14 +947,26 @@ model GrantedAbility {
 // AdvancementEntry.featId (nullable so custom feats have no catalog row).
 // abilityOptions/abilityIncrease drive the half-feat ability bump (e.g.
 // Resilient: +1 to one chosen ability). Empty abilityOptions = not a half-feat.
+// PHB'24 feat categories: Origin (background-granted, no level req), General
+// (level 4+, +1 ability), Fighting Style, and Epic Boon (level 19+).
+enum FeatCategory {
+  origin
+  general
+  fighting_style
+  epic_boon
+}
+
 model Feat {
-  id              String   @id @default(uuid())
-  name            String   @unique
-  description     String
-  prerequisite    String?
-  abilityOptions  String[] @default([]) // abilities the player may raise by abilityIncrease
-  abilityIncrease Int      @default(0)  // usually 1 for half-feats
-  improvements    Json     @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
+  id                String       @id @default(uuid())
+  name              String       @unique
+  description       String
+  prerequisite      String?
+  category          FeatCategory @default(general)
+  levelPrerequisite Int?         // General ⇒ 4, Epic Boon ⇒ 19 (PHB'24)
+  repeatable        Boolean      @default(false)
+  abilityOptions    String[]     @default([]) // abilities the player may raise by abilityIncrease
+  abilityIncrease   Int          @default(0)  // usually 1 for half-feats
+  improvements      Json         @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
 }
 
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from

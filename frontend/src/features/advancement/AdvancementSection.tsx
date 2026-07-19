@@ -149,6 +149,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
         currentScores={character.abilityScores as unknown as Record<string, number>}
         slotsRemaining={slotsRemaining}
         busy={busy}
+        characterLevel={character.level}
         skillNames={(character.skills as { name: string }[]).map((s) => s.name)}
         onSubmit={handleSubmit}
       />

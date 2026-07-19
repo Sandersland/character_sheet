@@ -55,6 +55,7 @@ function planFor(subclassId: string | undefined): LevelUpPlanResponse {
     steps: subclassId
       ? [{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "maneuvers", count: 2 }, { kind: "review" }]
       : [{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }],
+    grantedSpells: [],
   };
 }
 

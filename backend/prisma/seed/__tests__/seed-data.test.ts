@@ -32,6 +32,7 @@ import { FEATS } from "../feats.js";
 import { SPELLS } from "../spells.js";
 import { PACKS } from "../packs.js";
 import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
+import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
 
 // The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
@@ -78,6 +79,64 @@ describe("per-domain business-key uniqueness", () => {
         `pack "${pack.name}" lists a duplicate item`,
       ).toEqual([]);
     }
+  });
+});
+
+// SRD 5.2.1 pp. 87-88 + PHB'24 feat categories (#1129).
+describe("FEATS — PHB'24 category invariants", () => {
+  it("every feat carries a category", () => {
+    const missing = FEATS.filter((f) => !f.category).map((f) => f.name);
+    expect(missing, "feats without a category").toEqual([]);
+  });
+
+  it("General feats have levelPrerequisite 4, a nonempty abilityOptions, and abilityIncrease 1", () => {
+    for (const f of FEATS.filter((f) => f.category === "general")) {
+      expect(f.levelPrerequisite, `${f.name} levelPrerequisite`).toBe(4);
+      expect((f.abilityOptions ?? []).length, `${f.name} abilityOptions`).toBeGreaterThan(0);
+      expect(f.abilityIncrease, `${f.name} abilityIncrease`).toBe(1);
+    }
+  });
+
+  it("Epic Boon feats have levelPrerequisite 19 and abilityIncrease 1", () => {
+    for (const f of FEATS.filter((f) => f.category === "epic_boon")) {
+      expect(f.levelPrerequisite, `${f.name} levelPrerequisite`).toBe(19);
+      expect(f.abilityIncrease, `${f.name} abilityIncrease`).toBe(1);
+    }
+  });
+
+  it("Origin feats carry no levelPrerequisite", () => {
+    const withLevel = FEATS.filter((f) => f.category === "origin" && f.levelPrerequisite != null).map((f) => f.name);
+    expect(withLevel, "origin feats with a levelPrerequisite").toEqual([]);
+  });
+
+  it("Fighting Style feats name their Fighting Style prerequisite", () => {
+    for (const f of FEATS.filter((f) => f.category === "fighting_style")) {
+      expect(f.prerequisite ?? "", `${f.name} prerequisite`).toContain("Fighting Style");
+    }
+  });
+
+  it("only Magic Initiate and Skilled are repeatable", () => {
+    const repeatable = FEATS.filter((f) => f.repeatable).map((f) => f.name).sort();
+    expect(repeatable).toEqual(["Magic Initiate", "Skilled"]);
+  });
+
+  it("every improvement target is a known FEAT_IMPROVEMENT_TARGET", () => {
+    const allowed = new Set<string>(FEAT_IMPROVEMENT_TARGETS);
+    const unknown = FEATS.flatMap((f) => (f.improvements ?? []).map((i) => i.target)).filter((t) => !allowed.has(t));
+    expect([...new Set(unknown)], "unknown improvement targets").toEqual([]);
+  });
+
+  it("seeds the 16 SRD 5.2.1 feats (17 minus Ability Score Improvement)", () => {
+    const names = new Set(FEATS.map((f) => f.name));
+    const srd = [
+      "Alert", "Magic Initiate", "Savage Attacker", "Skilled", "Grappler",
+      "Archery", "Defense", "Great Weapon Fighting", "Two-Weapon Fighting",
+      "Boon of Combat Prowess", "Boon of Dimensional Travel", "Boon of Fate",
+      "Boon of Irresistible Offense", "Boon of Spell Recall", "Boon of the Night Spirit",
+      "Boon of Truesight",
+    ];
+    const missing = srd.filter((n) => !names.has(n));
+    expect(missing, "missing SRD 5.2.1 feats").toEqual([]);
   });
 });
 

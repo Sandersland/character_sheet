@@ -72,7 +72,7 @@ describe("stepPosition", () => {
 
 describe("ceremonyBlocked", () => {
   function plan(steps: LevelUpStep[], isPrimary: boolean): LevelUpPlanResponse {
-    return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps };
+    return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps, grantedSpells: [] };
   }
 
   it("blocks a non-primary plan containing a resource-backed step (#1065)", () => {
