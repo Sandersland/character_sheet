@@ -7,6 +7,7 @@ import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { advancementSlotsForLevel, fightingStyleChoiceCount } from "@/lib/srd/srd.js";
 import {
   BARD_MAGICAL_SECRETS_LEVELS,
+  isKnownCaster,
   learnsNewSpellsOnLevelUp,
   maxSpellLevelForClass,
   spellsGainedAtLevel,
@@ -98,13 +99,20 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
 }
 
 // Known casters + Wizard's spellbook; Bard's Magical Secrets levels are tagged.
+// #1101: known casters may swap one known spell EVERY level-up, so a swap-only
+// step (count 0, canSwap) is emitted even on a no-new-spells level.
 function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
   if (!learnsNewSpellsOnLevelUp(target.name, target.subclass)) return null;
   const count = spellsGainedAtLevel(target.name, target.newLevel);
-  if (count <= 0) return null;
+  const canSwap = isKnownCaster(target.name, target.subclass);
+  if (count <= 0 && !canSwap) return null;
   const magicalSecrets = target.name.toLowerCase() === "bard" && BARD_MAGICAL_SECRETS_LEVELS.has(target.newLevel);
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass);
-  return { kind: "newSpells", count, meta: { maxSpellLevel, ...(magicalSecrets ? { magicalSecrets: true } : {}) } };
+  return {
+    kind: "newSpells",
+    count,
+    meta: { maxSpellLevel, ...(magicalSecrets ? { magicalSecrets: true } : {}), ...(canSwap ? { canSwap: true } : {}) },
+  };
 }
 
 /**
