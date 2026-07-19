@@ -1,0 +1,68 @@
+// The Hit Points ceremony step (#887): the player takes the fixed average or
+// rolls the advancing class's hit die; a live preview shows the new max HP. The
+// HP math, the roll/selection state, and each sub-view live in their own unit.
+
+import AdvancingClassSelector from "@/features/level-up/AdvancingClassSelector";
+import HpChoiceCard from "@/features/level-up/HpChoiceCard";
+import HpDiceReveal from "@/features/level-up/HpDiceReveal";
+import { useAdvancingEntry } from "@/features/level-up/useAdvancingEntry";
+import { useHpRoll } from "@/features/level-up/useHpRoll";
+import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
+import { useReferenceData } from "@/hooks/useReferenceData";
+import { abilityLabel } from "@/lib/abilities";
+import { hitPointStepMath } from "@/lib/hitDice";
+
+export default function HitPointsStep() {
+  const { character } = useLevelUpStepContext();
+  const { reference } = useReferenceData();
+  const { entries, classEntryId, setEntry } = useAdvancingEntry(character);
+
+  const math = hitPointStepMath(character, reference?.classes ?? [], classEntryId);
+  const { roll, method, gain, handleRoll, chooseAverage, chooseRoll } = useHpRoll(math);
+  const currentMax = character.hitPoints.max;
+
+  return (
+    <div>
+      {entries.length > 1 && (
+        <AdvancingClassSelector entries={entries} classEntryId={classEntryId} onSelect={setEntry} />
+      )}
+
+      <h2 className="text-center font-display text-xl font-semibold text-parchment-900">
+        Roll for hit points, or take the average?
+      </h2>
+      <p className="mt-1 text-center text-sm text-parchment-600">
+        You gain 1{math.die} + your {abilityLabel("constitution")} modifier ({math.conLabel}) this level.
+      </p>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <HpChoiceCard
+          label="Take average"
+          value={`+${math.averageGain}`}
+          note={`${math.fixedBase} (fixed) ${math.conText} = reliable`}
+          selected={method === "average"}
+          onSelect={chooseAverage}
+        />
+        <HpChoiceCard
+          label={`Roll 1${math.die}`}
+          value={roll != null ? `+${roll + math.conMod}` : `${math.minRoll}–${math.maxRoll}`}
+          note={`1${math.die} ${math.conText} = a gamble`}
+          selected={method === "roll"}
+          onSelect={chooseRoll}
+        />
+      </div>
+
+      {method === "roll" && roll == null && (
+        <HpDiceReveal faces={math.faces} die={math.die} onResult={handleRoll} />
+      )}
+
+      {gain != null && (
+        <p className="mt-4 text-center text-sm text-parchment-600">
+          New maximum HP{" "}
+          <b className="font-display text-lg text-vitality-700">
+            {currentMax} → {currentMax + gain}
+          </b>
+        </p>
+      )}
+    </div>
+  );
+}

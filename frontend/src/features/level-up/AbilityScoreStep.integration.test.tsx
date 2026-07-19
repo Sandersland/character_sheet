@@ -8,7 +8,13 @@ import LevelUpCeremony from "@/features/level-up/LevelUpCeremony";
 import { axe } from "@/test/axe";
 import type { CatalogFeat, Character, LevelUpPlanResponse } from "@/types/character";
 
-vi.mock("@/api/client", () => ({ fetchLevelUpPlan: vi.fn(), submitLevelUp: vi.fn(), fetchFeats: vi.fn() }));
+vi.mock("@/api/client", () => ({
+  fetchLevelUpPlan: vi.fn(),
+  submitLevelUp: vi.fn(),
+  fetchFeats: vi.fn(),
+  // HitPointsStep (#887) renders on step 1; it falls back to character.hitDice when reference is empty.
+  fetchReference: vi.fn().mockResolvedValue({ races: [], backgrounds: [], alignments: [], artisanTools: [], classes: [] }),
+}));
 const planMock = vi.mocked(fetchLevelUpPlan);
 const submitMock = vi.mocked(submitLevelUp);
 const featsMock = vi.mocked(fetchFeats);
@@ -17,11 +23,14 @@ const CATALOG: CatalogFeat[] = [
   { id: "alert", name: "Alert", description: "Always on guard.", abilityOptions: [], abilityIncrease: 0, improvements: [] },
 ];
 
+// hitPoints/hitDice present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
   classes: [{ id: "entry-1", name: "fighter", level: 7, subclass: "Champion" }],
   abilityScores: { strength: 15, dexterity: 14, constitution: 16, intelligence: 10, wisdom: 12, charisma: 8 },
   skills: [{ name: "athletics", ability: "strength", proficient: true }],
+  hitPoints: { current: 52, max: 52 },
+  hitDice: { die: "d10", total: 7 },
 } as unknown as Character;
 
 const plan: LevelUpPlanResponse = {
@@ -53,6 +62,7 @@ describe("AbilityScoreStep in the ceremony", () => {
     renderCeremony();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     // On the advancement step, Continue is blocked until the ASI is complete.
@@ -80,6 +90,7 @@ describe("AbilityScoreStep in the ceremony", () => {
     const { container } = renderCeremony();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     expect(await axe(container)).toHaveNoViolations();
 
