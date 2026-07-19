@@ -6,6 +6,7 @@ import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
 import SheetBottomNav from "@/features/character-meta/SheetBottomNav";
 import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals";
+import LevelUpBanner from "@/features/level-up/LevelUpBanner";
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
 import { useScrollCollapse } from "@/features/character-meta/useScrollCollapse";
@@ -140,6 +141,10 @@ function CharacterSheetWorkspace({
           onOpenActivity={modals.openActivity}
           onOpenDelete={modals.openDelete}
         />
+
+        {/* Armed level-up entry (#892): pinned under the header on every tab,
+            above the mobile scroller so it can't scroll away. */}
+        <LevelUpBanner character={character} />
 
         {/* Desktop: the session cue (live-strip when joined, else doorway),
             pinned under the garnet banner; absent on the Combat tab (#961). */}
