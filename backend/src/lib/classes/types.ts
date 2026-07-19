@@ -81,6 +81,7 @@ export type ResourceFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  subclassKey?: string,
 ) => DerivedResource[];
 
 /** Extra DerivedClassInfo fields a subclass contributes beyond resources/features (e.g. Battle Master maneuvers). */

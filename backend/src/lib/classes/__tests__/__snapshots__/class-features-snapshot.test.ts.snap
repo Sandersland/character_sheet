@@ -14123,7 +14123,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14169,7 +14169,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14215,7 +14215,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14261,7 +14261,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14313,7 +14313,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14365,7 +14365,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14417,7 +14417,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 2). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14469,7 +14469,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 3). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14527,7 +14527,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 3). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14585,7 +14585,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 3). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14643,7 +14643,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 4). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14701,7 +14701,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 4). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14765,7 +14765,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 4). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14829,7 +14829,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 5). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14893,7 +14893,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 5). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14957,7 +14957,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 5). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -15033,7 +15033,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 6). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -15109,7 +15109,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 6). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -15191,7 +15191,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 10 hour(s). Regain all uses on a short or long rest. Unlimited uses (Archdruid).",
+          "description": "Transform into a beast (max CR 6). Lasts up to 10 hour(s). Regain all uses on a short or long rest. Unlimited uses (Archdruid).",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
