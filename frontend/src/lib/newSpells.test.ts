@@ -24,6 +24,7 @@ const CATALOG: CatalogSpell[] = [
   spell("mistyStep", 2, ["wizard", "sorcerer"]),
   spell("fireball", 3, ["wizard", "sorcerer"]),   // above a level-2 ceiling
   spell("cureWounds", 1, ["bard", "cleric"]),     // off-class for a wizard
+  spell("chaosBolt", 1, ["sorcerer"]),            // sorcerer-only — off every Magical Secrets list
 ];
 
 describe("readNewSpellsMeta", () => {
@@ -103,8 +104,9 @@ describe("eligibleNewSpells", () => {
     expect(eligible.map((s) => s.id)).toEqual(["shield"]);
   });
 
-  it("with Magical Secrets ignores the class list (any list, still level-gated)", () => {
+  it("with Magical Secrets admits only the Bard/Cleric/Druid/Wizard lists (2024), still level-gated", () => {
     const eligible = eligibleNewSpells(CATALOG, { className: "bard", maxSpellLevel: 2, magicalSecrets: true });
+    // shield/mistyStep (wizard) + cureWounds (bard/cleric) admitted; chaosBolt (sorcerer-only) excluded.
     expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep", "cureWounds"]);
   });
 

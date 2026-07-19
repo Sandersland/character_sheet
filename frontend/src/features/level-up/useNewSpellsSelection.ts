@@ -10,7 +10,7 @@ export interface NewSpellsSelection {
   count: number;
   maxSpellLevel: number;
   magicalSecrets: boolean;
-  /** #1101: this known caster may swap one known spell this level-up. */
+  /** #1101/#1127: an onLevelUp-cadence caster may swap one prepared spell this level-up. */
   canSwap: boolean;
   selectedIds: string[];
   /** The entry id of the spell staged to be swapped out, or null. */
