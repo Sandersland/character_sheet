@@ -4,6 +4,7 @@
 
 import Spinner from "@/components/ui/Spinner";
 import AbilityScoreStep from "@/features/level-up/AbilityScoreStep";
+import ChoiceStep from "@/features/level-up/ChoiceStep";
 import HitPointsStep from "@/features/level-up/HitPointsStep";
 import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
 import StepRail from "@/features/level-up/StepRail";
@@ -34,6 +35,10 @@ const PRIMARY_BTN =
 const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>>> = {
   hitPoints: HitPointsStep,
   advancement: AbilityScoreStep,
+  maneuvers: ChoiceStep,
+  fightingStyle: ChoiceStep,
+  toolProficiency: ChoiceStep,
+  disciplines: ChoiceStep,
   subclass: SubclassStep,
 };
 
