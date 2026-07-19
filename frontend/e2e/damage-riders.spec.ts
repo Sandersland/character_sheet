@@ -82,10 +82,11 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   // The attack picker is a modal bottom sheet (#729) — dismiss it before reading.
   await page.keyboard.press("Escape");
-  // The rider damage lands on the session log — the always-visible right rail on
-  // desktop (#964; the Turn/Log sub-nav is mobile-only).
+  // The rider damage lands on the session log — opened on demand from the one-line
+  // log row (#1086; the always-visible rail is gone).
+  await page.getByRole("button", { name: /open session log/i }).click();
   await expect(
-    page.getByRole("complementary", { name: /Session log/i }).getByText(/fire/i).first(),
+    page.getByRole("dialog", { name: "Session Log" }).getByText(/fire/i).first(),
   ).toBeVisible();
 
   expect(errors).toEqual([]);
