@@ -25,7 +25,7 @@ import {
   learnToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
 } from "@/routes/character/resources.js";
-import { learnSpellOpSchema } from "@/routes/character/spellcasting.js";
+import { forgetSpellOpSchema, learnSpellOpSchema } from "@/routes/character/spellcasting.js";
 import { fightingStyleKeySchema } from "@/routes/character/class.js";
 
 export const levelUpRouter = Router({ mergeParams: true });
@@ -109,6 +109,7 @@ const levelUpSubmissionSchema = z.object({
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
   spellsLearned: z.array(learnSpellOpSchema).optional(),
+  spellsForgotten: z.array(forgetSpellOpSchema).optional(),
 });
 
 /**
