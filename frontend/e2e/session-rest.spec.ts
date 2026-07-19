@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createSessionCharacter, uniqueName } from "./helpers/api";
+import { enterLiveCombat, createSessionCharacter, uniqueName } from "./helpers/api";
 
 // Session rest button (#814): the Rest & HP tab is gone; rests now live behind an
 // always-visible campfire button beside the HP strip. A fresh session character
@@ -19,7 +19,7 @@ test("session rest button: short rest spends a hit die, long rest is available",
   });
 
   await page.goto(`/characters/${id}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   // No Rest & HP tab in the reference strip anymore.
