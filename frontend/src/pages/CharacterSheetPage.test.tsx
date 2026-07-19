@@ -53,7 +53,6 @@ vi.mock("@/features/journal/CapturePalette", () => ({
 vi.mock("@/features/session/SessionsModal", () => ({ default: () => null }));
 vi.mock("@/features/abilities/AllSkillsCard", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellSlotSummary", () => ({ default: () => null }));
-vi.mock("@/features/inventory/EquippedItemsCard", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellsSection", () => ({ default: () => null }));
 vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));

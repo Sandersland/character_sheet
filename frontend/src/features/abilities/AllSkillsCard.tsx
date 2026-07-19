@@ -18,13 +18,26 @@ interface AllSkillsCardProps {
    * reference rail, so it recedes behind the turn tracker. Defaults off.
    */
   muted?: boolean;
+  /**
+   * Flow the six ability groups two-up (#1086) so the card is half as tall — the
+   * Overview's 3fr/2fr left column keeps pace with the XP/features/advancements
+   * stack on its right. `divide-y` between groups is dropped in this mode (the
+   * column split reads the grouping); defaults off (single stacked column).
+   */
+  twoColumn?: boolean;
 }
 
 // All 18 skills inline on the Overview, grouped by ability (D1: flat, no
 // accordion); every skill is a one-tap RollButton so the roll fires with no
 // dialog open and its result is un-suppressed (#957). Replaces the
 // proficient-only card + "All Skills" modal.
-export default function AllSkillsCard({ skills, abilityScores, proficiencyBonus, muted = false }: AllSkillsCardProps) {
+export default function AllSkillsCard({
+  skills,
+  abilityScores,
+  proficiencyBonus,
+  muted = false,
+  twoColumn = false,
+}: AllSkillsCardProps) {
   const groups = ABILITY_ORDER.map((ability) => ({
     ability,
     skills: skills
@@ -34,7 +47,13 @@ export default function AllSkillsCard({ skills, abilityScores, proficiencyBonus,
 
   return (
     <Card title="Skills" className={muted ? "bg-parchment-100 shadow-none" : ""}>
-      <div className="flex flex-col divide-y divide-parchment-200">
+      <div
+        className={
+          twoColumn
+            ? "grid grid-cols-1 gap-x-6 pb-1 sm:grid-cols-2"
+            : "flex flex-col divide-y divide-parchment-200"
+        }
+      >
         {groups.map((group) => (
           <section key={group.ability} className="py-1.5 first:pt-0.5 last:pb-0.5">
             <SkillGroupHeading ability={group.ability} />

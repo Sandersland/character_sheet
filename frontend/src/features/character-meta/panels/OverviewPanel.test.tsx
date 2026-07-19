@@ -24,13 +24,14 @@ function makeCharacter(overrides: Partial<Character>): Character {
     abilityScores: { strength: 10, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
     skills: [{ name: "arcana", ability: "intelligence", proficient: true }],
     savingThrowProficiencies: [],
-    toolProficiencies: [],
+    toolProficiencies: ["smiths-tools"],
+    armorProficiencies: ["light"],
     inventory: [],
-    advancements: [],
-    advancementSlots: { total: 0, used: 0 },
+    advancements: [{ id: "a1", type: "asi", level: 4, label: "STR +2" }],
+    advancementSlots: { total: 1, used: 1 },
     rollModifiers: [],
     ...overrides,
-  } as Character;
+  } as unknown as Character;
 }
 
 function renderPanel(character: Character) {
@@ -43,7 +44,7 @@ function renderPanel(character: Character) {
 }
 
 describe("OverviewPanel", () => {
-  it("renders the curated columns for a caster, including the Spell Slots card", () => {
+  it("renders the two-column layout for a caster, including the Spell Slots card, and no Equipped card", () => {
     renderPanel(
       makeCharacter({
         spellcasting: {
@@ -54,15 +55,28 @@ describe("OverviewPanel", () => {
         },
       } as Partial<Character>)
     );
+    // Left column: Skills + Proficiencies.
     expect(screen.getByText("Skills")).toBeInTheDocument();
+    expect(screen.getByText("proficiencies")).toBeInTheDocument();
+    // Right column: XP, Spell Slots (caster), Class Features, Advancements.
+    expect(screen.getByText("xp")).toBeInTheDocument();
     expect(screen.getByText("Spell Slots")).toBeInTheDocument();
-    expect(screen.getByText("Equipped")).toBeInTheDocument();
+    expect(screen.getByText("features")).toBeInTheDocument();
+    expect(screen.getByText("advancements")).toBeInTheDocument();
+    // Equipped gear now lives on the Inventory tab (#1086).
+    expect(screen.queryByText("Equipped")).toBeNull();
   });
 
   it("omits the Spell Slots card for a non-caster", () => {
     renderPanel(makeCharacter({ spellcasting: undefined }));
     expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.queryByText("Spell Slots")).not.toBeInTheDocument();
+    expect(screen.queryByText("Equipped")).toBeNull();
+  });
+
+  it("keeps the #advancement-card anchor so HP notices can deep-link to it", () => {
+    const { container } = renderPanel(makeCharacter({ spellcasting: undefined }));
+    expect(container.querySelector("#advancement-card")).not.toBeNull();
   });
 
   it("shows the mobile quick-bar labels and no 'vitals' copy", () => {
