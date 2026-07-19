@@ -53,7 +53,7 @@ describe("SpellSlotMeters", () => {
         onRestore={onRestore}
       />,
     );
-    expect(screen.getByRole("heading", { name: /Pact Magic/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Pact Magic/i })).toHaveTextContent(/level 1/i);
     await user.click(screen.getByTitle("Expend a level 1 slot"));
     await user.click(screen.getByTitle("Restore a level 1 slot"));
     expect(onExpend).toHaveBeenCalledWith(1);
