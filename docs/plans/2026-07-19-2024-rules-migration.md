@@ -31,9 +31,9 @@ Lanes within a wave run **concurrently in separate worktrees**; lanes are ordere
 
 | Lane | Issue(s) | Hot files (why lanes don't collide) |
 |---|---|---|
-| W1-a | #1127 prepared-caster unification | `spellcasting-tables.ts`, `level-up-plan/submission`, `spellcasting.ts`, `spellList.ts`/`newSpells.ts`. Biggest lane — start it first, staff it best. |
+| W1-a | #1127 prepared-caster unification | `lib/srd/spellcasting-tables.ts`, `lib/leveling/level-up-plan.ts`/`level-up-submission.ts`, `lib/spellcasting/spellcasting.ts`, frontend `lib/spellList.ts`/`lib/newSpells.ts`. Biggest lane — start it first, staff it best. |
 | W1-b | #1128 subclass at level 3 | class files ×5, `catalog-data.ts`, `subclass-granted-spells.ts` |
-| W1-c | #1129 feat categories + reseed | `schema.prisma`, `seed/feats.ts`, `srd/feats.ts`, `advancement.ts`. **Only schema-touching lane in this wave** (see §4, migrations). |
+| W1-c | #1129 feat categories + reseed | `schema.prisma`, `prisma/seed/feats.ts`, `lib/srd/feats.ts`, `lib/leveling/advancement.ts`. **Only schema-touching lane in this wave** (see §4, migrations). |
 | W1-d | #1135 conditions text **then** #1136 exhaustion, chained in one worktree | Both edit `condition-data.ts` + `ConditionsSheetBody.tsx` — never concurrent with each other, freely concurrent with a/b/c. |
 
 Merge into the integration branch as each lane finishes (no barrier); expect only test-file and doc-file conflicts. **Promote to main once wave 1 is green and verified.**
