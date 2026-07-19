@@ -159,6 +159,9 @@ export interface Character {
   /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
   attacksPerAction: number;
 
+  /** Rogue Sneak Attack Nd6 (dice count + faces), or null for a non-rogue. */
+  sneakAttack: { dice: number; faces: number } | null;
+
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];
   /** How many advancement slots this character has earned at their level. */

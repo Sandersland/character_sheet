@@ -19,6 +19,7 @@ import {
   hasSuperiorityDice,
   type AttackEntry,
 } from "@/lib/attackMath";
+import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
@@ -26,6 +27,7 @@ import AttackStepCard, { AttackKickerPips } from "@/features/session/AttackStepC
 import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
+import SneakAttackSection from "@/features/session/SneakAttackSection";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -55,6 +57,43 @@ function pickerView(character: Character, attack: TurnState["attack"], forms: At
     preRoll: attack !== null && attack.used === 0,
     attacksRemain: attack !== null && attack.used > 0 && attack.used < attack.total,
   };
+}
+
+// The last Attack-action row steps 2–3 bind to — the tally also holds off-hand
+// (bonusAction) rows, so the search is source-scoped (#813).
+function lastActionRow(tally: TurnState["attackTally"]): {
+  index: number;
+  row: AttackTallyRow | null;
+} {
+  const index = tally.map((r) => r.source).lastIndexOf("action");
+  return { index, row: index >= 0 ? tally[index] : null };
+}
+
+// With a weapon: the sheet's ADV/DIS control (#958); without: the empty hint.
+function WeaponRollModeRow({
+  hasWeapon,
+  mode,
+  onSelect,
+}: {
+  hasWeapon: boolean;
+  mode: RollMode;
+  onSelect: (m: RollMode) => void;
+}) {
+  if (!hasWeapon) {
+    return (
+      <p className="text-sm text-parchment-600">
+        No weapon equipped — use Change on the turn screen.
+      </p>
+    );
+  }
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+        Roll to hit
+      </span>
+      <RollModeChoice selected={mode} onSelect={onSelect} ariaLabel="Attack roll mode" />
+    </div>
+  );
 }
 
 interface InlineAttackPickerProps {
@@ -90,10 +129,7 @@ export default function InlineAttackPicker({
   // roll-mode footer. Visible on the sheet, applied to each to-hit roll here.
   const [attackMode, setAttackMode] = useState<RollMode>("normal");
 
-  // Scope to the Attack action's own rows — the tally now also holds off-hand
-  // (bonusAction) rows, and steps 2–3 must bind to the last ACTION row (#813).
-  const currentRowIndex = turnState.attackTally.map((r) => r.source).lastIndexOf("action");
-  const currentRow = currentRowIndex >= 0 ? turnState.attackTally[currentRowIndex] : null;
+  const { index: currentRowIndex, row: currentRow } = lastActionRow(turnState.attackTally);
 
   const { riderTotals, viewFor } = useAttackRolls({
     roll,
@@ -161,6 +197,14 @@ export default function InlineAttackPicker({
       onUpdate={onUpdate}
     />
   );
+  const sneakAttack = boundView && (
+    <SneakAttackSection
+      character={character}
+      turnState={turnState}
+      currentRow={currentRow}
+      onUpdate={onUpdate}
+    />
+  );
   const spellAttacks = (
     <InlineSpellAttackSection
       character={character}
@@ -197,18 +241,8 @@ export default function InlineAttackPicker({
       onClose={onClose}
     />
   );
-  // With a weapon: the sheet's ADV/DIS control (#958); without: the empty hint.
-  const weaponRow = view.hasWeapon ? (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-        Roll to hit
-      </span>
-      <RollModeChoice selected={attackMode} onSelect={setAttackMode} ariaLabel="Attack roll mode" />
-    </div>
-  ) : (
-    <p className="text-sm text-parchment-600">
-      No weapon equipped — use Change on the turn screen.
-    </p>
+  const weaponRow = (
+    <WeaponRollModeRow hasWeapon={view.hasWeapon} mode={attackMode} onSelect={setAttackMode} />
   );
 
   // Mobile: one column in journey order. md+: the step card keeps the left
@@ -221,6 +255,7 @@ export default function InlineAttackPicker({
         {weaponRow}
         {stepCard}
         {maneuversDisclosure}
+        {sneakAttack}
         {spellAttacks}
         {footer}
       </div>
@@ -238,6 +273,7 @@ export default function InlineAttackPicker({
         <AttackKickerPips attack={turnState.attack} />
         {tallyStrip}
         {maneuversDisclosure}
+        {sneakAttack}
         {spellAttacks}
       </div>
     </div>
