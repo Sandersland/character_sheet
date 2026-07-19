@@ -80,6 +80,16 @@ const restoreSlotOpSchema = z.object({
   level: z.number().int().min(1).max(9),
 });
 
+// Wizard Arcane Recovery (#904): recover expended slots totalling up to
+// ceil(wizardLevel/2) slot-levels, none above 5th. The lib enforces the cap,
+// the >5th rule, and the once-per-long-rest gate.
+const arcaneRecoveryOpSchema = z.object({
+  type: z.literal("arcaneRecovery"),
+  slots: z
+    .array(z.object({ level: z.number().int().min(1).max(9), count: z.number().int().positive() }))
+    .min(1),
+});
+
 export const learnSpellOpSchema = z
   .object({
     type: z.literal("learnSpell"),
@@ -121,6 +131,7 @@ const operationSchema = z.discriminatedUnion("type", [
   castItemSpellOpSchema,
   expendSlotOpSchema,
   restoreSlotOpSchema,
+  arcaneRecoveryOpSchema,
   learnSpellOpSchema,
   forgetSpellOpSchema,
   prepareSpellOpSchema,
