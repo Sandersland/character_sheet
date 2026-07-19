@@ -7,7 +7,7 @@ import {
   deriveFeatBonuses,
   hitDieFace,
 } from "@/lib/srd/srd.js";
-import { normalizeResourcesMutable } from "@/lib/classes/resources.js";
+import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources.js";
 import {
   InvalidHitPointOperationError,
   normalizeHitPoints,
@@ -132,7 +132,9 @@ export async function buildHpOpContext(
     primaryEntry?.name ?? "",
     levelForExperience(row.experiencePoints),
   );
-  const featBonus = deriveFeatBonuses(advStateForFeat.advancements.slice(0, featSlotCap), hd.total);
+  // Origin feats are kept regardless of the slot cap (#1130).
+  const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advStateForFeat.advancements, featSlotCap);
+  const featBonus = deriveFeatBonuses(inCapAdvancements, hd.total);
   // effMax is used for all clamp/ceiling operations instead of hp.max.
   // hp.max is the stored (feat-free) base and is what gets persisted.
   const effMax = hp.max + featBonus.maxHp;

@@ -28,6 +28,7 @@ import {
   snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
+  splitAdvancementsBySlotCap,
   type AdvancementEntry,
   type FeatImprovement,
   type ResourcesMutableState,
@@ -196,9 +197,11 @@ function snapshotAdvancementState(
 }
 
 function assertSlotAvailable(state: ResourcesMutableState, totalSlots: number): void {
-  if (state.advancements.length >= totalSlots) {
+  // Origin feats don't occupy a slot (#1130) — gate on slot-bearing entries only.
+  const { usedSlots } = splitAdvancementsBySlotCap(state.advancements, totalSlots);
+  if (usedSlots >= totalSlots) {
     throw new InvalidAdvancementOperationError(
-      `No advancement slots available (${state.advancements.length}/${totalSlots} used)`,
+      `No advancement slots available (${usedSlots}/${totalSlots} used)`,
     );
   }
 }
@@ -444,6 +447,14 @@ function applyRemoveAdvancement(ctx: AdvancementOpContext, op: RemoveAdvancement
   }
 
   const removed = state.advancements[idx];
+
+  // Origin feats are background grants, not player-taken advancements (#1130) —
+  // they're removed by changing the background at creation, never via this route.
+  if (removed.origin) {
+    throw new InvalidAdvancementOperationError(
+      `Cannot remove an Origin feat (${removed.featName ?? "background grant"})`,
+    );
+  }
 
   // Reverse the single entry's effects on scores, HP, and initiative.
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, [removed]);

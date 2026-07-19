@@ -40,6 +40,7 @@ import {
   normalizeResourcesMutable,
   serializeResourcesState,
   snapshotResources,
+  splitAdvancementsBySlotCap,
   type DisciplineEntry,
   type ManeuverEntry,
   type ResourcesMutableState,
@@ -599,7 +600,10 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   const className = row.classEntries[0]?.name ?? "";
   const allowed = advancementSlotsForLevel(className, newDerivedLevel);
 
-  if (state.advancements.length <= allowed) return; // within cap
+  // Origin feats are exempt from the cap and never reversed (#1130); trim only
+  // the slot-bearing tail beyond `allowed` (LIFO), keeping origin entries.
+  const { kept, excess: toRemove } = splitAdvancementsBySlotCap(state.advancements, allowed);
+  if (toRemove.length === 0) return; // within cap
 
   const scores = row.abilityScores as Record<string, number>;
   const hp = normalizeHitPoints(row.hitPoints);
@@ -613,12 +617,10 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
     resources: snapshotResources(state),
   };
 
-  // LIFO: reverse the tail entries (those beyond the new cap).
-  const toRemove = state.advancements.slice(allowed);
   const removedCount = toRemove.length;
 
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, toRemove);
-  state.advancements = state.advancements.slice(0, allowed);
+  state.advancements = kept;
 
   const newHp = {
     ...reversed.hitPoints,
