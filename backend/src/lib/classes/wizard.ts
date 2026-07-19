@@ -147,6 +147,18 @@ const SCHOOL_OF_ILLUSION_FEATURES: DerivedFeature[] = [
 
 export const wizard: ClassDefinition = {
   features: WIZARD_FEATURES,
+  // Arcane Recovery's once-per-day use, tracked as a longRest-recharge pool so a
+  // long rest refreshes it (#904). The slot-level cap is computed at op time.
+  resourceFn: () => [
+    {
+      key: "arcaneRecovery",
+      label: "Arcane Recovery",
+      total: 1,
+      recharge: "longRest",
+      description:
+        "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+    },
+  ],
   subclasses: {
     "school of evocation": { grantLevel: 2, features: SCHOOL_OF_EVOCATION_FEATURES },
     "school of abjuration": { grantLevel: 2, features: SCHOOL_OF_ABJURATION_FEATURES },

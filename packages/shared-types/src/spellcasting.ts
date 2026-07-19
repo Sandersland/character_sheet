@@ -98,6 +98,12 @@ export interface RestoreSlotOperation {
   level: number;
 }
 
+/** Wizard Arcane Recovery: recover expended slots on a short rest, once per long rest (#904). */
+export interface ArcaneRecoveryOperation {
+  type: "arcaneRecovery";
+  slots: { level: number; count: number }[];
+}
+
 /** Learn a spell from the catalog (spellId) or add a custom one. Exactly one of spellId/custom. */
 export interface LearnSpellOperation {
   type: "learnSpell";
@@ -150,6 +156,7 @@ export type SpellcastingOperation =
   | CastItemSpellOperation
   | ExpendSlotOperation
   | RestoreSlotOperation
+  | ArcaneRecoveryOperation
   | LearnSpellOperation
   | ForgetSpellOperation
   | PrepareSpellOperation

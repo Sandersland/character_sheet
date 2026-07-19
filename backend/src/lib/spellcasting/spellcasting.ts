@@ -38,7 +38,15 @@ import type {
   SpellcastingMutableState,
 } from "./spell-state.js";
 import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
+import { deriveResources } from "@/lib/classes/class-features.js";
+import {
+  normalizeResourcesMutable,
+  serializeResourcesState,
+  snapshotResources,
+  type ResourcesMutableState,
+} from "@/lib/classes/resources.js";
 import type {
+  ArcaneRecoveryOperation,
   CastItemSpellOperation,
   CastSpellOperation,
   ConvertSorceryPointsOperation,
@@ -91,6 +99,12 @@ interface SpellOpContext {
   wielderSpellAttackBonus: number | null;
   // Derived prepared-spell cap (#883). Null for known/pact/third casters.
   preparedSpellLimit: number | null;
+  // Arcane Recovery (#904): the mutable resources state (the once-per-long-rest
+  // use counter lives here), whether the character has the pool, and the wizard
+  // level driving the ceil(level/2) slot-level cap.
+  resources: ResourcesMutableState;
+  arcaneRecoveryAvailable: boolean;
+  wizardLevel: number;
 }
 
 function applyExpendSlotOp(ctx: SpellOpContext, op: ExpendSlotOperation): OpOutcome {
@@ -129,6 +143,78 @@ function applyRestoreSlotOp(ctx: SpellOpContext, op: RestoreSlotOperation): OpOu
     );
   }
   return { eventType: "restoreSlot", summary, eventData: { level: op.level } };
+}
+
+const ARCANE_RECOVERY_KEY = "arcaneRecovery";
+
+// Aggregate the requested recoveries into a level→count map so duplicate entries
+// at the same level are summed once (a per-entry check would let two entries each
+// pass against the full expended count and over-recover, #904 review).
+function aggregateArcaneRecovery(op: ArcaneRecoveryOperation): Map<number, number> {
+  const byLevel = new Map<number, number>();
+  for (const { level, count } of op.slots) {
+    byLevel.set(level, (byLevel.get(level) ?? 0) + count);
+  }
+  return byLevel;
+}
+
+// Validate the aggregated recoveries against the 5th-level ceiling, the number of
+// slots actually expended at each level, and the total slot-level cap. Returns
+// the total slot-levels recovered.
+function validateArcaneRecovery(ctx: SpellOpContext, byLevel: Map<number, number>): number {
+  const cap = Math.ceil(ctx.wizardLevel / 2);
+  let totalLevels = 0;
+  for (const [level, count] of byLevel) {
+    if (level > 5) {
+      throw new InvalidSpellcastingOperationError("Arcane Recovery cannot recover a slot above 5th level");
+    }
+    const expended = ctx.state.slotsUsed[String(level)] ?? 0;
+    if (count > expended) {
+      throw new InvalidSpellcastingOperationError(
+        `Cannot recover ${count} level-${level} slot${count === 1 ? "" : "s"}: only ${expended} expended`,
+      );
+    }
+    totalLevels += level * count;
+  }
+  if (totalLevels > cap) {
+    throw new InvalidSpellcastingOperationError(
+      `Arcane Recovery can restore at most ${cap} slot-level${cap === 1 ? "" : "s"}; requested ${totalLevels}`,
+    );
+  }
+  return totalLevels;
+}
+
+// Recover expended spell slots (Wizard Arcane Recovery, #904). Gated to once per
+// long rest via the arcaneRecovery resource pool (recharge longRest, total 1),
+// which is written here and snapshotted into the event for undo.
+async function applyArcaneRecoveryOp(ctx: SpellOpContext, op: ArcaneRecoveryOperation): Promise<OpOutcome> {
+  const { state, resources } = ctx;
+  if (!ctx.arcaneRecoveryAvailable) {
+    throw new InvalidSpellcastingOperationError("Arcane Recovery is not available for this character");
+  }
+  if ((resources.used[ARCANE_RECOVERY_KEY] ?? 0) >= 1) {
+    throw new InvalidSpellcastingOperationError("Arcane Recovery already used — regained on a long rest");
+  }
+  const byLevel = aggregateArcaneRecovery(op);
+  const totalLevels = validateArcaneRecovery(ctx, byLevel);
+
+  const beforeResources = snapshotResources(resources);
+  for (const [level, count] of byLevel) {
+    state.slotsUsed[String(level)] = (state.slotsUsed[String(level)] ?? 0) - count;
+  }
+  resources.used[ARCANE_RECOVERY_KEY] = 1;
+  await ctx.tx.character.update({
+    where: { id: ctx.characterId },
+    data: { resources: serializeResourcesState(resources) },
+  });
+
+  return {
+    eventType: "restoreSlot",
+    summary: `Arcane Recovery — restored ${totalLevels} slot-level${totalLevels === 1 ? "" : "s"}`,
+    eventData: { arcaneRecovery: true, slots: op.slots, totalLevels },
+    beforeExtra: { resources: beforeResources },
+    afterExtra: { resources: snapshotResources(resources) },
+  };
 }
 
 // Normalize a nullable catalog column to the SpellEntry's optional (undefined).
@@ -686,6 +772,7 @@ const SPELL_OP_HANDLERS: {
   castItemSpell: applyCastItemSpellOp,
   expendSlot: applyExpendSlotOp,
   restoreSlot: applyRestoreSlotOp,
+  arcaneRecovery: applyArcaneRecoveryOp,
   learnSpell: applyLearnSpellOp,
   forgetSpell: applyForgetSpellOp,
   prepareSpell: applyPrepareSpellOp,
@@ -717,6 +804,7 @@ function buildSpellOpContext(
   arcanaTotals: Record<number, number>,
   derived: DerivedSpellcasting,
   preparedSpellLimit: number | null,
+  arcaneRecovery: { resources: ResourcesMutableState; available: boolean; wizardLevel: number },
 ): SpellOpContext {
   return {
     ...ids,
@@ -728,6 +816,9 @@ function buildSpellOpContext(
     wielderSpellSaveDC: derived?.spellSaveDC ?? null,
     wielderSpellAttackBonus: derived?.spellAttackBonus ?? null,
     preparedSpellLimit,
+    resources: arcaneRecovery.resources,
+    arcaneRecoveryAvailable: arcaneRecovery.available,
+    wizardLevel: arcaneRecovery.wizardLevel,
   };
 }
 
@@ -784,6 +875,7 @@ const SPELLCASTING_SELECT = {
   name: true,
   campaignId: true,
   spellcasting: true,
+  resources: true,
   experiencePoints: true,
   abilityScores: true,
   classEntries: {
@@ -803,6 +895,27 @@ const SPELLCASTING_SELECT = {
 } satisfies Prisma.CharacterSelect;
 
 type SpellcastingRow = Prisma.CharacterGetPayload<{ select: typeof SPELLCASTING_SELECT }>;
+
+// Arcane Recovery (#904): the pool comes from the primary class's derived
+// resources — present only for a wizard — so usage and the long-rest refresh
+// (resetRestResources, also primary-class-scoped) key off the same fact.
+// Single-class uses the XP-derived level; multiclass uses the primary entry's.
+function resolveArcaneRecoveryContext(
+  row: SpellcastingRow,
+  className: string,
+  level: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): { resources: ResourcesMutableState; available: boolean; wizardLevel: number } {
+  const primary = row.classEntries[0];
+  const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
+  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus);
+  return {
+    resources: normalizeResourcesMutable(row.resources),
+    available: Boolean(resourceInfo?.resources.some((r) => r.key === "arcaneRecovery")),
+    wizardLevel,
+  };
+}
 
 // Read fresh state and assemble the per-op context + before-snapshot. Split out
 // of applySpellcastingOpInTx to keep that seam under the unit-size gate.
@@ -825,6 +938,8 @@ function buildSpellcastingOp(
 
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
+  const arcaneRecovery = resolveArcaneRecoveryContext(row, className, level, abilityScores, profBonus);
+
   const state = normalizeSpellcastingMutable(row.spellcasting);
   const beforeState = cloneSpellState(state);
 
@@ -842,7 +957,7 @@ function buildSpellcastingOp(
     })),
   );
 
-  const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit);
+  const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit, arcaneRecovery);
   return { ctx, state, beforeState };
 }
 
