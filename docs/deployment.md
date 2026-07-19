@@ -12,6 +12,13 @@ Read this when packaging the app for hosting, deploying the dev environment (Rai
 
 Single-origin is deliberate: one hostname → one Cloudflare Access policy, same-origin fetch, no CORS/cookie problems.
 
+Every image builds from the **repo root context** — the npm-workspaces install must link `packages/*` (shared types, #820) — so split builds pass `-f`, never a subdirectory context:
+
+```bash
+docker build -f backend/Dockerfile.prod .
+docker build -f frontend/Dockerfile.prod --build-arg VITE_API_URL=https://api.example.com/api .
+```
+
 ### Environment variables
 
 | Var | Notes |
