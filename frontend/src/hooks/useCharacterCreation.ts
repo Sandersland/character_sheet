@@ -7,11 +7,13 @@ import type { ToolProficiencyChoices } from "@/features/character-create/useTool
 import {
   buildCreatePayload,
   creationMissing,
+  deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
   resolveSelections,
 } from "@/lib/characterCreation";
 import type {
+  CreationBackgroundBonuses,
   CreationPreview,
   CreationSelections,
   CreationSkillChoices,
@@ -36,6 +38,7 @@ export interface CharacterCreation {
   selections: CreationSelections;
   skills: CharacterCreationSkills;
   toolChoices: ToolProficiencyChoices;
+  backgroundBonuses: CreationBackgroundBonuses;
   catalog: Item[];
   preview: CreationPreview;
   missing: string[];
@@ -63,6 +66,7 @@ export function useCharacterCreation(): CharacterCreation {
 
   const selections = resolveSelections(reference, draft);
   const skillChoices = deriveSkillChoices(draft, selections);
+  const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   const toolChoices = useToolProficiencyChoices({
     draft,
     selectedClass: selections.class,
@@ -113,6 +117,7 @@ export function useCharacterCreation(): CharacterCreation {
     selections,
     skills: { ...skillChoices, toggle: toggleSkill },
     toolChoices,
+    backgroundBonuses,
     catalog,
     preview: derivePreview(draft, selections),
     missing,

@@ -168,7 +168,7 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
               />
               <button
                 type="button"
-                onClick={() => update({ useCustomBackground: false, customBackground: "" })}
+                onClick={() => update({ useCustomBackground: false, customBackground: "", backgroundAbilities: {} })}
                 className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
               >
                 Use list
@@ -179,7 +179,7 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
               <select
                 aria-label="Background"
                 value={draft.background}
-                onChange={(e) => update({ background: e.target.value, skillProficiencies: [], toolChoices: [] })}
+                onChange={(e) => update({ background: e.target.value, skillProficiencies: [], toolChoices: [], backgroundAbilities: {} })}
                 className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
               >
                 <option value="">Select background…</option>
@@ -192,7 +192,7 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
               <button
                 type="button"
                 onClick={() =>
-                  update({ useCustomBackground: true, background: "", skillProficiencies: [], toolChoices: [] })
+                  update({ useCustomBackground: true, background: "", skillProficiencies: [], toolChoices: [], backgroundAbilities: {} })
                 }
                 className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
               >

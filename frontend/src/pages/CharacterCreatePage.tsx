@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import AbilityScoresSection from "@/features/character-create/AbilityScoresSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
+import BackgroundBonusesSection from "@/features/character-create/BackgroundBonusesSection";
 import Card from "@/components/ui/Card";
 import CreateActions from "@/features/character-create/CreateActions";
 import IdentitySection from "@/features/character-create/IdentitySection";
@@ -24,6 +25,7 @@ export default function CharacterCreatePage() {
     selections,
     skills,
     toolChoices,
+    backgroundBonuses,
     catalog,
     preview,
     missing,
@@ -74,6 +76,13 @@ export default function CharacterCreatePage() {
             <IdentitySection draft={draft} update={update} reference={reference} />
 
             <AbilityScoresSection draft={draft} update={update} />
+
+            {backgroundBonuses.applicable ? (
+              <BackgroundBonusesSection
+                bonuses={backgroundBonuses}
+                onChange={(assignment) => update({ backgroundAbilities: assignment })}
+              />
+            ) : null}
 
             <SkillSection
               hasClass={Boolean(selections.class)}
