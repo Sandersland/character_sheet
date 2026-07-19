@@ -64,4 +64,4 @@ Wire types shared by both tiers (backend transaction-op inputs the frontend must
 
 ## Docker Compose
 
-Four services: `db` (Postgres 17, 5432), `pgadmin` (5050, behind the `tools` profile), `backend` (Express, 4000), `frontend` (Vite, 5173). Backend/frontend each have their own Dockerfile with source bind-mounted for hot reload and an anonymous volume shadowing `node_modules`. Prisma client generates into `src/generated/prisma` (gitignored) — run `npx prisma generate` after a fresh clone or schema change.
+Four services: `db` (Postgres 17, 5432), `pgadmin` (5050, behind the `tools` profile), `backend` (Express, 4000), `frontend` (Vite, 5173). Backend/frontend build from the repo-root context (npm workspaces must link `packages/*`) with the whole repo bind-mounted for hot reload and per-service named volumes shadowing both the hoisted root `node_modules` and the workspace-local one. Prisma client generates into `src/generated/prisma` (gitignored) — run `npx prisma generate` after a fresh clone or schema change.

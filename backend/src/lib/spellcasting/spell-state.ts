@@ -4,8 +4,9 @@ import type { SpellComponents } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
 
-// Re-exported so existing importers (spellcasting.ts, granted-spells.ts) keep
-// resolving SpellComponents here; the definition now lives in shared-types (#820).
+// Re-exported so existing consumers (applySpellcastingOperations,
+// deriveGrantedSpells) keep resolving SpellComponents from this module; the
+// definition now lives in shared-types (#820).
 export type { SpellComponents };
 
 // Stored in Character.spellcasting JSON column.

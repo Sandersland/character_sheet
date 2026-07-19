@@ -1,8 +1,9 @@
 // Spellcasting transaction-op wire types — the single source of truth shared by
 // the backend `applySpellcastingOperations` dispatcher and the frontend client
 // (#820, pattern-setter family). Both tiers re-export the consumed names from
-// their existing public modules (backend spell-state.ts / spellcasting.ts,
-// frontend types/character/spells.ts) so downstream importers are unaffected.
+// their existing public surfaces (the modules owning `applySpellcastingOperations`
+// / `normalizeSpellcastingMutable` on the backend, the frontend `Spell` types
+// barrel) so downstream importers are unaffected.
 //
 // Only types consumed by name elsewhere are exported; an op that appears solely
 // as a union member (dropConcentration — handled by `op.type` narrowing, never
