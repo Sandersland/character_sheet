@@ -171,6 +171,28 @@ describe("POST spellcasting/transactions — arcaneRecovery (#904)", () => {
     expect(res.status).toBe(400);
   });
 
+  it("aggregates duplicate-level entries so they cannot over-recover past expended", async () => {
+    // 2×L1 expended; two entries summing to 3 must be rejected as one over-count,
+    // not pass twice against the full expended count (#904 review).
+    const res = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
+      .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 1, count: 2 }, { level: 1, count: 1 }] }] });
+    expect(res.status).toBe(400);
+    // Rejected: slots untouched (still 2 expended) and the use not consumed.
+    const check = await supertest(app).get(`/api/characters/${WIZARD_ID}`).set("Cookie", COOKIE);
+    expect(slot(check.body, 1)!.used).toBe(2);
+    expect(pool(check.body, "arcaneRecovery")!.used).toBe(0);
+  });
+
+  it("applies valid duplicate-level entries once (aggregated, no double-decrement)", async () => {
+    // Two L1 entries summing to 2 (≤ 2 expended, 2 slot-levels ≤ cap 4): succeeds
+    // and restores exactly 2 L1 slots (used 2→0), not more.
+    const res = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
+      .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 1, count: 1 }, { level: 1, count: 1 }] }] });
+    expect(res.status).toBe(200);
+    expect(slot(res.body, 1)!.used).toBe(0);
+    expect(pool(res.body, "arcaneRecovery")!.used).toBe(1);
+  });
+
   it("rejects Arcane Recovery for a non-wizard", async () => {
     const res = await supertest(app).post(url(FIGHTER_ID)).set("Cookie", COOKIE)
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 1, count: 1 }] }] });

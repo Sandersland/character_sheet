@@ -246,13 +246,24 @@ function applyRestoreSlotOp(ctx: SpellOpContext, op: RestoreSlotOperation): OpOu
 
 const ARCANE_RECOVERY_KEY = "arcaneRecovery";
 
-// Validate the requested recoveries against the 5th-level ceiling, the number of
+// Aggregate the requested recoveries into a level→count map so duplicate entries
+// at the same level are summed once (a per-entry check would let two entries each
+// pass against the full expended count and over-recover, #904 review).
+function aggregateArcaneRecovery(op: ArcaneRecoveryOperation): Map<number, number> {
+  const byLevel = new Map<number, number>();
+  for (const { level, count } of op.slots) {
+    byLevel.set(level, (byLevel.get(level) ?? 0) + count);
+  }
+  return byLevel;
+}
+
+// Validate the aggregated recoveries against the 5th-level ceiling, the number of
 // slots actually expended at each level, and the total slot-level cap. Returns
 // the total slot-levels recovered.
-function validateArcaneRecovery(ctx: SpellOpContext, op: ArcaneRecoveryOperation): number {
+function validateArcaneRecovery(ctx: SpellOpContext, byLevel: Map<number, number>): number {
   const cap = Math.ceil(ctx.wizardLevel / 2);
   let totalLevels = 0;
-  for (const { level, count } of op.slots) {
+  for (const [level, count] of byLevel) {
     if (level > 5) {
       throw new InvalidSpellcastingOperationError("Arcane Recovery cannot recover a slot above 5th level");
     }
@@ -283,10 +294,11 @@ async function applyArcaneRecoveryOp(ctx: SpellOpContext, op: ArcaneRecoveryOper
   if ((resources.used[ARCANE_RECOVERY_KEY] ?? 0) >= 1) {
     throw new InvalidSpellcastingOperationError("Arcane Recovery already used — regained on a long rest");
   }
-  const totalLevels = validateArcaneRecovery(ctx, op);
+  const byLevel = aggregateArcaneRecovery(op);
+  const totalLevels = validateArcaneRecovery(ctx, byLevel);
 
   const beforeResources = snapshotResources(resources);
-  for (const { level, count } of op.slots) {
+  for (const [level, count] of byLevel) {
     state.slotsUsed[String(level)] = (state.slotsUsed[String(level)] ?? 0) - count;
   }
   resources.used[ARCANE_RECOVERY_KEY] = 1;
