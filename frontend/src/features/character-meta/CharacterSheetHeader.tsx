@@ -12,8 +12,9 @@ import type { Character } from "@/types/character";
 
 interface CharacterSheetHeaderProps {
   character: Character;
-  /** Applies HP edits from the header's tappable HP readout (#982) — routed to
-   *  `handleCharacterUpdate` so damage/heal also bumps the session log. */
+  /** Propagates HP edits so damage/heal also bumps the session log (#982).
+   *  Used by the mobile header's tappable HP readout; desktop live-play HP
+   *  lives in CombatUtilityStrip (#1085). */
   onUpdate: (c: Character) => void;
   tabs: SheetTab[];
   activeTab: SheetTabId;
