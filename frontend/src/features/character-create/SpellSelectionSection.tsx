@@ -51,7 +51,8 @@ function SpellPickGroup({
           const selected = selectedIds.includes(spell.id);
           return (
             <li key={spell.id}>
-              <label className="flex items-center gap-2 py-1 text-sm text-parchment-800">
+              {/* min-h-11 (44px) keeps the whole row a valid touch target on mobile. */}
+              <label className="flex min-h-11 items-center gap-2 py-1.5 text-sm text-parchment-800">
                 <input
                   type="checkbox"
                   checked={selected}
