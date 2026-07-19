@@ -183,4 +183,14 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
     render(<Harness step={swapStep(0)} character={casterWithBook(BOOK)} />);
     expect(await screen.findByText(/No new spells at this level, but you may swap one known spell/i)).toBeInTheDocument();
   });
+
+  it("a staged swap on a count-0 level reads 'swap replacement', not '0 + 1 swap'", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={swapStep(0)} character={casterWithBook(BOOK)} />);
+    await user.click(await screen.findByRole("button", { name: /swap a known spell/i }));
+    await user.click(await screen.findByRole("button", { name: /OldChant/ }));
+
+    expect(await screen.findByText(/Choose 1 \(swap replacement\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 \+ 1 swap/)).not.toBeInTheDocument();
+  });
 });

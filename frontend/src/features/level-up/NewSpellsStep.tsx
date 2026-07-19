@@ -19,11 +19,13 @@ import type { CatalogSpell, LevelUpStep } from "@/types/character";
 const NO_KNOWN: ReadonlySet<string> = new Set();
 
 // #1101: the budget header — a staged swap raises "Choose N" to "Choose N+1
-// (N + 1 swap)"; a swap-only level (count 0, no swap yet) reads as optional.
+// (N + 1 swap)"; a swap-only level (count 0) reads as optional, and once its
+// swap is staged the "(0 + 1 swap)" arithmetic is hidden as "(swap replacement)".
 function budgetHeadline(count: number, chosen: number, swapping: boolean): string {
   const cap = count + (swapping ? 1 : 0);
   if (cap === 0) return "No new spells at this level, but you may swap one known spell";
-  const label = swapping ? `Choose ${cap} (${count} + 1 swap)` : `Choose ${cap}`;
+  const swapNote = count === 0 ? "(swap replacement)" : `(${count} + 1 swap)`;
+  const label = swapping ? `Choose ${cap} ${swapNote}` : `Choose ${cap}`;
   return `${label} — ${chosen} of ${cap} chosen`;
 }
 

@@ -242,7 +242,7 @@ describe("validateLevelUpSubmission — known-spell swap (#1101)", () => {
         ...base,
         spellsForgotten: [forget("e1")],
       }),
-    ).toThrow(/new spells/i);
+    ).toThrow(/replacement spell/i);
   });
 });
 

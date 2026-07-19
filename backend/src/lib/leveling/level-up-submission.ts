@@ -131,6 +131,10 @@ function assertCounts(plan: LevelUpStep[], chosenSubclassName: string | null, su
     const expected = step.count ?? 1;
     const { provided, noun } = stepProvided(step, chosenSubclassName, submission);
     if (provided !== expected) {
+      // A negative net only happens when a swap forget outnumbers the learns.
+      if (provided < 0) {
+        throw new InvalidLevelUpError("You must learn a replacement spell for every spell you swap out.");
+      }
       throw new InvalidLevelUpError(`expected ${expected} ${noun} for this level-up, got ${provided}`);
     }
   }
@@ -165,6 +169,8 @@ function stepProvided(
 
 // Reverse sweep: any populated submission field with no matching plan step is
 // excess and rejected (the count check only visits fields the plan expects).
+// spellsForgotten is absent from SIMPLE_DOMAINS by design — assertForgets
+// rejects stray forgets with the swap-specific message.
 function assertNoExcess(plan: LevelUpStep[], submission: LevelUpSubmission): void {
   const kinds = new Set(plan.map((s) => s.kind));
   for (const domain of SIMPLE_DOMAINS) {
