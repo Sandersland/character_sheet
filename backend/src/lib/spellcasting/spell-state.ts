@@ -1,6 +1,13 @@
 // Leaf module: persisted spellcasting JSON shape + its normalizer, no back-imports.
 
+import type { SpellComponents } from "@character-sheet/shared-types";
+
 import { Prisma } from "@/generated/prisma/client.js";
+
+// Re-exported so existing consumers (applySpellcastingOperations,
+// deriveGrantedSpells) keep resolving SpellComponents from this module; the
+// definition now lives in shared-types (#820).
+export type { SpellComponents };
 
 // Stored in Character.spellcasting JSON column.
 // `slotsUsed`: slot level (as string key, JSON requirement) → used count.
@@ -69,14 +76,6 @@ export interface ItemSpellMeta {
   // then mirror the POOL's remaining/max, shared across the item's spells).
   poolCapabilityId?: string | null;
   chargeCost?: number;
-}
-
-/** Spell verbal/somatic/material component flags + optional material text. */
-export interface SpellComponents {
-  verbal: boolean;
-  somatic: boolean;
-  material: boolean;
-  materialDescription?: string;
 }
 
 /**
