@@ -45,11 +45,11 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
-import { advancementSlotsForLevel, characterFightingStyleChoiceCount, FIGHTING_STYLES } from "@/lib/srd/srd.js";
+import { advancementSlotsForLevel, characterFightingStyleChoiceCount, derivePreparedSpellLimit, FIGHTING_STYLES } from "@/lib/srd/srd.js";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
-import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { clampPreparedToLimit, normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { deriveGrantedSpells } from "@/lib/spellcasting/granted-spells.js";
 
 export interface ReconcileContext {
@@ -203,6 +203,77 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
     before,
     after,
     data: { removedCount },
+    batchId,
+  });
+}
+
+// Prepared-spell cap reconciler (#1127): the 2024 prepared count is a per-class
+// table value, so a level-down can leave more spells prepared than the new cap
+// allows. Trims the over-cap prepared entries (keeping the oldest, marking the
+// rest unprepared — the entries stay learned). Runs AFTER reconcileGrantedSpells
+// so it reads the post-trim spells[] with any cleared-subclass grants removed.
+// Reuses the spellcasting undo branch in activity.ts (restores before.spellcasting)
+// via an "unprepareSpell" event — no new EventType, mirroring reconcileGrantedSpells.
+
+async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      spellcasting: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        select: { name: true, level: true, subclass: true },
+      },
+    },
+  });
+  if (!row) return;
+
+  // Per-entry level resolution symmetric with preparedLimitEntries on the read side.
+  const entries = row.classEntries.map((e) => ({
+    name: e.name,
+    level: effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel),
+    subclass: e.subclass,
+  }));
+  const limit = derivePreparedSpellLimit(entries);
+
+  const state = normalizeSpellcastingMutable(row.spellcasting);
+  const { spells, trimmedCount } = clampPreparedToLimit(state.spells, limit);
+  if (trimmedCount === 0) return; // within cap — normal case
+
+  const snapshot = (spellsList: typeof state.spells) => ({
+    spellcasting: {
+      slotsUsed: { ...state.slotsUsed },
+      arcanumUsed: { ...state.arcanumUsed },
+      spells: [...spellsList],
+      concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
+    },
+  });
+  const before = snapshot(state.spells);
+  state.spells = spells;
+  const after = snapshot(state.spells);
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: state.slotsUsed,
+        arcanumUsed: state.arcanumUsed,
+        spells: state.spells,
+        concentratingOn: state.concentratingOn,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "spellcasting",
+    type: "unprepareSpell",
+    summary: `${trimmedCount} prepared spell${trimmedCount > 1 ? "s" : ""} unprepared — level cap reduced to ${limit}`,
+    before,
+    after,
+    data: { trimmedCount, limit },
     batchId,
   });
 }
@@ -701,6 +772,7 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileClassEntryLevels,
   reconcileSubclass,
   reconcileGrantedSpells,
+  reconcilePreparedSpells,
   reconcileManeuvers,
   reconcileDisciplines,
   reconcileToolProficiencies,

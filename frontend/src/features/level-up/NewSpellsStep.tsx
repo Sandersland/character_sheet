@@ -23,7 +23,7 @@ const NO_KNOWN: ReadonlySet<string> = new Set();
 // swap is staged the "(0 + 1 swap)" arithmetic is hidden as "(swap replacement)".
 function budgetHeadline(count: number, chosen: number, swapping: boolean): string {
   const cap = count + (swapping ? 1 : 0);
-  if (cap === 0) return "No new spells at this level, but you may swap one known spell";
+  if (cap === 0) return "No new spells at this level, but you may swap one prepared spell";
   const swapNote = count === 0 ? "(swap replacement)" : `(${count} + 1 swap)`;
   const label = swapping ? `Choose ${cap} ${swapNote}` : `Choose ${cap}`;
   return `${label} — ${chosen} of ${cap} chosen`;
@@ -32,7 +32,7 @@ function budgetHeadline(count: number, chosen: number, swapping: boolean): strin
 // #1139: spell out that the N learns and the optional swap are separate rules.
 function learnSummary(count: number, canSwap: boolean): string | null {
   if (count === 0) return null;
-  const swap = canSwap ? " You may also swap one spell you know for another." : "";
+  const swap = canSwap ? " You may also swap one spell for another." : "";
   return `You learn ${count} new spell${count === 1 ? "" : "s"}.${swap}`;
 }
 
@@ -107,7 +107,7 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
       )}
       {magicalSecrets && (
         <p className="mt-1 text-center text-xs text-arcane-700">
-          Magical Secrets — pick from <strong>any class&rsquo;s</strong> spell list.
+          Magical Secrets — pick from the <strong>Bard, Cleric, Druid, or Wizard</strong> spell lists.
         </p>
       )}
 

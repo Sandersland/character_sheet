@@ -31,7 +31,7 @@ describe("derivePreparedSummary", () => {
     expect(summary).toEqual({ count: 2, limit: 6 });
   });
 
-  it("returns null for a known caster with no prepare mechanic (limit null)", () => {
+  it("returns null for a non-caster (limit null — every 2024 caster has a cap)", () => {
     expect(derivePreparedSummary(sc({ preparedSpellLimit: null, preparedSpellCount: 0 }))).toBeNull();
   });
 

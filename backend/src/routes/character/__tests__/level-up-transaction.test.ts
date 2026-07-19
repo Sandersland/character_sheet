@@ -270,9 +270,10 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
   });
 });
 
-// Known-caster spell swap (#1101): a Sorcerer may forget one known spell and
-// learn an extra one in the same level-up. Forget must apply BEFORE learn.
-describe("POST …/level-up/transactions — known-spell swap (Sorcerer 4→5, #1101)", () => {
+// Prepared-spell swap (#1101/#1127): a Sorcerer (onLevelUp cadence) may forget one
+// prepared spell and learn an extra one in the same level-up. Forget applies BEFORE
+// learn. Sorcerer 5→6 is a clean count-1 level (prepared 9 → 10; no ASI/subclass step).
+describe("POST …/level-up/transactions — prepared-spell swap (Sorcerer 5→6, #1101)", () => {
   const CHAR_ID = "lvtx-sorcerer-swap";
   let seeded: Array<{ id: string; name: string }>; // catalog spells seeded as known
   let fresh: Array<{ id: string; name: string }>;   // catalog spells to learn new
@@ -306,15 +307,15 @@ describe("POST …/level-up/transactions — known-spell swap (Sorcerer 4→5, #
         ownerId: OWNER_ID,
         id: CHAR_ID,
         name: "LevelUpTx Sorcerer Swap",
-        experiencePoints: 6500, // level 5 threshold; hitDice.total 4 → 1 pending
+        experiencePoints: 14000, // level 6 threshold; hitDice.total 5 → 1 pending
         hitPoints: { current: 22, max: 22, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-        hitDice: { total: 4, die: "d6", spent: 0 },
+        hitDice: { total: 5, die: "d6", spent: 0 },
         abilityScores: { strength: 8, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 10, charisma: 16 },
         spellcasting: {
           slotsUsed: {}, arcanumUsed: {}, concentratingOn: null,
           spells: [entryFor(pool[0], "known-a"), entryFor(pool[1], "known-b")],
         },
-        classEntries: { create: [{ name: "sorcerer", subclass: "Draconic Bloodline", classId: sorcerer.id, position: 0, level: 4 }] },
+        classEntries: { create: [{ name: "sorcerer", subclass: "Draconic Bloodline", classId: sorcerer.id, position: 0, level: 5 }] },
       },
     });
   });
@@ -969,8 +970,7 @@ describe("POST …/level-up/transactions — subclassChoice validator messages",
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-choice-hunter" } });
 
     // Hunter's Prey grants exactly ONE choice at L3; submit TWO → count mismatch.
-    // (subclassChoice precedes newSpells in plan order, so this throws first —
-    // the ranger's L3 spell step is never reached.)
+    // (2024: the Ranger re-prepares on a rest, so there is no newSpells step here.)
     const res = await post("lvtx-choice-hunter", {
       target: { kind: "existing", classEntryId: entry.id },
       hp: { method: "average" },

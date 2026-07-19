@@ -100,7 +100,6 @@ export interface Character {
       ability: AbilityName;
       spellSaveDC: number;
       spellAttackBonus: number;
-      preparation: "known" | "prepared";
       casterFraction: "full" | "half" | "third" | "pact" | "none";
     }[];
     spells: Spell[];

@@ -144,6 +144,33 @@ function normalizeConcentration(value: unknown): ConcentrationState | null {
 }
 
 /**
+ * Clamp prepared spells to a level-derived cap (#1127): keep the first `limit`
+ * user-learned leveled prepared entries (prepared && level>0 && source==null) and
+ * mark the rest unprepared — cantrips and granted/item spells never count and are
+ * untouched. Pure; returns the original array (trimmedCount 0) when nothing needs
+ * trimming. The single shared rule for both the level-down reconciler and the
+ * clamp-on-read in serializeCharacter. `limit === null` (non-caster) is a no-op.
+ */
+export function clampPreparedToLimit(
+  spells: SpellEntry[],
+  limit: number | null,
+): { spells: SpellEntry[]; trimmedCount: number } {
+  if (limit == null) return { spells, trimmedCount: 0 };
+  let kept = 0;
+  let trimmedCount = 0;
+  const clamped = spells.map((s) => {
+    if (!(s.prepared && s.level > 0 && s.source == null)) return s;
+    if (kept < limit) {
+      kept++;
+      return s;
+    }
+    trimmedCount++;
+    return { ...s, prepared: false };
+  });
+  return trimmedCount > 0 ? { spells: clamped, trimmedCount } : { spells, trimmedCount: 0 };
+}
+
+/**
  * Deep-copy the spellcasting state into a before/after event snapshot. Shared by
  * the ki-cast handlers (disciplines, shadow-arts) so their audit-event snapshots
  * are byte-identical (the payload feeds LIFO undo via activity.ts).

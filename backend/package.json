@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "seed:verify": "tsx scripts/seed-verify.ts"
+    "seed:verify": "tsx scripts/seed-verify.ts",
+    "migrate:prepared-2024": "tsx scripts/migrate-known-casters-prepared-2024.ts"
   },
   "dependencies": {
     "@character-sheet/shared-types": "*",
