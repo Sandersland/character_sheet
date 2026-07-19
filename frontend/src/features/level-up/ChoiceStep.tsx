@@ -4,8 +4,6 @@
 // Enforces the plan's exact count; already-known options are hidden. The
 // catalog fetch, selection, and list rendering each live in their own unit.
 
-import { useState } from "react";
-
 import ChoiceOptionsList from "@/features/level-up/ChoiceOptionsList";
 import { useChoiceCatalog } from "@/features/level-up/useChoiceOptions";
 import { useChoiceSelection } from "@/features/level-up/useChoiceSelection";
@@ -16,8 +14,7 @@ import type { LevelUpStep } from "@/types/character";
 export default function ChoiceStep({ step }: { step: LevelUpStep }) {
   const { character } = useLevelUpStepContext();
   const config = CHOICE_KIND_CONFIGS[step.kind];
-  const [search, setSearch] = useState("");
-  const catalog = useChoiceCatalog(config, character, search);
+  const catalog = useChoiceCatalog(config, character);
   const { selectedIds, single, count, atCap, toggle } = useChoiceSelection(config, step);
 
   if (!config) return null;
@@ -30,8 +27,8 @@ export default function ChoiceStep({ step }: { step: LevelUpStep }) {
 
       <ChoiceOptionsList
         options={catalog.filtered}
-        search={search}
-        onSearch={setSearch}
+        search={catalog.search}
+        onSearch={catalog.setSearch}
         showSearch={catalog.showSearch}
         loadError={catalog.loadError}
         showSpinner={catalog.showSpinner}

@@ -53,17 +53,22 @@ export interface ChoiceCatalog {
   showSpinner: boolean;
   showSearch: boolean;
   emptyText: string | null;
+  search: string;
+  setSearch: (value: string) => void;
 }
 
 /** The displayable catalog: fetched options minus already-known, search-filtered,
- *  plus the loading/error/empty presentation flags. */
+ *  plus the loading/error/empty presentation flags. Owns the filter text and
+ *  clears it when the kind changes — a reused ChoiceStep instance would otherwise
+ *  carry a stale filter onto the next kind, silently hiding its options. */
 export function useChoiceCatalog(
   config: ChoiceKindConfig | undefined,
   character: Character,
-  search: string,
 ): ChoiceCatalog {
   const { options, loadError } = useChoiceOptions(config);
   const showSpinner = useDelayedFlag(options === null && !loadError);
+  const [search, setSearch] = useState("");
+  useEffect(() => setSearch(""), [config]);
 
   const known = useMemo(
     () => config?.fromCharacter(character) ?? new Set<string>(),
@@ -82,5 +87,7 @@ export function useChoiceCatalog(
     showSpinner,
     showSearch: loaded && available.length > SEARCH_THRESHOLD,
     emptyText: loaded ? emptyChoiceText(available.length, filtered.length) : null,
+    search,
+    setSearch,
   };
 }

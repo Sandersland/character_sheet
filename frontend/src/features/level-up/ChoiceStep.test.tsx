@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode, useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchReference } from "@/api/client";
+import { fetchDisciplines, fetchManeuvers, fetchReference } from "@/api/client";
 import ChoiceStep from "@/features/level-up/ChoiceStep";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -11,14 +11,23 @@ import { axe } from "@/test/axe";
 import type { Character, LevelUpPlanResponse, LevelUpStep } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
-  fetchManeuvers: vi.fn(async () => [
+  fetchManeuvers: vi.fn(),
+  fetchDisciplines: vi.fn(),
+  fetchReference: vi.fn(),
+}));
+
+// Defaults restored per-test so a test's mockResolvedValue override can't leak.
+beforeEach(() => {
+  vi.mocked(fetchManeuvers).mockResolvedValue([
     { id: "m1", name: "Riposte", description: "riposte" },
     { id: "m2", name: "Trip Attack", description: "trip" },
     { id: "m3", name: "Menacing Attack", description: "menace" },
-  ]),
-  fetchDisciplines: vi.fn(async () => []),
-  fetchReference: vi.fn(async () => ({ artisanTools: [] })),
-}));
+  ]);
+  vi.mocked(fetchDisciplines).mockResolvedValue([]);
+  vi.mocked(fetchReference).mockResolvedValue({ artisanTools: [] } as unknown as Awaited<
+    ReturnType<typeof fetchReference>
+  >);
+});
 
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Battle Master", newLevel: 3, isPrimary: true },
@@ -113,6 +122,30 @@ describe("ChoiceStep", () => {
     expect(screen.getByText("Brewer's Supplies")).toBeInTheDocument();
     // The prior kind's options must be gone, not lingering as stale rows.
     expect(screen.queryByText("Riposte")).not.toBeInTheDocument();
+  });
+
+  // The reused instance also holds the filter text; a filter typed on one kind
+  // must not survive to hide the next kind's options (comment 3609483577).
+  it("resets the search filter when the reused instance switches kind", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchManeuvers).mockResolvedValue(
+      Array.from({ length: 10 }, (_, i) => ({ id: `m${i}`, name: `Maneuver ${i}`, description: "d" })),
+    );
+    vi.mocked(fetchReference).mockResolvedValue({
+      artisanTools: Array.from({ length: 10 }, (_, i) => ({ name: `Tool ${i}` })),
+    } as Awaited<ReturnType<typeof fetchReference>>);
+
+    const { rerender } = render(<Harness step={{ kind: "maneuvers", count: 2 }} />);
+    const box = await screen.findByRole("searchbox");
+    await user.type(box, "Maneuver 3");
+    await waitFor(() => expect(box).toHaveValue("Maneuver 3"));
+
+    rerender(<Harness step={{ kind: "toolProficiency", count: 1 }} />);
+
+    // Every tool is visible — a stale "Maneuver 3" filter would hide them all.
+    expect(await screen.findByText("Tool 0")).toBeInTheDocument();
+    expect(screen.getByText("Tool 9")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox")).toHaveValue("");
   });
 
   it("loads options under StrictMode's double-invoked effects", async () => {
