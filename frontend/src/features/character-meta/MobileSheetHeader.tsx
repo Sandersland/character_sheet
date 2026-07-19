@@ -31,8 +31,9 @@ interface MobileSheetHeaderProps {
   /** Opens the shared HP sheet from the HP readout; omit for a read-only row. */
   onUpdate?: (character: Character) => void;
   /** Live-session controls folded into the "Sheet actions" menu while joined
-   *  (#979). Non-null ⇒ a session is live and this character is in it. */
-  sessionActions?: { busy: boolean; onLeave: () => void; onEnd: () => void } | null;
+   *  (#979). Non-null ⇒ a session is live and this character is in it. onLeave is
+   *  omitted for a solo session (#1082) — Leave is campaign-only, End is not. */
+  sessionActions?: { busy: boolean; onLeave?: () => void; onEnd: () => void } | null;
   /** Active combat round for the live pill (null → "Live"). */
   liveRound?: number | null;
   /** Jump to the Combat tab — the live pill's tap target (#1026). */
@@ -113,11 +114,13 @@ function buildMenuItems(
       ? [{ label: "Campaign settings…", onSelect: handlers.onOpenCampaignSettings }]
       : []),
     { label: "All characters", onSelect: onAllCharacters, separatorBefore: true },
+    // Leave is campaign-only (#1082): a solo session omits onLeave, so only End
+    // surfaces. The separator rides whichever item leads the session group.
+    ...(sessionActions?.onLeave
+      ? [{ label: "Leave Session", onSelect: sessionActions.onLeave, disabled: sessionActions.busy, separatorBefore: true }]
+      : []),
     ...(sessionActions
-      ? [
-          { label: "Leave Session", onSelect: sessionActions.onLeave, disabled: sessionActions.busy, separatorBefore: true },
-          { label: "End Session", onSelect: sessionActions.onEnd, disabled: sessionActions.busy },
-        ]
+      ? [{ label: "End Session", onSelect: sessionActions.onEnd, disabled: sessionActions.busy, separatorBefore: !sessionActions.onLeave }]
       : []),
     { label: "Delete", onSelect: handlers.onOpenDelete, danger: true, separatorBefore: true },
   ];

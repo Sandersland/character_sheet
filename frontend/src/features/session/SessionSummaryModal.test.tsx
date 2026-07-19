@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
-import { applyExperienceOperations, fetchSession } from "@/api/client";
+import { applyExperienceOperations, fetchEntities, fetchSession } from "@/api/client";
 import type {
   CampaignRecap,
   Character,
@@ -29,6 +29,7 @@ vi.mock("@/api/client", () => ({
 
 const mockApplyXp = vi.mocked(applyExperienceOperations);
 const mockFetchSession = vi.mocked(fetchSession);
+const mockFetchEntities = vi.mocked(fetchEntities);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -344,6 +345,17 @@ describe("SessionSummaryModal", () => {
 
     expect(await screen.findByText("950")).toBeInTheDocument();
     expect(onCharacterUpdate).toHaveBeenCalledWith(updatedCharacter);
+  });
+
+  it("renders a solo session's recap without fetching campaign entities (#1082)", () => {
+    const solo: Session = { ...baseSession, campaignId: null };
+    render(<SessionSummaryModal characterId="c1" session={solo} onClose={() => {}} />);
+
+    // The recap still renders off the session's own summary…
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("XP gained")).toBeInTheDocument();
+    // …but there is no campaign to resolve @-mention chips against.
+    expect(mockFetchEntities).not.toHaveBeenCalled();
   });
 
   it("calls onClose when the Close control is used", async () => {

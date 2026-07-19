@@ -131,6 +131,17 @@ describe("MobileSheetHeader", () => {
     expect(onEnd).not.toHaveBeenCalled();
   });
 
+  it("in a solo session (no onLeave) shows End Session but never Leave Session (#1082)", () => {
+    const onEnd = vi.fn();
+    renderHeader({ sessionActions: { busy: false, onEnd } });
+
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    expect(screen.getByRole("menuitem", { name: "End Session" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Leave Session" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "End Session" }));
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
   it("shows no Leave / End Session items when not in a live session", () => {
     renderHeader();
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));

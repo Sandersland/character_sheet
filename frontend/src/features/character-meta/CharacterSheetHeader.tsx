@@ -48,14 +48,15 @@ interface CharacterSheetHeaderProps {
 
 /** The mobile header's folded-in Leave/End controls (#979), present only while
  *  this character is in a live session. Extracted so the header render stays
- *  under the cognitive ceiling. */
+ *  under the cognitive ceiling. onLeave is optional — a solo session (#1082)
+ *  omits it (Leave is campaign-only), so the group hinges on End, not Leave. */
 function buildSessionActions(
   isLiveJoined: boolean,
   busy: boolean,
   onLeave?: () => void,
   onEnd?: () => void,
-): { busy: boolean; onLeave: () => void; onEnd: () => void } | null {
-  if (!isLiveJoined || !onLeave || !onEnd) return null;
+): { busy: boolean; onLeave?: () => void; onEnd: () => void } | null {
+  if (!isLiveJoined || !onEnd) return null;
   return { busy, onLeave, onEnd };
 }
 
