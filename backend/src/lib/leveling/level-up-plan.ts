@@ -6,11 +6,10 @@ import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-feat
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { advancementSlotsForLevel, fightingStyleChoiceCount } from "@/lib/srd/srd.js";
 import {
-  BARD_MAGICAL_SECRETS_LEVELS,
-  isKnownCaster,
-  learnsNewSpellsOnLevelUp,
+  bardMagicalSecretsAt,
+  levelUpSpellPicks,
   maxSpellLevelForClass,
-  spellsGainedAtLevel,
+  swapCadenceFor,
 } from "@/lib/srd/spellcasting-tables.js";
 
 export type LevelUpStepKind =
@@ -102,15 +101,16 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
     }));
 }
 
-// Known casters + Wizard's spellbook; Bard's Magical Secrets levels are tagged.
-// #1101: known casters may swap one known spell EVERY level-up, so a swap-only
-// step (count 0, canSwap) is emitted even on a no-new-spells level.
+// 2024: onLevelUp-cadence casters (Bard/Sorcerer/Warlock + EK/AT) offer the
+// prepared-count delta plus one optional swap (#1101), so a swap-only step
+// (count 0, canSwap) is emitted even on a no-new-spells level; the Wizard scribes
+// a flat 2 with no swap. Re-prepare classes (Cleric/Druid/Paladin/Ranger) get no
+// step — they re-prepare on a rest. Bard picks from level 10 are Magical Secrets.
 function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
-  if (!learnsNewSpellsOnLevelUp(target.name, target.subclass)) return null;
-  const count = spellsGainedAtLevel(target.name, target.newLevel);
-  const canSwap = isKnownCaster(target.name, target.subclass);
+  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass);
+  const canSwap = swapCadenceFor(target.name, target.subclass) === "onLevelUp";
   if (count <= 0 && !canSwap) return null;
-  const magicalSecrets = target.name.toLowerCase() === "bard" && BARD_MAGICAL_SECRETS_LEVELS.has(target.newLevel);
+  const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass);
   return {
     kind: "newSpells",
