@@ -41,6 +41,15 @@ describe("ConditionRollBanner (#984)", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders an exhaustion flat penalty as one d20-Tests line (#1136)", () => {
+    const exhaustion2: RollModifier[] = (["attack", "check", "save", "initiative"] as const).map(
+      (kind) => ({ mode: "flat", modifier: -4, kind, source: "Exhaustion" }),
+    );
+    render(<ConditionRollBanner modifiers={exhaustion2} />);
+    expect(screen.getByText("Exhaustion")).toBeInTheDocument();
+    expect(screen.getByText("−4 on d20 Tests")).toBeInTheDocument();
+  });
+
   it("renders a single banner joining both clauses for a mixed-tone source", () => {
     // One source granting both advantage and disadvantage collapses to ONE
     // banner (name appears once) with both clauses joined by "; ".

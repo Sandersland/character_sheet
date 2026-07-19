@@ -10,6 +10,11 @@ import {
 } from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
+  normalizeConditionsMutable,
+  serializeConditionsState,
+  type ConditionsMutableState,
+} from "./conditions.js";
+import {
   castResourceRechargesOn,
   chargeTriggerRechargesOn,
   readCapability,
@@ -379,6 +384,30 @@ async function rechargeConsumables(
   return { consumablesRecharged, before, after };
 }
 
+/**
+ * A long rest removes exactly one level of exhaustion (SRD 5.2 / #1136).
+ * Returns null (no write, no snapshot, no summary part) when the character has
+ * no exhaustion, so undo only ever restores a level that was actually cleared.
+ */
+function recoverExhaustionOnLongRest(row: HpOpContext["row"]): {
+  beforeConditionsState: ConditionsMutableState;
+  afterConditionsState: ConditionsMutableState;
+  conditions: Prisma.InputJsonValue;
+  summaryPart: string;
+} | null {
+  const state = normalizeConditionsMutable(row.conditions);
+  if (state.exhaustion <= 0) return null;
+  const beforeConditionsState = { active: state.active.map((e) => ({ ...e })), exhaustion: state.exhaustion };
+  state.exhaustion -= 1;
+  const afterConditionsState = { active: state.active.map((e) => ({ ...e })), exhaustion: state.exhaustion };
+  return {
+    beforeConditionsState,
+    afterConditionsState,
+    conditions: serializeConditionsState(state),
+    summaryPart: `Exhaustion −1 (now ${state.exhaustion})`,
+  };
+}
+
 export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const { tx, characterId, row, hp, hd, effMax } = ctx;
   const prevCurrent = hp.current;
@@ -392,6 +421,7 @@ export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const spells = resetLongRestSpellcasting(row);
   const resources = resetRestResources(row, "long");
   const afterResourceState = serializeResourcesState(resources.state);
+  const exhaustion = recoverExhaustionOnLongRest(row);
   const items = await runItemRestResets(ctx, "long");
   const consumables = await rechargeConsumables(tx, characterId);
 
@@ -418,17 +448,27 @@ export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   if (items.itemSpellsRestored > 0) parts.push(`item spells restored`);
   if (consumables.consumablesRecharged > 0) parts.push(`consumables recharged`);
   if (items.chargePools.recharged > 0) parts.push(`item charges recharged`);
+  if (exhaustion) parts.push(exhaustion.summaryPart);
   const summary = `Long rest — ${parts.join(", ")}`;
 
-  // Write spellcasting + resources; the dispatcher writes HP separately below.
+  // Write spellcasting + resources (+ conditions when exhaustion recovered); the
+  // dispatcher writes HP separately below.
   await tx.character.update({
     where: { id: characterId },
-    data: { spellcasting: spells.spellcasting, resources: afterResourceState },
+    data: {
+      spellcasting: spells.spellcasting,
+      resources: afterResourceState,
+      ...(exhaustion ? { conditions: exhaustion.conditions } : {}),
+    },
   });
 
   // Include spellcasting + resources in the before/after snapshot for undo.
   eventData.beforeSpellState = spells.beforeSpellState;
   eventData.beforeResourceState = resources.beforeResourceState;
   eventData.afterResourceState = afterResourceState;
+  if (exhaustion) {
+    eventData.beforeConditionsState = exhaustion.beforeConditionsState;
+    eventData.afterConditionsState = exhaustion.afterConditionsState;
+  }
   return { summary, eventData };
 }

@@ -79,7 +79,7 @@ export function normalizeConditionsMutable(json: Prisma.JsonValue): ConditionsMu
  * Character.conditions. Route every update through this helper so all keys
  * round-trip.
  */
-function serializeConditionsState(state: ConditionsMutableState): Prisma.InputJsonValue {
+export function serializeConditionsState(state: ConditionsMutableState): Prisma.InputJsonValue {
   return {
     active: state.active.map((e) => ({
       key: e.key,

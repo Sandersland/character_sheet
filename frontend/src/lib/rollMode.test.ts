@@ -11,6 +11,13 @@ const poisoned: RollModifier[] = [
   { mode: "disadvantage", kind: "attack", source: "Poisoned" },
   { mode: "disadvantage", kind: "check", source: "Poisoned" },
 ];
+// 2024 exhaustion level 2: a flat −4 on every d20 Test (#1136).
+const exhaustion2: RollModifier[] = [
+  { mode: "flat", modifier: -4, kind: "attack", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "check", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "save", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "initiative", source: "Exhaustion" },
+];
 
 describe("resolveRollMode (#486)", () => {
   it("grants advantage on a Strength check while raging, sourced to Rage", () => {
@@ -57,7 +64,33 @@ describe("resolveRollMode (#486)", () => {
 
   it("returns normal + no sources when no state applies", () => {
     const r = resolveRollMode([], { kind: "initiative" });
-    expect(r).toEqual({ mode: "normal", sources: [] });
+    expect(r).toEqual({ mode: "normal", modifier: 0, sources: [] });
+  });
+});
+
+describe("resolveRollMode flat modifiers (#1136)", () => {
+  it("sums a flat penalty into `modifier` without touching the mode", () => {
+    const r = resolveRollMode(exhaustion2, { kind: "attack" });
+    expect(r.mode).toBe("normal");
+    expect(r.modifier).toBe(-4);
+  });
+
+  it("applies the flat penalty on a save (initiative subsumed as a Dex check elsewhere)", () => {
+    expect(resolveRollMode(exhaustion2, { kind: "save", ability: "wisdom" }).modifier).toBe(-4);
+  });
+
+  it("carries the flat penalty alongside a disadvantage mode from another source", () => {
+    const r = resolveRollMode([...exhaustion2, ...poisoned], { kind: "attack" });
+    expect(r.mode).toBe("disadvantage");
+    expect(r.modifier).toBe(-4);
+  });
+
+  it("keeps the flat penalty through a manual override (override only flips the adv/dis axis)", () => {
+    const r = resolveRollMode([...exhaustion2, ...poisoned], { kind: "attack" }, "advantage");
+    expect(r.mode).toBe("advantage");
+    expect(r.modifier).toBe(-4);
+    // The adv/dis grants are overridden away; only the flat penalty's source remains.
+    expect(r.sources.map((s) => s.source)).toEqual(["Exhaustion"]);
   });
 });
 
@@ -72,8 +105,18 @@ describe("rollModeChip (#486)", () => {
     expect(rollModeChip(r)).toBe("advantage — Rage");
   });
 
-  it("is empty when nothing applied or on a manual override", () => {
+  it("is empty when nothing applied or on a manual override with no flat penalty", () => {
     expect(rollModeChip(resolveRollMode([], { kind: "attack" }))).toBe("");
     expect(rollModeChip(resolveRollMode(poisoned, { kind: "attack" }, "advantage"))).toBe("");
+  });
+
+  it("renders a flat penalty with no mode word (#1136)", () => {
+    expect(rollModeChip(resolveRollMode(exhaustion2, { kind: "attack" }))).toBe("−4 — Exhaustion");
+  });
+
+  it("renders mode and flat penalty together (#1136)", () => {
+    expect(rollModeChip(resolveRollMode([...poisoned, ...exhaustion2], { kind: "attack" }))).toBe(
+      "disadvantage −4 — Poisoned, Exhaustion",
+    );
   });
 });

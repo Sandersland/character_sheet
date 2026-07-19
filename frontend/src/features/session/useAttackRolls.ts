@@ -94,9 +94,15 @@ export function useAttackRolls({
   // Roll an attack for a row: log it, retain the result, clear any override, spend
   // one attack, and append the tally row for this action (#802).
   function handleAttack(entry: AttackEntry) {
-    // Pin the state-resolved mode (Poisoned disadvantage, manual override, RAW cancel).
-    const result = roll({ ...entry.attackSpec, mode: resolvedAttack.mode }, entry.attackRollLabel);
-    logRollSafe("attack", entry.logSource, result, entry.attackSpec);
+    // Pin the state-resolved mode (Poisoned disadvantage, manual override, RAW
+    // cancel) and fold in any flat penalty (exhaustion −2×level, #1136).
+    const attackSpec = {
+      ...entry.attackSpec,
+      modifier: (entry.attackSpec.modifier ?? 0) + resolvedAttack.modifier,
+      mode: resolvedAttack.mode,
+    };
+    const result = roll(attackSpec, entry.attackRollLabel);
+    logRollSafe("attack", entry.logSource, result, attackSpec);
     setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
     setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
     recordAttack({

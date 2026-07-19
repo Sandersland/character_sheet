@@ -66,25 +66,20 @@ export function conditionLabel(key: string): string {
 /** Maximum exhaustion level (6 = death). */
 export const EXHAUSTION_MAX = 6;
 
-/** Cumulative effect text per exhaustion level (index 0 = no exhaustion). */
-const EXHAUSTION_EFFECTS: readonly string[] = [
-  "No exhaustion.",
-  "Disadvantage on ability checks.",
-  "Speed halved.",
-  "Disadvantage on attack rolls and saving throws.",
-  "Hit point maximum halved.",
-  "Speed reduced to 0.",
-  "Death.",
-];
-
 /** Short label for an exhaustion level, e.g. "Exhaustion 3". */
 export function exhaustionLabel(level: number): string {
   const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
   return `Exhaustion ${clamped}`;
 }
 
-/** Cumulative effect text for an exhaustion level, clamped to 0–6. */
+/**
+ * Effect text for an exhaustion level, clamped to 0–6 (SRD 5.2 / #1136). Each
+ * level is a flat −2 on d20 Tests and −5 ft Speed; level 6 is death. The rules
+ * themselves live in backend lib/srd — this is the presentation string.
+ */
 export function exhaustionEffect(level: number): string {
   const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
-  return EXHAUSTION_EFFECTS[clamped];
+  if (clamped === 0) return "No exhaustion.";
+  if (clamped === EXHAUSTION_MAX) return "Death.";
+  return `−${2 * clamped} on d20 Tests; Speed −${5 * clamped} ft.`;
 }

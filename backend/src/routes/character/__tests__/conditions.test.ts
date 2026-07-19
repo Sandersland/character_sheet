@@ -222,6 +222,20 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
     expect(res.status).toBe(400);
   });
 
+  it("derives a −5 ft×level Speed penalty from exhaustion (#1136)", async () => {
+    const app = createApp();
+    const base = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
+    expect(base.body.speed).toBe(30);
+
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "setExhaustion", level: 3 }] });
+    const exhausted = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
+    expect(exhausted.body.speed).toBe(15); // 30 − 5×3
+
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "setExhaustion", level: 0 }] });
+    const cleared = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
+    expect(cleared.body.speed).toBe(30);
+  });
+
   it("clamps a stale out-of-range stored exhaustion on read", async () => {
     // Write an out-of-range value directly, bypassing the validated route.
     await prisma.character.update({
