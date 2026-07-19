@@ -75,7 +75,9 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await page.getByRole("checkbox", { name: /Eldritch Blast/ }).check();
   await page.getByRole("checkbox", { name: /Poison Spray/ }).check();
   await page.getByRole("checkbox", { name: /Charm Person/ }).check();
-  await page.getByRole("checkbox", { name: /Dissonant Whispers/ }).check();
+  // Hideous Laughter is warlock-legal under SRD 5.2; Dissonant Whispers is now
+  // bard-only (#1132) and no longer offered in the warlock picker.
+  await page.getByRole("checkbox", { name: /Hideous Laughter/ }).check();
 
   // Equipment: the deterministic starting-gold path (as above).
   await page.getByRole("button", { name: /Starting gold/ }).click();

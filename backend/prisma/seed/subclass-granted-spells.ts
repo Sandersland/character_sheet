@@ -127,13 +127,13 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
 
   // The Great Old One (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Dissonant Whispers", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Tasha's Hideous Laughter", gateLevel: 3, castingAbility: "charisma" },
+  { className: "Warlock", subclassName: "The Great Old One", spellName: "Hideous Laughter", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Detect Thoughts", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Phantasmal Force", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Clairvoyance", gateLevel: 5, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Sending", gateLevel: 5, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Dominate Beast", gateLevel: 7, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Evard's Black Tentacles", gateLevel: 7, castingAbility: "charisma" },
+  { className: "Warlock", subclassName: "The Great Old One", spellName: "Black Tentacles", gateLevel: 7, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Dominate Person", gateLevel: 9, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Telekinesis", gateLevel: 9, castingAbility: "charisma" },
 ];
