@@ -1,5 +1,5 @@
 import { isMulticlass } from "@/lib/multiclass";
-import type { AddClassOperation, Character, ClassEntry, ClassOption } from "@/types/character";
+import type { Character, ClassEntry, ClassOption } from "@/types/character";
 import AddClassPanel from "@/features/class/AddClassPanel";
 
 interface Props {
@@ -7,7 +7,6 @@ interface Props {
   referenceClasses: ClassOption[];
   rosterEntries: ClassEntry[];
   busy: boolean;
-  onAddClass: (op: AddClassOperation) => void;
 }
 
 export default function ClassRosterSection({
@@ -15,7 +14,6 @@ export default function ClassRosterSection({
   referenceClasses,
   rosterEntries,
   busy,
-  onAddClass,
 }: Props) {
   const multiclass = isMulticlass(character.classes);
 
@@ -52,7 +50,6 @@ export default function ClassRosterSection({
         character={character}
         referenceClasses={referenceClasses}
         busy={busy}
-        onAddClass={onAddClass}
       />
     </div>
   );

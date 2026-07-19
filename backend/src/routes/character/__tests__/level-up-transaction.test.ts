@@ -1076,3 +1076,64 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
     expect(await eventCount(CHAR_ID)).toBe(0);
   });
 });
+
+// #1131: adding a first level in a new class routes through the SAME ceremony
+// (target {kind:"new"}), not a creation-only fork. A caster second class picks
+// its level-1 spells + cantrips; a Fighter second class commits its fighting style.
+describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)", () => {
+  const CHAR_ID = "lvtx-mc-add";
+
+  beforeEach(async () => {
+    const rogue = await prisma.characterClass.findFirstOrThrow({ where: { name: "Rogue" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Multiclass",
+        experiencePoints: 14000, // level 6 threshold; hitDice.total 5 → 1 pending
+        hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d8", spent: 0 },
+        // High across the board so any multiclass prerequisite is met.
+        abilityScores: { strength: 15, dexterity: 15, constitution: 15, intelligence: 15, wisdom: 15, charisma: 15 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "rogue", subclass: "Thief", classId: rogue.id, position: 0, level: 5 }] },
+      },
+    });
+  });
+
+  it("adds a Warlock second class and applies its 2 cantrips + 2 spells", async () => {
+    const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
+    const cantrips = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 0 }, take: 2, select: { id: true } });
+    const spells = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 1 }, take: 2, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "new", classId: warlock.id },
+      hp: { method: "average" },
+      spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+      cantripsLearned: cantrips.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.classes.map((c: { name: string }) => c.name.toLowerCase())).toContain("warlock");
+    // The 2 cantrips + 2 leveled spells are all learned into the new class's book.
+    const book = res.body.spellcasting.spells as Array<{ level: number }>;
+    expect(book).toHaveLength(4);
+    expect(book.filter((s) => s.level === 0)).toHaveLength(2);
+    expect(await distinctBatchIds(CHAR_ID)).toHaveLength(1);
+  });
+
+  it("adds a Fighter second class and commits its fighting style against the new entry", async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "new", classId: fighter.id },
+      hp: { method: "average" },
+      fightingStyle: "defense",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.classes.map((c: { name: string }) => c.name.toLowerCase())).toContain("fighter");
+    expect(res.body.resources.fightingStyle).toBe("defense");
+  });
+});
