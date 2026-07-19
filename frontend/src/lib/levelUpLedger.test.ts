@@ -24,7 +24,7 @@ function makeCharacter(over?: Partial<Character>): Character {
 }
 
 function makePlan(steps: LevelUpStep[] = [], subclass: string | null = "Champion"): LevelUpPlanResponse {
-  return { target: { className: "Fighter", subclass, newLevel: 8, isPrimary: true }, steps };
+  return { target: { className: "Fighter", subclass, newLevel: 8, isPrimary: true }, steps, grantedSpells: [] };
 }
 
 function rowFor(rows: LedgerRow[], label: string): LedgerRow | undefined {
@@ -173,6 +173,25 @@ describe("buildLevelUpLedger", () => {
   it("renders no Forgotten row when nothing is swapped (#1101)", () => {
     const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers);
     expect(rowFor(rows, "Forgotten")).toBeUndefined();
+  });
+
+  it("lists incoming granted spells under the granting subclass (#1139)", () => {
+    const plan = { ...makePlan(), grantedSpells: [{ name: "Lesser Restoration", level: 2 }, { name: "Zone of Truth", level: 2 }] };
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers);
+    expect(rowFor(rows, "Granted by Champion")).toMatchObject({
+      items: ["Lesser Restoration", "Zone of Truth"], variant: "list",
+    });
+  });
+
+  it("labels the granted-spells row generically when no subclass name is on the plan (#1139)", () => {
+    const plan = { ...makePlan([], null), grantedSpells: [{ name: "Faerie Fire", level: 1 }] };
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers);
+    expect(rowFor(rows, "Granted Spells")).toMatchObject({ items: ["Faerie Fire"], variant: "list" });
+  });
+
+  it("renders no granted-spells row when none are incoming (#1139)", () => {
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers);
+    expect(rows.some((r) => r.label.startsWith("Granted"))).toBe(false);
   });
 
   it("names subclass-feature picks by custom name, else the step's meta label", () => {

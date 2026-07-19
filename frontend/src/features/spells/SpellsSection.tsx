@@ -48,6 +48,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
           spells={spells}
           sortedSpells={derived.sortedSpells}
           slots={slots}
+          slotsArePactMagic={derived.slotsArePactMagic}
           characterLevel={character.level}
           budget={budget}
           busy={busy}

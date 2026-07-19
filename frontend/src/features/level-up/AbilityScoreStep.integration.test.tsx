@@ -36,6 +36,7 @@ const character = {
 const plan: LevelUpPlanResponse = {
   target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true },
   steps: [{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }],
+  grantedSpells: [],
 };
 
 function renderCeremony() {

@@ -37,6 +37,7 @@ function plan(steps: LevelUpStep[]): LevelUpPlanResponse {
   return {
     target: { className: "fighter", subclass: "Battle Master", newLevel: 3, isPrimary: true },
     steps,
+    grantedSpells: [],
   };
 }
 

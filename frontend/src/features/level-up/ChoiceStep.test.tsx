@@ -32,6 +32,7 @@ beforeEach(() => {
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Battle Master", newLevel: 3, isPrimary: true },
   steps: [],
+  grantedSpells: [],
 };
 
 function Harness({ step, character }: { step: LevelUpStep; character?: Character }) {

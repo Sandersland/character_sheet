@@ -4,6 +4,7 @@ import {
   canPrepare,
   deriveSpellList,
   filterSpellbook,
+  pactMagicNote,
   preparedBudget,
   swapCandidates,
 } from "@/lib/spellList";
@@ -156,6 +157,12 @@ describe("deriveSpellList — buffs & pact labeling", () => {
 
   it("is not Pact Magic for a non-warlock", () => {
     expect(deriveSpellList(makeCharacter()).slotsArePactMagic).toBe(false);
+  });
+});
+
+describe("pactMagicNote", () => {
+  it("states the fixed cast level and short-rest recharge", () => {
+    expect(pactMagicNote(3)).toBe("All slots are cast at level 3 and return on a short rest.");
   });
 });
 

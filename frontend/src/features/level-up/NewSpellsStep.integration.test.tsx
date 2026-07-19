@@ -49,7 +49,7 @@ const swapCaster = {
 } as unknown as Character;
 
 function plan(steps: LevelUpStep[], className = "wizard"): LevelUpPlanResponse {
-  return { target: { className, subclass: null, newLevel: 3, isPrimary: true }, steps };
+  return { target: { className, subclass: null, newLevel: 3, isPrimary: true }, steps, grantedSpells: [] };
 }
 
 function renderCeremony(c: Character = character) {

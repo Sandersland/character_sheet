@@ -45,6 +45,12 @@ export function deriveSpellList(character: Character): SpellListDerivation {
   };
 }
 
+// One-liner under a Pact Magic slot group (#1139): warlock slots all cast at their
+// single pact level and refresh on a short rest — clarifies "why only level N?".
+export function pactMagicNote(slotLevel: number): string {
+  return `All slots are cast at level ${slotLevel} and return on a short rest.`;
+}
+
 // Prepared-spell budget (#883): N prepared of the derived cap, plus atLimit gate.
 // limit === null for known casters (Sorcerer/Bard) — no prepare cap applies.
 export interface PreparedBudget {
