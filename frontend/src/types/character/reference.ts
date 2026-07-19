@@ -98,6 +98,8 @@ export interface ClassOption {
   toolChoices: string[];
   /** Number of tool choices the player may make. */
   toolChoiceCount: number;
+  /** #1131: level-1 creation pick counts (SRD 5.2); null for a non-caster. */
+  level1SpellPicks: { cantrips: number; spells: number } | null;
 }
 
 export interface BackgroundOption {
