@@ -12,7 +12,7 @@ import type {
   LearnToolProficiencyOperation,
   LearnSubclassChoiceOperation,
 } from "@/lib/classes/resources.js";
-import type { LearnSpellOperation } from "@/lib/spellcasting/spellcasting.js";
+import type { ForgetSpellOperation, LearnSpellOperation } from "@/lib/spellcasting/spellcasting.js";
 import {
   buildLevelUpPlan,
   type LevelUpPlanCharacter,
@@ -42,6 +42,9 @@ export interface LevelUpSubmission {
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
+  // #1101: an optional known-spell swap — one forgotten entry offset by one
+  // extra learn (net count still equals the newSpells step's count).
+  spellsForgotten?: ForgetSpellOperation[];
 }
 
 // Canonical step order — mirrors the candidates array in buildLevelUpPlan. The
@@ -133,6 +136,11 @@ function assertCounts(plan: LevelUpStep[], chosenSubclassName: string | null, su
   }
 }
 
+// #1101: learns net of the one optional swap forget.
+function netSpellsLearned(submission: LevelUpSubmission): number {
+  return (submission.spellsLearned?.length ?? 0) - (submission.spellsForgotten?.length ?? 0);
+}
+
 function stepProvided(
   step: LevelUpStep,
   chosenSubclassName: string | null,
@@ -145,6 +153,11 @@ function stepProvided(
     const key = step.meta?.key;
     const provided = (submission.subclassChoices ?? []).filter((c) => c.choiceKey === key).length;
     return { provided, noun: `${String(key)} choices` };
+  }
+  // #1101: a swap offsets its extra learn — the NET learn count must equal the
+  // step count (spellsLearned.length === step.count + spellsForgotten.length).
+  if (step.kind === "newSpells") {
+    return { provided: netSpellsLearned(submission), noun: "new spells" };
   }
   const domain = SIMPLE_DOMAINS.find((d) => d.kind === step.kind)!;
   return { provided: domain.provided(submission), noun: domain.noun };
@@ -169,6 +182,32 @@ function assertNoExcess(plan: LevelUpStep[], submission: LevelUpSubmission): voi
   }
 }
 
+// #1101: a legal swap target is a user-learned (source null) leveled spell.
+function isSwappableEntry(entry: NonNullable<LevelUpPlanCharacter["spellEntries"]>[number] | undefined): boolean {
+  return entry != null && entry.level > 0 && entry.source == null;
+}
+
+// #1101: a known-spell swap forgets exactly one user-learned leveled spell, only
+// on a newSpells step that carries meta.canSwap (a missing/non-swap step throws
+// the same way, so a non-caster level rejects a stray forget too).
+function assertForgets(plan: LevelUpStep[], character: LevelUpPlanCharacter, submission: LevelUpSubmission): void {
+  const forgets = submission.spellsForgotten ?? [];
+  if (forgets.length === 0) return;
+  if (forgets.length > 1) {
+    throw new InvalidLevelUpError("You may swap at most one known spell per level-up.");
+  }
+  const step = plan.find((s) => s.kind === "newSpells");
+  if (step?.meta?.canSwap !== true) {
+    throw new InvalidLevelUpError("this level-up does not allow swapping a known spell");
+  }
+  const entries = character.spellEntries ?? [];
+  for (const op of forgets) {
+    if (!isSwappableEntry(entries.find((e) => e.id === op.entryId))) {
+      throw new InvalidLevelUpError(`Cannot swap that spell: ${op.entryId} is not a swappable known spell.`);
+    }
+  }
+}
+
 /**
  * Validate a level-up submission against its derived plan and return the effective
  * ordered steps. Throws InvalidLevelUpError on any subclass-contract violation,
@@ -185,5 +224,6 @@ export function validateLevelUpSubmission(
   const plan = resolveEffectivePlan(character, target, chosenSubclassName, submission);
   assertCounts(plan, chosenSubclassName, submission);
   assertNoExcess(plan, submission);
+  assertForgets(plan, character, submission);
   return plan;
 }

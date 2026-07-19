@@ -35,6 +35,10 @@ export interface LevelUpStep {
 export interface LevelUpPlanCharacter {
   abilityScores: Record<string, number>;
   classEntries: { name: string; subclass?: string | null; level: number }[];
+  // The character's known spell entries, for validating a #1101 swap forget.
+  // Only id/level/source matter (a legal swap target is a user-learned leveled
+  // spell); populated in resolveLevelUpContext, absent in swap-free callers.
+  spellEntries?: { id: string; level: number; source?: string | null }[];
 }
 
 // The class entry AFTER this level-up. subclassLevel is passed in (a pure fn

@@ -14,8 +14,13 @@ import {
 
 const ABILITIES = { strength: 16, dexterity: 14, constitution: 14, intelligence: 12, wisdom: 12, charisma: 10 };
 
-function char(name: string, level: number, subclass: string | null = null): LevelUpPlanCharacter {
-  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }] };
+function char(
+  name: string,
+  level: number,
+  subclass: string | null = null,
+  spellEntries?: LevelUpPlanCharacter["spellEntries"],
+): LevelUpPlanCharacter {
+  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], spellEntries };
 }
 
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {
@@ -127,6 +132,117 @@ describe("validateLevelUpSubmission — excess submissions", () => {
         },
       ),
     ).toThrow(InvalidLevelUpError);
+  });
+});
+
+describe("validateLevelUpSubmission — known-spell swap (#1101)", () => {
+  const learn = (spellId: string): NonNullable<LevelUpSubmission["spellsLearned"]>[number] => ({ type: "learnSpell", spellId });
+  const forget = (entryId: string): NonNullable<LevelUpSubmission["spellsForgotten"]>[number] => ({ type: "forgetSpell", entryId });
+  const base = { target: { kind: "existing", classEntryId: "x" } as const, hp: { method: "average" as const } };
+  // A user-learned (source null) level-1 known spell — the legal swap target.
+  const KNOWN = [{ id: "e1", level: 1, source: null }];
+
+  it("accepts a count-1 learn level plus one swap (2 learns, 1 forget)", () => {
+    const steps = validateLevelUpSubmission(char("sorcerer", 4, null, KNOWN), target("sorcerer", 5), null, {
+      ...base,
+      spellsLearned: [learn("s1"), learn("s2")],
+      spellsForgotten: [forget("e1")],
+    });
+    expect(kinds(steps)).toEqual(["hitPoints", "newSpells", "review"]);
+  });
+
+  it("accepts a swap-only level (count 0: 1 learn + 1 forget)", () => {
+    const steps = validateLevelUpSubmission(char("sorcerer", 13, null, KNOWN), target("sorcerer", 14), null, {
+      ...base,
+      spellsLearned: [learn("s1")],
+      spellsForgotten: [forget("e1")],
+    });
+    expect(kinds(steps)).toEqual(["hitPoints", "newSpells", "review"]);
+  });
+
+  it("accepts a swap-only level with no swap taken (0 learn, 0 forget)", () => {
+    const steps = validateLevelUpSubmission(char("sorcerer", 13, null, KNOWN), target("sorcerer", 14), null, { ...base });
+    expect(kinds(steps)).toEqual(["hitPoints", "newSpells", "review"]);
+  });
+
+  it("rejects two forgets", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("sorcerer", 4, null, [{ id: "e1", level: 1, source: null }, { id: "e2", level: 1, source: null }]), target("sorcerer", 5), null, {
+        ...base,
+        spellsLearned: [learn("s1"), learn("s2"), learn("s3")],
+        spellsForgotten: [forget("e1"), forget("e2")],
+      }),
+    ).toThrow(/at most one/i);
+  });
+
+  it("rejects a forget on a level whose newSpells step cannot swap (Wizard)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("wizard", 3, null, KNOWN), target("wizard", 4), null, {
+        ...base,
+        advancement: takeAsi,
+        spellsLearned: [learn("s1"), learn("s2"), learn("s3")],
+        spellsForgotten: [forget("e1")],
+      }),
+    ).toThrow(/does not allow swapping/i);
+  });
+
+  it("rejects a forget when there is no newSpells step at all (Fighter)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("fighter", 7, "champion", KNOWN), target("fighter", 8, "champion"), null, {
+        ...base,
+        advancement: takeAsi,
+        spellsForgotten: [forget("e1")],
+      }),
+    ).toThrow(/does not allow swapping/i);
+  });
+
+  it("rejects forgetting a cantrip entry (level 0)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("sorcerer", 4, null, [{ id: "e1", level: 0, source: null }]), target("sorcerer", 5), null, {
+        ...base,
+        spellsLearned: [learn("s1"), learn("s2")],
+        spellsForgotten: [forget("e1")],
+      }),
+    ).toThrow(/cannot swap/i);
+  });
+
+  it("rejects forgetting a subclass-granted entry (source set)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("sorcerer", 4, null, [{ id: "e1", level: 1, source: "subclass" }]), target("sorcerer", 5), null, {
+        ...base,
+        spellsLearned: [learn("s1"), learn("s2")],
+        spellsForgotten: [forget("e1")],
+      }),
+    ).toThrow(/cannot swap/i);
+  });
+
+  it("rejects forgetting an unknown entryId", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("sorcerer", 4, null, KNOWN), target("sorcerer", 5), null, {
+        ...base,
+        spellsLearned: [learn("s1"), learn("s2")],
+        spellsForgotten: [forget("nope")],
+      }),
+    ).toThrow(/cannot swap/i);
+  });
+
+  it("rejects a count-1 learn level with a forget but only 1 learn (net mismatch)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("sorcerer", 4, null, KNOWN), target("sorcerer", 5), null, {
+        ...base,
+        spellsLearned: [learn("s1")],
+        spellsForgotten: [forget("e1")],
+      }),
+    ).toThrow(/new spells/i);
+  });
+
+  it("rejects a swap-only level with a forget but no replacement learn (net mismatch)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char("sorcerer", 13, null, KNOWN), target("sorcerer", 14), null, {
+        ...base,
+        spellsForgotten: [forget("e1")],
+      }),
+    ).toThrow(/new spells/i);
   });
 });
 
