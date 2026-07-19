@@ -52,11 +52,18 @@ export interface AdvancementSlots {
   used: number;
 }
 
+/** PHB'24 feat categories — mirror of the backend FeatCategory. */
+export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
+
 /** Catalog feat served by GET /api/feats. */
 export interface CatalogFeat {
   id: string;
   name: string;
   description: string;
+  category: FeatCategory;
+  /** General ⇒ 4, Epic Boon ⇒ 19 (PHB'24). */
+  levelPrerequisite?: number;
+  repeatable?: boolean;
   prerequisite?: string;
   /** Ability names the player may choose to bump by abilityIncrease. Empty = not a half-feat. */
   abilityOptions: string[];

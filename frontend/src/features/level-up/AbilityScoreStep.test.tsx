@@ -13,15 +13,18 @@ vi.mock("@/api/client", () => ({ fetchFeats: vi.fn() }));
 const feats = vi.mocked(fetchFeats);
 
 const CATALOG: CatalogFeat[] = [
-  { id: "alert", name: "Alert", description: "Always on guard.", abilityOptions: [], abilityIncrease: 0, improvements: [] },
+  { id: "alert", name: "Alert", description: "Always on guard.", category: "general", abilityOptions: [], abilityIncrease: 0, improvements: [] },
   {
     id: "resilient",
     name: "Resilient",
     description: "Gain proficiency in a save.",
+    category: "general",
     abilityOptions: ["strength", "dexterity", "constitution"],
     abilityIncrease: 1,
     improvements: [],
   },
+  // Origin feats come from backgrounds, never the ASI picker (#1129).
+  { id: "lucky", name: "Lucky", description: "Luck points.", category: "origin", abilityOptions: [], abilityIncrease: 0, improvements: [] },
 ];
 
 const character = {
@@ -166,6 +169,13 @@ describe("AbilityScoreStep — feat branch", () => {
     expect(feats).toHaveBeenCalled();
     expect(screen.getByText("Alert")).toBeInTheDocument();
     expect(screen.getByText("Resilient")).toBeInTheDocument();
+  });
+
+  it("hides Origin feats from the ASI picker but shows General feats (#1129)", async () => {
+    // plan.target.newLevel is 8, so General feats are offered; Origin never is.
+    await toFeatBranch();
+    expect(screen.getByText("Resilient")).toBeInTheDocument();
+    expect(screen.queryByText("Lucky")).not.toBeInTheDocument();
   });
 
   it("stages a full-feat op", async () => {

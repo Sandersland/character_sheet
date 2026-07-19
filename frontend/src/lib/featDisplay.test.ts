@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { abilityScorePreviews, featAbilityChipLabel } from "@/lib/featDisplay";
+import { abilityScorePreviews, featAbilityChipLabel, featOfferedForAsiSlot } from "@/lib/featDisplay";
 import type { CatalogFeat } from "@/types/character";
 
 function feat(partial: Partial<CatalogFeat>): CatalogFeat {
@@ -8,12 +8,31 @@ function feat(partial: Partial<CatalogFeat>): CatalogFeat {
     id: "f",
     name: "Feat",
     description: "",
+    category: "general",
     abilityOptions: [],
     abilityIncrease: 0,
     improvements: [],
     ...partial,
   };
 }
+
+describe("featOfferedForAsiSlot", () => {
+  it("never offers Origin or Fighting Style feats", () => {
+    expect(featOfferedForAsiSlot(feat({ category: "origin" }), 20)).toBe(false);
+    expect(featOfferedForAsiSlot(feat({ category: "fighting_style" }), 20)).toBe(false);
+  });
+
+  it("offers General feats at level 4+ (default), honouring a levelPrerequisite override", () => {
+    expect(featOfferedForAsiSlot(feat({ category: "general" }), 3)).toBe(false);
+    expect(featOfferedForAsiSlot(feat({ category: "general" }), 4)).toBe(true);
+    expect(featOfferedForAsiSlot(feat({ category: "general", levelPrerequisite: 8 }), 7)).toBe(false);
+  });
+
+  it("offers Epic Boon feats only at level 19+", () => {
+    expect(featOfferedForAsiSlot(feat({ category: "epic_boon" }), 18)).toBe(false);
+    expect(featOfferedForAsiSlot(feat({ category: "epic_boon" }), 19)).toBe(true);
+  });
+});
 
 describe("featAbilityChipLabel", () => {
   it("returns null for a full feat", () => {
