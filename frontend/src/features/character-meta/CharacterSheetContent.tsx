@@ -119,7 +119,9 @@ function CharacterSheetWorkspace({
           liveRound={liveRound}
           isLiveJoined={isLiveJoined}
           sessionActionBusy={life.sessionActionBusy}
-          onLeaveSession={life.handleLeave}
+          // Leave is campaign-only (#1082): omit the handler for a solo session
+          // so the header hides Leave while keeping End.
+          onLeaveSession={life.canLeave ? life.handleLeave : undefined}
           onEndSession={life.openEndPrompt}
           scrolled={collapse.collapsed}
           onGoToCombat={goToCombat}
