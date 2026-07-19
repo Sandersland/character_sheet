@@ -96,6 +96,50 @@ describe("buildRollModifiers (#486)", () => {
       { mode: "disadvantage", kind: "check", source: "Frightened" },
     ]);
   });
+
+  it("emits Grappled's disadvantage on attacks (vs targets other than the grappler)", () => {
+    expect(buildRollModifiers(condition("grappled"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "attack", source: "Grappled" },
+    ]);
+  });
+
+  it("emits Invisible's advantage on initiative + attack rolls (2024)", () => {
+    expect(buildRollModifiers(condition("invisible"), noEffects)).toEqual([
+      { mode: "advantage", kind: "initiative", source: "Invisible" },
+      { mode: "advantage", kind: "attack", source: "Invisible" },
+    ]);
+  });
+
+  it("emits Incapacitated's disadvantage on initiative (2024 Surprised)", () => {
+    expect(buildRollModifiers(condition("incapacitated"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Incapacitated" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Paralyzed", () => {
+    expect(buildRollModifiers(condition("paralyzed"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Paralyzed" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Stunned", () => {
+    expect(buildRollModifiers(condition("stunned"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Stunned" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Petrified", () => {
+    expect(buildRollModifiers(condition("petrified"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Petrified" },
+    ]);
+  });
+
+  it("flattens Incapacitated + Prone effects onto Unconscious", () => {
+    expect(buildRollModifiers(condition("unconscious"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Unconscious" },
+      { mode: "disadvantage", kind: "attack", source: "Unconscious" },
+    ]);
+  });
 });
 
 describe("buildRollModifiers exhaustion thresholds (#846)", () => {

@@ -1,4 +1,4 @@
-// The 14 standard 5e status conditions (PHB Appendix A). This is the single
+// The 14 standard 5e status conditions (SRD 5.2). This is the single
 // source of truth for condition rules data — the frontend resolves display text
 // through a label map derived from these keys, never by rendering raw keys.
 // Exhaustion is intentionally NOT in this list: it is a single 0–6 level handled
@@ -44,7 +44,7 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "charmed",
     label: "Charmed",
     description:
-      "Can't attack the charmer or target it with harmful abilities or magical effects. The charmer has advantage on ability checks to interact socially with the creature.",
+      "Can't attack the charmer or target it with damaging abilities or magical effects. The charmer has advantage on any ability check to interact socially with the creature.",
   },
   {
     key: "deafened",
@@ -65,30 +65,40 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "grappled",
     label: "Grappled",
     description:
-      "Speed becomes 0, and it can't benefit from any bonus to its speed. The condition ends if the grappler is incapacitated or if the creature is moved out of reach.",
+      "Speed is 0 and can't increase. Has disadvantage on attack rolls against any target other than the grappler. The grappler can drag or carry the creature when it moves, but every foot of movement costs it 1 extra foot unless the creature is Tiny or two or more sizes smaller than the grappler.",
+    rollEffects: [{ mode: "disadvantage", kind: "attack" }],
   },
   {
     key: "incapacitated",
     label: "Incapacitated",
-    description: "Can't take actions or reactions.",
+    description:
+      "Can't take any action, Bonus Action, or Reaction. Concentration is broken, and the creature can't speak. If it is incapacitated when it rolls Initiative, it has disadvantage on the roll.",
+    rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
     key: "invisible",
     label: "Invisible",
     description:
-      "Impossible to see without the aid of magic or a special sense. The creature is heavily obscured. Attack rolls against it have disadvantage, and its attack rolls have advantage.",
+      "If invisible when it rolls Initiative, it has advantage on the roll. Isn't affected by any effect that requires its target to be seen unless the effect's creator can somehow see it, and any equipment it wears or carries is also concealed. Attack rolls against the creature have disadvantage, and its attack rolls have advantage; a creature that can somehow see it ignores this benefit.",
+    rollEffects: [
+      { mode: "advantage", kind: "initiative" },
+      { mode: "advantage", kind: "attack" },
+    ],
   },
   {
     key: "paralyzed",
     label: "Paralyzed",
     description:
-      "Incapacitated and can't move or speak. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits from within 5 feet is a critical hit.",
+      "Has the Incapacitated condition, and its Speed is 0 and can't increase. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits it from within 5 feet is a critical hit.",
+    // Conditions that include Incapacitated inherit its initiative disadvantage; buildRollModifiers does no inheritance walk, so it's flattened per-condition (SRD 5.2).
+    rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
     key: "petrified",
     label: "Petrified",
     description:
-      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance. Incapacitated, can't move or speak, and is unaware of its surroundings. Resistant to all damage; immune to poison and disease.",
+      "Transformed, along with any nonmagical object it is wearing or carrying, into a solid inanimate substance (usually stone); its weight increases tenfold and it ceases aging. Has the Incapacitated condition and its Speed is 0. Automatically fails Strength and Dexterity saving throws, and attack rolls against it have advantage. Has resistance to all damage and immunity to the Poisoned condition.",
+    rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
     key: "poisoned",
@@ -103,7 +113,7 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "prone",
     label: "Prone",
     description:
-      "Can only crawl unless it stands up. Has disadvantage on attack rolls. An attack roll against it has advantage if the attacker is within 5 feet; otherwise the attack roll has disadvantage.",
+      "Its only movement options are to crawl or to spend half its Speed (round down) to right itself and end the condition; if its Speed is 0, it can't right itself. Has disadvantage on attack rolls. An attack roll against it has advantage if the attacker is within 5 feet; otherwise the attack roll has disadvantage.",
     rollEffects: [{ mode: "disadvantage", kind: "attack" }],
   },
   {
@@ -120,13 +130,18 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "stunned",
     label: "Stunned",
     description:
-      "Incapacitated, can't move, and can speak only falteringly. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage.",
+      "Has the Incapacitated condition. Automatically fails Strength and Dexterity saving throws, and attack rolls against it have advantage.",
+    rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
     key: "unconscious",
     label: "Unconscious",
     description:
-      "Incapacitated, can't move or speak, and is unaware of its surroundings. Drops whatever it's holding and falls prone. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits from within 5 feet is a critical hit.",
+      "Has the Incapacitated and Prone conditions and drops whatever it is holding; when the condition ends, it remains Prone. Its Speed is 0. Automatically fails Strength and Dexterity saving throws, and attack rolls against it have advantage; any attack that hits it from within 5 feet is a critical hit. Unaware of its surroundings.",
+    rollEffects: [
+      { mode: "disadvantage", kind: "initiative" },
+      { mode: "disadvantage", kind: "attack" },
+    ],
   },
 ];
 
