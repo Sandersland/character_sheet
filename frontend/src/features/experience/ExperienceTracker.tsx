@@ -67,7 +67,6 @@ export default function ExperienceTracker({ character, onUpdate }: ExperienceTra
   );
 }
 
-// The XP total, meter, and the "N XP to Level M" caption (hidden at the cap).
 function ExperienceMeter({ character }: { character: Character }) {
   const { experiencePoints, currentLevelThreshold, nextLevelThreshold, level } = character;
   const isMaxed = nextLevelThreshold === null;
@@ -111,7 +110,6 @@ function ExperienceMeter({ character }: { character: Character }) {
   );
 }
 
-// Award XP — the primary action.
 function AwardXpForm({ pending, apply }: { pending: boolean; apply: ApplyXp }) {
   const [awardValue, setAwardValue] = useState("");
 
@@ -147,7 +145,6 @@ function AwardXpForm({ pending, apply }: { pending: boolean; apply: ApplyXp }) {
   );
 }
 
-// Set exact total — a low-emphasis disclosure; seeds from the live total on open.
 function SetExactTotalRow({
   pending,
   apply,
@@ -172,6 +169,7 @@ function SetExactTotalRow({
       <button
         type="button"
         onClick={() => {
+          // Seed from the live total so the field opens on the current XP.
           setValue(String(experiencePoints));
           setOpen(true);
         }}

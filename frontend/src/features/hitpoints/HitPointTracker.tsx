@@ -5,8 +5,8 @@ import AutoRollConcentrationToggle from "@/features/hitpoints/AutoRollConcentrat
 import HpActionControl from "@/features/hitpoints/HpActionControl";
 import HpDeathSaveBlock from "@/features/hitpoints/HpDeathSaveBlock";
 import HpMeter from "@/features/hitpoints/HpMeter";
+import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import HpNotices from "@/features/hitpoints/HpNotices";
-import HpTrackerModals from "@/features/hitpoints/HpTrackerModals";
 import RestControls from "@/features/hitpoints/RestControls";
 import { useDeathSaves } from "@/features/hitpoints/useDeathSaves";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
@@ -65,11 +65,13 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         <HpNotices concentrationNote={hp.concentrationNote} error={hp.error} />
       </div>
 
-      <HpTrackerModals
-        pendingSave={hp.pendingSave}
-        onResolveSave={hp.resolveConcentrationSave}
-        onCloseSave={() => hp.setPendingSave(null)}
-      />
+      {hp.pendingSave && (
+        <ConcentrationSaveModal
+          save={hp.pendingSave}
+          onResolve={hp.resolveConcentrationSave}
+          onClose={() => hp.setPendingSave(null)}
+        />
+      )}
     </Card>
   );
 }

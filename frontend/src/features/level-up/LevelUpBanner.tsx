@@ -6,12 +6,7 @@ interface LevelUpBannerProps {
   character: Character;
 }
 
-/**
- * The armed entry point to the level-up ceremony (#892): a full-bleed gold band
- * pinned under the sheet header on every tab (above the mobile scroller) whenever
- * XP has outpaced the applied level. Null — reclaiming its height — with nothing
- * pending. The old below-the-fold HP-card callout is retired in its favor.
- */
+// Mounted outside the tab scroller (#892) so it arms on every tab when a level-up is pending.
 export default function LevelUpBanner({ character }: LevelUpBannerProps) {
   const { pendingLevelUps, level, id } = character;
   if (pendingLevelUps < 1) return null;
@@ -24,7 +19,7 @@ export default function LevelUpBanner({ character }: LevelUpBannerProps) {
   return (
     <div className="border-y border-gold-300 bg-gradient-to-r from-gold-50 to-gold-100">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
-        <span aria-hidden className="text-lg leading-none text-gold-600">
+        <span aria-hidden="true" className="text-lg leading-none text-gold-600">
           ✦
         </span>
         <div className="min-w-0 flex-1">
