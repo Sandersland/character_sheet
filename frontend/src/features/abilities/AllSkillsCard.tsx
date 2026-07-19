@@ -14,11 +14,6 @@ interface AllSkillsCardProps {
   abilityScores: AbilityScores;
   proficiencyBonus: number;
   /**
-   * Render the card flat + border-defined (#986) for the desktop live-Combat
-   * reference rail, so it recedes behind the turn tracker. Defaults off.
-   */
-  muted?: boolean;
-  /**
    * Flow the six ability groups two-up (#1086) so the card is half as tall — the
    * Overview's 3fr/2fr left column keeps pace with the XP/features/advancements
    * stack on its right. `divide-y` between groups is dropped in this mode (the
@@ -35,7 +30,6 @@ export default function AllSkillsCard({
   skills,
   abilityScores,
   proficiencyBonus,
-  muted = false,
   twoColumn = false,
 }: AllSkillsCardProps) {
   const groups = ABILITY_ORDER.map((ability) => ({
@@ -46,7 +40,7 @@ export default function AllSkillsCard({
   })).filter((group) => group.skills.length > 0);
 
   return (
-    <Card title="Skills" className={muted ? "bg-parchment-100 shadow-none" : ""}>
+    <Card title="Skills">
       <div
         className={
           twoColumn

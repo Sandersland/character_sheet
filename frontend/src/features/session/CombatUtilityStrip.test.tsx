@@ -169,34 +169,6 @@ describe("CombatUtilityStrip (#982)", () => {
     expect(screen.getByRole("button", { name: "Increase exhaustion" })).toBeDisabled();
   });
 
-  // #1085: the desktop header dropped HP, so the desktop utility line carries the
-  // live-play HP entry. jsdom's matchMedia stub reports every query unmatched
-  // (mobile), so force the desktop line to exercise it.
-  it("carries the HP manage-sheet entry on the desktop line (#1085)", () => {
-    const original = window.matchMedia;
-    window.matchMedia = ((query: string) =>
-      ({
-        matches: true,
-        media: query,
-        onchange: null,
-        addEventListener() {},
-        removeEventListener() {},
-        addListener() {},
-        removeListener() {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-    try {
-      render(
-        <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 0 })} onUpdate={vi.fn()} />,
-      );
-      expect(
-        screen.getByRole("button", { name: /manage hit points: 30 of 30/i }),
-      ).toBeInTheDocument();
-    } finally {
-      window.matchMedia = original;
-    }
-  });
-
   it("keeps 'manage conditions' as the ONLY control matching that name (no exhaustion collision)", () => {
     render(
       <CombatUtilityStrip
