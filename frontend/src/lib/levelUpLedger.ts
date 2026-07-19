@@ -109,7 +109,19 @@ function listRow(label: string, items: string[]): LedgerRow | null {
   return items.length ? { label, items, variant: "list" } : null;
 }
 
-function learnedListRows(draft: LevelUpDraft, plan: LevelUpPlanResponse, r: LedgerResolvers): LedgerRow[] {
+// #1101: a forgotten spell is a per-character ENTRY id, so its name resolves from
+// the character's own spellbook — not resolvers.spell (which is catalog-id space).
+function forgottenNames(draft: LevelUpDraft, character: Character): string[] {
+  const book = character.spellcasting?.spells ?? [];
+  return (draft.spellsForgotten ?? []).map((op) => book.find((s) => s.id === op.entryId)?.name ?? op.entryId);
+}
+
+function learnedListRows(
+  draft: LevelUpDraft,
+  plan: LevelUpPlanResponse,
+  r: LedgerResolvers,
+  character: Character,
+): LedgerRow[] {
   const rows = [
     listRow("Maneuvers", (draft.maneuvers ?? []).map((op) => resolvedName(op.maneuverId, op.custom, r.maneuver))),
     listRow(
@@ -118,6 +130,7 @@ function learnedListRows(draft: LevelUpDraft, plan: LevelUpPlanResponse, r: Ledg
     ),
     listRow("Tool Proficiencies", (draft.toolProficiencies ?? []).map((op) => op.name)),
     listRow("Subclass Features", (draft.subclassChoices ?? []).map((op) => subclassChoiceName(op, plan))),
+    listRow("Forgotten", forgottenNames(draft, character)),
     listRow("New Spells", (draft.spellsLearned ?? []).map((op) => resolvedName(op.spellId, op.custom, r.spell))),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);
@@ -145,7 +158,7 @@ export function buildLevelUpLedger(
     { label: "Hit Dice", before: `${total}${die}`, after: `${total + 1}${die}`, variant: "delta" },
     draft.subclassId ? { label: "Subclass", after: plan.target.subclass ?? "New subclass", variant: "delta" } : null,
     draft.fightingStyle ? { label: "Fighting Style", after: fightingStyleLabel(draft.fightingStyle), variant: "delta" } : null,
-    ...learnedListRows(draft, plan, resolvers),
+    ...learnedListRows(draft, plan, resolvers, character),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);
 }
