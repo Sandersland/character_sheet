@@ -58,6 +58,10 @@ Every mutable domain follows the same shape:
 
 The level-up ceremony endpoint (`/level-up/transactions`) is the **composition variant**: it validates a structured submission against `buildLevelUpPlan`, then drives ONE `runCharacterTransaction` whose applyOp dispatches to the per-domain `*InTx` seams (`applyLevelUpHpInTx`, `applyAdvancementOpInTx`, `setSubclassInTx`, `setFightingStyleInTx`, `applyResourceOpInTx`, `applySpellcastingOpInTx`) — never the outer `apply*Operations` wrappers, which each mint their own transaction + `batchId`. The shared `batchId` is what makes the whole ceremony one atomic unit and one `revertBatch` undo.
 
+### Cross-tier shared types
+
+Wire types shared by both tiers (backend transaction-op inputs the frontend must construct) have a single source of truth in the `@character-sheet/shared-types` workspace (`packages/shared-types/`), consumed via `import type` only — so nothing reaches either runtime bundle and tsc catches drift that hand-mirrors used to hide (#820). Each tier re-exports the names it uses from its existing public module (backend `lib/spellcasting/spellcasting.ts`, frontend `types/character/spells.ts`) so downstream imports are unchanged. Add a mirror family as one file under `src/`, export only names consumed by name (union-only members stay module-private for the zero-dead-export gate), and re-export per tier. The spellcasting-op family is the migrated pattern-setter; remaining families (`#820`) still hand-mirror until moved.
+
 ## Docker Compose
 
 Four services: `db` (Postgres 17, 5432), `pgadmin` (5050, behind the `tools` profile), `backend` (Express, 4000), `frontend` (Vite, 5173). Backend/frontend each have their own Dockerfile with source bind-mounted for hot reload and an anonymous volume shadowing `node_modules`. Prisma client generates into `src/generated/prisma` (gitignored) — run `npx prisma generate` after a fresh clone or schema change.

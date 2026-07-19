@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 
 
 import { Prisma, type Spell } from "@/generated/prisma/client.js";
-import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
+import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
 import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
@@ -36,6 +36,19 @@ import type {
   SpellcastingMutableState,
 } from "./spell-state.js";
 import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
+import type {
+  CastItemSpellOperation,
+  CastSpellOperation,
+  CustomSpellInput,
+  DismissBuffOperation,
+  ExpendSlotOperation,
+  ForgetSpellOperation,
+  LearnSpellOperation,
+  PrepareSpellOperation,
+  RestoreSlotOperation,
+  SpellcastingOperation,
+  UnprepareSpellOperation,
+} from "@character-sheet/shared-types";
 
 // Defined in ability-cost.ts (one-directional dep graph); re-exported so
 // existing importers (spellcastingRouter) keep resolving it here unchanged.
@@ -46,122 +59,13 @@ export { InvalidSpellcastingOperationError };
 // here so this module's public surface stays stable.
 export { normalizeSpellcastingMutable };
 
-export interface CustomSpellInput {
-  name: string;
-  level: number;
-  school: string;
-  castingTime: string;
-  range: string;
-  duration: string;
-  description: string;
-  concentration?: boolean;
-  ritual?: boolean;
-  components?: SpellComponents;
-  saveEffect?: string;
-  effectKind?: string;
-  effectDiceCount?: number;
-  effectDiceFaces?: number;
-  effectModifier?: number;
-  damageType?: string;
-  attackType?: string;
-  saveAbility?: string;
-  upcastDicePerLevel?: number;
-  cantripScaling?: boolean;
-}
-
-/**
- * Cast a spell. For leveled spells, `slotLevel` must be >= spell.level and a
- * slot of that level must be available. Cantrips (spell.level === 0) skip slot
- * expenditure. `roll` is the client-computed effect total (0 for utility spells
- * with no dice); the server validates and logs it but does not recompute.
- */
-export interface CastSpellOperation {
-  type: "castSpell";
-  entryId: string;
-  slotLevel?: number; // required for leveled spells, omit/ignore for cantrips
-  roll: number;       // client-rolled total (0 for utility)
-  /**
-   * Optionally apply the rolled effect in the same atomic batch. `target: "self"`
-   * hits the caster's own HP; `target: { characterId }` heals a consenting ally's
-   * sheet (#462, healing only). Omitted when targeting an enemy (no enemy entities
-   * exist; the player relays damage to the DM).
-   */
-  apply?: { target: CastTarget; kind: "heal" | "damage"; amount: number };
-}
-
-/**
- * Cast a spell granted by a held magic item (#528). `entryId` is the derived
- * `item:<inventoryItemId>:<spellId>` seam. Spends the item's own resource (its
- * per-capability `used` counter), never a character spell slot. `roll` is the
- * client-computed effect total (0 for utility). Blocked when the item is inactive
- * (not equipped/attuned) or its uses are exhausted until the matching rest.
- */
-export interface CastItemSpellOperation {
-  type: "castItemSpell";
-  entryId: string;
-  roll: number;
-  apply?: { target: CastTarget; kind: "heal" | "damage"; amount: number };
-}
-
-/** Expend one slot of a given level without associating it with a specific spell. */
-export interface ExpendSlotOperation {
-  type: "expendSlot";
-  level: number;
-}
-
-/** Restore one previously-expended slot (undo mis-click; not Arcane Recovery). */
-export interface RestoreSlotOperation {
-  type: "restoreSlot";
-  level: number;
-}
-
-/** Learn a spell from the catalog (spellId) or add a custom one. Exactly one of spellId/custom. */
-export interface LearnSpellOperation {
-  type: "learnSpell";
-  spellId?: string;
-  custom?: CustomSpellInput;
-}
-
-/** Remove a learned spell by its per-character entry id. */
-export interface ForgetSpellOperation {
-  type: "forgetSpell";
-  entryId: string;
-}
-
-/** Mark a non-cantrip spell as prepared. */
-export interface PrepareSpellOperation {
-  type: "prepareSpell";
-  entryId: string;
-}
-
-/** Mark a non-cantrip spell as unprepared. */
-export interface UnprepareSpellOperation {
-  type: "unprepareSpell";
-  entryId: string;
-}
-
-/** End the active concentration spell manually (player ends it / it was countered). */
-export interface DropConcentrationOperation {
-  type: "dropConcentration";
-}
-
-/** Dismiss an active while-active spell buff by its spell entry id (#363). */
-export interface DismissBuffOperation {
-  type: "dismissBuff";
-  entryId: string;
-}
-
-export type SpellcastingOperation =
-  | CastSpellOperation
-  | CastItemSpellOperation
-  | ExpendSlotOperation
-  | RestoreSlotOperation
-  | LearnSpellOperation
-  | ForgetSpellOperation
-  | PrepareSpellOperation
-  | UnprepareSpellOperation
-  | DropConcentrationOperation
-  | DismissBuffOperation;
+// Spell transaction-op wire types now live in shared-types (#820); the ops the
+// dispatcher references are imported above, and the ones other backend modules
+// import from here are re-exported so their import paths stay unchanged. The
+// shared CastSpell/CastItemSpell ops type `apply.target` as the same structural
+// union CastTarget aliases, so the dispatcher forwards it to castAbilityInTx
+// unchanged.
+export type { ForgetSpellOperation, LearnSpellOperation, SpellcastingOperation };
 
 // Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
 // no-op (which skips both the state write-back and the logEvent in the dispatcher).
