@@ -46,7 +46,7 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
-import { advancementSlotsForLevel, characterFightingStyleChoiceCount, derivePreparedSpellLimit, FIGHTING_STYLES } from "@/lib/srd/srd.js";
+import { advancementSlotsForLevel, characterFightingStyleChoiceCount, characterFightingStyleFeatSlots, derivePreparedSpellLimit, FIGHTING_STYLES } from "@/lib/srd/srd.js";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -587,8 +587,9 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
       initiativeBonus: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true },
+        // All entries — the ASI cap reads the primary (position 0), the fs cap
+        // sums entitlement across every class entry (#1137).
+        select: { name: true, level: true },
       },
     },
   });
@@ -599,10 +600,12 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
 
   const className = row.classEntries[0]?.name ?? "";
   const allowed = advancementSlotsForLevel(className, newDerivedLevel);
+  const fightingStyleAllowed = characterFightingStyleFeatSlots(row.classEntries, newDerivedLevel);
 
-  // Origin feats are exempt from the cap and never reversed (#1130); trim only
-  // the slot-bearing tail beyond `allowed` (LIFO), keeping origin entries.
-  const { kept, excess: toRemove } = splitAdvancementsBySlotCap(state.advancements, allowed);
+  // Origin feats are exempt from both caps and never reversed (#1130); ASI feats
+  // trim beyond `allowed`, Fighting Style feats beyond `fightingStyleAllowed`
+  // (#1137) — LIFO tail per partition, keeping origin entries.
+  const { kept, excess: toRemove } = splitAdvancementsBySlotCap(state.advancements, allowed, fightingStyleAllowed);
   if (toRemove.length === 0) return; // within cap
 
   const scores = row.abilityScores as Record<string, number>;

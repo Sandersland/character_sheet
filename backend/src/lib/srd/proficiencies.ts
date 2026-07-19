@@ -1,4 +1,3 @@
-import type { FightingStyleKey } from "@/lib/srd/fighting-styles.js";
 import { abilityModifier } from "@/lib/srd/math.js";
 
 /** Armor categories that a character can be proficient with. */
@@ -115,16 +114,15 @@ export function deriveWeaponAttackBonus(
   proficiencyBonus: number,
   weaponGrants: ReadonlyArray<{ name: string }>,
   /**
-   * The character's chosen Fighting Style, if any. Archery contributes +2 to
-   * attack rolls with ranged weapons; all other styles are no-ops here.
+   * Flat bonus to ranged weapon attack rolls only — the Archery Fighting Style
+   * feat's +2 (#1137), summed from feat improvements via deriveRangedAttackRollBonus.
    */
-  fightingStyle?: FightingStyleKey | null,
+  rangedAttackRollBonus = 0,
   /** Flat bonus from active "attackRoll" buffs (e.g. Sacred Weapon); #419. */
   attackRollBonus = 0,
 ): number {
   const abilityMod = weaponAbilityMod(weapon, effectiveScores);
   const proficient = isProficientWithWeapon(weapon, weaponGrants);
-  const archeryBonus =
-    fightingStyle === "archery" && weapon.weaponRange === "ranged" ? 2 : 0;
-  return abilityMod + (proficient ? proficiencyBonus : 0) + archeryBonus + attackRollBonus;
+  const rangedBonus = weapon.weaponRange === "ranged" ? rangedAttackRollBonus : 0;
+  return abilityMod + (proficient ? proficiencyBonus : 0) + rangedBonus + attackRollBonus;
 }

@@ -1073,3 +1073,68 @@ describe("POST /api/characters/:id/experience — fighting style reconciled on c
     expect(stored?.fightingStyle).toBe("defense");
   });
 });
+
+// ── Fighting Style FEAT reconciliation (#1137) ────────────────────────────────
+// Fighting Style feats live in advancements[] tagged slot:"fightingStyle" and
+// reconcile through reconcileAdvancements' fs partition — independently of the
+// ASI partition and exempt origin feats.
+describe("POST /api/characters/:id/experience — Fighting Style feat reconciliation", () => {
+  const XP_L1 = 0, XP_L2 = 300, XP_L4 = 2700, XP_L5 = 6500;
+
+  const fsFeat = () => ({
+    id: "fs-recon-feat", level: 2, kind: "feat" as const, slot: "fightingStyle" as const,
+    abilityDeltas: {}, hpDelta: 0, initDelta: 0,
+    featName: "Defense", featDescription: "d", improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
+  });
+  const resourcesWith = (advancements: unknown[]) => ({
+    used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {},
+    advancements, fightingStyle: null,
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "FSFeatRecon" } } });
+  });
+
+  async function create(id: string, entries: { name: string; position: number; level: number }[], xp: number, advancements: unknown[]) {
+    await ensureTestOwner(OWNER_ID);
+    return prisma.character.create({
+      data: {
+        ...BASE_CHARACTER, ownerId: OWNER_ID, id, name: `FSFeatRecon ${id}`,
+        experiencePoints: xp, hitDice: { total: entries.reduce((s, e) => s + e.level, 0), die: "d10", spent: 0 },
+        spellcasting: Prisma.JsonNull, resources: resourcesWith(advancements),
+        classEntries: { create: entries },
+      },
+    });
+  }
+
+  it("removes a Paladin's Fighting Style feat when it drops below level 2", async () => {
+    await create("fsr-pal21", [{ name: "Paladin", position: 0, level: 2 }], XP_L2, [fsFeat()]);
+    const res = await postXp("fsr-pal21", { operations: [{ type: "set", value: XP_L1 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.advancements.some((a: { slot?: string }) => a.slot === "fightingStyle")).toBe(false);
+    const act = await getActivity("fsr-pal21");
+    expect(act.body.some((e: { type: string }) => e.type === "advancementsReconciled")).toBe(true);
+  });
+
+  it("trims the ASI partition on level-down while keeping the fs feat and origin feats", async () => {
+    const asi = { id: "asi-x", level: 4, kind: "asi" as const, abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 };
+    const origin = { id: "origin-x", level: 1, kind: "feat" as const, origin: true as const, abilityDeltas: {}, hpDelta: 0, initDelta: 0, featName: "Tough", featDescription: "o", improvements: [] };
+    await create("fsr-pal42", [{ name: "Paladin", position: 0, level: 4 }], XP_L4, [origin, asi, fsFeat()]);
+    const res = await postXp("fsr-pal42", { operations: [{ type: "set", value: XP_L2 }] });
+    expect(res.status).toBe(200);
+    const adv = res.body.advancements as { kind: string; slot?: string; origin?: boolean }[];
+    expect(adv.some((a) => a.kind === "asi")).toBe(false);          // ASI over cap removed
+    expect(adv.some((a) => a.slot === "fightingStyle")).toBe(true); // fs kept (fs cap 1 at L2)
+    expect(adv.some((a) => a.origin)).toBe(true);                    // origin exempt
+  });
+
+  it("removes the fs feat when the multiclass Fighter entry vanishes on level-down", async () => {
+    await create("fsr-mc", [
+      { name: "Wizard", position: 0, level: 4 },
+      { name: "Fighter", position: 1, level: 1 },
+    ], XP_L5, [fsFeat()]);
+    const res = await postXp("fsr-mc", { operations: [{ type: "set", value: XP_L4 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.advancements.some((a: { slot?: string }) => a.slot === "fightingStyle")).toBe(false);
+  });
+});

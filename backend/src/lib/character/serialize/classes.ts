@@ -3,6 +3,7 @@
 import {
   advancementSlotsForLevel,
   characterFightingStyleChoiceCount,
+  characterFightingStyleFeatSlots,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   type FightingStyleKey,
@@ -138,16 +139,22 @@ export function applyAdvancementClamp(
   clampedAdvancements: AdvancementEntry[];
   advSlotTotal: number;
   usedSlots: number;
+  fightingStyleSlotTotal: number;
+  usedFightingStyleSlots: number;
 } {
   const storedForAdv = normalizeResourcesMutable(row.resources);
   const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", level);
+  // Fighting Style feat cap across all class entries (#1137) — its own partition.
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
   let effectiveHitPoints = hitPoints;
-  // Origin feats are kept regardless of the slot cap (#1130) via the shared split.
-  const { kept: clampedAdvancements, excess, usedSlots } = splitAdvancementsBySlotCap(
+  // Origin feats are kept regardless of the slot cap (#1130); fs feats trim against
+  // their own cap (#1137) — both handled by the shared split.
+  const { kept: clampedAdvancements, excess, usedSlots, usedFightingStyleSlots } = splitAdvancementsBySlotCap(
     storedForAdv.advancements,
     advSlotTotal,
+    fightingStyleSlotTotal,
   );
 
   if (excess.length > 0) {
@@ -164,7 +171,7 @@ export function applyAdvancementClamp(
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
-  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots };
+  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots };
 }
 
 // Feat improvement modifier layer: sum structured feat improvements over the

@@ -116,6 +116,26 @@ export function deriveFeatBonuses(
 }
 
 /**
+ * Labeled AC addends from the Defense Fighting Style feat's `armorClassWhileArmored`
+ * improvement (#1137) — one part per contributing feat, labeled with its snapshot
+ * name. The caller (buildArmorClassView) applies these only while body armor is
+ * worn. Callers pass the already-clamped slice so an over-cap fs feat is excluded.
+ */
+export function deriveArmoredArmorClassParts(
+  advancements: AdvancementEntry[],
+): { label: string; value: number }[] {
+  const parts: { label: string; value: number }[] = [];
+  for (const entry of advancements) {
+    for (const imp of entry.improvements ?? []) {
+      if (imp.target === "armorClassWhileArmored" && imp.amount !== 0) {
+        parts.push({ label: entry.featName ?? "Fighting Style", value: imp.amount });
+      }
+    }
+  }
+  return parts;
+}
+
+/**
  * Sums the Archery Fighting Style feat's `rangedAttackRoll` improvement (#1137)
  * across a set of advancements — the +2 added to ranged weapon attack rolls in
  * deriveWeaponAttackBonus. Callers pass the already-clamped slice so an over-cap

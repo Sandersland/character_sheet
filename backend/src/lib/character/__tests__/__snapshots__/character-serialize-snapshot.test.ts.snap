@@ -124,6 +124,10 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "currentLevelThreshold": 14000,
   "damageImmunities": [],
   "experiencePoints": 14000,
+  "fightingStyleSlots": {
+    "total": 0,
+    "used": 0,
+  },
   "grantedAdvantages": [],
   "grantedProficiencies": [],
   "hitDice": {
@@ -673,6 +677,10 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "currentLevelThreshold": 6500,
   "damageImmunities": [],
   "experiencePoints": 6500,
+  "fightingStyleSlots": {
+    "total": 1,
+    "used": 0,
+  },
   "grantedAdvantages": [],
   "grantedProficiencies": [],
   "hitDice": {

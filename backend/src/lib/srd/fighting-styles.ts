@@ -90,15 +90,3 @@ export function characterFightingStyleChoiceCount(
     0,
   );
 }
-
-/**
- * Derives the additive bonuses a chosen Fighting Style contributes to derived
- * stats. Today only Defense (+1 AC) is a simple additive bonus; the others are
- * conditional/situational (archery is handled in deriveWeaponAttackBonus;
- * dueling/great-weapon/two-weapon/protection are descriptive for now).
- */
-export function deriveFightingStyleBonuses(
-  styleKey: FightingStyleKey | null | undefined,
-): { armorClass: number } {
-  return { armorClass: styleKey === "defense" ? 1 : 0 };
-}
