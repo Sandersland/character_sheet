@@ -496,6 +496,93 @@ describe("characters routes", () => {
       expect(response.status).toBe(400);
     });
 
+    // ── 2024 background ability spread + Origin feat (#1130) ──────────────
+    // Uses the seeded Criminal background (abilityChoices dex/con/int, Origin
+    // feat Alert) with the seeded Human race + Fighter class.
+    describe("background ability spread + Origin feat (#1130)", () => {
+      const criminalBody = {
+        name: "Sneak",
+        alignment: "True Neutral",
+        race: "Human",
+        background: "Criminal",
+        classes: [{ name: "Fighter" }],
+        abilityScores: { strength: 10, dexterity: 13, constitution: 14, intelligence: 12, wisdom: 10, charisma: 8 },
+      };
+
+      async function post(body: object) {
+        return supertest.agent(createApp()).set("Cookie", COOKIE).post("/api/characters").send(body);
+      }
+
+      it("applies the +2/+1 spread, grants the origin feat, and consumes no slot", async () => {
+        const res = await post({ ...criminalBody, backgroundAbilities: { dexterity: 2, intelligence: 1 } });
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+
+        // Spread folded into effective scores.
+        expect(res.body.abilityScores.dexterity).toBe(15);
+        expect(res.body.abilityScores.intelligence).toBe(13);
+        expect(res.body.abilityScores.constitution).toBe(14);
+
+        // Origin feat = a slot-exempt advancement entry; slots stay 0/0 at level 1.
+        expect(res.body.advancements).toHaveLength(1);
+        expect(res.body.advancements[0]).toMatchObject({ kind: "feat", origin: true, featName: "Alert" });
+        expect(res.body.advancementSlots).toEqual({ total: 0, used: 0 });
+
+        // DEX 15 → +2 base init, plus Alert's +PB (2 at level 1) = 4.
+        expect(res.body.initiativeBonus).toBe(4);
+      });
+
+      it("a CON-touching spread raises level-1 max HP", async () => {
+        const res = await post({ ...criminalBody, backgroundAbilities: { constitution: 2, dexterity: 1 } });
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+        // CON 14→16 (+3 mod), Fighter d10 → 13 max HP.
+        expect(res.body.abilityScores.constitution).toBe(16);
+        expect(res.body.hitPoints.max).toBe(13);
+      });
+
+      it("grants the origin feat even when the spread is omitted (no bump)", async () => {
+        const res = await post(criminalBody);
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+        expect(res.body.abilityScores.dexterity).toBe(13); // unchanged
+        expect(res.body.advancements).toHaveLength(1);
+        expect(res.body.advancements[0]).toMatchObject({ origin: true, featName: "Alert" });
+      });
+
+      it("rejects an ability outside the background's three with 400", async () => {
+        const res = await post({ ...criminalBody, backgroundAbilities: { strength: 2, dexterity: 1 } });
+        expect(res.status).toBe(400);
+      });
+
+      it.each([
+        ["a single +3", { dexterity: 3 }],
+        ["+2/+2 (sum 4)", { dexterity: 2, constitution: 2 }],
+        ["four +1s", { dexterity: 1, constitution: 1, intelligence: 1, strength: 1 }],
+      ])("rejects an illegal shape (%s) with 400", async (_label, backgroundAbilities) => {
+        const res = await post({ ...criminalBody, backgroundAbilities });
+        expect(res.status).toBe(400);
+      });
+
+      it("rejects a spread pushing a score over 20 with 400", async () => {
+        const res = await post({
+          ...criminalBody,
+          abilityScores: { ...criminalBody.abilityScores, dexterity: 19 },
+          backgroundAbilities: { dexterity: 2, constitution: 1 },
+        });
+        expect(res.status).toBe(400);
+      });
+
+      it("rejects backgroundAbilities on a spec-less/custom background with 400", async () => {
+        const res = await post({
+          ...criminalBody,
+          background: "Wandering Storyteller",
+          backgroundAbilities: { dexterity: 2, constitution: 1 },
+        });
+        expect(res.status).toBe(400);
+      });
+    });
+
     // ── Starting equipment tests ──────────────────────────────────────────
     // These tests rely on the seeded catalog (Wizard/Fighter classes, Human
     // race, Sage/Soldier backgrounds, and the weapon/armor/gear items) which

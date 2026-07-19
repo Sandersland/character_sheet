@@ -43,7 +43,7 @@ const ABILITY_NAMES = new Set([
   "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
 ]);
 
-const ABILITY_CAP = 20;
+export const ABILITY_CAP = 20;
 // PHB'24: Epic Boon feats raise an ability score to a maximum of 30, not 20.
 const ABILITY_CAP_EPIC_BOON = 30;
 
