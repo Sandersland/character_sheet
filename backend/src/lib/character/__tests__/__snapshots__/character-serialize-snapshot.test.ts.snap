@@ -469,6 +469,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "proficient": false,
     },
   ],
+  "sneakAttack": null,
   "speed": 40,
   "spellcasting": {
     "ability": "intelligence",
@@ -806,6 +807,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
       "proficient": false,
     },
   ],
+  "sneakAttack": null,
   "speed": 30,
   "spellcasting": undefined,
   "subclass": "battle master",
