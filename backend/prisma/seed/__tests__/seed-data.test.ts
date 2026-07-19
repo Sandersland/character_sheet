@@ -312,6 +312,33 @@ describe("SRD 5.2 catalog values — CHUNK 2 L2 + L3 (#1132)", () => {
   });
 });
 
+describe("SRD 5.2 catalog values — CHUNK 3 L4 + L5 (#1132)", () => {
+  it("renames Evard's Black Tentacles → Black Tentacles in place", () => {
+    expect(has("Evard's Black Tentacles")).toBe(false);
+    expect(has("Black Tentacles")).toBe(true);
+    expect(SPELL_RENAMES).toContainEqual({ from: "Evard's Black Tentacles", to: "Black Tentacles" });
+  });
+
+  it("applies L4 deltas", () => {
+    expect(get("Stoneskin").school).toBe("transmutation");
+    expect(get("Stoneskin").description).not.toContain("nonmagical");
+    expect(get("Banishment").range).toBe("30 ft");
+    expect(get("Banishment").description).toContain("Incapacitated");
+    expect(get("Fire Shield").classes).toEqual(expect.arrayContaining(["druid", "sorcerer"]));
+    expect(get("Dominate Beast").classes).toContain("ranger");
+    expect(get("Ice Storm").description).toContain("2d10");
+  });
+
+  it("applies L5 deltas", () => {
+    expect(get("Cone of Cold").classes).toContain("druid");
+    expect(get("Flame Strike").classes).toEqual(["cleric"]);
+    expect(get("Hallow").school).toBe("abjuration");
+    expect(get("Hold Monster").description).not.toContain("not undead");
+    const mcw = get("Mass Cure Wounds");
+    expect([mcw.effectDiceCount, mcw.school]).toEqual([5, "abjuration"]);
+  });
+});
+
 describe("global GrantedAbility name-uniqueness", () => {
   // All four sources upsert into GrantedAbility, whose `name` is globally
   // unique — a cross-source collision would make one row silently overwrite
