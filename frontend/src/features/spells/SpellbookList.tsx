@@ -46,13 +46,20 @@ type GroupProps = Pick<
   "slots" | "slotsArePactMagic" | "characterLevel" | "budget" | "busy" | "concentratingOnEntryId" | "onCast" | "onPrepare" | "onForget" | "availableSlotsFor"
 > & { level: number; levelSpells: Spell[] };
 
+// The right-aligned slot line for a level group. A single-class warlock's one slot
+// pool is all Pact Magic, so it's labelled to avoid reading as "only level N has
+// slots" (#1139); cantrips have no pool.
+function slotSummary(level: number, slotInfo: SpellSlots | undefined, pact: boolean): string {
+  if (level === 0) return "always prepared";
+  if (!slotInfo) return "";
+  return `${pact ? "Pact Magic — " : ""}${slotInfo.total - slotInfo.used}/${slotInfo.total} slots`;
+}
+
 function SpellLevelGroup({
   level, levelSpells, slots, slotsArePactMagic, characterLevel, budget, busy,
   concentratingOnEntryId, onCast, onPrepare, onForget, availableSlotsFor,
 }: GroupProps) {
-  const slotInfo = level === 0 ? null : slots.find((s) => s.level === level);
-  // A single-class warlock's one slot pool is all Pact Magic — label it so the level
-  // heading doesn't read as "only level N has slots" (#1139).
+  const slotInfo = level === 0 ? undefined : slots.find((s) => s.level === level);
   const pact = slotsArePactMagic && slotInfo != null;
   return (
     <div className="break-inside-avoid">
@@ -61,11 +68,7 @@ function SpellLevelGroup({
           {level === 0 ? "Cantrips" : `Level ${level}`}
         </h4>
         <span className="text-[10px] uppercase tracking-wide text-parchment-500">
-          {level === 0
-            ? "always prepared"
-            : slotInfo
-              ? `${pact ? "Pact Magic — " : ""}${slotInfo.total - slotInfo.used}/${slotInfo.total} slots`
-              : ""}
+          {slotSummary(level, slotInfo, pact)}
         </span>
       </div>
       {pact && (

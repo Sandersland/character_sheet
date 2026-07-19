@@ -29,6 +29,13 @@ function budgetHeadline(count: number, chosen: number, swapping: boolean): strin
   return `${label} — ${chosen} of ${cap} chosen`;
 }
 
+// #1139: spell out that the N learns and the optional swap are separate rules.
+function learnSummary(count: number, canSwap: boolean): string | null {
+  if (count === 0) return null;
+  const swap = canSwap ? " You may also swap one spell you know for another." : "";
+  return `You learn ${count} new spell${count === 1 ? "" : "s"}.${swap}`;
+}
+
 // Tri-state of one catalog row: an already-known spell is disabled, a picked one
 // is pressed, and an unpicked one disables once the (swap-aware) cap is hit.
 function catalogRowState(
@@ -85,11 +92,7 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
   const eligible = eligibleNewSpells(catalog, { className: plan.target.className, maxSpellLevel, magicalSecrets });
   const filtered = filterCatalog(eligible, search, "");
   const swapCandidates = swappableKnownSpells(character.spellcasting?.spells ?? []);
-
-  // #1139: spell out that the N learns and the optional swap are separate rules.
-  const learnCopy = count > 0
-    ? `You learn ${count} new spell${count === 1 ? "" : "s"}.${canSwap ? " You may also swap one spell you know for another." : ""}`
-    : null;
+  const learnCopy = learnSummary(count, canSwap);
 
   return (
     <div>
