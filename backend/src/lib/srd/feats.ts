@@ -60,7 +60,11 @@ const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
  * the max across all active advancements rather than summing them.
  */
 const COMBAT_FEAT_IMPROVEMENT_TARGETS = [
-  "unarmedDamageDie", // amount = die face count (e.g. 4 for d4); max across feats
+  "unarmedDamageDie",       // amount = die face count (e.g. 4 for d4); max across feats
+  // Fighting Style feats (#1137) — situational, applied per-read, not summed as flat bonuses:
+  "rangedAttackRoll",       // Archery: +amount to ranged weapon attack rolls (deriveRangedAttackRollBonus)
+  "armorClassWhileArmored", // Defense: +amount to AC only while wearing body armor (buildArmorClassView)
+  "offhandAbilityDamage",   // Two-Weapon Fighting: marker — add ability mod to the off-hand attack's damage
 ] as const;
 
 /**
@@ -109,6 +113,22 @@ export function deriveFeatBonuses(
   }
 
   return totals;
+}
+
+/**
+ * Sums the Archery Fighting Style feat's `rangedAttackRoll` improvement (#1137)
+ * across a set of advancements — the +2 added to ranged weapon attack rolls in
+ * deriveWeaponAttackBonus. Callers pass the already-clamped slice so an over-cap
+ * fs feat is excluded automatically.
+ */
+export function deriveRangedAttackRollBonus(advancements: AdvancementEntry[]): number {
+  let total = 0;
+  for (const entry of advancements) {
+    for (const imp of entry.improvements ?? []) {
+      if (imp.target === "rangedAttackRoll") total += imp.amount;
+    }
+  }
+  return total;
 }
 
 /**

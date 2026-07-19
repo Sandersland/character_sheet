@@ -87,18 +87,22 @@ export const FEATS: FeatSeed[] = [
   },
 
   // ── Fighting Style feats (SRD 5.2.1) — granted by a Fighting Style feature ──
-  // Effects are wired in #1137; seeded here data-only with empty improvements.
+  // Improvements carry the same derived effects the former scalar styles applied
+  // (#1137). Great Weapon Fighting's damage-die floor is not automated, so it stays
+  // descriptive.
   {
     name: "Archery",
     description: "You gain a +2 bonus to attack rolls you make with ranged weapons.",
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
+    improvements: [{ target: "rangedAttackRoll", amount: 2 }],
   },
   {
     name: "Defense",
     description: "While you are wearing armor, you gain a +1 bonus to Armor Class.",
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
+    improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
   },
   {
     name: "Great Weapon Fighting",
@@ -109,10 +113,12 @@ export const FEATS: FeatSeed[] = [
   },
   {
     name: "Two-Weapon Fighting",
+    // SRD 5.2.1: the off-hand attack requires a Light weapon in each hand.
     description:
-      "When you make an attack as part of the Attack action while wielding two weapons, you can add your ability modifier to the damage of the second attack.",
+      "When you make the extra attack of the Two-Weapon Fighting rule while wielding a weapon that has the Light property in each hand, you can add your ability modifier to that attack's damage.",
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
+    improvements: [{ target: "offhandAbilityDamage", amount: 1 }],
   },
 
   // ── General feats (level 4+) — each grants +1 to a listed ability ──────────
