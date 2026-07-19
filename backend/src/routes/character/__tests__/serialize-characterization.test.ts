@@ -248,7 +248,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     // Derive-don't-persist scalars.
     expect(a.level).toBe(5);
     expect(a.proficiencyBonus).toBe(3);
-    expect(a.speed).toBe(30);
+    expect(a.speed).toBe(25); // base 30 − exhaustion 1 (−5 ft×level, SRD 5.2 / #1136)
     expect(a.attacksPerAction).toBe(1); // Extra Attack not until fighter 5? locked as current
     // Unarmored AC = 10 + Dex(+2).
     expect(a.armorClass).toBe(12);
