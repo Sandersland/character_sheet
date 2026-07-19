@@ -155,10 +155,49 @@ const ASSASSIN_FEATURES: DerivedFeature[] = [
   },
 ];
 
+const THIEF_FEATURES: DerivedFeature[] = [
+  {
+    name: "Fast Hands",
+    level: 3,
+    source: "subclass",
+    description:
+      "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+  },
+  {
+    name: "Second-Story Work",
+    level: 3,
+    source: "subclass",
+    description:
+      "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+  },
+  {
+    name: "Supreme Sneak",
+    level: 9,
+    source: "subclass",
+    description:
+      "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+  },
+  {
+    name: "Use Magic Device",
+    level: 13,
+    source: "subclass",
+    description:
+      "You ignore all class, race, and level requirements on the use of magic items.",
+  },
+  {
+    name: "Thief's Reflexes",
+    level: 17,
+    source: "subclass",
+    description:
+      "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+  },
+];
+
 export const rogue: ClassDefinition = {
   features: ROGUE_FEATURES,
   subclasses: {
     "arcane trickster": { grantLevel: 3, features: ARCANE_TRICKSTER_FEATURES },
     assassin: { grantLevel: 3, features: ASSASSIN_FEATURES },
+    thief: { grantLevel: 3, features: THIEF_FEATURES },
   },
 };

@@ -61,6 +61,12 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "Trained in the art of swift, lethal strikes. You gain proficiency with disguise and poisoner's kits, and deal massive damage to surprised targets with Assassinate.",
   },
+  {
+    className: "Rogue",
+    name: "Thief",
+    description:
+      "A nimble expert at burglary and larceny. Fast Hands lets you use Cunning Action for Sleight of Hand, Thieves' Tools, or Use an Object; Second-Story Work eases climbing and jumps. At higher levels you become supremely stealthy, can use any magic item, and take two turns in the first round of combat.",
+  },
   // ── Cleric ────────────────────────────────────────────────────────────────
   {
     className: "Cleric",

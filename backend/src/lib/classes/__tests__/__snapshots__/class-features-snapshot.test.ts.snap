@@ -44495,6 +44495,1347 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 ]
 `;
 
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / thief 1`] = `
+[
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+        {
+          "description": "No attack roll has advantage against you while you aren't incapacitated.",
+          "level": 18,
+          "name": "Elusive",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+        {
+          "description": "No attack roll has advantage against you while you aren't incapacitated.",
+          "level": 18,
+          "name": "Elusive",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+        {
+          "description": "No attack roll has advantage against you while you aren't incapacitated.",
+          "level": 18,
+          "name": "Elusive",
+          "source": "class",
+        },
+        {
+          "description": "If your attack misses a target in range, you can turn the miss into a hit. Or if you fail an ability check, you can treat the d20 roll as a 20. Once used, regain on a short or long rest.",
+          "level": 20,
+          "name": "Stroke of Luck",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > sorcerer / (no subclass) 1`] = `
 [
   {
@@ -57791,6 +59132,91 @@ exports[`resolveClassDie snapshot — every class-die pool across all classes/su
 `;
 
 exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > rogue / assassin 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > rogue / thief 1`] = `
 [
   {
     "dice": {},
