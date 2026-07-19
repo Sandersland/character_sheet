@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CHOICE_KIND_CONFIGS } from "@/lib/levelUpChoices";
+import {
+  CHOICE_KIND_CONFIGS,
+  filterChoiceOptions,
+  nextChoiceSelection,
+  type ChoiceOption,
+} from "@/lib/levelUpChoices";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type { Character } from "@/types/character";
 
@@ -114,6 +119,43 @@ describe("CHOICE_KIND_CONFIGS", () => {
         disciplinesKnown: [{ id: "e1", disciplineId: "d1", name: "", description: "" }],
       } as Character["resources"]);
       expect([...cfg.fromCharacter(character)]).toEqual(["d1"]);
+    });
+  });
+
+  describe("nextChoiceSelection", () => {
+    it("single-select replaces the current pick", () => {
+      expect(nextChoiceSelection(["a"], "b", { single: true, count: 1 })).toEqual(["b"]);
+    });
+
+    it("multi-select adds an unchosen id below the cap", () => {
+      expect(nextChoiceSelection(["a"], "b", { single: false, count: 2 })).toEqual(["a", "b"]);
+    });
+
+    it("multi-select toggles off a chosen id", () => {
+      expect(nextChoiceSelection(["a", "b"], "a", { single: false, count: 2 })).toEqual(["b"]);
+    });
+
+    it("blocks an (N+1)th pick at the cap (returns null)", () => {
+      expect(nextChoiceSelection(["a", "b"], "c", { single: false, count: 2 })).toBeNull();
+    });
+  });
+
+  describe("filterChoiceOptions", () => {
+    const opts: ChoiceOption[] = [
+      { id: "1", name: "Riposte", description: "reaction attack" },
+      { id: "2", name: "Trip Attack", description: "knock prone" },
+    ];
+
+    it("returns all options for a blank query", () => {
+      expect(filterChoiceOptions(opts, "  ")).toHaveLength(2);
+    });
+
+    it("matches name case-insensitively", () => {
+      expect(filterChoiceOptions(opts, "rIPoS").map((o) => o.id)).toEqual(["1"]);
+    });
+
+    it("matches description text", () => {
+      expect(filterChoiceOptions(opts, "prone").map((o) => o.id)).toEqual(["2"]);
     });
   });
 });

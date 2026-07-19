@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { fetchReference } from "@/api/client";
 import ChoiceStep from "@/features/level-up/ChoiceStep";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -93,5 +94,34 @@ describe("ChoiceStep", () => {
     const { container } = render(<Harness step={{ kind: "maneuvers", count: 2 }} />);
     await screen.findByText("Riposte");
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  // STEP_BODIES maps several kinds to the same ChoiceStep; navigating between two
+  // adjacent choice steps re-renders the SAME instance with a new step.kind, which
+  // must refetch that kind's catalog (regression: a fetch-once guard stranded it).
+  it("refetches for the new kind when the same instance is reused (maneuvers → toolProficiency)", async () => {
+    vi.mocked(fetchReference).mockResolvedValue({
+      artisanTools: [{ name: "Smith's Tools" }, { name: "Brewer's Supplies" }],
+    } as Awaited<ReturnType<typeof fetchReference>>);
+
+    const { rerender } = render(<Harness step={{ kind: "maneuvers", count: 2 }} />);
+    expect(await screen.findByText("Riposte")).toBeInTheDocument();
+
+    rerender(<Harness step={{ kind: "toolProficiency", count: 1 }} />);
+
+    expect(await screen.findByText("Smith's Tools")).toBeInTheDocument();
+    expect(screen.getByText("Brewer's Supplies")).toBeInTheDocument();
+    // The prior kind's options must be gone, not lingering as stale rows.
+    expect(screen.queryByText("Riposte")).not.toBeInTheDocument();
+  });
+
+  it("loads options under StrictMode's double-invoked effects", async () => {
+    render(
+      <StrictMode>
+        <Harness step={{ kind: "maneuvers", count: 2 }} />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByText("Riposte")).toBeInTheDocument();
   });
 });

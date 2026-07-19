@@ -90,3 +90,35 @@ export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConf
   toolProficiency,
   disciplines,
 };
+
+/**
+ * Next selection after toggling `id`, or null when the pick is blocked. Single-
+ * select always replaces; multi-select toggles off a chosen id, adds an unchosen
+ * one, and refuses an (N+1)th pick (the exact-count gate — #896).
+ */
+export function nextChoiceSelection(
+  selectedIds: readonly string[],
+  id: string,
+  opts: { single: boolean; count: number },
+): string[] | null {
+  if (opts.single) return [id];
+  if (selectedIds.includes(id)) return selectedIds.filter((s) => s !== id);
+  if (selectedIds.length >= opts.count) return null;
+  return [...selectedIds, id];
+}
+
+/** Case-insensitive name/description filter for the options list. */
+export function filterChoiceOptions(options: ChoiceOption[], search: string): ChoiceOption[] {
+  const q = search.trim().toLowerCase();
+  if (!q) return options;
+  return options.filter(
+    (o) => o.name.toLowerCase().includes(q) || (o.description?.toLowerCase().includes(q) ?? false),
+  );
+}
+
+/** Informational text for an empty list from a non-error cause, else null. */
+export function emptyChoiceText(availableCount: number, filteredCount: number): string | null {
+  if (availableCount === 0) return "Nothing left to choose — you already know them all.";
+  if (filteredCount === 0) return "No options match your search.";
+  return null;
+}
