@@ -306,6 +306,36 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     expect(b.conditions).toEqual({ active: [], exhaustion: 0 });
   });
 
+  // Clamp-on-read (#1127): an over-cap prepared blob renders exactly `limit`
+  // prepared leveled runes (the reconciler trims on write; this is the read-side
+  // safety net for a blob that got ahead of the cap).
+  it("wizard: over-cap prepared blob clamps to exactly the limit on read", async () => {
+    await prisma.character.create({
+      data: {
+        id: "serial-char-overcap", name: "SerialChar Overcap", ownerId: OWNER_ID, alignment: "Neutral",
+        experiencePoints: 6500, initiativeBonus: 0, speed: 30, // Wizard L5 → prepared cap 9
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: ["intelligence"], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        hitPoints: { current: 22, max: 22, temp: 0 }, hitDice: { total: 5, die: "d6" },
+        spellcasting: {
+          slotsUsed: {}, arcanumUsed: {}, concentratingOn: null,
+          spells: Array.from({ length: 12 }, (_, i) => ({
+            id: `oc-${i + 1}`, name: `Overcap ${i + 1}`, level: 1, school: "evocation", prepared: true,
+            castingTime: "1 action", range: "60 ft", duration: "Instantaneous", description: "x",
+          })),
+        },
+        classEntries: { create: [{ name: "wizard", position: 0, level: 5 }] },
+      },
+    });
+    const oc = (await getChar("serial-char-overcap")).body;
+    expect(oc.spellcasting.preparedSpellLimit).toBe(9);
+    expect(oc.spellcasting.preparedSpellCount).toBe(9);
+    // The first 9 stay prepared; entries beyond the cap remain in the book, unprepared.
+    expect(oc.spellcasting.spells.filter((s: { prepared: boolean }) => s.prepared)).toHaveLength(9);
+    expect(oc.spellcasting.spells).toHaveLength(12);
+  });
+
   // ── Char C: Warlock 11 / Fighter 1 — multiclass Pact Magic branch ───────────
   it("warlock/fighter multiclass: combined pool empty, Pact Magic + arcana surfaced separately", async () => {
     await createMulticlassWarlockFighter();
