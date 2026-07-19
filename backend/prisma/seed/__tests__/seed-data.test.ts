@@ -29,7 +29,7 @@ import { DISCIPLINES } from "../disciplines.js";
 import { SHADOW_ARTS } from "../shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "../channel-divinity.js";
 import { FEATS } from "../feats.js";
-import { SPELLS, SPELL_RENAMES } from "../spells.js";
+import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "../spells.js";
 import { PACKS } from "../packs.js";
 import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
@@ -211,6 +211,62 @@ describe("SPELLS — structured-field invariants (#1132)", () => {
     const missingTargets = SPELL_RENAMES.filter((r) => !names.has(r.to)).map((r) => r.to);
     expect(strandedSources, "rename source still present in SPELLS").toEqual([]);
     expect(missingTargets, "rename target missing from SPELLS").toEqual([]);
+  });
+});
+
+// SRD 5.2 value spot-checks (#1132) — the load-bearing deltas per level band.
+// Not exhaustive: guards the mechanics that changed and the class-list leak fix.
+// `get` throws (definite CatalogSpell, no optional chains → low complexity);
+// `has` covers the removed/renamed presence checks.
+const get = (name: string): CatalogSpell => {
+  const s = SPELLS.find((sp) => sp.name === name);
+  if (!s) throw new Error(`SPELLS has no "${name}"`);
+  return s;
+};
+const has = (name: string): boolean => SPELLS.some((s) => s.name === name);
+
+describe("SRD 5.2 catalog values — CHUNK 1 cantrips + L1 (#1132)", () => {
+  it("removes Toll the Dead (no 2024 version) and renames Tasha's Hideous Laughter", () => {
+    expect(has("Toll the Dead")).toBe(false);
+    expect(has("Tasha's Hideous Laughter")).toBe(false);
+    expect(has("Hideous Laughter")).toBe(true);
+    expect(SPELL_RENAMES).toContainEqual({ from: "Tasha's Hideous Laughter", to: "Hideous Laughter" });
+  });
+
+  it("applies cantrip deltas (dice, class lists, components, duration)", () => {
+    expect(get("Vicious Mockery").effectDiceFaces).toBe(6);
+    expect(get("Mage Hand").classes).toContain("warlock");
+    expect(get("Prestidigitation").classes).toContain("warlock");
+    expect(get("Prestidigitation").duration).toBe("1 hour");
+    expect(get("Minor Illusion").components?.verbal).toBe(false);
+  });
+
+  it("upgrades the healing spells to 2dX abjuration", () => {
+    const cure = get("Cure Wounds");
+    expect([cure.effectDiceCount, cure.upcastDicePerLevel, cure.school]).toEqual([2, 2, "abjuration"]);
+    expect(cure.classes).toEqual(expect.arrayContaining(["paladin", "ranger"]));
+    const hw = get("Healing Word");
+    expect([hw.effectDiceCount, hw.upcastDicePerLevel, hw.school]).toEqual([2, 2, "abjuration"]);
+  });
+
+  it("fixes the L1 class lists (leak fix + additions/removals)", () => {
+    expect(get("Thunderwave").classes).not.toContain("cleric");
+    expect(get("Detect Magic").classes.length).toBe(8);
+    expect(get("Bane").classes).toContain("warlock");
+    expect(get("Command").classes).toContain("bard");
+    expect(get("Command").duration).toBe("Instantaneous");
+    expect(get("Dissonant Whispers").classes).toEqual(["bard"]); // GOO leak fix
+    expect(get("Protection from Evil and Good").classes).toContain("druid");
+    expect(get("Sanctuary").classes).toEqual(["cleric"]);
+  });
+
+  it("redesigns Sleep and re-types Hunter's Mark damage", () => {
+    const sleep = get("Sleep");
+    expect(sleep.concentration).toBe(true);
+    expect(sleep.range).toBe("60 ft");
+    expect(sleep.effectDiceCount).toBeUndefined(); // 5d8 HP pool dropped
+    expect(sleep.description).toContain("Incapacitated");
+    expect(get("Hunter's Mark").description).toContain("Force");
   });
 });
 
