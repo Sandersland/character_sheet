@@ -46,7 +46,7 @@ export default function CampaignSettingsSheet({
   return (
     <BottomSheet title="Campaign settings" onClose={onClose}>
       {campaignName && (
-        <p className="px-4 pb-2 text-sm text-parchment-700">
+        <p className="pb-2 text-sm text-parchment-700">
           <span className="font-semibold text-parchment-900">{campaignName}</span>
           {dmName && <span className="text-parchment-600"> · DM: {dmName}</span>}
         </p>
