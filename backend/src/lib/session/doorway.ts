@@ -82,6 +82,8 @@ export async function getSessionDoorway(
   // start (mirrors today's startCampaignSession/startSoloSession authorization).
   const canStart = true;
 
+  // character is always non-null here — the route layer's assertCharacterAccess
+  // 404s first; standalone callers of a nonexistent id get canStart:true anyway.
   const active = character ? await getActiveSession(characterId) : null;
   if (!active) {
     return { campaignId, role, canStart, kind: "none", session: null };

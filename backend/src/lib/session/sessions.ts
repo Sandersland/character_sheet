@@ -52,9 +52,9 @@ type SessionWithParticipants = Prisma.SessionGetPayload<{
 }>;
 
 /**
- * Returns the id of the campaign's currently-active session for a character, or
- * null if the character is in no campaign / no session is active. Signature is
- * load-bearing: threaded into every apply*Operations() lib to tag events.
+ * Returns the id of the character's currently-active session (campaign or
+ * solo), or null if no session is active. Signature is load-bearing: threaded
+ * into every apply*Operations() lib to tag events.
  */
 export async function getActiveSessionId(
   characterId: string,
