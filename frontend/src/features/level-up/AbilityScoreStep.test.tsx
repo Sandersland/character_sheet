@@ -172,7 +172,7 @@ describe("AbilityScoreStep — feat branch", () => {
     const { user, setDraft } = await toFeatBranch();
     const alertRow = screen.getByText("Alert").closest("li")!;
     await user.click(within(alertRow).getByRole("button", { name: /select/i }));
-    await user.click(screen.getByRole("button", { name: /take feat/i }));
+    await user.click(screen.getByRole("button", { name: "Take Alert" }));
 
     expect(applied(setDraft).advancement).toEqual({ type: "takeFeat", featId: "alert" });
   });
@@ -182,12 +182,11 @@ describe("AbilityScoreStep — feat branch", () => {
     const resilientRow = screen.getByText("Resilient").closest("li")!;
     await user.click(within(resilientRow).getByRole("button", { name: /select/i }));
 
-    // Half-feat: Take feat gates on a choice.
-    expect(screen.getByRole("button", { name: /take feat/i })).toBeDisabled();
-    expect(screen.getByRole("option", { name: /Constitution \(currently 16\)/ })).toBeInTheDocument();
+    // Half-feat: Take button gates on a choice.
+    expect(screen.getByRole("button", { name: "Take Resilient" })).toBeDisabled();
 
-    await user.selectOptions(screen.getByRole("combobox"), "constitution");
-    await user.click(screen.getByRole("button", { name: /take feat/i }));
+    await user.click(screen.getByRole("radio", { name: /constitution/i }));
+    await user.click(screen.getByRole("button", { name: "Take Resilient" }));
 
     expect(applied(setDraft).advancement).toEqual({
       type: "takeFeat",
