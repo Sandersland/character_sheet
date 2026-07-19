@@ -199,7 +199,7 @@ function snapshotAdvancementState(
     abilityScores: { ...scores },
     hitPoints: { ...hp, deathSaves: { ...hp.deathSaves } },
     initiativeBonus: initBonus,
-    // Full resources snapshot (incl. fightingStyle) so revert can't wipe it (#818).
+    // Full resources snapshot (incl. all advancements) so revert can't wipe it (#818).
     resources: snapshotResources(state),
   };
 }
