@@ -7,6 +7,20 @@
 // in seed.ts main().
 import { describe, it, expect } from "vitest";
 
+import { barbarian } from "@/lib/classes/barbarian.js";
+import { bard } from "@/lib/classes/bard.js";
+import { cleric } from "@/lib/classes/cleric.js";
+import { druid } from "@/lib/classes/druid.js";
+import { fighter } from "@/lib/classes/fighter.js";
+import { monk } from "@/lib/classes/monk.js";
+import { paladin } from "@/lib/classes/paladin.js";
+import { ranger } from "@/lib/classes/ranger.js";
+import { rogue } from "@/lib/classes/rogue.js";
+import { sorcerer } from "@/lib/classes/sorcerer.js";
+import type { ClassDefinition } from "@/lib/classes/types.js";
+import { warlock } from "@/lib/classes/warlock.js";
+import { wizard } from "@/lib/classes/wizard.js";
+
 import { CLASSES, ITEMS } from "../catalog-data.js";
 import { ACTIONS } from "../actions.js";
 import { SUBCLASSES } from "../subclasses.js";
@@ -98,6 +112,23 @@ describe("referential integrity", () => {
       .map((c) => c.itemName)
       .filter((name) => !itemNames.has(name));
     expect([...new Set(dangling)], "pack references an item missing from ITEMS").toEqual([]);
+  });
+
+  // Cross-source (#1128): the seed subclassLevel (drives the level-up choice
+  // step) must equal the class-definition grantLevel (drives feature/pool
+  // derivation) — the single rule split across two files must not drift.
+  it("every seed subclassLevel matches its class-definition grantLevel", () => {
+    const defByName: Record<string, ClassDefinition> = {
+      Barbarian: barbarian, Bard: bard, Cleric: cleric, Druid: druid, Fighter: fighter,
+      Monk: monk, Paladin: paladin, Ranger: ranger, Rogue: rogue, Sorcerer: sorcerer,
+      Warlock: warlock, Wizard: wizard,
+    };
+    const drift = CLASSES.flatMap((seedClass) =>
+      Object.entries(defByName[seedClass.name]?.subclasses ?? {})
+        .filter(([, sub]) => (sub.grantLevel ?? 3) !== seedClass.subclassLevel)
+        .map(([key]) => `${seedClass.name}/${key}`),
+    );
+    expect(drift, "subclass grantLevel differs from seed subclassLevel").toEqual([]);
   });
 
   // 2024 rules: a subclass grants nothing before its choice level (#1128), so no
