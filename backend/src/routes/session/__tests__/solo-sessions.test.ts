@@ -258,6 +258,85 @@ describe("solo session event tagging", () => {
   });
 });
 
+describe("solo session combat + rolls (existing participant-gated routes)", () => {
+  it("logs combat start, round, and a roll on a solo session", async () => {
+    const session = await startSoloSession(CHAR_SOLO);
+
+    const start = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/combat/start`)
+      .send({});
+    expect(start.status).toBe(201);
+
+    const round = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/combat/round`)
+      .send({ round: 2 });
+    expect(round.status).toBe(201);
+
+    const roll = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/roll`)
+      .send({ kind: "attack", source: "Longsword", total: 17 });
+    expect(roll.status).toBe(201);
+
+    const events = await prisma.characterEvent.findMany({
+      where: { characterId: CHAR_SOLO, sessionId: session.id },
+      select: { type: true },
+    });
+    const types = events.map((e) => e.type);
+    expect(types).toContain("combatStarted");
+    expect(types).toContain("combatRoundAdvanced");
+    expect(types).toContain("attackRoll");
+  });
+});
+
+describe("solo session XP summary", () => {
+  it("live self-award then end surfaces xpGained in the session recap", async () => {
+    const session = await startSoloSession(CHAR_SOLO);
+
+    const award = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/experience`)
+      .send({ operations: [{ type: "award", amount: 300 }] });
+    expect(award.status).toBe(200);
+
+    const ended = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/end`)
+      .send({});
+    expect(ended.status).toBe(200);
+    expect(ended.body.session.summary.xpGained).toBe(300);
+  });
+
+  it("retroactive XP with sessionId against an ended solo session recomputes its summary", async () => {
+    const session = await startSoloSession(CHAR_SOLO);
+    await agent().post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/end`).send({});
+
+    const award = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/experience`)
+      .send({ operations: [{ type: "award", amount: 500 }], sessionId: session.id });
+    expect(award.status).toBe(200);
+
+    const reloaded = await prisma.session.findUniqueOrThrow({ where: { id: session.id } });
+    expect((reloaded.summary as { xpGained: number }).xpGained).toBe(500);
+  });
+});
+
+describe("solo session chronicle visibility", () => {
+  it("excludes solo sessions from the campaign chronicle but lists them under the character", async () => {
+    const campaignId = await attachToCampaign(CHAR_CAMPAIGN);
+    const campaignSession = await startCampaignSession(campaignId, CHAR_CAMPAIGN);
+    const soloSession = await startSoloSession(CHAR_SOLO);
+
+    const chronicle = await agent().get(`/api/campaigns/${campaignId}/sessions`);
+    expect(chronicle.status).toBe(200);
+    const chronicleIds = chronicle.body.map((s: { id: string }) => s.id);
+    expect(chronicleIds).toContain(campaignSession.id);
+    expect(chronicleIds).not.toContain(soloSession.id);
+
+    const charSessions = await agent().get(`/api/characters/${CHAR_SOLO}/sessions`);
+    expect(charSessions.status).toBe(200);
+    const charIds = charSessions.body.map((s: { id: string }) => s.id);
+    expect(charIds).toContain(soloSession.id);
+  });
+});
+
 describe("solo session doorway", () => {
   it("reports liveJoined with campaignId null after a solo start", async () => {
     const session = await startSoloSession(CHAR_SOLO, "Lone Road");
