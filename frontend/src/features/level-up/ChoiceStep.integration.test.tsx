@@ -22,11 +22,15 @@ vi.mock("@/api/client", () => ({
 const planMock = vi.mocked(fetchLevelUpPlan);
 const submitMock = vi.mocked(submitLevelUp);
 
+// hitPoints/hitDice/abilityScores present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
   pendingLevelUps: 1,
   classes: [{ id: "entry-1", name: "fighter", level: 2, subclass: "Battle Master" }],
   resources: {},
+  abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
+  hitPoints: { current: 20, max: 20 },
+  hitDice: { die: "d10", total: 2 },
 } as unknown as Character;
 
 function plan(steps: LevelUpStep[]): LevelUpPlanResponse {
@@ -59,6 +63,7 @@ describe("ChoiceStep in the ceremony", () => {
     renderCeremony();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     // Maneuvers step: real ChoiceStep renders the catalog; Continue stays off.
@@ -93,6 +98,7 @@ describe("ChoiceStep in the ceremony", () => {
     renderCeremony();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     await user.click(await screen.findByText("Archery"));
