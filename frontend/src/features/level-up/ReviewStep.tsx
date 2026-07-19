@@ -34,14 +34,15 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
 }
 
 function useLedgerResolvers(draft: LevelUpDraft): { resolvers: LedgerResolvers; resolving: boolean } {
-  const feat = draft.advancement?.type === "takeFeat" && !!draft.advancement.featId;
   const maneuvers = useCatalogNames(draft.maneuvers?.length ? fetchManeuvers : undefined);
   const disciplines = useCatalogNames(draft.disciplines?.length ? fetchDisciplines : undefined);
   const spells = useCatalogNames(draft.spellsLearned?.length ? fetchSpells : undefined);
-  const feats = useCatalogNames(feat ? fetchFeats : undefined);
+  // Any taken feat fetches the catalog — a custom feat resolves by its own name,
+  // so this needs no second (featId) guard.
+  const feats = useCatalogNames(draft.advancement?.type === "takeFeat" ? fetchFeats : undefined);
   return {
     resolvers: { maneuver: maneuvers.lookup, discipline: disciplines.lookup, spell: spells.lookup, feat: feats.lookup },
-    resolving: maneuvers.pending || disciplines.pending || spells.pending || feats.pending,
+    resolving: [maneuvers, disciplines, spells, feats].some((c) => c.pending),
   };
 }
 
