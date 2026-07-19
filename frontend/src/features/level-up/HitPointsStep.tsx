@@ -1,137 +1,58 @@
 // The Hit Points ceremony step (#887): the player takes the fixed average or
-// rolls the advancing class's hit die; a live preview shows the new max HP.
+// rolls the advancing class's hit die; a live preview shows the new max HP. The
+// HP math, the roll/selection state, and each sub-view live in their own unit.
 
-import { lazy, Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-
+import AdvancingClassSelector from "@/features/level-up/AdvancingClassSelector";
+import HpChoiceCard from "@/features/level-up/HpChoiceCard";
+import HpDiceReveal from "@/features/level-up/HpDiceReveal";
+import { useAdvancingEntry } from "@/features/level-up/useAdvancingEntry";
+import { useHpRoll } from "@/features/level-up/useHpRoll";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useReferenceData } from "@/hooks/useReferenceData";
-import { abilityAbbr, abilityLabel, abilityModifier, formatModifier } from "@/lib/abilities";
-import type { RollResult } from "@/lib/dice";
-import { advancingHitDie, averageHitPointGain, dieFaces, hitPointGainRange } from "@/lib/hitDice";
-
-// Lazy so the 3D dice stack loads only when the player actually rolls their hit die.
-const DiceRoller = lazy(() => import("@/features/dice/DiceRoller"));
-
-const CHOICE_BASE =
-  "relative rounded-card border border-parchment-300 bg-parchment-50 px-4 py-5 text-center transition-colors hover:bg-parchment-100";
-const CHOICE_SEL = "border-garnet-600 ring-2 ring-garnet-50";
-const CH = "text-[11px] font-bold uppercase tracking-wide text-parchment-500";
-const CBIG = "mt-1.5 font-display text-4xl font-bold";
-const CNOTE = "mt-0.5 text-xs text-parchment-500";
-const PICK = "absolute right-3 top-3 h-5 w-5 rounded-full border";
+import { abilityLabel } from "@/lib/abilities";
+import { hitPointStepMath } from "@/lib/hitDice";
 
 export default function HitPointsStep() {
-  const { character, draft, setDraft } = useLevelUpStepContext();
+  const { character } = useLevelUpStepContext();
   const { reference } = useReferenceData();
-  const referenceClasses = reference?.classes ?? [];
-  const [searchParams, setSearchParams] = useSearchParams();
-  const entries = character.classes ?? [];
-  const classEntryId = searchParams.get("entry") ?? entries[0]?.id;
+  const { entries, classEntryId, setEntry } = useAdvancingEntry(character);
 
-  const conMod = abilityModifier(character.abilityScores.constitution);
-  const conLabel = formatModifier(conMod);
-  const conText = `${conLabel} ${abilityAbbr("constitution")}`;
-
-  const die = advancingHitDie(
-    character,
-    referenceClasses,
-    classEntryId ? { kind: "existing", classEntryId } : undefined,
-  );
-  const faces = dieFaces(die);
-  const averageGain = averageHitPointGain(faces, conMod);
-  const fixedBase = averageHitPointGain(faces, 0);
-  const { min, max } = hitPointGainRange(faces, conMod);
-
-  // The rolled hit die, held locally so toggling average↔roll reuses the same
-  // roll (#887): the die only re-mounts — and re-rolls — while this is null.
-  const [roll, setRoll] = useState<number | null>(null);
-  // Drop a held roll when the advancing class (hence the die) changes, so a d10
-  // roll never carries onto a d6 class — the re-mounted die auto-rolls the new one.
-  useEffect(() => setRoll(null), [faces]);
-
-  function handleRoll(result: RollResult) {
-    const value = result.dice[0]?.value ?? 1;
-    setRoll(value);
-    setDraft((d) => ({ ...d, hp: { method: "roll", roll: value } }));
-  }
-
-  const method = draft.hp?.method;
-  const gain =
-    method === "average" ? averageGain : method === "roll" && roll != null ? roll + conMod : null;
+  const math = hitPointStepMath(character, reference?.classes ?? [], classEntryId);
+  const { roll, method, gain, handleRoll, chooseAverage, chooseRoll } = useHpRoll(math);
   const currentMax = character.hitPoints.max;
 
   return (
     <div>
       {entries.length > 1 && (
-        <fieldset className="mb-5 flex flex-col gap-2">
-          <legend className="text-[11px] font-bold uppercase tracking-wide text-parchment-500">
-            Which class advances?
-          </legend>
-          {entries.map((entry) => (
-            <label key={entry.id} className="flex items-center gap-2 text-sm text-parchment-800">
-              <input
-                type="radio"
-                name="levelup-advancing-class"
-                checked={classEntryId === entry.id}
-                onChange={() => setSearchParams({ entry: entry.id }, { replace: true })}
-              />
-              {entry.name} {entry.level} → {entry.level + 1}
-            </label>
-          ))}
-        </fieldset>
+        <AdvancingClassSelector entries={entries} classEntryId={classEntryId} onSelect={setEntry} />
       )}
 
       <h2 className="text-center font-display text-xl font-semibold text-parchment-900">
         Roll for hit points, or take the average?
       </h2>
       <p className="mt-1 text-center text-sm text-parchment-600">
-        You gain 1{die} + your {abilityLabel("constitution")} modifier ({conLabel}) this level.
+        You gain 1{math.die} + your {abilityLabel("constitution")} modifier ({math.conLabel}) this level.
       </p>
 
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => setDraft((d) => ({ ...d, hp: { method: "average" } }))}
-          aria-pressed={method === "average"}
-          className={`${CHOICE_BASE} ${method === "average" ? CHOICE_SEL : ""}`}
-        >
-          <span className={`${PICK} ${method === "average" ? "border-garnet-700 bg-garnet-600" : "border-parchment-300"}`} />
-          <div className={CH}>Take average</div>
-          <div className={`${CBIG} ${method === "average" ? "text-garnet-700" : "text-parchment-900"}`}>+{averageGain}</div>
-          <div className={CNOTE}>
-            {fixedBase} (fixed) {conText} = reliable
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setDraft((d) => ({ ...d, hp: roll != null ? { method: "roll", roll } : { method: "roll" } }))}
-          aria-pressed={method === "roll"}
-          className={`${CHOICE_BASE} ${method === "roll" ? CHOICE_SEL : ""}`}
-        >
-          <span className={`${PICK} ${method === "roll" ? "border-garnet-700 bg-garnet-600" : "border-parchment-300"}`} />
-          <div className={CH}>Roll 1{die}</div>
-          <div className={`${CBIG} ${method === "roll" ? "text-garnet-700" : "text-parchment-900"}`}>
-            {roll != null ? `+${roll + conMod}` : `${min}–${max}`}
-          </div>
-          <div className={CNOTE}>
-            1{die} {conText} = a gamble
-          </div>
-        </button>
+        <HpChoiceCard
+          label="Take average"
+          value={`+${math.averageGain}`}
+          note={`${math.fixedBase} (fixed) ${math.conText} = reliable`}
+          selected={method === "average"}
+          onSelect={chooseAverage}
+        />
+        <HpChoiceCard
+          label={`Roll 1${math.die}`}
+          value={roll != null ? `+${roll + math.conMod}` : `${math.minRoll}–${math.maxRoll}`}
+          note={`1${math.die} ${math.conText} = a gamble`}
+          selected={method === "roll"}
+          onSelect={chooseRoll}
+        />
       </div>
 
       {method === "roll" && roll == null && (
-        <Suspense fallback={null}>
-          <DiceRoller
-            spec={{ count: 1, faces }}
-            label={`Hit die — 1${die}`}
-            onResult={handleRoll}
-            autoRollOnMount
-            showTotal={false}
-            className="mt-4"
-          />
-        </Suspense>
+        <HpDiceReveal faces={math.faces} die={math.die} onResult={handleRoll} />
       )}
 
       {gain != null && (
