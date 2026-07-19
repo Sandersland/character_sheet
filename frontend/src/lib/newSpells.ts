@@ -3,22 +3,48 @@
 // draft's learnSpell ops under a hard cap. The spell-level ceiling itself is
 // derived on the backend (maxSpellLevelForClass) and rides in step.meta — never
 // re-encoded here.
-import type { CatalogSpell, LearnSpellOperation, LevelUpStep } from "@/types/character";
+import type { CatalogSpell, ForgetSpellOperation, LearnSpellOperation, LevelUpStep, Spell } from "@/types/character";
 
 export interface NewSpellsMeta {
   count: number;
   maxSpellLevel: number;
   magicalSecrets: boolean;
+  /** #1101: this known caster may swap one known spell this level-up. */
+  canSwap: boolean;
 }
 
-/** Safe reads of the newSpells step: count, the derived ceiling, and the secrets flag. */
+/** Safe reads of the newSpells step: count, the derived ceiling, secrets, and swap flags. */
 export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
   const max = step.meta?.maxSpellLevel;
   return {
     count: step.count ?? 0,
     maxSpellLevel: typeof max === "number" ? max : 0,
     magicalSecrets: step.meta?.magicalSecrets === true,
+    canSwap: step.meta?.canSwap === true,
   };
+}
+
+/** Known-spell swap targets (#1101): a user-learned (source null) leveled spell — not a cantrip or granted/item spell. */
+export function swappableKnownSpells(spells: Spell[]): Spell[] {
+  return spells.filter((s) => s.source == null && s.level > 0);
+}
+
+/**
+ * Toggle the single optional swap forget (#1101). Selecting sets/replaces the one
+ * forget (cap rises to count + 1, learns untouched); deselecting the same entry
+ * clears it and trims spellsLearned back to `count` — the server requires an
+ * exact learns === count + forgotten match.
+ */
+export function toggleForgetSpell(
+  draft: { spellsForgotten?: ForgetSpellOperation[]; spellsLearned?: LearnSpellOperation[] },
+  entryId: string,
+  count: number,
+): { spellsForgotten: ForgetSpellOperation[]; spellsLearned: LearnSpellOperation[] } {
+  const learned = draft.spellsLearned ?? [];
+  if (draft.spellsForgotten?.[0]?.entryId === entryId) {
+    return { spellsForgotten: [], spellsLearned: learned.slice(0, count) };
+  }
+  return { spellsForgotten: [{ type: "forgetSpell", entryId }], spellsLearned: learned };
 }
 
 /**

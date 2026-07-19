@@ -161,4 +161,43 @@ describe("draftSatisfies", () => {
     ).toBe(true);
     expect(draftSatisfies({ kind: "review" }, empty)).toBe(true);
   });
+
+  it("newSpells swap: a count-0 step needs a replacement learn per forget (#1101)", () => {
+    const swapStep: LevelUpStep = { kind: "newSpells", count: 0, meta: { canSwap: true } };
+    // No swap taken → trivially satisfied.
+    expect(draftSatisfies(swapStep, empty)).toBe(true);
+    // Forget with no replacement learn → unsatisfied (net count would be −1).
+    expect(
+      draftSatisfies(swapStep, { ...empty, spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }] }),
+    ).toBe(false);
+    // Forget + one replacement learn → satisfied.
+    expect(
+      draftSatisfies(swapStep, {
+        ...empty,
+        spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }],
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      }),
+    ).toBe(true);
+  });
+
+  it("newSpells swap: a count-1 step with a forget needs two learns (#1101)", () => {
+    const step: LevelUpStep = { kind: "newSpells", count: 1, meta: { canSwap: true } };
+    expect(
+      draftSatisfies(step, {
+        ...empty,
+        spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }],
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      }),
+    ).toBe(false);
+    expect(
+      draftSatisfies(step, {
+        ...empty,
+        spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }],
+        spellsLearned: [
+          { type: "learnSpell", spellId: "s1" },
+          { type: "learnSpell", spellId: "s2" },
+        ],
+      }),
+    ).toBe(true);
+  });
 });
