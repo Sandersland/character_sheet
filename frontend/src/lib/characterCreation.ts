@@ -1,6 +1,7 @@
 import { abilityModifier } from "@/lib/abilities";
 import { draftToInput } from "@/lib/startingEquipment";
 import { missingRequirements } from "@/lib/characterCreationValidation";
+import { creationSpellCounts, creationSpellsMissing } from "@/lib/creationSpells";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type {
   BackgroundOption,
@@ -96,15 +97,19 @@ export function creationMissing(
   draft: CharacterDraft,
   selections: CreationSelections
 ): string[] {
-  return missingRequirements({
-    name: draft.name,
-    alignment: draft.alignment,
-    race: draft.race,
-    className: draft.className,
-    backgroundName: resolveBackgroundName(draft),
-    startingEquipment: selections.class?.startingEquipment ?? null,
-    equipmentDraft: draft.equipmentDraft,
-  });
+  return [
+    ...missingRequirements({
+      name: draft.name,
+      alignment: draft.alignment,
+      race: draft.race,
+      className: draft.className,
+      backgroundName: resolveBackgroundName(draft),
+      startingEquipment: selections.class?.startingEquipment ?? null,
+      equipmentDraft: draft.equipmentDraft,
+    }),
+    // #1131: a level-1 caster must finish its cantrip + spell picks.
+    ...creationSpellsMissing(creationSpellCounts(selections.class), draft.cantripIds, draft.spellIds),
+  ];
 }
 
 export function buildCreatePayload(
@@ -128,5 +133,9 @@ export function buildCreatePayload(
     toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
     portraitUrl: draft.portraitUrl.trim() || null,
     startingEquipment: resolveEquipmentInput(draft, selections.class) ?? undefined,
+    // #1131: casters send their prepared picks; a non-caster omits the field.
+    ...(selections.class?.level1SpellPicks
+      ? { spells: { cantripIds: draft.cantripIds, spellIds: draft.spellIds } }
+      : {}),
   };
 }

@@ -44,6 +44,10 @@ export interface CharacterDraft {
   skillProficiencies: SkillName[];
   /** Tool proficiency names chosen by the player at character creation. */
   toolChoices: string[];
+  /** #1131: chosen level-1 cantrip catalog ids (casters only). */
+  cantripIds: string[];
+  /** #1131: chosen level-1 prepared-spell catalog ids (casters only). */
+  spellIds: string[];
   equipmentDraft: EquipmentDraft | null;
 }
 
@@ -64,6 +68,8 @@ const EMPTY_DRAFT: CharacterDraft = {
   abilityScores: DEFAULT_ABILITY_SCORES,
   skillProficiencies: [],
   toolChoices: [],
+  cantripIds: [],
+  spellIds: [],
   equipmentDraft: null,
 };
 
