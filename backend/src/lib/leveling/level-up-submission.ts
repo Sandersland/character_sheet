@@ -42,6 +42,9 @@ export interface LevelUpSubmission {
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
+  // #1131: new cantrips picked this level — counted against the newSpells step's
+  // meta.cantrips, separately from leveled picks (a cantrip never offsets a swap).
+  cantripsLearned?: LearnSpellOperation[];
   // #1101/#1127: an optional prepared-spell swap — one forgotten entry offset by
   // one extra learn (net count still equals the newSpells step's count).
   spellsForgotten?: ForgetSpellOperation[];
@@ -216,6 +219,20 @@ function assertForgets(plan: LevelUpStep[], character: LevelUpPlanCharacter, sub
   }
 }
 
+// #1131: new cantrips ride the newSpells step's meta.cantrips, counted separately
+// from leveled picks (a cantrip never offsets a swap forget). A level with no
+// newSpells step — or one granting no cantrips — rejects any cantripsLearned.
+function assertCantrips(plan: LevelUpStep[], submission: LevelUpSubmission): void {
+  const step = plan.find((s) => s.kind === "newSpells");
+  const expected = typeof step?.meta?.cantrips === "number" ? step.meta.cantrips : 0;
+  const provided = submission.cantripsLearned?.length ?? 0;
+  if (provided === expected) return;
+  if (!step || expected === 0) {
+    throw new InvalidLevelUpError("this level-up does not grant new cantrips");
+  }
+  throw new InvalidLevelUpError(`expected ${expected} new cantrips for this level-up, got ${provided}`);
+}
+
 /**
  * Validate a level-up submission against its derived plan and return the effective
  * ordered steps. Throws InvalidLevelUpError on any subclass-contract violation,
@@ -233,5 +250,6 @@ export function validateLevelUpSubmission(
   assertCounts(plan, chosenSubclassName, submission);
   assertNoExcess(plan, submission);
   assertForgets(plan, character, submission);
+  assertCantrips(plan, submission);
   return plan;
 }

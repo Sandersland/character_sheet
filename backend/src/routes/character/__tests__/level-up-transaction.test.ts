@@ -218,10 +218,13 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
     });
   });
 
-  it("learns 2 spells alongside hp + ASI under one batchId", async () => {
+  it("learns 2 spells + 1 cantrip alongside hp + ASI under one batchId", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" } }, take: 2, select: { id: true, name: true } });
+    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0 } }, take: 2, select: { id: true, name: true } });
     expect(spells).toHaveLength(2);
+    // #1131: wizard gains its 4th cantrip at level 4, so the newSpells step now
+    // demands exactly one cantrip pick alongside the two scribed spells.
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true, name: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -229,12 +232,14 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
       // Wizard gains an ASI at level 4; bump INT (not CON) so HP isn't perturbed.
       advancement: { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] },
       spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
     });
 
     expect(res.status).toBe(200);
     expect(res.body.hitDice.total).toBe(4);
     const bookNames = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
     for (const spell of spells) expect(bookNames).toContain(spell.name);
+    expect(bookNames).toContain(cantrip.name);
 
     const batchIds = await distinctBatchIds(CHAR_ID);
     expect(batchIds).toHaveLength(1);
@@ -248,13 +253,15 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
   // ceremony covers the two domains the Battle Master undo test can't.
   it("single revert restores hp, ability delta, hit die, and unlearns the spells", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" } }, take: 2, select: { id: true } });
+    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0 } }, take: 2, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
 
     const ceremony = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
       hp: { method: "average" },
       advancement: { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] },
       spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
     });
     expect(ceremony.status).toBe(200);
     expect(ceremony.body.abilityScores.intelligence).toBe(18);
@@ -461,8 +468,11 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
 
   it("rolls back hp + ASI + the first (valid) spell when the LAST spell id is bogus", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const [realSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" } }, take: 1, select: { id: true, name: true } });
+    const [realSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0 } }, take: 1, select: { id: true, name: true } });
     expect(realSpell).toBeDefined();
+    // #1131: wizard L4 also demands one cantrip; a valid one keeps the failure in
+    // the LAST leveled spell so the atomicity assertion still exercises the rollback.
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -475,6 +485,7 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
         { type: "learnSpell", spellId: realSpell.id },
         { type: "learnSpell", spellId: "bogus-but-well-formed-spell-id" },
       ],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
     });
 
     expect(res.status).toBe(400);
@@ -982,5 +993,86 @@ describe("POST …/level-up/transactions — subclassChoice validator messages",
     });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/expected 1 huntersPrey choices for this level-up, got 2/i);
+  });
+});
+
+// #1131: cantrip progression through the ceremony. Warlock gains its 3rd cantrip
+// and a prepared spell at level 4 (plus an ASI), so the newSpells step now carries
+// a cantrip pick alongside the leveled pick.
+describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#1131)", () => {
+  const CHAR_ID = "lvtx-warlock-4";
+
+  beforeEach(async () => {
+    const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Warlock",
+        experiencePoints: 2700, // level 4 threshold; hitDice.total 3 → 1 pending
+        hitPoints: { current: 22, max: 22, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d8", spent: 0 },
+        abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "warlock", subclass: "The Fiend", classId: warlock.id, position: 0, level: 3 }] },
+      },
+    });
+  });
+
+  it("commits one new cantrip and one new spell together with hp + ASI", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const spell = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 1 }, select: { id: true, name: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 0 }, select: { id: true, name: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: spell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.hitDice.total).toBe(4);
+    const bookNames = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(bookNames).toContain(spell.name);
+    expect(bookNames).toContain(cantrip.name);
+    expect(await distinctBatchIds(CHAR_ID)).toHaveLength(1);
+  });
+
+  it("rejects a leveled spell submitted as a cantrip (400)", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const spells = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 1 }, take: 2, select: { id: true } });
+    expect(spells).toHaveLength(2);
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: spells[0].id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: spells[1].id }], // level-1 spell in the cantrip slot
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/cantrip/i);
+    // Nothing committed — the level check runs before the tx opens.
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("rejects a cantrip submitted as a leveled spell (400)", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 0 }, select: { id: true } });
+    const validCantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: cantrip.id }], // level-0 spell in the leveled slot
+      cantripsLearned: [{ type: "learnSpell", spellId: validCantrip.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/cantrip/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
   });
 });
