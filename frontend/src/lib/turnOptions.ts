@@ -24,8 +24,6 @@ import { canTwoWeaponFight, type TurnActionOption } from "@/lib/turnRules";
 import type { ActionResolver } from "@/features/session/actionResolvers";
 import type { AvailableAction, Character, ResourcePool } from "@/types/character";
 
-// ── Attack summaries ──────────────────────────────────────────────────────────
-
 /** "Longsword · +7 to hit · 1d8 + 4 slashing" for the first attack row
  *  (first equipped weapon, falling back naturally to Unarmed Strike). */
 export function mainWeaponSummary(character: Character): string {
@@ -38,8 +36,6 @@ export function offHandSummary(character: Character): string | null {
   const entry = buildOffHandEntry(character);
   return entry ? `${entry.name} · ${entry.attackLabel} to hit · ${entry.damageLabel}` : null;
 }
-
-// ── Item / resource badges ────────────────────────────────────────────────────
 
 /** Total consumable quantity in the pack — the "×N" badge on Use an item. */
 export function consumableCount(character: Character): number {
@@ -67,8 +63,6 @@ export function poolBadgeFor(
       return `×${pool.remaining}`;
   }
 }
-
-// ── Class-action cards ────────────────────────────────────────────────────────
 
 /** Render model for one class-action option card. */
 export interface ClassActionOption {
@@ -108,8 +102,6 @@ export function classActionOption(
     heal,
   };
 }
-
-// ── Bonus-action spell cards ──────────────────────────────────────────────────
 
 /** Render model for one castable bonus-action spell card. */
 export interface BonusSpellOption {
@@ -158,8 +150,6 @@ export function bonusSpellOptions(
   });
 }
 
-// ── Two-Weapon Fighting hint ──────────────────────────────────────────────────
-
 /**
  * Footer hint for the Bonus Action sheet when TWF is unavailable. Names a
  * concrete owned light-weapon pair when one exists ("equip Two Shortswords…"),
@@ -180,8 +170,6 @@ export function twfHint(character: Character): string | null {
   const pair = first.name === second.name ? samePair : `${first.name} & ${second.name}`;
   return `Off-hand attack needs two light weapons — equip ${pair} to enable it.`;
 }
-
-// ── More-actions disclosure ───────────────────────────────────────────────────
 
 /** Which universal actions render as primary rich cards on the Action sheet;
  *  everything else falls into the "More actions" disclosure grid. */
@@ -211,8 +199,7 @@ export function moreActionsPreview(actions: TurnActionOption[]): string {
   return actions.map((a) => a.label).join(" · ");
 }
 
-// ── Sheet models (built in useTurnActions, consumed by the sheet bodies) ─────
-
+/** Sheet models built in useTurnActions, consumed by the sheet bodies. */
 export interface ActionSheetModel {
   attackSummary: string;
   consumableCount: number;

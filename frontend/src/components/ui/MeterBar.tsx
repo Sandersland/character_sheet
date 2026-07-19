@@ -5,6 +5,8 @@ interface MeterBarProps {
   max: number;
   tone?: MeterTone;
   label?: string;
+  /** Track sizing override; defaults to the full-width 10px desktop bar. */
+  className?: string;
 }
 
 const TONE_FILL: Record<MeterTone, string> = {
@@ -24,6 +26,7 @@ export default function MeterBar({
   max,
   tone = "garnet",
   label,
+  className = "h-2.5 w-full",
 }: MeterBarProps) {
   const pct = max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0;
 
@@ -34,7 +37,7 @@ export default function MeterBar({
       aria-valuemin={0}
       aria-valuemax={max}
       aria-label={label ?? `${current} of ${max}`}
-      className="h-2.5 w-full overflow-hidden rounded-full bg-parchment-200"
+      className={`overflow-hidden rounded-full bg-parchment-200 ${className}`}
     >
       <div
         className={`h-full rounded-full ${TONE_FILL[tone]} transition-[width]`}

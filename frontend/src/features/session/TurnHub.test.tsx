@@ -76,10 +76,12 @@ function Harness({
   character,
   onUpdate,
   onLogChanged,
+  onOpenLog,
 }: {
   character: Character;
   onUpdate: (c: Character) => void;
   onLogChanged: () => void;
+  onOpenLog?: () => void;
 }) {
   const turnState = useTurnState(character, "sess-1");
   return (
@@ -90,16 +92,17 @@ function Harness({
       onUpdate={onUpdate}
       onLogChanged={onLogChanged}
       allies={[]}
+      onOpenLog={onOpenLog}
     />
   );
 }
 
-function renderHub(character: Character = makeCharacter()) {
+function renderHub(character: Character = makeCharacter(), onOpenLog?: () => void) {
   const onUpdate = vi.fn();
   const onLogChanged = vi.fn();
   const result = render(
     <RollProvider>
-      <Harness character={character} onUpdate={onUpdate} onLogChanged={onLogChanged} />
+      <Harness character={character} onUpdate={onUpdate} onLogChanged={onLogChanged} onOpenLog={onOpenLog} />
     </RollProvider>,
   );
   return { ...result, onUpdate, onLogChanged };
@@ -770,6 +773,35 @@ describe("TurnHub — death saves (#736/#744)", () => {
     // The primary moment a downed player rolls a save is on their own turn.
     expect(screen.getByText("Your turn")).toBeInTheDocument();
     expect(screen.getByText(/Unconscious — Roll Death Saves/i)).toBeInTheDocument();
+  });
+});
+
+describe("TurnHub — mobile turn bar (#1028)", () => {
+  it("shows the round + derived Speed in the turn-bar subtitle, with a pinned End turn", async () => {
+    const user = userEvent.setup();
+    renderHub(makeCharacter({ speed: 30 } as unknown as Partial<Character>));
+    await startTurn(user);
+
+    expect(screen.getByText(/Round 1 · Move 30 ft/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "End turn" })).toBeInTheDocument();
+  });
+
+  it("renders the log icon only when a host wires onOpenLog, and opening calls it", async () => {
+    const user = userEvent.setup();
+    const onOpenLog = vi.fn();
+    renderHub(makeCharacter(), onOpenLog);
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Open session log" }));
+    expect(onOpenLog).toHaveBeenCalled();
+  });
+
+  it("omits the log icon when no host wires onOpenLog", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    expect(screen.queryByRole("button", { name: "Open session log" })).not.toBeInTheDocument();
   });
 });
 

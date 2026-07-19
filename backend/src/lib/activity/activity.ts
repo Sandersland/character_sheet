@@ -78,7 +78,7 @@ type ActivityEventRow = CharacterEvent & {
 
 type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
-// ── Revert context + handler registry ─────────────────────────────────────────
+// Revert context + handler registry.
 // Mirrors the LEVEL_GATED_RECONCILERS pattern in level-reconciliation.ts: each
 // category's before-snapshot restore lives in a named handler, and reverseEvent
 // dispatches through REVERT_HANDLERS instead of an if/else chain.
@@ -539,8 +539,9 @@ export async function revertBatch(
   } catch (error) {
     // A revert that can't be reversed cleanly (e.g. undoing a sale after the
     // proceeds were already spent) throws InsufficientCurrencyError from
-    // revertInventoryEvent. The whole $transaction rolls back; surface it as a
-    // 409 to match this route's other conflict responses instead of a 500.
+    // revertInventoryEvent. The whole $transaction rolls back; deliberately
+    // remap the errors' own 400 to a 409 — an undo blocked by later state is a
+    // conflict, not a bad request, matching this route's other conflict responses.
     if (
       error instanceof InsufficientCurrencyError ||
       error instanceof InvalidInventoryOperationError

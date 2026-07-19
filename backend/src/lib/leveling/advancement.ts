@@ -35,19 +35,13 @@ import {
 import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
 import { normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidAdvancementOperationError extends Error {}
-
-// ── Valid ability names ───────────────────────────────────────────────────────
 
 const ABILITY_NAMES = new Set([
   "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
 ]);
 
 const ABILITY_CAP = 20;
-
-// ── Pure helpers ──────────────────────────────────────────────────────────────
 
 /**
  * Computes the effect of applying `abilityDeltas` to `scores`.
@@ -112,8 +106,6 @@ export function reverseAdvancementEffects(
   return { scores: newScores, hitPoints: newHp, initiativeBonus: newInit };
 }
 
-// ── Operation types ───────────────────────────────────────────────────────────
-
 export interface TakeAsiOperation {
   type: "takeAsi";
   /** One or two increases summing to exactly 2, each capped at 1 or 2. */
@@ -151,8 +143,6 @@ export type AdvancementOperation =
   | TakeAsiOperation
   | TakeFeatOperation
   | RemoveAdvancementOperation;
-
-// ── Per-op context, outcome, and shared helpers ───────────────────────────────
 
 /** Normalized per-op inputs handed to each advancement op handler. */
 interface AdvancementOpContext {
@@ -244,8 +234,6 @@ function resolveHalfFeatBump(args: {
   abilityDeltas[abilityChoice] = abilityIncrease;
   return abilityDeltas;
 }
-
-// ── Op handlers ───────────────────────────────────────────────────────────────
 
 /** Validates a takeAsi op's increases (count, sum, ability names, per-ability cap). */
 function validateAsiIncreases(op: TakeAsiOperation, scores: Record<string, number>): void {
@@ -473,7 +461,86 @@ function dispatchAdvancementOp(
   }
 }
 
-// ── Transaction handler ───────────────────────────────────────────────────────
+// Columns/relations applyAdvancementOpInTx re-reads per op; the batch wrapper's
+// scaffold row is an existence-only { id: true } check.
+const ADVANCEMENT_SELECT = {
+  resources: true,
+  abilityScores: true,
+  hitPoints: true,
+  hitDice: true,
+  initiativeBonus: true,
+  experiencePoints: true,
+  classEntries: {
+    orderBy: { position: "asc" as const },
+    take: 1,
+    select: { name: true },
+  },
+} satisfies Prisma.CharacterSelect;
+
+/**
+ * Applies one advancement op inside a caller-supplied transaction/batchId, so the
+ * unified level-up endpoint (#885) can compose advancement with other domains
+ * under one batchId. Reads fresh state via `tx` on every call — a batch of 2 ASIs
+ * must see each other's results — then dispatches → writes back → logs its own
+ * event (same phases as the wrapper's applyOp, now the single copy of the logic).
+ */
+export async function applyAdvancementOpInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: AdvancementOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const character = await tx.character.findUnique({
+    where: { id: characterId },
+    select: ADVANCEMENT_SELECT,
+  });
+  if (!character) {
+    throw new InvalidAdvancementOperationError(`Character not found: ${characterId}`);
+  }
+
+  const level = levelForExperience(character.experiencePoints);
+  proficiencyBonusForLevel(level); // validate level is reachable (side-effect-free)
+  const className = character.classEntries[0]?.name ?? "";
+
+  const ctx: AdvancementOpContext = {
+    tx,
+    scores: character.abilityScores as Record<string, number>,
+    hp: normalizeHitPoints(character.hitPoints),
+    hitDice: normalizeHitDice(character.hitDice),
+    initBonus: character.initiativeBonus,
+    state: normalizeResourcesMutable(character.resources),
+    level,
+    totalSlots: advancementSlotsForLevel(className, level),
+  };
+
+  const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);
+  const outcome = await dispatchAdvancementOp(ctx, op);
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      abilityScores: outcome.newScores as unknown as Prisma.InputJsonValue,
+      hitPoints: outcome.newHp as unknown as Prisma.InputJsonValue,
+      initiativeBonus: outcome.newInitBonus,
+      resources: serializeResourcesState(ctx.state),
+    },
+  });
+
+  const after = snapshotAdvancementState(outcome.newScores, outcome.newHp, outcome.newInitBonus, ctx.state);
+
+  await logEvent(tx, {
+    characterId,
+    category: "advancement",
+    type: outcome.eventType,
+    summary: outcome.summary,
+    before,
+    after,
+    data: outcome.eventData,
+    batchId,
+    sessionId,
+  });
+}
 
 /**
  * Applies a batch of advancement operations atomically in one Prisma transaction.
@@ -481,68 +548,18 @@ function dispatchAdvancementOp(
  *   - one batchId per request groups ops on the activity timeline
  *   - any throw rolls back the entire batch
  *   - CharacterEvent logged per op with before/after snapshot for undo symmetry
+ *
+ * The scaffold's per-op row is only the existence check: applyAdvancementOpInTx
+ * re-reads its own state via ADVANCEMENT_SELECT so it composes under a caller tx.
  */
 export async function applyAdvancementOperations(
   characterId: string,
   operations: AdvancementOperation[],
 ): Promise<void> {
   await runCharacterTransaction(characterId, operations, {
-    select: {
-      resources: true,
-      abilityScores: true,
-      hitPoints: true,
-      hitDice: true,
-      initiativeBonus: true,
-      experiencePoints: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true },
-      },
-    },
+    select: { id: true },
     notFound: (id) => new InvalidAdvancementOperationError(`Character not found: ${id}`),
-    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      const level = levelForExperience(row.experiencePoints);
-      proficiencyBonusForLevel(level); // validate level is reachable (side-effect-free)
-      const className = row.classEntries[0]?.name ?? "";
-
-      const ctx: AdvancementOpContext = {
-        tx,
-        scores: row.abilityScores as Record<string, number>,
-        hp: normalizeHitPoints(row.hitPoints),
-        hitDice: normalizeHitDice(row.hitDice),
-        initBonus: row.initiativeBonus,
-        state: normalizeResourcesMutable(row.resources),
-        level,
-        totalSlots: advancementSlotsForLevel(className, level),
-      };
-
-      const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);
-      const outcome = await dispatchAdvancementOp(ctx, op);
-
-      await tx.character.update({
-        where: { id: characterId },
-        data: {
-          abilityScores: outcome.newScores as unknown as Prisma.InputJsonValue,
-          hitPoints: outcome.newHp as unknown as Prisma.InputJsonValue,
-          initiativeBonus: outcome.newInitBonus,
-          resources: serializeResourcesState(ctx.state),
-        },
-      });
-
-      const after = snapshotAdvancementState(outcome.newScores, outcome.newHp, outcome.newInitBonus, ctx.state);
-
-      await logEvent(tx, {
-        characterId,
-        category: "advancement",
-        type: outcome.eventType,
-        summary: outcome.summary,
-        before,
-        after,
-        data: outcome.eventData,
-        batchId,
-        sessionId,
-      });
-    },
+    applyOp: ({ tx, op, characterId: id, batchId, sessionId }) =>
+      applyAdvancementOpInTx(tx, id, op, batchId, sessionId),
   });
 }

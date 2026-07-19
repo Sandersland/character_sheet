@@ -19,7 +19,7 @@ interface AbilityScoreBoxProps {
  * table, so it gets the visual weight, not the label.
  *
  * The modifier and "Save" link are clickable roll affordances that emit
- * to `RollResultToast` via `RollContext`.
+ * to `RollResultSeal` via `RollContext`.
  */
 export default function AbilityScoreBox({
   ability,
@@ -56,10 +56,7 @@ export default function AbilityScoreBox({
       </span>
       <div className="mt-1.5 flex items-center gap-1">
         {saveProficient && (
-          <span
-            className="h-1.5 w-1.5 rounded-full bg-arcane-500"
-            aria-hidden="true"
-          />
+          <span className="h-1.5 w-1.5 rounded-full bg-arcane-500" aria-hidden="true" />
         )}
         <RollButton
           spec={saveSpec}

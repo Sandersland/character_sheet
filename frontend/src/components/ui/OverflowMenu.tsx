@@ -20,10 +20,17 @@ interface OverflowMenuProps {
   items: OverflowMenuItem[];
   label?: string;
   className?: string;
+  /** Overrides the default (parchment) trigger styling — e.g. a light kebab for
+   *  the garnet banner. The dropdown panel is unaffected. */
+  triggerClassName?: string;
 }
 
+// Default parchment-surface trigger; hosts on a dark surface pass `triggerClassName`.
+const DEFAULT_TRIGGER =
+  "flex h-7 w-7 items-center justify-center rounded-control text-lg leading-none text-parchment-600 transition-colors hover:bg-parchment-200 hover:text-parchment-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600";
+
 // Icon-only kebab menu-button: WAI-ARIA menu pattern, roving tabindex, focus returns to trigger.
-export default function OverflowMenu({ items, label, className = "" }: OverflowMenuProps) {
+export default function OverflowMenu({ items, label, className = "", triggerClassName }: OverflowMenuProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -104,7 +111,7 @@ export default function OverflowMenu({ items, label, className = "" }: OverflowM
         aria-label={label ?? "More actions"}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={handleTriggerKeyDown}
-        className="flex h-7 w-7 items-center justify-center rounded-control text-lg leading-none text-parchment-600 transition-colors hover:bg-parchment-200 hover:text-parchment-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+        className={triggerClassName ?? DEFAULT_TRIGGER}
       >
         <MoreVertical aria-hidden="true" className="h-4 w-4" />
       </button>

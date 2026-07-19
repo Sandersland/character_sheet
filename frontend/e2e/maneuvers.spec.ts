@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { findCharacterByName, restoreResourcePool } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName, restoreResourcePool } from "./helpers/api";
 
 // The Battle Master roster persona (seeded in global-setup) is Fighter L5 with a
 // subclass + the Evasive Footwork maneuver. Superiority dice are persisted spend
@@ -21,8 +21,8 @@ test("maneuvers: spending an effect maneuver decrements a superiority die", asyn
   await page.goto(`/characters/${id}`);
   await expect(page.getByRole("heading", { name: /Battle Master/, level: 1 })).toBeVisible();
 
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -35,7 +35,10 @@ test("maneuvers: spending an effect maneuver decrements a superiority die", asyn
 
   await evasive.click();
   await expect.poll(() => superiorityLeft(page)).toBe(before - 1);
-  await expect(page.getByText(/Evasive Footwork —/)).toBeVisible();
+  // Scope to the applied-effect strip ("… — add +N to your AC"), not the desktop
+  // right-rail log's "Used Evasive Footwork — d8:X" entries (#964 made it always
+  // visible, so the bare name now matches many log rows).
+  await expect(page.getByText(/Evasive Footwork — add/)).toBeVisible();
 
   expect(errors).toEqual([]);
 });

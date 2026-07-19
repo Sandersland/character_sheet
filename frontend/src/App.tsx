@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import AppHeader from "@/features/auth/AppHeader";
@@ -15,11 +15,19 @@ import AboutPage from "@/pages/AboutPage";
 import CharacterListPage from "@/pages/CharacterListPage";
 import CharacterSheetPage from "@/pages/CharacterSheetPage";
 
-// Route-lazy the heavy non-initial surfaces: character creation and live-play
-// session (the latter drags in the whole session/turn-tracking cluster).
+// Route-lazy the heavy non-initial surfaces: character creation, the journal,
+// and the level-up ceremony.
 const CharacterCreatePage = lazy(() => import("@/pages/CharacterCreatePage"));
-const SessionPage = lazy(() => import("@/pages/SessionPage"));
 const JournalPage = lazy(() => import("@/pages/JournalPage"));
+const LevelUpPage = lazy(() => import("@/pages/LevelUpPage"));
+
+// #962: the live session now lives on the sheet's Combat tab (#960), so the old
+// `/characters/:id/session` route redirects there. Kept for bookmarks / e2e; a
+// param-aware component is needed since a plain <Navigate> can't read `:id`.
+function LegacySessionRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/characters/${id}?tab=combat`} replace />;
+}
 
 export default function App() {
   return (
@@ -46,8 +54,11 @@ export default function App() {
                     <Route path="/characters/:id" element={<CharacterSheetPage />} />
                     {/* Field-chronicle journal page (#864) */}
                     <Route path="/characters/:id/journal" element={<JournalPage />} />
-                    {/* Session (live-play) mode — focused action-first UI */}
-                    <Route path="/characters/:id/session" element={<SessionPage />} />
+                    {/* Level-up ceremony (#886) */}
+                    <Route path="/characters/:id/level-up" element={<LevelUpPage />} />
+                    {/* Live-play now lives on the sheet's Combat tab (#960/#962);
+                        the old session route redirects there. */}
+                    <Route path="/characters/:id/session" element={<LegacySessionRedirect />} />
                     {/* Shared campaigns (#246) */}
                     <Route path="/campaigns" element={<CampaignsPage />} />
                     <Route path="/campaigns/:id" element={<CampaignDetailPage />} />

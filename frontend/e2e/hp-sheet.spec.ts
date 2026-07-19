@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
+import { enterLiveCombat } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // Tap-to-manage HP sheet (#768): the always-visible session HP strip opens a
@@ -10,8 +11,8 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   const bar = page.getByRole("button", { name: /manage hit points/i });
   await expect(bar).toBeVisible();
@@ -38,9 +39,12 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The damage event lands on the activity log like Rest-tab damage.
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText("damage", { exact: true }).first()).toBeVisible();
+  // The damage event lands on the session log — opened on demand from the one-line
+  // log row (#1086; the always-visible rail is gone).
+  await page.getByRole("button", { name: /open session log/i }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Session Log" }).getByText("damage", { exact: true }).first(),
+  ).toBeVisible();
 
   expect(errors).toEqual([]);
 });

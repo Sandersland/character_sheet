@@ -19,7 +19,6 @@ export default function CampaignRecapSection({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* ── Time window + party size ────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-parchment-600">
         {hasWindow && <span>{formatTimeRange(recap.startedAt!, recap.endedAt!)}</span>}
         <span className="flex items-center gap-2">
@@ -30,7 +29,6 @@ export default function CampaignRecapSection({
         </span>
       </div>
 
-      {/* ── Campaign recap tiles ────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile label="XP gained" value={recap.xpGained.toLocaleString()} tone="text-arcane-700" />
         <StatTile label="Spells cast" value={recap.spellsCast} tone="text-arcane-700" />
@@ -40,7 +38,6 @@ export default function CampaignRecapSection({
 
       <RecapSecondaryFacts levelsGained={recap.levelsGained} combatRounds={recap.combatRounds} />
 
-      {/* ── Items acquired (party-wide) ─────────────────────────────── */}
       <div className="flex flex-col gap-1.5">
         <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
           Items acquired
@@ -54,7 +51,7 @@ export default function CampaignRecapSection({
 
       <RecapDomainGroups recap={recap} />
 
-      {/* ── Participants (multiplayer only #278) ────────────────────── */}
+      {/* Participants — multiplayer only (#278). */}
       {showParticipants && (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">

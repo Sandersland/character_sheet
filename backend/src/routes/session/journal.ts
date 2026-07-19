@@ -157,9 +157,10 @@ async function serializeForCharacter(characterId: string) {
   return serializeCharacter(updated);
 }
 
-// ── POST /api/characters/:id/journal ─────────────────────────────────────────
-// Create a new journal entry (ENTRY by default, or a fast NOTE).
-
+/**
+ * POST /api/characters/:id/journal
+ * Create a new journal entry (ENTRY by default, or a fast NOTE).
+ */
 journalRouter.post("/characters/:id/journal", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
@@ -193,9 +194,10 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
   res.status(201).json(await serializeForCharacter(req.params.id));
 });
 
-// ── PATCH /api/characters/:id/journal/:entryId ───────────────────────────────
-// Partial update of an existing entry.
-
+/**
+ * PATCH /api/characters/:id/journal/:entryId
+ * Partial update of an existing entry.
+ */
 journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
@@ -234,9 +236,10 @@ journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
   res.json(await serializeForCharacter(req.params.id));
 });
 
-// ── DELETE /api/characters/:id/journal/:entryId ──────────────────────────────
-// Delete an entry.
-
+/**
+ * DELETE /api/characters/:id/journal/:entryId
+ * Delete an entry.
+ */
 journalRouter.delete("/characters/:id/journal/:entryId", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 

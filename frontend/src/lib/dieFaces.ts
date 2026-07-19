@@ -1,7 +1,7 @@
 /**
  * Shared, React-free three.js geometry/face-data for dice. Both the scripted
- * animator (`components/DiceRoller.tsx`) and the physics roller
- * (`components/PhysicsDiceRoller.tsx`) render the same die shapes and need
+ * animator (DiceRoller) and the physics roller
+ * (PhysicsDiceRoller) render the same die shapes and need
  * the same per-face normals/centroids — the scripted roller to know which
  * orientation to unwind onto, the physics roller to both build a matching
  * collision body and to read which face landed up. Keeping this pure and
@@ -29,6 +29,7 @@ export const FACE_LABEL_FONT_SIZE: Readonly<Record<number, number>> = {
   4: 0.42,
   6: 0.55,
   8: 0.46,
+  10: 0.32,
   12: 0.36,
   20: 0.34,
 };
@@ -59,9 +60,78 @@ export interface FaceGroup {
   labelQuaternion: THREE.Quaternion;
 }
 
-/** Sharp three.js geometry for a given die type; SRD dice with no built-in
- * polyhedron (only d10/d100, the pentagonal trapezohedron) fall back to a
- * plain cube — it still tumbles, it just can't land on a matching face.
+// Pentagonal-trapezohedron (d10) dimensions. Apex height and equatorial radius
+// match the other solids' 0.95 scale. h is the one non-obvious value: the
+// zigzag ring's ±y offset that makes each kite's four vertices coplanar — any
+// other h leaves the kite non-planar, so its two triangles get distinct
+// normals and computeFaceGroups can't cluster them (#1102).
+const D10_APEX_HEIGHT = 0.95;
+const D10_RING_RADIUS = 0.95;
+const D10_KITE_ANGLE = Math.PI / 5; // 36° between adjacent ring vertices
+const D10_RING_Y =
+  (D10_APEX_HEIGHT * (1 - Math.cos(D10_KITE_ANGLE))) / (1 + Math.cos(D10_KITE_ANGLE));
+
+/** Reorders a planar quad's indices so its winding normal points away from the
+ *  origin — top and bottom kites share an index pattern but opposite handedness,
+ *  so orientation has to be per-face, not a single global winding. */
+function orientedOutward(quad: readonly number[], vertices: readonly number[][]): number[] {
+  const [a, b, c] = quad.map((i) => new THREE.Vector3(...(vertices[i] as [number, number, number])));
+  const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
+  const centroidSum = new THREE.Vector3();
+  for (const i of quad) centroidSum.add(new THREE.Vector3(...(vertices[i] as [number, number, number])));
+  return normal.dot(centroidSum) >= 0 ? [...quad] : [quad[0], quad[3], quad[2], quad[1]];
+}
+
+/** Canonical d10 vertices + outward-wound kite faces, shared by the THREE
+ *  geometry and the CANNON collision body so both agree on shape and on which
+ *  kite is which value. Faces are emitted in value order 1..10 (odd values on
+ *  the top apex, opposite faces summing to 11) — that emission order IS the
+ *  face→value map, since computeFaceGroups clusters in first-encounter order. */
+export function d10FaceData(): { vertices: number[][]; faces: number[][] } {
+  const vertices: number[][] = [
+    [0, D10_APEX_HEIGHT, 0],
+    [0, -D10_APEX_HEIGHT, 0],
+  ];
+  for (let k = 0; k < 10; k++) {
+    const angle = D10_KITE_ANGLE * k;
+    const y = k % 2 === 0 ? D10_RING_Y : -D10_RING_Y;
+    vertices.push([D10_RING_RADIUS * Math.cos(angle), y, D10_RING_RADIUS * Math.sin(angle)]);
+  }
+
+  const ring = (k: number): number => 2 + (k % 10);
+  const rawFaces: number[][] = [
+    [0, ring(0), ring(1), ring(2)], // 1  (T0)
+    [1, ring(3), ring(4), ring(5)], // 2  (B1)
+    [0, ring(2), ring(3), ring(4)], // 3  (T1)
+    [1, ring(1), ring(2), ring(3)], // 4  (B0)
+    [0, ring(4), ring(5), ring(6)], // 5  (T2)
+    [1, ring(9), ring(0), ring(1)], // 6  (B4)
+    [0, ring(6), ring(7), ring(8)], // 7  (T3)
+    [1, ring(7), ring(8), ring(9)], // 8  (B3)
+    [0, ring(8), ring(9), ring(0)], // 9  (T4)
+    [1, ring(5), ring(6), ring(7)], // 10 (B2)
+  ];
+
+  return { vertices, faces: rawFaces.map((quad) => orientedOutward(quad, vertices)) };
+}
+
+/** Sharp three.js BufferGeometry for the d10 from `d10FaceData` — each kite
+ *  fan-triangulated in its already-outward winding. */
+function createD10Geometry(): THREE.BufferGeometry {
+  const { vertices, faces } = d10FaceData();
+  const positions: number[] = [];
+  for (const [i0, i1, i2, i3] of faces) {
+    for (const i of [i0, i1, i2, i0, i2, i3]) positions.push(vertices[i][0], vertices[i][1], vertices[i][2]);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Sharp three.js geometry for a given die type; the d100 (which nothing rolls)
+ * falls back to a plain cube — it still tumbles, it just can't land on a
+ * matching face.
  * This is always the *logic* geometry (see `createVisualDieGeometry`): face
  * normals/centroids and result orientation are computed from this sharp
  * solid even on die types whose rendered mesh is rounded, since rounding
@@ -76,6 +146,8 @@ export function createDieGeometry(faces: number): THREE.BufferGeometry {
       return new THREE.TetrahedronGeometry(0.95);
     case 8:
       return new THREE.OctahedronGeometry(0.95);
+    case 10:
+      return createD10Geometry();
     case 12:
       return new THREE.DodecahedronGeometry(0.9);
     case 20:
@@ -86,10 +158,10 @@ export function createDieGeometry(faces: number): THREE.BufferGeometry {
   }
 }
 
-/** Rendered geometry for a given die type. The d6 — the only die type
- * actually rolled in the app today — gets a rounded box for the realistic
- * "resin die from a game shop" look; other die types aren't rounded yet
- * and just reuse the sharp logic solid. */
+/** Rendered geometry for a given die type. The d6 gets a purpose-built rounded
+ * box; every other recognized solid (d4/d8/d10/d12/d20) gets a Minkowski-style
+ * rounded hull for the same "resin die from a game shop" look. Only the d100
+ * fallback renders as its sharp logic solid. */
 // Edge-rounding for the platonic dice. A real resin die has flat number faces
 // with rounded edges/corners — exactly what RoundedBoxGeometry gives the d6.
 // For the other solids we approximate the same "round the edges, keep the faces
@@ -150,6 +222,7 @@ export function createVisualDieGeometry(faces: number): THREE.BufferGeometry {
       return new RoundedBoxGeometry(D6_SIZE, D6_SIZE, D6_SIZE, D6_ROUNDING_SEGMENTS, D6_ROUNDING_RADIUS);
     case 4:
     case 8:
+    case 10:
     case 12:
     case 20:
       return createRoundedPolyhedron(faces);

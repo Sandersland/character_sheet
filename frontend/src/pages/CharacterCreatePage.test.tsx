@@ -7,7 +7,6 @@ import CharacterCreatePage from "@/pages/CharacterCreatePage";
 import { createCharacter, fetchItems, fetchReference } from "@/api/client";
 import type { ReferenceData } from "@/types/character";
 
-// ── Mocks ──────────────────────────────────────────────────────────────────────
 // Real: useCharacterDraft, useReferenceData, the ability/skill/tool DOM. Mock the
 // router navigate, the API client, and BackendStatus (skips its health side-effect).
 

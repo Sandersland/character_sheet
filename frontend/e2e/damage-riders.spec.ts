@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { enterLiveCombat, createCharacter, uniqueName } from "./helpers/api";
 
 // A Flame Tongue-style weapon (dice-valued passiveBonus damage cap, requires
 // attunement) adds a typed +2d6 fire rider to its damage roll in the attack
@@ -61,8 +61,8 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   const errors = collectConsoleErrors(page);
   await page.goto(`/characters/${characterId}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -80,11 +80,14 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
   await expect(rider).toBeVisible();
   await rider.click();
 
-  // The attack picker is a modal bottom sheet (#729) — dismiss it before
-  // reaching the Log tab behind the scrim.
+  // The attack picker is a modal bottom sheet (#729) — dismiss it before reading.
   await page.keyboard.press("Escape");
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText(/fire/i).first()).toBeVisible();
+  // The rider damage lands on the session log — opened on demand from the one-line
+  // log row (#1086; the always-visible rail is gone).
+  await page.getByRole("button", { name: /open session log/i }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Session Log" }).getByText(/fire/i).first(),
+  ).toBeVisible();
 
   expect(errors).toEqual([]);
 });

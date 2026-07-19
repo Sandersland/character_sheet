@@ -1,9 +1,9 @@
 /**
  * Shared, React-free cannon-es physics for the real-physics dice roller
- * (`components/PhysicsDiceRoller.tsx`). Builds the world/tray/bodies, throws
+ * (PhysicsDiceRoller). Builds the world/tray/bodies, throws
  * dice with randomized velocity, steps the simulation, and reads the
  * settled face value off each die — physics *is* the source of randomness
- * here, unlike `lib/dice.ts`'s `rollDie`. Kept separate from the React
+ * here, unlike `rollDie`. Kept separate from the React
  * component so the same throw/step/read logic can run either across many
  * animation frames (the normal tumble) or synchronously in a tight loop
  * (the reduced-motion/skip path) without duplicating it.
@@ -11,7 +11,7 @@
 import * as CANNON from "cannon-es";
 import * as THREE from "three";
 
-import { D6_SIZE, DIE_GAP, UP_AXIS, type FaceGroup } from "./dieFaces";
+import { D6_SIZE, DIE_GAP, UP_AXIS, d10FaceData, type FaceGroup } from "./dieFaces";
 
 // Exaggerated well past Earth gravity (9.8) for snappy, readable game feel —
 // matches the scale the Codrops cannon-es dice article settled on for the
@@ -71,7 +71,7 @@ const TRAY_WALL_HEIGHT = 4;
 const TRAY_WALL_THICKNESS = 0.5;
 // How far a die's start x can jitter off its lane center before being
 // thrown — small, for the same neighbor-clipping reason DiceRoller's
-// scripted skitter stays z-only (see lib/dieFaces.ts's DIE_GAP comment).
+// scripted skitter stays z-only (see the DIE_GAP comment).
 const START_X_JITTER = 0.4;
 // Room beyond a die's outermost resting lane for its own half-width, the
 // start jitter above, and some margin to actually scatter/bounce around in
@@ -119,12 +119,15 @@ const MAX_REROLL_ATTEMPTS = 5;
 // nearest face instead of re-thrown again.
 const MAX_ROLL_MS = 4000;
 
-/** One die's physics body plus the face data needed to read its result and
- *  the lane (resting x position) it should be re-thrown from on a retry. */
+/** One die's physics body plus the face data needed to read its result, the
+ *  lane (resting x position) it should be re-thrown from on a retry, and its
+ *  single-layer rest height (face-to-center distance) — which differs per solid,
+ *  so the stacked-die check can't assume the d6's. */
 export interface PhysicsDie {
   body: CANNON.Body;
   groups: FaceGroup[];
   laneX: number;
+  restY: number;
 }
 
 /** A fresh world + tray sized for `count` dice, ready to have dice bodies
@@ -183,15 +186,26 @@ function addTray(world: CANNON.World, floorMaterial: CANNON.Material, trayHalfX:
   }
 }
 
-/** A dynamic die body. Only d6 has a matching cannon shape today — other die
- *  types fall back to the same box, same as `dieFaces.ts`'s sharp geometry
- *  fallback, so they still tumble and settle, just without a real per-face read. */
-export function createDieBody(diceMaterial: CANNON.Material): CANNON.Body {
+/** The d10's collision shape: the same pentagonal trapezohedron the mesh uses
+ *  (`d10FaceData`), so it comes to rest on a real kite face the reader can map. */
+function d10Shape(): CANNON.ConvexPolyhedron {
+  const { vertices, faces } = d10FaceData();
+  return new CANNON.ConvexPolyhedron({
+    vertices: vertices.map((v) => new CANNON.Vec3(v[0], v[1], v[2])),
+    faces,
+  });
+}
+
+/** A dynamic die body. The d6 and d10 have matching cannon shapes; the d100
+ *  falls back to the box (like `createDieGeometry`), so it still tumbles and
+ *  settles, just without a real per-face read. */
+export function createDieBody(diceMaterial: CANNON.Material, faces: number): CANNON.Body {
   const half = D6_SIZE / 2;
+  const shape = faces === 10 ? d10Shape() : new CANNON.Box(new CANNON.Vec3(half, half, half));
   return new CANNON.Body({
     mass: DIE_MASS,
     material: diceMaterial,
-    shape: new CANNON.Box(new CANNON.Vec3(half, half, half)),
+    shape,
     allowSleep: true,
     sleepSpeedLimit: SLEEP_SPEED_LIMIT,
     sleepTimeLimit: SLEEP_TIME_LIMIT,
@@ -263,11 +277,11 @@ const scratchNormal = new THREE.Vector3();
  *  with +Y. Flags a "cocked" read — an edge/corner balance, or a die resting
  *  on top of a neighbor rather than the floor — so the caller can re-throw
  *  rather than report a value nobody would actually read off the die. */
-function readUpFace(body: CANNON.Body, groups: FaceGroup[]): FaceReading {
-  // Die types with no per-face mapping (only d10/d100 today — see
-  // dieFaces.ts's createDieGeometry fallback) can't be read at all; treat
-  // them as an always-valid "1" rather than retrying forever against a
-  // confidence score that can never clear the threshold.
+export function readUpFace(body: CANNON.Body, groups: FaceGroup[], restY: number): FaceReading {
+  // Die types with no per-face mapping (only the d100 today — see
+  // createDieGeometry's fallback) can't be read at all; treat them as an
+  // always-valid "1" rather than retrying forever against a confidence score
+  // that can never clear the threshold.
   if (groups.length === 0) return { value: 1, confidence: 1, cocked: false };
 
   scratchQuaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
@@ -283,7 +297,7 @@ function readUpFace(body: CANNON.Body, groups: FaceGroup[]): FaceReading {
     }
   }
 
-  const expectedRestY = FLOOR_Y + D6_SIZE / 2;
+  const expectedRestY = FLOOR_Y + restY;
   const offFloor = Math.abs(body.position.y - expectedRestY) > REST_HEIGHT_TOLERANCE;
   const cocked = best < COCK_DOT_THRESHOLD || offFloor;
 
@@ -333,7 +347,7 @@ export function createRollResolver(world: CANNON.World, dice: readonly PhysicsDi
     const allSettled = dice.every((die, index) => isBodySettled(die.body, sinceThrowMs[index]));
     if (!allSettled && !timedOut) return { done: false };
 
-    const readings = dice.map((die) => readUpFace(die.body, die.groups));
+    const readings = dice.map((die) => readUpFace(die.body, die.groups, die.restY));
     const cockedIndices = readings.map((reading, index) => (reading.cocked ? index : -1)).filter((index) => index >= 0);
 
     if (cockedIndices.length > 0 && attempts < MAX_REROLL_ATTEMPTS && !timedOut) {

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 
-import { CombatError, SessionError, type RollKind, type RollMode } from "@/lib/session/sessions.js";
+import type { RollKind, RollMode } from "@/lib/session/sessions.js";
 
 export interface RollInput {
   kind: RollKind;
@@ -56,11 +56,6 @@ const ROLL_CHECKS: { ok: (b: RollBody) => boolean; error: string }[] = [
   },
 ];
 
-// SessionError/CombatError message → HTTP status: 404 for not-found, else 409.
-export function sessionErrorStatus(message: string): number {
-  return message.includes("not found") ? 404 : 409;
-}
-
 // Validates a required characterId in the body; sends 400 and returns null when
 // missing/blank, otherwise returns the raw id.
 export function requireCharacterId(req: Request, res: Response): string | null {
@@ -102,22 +97,4 @@ function areValidFaces(faces: unknown): boolean {
     Array.isArray(faces) &&
     faces.every((f) => typeof f === "number" && Number.isInteger(f) && f > 0)
   );
-}
-
-// Wraps an async handler so SessionError/CombatError map to a status + { error };
-// any other error re-throws to the terminal handler (express-async-errors).
-export function withSessionErrors(
-  handler: (req: Request, res: Response) => Promise<void>,
-): (req: Request, res: Response) => Promise<void> {
-  return async (req, res) => {
-    try {
-      await handler(req, res);
-    } catch (err) {
-      if (err instanceof SessionError || err instanceof CombatError) {
-        res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-        return;
-      }
-      throw err;
-    }
-  };
 }

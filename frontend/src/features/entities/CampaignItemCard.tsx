@@ -24,7 +24,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 // The Codex item card: badges (rarity/attunement/unique), category-specific
-// mechanical detail (rows derived in lib/itemCard.ts), description, and —
+// mechanical detail (rows derived in itemDetailRows), description, and —
 // owner only — the DM's private notes.
 export default function CampaignItemCard({ item, isOwner }: CampaignItemCardProps) {
   return (

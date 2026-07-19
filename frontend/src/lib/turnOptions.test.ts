@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/turnOptions.ts — pure option-card render models.
+ * Unit tests for turnOptions — pure option-card render models.
  * Fixture style mirrors attackMath.test.ts (minimal `as unknown as Character`).
  */
 
@@ -91,8 +91,6 @@ function makeSpell(overrides: Partial<Spell> = {}): Spell {
   } as Spell;
 }
 
-// ── mainWeaponSummary / offHandSummary ────────────────────────────────────────
-
 describe("mainWeaponSummary", () => {
   it("summarizes the first equipped weapon", () => {
     const c = makeCharacter({ inventory: [weaponItem()] } as Partial<Character>);
@@ -131,8 +129,6 @@ describe("offHandSummary", () => {
   });
 });
 
-// ── consumableCount ───────────────────────────────────────────────────────────
-
 describe("consumableCount", () => {
   it("sums quantities over consumables only", () => {
     const c = makeCharacter({
@@ -149,8 +145,6 @@ describe("consumableCount", () => {
     expect(consumableCount(makeCharacter())).toBe(0);
   });
 });
-
-// ── poolBadgeFor ──────────────────────────────────────────────────────────────
 
 describe("poolBadgeFor", () => {
   const pool = (overrides: Partial<ResourcePool>): ResourcePool =>
@@ -175,8 +169,6 @@ describe("poolBadgeFor", () => {
     expect(poolBadgeFor("ki", undefined)).toBeUndefined();
   });
 });
-
-// ── classActionOption ─────────────────────────────────────────────────────────
 
 describe("classActionOption", () => {
   const available = (overrides: Partial<AvailableAction> = {}): AvailableAction => ({
@@ -240,8 +232,6 @@ describe("classActionOption", () => {
   });
 });
 
-// ── bonusSpellOptions ─────────────────────────────────────────────────────────
-
 describe("bonusSpellOptions", () => {
   const spellcastingCharacter = (spells: Spell[], slots = [{ level: 1, total: 3, used: 1 }]) =>
     makeCharacter({
@@ -296,8 +286,6 @@ describe("bonusSpellOptions", () => {
   });
 });
 
-// ── twfHint ───────────────────────────────────────────────────────────────────
-
 describe("twfHint", () => {
   it("null when TWF is already available", () => {
     const c = makeCharacter({
@@ -350,8 +338,6 @@ describe("twfHint", () => {
     expect(twfHint(c)).toBe("Off-hand attack needs two light weapons equipped.");
   });
 });
-
-// ── More-actions helpers ──────────────────────────────────────────────────────
 
 describe("more-actions helpers", () => {
   it("every non-primary universal action has a micro-caption", () => {

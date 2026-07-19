@@ -1,5 +1,5 @@
 /**
- * Unit tests for features/session/useTurnState.ts.
+ * Unit tests for useTurnState.
  *
  * Establishes the first renderHook test in the repo. jsdom provides a real
  * localStorage; we clear it in beforeEach to isolate each test.
@@ -15,8 +15,7 @@ import { useTurnState } from "@/features/session/useTurnState";
 import type { EconomySnapshot } from "@/features/session/useTurnState";
 import type { Character, InventoryItem } from "@/types/character";
 
-// ── Minimal character fixture ─────────────────────────────────────────────────
-// useTurnState reads only inventory + the server-derived attacksPerAction.
+// Minimal character fixture: useTurnState reads only inventory + the server-derived attacksPerAction.
 // Cast to avoid satisfying the full ~50-field Character interface.
 
 function makeCharacter(
@@ -76,8 +75,6 @@ const SESSION_ID = "test-session-abc";
 beforeEach(() => {
   localStorage.clear();
 });
-
-// ── Combat / turn lifecycle ───────────────────────────────────────────────────
 
 describe("combat lifecycle", () => {
   it("initial state: not in combat, round 0, idle phase", () => {
@@ -202,8 +199,6 @@ describe("combat lifecycle", () => {
   });
 });
 
-// ── Action slot consumption ───────────────────────────────────────────────────
-
 describe("action slot consumption", () => {
   function inActiveTurn(character = makeCharacter()) {
     const hook = renderHook(() => useTurnState(character, SESSION_ID));
@@ -239,8 +234,6 @@ describe("action slot consumption", () => {
     expect(result.current.actionsRemaining).toBe(1);
   });
 });
-
-// ── Attack flow ───────────────────────────────────────────────────────────────
 
 describe("attack mode flow", () => {
   it("enterAttackMode spends an action and sets attack state (attacksPerAction 2 → total 2)", () => {
@@ -342,8 +335,7 @@ describe("attack mode flow", () => {
   });
 });
 
-// ── Attack tally (#802) ───────────────────────────────────────────────────────
-
+// Attack tally (#802).
 describe("attack tally", () => {
   function inAttack(attacksPerAction = 2) {
     const hook = renderHook(() => useTurnState(makeCharacter({ attacksPerAction }), SESSION_ID));
@@ -418,6 +410,17 @@ describe("attack tally", () => {
     act(() => { result.current.recordAttack(recorded()); });
     act(() => { result.current.setTallyDamage("nope", 9); });
     expect(result.current.attackTally[0].damage).toBeUndefined();
+  });
+
+  it("a tally refinement (setTallyDamage) pushes no new undo snapshot (#967)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    const historyLen = result.current.history.length;
+    const id = result.current.attackTally[0].id;
+    // The refinement writes directly — undoing the parent recordAttack drops the
+    // whole row, so the damage write is never independently undoable.
+    act(() => { result.current.setTallyDamage(id, 9); });
+    expect(result.current.history).toHaveLength(historyLen);
   });
 
   it("setTallyAttackTotal overrides a row's to-hit total by id, preserving nat flags + verdict", () => {
@@ -584,9 +587,8 @@ describe("attack tally", () => {
   });
 });
 
-// ── Per-source tally clearing (#813) ──────────────────────────────────────────
-// action + bonusAction rows coexist in one tally; entering each mode clears only
-// its own rows, endTurn clears both.
+// Per-source tally clearing (#813): action + bonusAction rows coexist in one
+// tally; entering each mode clears only its own rows, endTurn clears both.
 
 describe("per-source tally clearing (#813)", () => {
   const OFF = { formId: "off", formName: "Dagger (off-hand)", attack: { total: 14, keptFace: 9, nat20: false, nat1: false } };
@@ -632,8 +634,6 @@ describe("per-source tally clearing (#813)", () => {
     expect(hook.result.current.attackTally.map((r) => r.source)).toEqual(["action"]);
   });
 });
-
-// ── Bonus action / TWF ────────────────────────────────────────────────────────
 
 describe("bonus action and TWF", () => {
   function inActiveTurn() {
@@ -730,8 +730,6 @@ describe("bonus action and TWF", () => {
   });
 });
 
-// ── Reaction ──────────────────────────────────────────────────────────────────
-
 describe("reaction", () => {
   it("consumeReaction → reactionUsed:true", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
@@ -772,8 +770,7 @@ describe("reaction", () => {
   });
 });
 
-// ── Undo (#730) ───────────────────────────────────────────────────────────────
-
+// Turn-scoped undo (#730).
 describe("turn-scoped undo", () => {
   function inActiveTurn(character = makeCharacter()) {
     const hook = renderHook(() => useTurnState(character, SESSION_ID));
@@ -884,8 +881,6 @@ describe("turn-scoped undo", () => {
   });
 });
 
-// ── Spell commits ─────────────────────────────────────────────────────────────
-
 describe("spell commits", () => {
   function inActiveTurn() {
     const hook = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
@@ -926,8 +921,6 @@ describe("spell commits", () => {
     expect(result.current.reactionUsed).toBe(true);
   });
 });
-
-// ── Persistence ───────────────────────────────────────────────────────────────
 
 describe("localStorage persistence", () => {
   const STORAGE_KEY = `cs:turn:${SESSION_ID}`;
@@ -1113,7 +1106,7 @@ describe("localStorage persistence", () => {
   });
 });
 
-// ── Durable-buff turn-hook window (#457) ──────────────────────────────────────
+// Durable-buff turn-hook window (#457).
 
 /** Character with a current-HP value, for the damage watcher. */
 function withHp(current: number): Character {
@@ -1202,5 +1195,33 @@ describe("turn-hook activity window (#457)", () => {
     expect(result.current.tookDamageThisTurn).toBe(true);
     act(() => { result.current.startTurn(); });    // my next turn begins
     expect(result.current.tookDamageThisTurn).toBe(true); // ← survives (was the bug)
+  });
+});
+
+describe("nullable sessionId (workspace provider, #959)", () => {
+  it("returns null when there is no live joined session", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), null));
+    expect(result.current).toBeNull();
+  });
+
+  it("re-hydrates on null → id (session goes live) and tears down on id → null", () => {
+    // Seed a persisted in-combat snapshot for the session about to go live.
+    localStorage.setItem("cs:turn:s-live", JSON.stringify({ inCombat: true, round: 2 }));
+    const { result, rerender } = renderHook(
+      ({ sid }: { sid: string | null }) => useTurnState(makeCharacter(), sid),
+      { initialProps: { sid: null as string | null } },
+    );
+    expect(result.current).toBeNull();
+
+    // Session goes live: the re-hydration effect loads the snapshot (the lazy
+    // initializer only ran on mount, when sessionId was null).
+    rerender({ sid: "s-live" });
+    expect(result.current).not.toBeNull();
+    expect(result.current?.inCombat).toBe(true);
+    expect(result.current?.round).toBe(2);
+
+    // Session ends: back to null.
+    rerender({ sid: null });
+    expect(result.current).toBeNull();
   });
 });

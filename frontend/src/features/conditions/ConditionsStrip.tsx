@@ -2,10 +2,10 @@
  * ConditionsStrip — the character's active status-condition chips plus an
  * exhaustion stepper and an inline "add condition" panel, in a Card shell. The
  * interactive innards (and the applyConditionTransactions / busy / error logic)
- * live in ConditionsSheetBody, shared with the mobile CompactConditionsBar sheet.
+ * live in ConditionsSheetBody, shared with the live-Combat CombatUtilityStrip.
  *
- * On the character sheet it's mounted on the Combat tab; on the session page it's
- * the desktop (md+) form, with CompactConditionsBar taking mobile.
+ * It's the desktop conditions card mounted on the static Combat tab; the
+ * live-play equivalent is the one-line CombatUtilityStrip.
  */
 
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";

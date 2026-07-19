@@ -7,8 +7,8 @@ import { configureTextBuilder } from "troika-three-text";
  * Why (#408): troika's default worker is created from a `blob:` URL and then calls
  * `importScripts(blob:…)` to rehydrate its module. `importScripts` is governed by the
  * CSP `script-src` directive — NOT `worker-src` — and our single-origin CSP
- * deliberately keeps `blob:` out of `script-src` (see backend/src/lib/security.ts +
- * security.test.ts, #150/#151). So the worker fails ("worker module init function
+ * deliberately keeps `blob:` out of `script-src` (see the backend CSP config +
+ * its security tests, #150/#151). So the worker fails ("worker module init function
  * failed to rehydrate"), `<Text>` suspends forever, and any scene relying on it
  * (the ability-score dice roller) never completes. Running text on the main thread
  * removes the only worker/`importScripts` path — no CSP loosening required.

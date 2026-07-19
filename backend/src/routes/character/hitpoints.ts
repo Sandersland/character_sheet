@@ -2,15 +2,14 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { applyHitPointOperations, InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
+import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 export const hitPointsRouter = Router({ mergeParams: true });
 
-// ---- Per-op Zod schemas ---- (discriminated on `type`) --------------------
-
+// Per-op Zod schemas, discriminated on `type`.
 const damageOpSchema = z.object({
   type: z.literal("damage"),
   amount: z.number().int().positive(),
@@ -47,7 +46,7 @@ const longRestOpSchema = z.object({
 // `roll` is optional in Zod — the lib validates it's present and in-range
 // when method === "roll". `target` (issue #124) chooses which class advances;
 // omitted keeps the backward-compatible position-0 self-heal.
-const levelUpTargetSchema = z.discriminatedUnion("kind", [
+export const levelUpTargetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("existing"), classEntryId: z.string().min(1) }),
   z.object({ kind: z.literal("new"), classId: z.string().min(1) }),
 ]);
@@ -94,8 +93,6 @@ const hpRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-// ---- Route ----------------------------------------------------------------
-
 hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
@@ -107,21 +104,12 @@ hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
     return;
   }
 
-  let concentrationChecks: Awaited<
-    ReturnType<typeof applyHitPointOperations>
-  >["concentrationChecks"] = [];
-  try {
-    ({ concentrationChecks } = await applyHitPointOperations(
-      req.params.id,
-      parseResult.data.operations,
-    ));
-  } catch (error) {
-    if (error instanceof InvalidHitPointOperationError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
+  // InvalidHitPointOperationError carries status 400, so an invalid op flows to
+  // the central `errorHandler` — no route-local try/catch needed.
+  const { concentrationChecks } = await applyHitPointOperations(
+    req.params.id,
+    parseResult.data.operations,
+  );
 
   const updated = await prisma.character.findUnique({
     where: { id: req.params.id },

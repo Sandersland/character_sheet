@@ -37,11 +37,15 @@ import type {
   JournalEntryKind,
   InventoryOperation,
   Item,
+  LevelUpPlanResponse,
+  LevelUpSubmission,
+  LevelUpTarget,
   ManeuverOperation,
   ManeuverCastResult,
   ReferenceData,
   ResourceOperation,
   Session,
+  SessionDoorwayState,
   SpellcastingOperation,
 } from "@/types/character";
 import type { AuthProviderInfo, AuthUser } from "@/types/auth";
@@ -100,7 +104,9 @@ const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
 // full updated Character. Every uniform domain funnels through here — the only
 // per-domain differences are the URL segment and the error label. (applyHitPoint-
 // Operations and applyExperienceOperations deliberately don't use this: HP unwraps
-// { character, concentrationChecks } and XP threads an optional sessionId.)
+// { character, concentrationChecks } and XP threads an optional sessionId.
+// submitLevelUp doesn't either: its body is the structured LevelUpSubmission
+// itself, not an { operations } batch.)
 async function postTransactions<TOp>(
   characterId: string,
   domain: string,
@@ -113,8 +119,6 @@ async function postTransactions<TOp>(
     errorLabel,
   );
 }
-
-// ── Auth ────────────────────────────────────────────────────────────────────
 
 // The enabled sign-in providers — drives the login screen's buttons (data-driven
 // so adding a provider server-side needs no frontend change). Public endpoint.
@@ -268,8 +272,8 @@ export async function applyChannelDivinityTransactions(
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
-// several stacks at once) is a batch of several — see backend's
-// lib/inventory/inventory.ts for the atomicity/ledger semantics.
+// several stacks at once) is a batch of several — see backend
+// applyInventoryOperations for the atomicity/ledger semantics.
 export async function applyInventoryTransactions(
   characterId: string,
   operations: InventoryOperation[]
@@ -300,8 +304,7 @@ export async function deleteCharacter(id: string): Promise<void> {
   await send(`/characters/${id}`, { method: "DELETE" }, `Failed to delete character ${id}`);
 }
 
-// ── Journal CRUD ─────────────────────────────────────────────────────────────
-// Plain REST (no transaction/op batching) — journal entries carry no mechanical
+// Journal CRUD. Plain REST (no transaction/op batching) — journal entries carry no mechanical
 // effect, so they aren't routed through the audit log. Each call returns the
 // full updated Character so the caller can swap its state in one assignment.
 
@@ -457,6 +460,38 @@ export async function applyAdvancementTransactions(
   return postTransactions(characterId, "advancement", operations, "Failed to apply advancement operations");
 }
 
+// The derived level-up ceremony plan (#886): resolved target + ordered steps.
+// `subclassId` triggers the server-side re-plan for a not-yet-committed subclass
+// pick. Read-only — nothing is mutated.
+export async function fetchLevelUpPlan(
+  characterId: string,
+  target: LevelUpTarget,
+  subclassId?: string,
+): Promise<LevelUpPlanResponse> {
+  const params = new URLSearchParams();
+  if (target.kind === "existing") params.set("classEntryId", target.classEntryId);
+  else params.set("classId", target.classId);
+  if (subclassId) params.set("subclassId", subclassId);
+  return request<LevelUpPlanResponse>(
+    `/characters/${characterId}/level-up/plan?${params.toString()}`,
+    undefined,
+    "Failed to fetch level-up plan",
+  );
+}
+
+// Commits one whole level-up ceremony atomically. The submission is the body
+// verbatim (see the postTransactions note above); returns the leveled Character.
+export async function submitLevelUp(
+  characterId: string,
+  submission: LevelUpSubmission,
+): Promise<Character> {
+  return request<Character>(
+    `/characters/${characterId}/level-up/transactions`,
+    jsonBody(submission),
+    "Failed to apply level-up",
+  );
+}
+
 // Reverts the most-recent non-reverted batch (LIFO undo). Returns the updated
 // character if the revert succeeds, or throws with a human-readable message
 // (409 if the batch isn't the most recent, or it's already reverted).
@@ -470,8 +505,6 @@ export async function revertBatch(
     "Failed to revert batch",
   );
 }
-
-// ── Actions ───────────────────────────────────────────────────────────────────
 
 // Applies a batch of action operations atomically via the Phase-C orchestrator:
 // each action's effect function (spend resource, consume item, heal, etc.) runs
@@ -491,9 +524,8 @@ export async function applyActionTransactions(
   );
 }
 
-// ── Campaigns (#246) ──────────────────────────────────────────────────────────
-// Plain REST: list/create/join/attach. The attach call returns the full updated
-// Character (same shape as every character-mutating endpoint).
+// Campaigns (#246). Plain REST: list/create/join/attach. The attach call returns
+// the full updated Character (same shape as every character-mutating endpoint).
 
 export async function fetchCampaigns(): Promise<Campaign[]> {
   return request<Campaign[]>("/campaigns", undefined, "Failed to fetch campaigns");
@@ -522,11 +554,10 @@ export async function addCharacterToCampaign(
   );
 }
 
-// ── Campaign entities & @-tagging (#248) ───────────────────────────────────────
-// Plain REST. Search/list is campaign-scoped; create/edit are any-member; delete
-// is OWNER-only (server-enforced). Backlinks come pre-filtered server-side to the
-// caller's own notes plus other members' CAMPAIGN-shared ones (#838), so no
-// client-side visibility logic is needed.
+// Campaign entities & @-tagging (#248). Plain REST. Search/list is campaign-scoped;
+// create/edit are any-member; delete is OWNER-only (server-enforced). Backlinks come
+// pre-filtered server-side to the caller's own notes plus other members' CAMPAIGN-
+// shared ones (#838), so no client-side visibility logic is needed.
 
 export async function fetchEntities(
   campaignId: string,
@@ -625,9 +656,9 @@ export async function fetchEntityActivity(
   );
 }
 
-// ── Entity identity merges (#387) ─────────────────────────────────────────────
-// Owner-only writes (prepare/execute/unmerge). The list is scrubbed server-side:
-// a non-owner only ever receives EXECUTED merges between revealed identities.
+// Entity identity merges (#387). Owner-only writes (prepare/execute/unmerge). The
+// list is scrubbed server-side: a non-owner only ever receives EXECUTED merges
+// between revealed identities.
 
 export async function fetchEntityMerges(campaignId: string): Promise<CampaignEntityMerge[]> {
   return request<CampaignEntityMerge[]>(
@@ -667,10 +698,10 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
   );
 }
 
-// ── Campaign items (#380) ───────────────────────────────────────────────────────
-// Owner-only CRUD (list/create/update/delete). fetchCampaignItemByEntity is the
-// member-readable Codex read, keyed by the fronting entity — non-owners get it
-// only when that entity is revealed, and never see dmNotes (scrubbed server-side).
+// Campaign items (#380). Owner-only CRUD (list/create/update/delete).
+// fetchCampaignItemByEntity is the member-readable Codex read, keyed by the fronting
+// entity — non-owners get it only when that entity is revealed, and never see
+// dmNotes (scrubbed server-side).
 
 export async function fetchCampaignItems(campaignId: string): Promise<CampaignItem[]> {
   return request<CampaignItem[]>(`/campaigns/${campaignId}/items`, undefined, "Failed to fetch campaign items");
@@ -741,8 +772,6 @@ export async function revokeCampaignItem(
   );
 }
 
-// ── Sessions ──────────────────────────────────────────────────────────────────
-
 /** Start a shared campaign session with the given character as first participant. */
 export async function startCampaignSession(
   campaignId: string,
@@ -753,6 +782,35 @@ export async function startCampaignSession(
     `/campaigns/${campaignId}/sessions`,
     jsonBody({ characterId, title }),
     "Failed to start session",
+  );
+}
+
+// Solo sessions (#1082) live on the character, not a campaign — a campaign-less
+// character starts/ends its own private session through these character-scoped
+// routes (#1081). Same response shapes as the campaign start/end so the shared
+// doorway + lifecycle plumbing branches only on which call to make.
+
+/** Start a solo (campaign-less) session for a character. */
+export async function startSoloSession(
+  characterId: string,
+  title?: string,
+): Promise<{ session: Session; character: Character }> {
+  return request<{ session: Session; character: Character }>(
+    `/characters/${characterId}/sessions`,
+    jsonBody({ title }),
+    "Failed to start session",
+  );
+}
+
+/** End a solo session by id. */
+export async function endSoloSession(
+  characterId: string,
+  sessionId: string,
+): Promise<{ session: Session }> {
+  return request<{ session: Session }>(
+    `/characters/${characterId}/sessions/${sessionId}/end`,
+    { method: "POST" },
+    "Failed to end session",
   );
 }
 
@@ -804,11 +862,11 @@ export async function fetchSessions(characterId: string): Promise<Session[]> {
   return request<Session[]>(`/characters/${characterId}/sessions`, undefined, "Failed to fetch sessions");
 }
 
-// ── Journal chronicle (#863/#864) ─────────────────────────────────────────────
-// The read model behind the field-chronicle page: the campaign's arcs ("parts")
-// and its sessions ("chapters") with derived sessionNumber + this character's
-// per-session noteCount. A member sees every session of their campaign; passing a
-// characterId that isn't the caller's own 403s server-side.
+// Journal chronicle (#863/#864). The read model behind the field-chronicle page:
+// the campaign's arcs ("parts") and its sessions ("chapters") with derived
+// sessionNumber + this character's per-session noteCount. A member sees every
+// session of their campaign; passing a characterId that isn't the caller's own
+// 403s server-side.
 
 /** The campaign's arcs / "parts", ordered by position asc (story order). */
 export async function fetchCampaignArcs(campaignId: string): Promise<CampaignArc[]> {
@@ -854,6 +912,18 @@ export async function fetchActiveSession(characterId: string): Promise<Session |
     `/characters/${characterId}/sessions/active`,
     undefined,
     "Failed to fetch active session",
+  );
+}
+
+/**
+ * Get the sheet's session-doorway state (#942) — the one state-aware fact set the
+ * SessionDoorway bar renders. Solo characters get `campaignId: null` (bar absent).
+ */
+export async function fetchSessionDoorway(characterId: string): Promise<SessionDoorwayState> {
+  return request<SessionDoorwayState>(
+    `/characters/${characterId}/sessions/doorway`,
+    undefined,
+    "Failed to fetch session doorway",
   );
 }
 

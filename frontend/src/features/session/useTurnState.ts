@@ -23,7 +23,7 @@
  *   - `consumeReaction()` can be called at any time (during your turn or between turns).
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useReducer, useMemo, useEffect, useRef } from "react";
 import { canTwoWeaponFight } from "@/lib/turnRules";
 import { autoVerdict } from "@/lib/attackTallySummary";
 import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
@@ -52,8 +52,6 @@ function nextRowId(): string {
   rowIdSeq += 1;
   return `tally-${Date.now().toString(36)}-${rowIdSeq}`;
 }
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type TurnPhase = "idle" | "active";
 
@@ -252,8 +250,6 @@ export type TurnStateView = TurnState &
     twfAvailable: boolean;
   };
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
 function initialState(): TurnState {
   return {
     inCombat: false,
@@ -307,9 +303,8 @@ function backfillRows(rows: AttackTallyRow[] | undefined): AttackTallyRow[] {
   return (rows ?? []).map((r) => ({ ...r, id: r.id ?? nextRowId(), source: r.source ?? "action" }));
 }
 
-// ── Pure state transitions ────────────────────────────────────────────────────
-// Module-scope, one per economy mutation. A `return s` no-op means `mutate`
-// pushes nothing onto the undo stack (guards stay history-free).
+// Pure state transitions: module-scope, one per economy mutation. A `return s`
+// no-op means `mutate` pushes nothing onto the undo stack (guards stay history-free).
 
 const consumeActionState = (s: TurnState): TurnState =>
   s.actionsRemaining <= 0 ? s : { ...s, actionsRemaining: s.actionsRemaining - 1, attack: null };
@@ -535,29 +530,217 @@ function endTurnState(s: TurnState): TurnState {
   };
 }
 
-// The cognitive score here counts the hook's ~24 delegating useCallback closures,
-// one per TurnStateActions member — all real branching lives in the module-level
-// pure transition functions above (each individually under the ceilings).
-// fallow-ignore-next-line complexity
-export function useTurnState(character: Character, sessionId: string): TurnStateView {
-  const [state, setState] = useState<TurnState>(() => {
-    // Lazily hydrate; merge over defaults so a stale-schema snapshot missing a
-    // newer field (e.g. history, pre-#730) backfills its current default (#750).
-    const loaded = loadTurnState(sessionId);
-    return loaded ? hydrateTurnState(loaded) : initialState();
-  });
+// Remaining transitions extracted for the reducer (#967).
+function startCombatState(): TurnState {
+  return {
+    inCombat: true,
+    round: 1,
+    phase: "idle",
+    actionsRemaining: 0,
+    bonusActionUsed: false,
+    reactionUsed: false,
+    attack: null,
+    bonusAttack: null,
+    attackTally: [],
+    spellCastThisTurn: {},
+    attackedThisTurn: false,
+    tookDamageThisTurn: false,
+    history: [],
+  };
+}
+
+// Begin the turn. Deliberately does NOT reset attackedThisTurn/tookDamageThisTurn
+// (cleared in endTurn) so damage/attacks between your turns carry into the
+// auto-end check. The HP-drop baseline sync (`prevHpRef`) is a side effect kept
+// in the dispatch wrapper — the reducer stays pure.
+function startTurnState(s: TurnState): TurnState {
+  return {
+    ...s,
+    phase: "active",
+    actionsRemaining: 1,
+    bonusActionUsed: false,
+    reactionUsed: false, // reaction resets at start of YOUR turn
+    attack: null,
+    bonusAttack: null,
+    attackTally: [],
+    spellCastThisTurn: {},
+    history: [], // undo never reaches across turns
+  };
+}
+
+function commitActionSpellState(s: TurnState, spellLevel: number): TurnState {
+  const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
+  return {
+    ...s,
+    actionsRemaining: Math.max(0, s.actionsRemaining - 1),
+    attack: null,
+    spellCastThisTurn: { ...s.spellCastThisTurn, action: kind },
+  };
+}
+
+function commitBonusActionSpellState(s: TurnState, spellLevel: number): TurnState {
+  const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
+  return {
+    ...s,
+    bonusActionUsed: true,
+    bonusAttack: null,
+    spellCastThisTurn: { ...s.spellCastThisTurn, bonus: kind },
+  };
+}
+
+// Reducer: actions-as-data over the pure transitions above (#967).
+// Collapses the former ~24 delegating useCallbacks into one stable dispatch.
+// Every real transition still lives in a module-level pure fn; the reducer only
+// routes an action to its handler and — for the CONSUMING actions — pushes the
+// pre-mutation economy snapshot onto the undo stack, exactly reproducing the old
+// `mutate` wrapper (push iff the transition changed state, so no-op guards stay
+// history-free). Lifecycle actions reset history; tally refinements + meta ops
+// write through untouched. This is the seam a future server-pushed combat event
+// (DM view / multiplayer) dispatches into — a remote event is the same action.
+
+type TurnAction =
+  // Lifecycle — reset history, never push a snapshot.
+  | { type: "startCombat" }
+  | { type: "endCombat" }
+  | { type: "startTurn" }
+  | { type: "endTurn" }
+  // Consuming — push a pre-mutation snapshot iff the transition changes state.
+  | { type: "consumeAction" }
+  | { type: "enterAttackMode"; attacksPerAction: number }
+  | { type: "recordAttack"; recorded?: RecordedAttack }
+  | { type: "cancelAttack" }
+  | { type: "finishAttack" }
+  | { type: "consumeBonusAction" }
+  | { type: "enterTwfMode" }
+  | { type: "recordTwfAttack"; recorded?: RecordedAttack }
+  | { type: "cancelTwf" }
+  | { type: "consumeReaction" }
+  | { type: "grantExtraAction" }
+  | { type: "commitActionSpell"; spellLevel: number }
+  | { type: "commitBonusActionSpell"; spellLevel: number }
+  // Non-undoable tally refinements — write through, never push.
+  | { type: "setTallyDamage"; rowId: string; damage: number }
+  | { type: "setTallyDamageAt"; index: number; damage: number }
+  | { type: "setTallyAttackTotal"; rowId: string; total: number }
+  | { type: "addTallyDamageRider"; rowId: string; amount: number }
+  | { type: "setTallyVerdict"; index: number; verdict: TallyVerdict | undefined }
+  | { type: "clearAttackTally" }
+  // Meta / effect-driven — write through, never push.
+  | { type: "attachBatchId"; batchId: string }
+  | { type: "undo" }
+  | { type: "markDamageTaken" }
+  | { type: "hydrate"; state: TurnState };
+
+// The action types whose transition pushes an undo snapshot (the former `mutate`
+// callers). refundAction and commitReactionSpell are facade aliases that dispatch
+// grantExtraAction / consumeReaction, so they inherit the push behavior.
+const CONSUMING: ReadonlySet<TurnAction["type"]> = new Set([
+  "consumeAction",
+  "enterAttackMode",
+  "recordAttack",
+  "cancelAttack",
+  "finishAttack",
+  "consumeBonusAction",
+  "enterTwfMode",
+  "recordTwfAttack",
+  "cancelTwf",
+  "consumeReaction",
+  "grantExtraAction",
+  "commitActionSpell",
+  "commitBonusActionSpell",
+]);
+
+// One handler per action, each narrowed to its member via key remapping. A flat
+// table keeps the router at cyclomatic 1 (a 28-case switch would breach the
+// ceiling).
+type TurnActionHandlers = {
+  [K in TurnAction as K["type"]]: (s: TurnState, action: K) => TurnState;
+};
+
+const HANDLERS: TurnActionHandlers = {
+  startCombat: () => startCombatState(),
+  endCombat: () => initialState(),
+  startTurn: (s) => startTurnState(s),
+  endTurn: (s) => endTurnState(s),
+  consumeAction: (s) => consumeActionState(s),
+  enterAttackMode: (s, a) => enterAttackModeState(s, a.attacksPerAction),
+  recordAttack: (s, a) => recordAttackState(s, a.recorded),
+  cancelAttack: (s) => cancelAttackState(s),
+  finishAttack: (s) => finishAttackState(s),
+  consumeBonusAction: (s) => consumeBonusActionState(s),
+  enterTwfMode: (s) => enterTwfModeState(s),
+  recordTwfAttack: (s, a) => recordTwfAttackState(s, a.recorded),
+  cancelTwf: (s) => cancelTwfState(s),
+  consumeReaction: (s) => consumeReactionState(s),
+  grantExtraAction: (s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }),
+  commitActionSpell: (s, a) => commitActionSpellState(s, a.spellLevel),
+  commitBonusActionSpell: (s, a) => commitBonusActionSpellState(s, a.spellLevel),
+  setTallyDamage: (s, a) => setTallyDamageState(s, a.rowId, a.damage),
+  setTallyDamageAt: (s, a) => setTallyDamageAtState(s, a.index, a.damage),
+  setTallyAttackTotal: (s, a) => setTallyAttackTotalState(s, a.rowId, a.total),
+  addTallyDamageRider: (s, a) => addTallyDamageRiderState(s, a.rowId, a.amount),
+  setTallyVerdict: (s, a) => setTallyVerdictState(s, a.index, a.verdict),
+  clearAttackTally: (s) => clearAttackTallyState(s),
+  attachBatchId: (s, a) => attachBatchIdState(s, a.batchId),
+  undo: (s) => undoState(s),
+  markDamageTaken: (s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }),
+  hydrate: (_s, a) => a.state,
+};
+
+function turnReducer(state: TurnState, action: TurnAction): TurnState {
+  const handler = HANDLERS[action.type] as (s: TurnState, a: TurnAction) => TurnState;
+  const next = handler(state, action);
+  // CONSUMING actions push a pre-mutation snapshot — but only when the transition
+  // actually changed state (no-op guards stay history-free), matching old `mutate`.
+  if (next !== state && CONSUMING.has(action.type)) {
+    return { ...next, history: [...state.history, economyOf(state)] };
+  }
+  return next;
+}
+
+function hydrateOrInit(sessionId: string | null): TurnState {
+  const loaded = sessionId ? loadTurnState(sessionId) : null;
+  return loaded ? hydrateTurnState(loaded) : initialState();
+}
+
+export function useTurnState(character: Character, sessionId: string): TurnStateView;
+export function useTurnState(character: Character, sessionId: string | null): TurnStateView | null;
+// A null sessionId means "no live joined session" (#959): the hook still runs
+// every hook unconditionally but returns null, so the single TurnStateProvider
+// instance can hold a null value off-combat without violating rules-of-hooks.
+export function useTurnState(character: Character, sessionId: string | null): TurnStateView | null {
+  // Lazily hydrate (merge over defaults so a stale-schema snapshot backfills a
+  // newer field, e.g. history pre-#730, #750). `dispatch` is stable for #967.
+  const [state, dispatch] = useReducer(turnReducer, sessionId, hydrateOrInit);
+
+  // Re-hydrate when the session identity changes — a session may go live (null →
+  // id) or end (id → null) while the sheet stays mounted, and the lazy
+  // initializer above only runs on first mount.
+  const prevSessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    if (prevSessionIdRef.current === sessionId) return;
+    prevSessionIdRef.current = sessionId;
+    dispatch({ type: "hydrate", state: hydrateOrInit(sessionId) });
+  }, [sessionId]);
 
   // Derived (not persisted): TWF eligibility follows the LIVE loadout, so a
   // mid-turn weapon swap updates the off-hand affordance immediately (#733).
   const twfAvailable = canTwoWeaponFight(character.inventory, character.resources?.fightingStyle);
 
-  // Server-derived, multiclass-correct (max across classes); see srd.ts.
+  // Server-derived, multiclass-correct (max across classes); see srd.ts. Mirrored
+  // into refs so the action facade stays a stable, dependency-free useMemo while
+  // still dispatching the latest per-render values (#967).
   const attacksPerAction = character.attacksPerAction;
   const currentHp = character.hitPoints?.current ?? 0;
+  const attacksPerActionRef = useRef(attacksPerAction);
+  attacksPerActionRef.current = attacksPerAction;
+  const currentHpRef = useRef(currentHp);
+  currentHpRef.current = currentHp;
 
-  // Persist state to localStorage whenever it changes.
+  // Persist state to localStorage whenever it changes — a no-op while there is
+  // no live session (null sessionId).
   useEffect(() => {
-    saveTurnState(sessionId, state);
+    if (sessionId) saveTurnState(sessionId, state);
   }, [sessionId, state]);
 
   // Watch current HP: any drop marks damage taken (feeds the durable-buff
@@ -569,214 +752,55 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   // Heals and non-HP updates are ignored.
   const prevHpRef = useRef(currentHp);
   useEffect(() => {
-    if (currentHp < prevHpRef.current) {
-      setState((s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }));
-    }
+    if (currentHp < prevHpRef.current) dispatch({ type: "markDamageTaken" });
     prevHpRef.current = currentHp;
   }, [currentHp]);
 
-  const startCombat = useCallback(() => {
-    setState({
-      inCombat: true,
-      round: 1,
-      phase: "idle",
-      actionsRemaining: 0,
-      bonusActionUsed: false,
-      reactionUsed: false,
-      attack: null,
-      bonusAttack: null,
-      attackTally: [],
-      spellCastThisTurn: {},
-      attackedThisTurn: false,
-      tookDamageThisTurn: false,
-      history: [],
-    });
-  }, []);
+  // The TurnStateActions facade — a stable useMemo over the stable `dispatch`
+  // (#967). Every callback is the same named affordance components already use;
+  // per-render values (currentHp for the startTurn HP-drop baseline sync,
+  // attacksPerAction for the Extra-Attack counter) are read from refs so the
+  // facade never needs rebuilding. Aliases (refundAction, commitReactionSpell)
+  // dispatch grantExtraAction / consumeReaction, preserving their old behavior.
+  const actions = useMemo<TurnStateActions>(
+    () => ({
+      startCombat: () => dispatch({ type: "startCombat" }),
+      endCombat: () => dispatch({ type: "endCombat" }),
+      startTurn: () => {
+        prevHpRef.current = currentHpRef.current;
+        dispatch({ type: "startTurn" });
+      },
+      endTurn: () => dispatch({ type: "endTurn" }),
+      consumeAction: () => dispatch({ type: "consumeAction" }),
+      enterAttackMode: () =>
+        dispatch({ type: "enterAttackMode", attacksPerAction: attacksPerActionRef.current }),
+      recordAttack: (recorded) => dispatch({ type: "recordAttack", recorded }),
+      setTallyDamage: (rowId, damage) => dispatch({ type: "setTallyDamage", rowId, damage }),
+      setTallyDamageAt: (index, damage) => dispatch({ type: "setTallyDamageAt", index, damage }),
+      setTallyAttackTotal: (rowId, total) => dispatch({ type: "setTallyAttackTotal", rowId, total }),
+      addTallyDamageRider: (rowId, amount) => dispatch({ type: "addTallyDamageRider", rowId, amount }),
+      setTallyVerdict: (index, verdict) => dispatch({ type: "setTallyVerdict", index, verdict }),
+      clearAttackTally: () => dispatch({ type: "clearAttackTally" }),
+      cancelAttack: () => dispatch({ type: "cancelAttack" }),
+      finishAttack: () => dispatch({ type: "finishAttack" }),
+      consumeBonusAction: () => dispatch({ type: "consumeBonusAction" }),
+      enterTwfMode: () => dispatch({ type: "enterTwfMode" }),
+      recordTwfAttack: (recorded) => dispatch({ type: "recordTwfAttack", recorded }),
+      cancelTwf: () => dispatch({ type: "cancelTwf" }),
+      consumeReaction: () => dispatch({ type: "consumeReaction" }),
+      grantExtraAction: () => dispatch({ type: "grantExtraAction" }),
+      refundAction: () => dispatch({ type: "grantExtraAction" }),
+      commitActionSpell: (spellLevel) => dispatch({ type: "commitActionSpell", spellLevel }),
+      commitBonusActionSpell: (spellLevel) => dispatch({ type: "commitBonusActionSpell", spellLevel }),
+      commitReactionSpell: () => dispatch({ type: "consumeReaction" }),
+      attachBatchId: (batchId) => dispatch({ type: "attachBatchId", batchId }),
+      undo: () => dispatch({ type: "undo" }),
+    }),
+    [],
+  );
 
-  const endCombat = useCallback(() => {
-    setState(initialState());
-  }, []);
+  // No live joined session → no turn tracker. Every hook above still ran.
+  if (sessionId === null) return null;
 
-  const startTurn = useCallback(() => {
-    // Keep the HP-drop baseline current (the watcher also syncs it on every HP
-    // change). Deliberately does NOT reset attackedThisTurn/tookDamageThisTurn —
-    // those are cleared in endTurn so damage/attacks between your turns carry
-    // into this turn's auto-end check.
-    prevHpRef.current = currentHp;
-    setState((s) => ({
-      ...s,
-      phase: "active",
-      actionsRemaining: 1,
-      bonusActionUsed: false,
-      reactionUsed: false, // reaction resets at start of YOUR turn
-      attack: null,
-      bonusAttack: null,
-      attackTally: [],
-      spellCastThisTurn: {},
-      history: [], // undo never reaches across turns
-    }));
-  }, [currentHp]);
-
-  const endTurn = useCallback(() => {
-    setState(endTurnState);
-  }, []);
-
-  // Wrap an economy mutation so a pre-mutation snapshot is pushed onto the undo
-  // stack (#730) — but only when the mutation actually changes state, so no-op
-  // guards (`return s`) push nothing.
-  const mutate = useCallback((fn: (s: TurnState) => TurnState) => {
-    setState((s) => {
-      const next = fn(s);
-      if (next === s) return s;
-      return { ...next, history: [...s.history, economyOf(s)] };
-    });
-  }, []);
-
-  const consumeAction = useCallback(() => {
-    mutate(consumeActionState);
-  }, [mutate]);
-
-  const enterAttackMode = useCallback(() => {
-    mutate((s) => enterAttackModeState(s, attacksPerAction));
-  }, [attacksPerAction, mutate]);
-
-  const recordAttack = useCallback((recorded?: RecordedAttack) => {
-    mutate((s) => recordAttackState(s, recorded));
-  }, [mutate]);
-
-  // Damage/verdict refinements are NOT undoable on their own — undoing the parent
-  // recordAttack drops the whole row (tally is in the economy snapshot), so these
-  // write directly rather than through `mutate`.
-  const setTallyDamage = useCallback((rowId: string, damage: number) => {
-    setState((s) => setTallyDamageState(s, rowId, damage));
-  }, []);
-
-  const setTallyDamageAt = useCallback((index: number, damage: number) => {
-    setState((s) => setTallyDamageAtState(s, index, damage));
-  }, []);
-
-  const setTallyAttackTotal = useCallback((rowId: string, total: number) => {
-    setState((s) => setTallyAttackTotalState(s, rowId, total));
-  }, []);
-
-  const addTallyDamageRider = useCallback((rowId: string, amount: number) => {
-    setState((s) => addTallyDamageRiderState(s, rowId, amount));
-  }, []);
-
-  const setTallyVerdict = useCallback((index: number, verdict: TallyVerdict | undefined) => {
-    setState((s) => setTallyVerdictState(s, index, verdict));
-  }, []);
-
-  const clearAttackTally = useCallback(() => {
-    setState(clearAttackTallyState);
-  }, []);
-
-  const cancelAttack = useCallback(() => {
-    mutate(cancelAttackState);
-  }, [mutate]);
-
-  const finishAttack = useCallback(() => {
-    mutate(finishAttackState);
-  }, [mutate]);
-
-  const consumeBonusAction = useCallback(() => {
-    mutate(consumeBonusActionState);
-  }, [mutate]);
-
-  const enterTwfMode = useCallback(() => {
-    mutate(enterTwfModeState);
-  }, [mutate]);
-
-  const recordTwfAttack = useCallback((recorded?: RecordedAttack) => {
-    mutate((s) => recordTwfAttackState(s, recorded));
-  }, [mutate]);
-
-  const cancelTwf = useCallback(() => {
-    mutate(cancelTwfState);
-  }, [mutate]);
-
-  const consumeReaction = useCallback(() => {
-    mutate(consumeReactionState);
-  }, [mutate]);
-
-  const grantExtraAction = useCallback(() => {
-    mutate((s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }));
-  }, [mutate]);
-
-  // Refunding a mid-turn loadout swap returns the spent action (#733); the +1 is
-  // identical to granting an extra action, so alias it rather than duplicate.
-  // Note: like grantExtraAction it goes through `mutate`, so the +1 is pushed onto
-  // the undo history — a subsequent `undo()` can revert it while the server
-  // inventory stays swapped-back (undo is local-only, per its doc). Acceptable:
-  // only the rare swap→refund→undo sequence diverges, and the loadout Refund is
-  // the intended reversal surface, not undo.
-  const refundAction = grantExtraAction;
-
-  const commitActionSpell = useCallback((spellLevel: number) => {
-    const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
-    mutate((s) => ({
-      ...s,
-      actionsRemaining: Math.max(0, s.actionsRemaining - 1),
-      attack: null,
-      spellCastThisTurn: { ...s.spellCastThisTurn, action: kind },
-    }));
-  }, [mutate]);
-
-  const commitBonusActionSpell = useCallback((spellLevel: number) => {
-    const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
-    mutate((s) => ({
-      ...s,
-      bonusActionUsed: true,
-      bonusAttack: null,
-      spellCastThisTurn: { ...s.spellCastThisTurn, bonus: kind },
-    }));
-  }, [mutate]);
-
-  // Committing a reaction-slot spell spends the reaction exactly like any other
-  // reaction — identical to consumeReaction, so alias it rather than duplicate
-  // the guarded mutation.
-  const commitReactionSpell = consumeReaction;
-
-  // Tag the top history entry with the server batchId (#758). The click that
-  // consumed the slot pushed the entry synchronously, so the top entry is this
-  // action's; `busy` gates a concurrent second consuming click while send is in flight.
-  const attachBatchId = useCallback((batchId: string) => {
-    setState((s) => attachBatchIdState(s, batchId));
-  }, []);
-
-  const undo = useCallback(() => {
-    setState(undoState);
-  }, []);
-
-  return {
-    ...state,
-    twfAvailable,
-    startCombat,
-    endCombat,
-    startTurn,
-    endTurn,
-    consumeAction,
-    enterAttackMode,
-    recordAttack,
-    setTallyDamage,
-    setTallyDamageAt,
-    setTallyAttackTotal,
-    addTallyDamageRider,
-    setTallyVerdict,
-    clearAttackTally,
-    cancelAttack,
-    finishAttack,
-    consumeBonusAction,
-    enterTwfMode,
-    recordTwfAttack,
-    cancelTwf,
-    consumeReaction,
-    grantExtraAction,
-    refundAction,
-    commitActionSpell,
-    commitBonusActionSpell,
-    commitReactionSpell,
-    attachBatchId,
-    undo,
-  };
+  return { ...state, twfAvailable, ...actions };
 }

@@ -2,7 +2,7 @@
  * DisciplineRow — a single known elemental discipline with an expandable
  * description, a ki-scaling cast affordance, and Forget / Swap actions. Renders
  * through AbilityRowShell (shared with ManeuverRow/ShadowArtRow); the cast path
- * rolls through RollContext (→ RollResultToast), the same player-driven roll
+ * rolls through RollContext (→ RollResultSeal), the same player-driven roll
  * path as spell casting.
  */
 

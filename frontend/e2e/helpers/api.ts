@@ -32,6 +32,26 @@ export async function gotoSheet(
   await page.goto(`/characters/${id}${tab ? `?tab=${tab}` : ""}`);
 }
 
+// Land on the live Combat tab for a session persona. Not joined yet → click the
+// doorway (Start/Resume/Join). Already joined (a shared roster persona joined by
+// an earlier spec) → mobile keeps its live pill (aria-label "… go to fight"), so
+// click that; desktop dropped its under-tabs "Go to fight" strip (#1085), so fall
+// back to the Combat tab there. Either path lands the workspace on ?tab=combat.
+export async function enterLiveCombat(page: Page): Promise<void> {
+  const entry = page
+    .getByRole("button", { name: /(Start|Resume|Join) session|go to fight/i })
+    .first();
+  // Desktop-joined shows no entry button; the banner's End Session marks the state.
+  const joinedDesktop = page.getByRole("button", { name: /End Session/i }).first();
+  await expect(entry.or(joinedDesktop)).toBeVisible();
+  if (await entry.isVisible()) {
+    await entry.click();
+  } else {
+    await page.getByRole("tab", { name: /^Combat/ }).click();
+  }
+  await expect(page).toHaveURL(/[?&]tab=combat/);
+}
+
 // The Magic tab is two mutually-exclusive views: the record block (quick-cast +
 // slot pips) and the grimoire (full spellbook rows: prepare/cast/forget). The
 // spellbook rows live only in the grimoire — open it via "Manage spellbook →"

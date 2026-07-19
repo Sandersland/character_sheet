@@ -1,17 +1,19 @@
-/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
 /**
  * Sheet-scoped roll context: a single `RollProvider` at the `CharacterSheetPage`
  * / `SessionPage` level gives every child component access to `useRoll()`.
  *
- * Two roll paths share the same sticky advantage/disadvantage `mode`:
+ * Roll mode is strictly per-roll (#958): the roll surface pins `spec.mode` (the
+ * skill/save long-press menu or the attack sheet's own ADV/DIS control), else a
+ * roll is Normal. Two roll paths:
  * - `roll(spec, label)` — instant fast-roll (no 3D), used by the in-combat
  *   attack/damage/spell pickers which run their own logging.
  * - `rollAnimated(spec, label, log?)` — the sheet's skill/ability/save/
  *   initiative affordances. Honors the Dice-rolls preference (#945): `animated`
- *   plays the 3D `DiceRollModal` (which shows its own result at settle — no
- *   persistent toast), `quick` resolves instantly to the compact
- *   `RollResultToast` chip. Both log the roll (when `log` is set and a session
- *   is active) via `logRoll` and hand the settled result to `onSettled`.
+ *   plays the 3D `DiceRollModal` which, at settle, hands off to the shared
+ *   `RollResultSeal`; `quick` publishes the same seal instantly. Both log the
+ *   roll (when `log` is set and a session is active) via `logRoll` and hand the
+ *   settled result to `onSettled`.
  *
  * `logSessionRoll` is the shared best-effort logging path — a no-op outside an
  * active session — used by `rollAnimated` and directly by the concentration-save
@@ -86,9 +88,6 @@ interface RollContextValue {
   rollAnimated: (spec: RollSpec, label: string, log?: RollLog, onSettled?: (result: RollResult) => void) => void;
   /** Best-effort session-log emit — no-op outside an active session. */
   logSessionRoll: (input: RollLogInput) => void;
-  /** Sticky manual advantage/disadvantage applied to eligible d20 rolls. */
-  mode: RollMode;
-  setMode: (mode: RollMode) => void;
   /** State-driven advantage/disadvantage grants (#486) for resolveRollMode. */
   rollModifiers: RollModifier[];
 }
@@ -141,12 +140,8 @@ function useSessionRollLog({
 /** Mount once at page level to enable `useRoll` in all children. */
 export function RollProvider({ children, characterId, sessionId, onRollLogged, rollModifiers = [] }: RollProviderProps) {
   const [lastRoll, setLastRoll] = useState<RollEntry | null>(null);
-  const [mode, setMode] = useState<RollMode>("normal");
   const [pending, setPending] = useState<PendingRoll | null>(null);
   const idRef = useRef(0);
-  // Read live values inside stable callbacks without re-creating them per change.
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
   // Dice-roll presentation preference (#945): `quick` skips the 3D overlay.
   const { style } = useDiceRollStyle();
   const styleRef = useRef(style);
@@ -159,9 +154,10 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged, r
 
   const logSessionRoll = useSessionRollLog({ characterId, sessionId, onRollLogged });
 
-  // Callers may pin a spec's own mode; otherwise the sticky toggle applies.
+  // Roll mode is strictly per-roll now (#958): a caller pins `spec.mode` (from
+  // the roll surface's own ADV/DIS control), else the roll is Normal.
   const roll = useCallback((spec: RollSpec, label: string): RollResult => {
-    const result = rollSpec({ ...spec, mode: spec.mode ?? modeRef.current });
+    const result = rollSpec({ ...spec, mode: spec.mode ?? "normal" });
     setLastRoll({ id: ++idRef.current, label, result });
     return result;
   }, []);
@@ -181,13 +177,13 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged, r
     [logSessionRoll],
   );
 
-  // Resolve the sticky mode up front so both paths (and any logged rollMode)
-  // reflect advantage/disadvantage. `animated` plays the 3D overlay (its own
-  // result surface — no persistent toast); `quick` resolves instantly to the
-  // compact chip. Both log and hand back the settled result identically.
+  // Roll mode is per-roll (#958): the caller's `spec.mode` (from the roll
+  // surface's ADV/DIS control) wins, else Normal. `animated` plays the 3D
+  // overlay which settles into the seal; `quick` resolves instantly to the
+  // seal. Both log and hand back the settled result identically.
   const rollAnimated = useCallback(
     (spec: RollSpec, label: string, log?: RollLog, onSettled?: (result: RollResult) => void) => {
-      const resolvedSpec = { ...spec, mode: spec.mode ?? modeRef.current };
+      const resolvedSpec = { ...spec, mode: spec.mode ?? "normal" };
       if (styleRef.current === "quick") {
         const result = rollSpec(resolvedSpec);
         setLastRoll({ id: ++idRef.current, label, result });
@@ -200,20 +196,23 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged, r
     [logResult],
   );
 
-  // Fired when the 3D overlay's die settles: log it, then hand it back. The
-  // modal itself is the result surface in animated mode, so we intentionally do
-  // NOT setLastRoll here — only RollResultToast reads lastRoll, and firing it
-  // would double up the readout with the modal.
+  // Fired when the 3D overlay's die settles: log it, hand it back, then hand
+  // off to the shared result seal. The animated tumble is the animation; the
+  // seal is the payoff — publishing `lastRoll` here and unmounting the overlay
+  // makes the 3D tray "settle into" the same seal the quick path lands on
+  // (#956), one visual language instead of a modal-vs-toast split.
   const handleResult = useCallback((result: RollResult) => {
     const current = pendingRef.current;
     if (!current) return;
     logResult(current.spec, current.log, result);
     // Hand the settled roll back so the caller can apply the exact shown values.
     current.onSettled?.(result);
+    setLastRoll({ id: current.id, label: current.label, result });
+    setPending(null);
   }, [logResult]);
 
   return (
-    <RollContext.Provider value={{ lastRoll, roll, rollAnimated, logSessionRoll, mode, setMode, rollModifiers }}>
+    <RollContext.Provider value={{ lastRoll, roll, rollAnimated, logSessionRoll, rollModifiers }}>
       {children}
       {pending && (
         <Suspense fallback={null}>

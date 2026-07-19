@@ -1,6 +1,5 @@
 import { abilityModifier } from "@/lib/srd/math.js";
 
-// ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
 // Warlock uses Pact Magic (single-level slots, short-rest recharge) and Paladin/
@@ -162,7 +161,6 @@ const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number
   20: { 1: 4, 2: 3, 3: 3, 4: 1 },
 };
 
-// ── Caster fractions (multiclass) ─────────────────────────────────────────────
 // How much each class contributes to the combined multiclass caster level:
 // full = +level, half = +floor(level/2), third = +floor(level/3), pact = tracked
 // separately (never merged), none = non-caster. Third casters are keyed by
@@ -425,7 +423,6 @@ export function deriveSpellcasting(
   return null;
 }
 
-// ── Spells Known progression (level-up learning) ──────────────────────────────
 // Cumulative "Spells Known" counts by class level for the classes that LEARN a
 // fixed set on level-up (PHB Spells Known columns). Bard includes the Magical
 // Secrets +2 jumps at 10/14/18; Ranger follows the half-caster cadence (none
@@ -468,9 +465,27 @@ export function spellsGainedAtLevel(className: string, level: number): number {
   return Math.max(0, known(level) - known(level - 1));
 }
 
+/**
+ * Highest spell level a class can cast/scribe at `level` — the ceiling on spells
+ * learnable at level-up. Derived from the slot table (max slot level) rather than
+ * re-encoding thresholds; 0 when the class has no spellcasting yet (non-casters,
+ * a Ranger below level 2). Third-caster subclasses resolve via `subclass`.
+ */
+export function maxSpellLevelForClass(className: string, level: number, subclass?: string | null): number {
+  // Ability scores / proficiency don't affect slot LEVELS, so pass neutral values.
+  const derived = deriveSpellcasting(className, level, {}, 2, subclass ?? undefined);
+  if (!derived) return 0;
+  return derived.slotTotals.reduce((max, slot) => Math.max(max, slot.level), 0);
+}
+
 /** Whether a class learns new spells on level-up (known casters + Wizard's spellbook), per RAW. */
 export function learnsNewSpellsOnLevelUp(className: string, subclass?: string | null): boolean {
   const profile = casterProfile(className, subclass);
   if (!profile) return false;
   return profile.preparation === "known" || className.toLowerCase() === "wizard";
+}
+
+/** Whether a class knows a fixed spell set (may swap one on level-up, #1101); Wizard scribes, so is excluded. */
+export function isKnownCaster(className: string, subclass?: string | null): boolean {
+  return casterProfile(className, subclass)?.preparation === "known";
 }

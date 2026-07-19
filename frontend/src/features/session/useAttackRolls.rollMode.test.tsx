@@ -29,7 +29,7 @@ const entry: AttackEntry = {
   damageRiders: [],
 };
 
-function setup(rollModifiers: RollModifier[]) {
+function setup(rollModifiers: RollModifier[], manualMode: "normal" | "advantage" | "disadvantage" = "normal") {
   const roll = vi.fn((spec): RollResult => ({ dice: [{ value: 10, dropped: false }], modifier: spec.modifier ?? 0, total: 10, spec }));
   const noop = vi.fn();
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -47,6 +47,7 @@ function setup(rollModifiers: RollModifier[]) {
         setTallyAttackTotal: noop,
         addTallyDamageRider: noop,
         currentRow: null,
+        manualMode,
       }),
     { wrapper },
   );
@@ -70,5 +71,16 @@ describe("useAttackRolls state-driven roll mode (#486)", () => {
 
     result.current.viewFor(entry).onAttack();
     expect(roll.mock.calls[0][0]).toMatchObject({ mode: "normal" });
+  });
+});
+
+describe("useAttackRolls manual roll mode (#958)", () => {
+  it("applies the sheet's manual advantage and lets it override a state disadvantage", () => {
+    // Manual advantage short-circuits the Poisoned disadvantage (resolveRollMode #4).
+    const { result, roll } = setup(poisoned, "advantage");
+    expect(result.current.viewFor(entry).attackMode).toBe("advantage");
+
+    result.current.viewFor(entry).onAttack();
+    expect(roll.mock.calls[0][0]).toMatchObject({ mode: "advantage" });
   });
 });

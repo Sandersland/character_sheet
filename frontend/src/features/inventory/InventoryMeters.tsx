@@ -1,4 +1,5 @@
 import MeterBar from "@/components/ui/MeterBar";
+import InventoryMetersSlim from "@/features/inventory/InventoryMetersSlim";
 
 interface InventoryMetersProps {
   totalWeight: number;
@@ -7,17 +8,15 @@ interface InventoryMetersProps {
   hasAttunable: boolean;
   attunedCount: number;
   atCap: boolean;
+  /** Mobile density variant (#1029): a 6px strip with the number right-aligned. */
+  slim?: boolean;
 }
 
 // Encumbrance meter + the X/3 attunement readout above the item list.
-export default function InventoryMeters({
-  totalWeight,
-  capacity,
-  overCapacity,
-  hasAttunable,
-  attunedCount,
-  atCap,
-}: InventoryMetersProps) {
+export default function InventoryMeters({ slim = false, ...props }: InventoryMetersProps) {
+  if (slim) return <InventoryMetersSlim {...props} />;
+
+  const { totalWeight, capacity, overCapacity, hasAttunable, attunedCount, atCap } = props;
   return (
     <>
       {totalWeight > 0 && (

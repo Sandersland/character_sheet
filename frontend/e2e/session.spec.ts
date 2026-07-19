@@ -1,18 +1,32 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
+import { enterLiveCombat } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
+
+// #962: the legacy /session route redirects to the sheet's Combat tab (bookmarks).
+test("session: /characters/:id/session redirects to the Combat tab", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: /Session Fighter/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[^/?]+$/);
+  const base = page.url();
+  await page.goto(`${base}/session`);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
+});
 
 // Uses the Session Fighter roster persona (seeded with its own campaign so a
 // live session can be started/resumed here). The session button resolves to
 // Start/Resume/Join depending on leftover state — any of them lands on /session.
-test("session: start combat, take an action, and see it in the log", async ({ page }) => {
+// #963: the doorway lands on the Combat tab in-workspace (?tab=combat), where
+// the live turn tracker runs. The session log is an on-demand overlay now (#1086,
+// see the dedicated test below), not a persistent rail.
+test("session: start combat and take an action from the Combat tab", async ({ page }) => {
   await login(page);
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -23,10 +37,45 @@ test("session: start combat, take an action, and see it in the log", async ({ pa
   await page.getByRole("button", { name: "Dodge" }).click();
   await expect(page.getByRole("button", { name: "Use Action" })).toHaveCount(0);
 
-  // The combat event is written to the session log.
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText(/No events yet/)).toHaveCount(0);
-  await expect(page.getByText("combat", { exact: true }).first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+// #1086: the #964 three-column live view is gone — no abilities/skills rail, no
+// persistent session-log rail. The log is a one-line row that opens an on-demand
+// overlay (a right-side Drawer on desktop). A roll made from the turn tracker
+// must land in that log without any tab switch.
+test("session: desktop live Combat has no rails; a roll lands in the on-demand log overlay", async ({ page }) => {
+  await login(page);
+
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: /Session Fighter/ }).click();
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
+
+  // The old rails are gone (#1086).
+  await expect(
+    page.getByRole("complementary", { name: /Ability checks, saves, and skills/i }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: /Session log/i })).toHaveCount(0);
+
+  // The persistent banner shows the live state; the Combat tab carries the pip.
+  await expect(page.getByRole("tab", { name: /Combat \(session live\)/i })).toBeVisible();
+
+  // Start combat + roll an attack from the turn tracker.
+  await page.getByRole("button", { name: /Start combat/i }).click();
+  await page.getByRole("button", { name: "Start my turn" }).click();
+  await page.getByRole("button", { name: /Use Action/ }).click();
+  await page.getByRole("button", { name: "Attack", exact: true }).click();
+  const attackSheet = page.getByRole("dialog");
+  await attackSheet.getByRole("button", { name: /Roll to hit/ }).first().click();
+  await attackSheet.getByRole("button", { name: /^Done$/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // Open the on-demand log overlay (a right Drawer) — the attack roll landed in it
+  // without any tab switch.
+  await page.getByRole("button", { name: /open session log/i }).click();
+  const logDrawer = page.getByRole("dialog", { name: "Session Log" });
+  await expect(logDrawer.getByText("attack").first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -38,8 +87,8 @@ test("session: opening Use-an-item then closing leaves the action available", as
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -58,39 +107,24 @@ test("session: opening Use-an-item then closing leaves the action available", as
   expect(errors).toEqual([]);
 });
 
-// #770: on a mobile viewport the roll-mode toggle docks as a fixed full-width
-// bottom bar instead of floating over the action controls.
-test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page }) => {
+// #958: the global docked NORMAL/ADV/DIS footer is retired — roll mode rides
+// the roll surface now (long-press menu on skills/saves; a visible control on
+// the attack sheet). This asserts the footer is gone and the turn flow still
+// works without it.
+test("session: the global roll-mode footer is retired (mobile)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  const toggle = page.getByRole("group", { name: "Roll mode" });
-  await expect(toggle).toBeVisible();
-  await expect(toggle.getByRole("button", { name: /^advantage$/i })).toBeVisible();
+  // No docked footer and no global "Roll mode" group anywhere.
+  await expect(page.getByTestId("roll-mode-bar")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Roll mode" })).toHaveCount(0);
 
-  // The outer wrapper is the full-width docked bar; the role=group is the
-  // centered inner control, so measure the bar itself for the geometry.
-  const bar = page.getByTestId("roll-mode-bar");
-  const box = await bar.boundingBox();
-  expect(box).not.toBeNull();
-  if (box) {
-    expect(box.x).toBeLessThan(40);
-    expect(box.width).toBeGreaterThan(300);
-    expect(box.y + box.height).toBeGreaterThan(844 - 120);
-  }
-
-  // Toggling advantage still flips the shared roll mode (aria-pressed).
-  const adv = toggle.getByRole("button", { name: /^advantage$/i });
-  await adv.click();
-  await expect(adv).toHaveAttribute("aria-pressed", "true");
-
-  // A d20 affordance below the bar remains tappable — Playwright's click gate
-  // fails if the bar overlaps it.
+  // The turn flow is unaffected by the footer's removal.
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
   await page.getByRole("button", { name: /Use Action/ }).click();
@@ -99,9 +133,11 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
   expect(errors).toEqual([]);
 });
 
-// #801: rolling to hit inside the attack sheet must not surface the corner roll
-// toast behind the scrim; it reappears once the sheet closes.
-test("session: roll toast is suppressed while the attack sheet is open (mobile)", async ({
+// #956: rolling to hit inside the attack sheet surfaces the result SEAL on top
+// of the sheet — it is NEVER suppressed behind the scrim (inverting the old
+// #801 behavior: the seal owns a z tier above dialogs so an in-sheet roll is
+// always visible).
+test("session: the result seal shows over the open attack sheet (mobile)", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -109,8 +145,8 @@ test("session: roll toast is suppressed while the attack sheet is open (mobile)"
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -118,17 +154,14 @@ test("session: roll toast is suppressed while the attack sheet is open (mobile)"
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
   const sheet = page.getByRole("dialog");
-  const toast = page.locator('[data-testid="roll-result-toast"]');
+  const seal = page.locator('[data-testid="roll-result-seal"]');
 
   await sheet.getByRole("button", { name: "Roll to hit" }).click();
 
-  // Result shows on the attack card; the corner toast stays hidden behind the scrim.
+  // The result seal appears on top of the open sheet — not suppressed (#956);
+  // the attack card still shows its own inline result too.
+  await expect(seal).toBeVisible();
   await expect(sheet.getByText("=").first()).toBeVisible();
-  await expect(toast).toHaveCount(0);
-
-  // Closing the sheet brings the toast back for the just-rolled result.
-  await sheet.getByRole("button", { name: "Close" }).click();
-  await expect(toast).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -144,8 +177,8 @@ test("session: Change weapons in the Action sheet opens the per-hand picker on m
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await enterLiveCombat(page);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();

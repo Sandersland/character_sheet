@@ -101,7 +101,7 @@ export function useTurnActions({
   const actionSurgePool = character.resources?.pools?.find((p) => p.key === "actionSurge");
   const actionSurgeAvailable = (actionSurgePool?.remaining ?? 0) > 0;
 
-  // Render models for the option-card picker sheets (pure lib/turnOptions
+  // Render models for the option-card picker sheets (pure turnOptions
   // derivations) — built here so the slot components stay presentational and
   // `character` never flows into them.
   const enrich = (a: AvailableAction) => classActionOption(a, resolverFor(a.key), character);

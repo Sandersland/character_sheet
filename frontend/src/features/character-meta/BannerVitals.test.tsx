@@ -102,19 +102,19 @@ describe("BannerVitals", () => {
     expect(screen.getByText("+2")).toBeInTheDocument(); // proficiencyBonus=2
   });
 
-  it("renders an always-on HP readout (current / max)", () => {
+  // #1085: HP left the header entirely (it lives in the Combat tab). The banner
+  // is four self-labeled stat cards, no HP readout and no manage-HP entry point.
+  it("renders no HP readout or manage-HP control in the header", () => {
     renderWithRoll(<BannerVitals character={mockCharacter} />);
-    expect(screen.getByText("Hit Points")).toBeInTheDocument();
-    expect(screen.getByText("28")).toBeInTheDocument();
-    expect(screen.getByText("/36")).toBeInTheDocument();
+    expect(screen.queryByText(/hit points/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /manage hit points/i })).not.toBeInTheDocument();
   });
 
-  it("shows temp HP when present", () => {
-    renderWithRoll(
-      <BannerVitals
-        character={{ ...mockCharacter, hitPoints: { ...mockCharacter.hitPoints, temp: 5 } }}
-      />,
-    );
-    expect(screen.getByText("+5")).toBeInTheDocument();
+  it("renders exactly four self-labeled stat cards: AC / Initiative / Speed / Proficiency", () => {
+    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    expect(screen.getByText("Armor Class")).toBeInTheDocument();
+    expect(screen.getByText("Initiative")).toBeInTheDocument();
+    expect(screen.getByText("Speed")).toBeInTheDocument();
+    expect(screen.getByText("Proficiency")).toBeInTheDocument();
   });
 });

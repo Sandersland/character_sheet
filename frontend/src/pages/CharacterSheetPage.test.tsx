@@ -3,13 +3,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import CharacterSheetPage from "@/pages/CharacterSheetPage";
-import { fetchActiveSession, joinSession, startCampaignSession } from "@/api/client";
+import { fetchSessionDoorway, joinSession, startCampaignSession } from "@/api/client";
 import { useCharacter } from "@/hooks/useCharacter";
-import type { Character, Session } from "@/types/character";
+import type { Character, SessionDoorwayState, SessionDoorwaySessionState } from "@/types/character";
 
-// ── Mocks ──────────────────────────────────────────────────────────────────────
 // Stub the data hooks + client; stub heavy sheet child components so the test
-// targets only the header session button's state matrix (#245).
+// targets only the session doorway's state matrix (#942, formerly the header
+// session button #245).
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -18,9 +18,14 @@ vi.mock("react-router-dom", async () => {
 });
 
 vi.mock("@/api/client", () => ({
-  fetchActiveSession: vi.fn(),
+  fetchSessionDoorway: vi.fn(),
+  fetchActiveSession: vi.fn().mockResolvedValue(null),
   joinSession: vi.fn(),
   startCampaignSession: vi.fn(),
+  // The idle Combat panel's CombatLogRow fetches the last session on mount once a
+  // start/join jumps to the Combat tab (#1086); stub it so the effect resolves.
+  fetchSessions: vi.fn().mockResolvedValue([]),
+  fetchSession: vi.fn().mockResolvedValue({ id: "s1", events: [] }),
 }));
 
 vi.mock("@/hooks/useCharacter", () => ({ useCharacter: vi.fn() }));
@@ -28,9 +33,14 @@ vi.mock("@/hooks/useReferenceData", () => ({ useReferenceData: () => ({ referenc
 vi.mock("@/hooks/useCaptureHotkey", () => ({ useCaptureHotkey: () => {} }));
 
 vi.mock("@/features/abilities/AbilityScoreBox", () => ({ default: () => null }));
-vi.mock("@/features/dice/RollResultToast", () => ({ default: () => null }));
-vi.mock("@/features/dice/RollModeToggle", () => ({ default: () => null }));
+vi.mock("@/features/dice/RollResultSeal", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollContext", () => ({ RollProvider: ({ children }: { children: React.ReactNode }) => children }));
+// The turn-state provider is orthogonal to the doorway states under test; stub it
+// so its useTurnState call doesn't need a full combat-ready character fixture.
+vi.mock("@/features/session/TurnStateProvider", () => ({
+  TurnStateProvider: ({ children }: { children: React.ReactNode }) => children,
+  useTurnStateContext: () => null,
+}));
 vi.mock("@/features/character-meta/ActivityModal", () => ({ default: () => null }));
 vi.mock("@/features/advancement/AdvancementSection", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/BackendStatus", () => ({ default: () => null }));
@@ -45,19 +55,18 @@ vi.mock("@/features/journal/CapturePalette", () => ({
   default: () => <div>capture-palette-open</div>,
 }));
 vi.mock("@/features/session/SessionsModal", () => ({ default: () => null }));
-vi.mock("@/features/abilities/SkillsTable", () => ({ default: () => null }));
-vi.mock("@/features/abilities/ProficientSkillsCard", () => ({ default: () => null }));
+vi.mock("@/features/abilities/AllSkillsCard", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellSlotSummary", () => ({ default: () => null }));
-vi.mock("@/features/inventory/EquippedItemsCard", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellsSection", () => ({ default: () => null }));
 vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));
-// Stub the mobile mini-header so the session-button matrix targets one (desktop) instance.
+// Stub the mobile mini-header (the desktop banner keeps the campaign-less link).
 vi.mock("@/features/character-meta/MobileSheetHeader", () => ({ default: () => null }));
+vi.mock("@/features/character-meta/MobileQuickBar", () => ({ default: () => null }));
 vi.mock("@/features/conditions/ConditionsStrip", () => ({ default: () => null }));
 
 const mockUseCharacter = vi.mocked(useCharacter);
-const mockFetchActive = vi.mocked(fetchActiveSession);
+const mockFetchDoorway = vi.mocked(fetchSessionDoorway);
 const mockJoin = vi.mocked(joinSession);
 const mockStart = vi.mocked(startCampaignSession);
 
@@ -76,24 +85,46 @@ function makeCharacter(overrides: Partial<Character>): Character {
     toolProficiencies: [],
     advancements: [],
     advancementSlots: { total: 0, used: 0 },
+    rollModifiers: [],
     ...overrides,
   } as Character;
 }
 
-function activeSession(overrides: Partial<Session>): Session {
+function liveSession(overrides: Partial<SessionDoorwaySessionState> = {}): SessionDoorwaySessionState {
   return {
     id: "s1",
-    campaignId: "camp1",
     status: "active",
     startedAt: "2026-06-22T18:00:00.000Z",
-    participants: [],
+    scheduledAt: null,
+    title: "Night One",
+    joined: true,
+    round: null,
     ...overrides,
   };
+}
+
+function doorwayState(overrides: Partial<SessionDoorwayState>): SessionDoorwayState {
+  return {
+    campaignId: "camp1",
+    role: "PLAYER",
+    canStart: true,
+    kind: "none",
+    session: null,
+    ...overrides,
+  };
+}
+
+// The doorway renders in two placements (mobile + desktop); jsdom applies no
+// Tailwind CSS, so both are present. Assert/act on the first instance.
+async function findDoorwayButton(name: RegExp) {
+  const buttons = await screen.findAllByRole("button", { name });
+  return buttons[0];
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockUseCharacter.mockReturnValue({ character: makeCharacter({}), error: null, setCharacter: vi.fn() } as never);
+  mockFetchDoorway.mockResolvedValue(doorwayState({ campaignId: null, canStart: false }));
 });
 
 function renderPage() {
@@ -104,92 +135,88 @@ function renderPage() {
   );
 }
 
-describe("CharacterSheetPage header session button (#245)", () => {
-  it("offers 'Join a campaign' when the character is in no campaign", async () => {
+describe("CharacterSheetPage session doorway (#942)", () => {
+  it("hides the doorway and offers 'Join a campaign' when the character is in no campaign", async () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: undefined }),
       error: null,
       setCharacter: vi.fn(),
     } as never);
-    mockFetchActive.mockResolvedValue(null);
+    mockFetchDoorway.mockResolvedValue(doorwayState({ campaignId: null, canStart: false }));
 
     renderPage();
 
     const link = await screen.findByRole("link", { name: /join a campaign/i });
     expect(link).toHaveAttribute("href", "/campaigns");
+    // No session doorway button for a campaign-less character (the banner's
+    // "Sessions" action is a different control).
+    expect(
+      screen.queryByRole("button", { name: /(start|resume|join) session/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it("shows 'Start Session' when in a campaign with no active session", async () => {
+  it("shows 'Start session' when in a campaign with no active session", async () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
       setCharacter: vi.fn(),
     } as never);
-    mockFetchActive.mockResolvedValue(null);
+    mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
 
     renderPage();
-    expect(await screen.findByRole("button", { name: "Start Session" })).toBeInTheDocument();
+    expect(await findDoorwayButton(/start session/i)).toBeInTheDocument();
   });
 
-  it("shows 'Resume Session' when this character is an active participant", async () => {
+  it("renders no under-tabs live strip when this character is an active participant (#1085)", async () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
       setCharacter: vi.fn(),
     } as never);
-    mockFetchActive.mockResolvedValue(
-      activeSession({ participants: [{ id: "p1", sessionId: "s1", characterId: "c1", joinedAt: "x", leftAt: null }] }),
+    mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "liveJoined", session: liveSession({ joined: true }) }));
+
+    renderPage();
+    // Wait for the live-joined header controls (doorway resolved). Live state now
+    // lives only in the header cluster — the old "Go to fight" strip is gone, and
+    // there's no "Resume session" doorway either (#1085).
+    await screen.findByRole("button", { name: /end session/i });
+    expect(screen.queryByRole("button", { name: /go to fight/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /resume session/i })).not.toBeInTheDocument();
+  });
+
+  it("shows and dispatches 'Join session' when an active session exists this character isn't in", async () => {
+    mockUseCharacter.mockReturnValue({
+      character: makeCharacter({ campaignId: "camp1" }),
+      error: null,
+      setCharacter: vi.fn(),
+    } as never);
+    mockFetchDoorway.mockResolvedValue(
+      doorwayState({ kind: "liveNotJoined", session: liveSession({ joined: false }) }),
     );
 
     renderPage();
-    expect(await screen.findByRole("button", { name: "Resume Session" })).toBeInTheDocument();
-  });
-
-  it("shows 'Join Session' when an active session exists this character isn't in", async () => {
-    mockUseCharacter.mockReturnValue({
-      character: makeCharacter({ campaignId: "camp1" }),
-      error: null,
-      setCharacter: vi.fn(),
-    } as never);
-    mockFetchActive.mockResolvedValue(
-      activeSession({ participants: [{ id: "p2", sessionId: "s1", characterId: "other", joinedAt: "x", leftAt: null }] }),
-    );
-
-    renderPage();
-    const button = await screen.findByRole("button", { name: "Join Session" });
+    const button = await findDoorwayButton(/join session/i);
     button.click();
     await waitFor(() => expect(mockJoin).toHaveBeenCalledWith("camp1", "s1", "c1"));
-    expect(navigateMock).toHaveBeenCalledWith("/characters/c1/session");
+    // #963: jumps to the Combat tab in-workspace, never navigates to /session.
+    expect(navigateMock).not.toHaveBeenCalledWith("/characters/c1/session");
   });
 
-  it("treats a left participant as not-joined ('Join Session')", async () => {
+  it("starts a session when 'Start session' is clicked", async () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
       setCharacter: vi.fn(),
     } as never);
-    mockFetchActive.mockResolvedValue(
-      activeSession({ participants: [{ id: "p1", sessionId: "s1", characterId: "c1", joinedAt: "x", leftAt: "y" }] }),
-    );
+    mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
+    mockStart.mockResolvedValue({ session: { id: "s1", campaignId: "camp1", status: "active", startedAt: "x" }, character: makeCharacter({ campaignId: "camp1" }) });
 
     renderPage();
-    expect(await screen.findByRole("button", { name: "Join Session" })).toBeInTheDocument();
-  });
-
-  it("starts a session when 'Start Session' is clicked", async () => {
-    mockUseCharacter.mockReturnValue({
-      character: makeCharacter({ campaignId: "camp1" }),
-      error: null,
-      setCharacter: vi.fn(),
-    } as never);
-    mockFetchActive.mockResolvedValue(null);
-    mockStart.mockResolvedValue({ session: activeSession({}), character: makeCharacter({ campaignId: "camp1" }) });
-
-    renderPage();
-    const button = await screen.findByRole("button", { name: "Start Session" });
+    const button = await findDoorwayButton(/start session/i);
     button.click();
     await waitFor(() => expect(mockStart).toHaveBeenCalledWith("camp1", "c1"));
-    expect(navigateMock).toHaveBeenCalledWith("/characters/c1/session");
+    // #963: lands on the Combat tab in-workspace, never navigates to /session.
+    expect(navigateMock).not.toHaveBeenCalledWith("/characters/c1/session");
   });
 
   it("surfaces an error and does not navigate when starting a session fails", async () => {
@@ -198,14 +225,14 @@ describe("CharacterSheetPage header session button (#245)", () => {
       error: null,
       setCharacter: vi.fn(),
     } as never);
-    mockFetchActive.mockResolvedValue(null);
+    mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
     mockStart.mockRejectedValue(new Error("Character already in a campaign"));
 
     renderPage();
-    const button = await screen.findByRole("button", { name: "Start Session" });
+    const button = await findDoorwayButton(/start session/i);
     button.click();
 
-    expect(await screen.findByText("Character already in a campaign")).toBeInTheDocument();
+    expect(await screen.findAllByText("Character already in a campaign")).not.toHaveLength(0);
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
@@ -215,7 +242,7 @@ describe("CharacterSheetPage header session button (#245)", () => {
       error: null,
       setCharacter: vi.fn(),
     } as never);
-    mockFetchActive.mockResolvedValue(null);
+    mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
 
     renderPage();
 

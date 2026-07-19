@@ -132,6 +132,21 @@ describe("applyInventoryOperations", () => {
     expect((event.data as Record<string, unknown>).currencyDelta).toEqual({ cp: 0, sp: -1, gp: 0, pp: 0 });
   });
 
+  it("a multi-op batch sees each prior op's persisted state (per-op re-read)", async () => {
+    // Two buys in one batch: each re-reads currency, so the debits accumulate
+    // only if op 2 sees op 1's write. Starts sp:5 → sp:3 → sp:1.
+    await applyInventoryOperations(characterAId, [
+      { type: "acquire", itemId, quantity: 1, currencyDelta: { cp: 0, sp: 2, gp: 0, pp: 0 } },
+      { type: "acquire", itemId, quantity: 1, currencyDelta: { cp: 0, sp: 2, gp: 0, pp: 0 } },
+    ]);
+
+    const character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
+    expect(character.currency).toEqual({ cp: 0, sp: 1, gp: 10, pp: 0 });
+
+    const items = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    expect(items).toHaveLength(2);
+  });
+
   it("rolls back the whole batch when a debit is unaffordable", async () => {
     await expect(
       applyInventoryOperations(characterAId, [

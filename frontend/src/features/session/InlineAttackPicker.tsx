@@ -11,6 +11,8 @@ import { useState } from "react";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
 import { useRoll } from "@/features/dice/RollContext";
+import RollModeChoice from "@/features/dice/RollModeChoice";
+import type { RollMode } from "@/lib/dice";
 import {
   attacksExhausted as computeAttacksExhausted,
   buildAttackForms,
@@ -84,6 +86,9 @@ export default function InlineAttackPicker({
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const die = useManeuverDie(character, onUpdate);
+  // The attack sheet's own ADV/DIS choice (#958) — replaces the retired global
+  // roll-mode footer. Visible on the sheet, applied to each to-hit roll here.
+  const [attackMode, setAttackMode] = useState<RollMode>("normal");
 
   // Scope to the Attack action's own rows — the tally now also holds off-hand
   // (bonusAction) rows, and steps 2–3 must bind to the last ACTION row (#813).
@@ -99,6 +104,7 @@ export default function InlineAttackPicker({
     addTallyDamageRider: turnState.addTallyDamageRider,
     currentRow,
     source: "action",
+    manualMode: attackMode,
   });
 
   const forms = buildAttackForms(character);
@@ -191,7 +197,15 @@ export default function InlineAttackPicker({
       onClose={onClose}
     />
   );
-  const emptyHint = !view.hasWeapon && (
+  // With a weapon: the sheet's ADV/DIS control (#958); without: the empty hint.
+  const weaponRow = view.hasWeapon ? (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+        Roll to hit
+      </span>
+      <RollModeChoice selected={attackMode} onSelect={setAttackMode} ariaLabel="Attack roll mode" />
+    </div>
+  ) : (
     <p className="text-sm text-parchment-600">
       No weapon equipped — use Change on the turn screen.
     </p>
@@ -203,8 +217,8 @@ export default function InlineAttackPicker({
   if (isMobile) {
     return (
       <div className="flex flex-col gap-2">
-        {emptyHint}
         {tallyStrip}
+        {weaponRow}
         {stepCard}
         {maneuversDisclosure}
         {spellAttacks}
@@ -216,7 +230,7 @@ export default function InlineAttackPicker({
   return (
     <div className="flex items-start gap-4">
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {emptyHint}
+        {weaponRow}
         {stepCard}
         {footer}
       </div>

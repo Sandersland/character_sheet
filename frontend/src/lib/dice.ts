@@ -1,7 +1,7 @@
 /**
  * Generic dice-rolling engine. This is the one place `Math.random` is read
- * for rolling dice — `lib/abilityGen.ts`'s 4d6-drop-lowest generator and the
- * `<DiceRoller>` component (components/DiceRoller.tsx) both delegate here,
+ * for rolling dice — abilityGen's 4d6-drop-lowest generator and the
+ * DiceRoller component both delegate here,
  * so every roll in the app (ability scores today; hit dice, attacks, and
  * saving throws later) shares the same engine and exposes the same
  * per-die detail instead of just a final sum.
@@ -161,7 +161,7 @@ export function formatRollSpec(spec: RollSpec): string {
 
 /**
  * Injects raw kept die faces into a spec label for the Session Log, matching
- * `RollResultToast`'s inline breakdown rendering: the leading `NdM` token is
+ * `RollResultSeal`'s inline breakdown rendering: the leading `NdM` token is
  * suffixed with `(face, face, …)`, and any trailing modifier from `specLabel`
  * is preserved as-is (so a Unicode-minus modifier from `formatRollSpec` carries
  * through unchanged). e.g. `formatRollBreakdown("1d20 + 5", [12])` → "1d20 (12) + 5".

@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import { logRoll } from "@/api/client";
 import { RollProvider } from "@/features/dice/RollContext";
-import SkillsTable from "@/features/abilities/SkillsTable";
+import AllSkillsCard from "@/features/abilities/AllSkillsCard";
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import BannerVitals from "@/features/character-meta/BannerVitals";
 import type { RollResult, RollSpec } from "@/lib/dice";
@@ -31,7 +31,7 @@ vi.mock("@/features/dice/DiceRoller", () => ({
         total: 11 + modifier,
         spec: { count: 1, faces: 20, modifier },
       });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- mock fires onResult once on mount; empty deps intentional
     }, []);
     return <div data-testid="dice-roller" />;
   },
@@ -65,7 +65,7 @@ describe("roll affordances log their category event", () => {
       { name: "perception", ability: "wisdom", proficient: true },
     ];
     renderInSession(
-      <SkillsTable skills={skills} abilityScores={scores} proficiencyBonus={2} />,
+      <AllSkillsCard skills={skills} abilityScores={scores} proficiencyBonus={2} />,
     );
 
     // WIS 16 → +3, proficient +2 = +5.

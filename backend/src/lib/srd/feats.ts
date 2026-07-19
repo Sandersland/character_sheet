@@ -1,7 +1,5 @@
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 
-// ── Feat improvement targets ──────────────────────────────────────────────────
-
 /**
  * Numeric stat targets: summed by deriveFeatBonuses and applied as additive
  * bonuses in serializeCharacter. Adding a target here + a new apply site in

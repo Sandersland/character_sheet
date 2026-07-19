@@ -48,7 +48,6 @@ export default function CustomFeatForm({ currentScores, skillNames, busy, custom
         />
       </div>
 
-      {/* ── Stat bonuses ── */}
       <div className="mt-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           Stat Bonuses
@@ -106,7 +105,6 @@ export default function CustomFeatForm({ currentScores, skillNames, busy, custom
         </button>
       </div>
 
-      {/* ── Skill proficiencies ── */}
       <div className="mt-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           Skill Proficiencies
@@ -126,7 +124,6 @@ export default function CustomFeatForm({ currentScores, skillNames, busy, custom
         </div>
       </div>
 
-      {/* ── Saving throw proficiencies ── */}
       <div className="mt-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           Saving Throw Proficiencies
@@ -146,7 +143,6 @@ export default function CustomFeatForm({ currentScores, skillNames, busy, custom
         </div>
       </div>
 
-      {/* ── Ability score increase (half-feat style) ── */}
       <div className="mt-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           Ability Score Increase

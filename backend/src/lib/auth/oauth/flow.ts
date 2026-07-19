@@ -9,8 +9,6 @@ import type { AuthProvider, NormalizedProfile } from "./types.js";
 // authorize URL, round-trip the state/verifier through a transaction cookie,
 // exchange the code for tokens, and fetch + normalize the userinfo profile.
 
-// ── OAuth transaction (state/PKCE) cookie codec ──────────────────────────────
-
 const oauthTxSchema = z.object({
   provider: z.string().min(1),
   state: z.string().min(1),
@@ -40,8 +38,6 @@ export function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-// ── Authorize URL ────────────────────────────────────────────────────────────
-
 // Build the provider authorize URL for a start request.
 export function buildAuthorizeUrl(
   provider: AuthProvider,
@@ -60,8 +56,6 @@ export function buildAuthorizeUrl(
   }).toString();
   return url.toString();
 }
-
-// ── Token-exchange / userinfo response shapes ────────────────────────────────
 
 const tokenResponseSchema = z.object({
   access_token: z.string(),

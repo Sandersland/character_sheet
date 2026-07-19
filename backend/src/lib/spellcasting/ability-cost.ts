@@ -15,11 +15,10 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { applySpendResourceInTx, type SpendResourceOperation } from "@/lib/classes/resources.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
-export class InvalidSpellcastingOperationError extends Error {}
-
-// ── Cost declaration ────────────────────────────────────────────────────────
+// status → the 400 the central `errorHandler` maps (client op-validation error).
+export class InvalidSpellcastingOperationError extends Error {
+  status = 400;
+}
 
 export type AbilityCost =
   | { kind: "slot"; minLevel: number }

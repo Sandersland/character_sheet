@@ -1,18 +1,28 @@
 import { useEffect } from "react";
-import { describe, it, expect, vi } from "vitest";
-import { render as rtlRender, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render as rtlRender, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import CombatPanel from "@/features/character-meta/panels/CombatPanel";
 import { RollProvider } from "@/features/dice/RollContext";
+import { fetchSessions } from "@/api/client";
+import { useSessionDoorway } from "@/features/session/useSessionDoorway";
+import type { SessionDoorwaySummary } from "@/features/session/sessionDoorwaySummary";
 import type { RollResult } from "@/lib/dice";
-import type { Character } from "@/types/character";
+import type { Character, Session } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   applyHitPointOperations: vi.fn(),
+  applyConditionTransactions: vi.fn(),
   logRoll: vi.fn().mockResolvedValue(undefined),
+  fetchSessions: vi.fn().mockResolvedValue([]),
+  fetchSession: vi.fn().mockResolvedValue({ id: "s-old", events: [] }),
 }));
 
-// Stub the 3D DiceRoller: the real one mounts a Three.js Canvas that jsdom can't render.
+// The doorway card reads useSessionDoorway directly; drive it to a "start" summary.
+vi.mock("@/features/session/useSessionDoorway", () => ({ useSessionDoorway: vi.fn() }));
+
+// Stub the 3D DiceRoller: the real one mounts a Three.js Canvas jsdom can't render.
 vi.mock("@/features/dice/DiceRoller", () => ({
   default: function MockDiceRoller({
     onResult,
@@ -29,11 +39,22 @@ vi.mock("@/features/dice/DiceRoller", () => ({
         total: 11 + modifier,
         spec: { count: 1, faces: 20, modifier },
       });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- mock fires onResult once on mount; empty deps intentional
     }, []);
     return <div data-testid="dice-roller" />;
   },
 }));
+
+const START_SUMMARY: SessionDoorwaySummary = {
+  visible: true,
+  tone: "invite",
+  label: "Start session",
+  sub: null,
+  action: "start",
+};
+
+const mockDoorway = vi.mocked(useSessionDoorway);
+const mockFetchSessions = vi.mocked(fetchSessions);
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
@@ -47,6 +68,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     },
     pendingLevelUps: 0,
     advancementSlots: { total: 0, used: 0 },
+    rollModifiers: [],
     resistances: [],
     damageImmunities: [],
     conditionImmunities: [],
@@ -55,45 +77,82 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
+function endedSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: "s-old",
+    campaignId: null,
+    status: "ended",
+    startedAt: "2026-06-20T18:00:00.000Z",
+    title: "The Sunless Citadel",
+    ...overrides,
+  } as Session;
+}
+
 function renderPanel(character: Character) {
   return rtlRender(
-    <RollProvider characterId="char-1" sessionId="sess-1">
+    <RollProvider characterId="char-1">
       <CombatPanel character={character} reference={null} onUpdate={() => {}} />
     </RollProvider>,
   );
 }
 
-describe("CombatPanel", () => {
-  it("renders Hit Points → Conditions → Resistances & Traits in DOM order", () => {
-    renderPanel(
-      makeCharacter({
-        resistances: [{ damageType: "fire", source: "Ring of Fire Resistance" }],
-      } as Partial<Character>),
-    );
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockDoorway.mockReturnValue({
+    ready: true,
+    summary: START_SUMMARY,
+    pending: false,
+    error: null,
+    onAction: vi.fn(),
+    inActiveSession: false,
+    activeSessionId: undefined,
+    activeSession: null,
+  });
+  mockFetchSessions.mockResolvedValue([]);
+});
 
-    const hp = screen.getByRole("heading", { name: "Hit Points" });
-    const conditions = screen.getByRole("heading", { name: "Conditions" });
-    const grants = screen.getByRole("heading", { name: "Resistances & Traits" });
-
-    expect(hp.compareDocumentPosition(conditions)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(conditions.compareDocumentPosition(grants)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+describe("CombatPanel (idle #1086)", () => {
+  it("renders the doorway card copy and a Start session button", () => {
+    renderPanel(makeCharacter());
+    expect(screen.getByText("No session live")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Start a session to track turns, actions, and rolls/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start session" })).toBeInTheDocument();
   });
 
-  it("hides the grants card when the character has no granted defenses", () => {
+  it("renders Hit Points and Conditions", () => {
     renderPanel(makeCharacter());
-
     expect(screen.getByRole("heading", { name: "Hit Points" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Conditions" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Resistances & Traits" })).toBeNull();
   });
 
-  it("shows the grants card when the character has granted defenses", () => {
+  it("renders the item-grants card when the character has granted defenses", () => {
     renderPanel(
       makeCharacter({
         conditionImmunities: [{ condition: "poisoned", source: "Amulet" }],
       } as Partial<Character>),
     );
-
     expect(screen.getByRole("heading", { name: "Resistances & Traits" })).toBeInTheDocument();
+  });
+
+  it("shows a one-line last-session log row and opens the log overlay on click", async () => {
+    mockFetchSessions.mockResolvedValue([endedSession()]);
+    const user = userEvent.setup();
+    renderPanel(makeCharacter());
+
+    const row = await screen.findByRole("button", { name: /open last session log/i });
+    expect(row).toHaveTextContent("Last session · The Sunless Citadel");
+
+    await user.click(row);
+    // The overlay (BottomSheet on jsdom's default mobile) carries the log title.
+    expect(await screen.findByRole("heading", { name: "Session Log" })).toBeInTheDocument();
+  });
+
+  it("hides the log row when there is no past session", async () => {
+    mockFetchSessions.mockResolvedValue([]);
+    renderPanel(makeCharacter());
+    await waitFor(() => expect(mockFetchSessions).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /last session log/i })).toBeNull();
   });
 });

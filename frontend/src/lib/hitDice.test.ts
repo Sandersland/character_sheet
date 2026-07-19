@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { advancingHitDie, averageHitPointGain, dieFaces, hitPointGainRange } from "@/lib/hitDice";
+import {
+  advancingHitDie,
+  averageHitPointGain,
+  dieFaces,
+  hitPointGainRange,
+  hitPointStepMath,
+} from "@/lib/hitDice";
 import type { Character, ClassOption, LevelUpTarget } from "@/types/character";
 
 describe("dieFaces", () => {
@@ -71,5 +77,48 @@ describe("advancingHitDie", () => {
   it("falls back to the primary die when no reference classes are supplied", () => {
     const target: LevelUpTarget = { kind: "existing", classEntryId: "entry-1" };
     expect(advancingHitDie(character, [], target)).toBe("d10");
+  });
+});
+
+describe("hitPointStepMath", () => {
+  const refs = [
+    { id: "cls-fighter", name: "fighter", hitDie: "d10" },
+    { id: "cls-wizard", name: "wizard", hitDie: "d6" },
+  ] as ClassOption[];
+
+  function characterWith(constitution: number): Character {
+    return {
+      abilityScores: { constitution } as Character["abilityScores"],
+      hitDice: { die: "d10", total: 7, spent: 0 },
+      classes: [
+        { id: "entry-1", name: "fighter", level: 7 },
+        { id: "entry-2", name: "wizard", level: 3 },
+      ],
+    } as unknown as Character;
+  }
+
+  it("derives the advancing die, faces, and average/roll gains with the Con modifier", () => {
+    const math = hitPointStepMath(characterWith(16), refs, "entry-1"); // d10, +3 Con
+    expect(math).toMatchObject({
+      die: "d10",
+      faces: 10,
+      conMod: 3,
+      conLabel: "+3",
+      conText: "+3 CON",
+      averageGain: 9, // 6 + 3
+      fixedBase: 6, // Con-free base
+      minRoll: 4, // 1 + 3
+      maxRoll: 13, // 10 + 3
+    });
+  });
+
+  it("follows the selected entry to its class's die (wizard → d6)", () => {
+    const math = hitPointStepMath(characterWith(10), refs, "entry-2"); // d6, +0 Con
+    expect(math).toMatchObject({ die: "d6", faces: 6, averageGain: 4, minRoll: 1, maxRoll: 6 });
+  });
+
+  it("falls back to the character's own die when reference is empty", () => {
+    const math = hitPointStepMath(characterWith(10), [], "entry-2");
+    expect(math.die).toBe("d10");
   });
 });

@@ -45,15 +45,18 @@ interface DicePhysics {
 function createDicePhysics(spec: DiceRollerProps["spec"], groups: FaceGroup[]): DicePhysics {
   const dieCount = usesAdvantage(spec) ? 2 : spec.count;
   const { world, diceMaterial } = createDiceWorld(dieCount);
+  // Single-layer rest height (face-to-center distance) of this die's solid;
+  // the d6 box's is exactly D6_SIZE/2, the d10's inradius is slightly larger.
+  const restY = groups.length > 0 ? groups[0].normal.dot(groups[0].centroid) : D6_SIZE / 2;
   const dice: PhysicsDie[] = Array.from({ length: dieCount }, (_, index) => {
     const laneX = (index - (dieCount - 1) / 2) * DIE_GAP;
-    const body = createDieBody(diceMaterial);
+    const body = createDieBody(diceMaterial, spec.faces);
     // Rest in its tidy lane from the very first paint, same as the scripted
     // roller's idle pose, rather than at the cannon body default of the world
     // origin until the first roll throws it somewhere real.
-    body.position.set(laneX, FLOOR_Y + D6_SIZE / 2, 0);
+    body.position.set(laneX, FLOOR_Y + restY, 0);
     world.addBody(body);
-    return { body, groups, laneX };
+    return { body, groups, laneX, restY };
   });
   return { world, dice, resolver: createRollResolver(world, dice) };
 }
@@ -122,7 +125,7 @@ function PhysicsRig({ dice, resolver, activeRef, onSettled, geometry, groups, ro
 
 /**
  * Real-physics dice roller: thrown with randomized velocity/spin into an
- * invisible tray (gravity, collisions, bouncing — see `lib/physicsDice.ts`),
+ * invisible tray (gravity, collisions, bouncing — see `createDiceWorld`/`throwDie`),
  * and the result is *read off whichever face lands up* rather than decided
  * in advance — physics is the source of randomness here, unlike the
  * scripted `DiceRoller`. Shares the same look (`DieMesh`/`DiceScene`) and
@@ -259,7 +262,7 @@ export default function PhysicsDiceRoller({
     }
 
     return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot lifecycle roll trigger; roll() reads every reactive value via refs, so completing the deps would restart the StrictMode-owned roll and re-fire onResult for an already-delivered result; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [rollKey, autoRollOnMount]);
 
   // Lets a parent (e.g. DiceRollSequence) interrupt an in-flight tumble on
@@ -279,7 +282,7 @@ export default function PhysicsDiceRoller({
     // depending on a function recreated every render would fire this on
     // every render, fighting the lifecycle effect above for ownership of
     // activeRef the same way depending on `rolling`/`result` would.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- skip-interrupt keyed on [skip] alone; resolveInstantly reads live refs, so adding its per-render identity would fire this every render and fight the lifecycle effect for activeRef ownership; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [skip]);
 
   const settled = rolling ? null : result;
