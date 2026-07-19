@@ -1,4 +1,48 @@
+import { readEffectSpec, resolveEffectSpec, type ClassDieResolver, type EffectRow } from "@/lib/combat/effects.js";
 import type { ClassDefinition, DerivedFeature } from "./types.js";
+
+// Sneak Attack is a C5 referenced-class-die consumer: a fixed d6 whose COUNT is
+// rogue-level-derived. The die is resolved through the same effects.ts machinery
+// (effectDieSource + ClassDieResolver + readEffectSpec) the Battle Master uses,
+// but the rogue die never grows, so it needs no resolveClassDie pool.
+export const SNEAK_ATTACK_DIE_SOURCE = "sneakAttackDice";
+
+// 1d6 at L1, +1d6 every odd level, capped at 10d6 from L19. 0 below L1.
+export function sneakAttackDiceCount(rogueLevel: number): number {
+  if (rogueLevel < 1) return 0;
+  return Math.min(10, Math.ceil(rogueLevel / 2));
+}
+
+// The referenced-class-die resolver for the C5 machinery: the rogue die is a
+// flat d6 (never scales with level, unlike the superiority die).
+export const resolveSneakAttackDie: ClassDieResolver = (source) =>
+  source === SNEAK_ATTACK_DIE_SOURCE ? 6 : null;
+
+function sneakAttackEffectRow(rogueLevel: number): EffectRow {
+  return {
+    level: 1,
+    effectKind: "damage",
+    effectDiceCount: sneakAttackDiceCount(rogueLevel),
+    effectDieSource: SNEAK_ATTACK_DIE_SOURCE,
+  };
+}
+
+// The resolved Nd6 dice for a rogue's Sneak Attack, or null below L1. Routes
+// through readEffectSpec/resolveEffectSpec so the die-source resolution matches
+// every other referenced-class-die effect.
+export function sneakAttackSpec(rogueLevel: number): { count: number; faces: number; modifier: number } | null {
+  if (sneakAttackDiceCount(rogueLevel) <= 0) return null;
+  const spec = readEffectSpec(sneakAttackEffectRow(rogueLevel), resolveSneakAttackDie);
+  // characterLevel receives rogueLevel: die faces (d6) never scale with level —
+  // only the count does, already baked into effectDiceCount above.
+  return resolveEffectSpec(spec, 0, { characterLevel: rogueLevel });
+}
+
+// Once-per-turn + eligibility guard. Eligibility (advantage OR an ally adjacent
+// to the target) is a manual assertion — never auto-detected from board state.
+export function canApplySneakAttack(input: { eligible: boolean; usedThisTurn: boolean }): boolean {
+  return input.eligible && !input.usedThisTurn;
+}
 
 const ROGUE_FEATURES: DerivedFeature[] = [
   {
@@ -155,10 +199,49 @@ const ASSASSIN_FEATURES: DerivedFeature[] = [
   },
 ];
 
+const THIEF_FEATURES: DerivedFeature[] = [
+  {
+    name: "Fast Hands",
+    level: 3,
+    source: "subclass",
+    description:
+      "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+  },
+  {
+    name: "Second-Story Work",
+    level: 3,
+    source: "subclass",
+    description:
+      "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+  },
+  {
+    name: "Supreme Sneak",
+    level: 9,
+    source: "subclass",
+    description:
+      "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+  },
+  {
+    name: "Use Magic Device",
+    level: 13,
+    source: "subclass",
+    description:
+      "You ignore all class, race, and level requirements on the use of magic items.",
+  },
+  {
+    name: "Thief's Reflexes",
+    level: 17,
+    source: "subclass",
+    description:
+      "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+  },
+];
+
 export const rogue: ClassDefinition = {
   features: ROGUE_FEATURES,
   subclasses: {
     "arcane trickster": { grantLevel: 3, features: ARCANE_TRICKSTER_FEATURES },
     assassin: { grantLevel: 3, features: ASSASSIN_FEATURES },
+    thief: { grantLevel: 3, features: THIEF_FEATURES },
   },
 };

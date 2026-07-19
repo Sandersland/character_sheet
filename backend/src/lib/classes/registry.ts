@@ -61,9 +61,10 @@ function deriveBaseLayer(
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  subclassKey: string | undefined,
 ): ClassLayer {
   return {
-    pools: classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus) : [],
+    pools: classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey) : [],
     features: (classDef?.features ?? []).filter((f) => f.level <= level),
   };
 }
@@ -123,8 +124,10 @@ export function deriveResources(
   const classKey = (className ?? "").toLowerCase();
   const subclassKey = (subclass ?? "").toLowerCase();
 
-  const base = deriveBaseLayer(CLASSES[classKey], level, abilityScores, profBonus);
   const sub = deriveSubclassLayer(subclassKey, level, abilityScores, profBonus);
+  // Feed the active subclass into the base pool derivation so base-wins pool-key
+  // collisions (e.g. druid wildShape) resolve to the subclass's variant (#906).
+  const base = deriveBaseLayer(CLASSES[classKey], level, abilityScores, profBonus, sub.active ? subclassKey : undefined);
   const { resources, features } = mergeLayers(base, sub);
 
   // Return null only for truly unknown/empty classes

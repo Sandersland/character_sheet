@@ -99,6 +99,8 @@ export interface TurnState {
   attackedThisTurn: boolean;
   /** Took damage this turn — feeds the durable-buff turn-hook (#457). */
   tookDamageThisTurn: boolean;
+  /** Sneak Attack applied this turn — enforces the rogue once-per-turn guard (#902). */
+  sneakAttackUsedThisTurn: boolean;
   /**
    * Turn-scoped undo stack (#730): a snapshot of the economy is pushed before
    * each consuming mutation and popped by `undo()`. Cleared on every turn/combat
@@ -236,6 +238,8 @@ export interface TurnStateActions {
    * BEFORE this pop; other server effects (a loadout swap) refund at their surface.
    */
   undo: () => void;
+  /** Mark Sneak Attack applied this turn — enforces the once-per-turn guard (#902). */
+  markSneakAttackUsed: () => void;
 }
 
 /**
@@ -264,6 +268,7 @@ function initialState(): TurnState {
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
+    sneakAttackUsedThisTurn: false,
     history: [],
   };
 }
@@ -526,6 +531,7 @@ function endTurnState(s: TurnState): TurnState {
     round: s.round + 1,
     attackedThisTurn: false,
     tookDamageThisTurn: false,
+    sneakAttackUsedThisTurn: false,
     history: [],
   };
 }
@@ -545,6 +551,7 @@ function startCombatState(): TurnState {
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
+    sneakAttackUsedThisTurn: false,
     history: [],
   };
 }
@@ -564,6 +571,7 @@ function startTurnState(s: TurnState): TurnState {
     bonusAttack: null,
     attackTally: [],
     spellCastThisTurn: {},
+    sneakAttackUsedThisTurn: false, // once per turn — resets each of your turns
     history: [], // undo never reaches across turns
   };
 }
@@ -629,6 +637,7 @@ type TurnAction =
   | { type: "attachBatchId"; batchId: string }
   | { type: "undo" }
   | { type: "markDamageTaken" }
+  | { type: "markSneakAttackUsed" }
   | { type: "hydrate"; state: TurnState };
 
 // The action types whose transition pushes an undo snapshot (the former `mutate`
@@ -684,6 +693,8 @@ const HANDLERS: TurnActionHandlers = {
   attachBatchId: (s, a) => attachBatchIdState(s, a.batchId),
   undo: (s) => undoState(s),
   markDamageTaken: (s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }),
+  markSneakAttackUsed: (s) =>
+    s.sneakAttackUsedThisTurn ? s : { ...s, sneakAttackUsedThisTurn: true },
   hydrate: (_s, a) => a.state,
 };
 
@@ -795,6 +806,7 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       commitReactionSpell: () => dispatch({ type: "consumeReaction" }),
       attachBatchId: (batchId) => dispatch({ type: "attachBatchId", batchId }),
       undo: () => dispatch({ type: "undo" }),
+      markSneakAttackUsed: () => dispatch({ type: "markSneakAttackUsed" }),
     }),
     [],
   );

@@ -1,6 +1,7 @@
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { deriveAttacksPerAction } from "@/lib/srd/srd.js";
+import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import type { CharacterWithRelations } from "./character-include.js";
@@ -30,6 +31,15 @@ import {
 import { buildSpellcastingView } from "./serialize/spellcasting.js";
 
 export { buildRollModifiers };
+
+// Sneak Attack wire shape: the Nd6 dice count + faces, or null for a non-rogue.
+// Scales with rogue class levels, matching applySneakAttackOperations.
+function serializeSneakAttack(
+  classEntries: { name: string; level: number }[],
+): { dice: number; faces: number } | null {
+  const spec = sneakAttackSpec(classEntries.find((c) => c.name.toLowerCase() === "rogue")?.level ?? 0);
+  return spec ? { dice: spec.count, faces: spec.faces } : null;
+}
 
 export function serializeCharacterSummary(row: {
   id: string;
@@ -292,6 +302,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     improvisedWeapon,
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.
     attacksPerAction: deriveAttacksPerAction(row.classEntries),
+    // Rogue Sneak Attack Nd6 (derived from rogue class levels); null otherwise.
+    // The count drives the session card's toggle + the roll shown in results.
+    sneakAttack: serializeSneakAttack(row.classEntries),
 
     journal: buildJournalView(row),
 

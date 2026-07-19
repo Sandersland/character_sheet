@@ -1392,6 +1392,7 @@ enum CharacterEventType {
   prepareSpell
   unprepareSpell
   concentrationDropped
+  convertSorceryPoints
   // class
   classAdded
   subclassChosen

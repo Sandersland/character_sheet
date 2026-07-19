@@ -14123,7 +14123,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14169,7 +14169,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14215,7 +14215,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14261,7 +14261,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 1 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14313,7 +14313,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14365,7 +14365,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14417,7 +14417,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 2). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14469,7 +14469,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 3). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14527,7 +14527,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 3). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14585,7 +14585,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 3). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14643,7 +14643,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 4). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14701,7 +14701,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 4). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14765,7 +14765,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 4). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14829,7 +14829,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 5). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14893,7 +14893,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 5). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -14957,7 +14957,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 5). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -15033,7 +15033,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 6). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -15109,7 +15109,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "Transform into a beast (max CR 6). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -15191,7 +15191,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 10 hour(s). Regain all uses on a short or long rest. Unlimited uses (Archdruid).",
+          "description": "Transform into a beast (max CR 6). Lasts up to 10 hour(s). Regain all uses on a short or long rest. Unlimited uses (Archdruid).",
           "key": "wildShape",
           "label": "Wild Shape",
           "recharge": "short-or-long",
@@ -44495,6 +44495,1347 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 ]
 `;
 
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / thief 1`] = `
+[
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+        {
+          "description": "No attack roll has advantage against you while you aren't incapacitated.",
+          "level": 18,
+          "name": "Elusive",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+        {
+          "description": "No attack roll has advantage against you while you aren't incapacitated.",
+          "level": 18,
+          "name": "Elusive",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+          "level": 1,
+          "name": "Expertise",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn, deal extra damage to a target you hit with a finesse or ranged weapon when you have advantage on the attack or an ally is adjacent to the target. 1d6 at L1, +1d6 every odd level (10d6 at L19).",
+          "level": 1,
+          "name": "Sneak Attack",
+          "source": "class",
+        },
+        {
+          "description": "Secret mix of dialect and codewords used by thieves' guilds. Takes 4× as long to convey a message compared to open speech. Also understand signs and symbols used by criminals.",
+          "level": 1,
+          "name": "Thieves' Cant",
+          "source": "class",
+        },
+        {
+          "description": "As a bonus action, take the Dash, Disengage, or Hide action.",
+          "level": 2,
+          "name": "Cunning Action",
+          "source": "class",
+        },
+        {
+          "description": "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "level": 3,
+          "name": "Fast Hands",
+          "source": "subclass",
+        },
+        {
+          "description": "Climbing no longer costs extra movement. When you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "level": 3,
+          "name": "Second-Story Work",
+          "source": "subclass",
+        },
+        {
+          "description": "When an attacker you can see hits you, use your reaction to halve the attack's damage.",
+          "level": 5,
+          "name": "Uncanny Dodge",
+          "source": "class",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "level": 9,
+          "name": "Supreme Sneak",
+          "source": "subclass",
+        },
+        {
+          "description": "When making an ability check with a skill or tool you're proficient in, treat a d20 roll of 9 or lower as a 10.",
+          "level": 11,
+          "name": "Reliable Talent",
+          "source": "class",
+        },
+        {
+          "description": "You ignore all class, race, and level requirements on the use of magic items.",
+          "level": 13,
+          "name": "Use Magic Device",
+          "source": "subclass",
+        },
+        {
+          "description": "If able to hear, you are aware of the location of any hidden or invisible creature within 10 feet.",
+          "level": 14,
+          "name": "Blindsense",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in Wisdom saving throws.",
+          "level": 15,
+          "name": "Slippery Mind",
+          "source": "class",
+        },
+        {
+          "description": "You take two turns during the first round of any combat: your first turn at your normal initiative and your second at your initiative minus 10. You can't use this feature when surprised.",
+          "level": 17,
+          "name": "Thief's Reflexes",
+          "source": "subclass",
+        },
+        {
+          "description": "No attack roll has advantage against you while you aren't incapacitated.",
+          "level": 18,
+          "name": "Elusive",
+          "source": "class",
+        },
+        {
+          "description": "If your attack misses a target in range, you can turn the miss into a hit. Or if you fail an ability check, you can treat the d20 roll as a 20. Once used, regain on a short or long rest.",
+          "level": 20,
+          "name": "Stroke of Luck",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > sorcerer / (no subclass) 1`] = `
 [
   {
@@ -44533,7 +45874,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44567,7 +45908,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44607,7 +45948,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44647,7 +45988,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44687,7 +46028,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44727,7 +46068,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44767,7 +46108,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44807,7 +46148,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44847,7 +46188,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44887,7 +46228,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44927,7 +46268,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44967,7 +46308,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45007,7 +46348,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45047,7 +46388,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45087,7 +46428,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45127,7 +46468,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45167,7 +46508,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45207,7 +46548,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45247,7 +46588,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45342,7 +46683,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45388,7 +46729,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45440,7 +46781,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45492,7 +46833,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45544,7 +46885,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45602,7 +46943,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45660,7 +47001,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45718,7 +47059,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45776,7 +47117,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45834,7 +47175,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45892,7 +47233,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45950,7 +47291,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46008,7 +47349,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46072,7 +47413,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46136,7 +47477,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46200,7 +47541,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46264,7 +47605,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46334,7 +47675,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46404,7 +47745,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46525,7 +47866,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46578,7 +47919,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46637,7 +47978,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46696,7 +48037,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46755,7 +48096,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46820,7 +48161,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46885,7 +48226,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46950,7 +48291,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47015,7 +48356,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47080,7 +48421,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47145,7 +48486,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47210,7 +48551,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47275,7 +48616,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47346,7 +48687,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47417,7 +48758,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47488,7 +48829,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47559,7 +48900,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47636,7 +48977,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47713,7 +49054,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -51998,7 +53339,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 1,
   },
@@ -52018,7 +53367,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
@@ -52038,7 +53395,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 3,
   },
@@ -52058,7 +53423,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 4,
   },
@@ -52078,7 +53451,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 5,
   },
@@ -52098,7 +53479,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 6,
   },
@@ -52118,7 +53507,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 7,
   },
@@ -52138,7 +53535,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 8,
   },
@@ -52158,7 +53563,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 9,
   },
@@ -52178,7 +53591,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 10,
   },
@@ -52198,7 +53619,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 11,
   },
@@ -52218,7 +53647,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 12,
   },
@@ -52238,7 +53675,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 13,
   },
@@ -52258,7 +53703,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 14,
   },
@@ -52278,7 +53731,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 15,
   },
@@ -52298,7 +53759,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 16,
   },
@@ -52318,7 +53787,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 17,
   },
@@ -52344,7 +53821,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 18,
   },
@@ -52370,7 +53855,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 19,
   },
@@ -52402,7 +53895,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 20,
   },
@@ -52427,7 +53928,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 1,
   },
@@ -52459,7 +53968,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
@@ -52491,7 +54008,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 3,
   },
@@ -52523,7 +54048,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 4,
   },
@@ -52555,7 +54088,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 5,
   },
@@ -52593,7 +54134,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 6,
   },
@@ -52631,7 +54180,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 7,
   },
@@ -52669,7 +54226,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 8,
   },
@@ -52707,7 +54272,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 9,
   },
@@ -52751,7 +54324,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 10,
   },
@@ -52795,7 +54376,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 11,
   },
@@ -52839,7 +54428,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 12,
   },
@@ -52883,7 +54480,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 13,
   },
@@ -52933,7 +54538,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 14,
   },
@@ -52983,7 +54596,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 15,
   },
@@ -53033,7 +54654,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 16,
   },
@@ -53083,7 +54712,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 17,
   },
@@ -53139,7 +54776,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 18,
   },
@@ -53195,7 +54840,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 19,
   },
@@ -53257,7 +54910,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 20,
   },
@@ -53282,7 +54943,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 1,
   },
@@ -53314,7 +54983,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
@@ -53346,7 +55023,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 3,
   },
@@ -53378,7 +55063,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 4,
   },
@@ -53410,7 +55103,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 5,
   },
@@ -53448,7 +55149,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 6,
   },
@@ -53486,7 +55195,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 7,
   },
@@ -53524,7 +55241,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 8,
   },
@@ -53562,7 +55287,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 9,
   },
@@ -53606,7 +55339,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 10,
   },
@@ -53650,7 +55391,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 11,
   },
@@ -53694,7 +55443,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 12,
   },
@@ -53738,7 +55495,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 13,
   },
@@ -53788,7 +55553,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 14,
   },
@@ -53838,7 +55611,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 15,
   },
@@ -53888,7 +55669,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 16,
   },
@@ -53938,7 +55727,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 17,
   },
@@ -53994,7 +55791,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 18,
   },
@@ -54050,7 +55855,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 19,
   },
@@ -54112,7 +55925,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 20,
   },
@@ -54137,7 +55958,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 1,
   },
@@ -54169,7 +55998,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
@@ -54201,7 +56038,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 3,
   },
@@ -54233,7 +56078,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 4,
   },
@@ -54265,7 +56118,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 5,
   },
@@ -54303,7 +56164,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 6,
   },
@@ -54341,7 +56210,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 7,
   },
@@ -54379,7 +56256,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 8,
   },
@@ -54417,7 +56302,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
       ],
-      "resources": [],
+      "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 9,
   },
@@ -54462,6 +56355,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
       ],
       "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
         {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
@@ -54515,6 +56415,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
           "label": "Illusory Self",
@@ -54567,6 +56474,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
           "label": "Illusory Self",
@@ -54618,6 +56532,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
       ],
       "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
         {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
@@ -54677,6 +56598,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
           "label": "Illusory Self",
@@ -54734,6 +56662,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
       ],
       "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
         {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
@@ -54793,6 +56728,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
           "label": "Illusory Self",
@@ -54850,6 +56792,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
       ],
       "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
         {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
@@ -54915,6 +56864,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
           "label": "Illusory Self",
@@ -54978,6 +56934,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
       ],
       "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
         {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
@@ -55048,6 +57011,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
       ],
       "resources": [
+        {
+          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
         {
           "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
           "key": "illusorySelf",
@@ -57791,6 +59761,91 @@ exports[`resolveClassDie snapshot — every class-die pool across all classes/su
 `;
 
 exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > rogue / assassin 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > rogue / thief 1`] = `
 [
   {
     "dice": {},

@@ -2,6 +2,7 @@
   "name": "character-sheet",
   "private": true,
   "workspaces": [
+    "packages/*",
     "backend",
     "frontend"
   ],

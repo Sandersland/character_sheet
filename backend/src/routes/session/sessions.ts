@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import type { CampaignRole } from "@/generated/prisma/client.js";
+import { serializeActivityEvent } from "@/lib/activity/activity.js";
 import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -342,7 +343,7 @@ sessionsRouter.get("/campaigns/:campaignId/sessions/:sessionId", async (req, res
     orderBy: { date: "desc" },
   });
 
-  res.json({ ...session, journalEntries, events: events.map(serializeEvent) });
+  res.json({ ...session, journalEntries, events: events.map(serializeActivityEvent) });
 });
 
 /**
@@ -444,7 +445,7 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
     orderBy: { date: "desc" },
   });
 
-  res.json({ ...session, journalEntries, events: events.map(serializeEvent) });
+  res.json({ ...session, journalEntries, events: events.map(serializeActivityEvent) });
 });
 
 /**
@@ -496,35 +497,3 @@ sessionsRouter.post(
   },
 );
 
-// Shared event serialization for session detail reads.
-function serializeEvent(row: {
-  id: string;
-  category: string;
-  type: string;
-  summary: string;
-  entityType: string | null;
-  entityId: string | null;
-  before: unknown;
-  after: unknown;
-  data: unknown;
-  actor: string;
-  reverted: boolean;
-  batchId: string | null;
-  createdAt: Date;
-}) {
-  return {
-    id: row.id,
-    category: row.category,
-    type: row.type,
-    summary: row.summary,
-    entityType: row.entityType ?? undefined,
-    entityId: row.entityId ?? undefined,
-    before: row.before ?? undefined,
-    after: row.after ?? undefined,
-    data: row.data ?? undefined,
-    actor: row.actor,
-    reverted: row.reverted,
-    batchId: row.batchId ?? undefined,
-    createdAt: row.createdAt,
-  };
-}

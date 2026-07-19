@@ -116,6 +116,14 @@ export interface ManeuverCastResult {
   summary: string;
 }
 
+/** Per-op result from POST …/sneak-attack/transactions — the server-rolled Nd6. */
+export interface SneakAttackRollResult {
+  roll: number;
+  dice: number;
+  faces: number;
+  summary: string;
+}
+
 /** A known elemental discipline entry on a character (Way of the Four Elements). */
 export interface DisciplineEntry {
   id: string;

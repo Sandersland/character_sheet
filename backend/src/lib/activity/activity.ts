@@ -199,12 +199,18 @@ async function revertCurrencyEvent(ctx: RevertContext): Promise<void> {
 
 async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
-  // Restore the full spellcasting JSON from before snapshot.
+  // Restore the full spellcasting JSON from before snapshot. Arcane Recovery
+  // (#904) also snapshots the resources JSON (its once-per-long-rest use
+  // counter lives there) — restore it so undo refunds the use.
   const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
-  if (beforeSpellcasting !== undefined) {
+  const beforeResources = before.resources as Record<string, unknown> | undefined;
+  if (beforeSpellcasting !== undefined || beforeResources !== undefined) {
     await tx.character.update({
       where: { id: characterId },
-      data: { spellcasting: beforeSpellcasting as Prisma.InputJsonValue },
+      data: {
+        ...(beforeSpellcasting !== undefined ? { spellcasting: beforeSpellcasting as Prisma.InputJsonValue } : {}),
+        ...(beforeResources !== undefined ? { resources: beforeResources as Prisma.InputJsonValue } : {}),
+      },
     });
   }
   // An item-spell cast (#528/#555) also spent an InventoryCapability.used
