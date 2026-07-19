@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import FeatFlow from "@/features/advancement/FeatFlow";
 import { FEAT_VIEW_INITIAL } from "@/features/advancement/featView";
 import type { FeatCatalog } from "@/features/advancement/useFeatCatalog";
+import type { CustomFeatDraft } from "@/features/advancement/useCustomFeatDraft";
 import type { CatalogFeat } from "@/types/character";
 
 const noop = () => {};
@@ -27,11 +28,29 @@ function stubCatalog(feats: CatalogFeat[]): FeatCatalog {
   };
 }
 
-const customDraft = {
-  form: { name: "", description: "", abilityChoice: "", skillChoice: "" },
-  setField: noop,
+const customDraft: CustomFeatDraft = {
+  name: "",
+  desc: "",
+  statBonuses: [],
+  grantedSkills: new Set<string>(),
+  grantedSaves: new Set<string>(),
+  abilityOptions: new Set<string>(),
+  abilityIncrease: 1,
+  abilityChoice: "",
+  setName: noop,
+  setDesc: noop,
+  addStatBonus: noop,
+  updateStatBonus: noop,
+  removeStatBonus: noop,
+  toggleSkill: noop,
+  toggleSave: noop,
+  toggleAbilityOption: noop,
+  setAbilityIncrease: noop,
+  setAbilityChoice: noop,
   reset: noop,
-} as never;
+  submitDisabled: () => true,
+  buildOperation: () => null,
+};
 
 describe("FeatFlow catalog list", () => {
   it("pads the scroll container so Select buttons clear the scrollbar", () => {
