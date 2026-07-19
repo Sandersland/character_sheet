@@ -52,8 +52,9 @@ interface ChannelDivinityGate {
 // description/cost/save ability; this table owns the class/subclass/level gate.
 export const CHANNEL_DIVINITY_OPTIONS: Record<string, ChannelDivinityGate> = {
   "Channel Divinity: Turn Undead": { className: "cleric", minLevel: 2, kind: "announce" },
-  "Channel Divinity: Preserve Life": { className: "cleric", subclass: "life domain", minLevel: 2, kind: "reminder" },
-  "Channel Divinity: Invoke Duplicity": { className: "cleric", subclass: "trickery domain", minLevel: 2, kind: "reminder" },
+  // SRD 5.2: domain Channel Divinity options unlock with the level-3 subclass grant (#1128).
+  "Channel Divinity: Preserve Life": { className: "cleric", subclass: "life domain", minLevel: 3, kind: "reminder" },
+  "Channel Divinity: Invoke Duplicity": { className: "cleric", subclass: "trickery domain", minLevel: 3, kind: "reminder" },
   "Channel Divinity: Cloak of Shadows": { className: "cleric", subclass: "trickery domain", minLevel: 6, kind: "invisible" },
   "Channel Divinity: Sacred Weapon": { className: "paladin", subclass: "oath of devotion", minLevel: 3, kind: "buff" },
   "Channel Divinity: Turn the Unholy": { className: "paladin", subclass: "oath of devotion", minLevel: 3, kind: "announce" },
