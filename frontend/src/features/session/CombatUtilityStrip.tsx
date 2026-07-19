@@ -3,7 +3,9 @@
  * the live Combat tab (#982). It collapses what used to be a full-height "No
  * active conditions" card into conditions + exhaustion + rest.
  *
- * Desktop keeps the one-line summary (DesktopUtilityLine). Mobile (#1028) breaks
+ * Desktop keeps the one-line summary (DesktopUtilityLine) and also carries the
+ * live-play HP entry point, since the desktop header dropped HP (#1085); mobile
+ * keeps HP in its header, so MobileUtilityRows stays HP-free. Mobile (#1028) breaks
  * it into full-bleed utility rows (MobileUtilityRows): a Conditions header + Add,
  * wrapping chips beside a big-hit exhaustion stepper, then a Rest row with the
  * hit-dice count inline. Both share the state/handlers here so the transaction
@@ -18,6 +20,7 @@ import { Minus, Plus } from "lucide-react";
 import { applyConditionTransactions } from "@/api/client";
 import BottomSheet from "@/components/ui/BottomSheet";
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";
+import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import RestButton from "@/features/hitpoints/RestButton";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { conditionLabel, EXHAUSTION_MAX } from "@/lib/conditions";
@@ -214,8 +217,27 @@ function DesktopUtilityLine({
   onAdd,
   onStep,
 }: UtilityViewProps) {
+  const { current, max, temp } = character.hitPoints;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2 shadow-card">
+      {/* HP — the desktop live-play entry to the shared Hit Points sheet (#1085).
+          Mobile keeps its header HP readout, so this desktop-only surface replaces
+          the header one that used to carry HP during live play (see LiveTurnBody). */}
+      <ManageHpButton
+        character={character}
+        onUpdate={onUpdate}
+        className="flex shrink-0 items-center gap-1.5 rounded-control px-1.5 py-0.5 transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+      >
+        <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+          HP
+        </span>
+        <span className="font-display text-sm font-semibold tabular-nums text-garnet-700">
+          {current}
+          <span className="text-parchment-500">/{max}</span>
+          {temp > 0 && <span className="text-arcane-700"> +{temp}</span>}
+        </span>
+      </ManageHpButton>
+
       {/* Conditions summary — opens the full add/remove/exhaustion sheet. Uses
           spans (not a <ul>) so it stays valid phrasing content inside a button. */}
       <button

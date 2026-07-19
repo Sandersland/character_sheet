@@ -54,7 +54,7 @@ describe("LiveTurnBody composition (#982)", () => {
     expect(hub.compareDocumentPosition(conditionsLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("no longer renders the CompactHpBar (HP lives in the sheet header)", () => {
+  it("keeps HP out of the mobile utility rows (mobile carries HP in its header)", () => {
     render(
       <LiveTurnBody
         character={makeCharacter()}
@@ -65,6 +65,10 @@ describe("LiveTurnBody composition (#982)", () => {
       />,
     );
 
+    // jsdom's matchMedia stub renders the mobile utility rows, which stay HP-free —
+    // mobile keeps its HP readout in the sheet header. The desktop live-play HP
+    // entry lives on the desktop utility line instead (#1085, covered in
+    // CombatUtilityStrip.test).
     expect(screen.queryByRole("button", { name: /manage hit points/i })).not.toBeInTheDocument();
   });
 
