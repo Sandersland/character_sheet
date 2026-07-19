@@ -339,6 +339,34 @@ describe("SRD 5.2 catalog values — CHUNK 3 L4 + L5 (#1132)", () => {
   });
 });
 
+describe("SRD 5.2 catalog values — CHUNK 4 additions (#1132)", () => {
+  const ADDED = [
+    "Aid", "Suggestion", "Invisibility", "Hypnotic Pattern", "Nondetection",
+    "Aura of Life", "Confusion", "Geas", "Insect Plague", "Greater Restoration",
+  ];
+
+  it("seeds all 10 new spells", () => {
+    expect(ADDED.filter((n) => !has(n))).toEqual([]);
+  });
+
+  it("gives each new spell a legal level and class list", () => {
+    for (const name of ADDED) {
+      const s = get(name);
+      expect(s.level, `${name} level`).toBeGreaterThanOrEqual(2);
+      expect(s.classes.length, `${name} classes`).toBeGreaterThan(0);
+    }
+  });
+
+  it("captures the load-bearing structured fields", () => {
+    expect(get("Hypnotic Pattern").components?.verbal).toBe(false); // S, M only
+    const ip = get("Insect Plague");
+    expect([ip.effectDiceCount, ip.effectDiceFaces, ip.damageType]).toEqual([4, 10, "piercing"]);
+    expect([ip.saveAbility, ip.saveEffect, ip.upcastDicePerLevel]).toEqual(["constitution", "half", 1]);
+    expect(get("Aura of Life").classes).toEqual(["paladin"]);
+    expect(get("Aid").effectKind).toBeUndefined(); // flat +5 HP is inexpressible
+  });
+});
+
 describe("global GrantedAbility name-uniqueness", () => {
   // All four sources upsert into GrantedAbility, whose `name` is globally
   // unique — a cross-source collision would make one row silently overwrite
