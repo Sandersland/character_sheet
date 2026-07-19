@@ -3,6 +3,7 @@
 // the Cancel/Back/Continue footer that flips to Confirm on the last step.
 
 import Spinner from "@/components/ui/Spinner";
+import AbilityScoreStep from "@/features/level-up/AbilityScoreStep";
 import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
 import StepRail from "@/features/level-up/StepRail";
 import SubclassStep from "@/features/level-up/SubclassStep";
@@ -30,6 +31,7 @@ const PRIMARY_BTN =
 // Step-body slot: #887–#891 register their real bodies per kind here; anything
 // unregistered renders the placeholder.
 const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>>> = {
+  advancement: AbilityScoreStep,
   subclass: SubclassStep,
 };
 
