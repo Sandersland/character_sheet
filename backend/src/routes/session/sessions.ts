@@ -7,6 +7,7 @@ import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import {
   startCampaignSession,
+  startSoloSession,
   endSession,
   joinSession,
   leaveSession,
@@ -345,6 +346,24 @@ sessionsRouter.get("/characters/:id/sessions", async (req, res) => {
   });
 
   res.json(sessions);
+});
+
+/**
+ * POST /api/characters/:id/sessions
+ * Start a solo (campaignId-null) session for the character as sole participant
+ * (#1081). 409 if the character is in a campaign or already has an active solo
+ * session; 404 unknown character; 403 not the caller's. Returns { session,
+ * character } to mirror the campaign start's one-assignment swap.
+ */
+sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+  const { title } = req.body as { title?: string };
+  const session = await startSoloSession(req.params.id, title);
+  const updated = await prisma.character.findUniqueOrThrow({
+    where: { id: req.params.id },
+    include: characterInclude,
+  });
+  res.status(201).json({ session, character: serializeCharacter(updated) });
 });
 
 /**

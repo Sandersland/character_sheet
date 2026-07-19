@@ -18,13 +18,16 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER = "owner-solo-owner";
+const OUTSIDER = "owner-solo-outsider";
 const CHAR_SOLO = "test-solo-char-wanderer";
 const CHAR_CAMPAIGN = "test-solo-char-campaigner";
 
 let cookie: string;
+let cookieOutsider: string;
 
 const app = createApp();
 const agent = () => supertest.agent(app).set("Cookie", cookie);
+const outsider = () => supertest.agent(app).set("Cookie", cookieOutsider);
 
 const BASE_CHAR = {
   alignment: "True Neutral",
@@ -67,14 +70,16 @@ async function attachToCampaign(characterId: string): Promise<string> {
 
 beforeEach(async () => {
   await ensureTestOwner(OWNER);
+  await ensureTestOwner(OUTSIDER);
   cookie = await authCookie(OWNER);
+  cookieOutsider = await authCookie(OUTSIDER);
   await makeChar(CHAR_SOLO, "Solo Wanderer");
   await makeChar(CHAR_CAMPAIGN, "Party Fighter");
 });
 
 afterEach(async () => {
   await prisma.character.deleteMany({ where: { id: { in: [CHAR_SOLO, CHAR_CAMPAIGN] } } });
-  await prisma.campaign.deleteMany({ where: { ownerId: OWNER } });
+  await prisma.campaign.deleteMany({ where: { ownerId: { in: [OWNER, OUTSIDER] } } });
 });
 
 describe("startSoloSession", () => {
@@ -106,6 +111,50 @@ describe("startSoloSession", () => {
     const err = await startSoloSession(CHAR_CAMPAIGN).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(SessionError);
     expect((err as SessionError).status).toBe(409);
+  });
+});
+
+describe("POST /api/characters/:id/sessions — solo start", () => {
+  it("201s { session, character } with a campaignId-null active session", async () => {
+    const res = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/sessions`)
+      .send({ title: "Lone Road" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.session.campaignId).toBeNull();
+    expect(res.body.session.status).toBe("active");
+    expect(res.body.session.title).toBe("Lone Road");
+    expect(res.body.session.participants).toHaveLength(1);
+    expect(res.body.session.participants[0].characterId).toBe(CHAR_SOLO);
+    expect(res.body.session.participants[0].leftAt).toBeNull();
+    // Serialized character shape: derived fields present, id echoed.
+    expect(res.body.character.id).toBe(CHAR_SOLO);
+    expect(res.body.character.level).toBeGreaterThan(0);
+    expect(res.body.character.proficiencyBonus).toBeGreaterThan(0);
+  });
+
+  it("409s a double-start for the same character", async () => {
+    await agent().post(`/api/characters/${CHAR_SOLO}/sessions`).send({});
+    const res = await agent().post(`/api/characters/${CHAR_SOLO}/sessions`).send({});
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/already active/i);
+  });
+
+  it("409s a character attached to a campaign", async () => {
+    await attachToCampaign(CHAR_CAMPAIGN);
+    const res = await agent().post(`/api/characters/${CHAR_CAMPAIGN}/sessions`).send({});
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/campaign/i);
+  });
+
+  it("404s an unknown character", async () => {
+    const res = await agent().post(`/api/characters/does-not-exist/sessions`).send({});
+    expect(res.status).toBe(404);
+  });
+
+  it("403s another user's character", async () => {
+    const res = await outsider().post(`/api/characters/${CHAR_SOLO}/sessions`).send({});
+    expect(res.status).toBe(403);
   });
 });
 
