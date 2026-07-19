@@ -69,6 +69,7 @@ function twoWeaponCharacter(overrides: Partial<Character> = {}): Character {
     unarmedStrike: { attackBonus: 2, damage: { count: 1, faces: 1, modifier: 0, damageType: "bludgeoning" } },
     improvisedWeapon: { attackBonus: 2, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" }, proficient: false },
     resources: { pools: [] },
+    advancements: [],
     ...overrides,
   } as unknown as Character;
 }
@@ -102,10 +103,12 @@ describe("InlineOffHandPicker (#813 redesign)", () => {
     expect(screen.queryByText(/1d6 \+ 3/)).not.toBeInTheDocument();
   });
 
-  it("keeps the ability mod in damage WITH the Two-Weapon Fighting style", () => {
+  it("keeps the ability mod in damage WITH the Two-Weapon Fighting feat", () => {
     const character = twoWeaponCharacter({
-      resources: { pools: [], fightingStyle: "twoWeaponFighting" },
-    } as unknown as Partial<Character>);
+      advancements: [
+        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
+      ] as unknown as Character["advancements"],
+    });
     renderPicker(character, makeTurnState({ total: 1, used: 0 }));
     expect(screen.getByText(/1d6 \+ 3 piercing/)).toBeInTheDocument();
   });

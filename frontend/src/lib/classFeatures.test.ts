@@ -57,18 +57,24 @@ describe("deriveClassFeatureView", () => {
     expect(view.maneuverKnownIds).toEqual(["trip"]);
   });
 
-  it("derives entitlement flags from resources", () => {
+  it("derives entitlement flags from resources, and Fighting Style from slots + advancements", () => {
     const view = deriveClassFeatureView(
-      makeChar({}, {
-        pools: [{ key: "channelDivinity" }] as unknown as CharacterResources["pools"],
-        maneuverChoiceCount: 3,
-        disciplineChoiceCount: 2,
-        shadowArtsAvailable: true,
-        cloakOfShadowsAvailable: true,
-        fightingStyleChoiceCount: 1,
-        fightingStyle: "archery",
-        features: [{ source: "class", name: "F", description: "d" }] as unknown as CharacterResources["features"],
-      }),
+      makeChar(
+        {
+          fightingStyleSlots: { total: 1, used: 1 },
+          advancements: [
+            { id: "fs1", slot: "fightingStyle", featId: "archery", featName: "Archery" },
+          ] as unknown as Character["advancements"],
+        },
+        {
+          pools: [{ key: "channelDivinity" }] as unknown as CharacterResources["pools"],
+          maneuverChoiceCount: 3,
+          disciplineChoiceCount: 2,
+          shadowArtsAvailable: true,
+          cloakOfShadowsAvailable: true,
+          features: [{ source: "class", name: "F", description: "d" }] as unknown as CharacterResources["features"],
+        },
+      ),
       [fighterDef],
     );
     expect(view.hasPools).toBe(true);
@@ -79,7 +85,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasCloakOfShadows).toBe(true);
     expect(view.hasFightingStyle).toBe(true);
     expect(view.hasFeatures).toBe(true);
-    expect(view.fightingStyle).toBe("archery");
+    expect(view.fightingStyleFeats.map((f) => f.featName)).toEqual(["Archery"]);
     expect(view.isEmpty).toBe(false);
   });
 
@@ -89,7 +95,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasManeuvers).toBe(false);
     expect(view.hasChannelDivinity).toBe(false);
     expect(view.hasFightingStyle).toBe(false);
-    expect(view.fightingStyle).toBeNull();
+    expect(view.fightingStyleFeats).toEqual([]);
     expect(view.isEmpty).toBe(true);
   });
 

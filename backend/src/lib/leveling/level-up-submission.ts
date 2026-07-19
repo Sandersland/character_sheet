@@ -4,7 +4,7 @@
 // submission matches them exactly. No DB, no Prisma — the caller resolves any
 // subclass id → name before calling. Later tasks wire the endpoint that applies
 // the returned steps.
-import type { AdvancementOperation } from "@/lib/leveling/advancement.js";
+import type { AdvancementOperation, TakeFeatOperation } from "@/lib/leveling/advancement.js";
 import type { LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import type {
   LearnManeuverOperation,
@@ -36,7 +36,9 @@ export interface LevelUpSubmission {
   hp: { method: "average" | "roll"; roll?: number };
   advancement?: AdvancementOperation;
   subclassId?: string;
-  fightingStyle?: string;
+  // #1137: a Fighting Style feat pick — a takeFeat op; the transaction forces
+  // slot:"fightingStyle" server-side so it lands in the fs partition.
+  fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
   disciplines?: LearnDisciplineOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
@@ -53,7 +55,7 @@ export interface LevelUpSubmission {
 // Canonical step order — mirrors the candidates array in buildLevelUpPlan. The
 // subclass step is spliced back at this rank after a re-plan (which omits it).
 const KIND_ORDER: LevelUpStepKind[] = [
-  "hitPoints", "advancement", "subclass", "maneuvers", "fightingStyle",
+  "hitPoints", "advancement", "subclass", "maneuvers", "fightingStyleFeat",
   "disciplines", "toolProficiency", "subclassChoice", "newSpells", "review",
 ];
 
@@ -69,7 +71,7 @@ interface SimpleDomain {
 const SIMPLE_DOMAINS: SimpleDomain[] = [
   { kind: "hitPoints", provided: () => 1, noun: "hit point roll", absentMessage: "this level-up does not include hit points" },
   { kind: "advancement", provided: (s) => (s.advancement ? 1 : 0), noun: "advancement", absentMessage: "this level-up does not include an ability score improvement or feat" },
-  { kind: "fightingStyle", provided: (s) => (s.fightingStyle ? 1 : 0), noun: "fighting style", absentMessage: "this level-up does not include a fighting style choice" },
+  { kind: "fightingStyleFeat", provided: (s) => (s.fightingStyleFeat ? 1 : 0), noun: "fighting style", absentMessage: "this level-up does not include a fighting style choice" },
   { kind: "maneuvers", provided: (s) => s.maneuvers?.length ?? 0, noun: "maneuvers", absentMessage: "this level-up does not grant maneuvers" },
   { kind: "disciplines", provided: (s) => s.disciplines?.length ?? 0, noun: "disciplines", absentMessage: "this level-up does not grant disciplines" },
   { kind: "toolProficiency", provided: (s) => s.toolProficiencies?.length ?? 0, noun: "tool proficiencies", absentMessage: "this level-up does not grant a tool proficiency" },

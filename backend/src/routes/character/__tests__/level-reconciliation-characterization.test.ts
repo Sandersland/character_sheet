@@ -247,7 +247,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: oneToolProf(),
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
     expect(ev.after).toEqual({
@@ -258,7 +257,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: oneToolProf(),
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
     // Tool profs untouched at level 3 (Student of War still grants 1).
@@ -275,10 +273,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(man.summary).toBe("All 5 maneuvers removed — subclass no longer available");
     expect(man.data).toEqual({ removedCount: 5, allowed: 0 });
     expect(man.before).toEqual({
-      resources: { used: {}, maneuversKnown: fiveManeuvers(), disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: fiveManeuvers(), disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
     expect(man.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
 
     const [tool] = await eventsByType("recon-full", "toolProficienciesReconciled");
@@ -287,10 +285,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(tool.data).toEqual({ removedCount: 1, allowed: 0 });
     // Ordering interaction: maneuvers already trimmed → maneuversKnown is [] here.
     expect(tool.before).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
     expect(tool.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [], fightingStyle: null },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
     });
 
     // Registry order: maneuvers event precedes toolProfs event within the batch.
@@ -323,7 +321,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: [],
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
     expect(ev.after).toEqual({
@@ -334,7 +331,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: [],
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
   });
@@ -356,7 +352,6 @@ describe("level-reconciliation characterization (#617)", () => {
         toolProficienciesKnown: [],
         choicesKnown: {},
         advancements: [],
-        fightingStyle: null,
       },
     });
   });

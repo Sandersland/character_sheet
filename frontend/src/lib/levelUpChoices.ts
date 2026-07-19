@@ -2,8 +2,7 @@
 // choice kind maps a shared UI (ChoiceStep) to its catalog source, the
 // character's already-known set, and the draft field it writes. No JSX.
 
-import { fetchDisciplines, fetchManeuvers, fetchReference } from "@/api/client";
-import { FIGHTING_STYLE_OPTIONS, fightingStyleLabel } from "@/lib/fightingStyles";
+import { fetchDisciplines, fetchFeats, fetchManeuvers, fetchReference } from "@/api/client";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type { Character, LevelUpStepKind } from "@/types/character";
 
@@ -21,7 +20,7 @@ export interface ChoiceKindConfig {
   selected(draft: LevelUpDraft): string[];
   /** Draft patch that replaces this kind's selection with `ids`. */
   select(draft: LevelUpDraft, ids: string[]): Partial<LevelUpDraft>;
-  /** Single-select kinds (fightingStyle) render radio-style and write a scalar. */
+  /** Single-select kinds (fightingStyleFeat) render radio-style and write one op. */
   single?: boolean;
 }
 
@@ -41,20 +40,25 @@ const maneuvers: ChoiceKindConfig = {
   select: (_draft, ids) => ({ maneuvers: ids.map((id) => ({ type: "learnManeuver", maneuverId: id })) }),
 };
 
-const fightingStyle: ChoiceKindConfig = {
+const fightingStyleFeat: ChoiceKindConfig = {
   single: true,
   loadOptions: () =>
-    Promise.resolve(
-      FIGHTING_STYLE_OPTIONS.map((o) => ({
-        id: o.key,
-        name: fightingStyleLabel(o.key),
-        description: o.description,
-      })),
+    fetchFeats().then((list) =>
+      list
+        .filter((f) => f.category === "fighting_style")
+        .map((f) => ({ id: f.id, name: f.name, description: f.description })),
     ),
   fromCharacter: (character) =>
-    character.resources?.fightingStyle ? new Set([character.resources.fightingStyle]) : new Set(),
-  selected: (draft) => (draft.fightingStyle ? [draft.fightingStyle] : []),
-  select: (_draft, ids) => ({ fightingStyle: ids[0] }),
+    new Set(
+      character.advancements
+        .filter((a) => a.slot === "fightingStyle")
+        .map((a) => a.featId)
+        .filter((id): id is string => id != null),
+    ),
+  selected: (draft) => (draft.fightingStyleFeat?.featId ? [draft.fightingStyleFeat.featId] : []),
+  select: (_draft, ids) => ({
+    fightingStyleFeat: ids[0] ? { type: "takeFeat", featId: ids[0], slot: "fightingStyle" } : undefined,
+  }),
 };
 
 const toolProficiency: ChoiceKindConfig = {
@@ -86,7 +90,7 @@ const disciplines: ChoiceKindConfig = {
 
 export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConfig>> = {
   maneuvers,
-  fightingStyle,
+  fightingStyleFeat,
   toolProficiency,
   disciplines,
 };

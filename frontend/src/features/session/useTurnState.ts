@@ -25,6 +25,7 @@
 
 import { useReducer, useMemo, useEffect, useRef } from "react";
 import { canTwoWeaponFight } from "@/lib/turnRules";
+import { hasFeatImprovement } from "@/lib/featDisplay";
 import { autoVerdict } from "@/lib/attackTallySummary";
 import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
 import type {
@@ -736,7 +737,10 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
 
   // Derived (not persisted): TWF eligibility follows the LIVE loadout, so a
   // mid-turn weapon swap updates the off-hand affordance immediately (#733).
-  const twfAvailable = canTwoWeaponFight(character.inventory, character.resources?.fightingStyle);
+  const twfAvailable = canTwoWeaponFight(
+    character.inventory,
+    hasFeatImprovement(character, "offhandAbilityDamage"),
+  );
 
   // Server-derived, multiclass-correct (max across classes); see srd.ts. Mirrored
   // into refs so the action facade stays a stable, dependency-free useMemo while

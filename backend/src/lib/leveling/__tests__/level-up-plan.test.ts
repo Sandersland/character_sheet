@@ -69,17 +69,30 @@ describe("buildLevelUpPlan — subclass", () => {
   });
 });
 
-describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyle/disciplines/toolProficiency)", () => {
+describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/disciplines/toolProficiency)", () => {
   it("Battle Master 6→7 grants 2 maneuvers", () => {
     const plan = buildLevelUpPlan(char("fighter", 6, "battle master"), target("fighter", 7, "battle master"));
     expect(kinds(plan)).toEqual(["hitPoints", "maneuvers", "review"]);
     expect(plan.find((s) => s.kind === "maneuvers")?.count).toBe(2);
   });
 
-  it("Fighter 0→1 grants a fighting style choice", () => {
+  it("Fighter 0→1 grants a Fighting Style feat (#1137)", () => {
     const plan = buildLevelUpPlan(char("fighter", 0), target("fighter", 1, null));
-    expect(kinds(plan)).toEqual(["hitPoints", "fightingStyle", "review"]);
-    expect(plan.find((s) => s.kind === "fightingStyle")?.count).toBe(1);
+    expect(kinds(plan)).toEqual(["hitPoints", "fightingStyleFeat", "review"]);
+    expect(plan.find((s) => s.kind === "fightingStyleFeat")?.count).toBe(1);
+  });
+
+  it("Paladin 1→2 and Ranger 1→2 grant a Fighting Style feat (#1137)", () => {
+    for (const cls of ["paladin", "ranger"]) {
+      const plan = buildLevelUpPlan(char(cls, 1), target(cls, 2, null));
+      expect(kinds(plan)).toContain("fightingStyleFeat");
+      expect(plan.find((s) => s.kind === "fightingStyleFeat")?.count).toBe(1);
+    }
+  });
+
+  it("Paladin 2→3 and a Fighter level-up past 1 grant no fighting-style feat", () => {
+    expect(kinds(buildLevelUpPlan(char("paladin", 2), target("paladin", 3, null)))).not.toContain("fightingStyleFeat");
+    expect(kinds(buildLevelUpPlan(char("fighter", 4, "champion"), target("fighter", 5, "champion")))).not.toContain("fightingStyleFeat");
   });
 
   it("Battle Master 2→3 re-plan (subclass pre-chosen) surfaces maneuvers + tool proficiency", () => {

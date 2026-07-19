@@ -11,6 +11,7 @@
 
 import { buildAttackEntries, buildOffHandEntry } from "@/lib/attackMath";
 import { formatRollSpec } from "@/lib/dice";
+import { hasFeatImprovement } from "@/lib/featDisplay";
 import { effectPreviewWithMod } from "@/lib/spellMeta";
 import {
   availableArcanaLevels,
@@ -156,7 +157,7 @@ export function bonusSpellOptions(
  * else falls back to the generic requirement. Null when TWF is already live.
  */
 export function twfHint(character: Character): string | null {
-  if (canTwoWeaponFight(character.inventory, character.resources?.fightingStyle)) return null;
+  if (canTwoWeaponFight(character.inventory, hasFeatImprovement(character, "offhandAbilityDamage"))) return null;
   const lightWeapons = character.inventory.filter(
     (item) => item.category === "weapon" && item.weapon?.light === true,
   );

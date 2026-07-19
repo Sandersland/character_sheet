@@ -133,7 +133,7 @@ export type LevelUpStepKind =
   | "advancement"
   | "subclass"
   | "maneuvers"
-  | "fightingStyle"
+  | "fightingStyleFeat"
   | "disciplines"
   | "toolProficiency"
   | "subclassChoice"
@@ -172,7 +172,8 @@ export interface LevelUpSubmission {
   hp: { method: "average" | "roll"; roll?: number };
   advancement?: TakeAsiOperation | TakeFeatOperation;
   subclassId?: string;
-  fightingStyle?: string;
+  /** #1137: a Fighting Style feat pick — a takeFeat op (server forces the fs slot). */
+  fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
   disciplines?: LearnDisciplineOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];

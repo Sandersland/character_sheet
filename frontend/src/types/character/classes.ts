@@ -173,18 +173,6 @@ export interface ToolProfEntry {
   name: string; // matches a TOOLS entry name
 }
 
-/**
- * The 6 core Fighting Style keys (mirror of the backend `FightingStyleKey`).
- * Persisted choice is just this key; the mechanical effect is derived on the backend.
- */
-export type FightingStyleKey =
-  | "archery"
-  | "defense"
-  | "dueling"
-  | "greatWeaponFighting"
-  | "protection"
-  | "twoWeaponFighting";
-
 /** Derived class/subclass resource data merged with stored mutable state. */
 export interface CharacterResources {
   features: ClassFeature[];
@@ -206,10 +194,6 @@ export interface CharacterResources {
   disciplinesKnown: DisciplineEntry[];
   /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
-  /** Number of Fighting Style choices the character is entitled to (Fighter L1 -> 1). */
-  fightingStyleChoiceCount?: number;
-  /** The chosen Fighting Style key, or null if unchosen / not entitled. */
-  fightingStyle?: FightingStyleKey | null;
 }
 
 /** One entry in `Character.classes` — structured multiclass-aware view. */
@@ -229,12 +213,12 @@ export interface ClassEntry {
  */
 export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
 
-export interface SetFightingStyleOperation { type: "setFightingStyle"; key: FightingStyleKey }
-
 // #1131: the frontend no longer dispatches an addClass op — AddClassPanel routes a
 // multiclass-add through the level-up ceremony (?classId=). The backend addClass op
 // stays for its other callers; the frontend mirror was dead and is dropped.
-export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation;
+// #1137: setFightingStyle is gone — Fighting Style is now a feat taken via the
+// advancement endpoint (fightingStyle slot), not a class-scalar op.
+export type ClassOperation = SetSubclassOperation;
 
 /**
  * Resource operation types — mirror of `applyResourceOperations`. Sent as

@@ -407,8 +407,6 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "source": "class",
       },
     ],
-    "fightingStyle": null,
-    "fightingStyleChoiceCount": 0,
     "maneuverChoiceCount": undefined,
     "maneuverSaveDC": undefined,
     "maneuversKnown": [],
@@ -764,8 +762,6 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
         "source": "class",
       },
     ],
-    "fightingStyle": "defense",
-    "fightingStyleChoiceCount": 1,
     "maneuverChoiceCount": 3,
     "maneuverSaveDC": 14,
     "maneuversKnown": [

@@ -46,7 +46,7 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
-import { advancementSlotsForLevel, characterFightingStyleChoiceCount, characterFightingStyleFeatSlots, derivePreparedSpellLimit, FIGHTING_STYLES } from "@/lib/srd/srd.js";
+import { advancementSlotsForLevel, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -71,6 +71,7 @@ type Reconciler = (ctx: ReconcileContext) => Promise<void>;
 // so the XP-derived total is authoritative there. Runs first (after class-level
 // reconciliation) so maneuver/tool reconcilers see the already-cleared subclass.
 
+// fallow-ignore-next-line complexity -- pre-existing per-entry subclass-clear logic; unchanged by #1137, CRAP re-estimated after the fightingStyle-scalar export removal
 async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
   const { tx, characterId, newDerivedLevel, batchId } = ctx;
 
@@ -505,62 +506,6 @@ async function reconcileSubclassChoices(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// Clears the persisted fighting style when NO class entry entitles the character
-// to one anymore (a multiclass Fighter entry deleted by reconcileClassEntryLevels
-// — which runs first — or a class change away from Fighter via the data). Fighter
-// keeps its choice at every level >= 1, so for a pure single-class Fighter this
-// only fires on a class change.
-//
-// Uses a `resources`-category event so the undo branch in activity.ts restores
-// before.resources wholesale (incl. fightingStyle) — no new undo code. The
-// clamp-on-read mirror lives in serializeCharacter.
-
-async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
-
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: {
-      resources: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        select: { name: true, level: true },
-      },
-    },
-  });
-  if (!row) return;
-
-  const state = normalizeResourcesMutable(row.resources);
-  if (state.fightingStyle === null) return; // nothing chosen
-
-  const allowed = characterFightingStyleChoiceCount(row.classEntries, newDerivedLevel);
-  if (allowed > 0) return; // still entitled — keep the choice
-
-  const before = { resources: snapshotResources(state) };
-
-  const removedKey = state.fightingStyle;
-  const removedLabel = FIGHTING_STYLES.find((s) => s.key === removedKey)?.label ?? removedKey;
-  state.fightingStyle = null;
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { resources: serializeResourcesState(state) },
-  });
-
-  const after = { resources: snapshotResources(state) };
-
-  await logEvent(tx, {
-    characterId,
-    category: "resources",
-    type: "fightingStyleRemoved",
-    summary: `Fighting style "${removedLabel}" removed — no longer available`,
-    before,
-    after,
-    data: { fightingStyle: removedKey },
-    batchId,
-  });
-}
-
 // Reverses the tail of advancements[] when the XP-derived level has fallen
 // below the level required for those slots (i.e. character leveled down past
 // an ASI level). Uses LIFO: the most-recently-taken advancements are removed
@@ -782,7 +727,6 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileDisciplines,
   reconcileToolProficiencies,
   reconcileSubclassChoices,
-  reconcileFightingStyle,
   reconcileAdvancements,
 ];
 

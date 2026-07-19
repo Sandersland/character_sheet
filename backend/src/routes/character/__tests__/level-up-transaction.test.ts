@@ -765,7 +765,7 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
 });
 
 // Non-primary ceremonies (#1065): multiclass-into-Fighter is the canonical case —
-// its plan is [hitPoints, fightingStyle, review], so without generalized class
+// its plan is [hitPoints, fightingStyleFeat, review], so without generalized class
 // appliers no valid submission exists at all.
 describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () => {
   const WIZARD_FIXTURE = {
@@ -776,9 +776,10 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
   };
 
-  it("multiclass INTO Fighter applies hp + fighting style under one batchId, and the style survives serialization", async () => {
+  it("multiclass INTO Fighter applies hp + fighting-style feat under one batchId, and it survives serialization", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
     const CHAR_ID = "lvtx-mc-into-fighter";
     await prisma.character.create({
       data: {
@@ -797,30 +798,32 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     const res = await post(CHAR_ID, {
       target: { kind: "new", classId: fighter.id },
       hp: { method: "average" },
-      fightingStyle: "defense",
+      fightingStyleFeat: { type: "takeFeat", featId: defense.id },
     });
 
     expect(res.status).toBe(200);
     expect(res.body.hitDice.total).toBe(4);
-    // The new level-1 Fighter entry exists and the chosen style is VISIBLE on the
-    // wire — the read-side clamp must not null it just because the primary class
-    // (wizard) grants no style.
+    // The new level-1 Fighter entry exists and the fs feat is VISIBLE on the wire
+    // — the read-side clamp keeps it since the Fighter entry entitles a fs slot.
     expect(res.body.classes).toHaveLength(2);
     // The created entry snapshots the catalog's display name ("Fighter").
     expect(res.body.classes[1]).toMatchObject({ name: "Fighter", level: 1 });
-    expect(res.body.resources.fightingStyle).toBe("defense");
+    const fsAdv = res.body.advancements.find((a: { slot?: string }) => a.slot === "fightingStyle");
+    expect(fsAdv?.featName).toBe("Defense");
+    expect(res.body.fightingStyleSlots).toMatchObject({ total: 1, used: 1 });
 
     const batchIds = await distinctBatchIds(CHAR_ID);
     expect(batchIds).toHaveLength(1);
 
     // Persisted, not just serialized.
     const after = await prisma.character.findUniqueOrThrow({ where: { id: CHAR_ID } });
-    expect((after.resources as { fightingStyle?: string }).fightingStyle).toBe("defense");
+    expect((after.resources as { advancements: { slot?: string }[] }).advancements.some((a) => a.slot === "fightingStyle")).toBe(true);
   });
 
-  it("single revert undoes the whole multiclass ceremony: entry gone, style cleared", async () => {
+  it("single revert undoes the whole multiclass ceremony: entry gone, fs feat cleared", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
     const CHAR_ID = "lvtx-mc-undo";
     await prisma.character.create({
       data: {
@@ -839,7 +842,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     const ceremony = await post(CHAR_ID, {
       target: { kind: "new", classId: fighter.id },
       hp: { method: "average" },
-      fightingStyle: "defense",
+      fightingStyleFeat: { type: "takeFeat", featId: defense.id },
     });
     expect(ceremony.status).toBe(200);
 
@@ -847,7 +850,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     expect(res.status).toBe(200);
     expect(res.body.classes).toHaveLength(1);
     expect(res.body.hitDice.total).toBe(3);
-    expect(res.body.resources.fightingStyle ?? null).toBeNull();
+    expect(res.body.advancements.some((a: { slot?: string }) => a.slot === "fightingStyle")).toBe(false);
     expect(res.body.pendingLevelUps).toBe(1);
   });
 
@@ -1124,17 +1127,18 @@ describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)
     expect(await distinctBatchIds(CHAR_ID)).toHaveLength(1);
   });
 
-  it("adds a Fighter second class and commits its fighting style against the new entry", async () => {
+  it("adds a Fighter second class and commits its fighting-style feat against the new entry", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "new", classId: fighter.id },
       hp: { method: "average" },
-      fightingStyle: "defense",
+      fightingStyleFeat: { type: "takeFeat", featId: defense.id },
     });
 
     expect(res.status).toBe(200);
     expect(res.body.classes.map((c: { name: string }) => c.name.toLowerCase())).toContain("fighter");
-    expect(res.body.resources.fightingStyle).toBe("defense");
+    expect(res.body.advancements.some((a: { slot?: string; featName?: string }) => a.slot === "fightingStyle" && a.featName === "Defense")).toBe(true);
   });
 });

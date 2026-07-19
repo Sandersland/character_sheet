@@ -9,7 +9,7 @@
  * tracking is flagged for a future phase.
  */
 
-import type { ActionCost, FightingStyleKey } from "@/types/character";
+import type { ActionCost } from "@/types/character";
 
 /**
  * Returns true when the character's equipped loadout allows a TWF bonus-action
@@ -18,10 +18,11 @@ import type { ActionCost, FightingStyleKey } from "@/types/character";
  * omits the ability modifier unless the character has the Two-Weapon Fighting
  * style — resolved from `weapon.damage.abilityModifier` in `buildOffHandEntry`.
  *
- * The **Two-Weapon Fighting fighting style** (PHB p.72) removes the light
- * restriction, so when `fightingStyle === "twoWeaponFighting"` any two equipped
- * weapons qualify. (The paper-doll already prevents equipping a two-handed
- * weapon alongside an off-hand, so we don't re-check that here.)
+ * The **Two-Weapon Fighting fighting style** (#1137: now a feat, its
+ * "offhandAbilityDamage" improvement) removes the light restriction, so when
+ * `canOffhandAbilityDamage` is true any two equipped weapons qualify. (The
+ * paper-doll already prevents equipping a two-handed weapon alongside an
+ * off-hand, so we don't re-check that here.)
  *
  * The existing `offHandBusy` field on the serialized character covers the
  * versatile-grip calculation but is a boolean that conflates "shield equipped"
@@ -30,14 +31,14 @@ import type { ActionCost, FightingStyleKey } from "@/types/character";
  */
 export function canTwoWeaponFight(
   inventory: Array<{ equipped: boolean; category: string; weapon?: { light: boolean } | null }>,
-  fightingStyle?: FightingStyleKey | null,
+  canOffhandAbilityDamage = false,
 ): boolean {
   const equippedWeapons = inventory.filter(
     (i) => i.equipped && i.category === "weapon" && i.weapon,
   );
   if (equippedWeapons.length < 2) return false;
   // The Two-Weapon Fighting style removes the light-weapon restriction.
-  if (fightingStyle === "twoWeaponFighting") return true;
+  if (canOffhandAbilityDamage) return true;
   // Baseline: both held weapons must have the light property.
   return equippedWeapons.slice(0, 2).every((i) => i.weapon?.light === true);
 }

@@ -27,7 +27,6 @@ import {
   learnSubclassChoiceOpSchema,
 } from "@/routes/character/resources.js";
 import { forgetSpellOpSchema, learnSpellOpSchema } from "@/routes/character/spellcasting.js";
-import { fightingStyleKeySchema } from "@/routes/character/class.js";
 
 export const levelUpRouter = Router({ mergeParams: true });
 
@@ -126,13 +125,13 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
 
 // z.infer of this schema must satisfy LevelUpSubmission — each field reuses the
 // exact op schema its domain already validates, so the parsed body is the domain
-// op shape verbatim (only `target`/hp/subclassId/fightingStyle are level-up-local).
+// op shape verbatim (only `target`/hp/subclassId are level-up-local; fightingStyleFeat reuses takeFeat).
 const levelUpSubmissionSchema = z.object({
   target: levelUpTargetSchema,
   hp: z.object({ method: z.enum(["average", "roll"]), roll: z.number().int().min(1).optional() }),
   advancement: z.discriminatedUnion("type", [takeAsiOpSchema, takeFeatOpSchema]).optional(),
   subclassId: z.string().min(1).optional(),
-  fightingStyle: fightingStyleKeySchema.optional(),
+  fightingStyleFeat: takeFeatOpSchema.optional(),
   maneuvers: z.array(learnManeuverOpSchema).optional(),
   disciplines: z.array(learnDisciplineOpSchema).optional(),
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),

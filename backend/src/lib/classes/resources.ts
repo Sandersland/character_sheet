@@ -16,11 +16,7 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";
-import {
-  toolsByCategory,
-  isKnownFightingStyle,
-  type FightingStyleKey,
-} from "@/lib/srd/srd.js";
+import { toolsByCategory } from "@/lib/srd/srd.js";
 
 // status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidResourceOperationError extends Error {
@@ -156,16 +152,9 @@ export interface ResourcesMutableState {
    * adds a subclass declaration + seed rows — no new state key here.
    */
   choicesKnown: Record<string, ChoiceEntry[]>;
-  /** Ability Score Improvements and feats taken, in the order chosen. */
+  /** Ability Score Improvements and feats taken, in the order chosen. Fighting
+   *  Style feats (#1137) live here tagged slot:"fightingStyle" — no separate key. */
   advancements: AdvancementEntry[];
-  /**
-   * The chosen Fighting Style key (Fighter L1 feature), or null if unchosen /
-   * not entitled. Only the key is persisted — the mechanical effect (Defense
-   * +1 AC, Archery +2 ranged attack) is derived at read time in
-   * serializeCharacter. Level-gated: reconciled to null on level-down via
-   * reconcileFightingStyle when the character can no longer choose a style.
-   */
-  fightingStyle: FightingStyleKey | null;
 }
 
 // Subclass "choose N" cap policy: single-sourced level-gating for choicesKnown, shared by reconcile-on-write
@@ -238,14 +227,9 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
       toolProficienciesKnown: [],
       choicesKnown: {},
       advancements: [],
-      fightingStyle: null,
     };
   }
   const obj = json as Record<string, unknown>;
-  // Tolerate null/unknown: drop a persisted fighting style that isn't a known key.
-  const rawStyle = obj.fightingStyle;
-  const fightingStyle: FightingStyleKey | null =
-    typeof rawStyle === "string" && isKnownFightingStyle(rawStyle) ? rawStyle : null;
   const rawChoices = obj.choicesKnown;
   const choicesKnown: Record<string, ChoiceEntry[]> =
     rawChoices && typeof rawChoices === "object" && !Array.isArray(rawChoices)
@@ -258,7 +242,6 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
     toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
     choicesKnown,
     advancements: (obj.advancements as AdvancementEntry[]) ?? [],
-    fightingStyle,
   };
 }
 
@@ -275,7 +258,6 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
     toolProficienciesKnown: state.toolProficienciesKnown,
     choicesKnown: state.choicesKnown,
     advancements: state.advancements,
-    fightingStyle: state.fightingStyle,
   } as unknown as Prisma.InputJsonValue;
 }
 
@@ -303,7 +285,6 @@ export function snapshotResources(state: ResourcesMutableState): ResourcesMutabl
       // treated as immutable snapshots.
       improvements: a.improvements ? [...a.improvements] : undefined,
     })),
-    fightingStyle: state.fightingStyle,
   };
 }
 
@@ -481,6 +462,7 @@ function applyRestoreResourceOp(
   };
 }
 
+// fallow-ignore-next-line complexity -- pre-existing maneuver-validation branches (dedup/catalog/count); unchanged by #1137, CRAP re-estimated after the fightingStyle-scalar export removal
 async function applyLearnManeuverOp(
   tx: Prisma.TransactionClient,
   state: ResourcesMutableState,

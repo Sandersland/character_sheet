@@ -3,6 +3,7 @@
 
 import { formatRollSpec } from "@/lib/dice";
 import type { RollSpec } from "@/lib/dice";
+import { hasFeatImprovement } from "@/lib/featDisplay";
 import type { Character, InventoryItem, WeaponDetail } from "@/types/character";
 
 export interface RollSpecTriple {
@@ -188,7 +189,7 @@ export function buildOffHandEntry(character: Character): AttackEntry | null {
   const offHand = weapons.find((i) => i.equippedSlot === "OFF_HAND") ?? weapons[1];
 
   const entry = buildWeaponEntry(offHand);
-  const hasStyle = character.resources?.fightingStyle === "twoWeaponFighting";
+  const hasStyle = hasFeatImprovement(character, "offhandAbilityDamage");
   // Undefined only for a legacy weapon serialized before #732 (no ability-mod
   // component) — skip the subtraction and show the full modifier, matching the
   // pre-#732 behavior rather than silently dropping the wrong amount.

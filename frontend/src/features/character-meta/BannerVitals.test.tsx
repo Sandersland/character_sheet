@@ -64,6 +64,7 @@ const mockCharacter: Character = {
   attacksPerAction: 1,
   advancements: [],
   advancementSlots: { total: 1, used: 0 },
+  fightingStyleSlots: { total: 0, used: 0 },
   journal: [],
 };
 
