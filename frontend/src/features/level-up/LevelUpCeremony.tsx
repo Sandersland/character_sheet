@@ -16,11 +16,11 @@ import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { Character, LevelUpStep, LevelUpStepKind } from "@/types/character";
 
-// Design note: the stage gradient rides the parchment tokens, so it THEME-FLIPS
-// with them — dark stage + light paper in light theme, inverted in dark. The
-// mockup hard-coded a dark stage; flagged for design review on the #886 PR.
+// The stage vignette is ALWAYS dark (mockup's fixed hexes, not parchment tokens):
+// riding the tokens flipped it to light-cream in dark theme under a dark nav.
+// The gold-400 step kicker keeps ≥6:1 contrast on it in both themes.
 const STAGE =
-  "min-h-screen bg-[radial-gradient(ellipse_70%_55%_at_50%_12%,var(--color-parchment-800),var(--color-parchment-900)_68%)] px-4 py-8 sm:px-6 sm:py-12";
+  "min-h-screen bg-[radial-gradient(ellipse_70%_55%_at_50%_12%,#4a4230,#1c1913_68%)] px-4 py-8 sm:px-6 sm:py-12";
 
 // The mockup's paper card: outer rule + a second rule inset 8px (the ::after).
 const PAPER =
