@@ -83,3 +83,11 @@ export function creationStepMissing(
       return [];
   }
 }
+
+// The whole form's unmet requirements — the concatenation of every step's own
+// missing-list (#1176), so the page's Save gate and the per-step gates can
+// never disagree. Lives here (not characterCreation) so the step model doesn't
+// import back into characterCreation, keeping the dependency one-directional.
+export function creationMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
+  return creationSteps(selections).flatMap((key) => creationStepMissing(key, draft, selections));
+}
