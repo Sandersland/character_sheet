@@ -154,8 +154,9 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     await u.click(screen.getByRole("checkbox", { name: "Drum" }));
     await continueStep(u); // → Spells
 
-    await u.click(await screen.findByRole("checkbox", { name: /Vicious Mockery/ }));
-    await u.click(screen.getByRole("checkbox", { name: /Charm Person/ }));
+    // Spells step (#1160): add straight from the row pills.
+    await u.click(await screen.findByRole("button", { name: "Add Vicious Mockery" }));
+    await u.click(screen.getByRole("button", { name: "Add Charm Person" }));
     await continueStep(u); // → Equipment
     await continueStep(u); // → Review
 

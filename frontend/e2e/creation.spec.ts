@@ -88,14 +88,18 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   // Skills & Tools step.
   await continueStep(page);
 
-  // Spells step: a level-1 warlock picks 2 cantrips + 2 spells.
-  await expect(page.getByRole("heading", { name: "Spells" })).toBeVisible();
-  await page.getByRole("checkbox", { name: /Eldritch Blast/ }).check();
-  await page.getByRole("checkbox", { name: /Poison Spray/ }).check();
-  await page.getByRole("checkbox", { name: /Charm Person/ }).check();
+  // Spells step (#1160): a level-1 warlock picks 2 cantrips + 2 spells through the
+  // guided picker — a quiet row opens the big detail card with the full text, and
+  // Learn there or the row pill adds the spell.
+  await expect(page.getByRole("heading", { name: "Learn your magic" })).toBeVisible();
+  await page.getByRole("button", { name: "Open Eldritch Blast" }).click();
+  await expect(page.getByText(/hurl a beam of crackling energy/)).toBeVisible();
+  await page.getByRole("button", { name: /Learn Eldritch Blast/ }).click();
+  await page.getByRole("button", { name: "Add Poison Spray" }).click();
+  await page.getByRole("button", { name: "Add Charm Person" }).click();
   // Hideous Laughter is warlock-legal under SRD 5.2; Dissonant Whispers is now
   // bard-only (#1132) and no longer offered in the warlock picker.
-  await page.getByRole("checkbox", { name: /Hideous Laughter/ }).check();
+  await page.getByRole("button", { name: "Add Hideous Laughter" }).click();
   await continueStep(page);
 
   // Equipment step — the deterministic starting-gold path (as above).

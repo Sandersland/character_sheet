@@ -6,9 +6,9 @@ import Spinner from "@/components/ui/Spinner";
 import AbilityScoresSection from "@/features/character-create/AbilityScoresSection";
 import BackgroundBonusesSection from "@/features/character-create/BackgroundBonusesSection";
 import CreationReviewStep from "@/features/character-create/CreationReviewStep";
+import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
-import SpellSelectionSection from "@/features/character-create/SpellSelectionSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
 import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
 import { CeremonyCard, CeremonyStage, CeremonyFooter } from "@/features/ceremony/CeremonyShell";
@@ -69,7 +69,7 @@ function SpellsStepBody({ c }: StepBodyProps) {
   const picks = c.selections.class?.level1SpellPicks;
   if (!picks) return null;
   return (
-    <SpellSelectionSection
+    <CreationSpellsStep
       className={c.draft.className}
       counts={picks}
       cantripIds={c.draft.cantripIds}
