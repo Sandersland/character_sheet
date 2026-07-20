@@ -29,10 +29,11 @@ test("levelup: the HP die lingers on its settled face alongside the result", asy
   await expect(page.getByRole("heading", { name: /roll for hit points/i })).toBeVisible();
   await page.getByRole("button", { name: /^roll 1d/i }).click();
 
-  // Give the ~1.3s tumble plenty of margin, then check both are up together.
-  await page.waitForTimeout(2000);
-  await expect(page.getByRole("status")).toBeVisible();
+  // Wait for the die to settle, then confirm the result text is up WITH it —
+  // the linger invariant, without a hardcoded tumble-length sleep.
+  await expect(page.getByRole("status")).toBeVisible({ timeout: 5000 });
   await expect(page.getByText(/new maximum hp/i)).toBeVisible();
+  await expect(page.getByRole("status")).toBeVisible();
 
   expect(errors).toEqual([]);
 });

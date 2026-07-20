@@ -58,8 +58,7 @@ describe("HpDiceReveal", () => {
     expect(rollSpecMock).toHaveBeenCalledWith({ count: 1, faces: 10 });
     expect(onResult).toHaveBeenCalledTimes(1);
     const result = onResult.mock.calls[0][0] as RollResult;
-    expect(result.dice[0]?.value).toBeGreaterThanOrEqual(1);
-    expect(result.dice[0]?.value).toBeLessThanOrEqual(10);
+    expect(result.dice[0]?.value).toBe(4);
   });
 
   it("fires onResult exactly once under StrictMode's double-invoke", () => {
