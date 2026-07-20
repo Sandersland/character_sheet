@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
 
 import { fetchReference } from "@/api/client";
+import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import HitPointsStep from "@/features/level-up/HitPointsStep";
 import { LevelUpStepContext, type LevelUpStepContextValue } from "@/features/level-up/useLevelUpStepContext";
 import type { RollResult } from "@/lib/dice";
@@ -132,6 +133,7 @@ function StatefulStep({
 beforeEach(() => {
   vi.clearAllMocks();
   rollMountCount = 0;
+  localStorage.clear();
   fetchReferenceMock.mockResolvedValue(EMPTY_REFERENCE);
 });
 
@@ -241,5 +243,20 @@ describe("HitPointsStep", () => {
     expect(await screen.findByRole("button", { name: /roll 1d6/i })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /take average/i }));
     expect(await screen.findByText(/52\s*→\s*56/)).toBeInTheDocument();
+  });
+
+  it("quick dice-roll preference bypasses the 3D die entirely", async () => {
+    localStorage.setItem("cs:pref:diceRoll", "quick");
+    render(
+      <DiceRollStyleProvider>
+        <StatefulStep />
+      </DiceRollStyleProvider>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
+
+    expect(await screen.findByText(/new maximum hp/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
   });
 });
