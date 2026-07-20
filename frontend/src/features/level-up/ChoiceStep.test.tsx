@@ -145,6 +145,7 @@ describe("ChoiceStep", () => {
     render(<Harness step={{ kind: "disciplines", count: 2 }} character={character} plan={targetPlan} />);
 
     expect(await screen.findByText("Fangs of the Fire Snake")).toBeInTheDocument();
+    expect(screen.getByText("L3+")).toBeInTheDocument();
     expect(screen.queryByText("Ride the Wind")).not.toBeInTheDocument();
     expect(screen.queryByText("Elemental Attunement")).not.toBeInTheDocument();
   });

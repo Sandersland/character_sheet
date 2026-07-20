@@ -125,16 +125,19 @@ describe("CHOICE_KIND_CONFIGS", () => {
   describe("disciplines", () => {
     const cfg = CHOICE_KIND_CONFIGS.disciplines!;
 
-    it("gates by target level and drops alwaysKnown options at level 3", async () => {
+    it("gates by target level, drops alwaysKnown options, and tags the L-gate at level 3", async () => {
       const opts = await cfg.loadOptions({ targetLevel: 3 });
       expect(opts).toEqual([
-        { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire" },
+        { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire", tag: "L3+" },
       ]);
     });
 
     it("includes higher minLevel options once the target level reaches them", async () => {
       const opts = await cfg.loadOptions({ targetLevel: 6 });
-      expect(opts.map((o) => o.id)).toEqual(["fangs-of-the-fire-snake", "ride-the-wind"]);
+      expect(opts.map((o) => ({ id: o.id, tag: o.tag }))).toEqual([
+        { id: "fangs-of-the-fire-snake", tag: "L3+" },
+        { id: "ride-the-wind", tag: "L6+" },
+      ]);
     });
 
     it("round-trips select → selected as learnDiscipline ops", () => {

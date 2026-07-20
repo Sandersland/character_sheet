@@ -27,7 +27,10 @@ export default function ChoiceOptionCard({
             : "border-parchment-300 bg-parchment-50 hover:border-garnet-400 hover:bg-parchment-100"
         } disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-parchment-300 disabled:hover:bg-parchment-50`}
       >
-        <span className="block text-sm font-semibold text-parchment-900">{option.name}</span>
+        <span className="block text-sm font-semibold text-parchment-900">
+          {option.name}
+          {option.tag && <span className="ml-1.5 text-[10px] font-normal text-parchment-500">{option.tag}</span>}
+        </span>
         {option.description && (
           <span className="mt-0.5 block text-xs leading-relaxed text-parchment-600">
             {option.description}

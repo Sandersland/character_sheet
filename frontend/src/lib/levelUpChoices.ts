@@ -10,6 +10,8 @@ export interface ChoiceOption {
   id: string;
   name: string;
   description?: string;
+  /** Short gate label rendered after the name, e.g. "L3+" (disciplines). */
+  tag?: string;
 }
 
 export interface ChoiceLoadContext {
@@ -83,7 +85,7 @@ const disciplines: ChoiceKindConfig = {
       list
         // 2014 gates enforced at the ceremony's target level (#1174); 2024 Four Elements rework = #1133.
         .filter((d) => !d.alwaysKnown && d.minLevel <= ctx.targetLevel)
-        .map((d) => ({ id: d.id, name: d.name, description: d.description })),
+        .map((d) => ({ id: d.id, name: d.name, description: d.description, tag: `L${d.minLevel}+` })),
     ),
   fromCharacter: (character) =>
     new Set(
