@@ -41,7 +41,7 @@ describe("CeremonyStepRail", () => {
     const ol = container.querySelector("ol");
     expect(ol?.className).not.toContain("flex-wrap");
     // Connectors carry flex-1 so they shrink instead of pushing a dot to a 2nd line.
-    expect(container.querySelectorAll("span.flex-1").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll("span.flex-1")).toHaveLength(STEPS.length - 1);
   });
 
   it("has no axe violations", async () => {

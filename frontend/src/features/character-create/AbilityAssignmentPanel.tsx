@@ -342,9 +342,10 @@ function AbilityRow(props: AbilityRowProps) {
   );
 }
 
-// display:contents (see AbilityRow): header cells join the shared grid. The
-// underline can't ride the wrapper's border (contents paints nothing), so it's
-// a full-width divider row spanning every column.
+// display:contents (see AbilityRow): header cells join the shared grid; the
+// wrapper's text utilities still reach the cells because they're inherited CSS.
+// The underline can't ride the wrapper's border (contents paints nothing), so
+// it's a full-width divider row spanning every column.
 function RowHeader({ applicable, mode }: { applicable: boolean; mode: SpreadMode }) {
   return (
     <div className="contents text-[10px] font-bold uppercase tracking-wide text-parchment-500">
@@ -358,7 +359,7 @@ function RowHeader({ applicable, mode }: { applicable: boolean; mode: SpreadMode
       )}
       {applicable && mode === "oneOneOne" && <span className="text-center">+1</span>}
       <span className="text-center">{applicable ? "Total" : "Mod"}</span>
-      <div className="col-span-full border-b border-parchment-200" />
+      <div aria-hidden className="col-span-full border-b border-parchment-200" />
     </div>
   );
 }
