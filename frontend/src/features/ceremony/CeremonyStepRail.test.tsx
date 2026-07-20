@@ -36,6 +36,14 @@ describe("CeremonyStepRail", () => {
     expect(screen.queryByText("1")).not.toBeInTheDocument();
   });
 
+  it("never wraps: the ol is not flex-wrap and connectors flex to fill (#1182)", () => {
+    const { container } = render(<CeremonyStepRail steps={STEPS} currentKey="advancement" />);
+    const ol = container.querySelector("ol");
+    expect(ol?.className).not.toContain("flex-wrap");
+    // Connectors carry flex-1 so they shrink instead of pushing a dot to a 2nd line.
+    expect(container.querySelectorAll("span.flex-1")).toHaveLength(STEPS.length - 1);
+  });
+
   it("has no axe violations", async () => {
     const { container } = render(<CeremonyStepRail steps={STEPS} currentKey="hitPoints" />);
     expect(await axe(container)).toHaveNoViolations();

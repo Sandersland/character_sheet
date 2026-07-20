@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import Card from "@/components/ui/Card";
-import { ABILITY_LABELS, formatModifier } from "@/lib/abilities";
+import { ABILITY_LABELS, abilityAbbr, formatModifier } from "@/lib/abilities";
 import {
   abilityRows,
   adjustPointBuy,
@@ -58,7 +58,7 @@ const MANUAL_CEILING = 30;
 const CHIP_BASE =
   "rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors";
 const STEP_BTN =
-  "flex h-7 w-7 items-center justify-center rounded-full border border-parchment-300 text-base leading-none disabled:opacity-40";
+  "flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full border border-parchment-300 text-base leading-none disabled:opacity-40";
 
 function MethodChips({ method, onSelect }: { method: AbilityMethod; onSelect: (m: AbilityMethod) => void }) {
   return (
@@ -162,7 +162,7 @@ function PooledScoreCell({ row, label, held, onPlace, onClear }: RowScoreCellPro
 
 function PointBuyScoreCell({ row, label, scores, update }: RowScoreCellProps) {
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex items-center gap-1 sm:gap-2">
       <button
         type="button"
         aria-label={`Decrease ${label}`}
@@ -188,7 +188,7 @@ function PointBuyScoreCell({ row, label, scores, update }: RowScoreCellProps) {
 
 function ManualScoreCell({ row, label, scores, onAdjustManual, onSetManual }: RowScoreCellProps) {
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="flex items-center gap-1 sm:gap-1.5">
       <button
         type="button"
         aria-label={`Decrease ${label}`}
@@ -204,7 +204,7 @@ function ManualScoreCell({ row, label, scores, onAdjustManual, onSetManual }: Ro
         max={MANUAL_CEILING}
         value={scores[row.ability]}
         onChange={(e) => onSetManual(row.ability, e.target.value)}
-        className="w-14 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-center text-sm tabular-nums"
+        className="w-10 sm:w-14 rounded-control border border-parchment-300 bg-parchment-50 px-1 sm:px-2 py-1 text-center text-sm tabular-nums"
       />
       <button
         type="button"
@@ -298,21 +298,26 @@ function RowTotal({ row }: { row: AbilityRowData }) {
 
 interface AbilityRowProps extends RowScoreCellProps {
   className: string;
-  gridCols: string;
   applicable: boolean;
   mode: SpreadMode;
   bonusAbilities: AbilityName[];
   bonusAssignment: BonusAssignment;
 }
 
+// display:contents so each cell is a direct item of the shared parent grid —
+// header + all six rows size their `auto` tracks together and align by
+// construction (#1182). A contents box paints nothing, so per-cell padding /
+// self-center must live on the cells, not this wrapper.
 function AbilityRow(props: AbilityRowProps) {
-  const { row, className, gridCols, applicable, mode, bonusAbilities } = props;
+  const { row, className, applicable, mode, bonusAbilities } = props;
   const label = ABILITY_LABELS[row.ability];
   const isBonusAbility = bonusAbilities.includes(row.ability);
   return (
-    <div className="grid items-center gap-2 py-1" style={{ gridTemplateColumns: gridCols }}>
-      <span className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-parchment-800">
-        {label}
+    <div className="contents">
+      <span className="flex flex-wrap items-baseline gap-x-2 self-center text-sm font-semibold text-parchment-800">
+        {/* Abbreviate below sm so the score/radio/total cells fit a phone; aria-labels keep the full name. */}
+        <span className="sm:hidden">{abilityAbbr(row.ability)}</span>
+        <span className="hidden sm:inline">{label}</span>
         {row.recommended && (
           <span className="text-[10px] font-bold uppercase tracking-wide text-gold-500">◆ {className}</span>
         )}
@@ -337,13 +342,14 @@ function AbilityRow(props: AbilityRowProps) {
   );
 }
 
-function RowHeader({ applicable, mode, gridCols }: { applicable: boolean; mode: SpreadMode; gridCols: string }) {
+// display:contents (see AbilityRow): header cells join the shared grid; the
+// wrapper's text utilities still reach the cells because they're inherited CSS.
+// The underline can't ride the wrapper's border (contents paints nothing), so
+// it's a full-width divider row spanning every column.
+function RowHeader({ applicable, mode }: { applicable: boolean; mode: SpreadMode }) {
   return (
-    <div
-      className="grid items-center gap-2 border-b border-parchment-200 pb-1 text-[10px] font-bold uppercase tracking-wide text-parchment-500"
-      style={{ gridTemplateColumns: gridCols }}
-    >
-      <span>Ability</span>
+    <div className="contents text-[10px] font-bold uppercase tracking-wide text-parchment-500">
+      <span className="self-center">Ability</span>
       <span className="text-center">{applicable ? "Base" : "Score"}</span>
       {applicable && mode === "twoOne" && (
         <>
@@ -353,6 +359,7 @@ function RowHeader({ applicable, mode, gridCols }: { applicable: boolean; mode: 
       )}
       {applicable && mode === "oneOneOne" && <span className="text-center">+1</span>}
       <span className="text-center">{applicable ? "Total" : "Mod"}</span>
+      <div aria-hidden className="col-span-full border-b border-parchment-200" />
     </div>
   );
 }
@@ -495,14 +502,13 @@ export default function AbilityAssignmentPanel({
 
         {pooled && pool && <PoolChips pool={pool} used={used} held={held} onHold={setHeld} />}
 
-        <div className="flex flex-col gap-1">
-          <RowHeader applicable={applicable} mode={mode} gridCols={gridCols} />
+        <div className="grid items-center gap-x-1.5 gap-y-1 sm:gap-x-2" style={{ gridTemplateColumns: gridCols }}>
+          <RowHeader applicable={applicable} mode={mode} />
           {rows.map((row) => (
             <AbilityRow
               key={row.ability}
               row={row}
               className={className}
-              gridCols={gridCols}
               applicable={applicable}
               mode={mode}
               pooled={pooled}
