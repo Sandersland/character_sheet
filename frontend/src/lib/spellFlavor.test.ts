@@ -20,6 +20,12 @@ describe("damagePillClass", () => {
     expect(damagePillClass("cold")).toContain("dmg-cold");
   });
 
+  it("pins the shared-token aliases (acid→poison, lightning/thunder→force)", () => {
+    expect(damagePillClass("acid")).toContain("dmg-poison");
+    expect(damagePillClass("lightning")).toContain("dmg-force");
+    expect(damagePillClass("thunder")).toContain("dmg-force");
+  });
+
   it("falls back to one neutral pill for unknown or absent damage", () => {
     const neutral = damagePillClass("chaos");
     expect(neutral).not.toContain("dmg-");

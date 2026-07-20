@@ -65,6 +65,13 @@ describe("CreationSpellsStep", () => {
     expect(screen.queryByRole("button", { name: "Open Shield" })).not.toBeInTheDocument();
   });
 
+  it("omits the Spells group when the class learns zero level-1 spells", async () => {
+    renderStep({ counts: { cantrips: 2, spells: 0 } });
+    // A cantrip row proves the catalog loaded; the Spells heading must be absent.
+    await screen.findByRole("button", { name: "Open Eldritch Blast" });
+    expect(screen.queryByText("Spells", { exact: true })).not.toBeInTheDocument();
+  });
+
   it("reflects the pick counts in the budget headline", async () => {
     renderStep({ cantripIds: ["eb"] });
     expect(await screen.findByText("Cantrips 1/2 · Spells 0/2")).toBeInTheDocument();

@@ -39,14 +39,16 @@ export default function CreationSpellsStep({
       onToggle: (id) => onChange({ cantripIds: toggleCreationPick(cantripIds, id, counts.cantrips) }),
     });
   }
-  groups.push({
-    key: "spells",
-    label: "Spells",
-    options: eligibleCreationSpells(catalog, className),
-    selectedIds: spellIds,
-    cap: counts.spells,
-    onToggle: (id) => onChange({ spellIds: toggleCreationPick(spellIds, id, counts.spells) }),
-  });
+  if (counts.spells > 0) {
+    groups.push({
+      key: "spells",
+      label: "Spells",
+      options: eligibleCreationSpells(catalog, className),
+      selectedIds: spellIds,
+      cap: counts.spells,
+      onToggle: (id) => onChange({ spellIds: toggleCreationPick(spellIds, id, counts.spells) }),
+    });
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

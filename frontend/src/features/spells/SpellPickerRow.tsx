@@ -24,7 +24,7 @@ export default function SpellPickerRow({
   state: SpellPickRowState;
   disabled: boolean;
   onToggle: (spellId: string) => void;
-  onOpen: (spell: CatalogSpell) => void;
+  onOpen: () => void;
 }) {
   const effect = effectPillLabel(spell);
   const effectTint = spell.effectKind === "heal" ? "bg-vitality-100 text-vitality-800" : damagePillClass(spell.damageType);
@@ -34,7 +34,7 @@ export default function SpellPickerRow({
         <button
           type="button"
           aria-label={`Open ${spell.name}`}
-          onClick={() => onOpen(spell)}
+          onClick={() => onOpen()}
           className="min-w-0 flex-1 text-left"
         >
           <span className="flex flex-wrap items-center gap-2">

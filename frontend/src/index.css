@@ -104,7 +104,7 @@
   --color-dmg-cold: oklch(0.58 0.12 230);
   --color-dmg-poison: oklch(0.52 0.14 150);
   --color-dmg-necrotic: oklch(0.48 0.09 320);
-  --color-dmg-radiant: oklch(0.62 0.12 90);
+  --color-dmg-radiant: oklch(0.5 0.14 85);
   --color-dmg-psychic: oklch(0.56 0.15 330);
   --color-dmg-force: oklch(0.55 0.13 290);
 
