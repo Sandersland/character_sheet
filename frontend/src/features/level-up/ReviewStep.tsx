@@ -33,7 +33,7 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
   return { lookup: (id) => map?.[id], pending: !!fetcher && map === null };
 }
 
-// fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/disciplines/tools/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
+// fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/disciplines/spells/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
 function useLedgerResolvers(draft: LevelUpDraft): { resolvers: LedgerResolvers; resolving: boolean } {
   const maneuvers = useCatalogNames(draft.maneuvers?.length ? fetchManeuvers : undefined);
   const disciplines = useCatalogNames(draft.disciplines?.length ? fetchDisciplines : undefined);
