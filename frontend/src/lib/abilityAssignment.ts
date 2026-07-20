@@ -90,9 +90,10 @@ export function usedSlotIndices(assignments: AbilityAssignments): Set<number> {
 
 export type SpreadMode = "twoOne" | "oneOneOne";
 
-/** The PHB'24 spread implied by an assignment: three +1s is oneOneOne, else twoOne. */
+/** The PHB'24 spread implied by an assignment: three explicit +1s is oneOneOne, else twoOne. */
 export function spreadMode(assignment: Partial<Record<AbilityName, number>>): SpreadMode {
-  return Object.values(assignment).length === 3 ? "oneOneOne" : "twoOne";
+  const values = Object.values(assignment);
+  return values.length === 3 && values.every((v) => v === 1) ? "oneOneOne" : "twoOne";
 }
 
 /** Sets the +2 ability, keeping an existing +1 (unless it's the new pick) and evicting the prior +2. */

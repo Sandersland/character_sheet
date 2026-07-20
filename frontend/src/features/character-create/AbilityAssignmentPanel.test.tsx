@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
@@ -123,6 +123,31 @@ describe("AbilityAssignmentPanel — standard array", () => {
   it("has no a11y violations", async () => {
     const { container } = renderPanel({ method: "standardArray", pool });
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("AbilityAssignmentPanel — manual entry", () => {
+  it("does not write 0 when the input is cleared", () => {
+    const { update } = renderPanel({ method: "manual", scores: ALL_EIGHT });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Strength" }), { target: { value: "" } });
+    expect(update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ abilityScores: expect.objectContaining({ strength: 0 }) }),
+    );
+  });
+
+  it("clamps an out-of-range value to the ceiling", () => {
+    const { update } = renderPanel({ method: "manual", scores: ALL_EIGHT });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Strength" }), { target: { value: "45" } });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ abilityScores: expect.objectContaining({ strength: 30 }) }),
+    );
+  });
+
+  it("bounds the manual input with native min/max", () => {
+    renderPanel({ method: "manual", scores: ALL_EIGHT });
+    const input = screen.getByRole("spinbutton", { name: "Strength" });
+    expect(input).toHaveAttribute("min", "1");
+    expect(input).toHaveAttribute("max", "30");
   });
 });
 

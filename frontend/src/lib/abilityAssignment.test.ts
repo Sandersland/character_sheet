@@ -124,6 +124,8 @@ describe("background spread", () => {
     expect(spreadMode({})).toBe("twoOne");
     expect(spreadMode({ dexterity: 1, constitution: 1, intelligence: 1 })).toBe("oneOneOne");
     expect(spreadMode({ dexterity: 2, constitution: 1 })).toBe("twoOne");
+    // A three-entry assignment that isn't all +1s is still a +2/+1 spread.
+    expect(spreadMode({ dexterity: 2, constitution: 1, intelligence: 1 })).toBe("twoOne");
   });
 
   it("setPlusTwo preserves an existing +1 and evicts a prior +2", () => {

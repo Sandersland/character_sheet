@@ -200,6 +200,8 @@ function ManualScoreCell({ row, label, scores, onAdjustManual, onSetManual }: Ro
       <input
         aria-label={label}
         type="number"
+        min={MANUAL_FLOOR}
+        max={MANUAL_CEILING}
         value={scores[row.ability]}
         onChange={(e) => onSetManual(row.ability, e.target.value)}
         className="w-14 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-center text-sm tabular-nums"
@@ -456,9 +458,12 @@ export default function AbilityAssignmentPanel({
   }
 
   function setManual(ability: AbilityName, raw: string) {
+    // Number("") is 0, so guard the empty field before it clobbers the score with 0.
+    if (!raw.trim()) return;
     const parsed = Number(raw);
     if (!Number.isInteger(parsed)) return;
-    update({ abilityScores: { ...scores, [ability]: parsed } });
+    const clamped = Math.min(MANUAL_CEILING, Math.max(MANUAL_FLOOR, parsed));
+    update({ abilityScores: { ...scores, [ability]: clamped } });
   }
 
   const rows = abilityRows({ method, scores, pool, assignments, bonus: bonusAssignment, primaryAbility });
