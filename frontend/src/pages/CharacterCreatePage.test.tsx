@@ -53,6 +53,7 @@ const referenceFixture: ReferenceData = {
       toolChoices: ["Lute", "Drum", "Flute"],
       toolChoiceCount: 2,
       level1SpellPicks: { cantrips: 1, spells: 1 },
+      primaryAbility: ["charisma"],
     },
     {
       id: "class-fighter",
@@ -70,6 +71,7 @@ const referenceFixture: ReferenceData = {
       toolChoices: [],
       toolChoiceCount: 0,
       level1SpellPicks: null,
+      primaryAbility: ["strength", "dexterity"],
     },
   ],
   backgrounds: [
