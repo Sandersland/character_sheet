@@ -41,11 +41,24 @@ const plan: LevelUpPlanResponse = {
   grantedSpells: [],
 };
 
-function Harness({ step, character }: { step: LevelUpStep; character?: Character }) {
+function Harness({
+  step,
+  character,
+  plan: planOverride,
+}: {
+  step: LevelUpStep;
+  character?: Character;
+  plan?: LevelUpPlanResponse;
+}) {
   const [draft, setDraft] = useState<LevelUpDraft>({ hp: { method: "average" } });
   return (
     <LevelUpStepContext.Provider
-      value={{ character: character ?? ({ resources: {}, advancements: [] } as unknown as Character), draft, setDraft, plan }}
+      value={{
+        character: character ?? ({ resources: {}, advancements: [] } as unknown as Character),
+        draft,
+        setDraft,
+        plan: planOverride ?? plan,
+      }}
     >
       <ChoiceStep step={step} />
       <pre data-testid="draft">{JSON.stringify(draft)}</pre>
@@ -112,6 +125,46 @@ describe("ChoiceStep", () => {
         slot: "fightingStyle",
       });
     });
+  });
+
+  // Discipline options are gated by the ceremony's TARGET level (post-level-up),
+  // not the character's current level — regression #1174.
+  it("gates disciplines by the plan's target level, hiding higher-gate and alwaysKnown options", async () => {
+    vi.mocked(fetchDisciplines).mockResolvedValue([
+      { id: "elemental-attunement", name: "Elemental Attunement", description: "attune", minLevel: 3, alwaysKnown: true },
+      { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire", minLevel: 3, alwaysKnown: false },
+      { id: "ride-the-wind", name: "Ride the Wind", description: "fly", minLevel: 6, alwaysKnown: false },
+    ] as unknown as Awaited<ReturnType<typeof fetchDisciplines>>);
+    const character = { level: 2, resources: {}, advancements: [] } as unknown as Character;
+    const targetPlan: LevelUpPlanResponse = {
+      target: { className: "Monk", subclass: "Way of the Four Elements", newLevel: 3, isPrimary: true },
+      steps: [],
+      grantedSpells: [],
+    };
+
+    render(<Harness step={{ kind: "disciplines", count: 2 }} character={character} plan={targetPlan} />);
+
+    expect(await screen.findByText("Fangs of the Fire Snake")).toBeInTheDocument();
+    expect(screen.queryByText("Ride the Wind")).not.toBeInTheDocument();
+    expect(screen.queryByText("Elemental Attunement")).not.toBeInTheDocument();
+  });
+
+  it("includes a higher-gate discipline once the plan's target level reaches it", async () => {
+    vi.mocked(fetchDisciplines).mockResolvedValue([
+      { id: "elemental-attunement", name: "Elemental Attunement", description: "attune", minLevel: 3, alwaysKnown: true },
+      { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire", minLevel: 3, alwaysKnown: false },
+      { id: "ride-the-wind", name: "Ride the Wind", description: "fly", minLevel: 6, alwaysKnown: false },
+    ] as unknown as Awaited<ReturnType<typeof fetchDisciplines>>);
+    const character = { level: 5, resources: {}, advancements: [] } as unknown as Character;
+    const targetPlan: LevelUpPlanResponse = {
+      target: { className: "Monk", subclass: "Way of the Four Elements", newLevel: 6, isPrimary: true },
+      steps: [],
+      grantedSpells: [],
+    };
+
+    render(<Harness step={{ kind: "disciplines", count: 2 }} character={character} plan={targetPlan} />);
+
+    expect(await screen.findByText("Ride the Wind")).toBeInTheDocument();
   });
 
   it("has no axe violations once loaded", async () => {

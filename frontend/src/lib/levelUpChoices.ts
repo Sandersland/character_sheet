@@ -12,8 +12,13 @@ export interface ChoiceOption {
   description?: string;
 }
 
+export interface ChoiceLoadContext {
+  /** Post-level-up class level (LevelUpPlanResponse.target.newLevel), for gates keyed on it. */
+  targetLevel: number;
+}
+
 export interface ChoiceKindConfig {
-  loadOptions(): Promise<ChoiceOption[]>;
+  loadOptions(ctx: ChoiceLoadContext): Promise<ChoiceOption[]>;
   /** Ids the character already owns — excluded from the picker. */
   fromCharacter(character: Character): Set<string>;
   /** Currently-selected ids in the draft. */
@@ -73,9 +78,12 @@ const toolProficiency: ChoiceKindConfig = {
 };
 
 const disciplines: ChoiceKindConfig = {
-  loadOptions: () =>
+  loadOptions: (ctx) =>
     fetchDisciplines().then((list) =>
-      list.map((d) => ({ id: d.id, name: d.name, description: d.description })),
+      list
+        // 2014 gates enforced at the ceremony's target level (#1174); 2024 Four Elements rework = #1133.
+        .filter((d) => !d.alwaysKnown && d.minLevel <= ctx.targetLevel)
+        .map((d) => ({ id: d.id, name: d.name, description: d.description })),
     ),
   fromCharacter: (character) =>
     new Set(

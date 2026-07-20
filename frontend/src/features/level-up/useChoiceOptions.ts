@@ -19,7 +19,10 @@ import type { Character } from "@/types/character";
 
 const SEARCH_THRESHOLD = 8;
 
-function useChoiceOptions(config: ChoiceKindConfig | undefined): {
+function useChoiceOptions(
+  config: ChoiceKindConfig | undefined,
+  targetLevel: number,
+): {
   options: ChoiceOption[] | null;
   loadError: boolean;
 } {
@@ -32,7 +35,7 @@ function useChoiceOptions(config: ChoiceKindConfig | undefined): {
     setOptions(null);
     setLoadError(false);
     config
-      .loadOptions()
+      .loadOptions({ targetLevel })
       .then((opts) => {
         if (!ignore) setOptions(opts);
       })
@@ -42,7 +45,7 @@ function useChoiceOptions(config: ChoiceKindConfig | undefined): {
     return () => {
       ignore = true;
     };
-  }, [config]);
+  }, [config, targetLevel]);
 
   return { options, loadError };
 }
@@ -64,8 +67,9 @@ export interface ChoiceCatalog {
 export function useChoiceCatalog(
   config: ChoiceKindConfig | undefined,
   character: Character,
+  targetLevel: number,
 ): ChoiceCatalog {
-  const { options, loadError } = useChoiceOptions(config);
+  const { options, loadError } = useChoiceOptions(config, targetLevel);
   const showSpinner = useDelayedFlag(options === null && !loadError);
   const [search, setSearch] = useState("");
   useEffect(() => setSearch(""), [config]);
