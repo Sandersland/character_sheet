@@ -18,8 +18,10 @@ import {
   toOneOneOne,
   toTwoOne,
   usedSlotIndices,
+  EMPTY_ASSIGNMENTS,
   type AbilityAssignments,
 } from "@/lib/abilityAssignment";
+import AbilityRollTray from "@/features/character-create/AbilityRollTray";
 import { POINT_BUY_BUDGET } from "@/lib/abilityGen";
 import type { CreationBackgroundBonuses } from "@/lib/characterCreation";
 import type { AbilityMethod, CharacterDraft } from "@/hooks/useCharacterDraft";
@@ -149,6 +151,14 @@ export default function AbilityAssignmentPanel({
           <p className="text-xs text-parchment-600">Enter scores rolled offline at the table.</p>
         )}
 
+        {method === "roll" && (
+          <AbilityRollTray
+            pool={pool}
+            hasAssignments={used.size > 0}
+            onRolled={(rolled) => update({ abilityPool: rolled, abilityAssignments: EMPTY_ASSIGNMENTS })}
+          />
+        )}
+
         {pooled && pool && (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Ability score pool">
             {pool.map((value, index) => {
@@ -174,10 +184,6 @@ export default function AbilityAssignmentPanel({
               );
             })}
           </div>
-        )}
-
-        {pooled && !pool && (
-          <p className="text-xs text-parchment-600">Roll a set of six scores, then assign each below.</p>
         )}
 
         <div className="flex flex-col gap-1">
