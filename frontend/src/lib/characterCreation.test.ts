@@ -29,6 +29,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolChoices: [],
     toolChoiceCount: 0,
     level1SpellPicks: null,
+    primaryAbility: [],
     ...overrides,
   };
 }

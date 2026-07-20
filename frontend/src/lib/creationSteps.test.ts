@@ -28,6 +28,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolChoices: [],
     toolChoiceCount: 0,
     level1SpellPicks: null,
+    primaryAbility: [],
     ...overrides,
   };
 }
@@ -166,6 +167,42 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("abilities", makeDraft(), sel())).toEqual([]);
   });
 
+  it("abilities gates an unrolled roll pool", () => {
+    const draft = makeDraft({ abilityMethod: "roll", abilityPool: null });
+    expect(creationStepMissing("abilities", draft, sel())).toEqual(["Roll ability scores"]);
+  });
+
+  it("abilities gates an incompletely-assigned pool", () => {
+    const draft = makeDraft({
+      abilityMethod: "standardArray",
+      abilityPool: [15, 14, 13, 12, 10, 8],
+      abilityAssignments: { strength: 0, dexterity: null, constitution: null, intelligence: null, wisdom: null, charisma: null },
+    });
+    expect(creationStepMissing("abilities", draft, sel())).toEqual(["Assign all ability scores"]);
+  });
+
+  it("abilities clears once the pool is fully assigned", () => {
+    const draft = makeDraft({
+      abilityMethod: "standardArray",
+      abilityPool: [15, 14, 13, 12, 10, 8],
+      abilityAssignments: { strength: 0, dexterity: 1, constitution: 2, intelligence: 3, wisdom: 4, charisma: 5 },
+    });
+    expect(creationStepMissing("abilities", draft, sel())).toEqual([]);
+  });
+
+  it("abilities never gates manual or point-buy generation", () => {
+    expect(creationStepMissing("abilities", makeDraft({ abilityMethod: "manual" }), sel())).toEqual([]);
+    expect(creationStepMissing("abilities", makeDraft({ abilityMethod: "pointBuy" }), sel())).toEqual([]);
+  });
+
+  it("abilities lists both a pool gap and an incomplete background spread", () => {
+    const draft = makeDraft({ background: "Criminal", abilityMethod: "roll", abilityPool: null });
+    expect(creationStepMissing("abilities", draft, sel({ background: specBackground }))).toEqual([
+      "Roll ability scores",
+      "Background ability scores",
+    ]);
+  });
+
   it("skills and review are always empty", () => {
     expect(creationStepMissing("skills", makeDraft(), sel({ class: rogue }))).toEqual([]);
     expect(creationStepMissing("review", makeDraft(), sel({ class: rogue }))).toEqual([]);
@@ -210,6 +247,13 @@ describe("aggregate matches creationMissing", () => {
     const draft = makeDraft({ name: "Mo", className: "Wizard", background: "Criminal", cantripIds: ["c1"] });
     const selections = sel({ class: wizard, background: specBackground });
     expect(aggregate(draft, selections)).toEqual(creationMissing(draft, selections));
+  });
+  it("unassigned pool draft surfaces the abilities gate", () => {
+    const draft = makeDraft({ name: "Mo", className: "Rogue", abilityMethod: "roll", abilityPool: null });
+    const selections = sel({ class: rogue });
+    const missing = creationMissing(draft, selections);
+    expect(missing).toContain("Roll ability scores");
+    expect(aggregate(draft, selections)).toEqual(missing);
   });
 });
 

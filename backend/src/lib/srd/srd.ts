@@ -24,6 +24,7 @@ export * from "@/lib/srd/extra-attack.js";
 export * from "@/lib/srd/spellcasting-tables.js";
 export * from "@/lib/srd/math.js";
 export * from "@/lib/srd/advancement-slots.js";
+export * from "@/lib/srd/primary-abilities.js";
 export * from "@/lib/srd/proficiencies.js";
 export * from "@/lib/srd/weapon-damage.js";
 export * from "@/lib/srd/character-derive.js";

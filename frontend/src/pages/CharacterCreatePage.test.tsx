@@ -53,6 +53,7 @@ const referenceFixture: ReferenceData = {
       toolChoices: ["Lute", "Drum", "Flute"],
       toolChoiceCount: 2,
       level1SpellPicks: { cantrips: 1, spells: 1 },
+      primaryAbility: ["charisma"],
     },
     {
       id: "class-fighter",
@@ -70,6 +71,7 @@ const referenceFixture: ReferenceData = {
       toolChoices: [],
       toolChoiceCount: 0,
       level1SpellPicks: null,
+      primaryAbility: ["strength", "dexterity"],
     },
   ],
   backgrounds: [
@@ -244,11 +246,11 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     await fillIdentity(u, { background: "Criminal" });
     await continueStep(u); // → Abilities
 
-    await u.selectOptions(screen.getByLabelText(/\+2 to/), "dexterity");
-    await u.selectOptions(screen.getByLabelText(/\+1 to/), "intelligence");
+    await u.click(screen.getByRole("radio", { name: "+2 to Dexterity" }));
+    await u.click(screen.getByRole("radio", { name: "+1 to Intelligence" }));
 
     await u.click(screen.getByRole("button", { name: "+2 / +1" }));
-    expect((screen.getByLabelText(/\+2 to/) as HTMLSelectElement).value).toBe("dexterity");
-    expect((screen.getByLabelText(/\+1 to/) as HTMLSelectElement).value).toBe("intelligence");
+    expect((screen.getByRole("radio", { name: "+2 to Dexterity" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "+1 to Intelligence" }) as HTMLInputElement).checked).toBe(true);
   });
 });

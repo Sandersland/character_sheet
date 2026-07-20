@@ -73,4 +73,13 @@ describe("GET /api/reference", () => {
     expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 4 });
     expect(byName("Fighter").level1SpellPicks).toBeNull();
   });
+
+  // #1161: each class carries its PHB'24 primary ability/abilities so the
+  // creation ability panel can flag recommended rows without re-encoding the rules.
+  it("ships primaryAbility per class", async () => {
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
+    expect(byName("Wizard").primaryAbility).toEqual(["intelligence"]);
+    expect(byName("Fighter").primaryAbility).toEqual(["strength", "dexterity"]);
+  });
 });

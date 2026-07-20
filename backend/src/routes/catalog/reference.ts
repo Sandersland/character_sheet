@@ -6,6 +6,7 @@ import {
   cantripsKnownAtLevel,
   multiclassPrerequisitesMet,
   preparedSpellCountAt,
+  primaryAbilities,
   toolsByCategory,
 } from "@/lib/srd/srd.js";
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
@@ -46,6 +47,8 @@ referenceRouter.get("/reference", async (_req, res) => {
     toolChoiceCount: c.toolChoiceCount,
     subclasses: c.subclasses.map((s) => ({ id: s.id, name: s.name, description: s.description })),
     startingEquipment: STARTING_EQUIPMENT[c.name] ?? null,
+    // #1161: PHB'24 primary ability/abilities; [] for a homebrew class.
+    primaryAbility: primaryAbilities(c.name),
     // #1131: level-1 creation pick counts from the SRD 5.2 tables (null for a
     // non-caster) so the creation picker never re-encodes the rules.
     level1SpellPicks:

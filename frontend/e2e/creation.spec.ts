@@ -32,11 +32,13 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   await page.getByLabel("Background").selectOption({ label: "Soldier" });
   await continueStep(page);
 
-  // Abilities step — 2024 background ability spread (#1130): Soldier draws from
-  // Str/Dex/Con and grants the Savage Attacker Origin feat. Assign +2 Str / +1 Dex.
+  // Abilities step (#1161): Soldier draws from Str/Dex/Con and grants the Savage
+  // Attacker Origin feat; Fighter's primary abilities carry the recommended
+  // diamond. Assign +2 Str / +1 Dex via the bonus-column radios.
   await expect(page.getByText("Origin feat: Savage Attacker")).toBeVisible();
-  await page.getByLabel(/\+2 to/).selectOption({ label: "Strength" });
-  await page.getByLabel(/\+1 to/).selectOption({ label: "Dexterity" });
+  await expect(page.getByText("◆ Fighter").first()).toBeVisible();
+  await page.getByRole("radio", { name: "+2 to Strength" }).check();
+  await page.getByRole("radio", { name: "+1 to Dexterity" }).check();
   await continueStep(page);
 
   // Skills & Tools step — no required picks for this build.
@@ -80,9 +82,9 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await page.getByLabel("Background").selectOption({ label: "Sage" });
   await continueStep(page);
 
-  // Abilities step — Sage draws from Con/Int/Wis; assign it so the step unblocks.
-  await page.getByLabel(/\+2 to/).selectOption({ label: "Intelligence" });
-  await page.getByLabel(/\+1 to/).selectOption({ label: "Constitution" });
+  // Abilities step — Sage draws from Con/Int/Wis; assign the spread via radios.
+  await page.getByRole("radio", { name: "+2 to Intelligence" }).check();
+  await page.getByRole("radio", { name: "+1 to Constitution" }).check();
   await continueStep(page);
 
   // Skills & Tools step.

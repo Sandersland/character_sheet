@@ -3,8 +3,7 @@
 // between them. Each step body reuses its existing section component.
 
 import Spinner from "@/components/ui/Spinner";
-import AbilityScoresSection from "@/features/character-create/AbilityScoresSection";
-import BackgroundBonusesSection from "@/features/character-create/BackgroundBonusesSection";
+import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
 import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
@@ -27,19 +26,20 @@ function IdentityStepBody({ c, reference }: StepBodyProps) {
 }
 
 function AbilitiesStepBody({ c }: StepBodyProps) {
+  // The unified panel (#1161) drives all four methods and folds in the #1130
+  // background spread itself, so it replaces the old AbilityScores +
+  // BackgroundBonuses section pair here.
   return (
-    <>
-      <AbilityScoresSection draft={c.draft} update={c.update} />
-      {c.backgroundBonuses.applicable && (
-        <BackgroundBonusesSection
-          // Remount on background switch so the local spread-mode state can't
-          // outlive the cleared assignment and mislead the user (#1130).
-          key={c.draft.background}
-          bonuses={c.backgroundBonuses}
-          onChange={(assignment) => c.update({ backgroundAbilities: assignment })}
-        />
-      )}
-    </>
+    <AbilityAssignmentPanel
+      method={c.draft.abilityMethod}
+      pool={c.draft.abilityPool}
+      assignments={c.draft.abilityAssignments}
+      scores={c.draft.abilityScores}
+      bonuses={c.backgroundBonuses}
+      primaryAbility={c.selections.class?.primaryAbility ?? []}
+      className={c.draft.className}
+      update={c.update}
+    />
   );
 }
 
