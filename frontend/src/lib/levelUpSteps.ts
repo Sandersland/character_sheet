@@ -1,11 +1,8 @@
-// Pure step model for the level-up ceremony rail (#886) — precedent: ceremonySteps.
-// No JSX; rendered by CeremonyStepRail / LevelUpCeremony.
+// Pure step model for the level-up ceremony (#886) — step identity, labels, and
+// Continue-gating. Rail-state math is shared in ceremonySteps. No JSX; consumed
+// by useLevelUpCeremony / LevelUpCeremony (which build the rail via CeremonyStepRail).
 
-import { railState as ceremonyRailState, stepPosition as ceremonyStepPosition } from "@/lib/ceremonySteps";
-import type { CeremonyStepState } from "@/lib/ceremonySteps";
 import type { LevelUpPlanResponse, LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
-
-export type LevelUpStepState = CeremonyStepState;
 
 // The in-progress submission minus its target (owned by useLevelUpCeremony). hp
 // is optional here because the ceremony starts before the player picks it — the
@@ -42,16 +39,6 @@ export function stepLabel(step: LevelUpStep): string {
   const label = step.meta?.label;
   if (step.kind === "subclassChoice" && typeof label === "string") return label;
   return STEP_LABELS[step.kind];
-}
-
-/** stepPosition over LevelUpStep[], keyed by stepKey — see ceremonySteps. */
-export function stepPosition(steps: LevelUpStep[], currentKey: string): number {
-  return ceremonyStepPosition(steps.map(stepKey), currentKey);
-}
-
-/** railState over LevelUpStep[], keyed by stepKey — see ceremonySteps. */
-export function railState(steps: LevelUpStep[], currentKey: string): LevelUpStepState[] {
-  return ceremonyRailState(steps.map(stepKey), currentKey);
 }
 
 // Mirror of the backend RESOURCE_BACKED set gating applyLevelUpTransaction:

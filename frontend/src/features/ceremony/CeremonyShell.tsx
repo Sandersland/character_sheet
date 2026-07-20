@@ -15,13 +15,13 @@ const STAGE_PAGE = `min-h-screen ${STAGE_BG} px-4 py-8 sm:px-6 sm:py-12`;
 const STAGE_VIEWPORT = `flex h-dvh flex-col ${STAGE_BG} px-4 py-6 sm:px-6 sm:py-8`;
 
 // The mockup's paper card: outer rule + a second rule inset 8px (the ::after).
-export const PAPER =
+const PAPER =
   "relative rounded border border-parchment-300 bg-parchment-50 shadow-raised after:pointer-events-none after:absolute after:inset-2 after:rounded-sm after:border after:border-parchment-300 after:content-['']";
 
 export const GHOST_BTN =
   "min-h-11 rounded-control border border-parchment-300 px-4 text-sm font-semibold text-parchment-600 transition-colors hover:bg-parchment-100";
 
-export const PRIMARY_BTN =
+const PRIMARY_BTN =
   "min-h-11 rounded-control border px-5 text-sm font-semibold text-parchment-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 export function CeremonyStage({ layout, children }: { layout: "page" | "viewport"; children: ReactNode }) {
