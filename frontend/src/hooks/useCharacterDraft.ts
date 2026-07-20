@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import type { CreationStepKey } from "@/lib/creationSteps";
 import type { EquipmentDraft } from "@/lib/startingEquipment";
 import type { AbilityName, AbilityScores, SkillName } from "@/types/character";
 
@@ -52,6 +53,8 @@ export interface CharacterDraft {
   /** #1131: chosen level-1 prepared-spell catalog ids (casters only). */
   spellIds: string[];
   equipmentDraft: EquipmentDraft | null;
+  /** #1176: the creation-ceremony step the player is on, so a reload resumes there. */
+  step: CreationStepKey;
 }
 
 const EMPTY_DRAFT: CharacterDraft = {
@@ -75,6 +78,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   cantripIds: [],
   spellIds: [],
   equipmentDraft: null,
+  step: "identity",
 };
 
 /**

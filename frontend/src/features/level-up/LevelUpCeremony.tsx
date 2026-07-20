@@ -1,36 +1,22 @@
-// The full-screen level-up ceremony shell (#886): dark stage, parchment paper
-// card with a double-rule frame, the adaptive StepRail, a step-body slot, and
-// the Cancel/Back/Continue footer that flips to Confirm on the last step.
+// The full-screen level-up ceremony (#886) over the shared ceremony chrome
+// (#1176): dark stage, parchment double-rule card, the adaptive step rail, a
+// step-body slot, and the Cancel/Back/Continue footer that flips to Confirm.
 
 import Spinner from "@/components/ui/Spinner";
+import { CeremonyCard, CeremonyFooter, CeremonyStage, GHOST_BTN } from "@/features/ceremony/CeremonyShell";
+import CeremonyStepRail from "@/features/ceremony/CeremonyStepRail";
 import AbilityScoreStep from "@/features/level-up/AbilityScoreStep";
 import ChoiceStep from "@/features/level-up/ChoiceStep";
 import HitPointsStep from "@/features/level-up/HitPointsStep";
 import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
 import NewSpellsStep from "@/features/level-up/NewSpellsStep";
 import ReviewStep from "@/features/level-up/ReviewStep";
-import StepRail from "@/features/level-up/StepRail";
 import SubclassStep from "@/features/level-up/SubclassStep";
 import { useLevelUpCeremony, type LevelUpCeremony as Ceremony } from "@/features/level-up/useLevelUpCeremony";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { stepKey, stepLabel } from "@/lib/levelUpSteps";
 import type { Character, LevelUpStep, LevelUpStepKind } from "@/types/character";
-
-// The stage vignette is ALWAYS dark (mockup's fixed hexes, not parchment tokens):
-// riding the tokens flipped it to light-cream in dark theme under a dark nav.
-// The gold-400 step kicker keeps ≥6:1 contrast on it in both themes.
-const STAGE =
-  "min-h-screen bg-[radial-gradient(ellipse_70%_55%_at_50%_12%,#4a4230,#1c1913_68%)] px-4 py-8 sm:px-6 sm:py-12";
-
-// The mockup's paper card: outer rule + a second rule inset 8px (the ::after).
-const PAPER =
-  "relative rounded border border-parchment-300 bg-parchment-50 shadow-raised after:pointer-events-none after:absolute after:inset-2 after:rounded-sm after:border after:border-parchment-300 after:content-['']";
-
-const GHOST_BTN =
-  "min-h-11 rounded-control border border-parchment-300 px-4 text-sm font-semibold text-parchment-600 transition-colors hover:bg-parchment-100";
-
-const PRIMARY_BTN =
-  "min-h-11 rounded-control border px-5 text-sm font-semibold text-parchment-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 // Step-body slot: #887–#891 register their real bodies per kind here; anything
 // unregistered renders the placeholder.
@@ -53,13 +39,13 @@ function StepBody({ step }: { step: LevelUpStep }) {
 
 function PaperNotice({ title, body, onBack }: { title: string; body: string; onBack: () => void }) {
   return (
-    <div className={`${PAPER} px-6 py-10 text-center`}>
+    <CeremonyCard className="px-6 py-10 text-center">
       <h1 className="font-display text-2xl font-semibold text-parchment-900">{title}</h1>
       <p className="mx-auto mt-2 max-w-md text-sm text-parchment-600">{body}</p>
       <button type="button" onClick={onBack} className={`${GHOST_BTN} mt-6`}>
         Back to sheet
       </button>
-    </div>
+    </CeremonyCard>
   );
 }
 
@@ -77,41 +63,6 @@ function CeremonyHeader({ target }: { target: NonNullable<Ceremony["plan"]>["tar
         Level <span className="text-xl font-semibold text-gold-700">{target.newLevel - 1} →</span> {target.newLevel}
       </h1>
     </header>
-  );
-}
-
-function CeremonyFooter(c: Ceremony) {
-  return (
-    <footer className="mt-6 flex items-center justify-between gap-3 border-t border-parchment-200 pt-4">
-      {c.stepIndex === 0 ? (
-        <button type="button" onClick={c.cancel} className={GHOST_BTN}>
-          Cancel
-        </button>
-      ) : (
-        <button type="button" onClick={c.back} className={GHOST_BTN}>
-          ‹ Back
-        </button>
-      )}
-      {c.isLast ? (
-        <button
-          type="button"
-          onClick={() => void c.confirm()}
-          disabled={c.submitting}
-          className={`${PRIMARY_BTN} border-vitality-700 bg-vitality-700 hover:bg-vitality-800`}
-        >
-          ✓ Confirm Level Up
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={c.next}
-          disabled={!c.canContinue}
-          className={`${PRIMARY_BTN} border-garnet-800 bg-garnet-700 hover:bg-garnet-800`}
-        >
-          Continue ›
-        </button>
-      )}
-    </footer>
   );
 }
 
@@ -138,10 +89,13 @@ export default function LevelUpCeremony({ character }: { character: Character })
         <p className="mb-3 text-center text-[11px] font-bold uppercase tracking-widest text-gold-400">
           Step {c.stepIndex + 1} of {c.steps.length}
         </p>
-        <section className={`${PAPER} px-5 py-7 sm:px-10`}>
+        <CeremonyCard className="px-5 py-7 sm:px-10">
           <CeremonyHeader target={c.plan.target} />
           <div className="mt-5">
-            <StepRail steps={c.steps} currentKey={c.currentKey} />
+            <CeremonyStepRail
+              steps={c.steps.map((s) => ({ key: stepKey(s), label: stepLabel(s) }))}
+              currentKey={c.currentKey}
+            />
           </div>
           <div className="mt-5 border-t border-parchment-200 pt-4">
             <LevelUpStepContext.Provider value={{ character, draft: c.draft, setDraft: c.setDraft, plan: c.plan }}>
@@ -153,15 +107,22 @@ export default function LevelUpCeremony({ character }: { character: Character })
               {c.submitError}
             </p>
           )}
-          <CeremonyFooter {...c} />
-        </section>
+          <CeremonyFooter
+            isFirst={c.stepIndex === 0}
+            isLast={c.isLast}
+            onCancel={c.cancel}
+            onBack={c.back}
+            onContinue={c.next}
+            canContinue={c.canContinue}
+            onConfirm={() => void c.confirm()}
+            confirmLabel="✓ Confirm Level Up"
+            confirmClassName="border-vitality-700 bg-vitality-700 hover:bg-vitality-800"
+            submitting={c.submitting}
+          />
+        </CeremonyCard>
       </>
     );
   }
 
-  return (
-    <div className={STAGE}>
-      <div className="mx-auto w-full max-w-3xl">{content}</div>
-    </div>
-  );
+  return <CeremonyStage layout="page">{content}</CeremonyStage>;
 }
