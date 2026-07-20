@@ -37,7 +37,8 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
 function useLedgerResolvers(draft: LevelUpDraft): { resolvers: LedgerResolvers; resolving: boolean } {
   const maneuvers = useCatalogNames(draft.maneuvers?.length ? fetchManeuvers : undefined);
   const disciplines = useCatalogNames(draft.disciplines?.length ? fetchDisciplines : undefined);
-  const spells = useCatalogNames(draft.spellsLearned?.length ? fetchSpells : undefined);
+  // Cantrips share the spell catalog, so either list gates the same fetch (#1157).
+  const spells = useCatalogNames(draft.spellsLearned?.length || draft.cantripsLearned?.length ? fetchSpells : undefined);
   // Any taken feat fetches the catalog — a custom feat resolves by its own name,
   // so this needs no second (featId) guard. A Fighting Style feat (#1137) resolves
   // through the same catalog.
