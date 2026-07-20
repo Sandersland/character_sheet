@@ -130,6 +130,8 @@ function learnedListRows(
     listRow("Tool Proficiencies", (draft.toolProficiencies ?? []).map((op) => op.name)),
     listRow("Subclass Features", (draft.subclassChoices ?? []).map((op) => subclassChoiceName(op, plan))),
     listRow("Forgotten", forgottenNames(draft, character)),
+    // #1157: cantrips get their own row above New Spells, same catalog as spells.
+    listRow("New Cantrips", (draft.cantripsLearned ?? []).map((op) => resolvedName(op.spellId, op.custom, r.spell))),
     listRow("New Spells", (draft.spellsLearned ?? []).map((op) => resolvedName(op.spellId, op.custom, r.spell))),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);

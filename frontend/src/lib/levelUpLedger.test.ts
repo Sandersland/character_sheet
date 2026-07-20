@@ -151,6 +151,38 @@ describe("buildLevelUpLedger", () => {
     expect(rowFor(rows, "New Spells")?.items).toEqual(["Fireball"]);
   });
 
+  it("lists learned cantrips under their own row, above New Spells (#1157)", () => {
+    const draft: LevelUpDraft = {
+      hp: { method: "average" },
+      cantripsLearned: [{ type: "learnSpell", spellId: "s1" }],
+    };
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    expect(rowFor(rows, "New Cantrips")).toMatchObject({ items: ["Fireball"], variant: "list" });
+    expect(rowFor(rows, "New Spells")).toBeUndefined();
+  });
+
+  it("falls back to a custom cantrip's name (#1157)", () => {
+    const draft: LevelUpDraft = {
+      hp: { method: "average" },
+      cantripsLearned: [{ type: "learnSpell", custom: { name: "Homebrew Cantrip", description: "" } }],
+    };
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    expect(rowFor(rows, "New Cantrips")).toMatchObject({ items: ["Homebrew Cantrip"] });
+  });
+
+  it("orders New Cantrips above New Spells when both are present (#1157)", () => {
+    const draft: LevelUpDraft = {
+      hp: { method: "average" },
+      cantripsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+    };
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const labels = rows.map((r) => r.label);
+    expect(rowFor(rows, "New Cantrips")).toBeDefined();
+    expect(rowFor(rows, "New Spells")).toBeDefined();
+    expect(labels.indexOf("New Cantrips")).toBeLessThan(labels.indexOf("New Spells"));
+  });
+
   it("renders a Forgotten row resolving the name from the character's spellbook (#1101)", () => {
     const character = makeCharacter({
       spellcasting: { slots: [], arcana: [], spells: [{ id: "k-old", name: "Charm Person", level: 1 }] },
