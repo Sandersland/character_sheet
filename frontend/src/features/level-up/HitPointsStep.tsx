@@ -12,6 +12,45 @@ import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityLabel } from "@/lib/abilities";
 import { hitPointStepMath } from "@/lib/hitDice";
 
+/** The "New maximum HP" preview line, split out to keep HitPointsStep's render flat. */
+function HpGainPreview({
+  method,
+  roll,
+  gain,
+  currentMax,
+  conText,
+}: {
+  method: "average" | "roll" | undefined;
+  roll: number | null;
+  gain: number | null;
+  currentMax: number;
+  conText: string;
+}) {
+  if (method === "roll") {
+    // Always rendered (reserving its height) once Roll is chosen, so the
+    // layout doesn't jump when the die settles — invisible until it does.
+    return (
+      <p className={`mt-4 text-center text-sm text-parchment-600 ${roll == null ? "invisible" : ""}`}>
+        Rolled {roll} {conText} — New maximum HP{" "}
+        <b className="font-display text-lg text-vitality-700">
+          {currentMax} → {currentMax + (gain ?? 0)}
+        </b>
+      </p>
+    );
+  }
+  if (method === "average" && gain != null) {
+    return (
+      <p className="mt-4 text-center text-sm text-parchment-600">
+        New maximum HP{" "}
+        <b className="font-display text-lg text-vitality-700">
+          {currentMax} → {currentMax + gain}
+        </b>
+      </p>
+    );
+  }
+  return null;
+}
+
 export default function HitPointsStep() {
   const { character } = useLevelUpStepContext();
   const { reference } = useReferenceData();
@@ -51,18 +90,17 @@ export default function HitPointsStep() {
         />
       </div>
 
-      {method === "roll" && roll == null && (
-        <HpDiceReveal faces={math.faces} die={math.die} onResult={handleRoll} />
+      {(method === "roll" || roll != null) && (
+        // Stays mounted once a roll exists — DiceRoller always self-rolls on
+        // mount and can't re-display a held value — so average↔roll toggling
+        // hides it instead of unmounting it. `key={math.faces}` forces the one
+        // legitimate remount (and re-roll) on a class/die switch.
+        <div hidden={method !== "roll"}>
+          <HpDiceReveal key={math.faces} faces={math.faces} die={math.die} onResult={handleRoll} />
+        </div>
       )}
 
-      {gain != null && (
-        <p className="mt-4 text-center text-sm text-parchment-600">
-          New maximum HP{" "}
-          <b className="font-display text-lg text-vitality-700">
-            {currentMax} → {currentMax + gain}
-          </b>
-        </p>
-      )}
+      <HpGainPreview method={method} roll={roll} gain={gain} currentMax={currentMax} conText={math.conText} />
     </div>
   );
 }

@@ -1,6 +1,8 @@
-// The 3D hit-die roll for the HP step (#887). Lazy so the dice stack loads only
-// when the player actually rolls; HitPointsStep mounts it once per roll (while no
-// value is held) and reads the result via onResult.
+// The 3D hit-die roll for the HP step (#887, #1172). Lazy so the dice stack
+// loads only when the player actually rolls. It always self-rolls on mount and
+// can't re-display a held value, so HitPointsStep keeps it mounted (hiding it
+// via `hidden`, not unmounting) once a roll exists — the settled die lingers
+// with its result until the player continues.
 
 import { lazy, Suspense } from "react";
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -13,19 +13,30 @@ import type { Character, LevelUpPlanResponse, ReferenceData } from "@/types/char
 
 vi.mock("@/api/client", () => ({ fetchReference: vi.fn() }));
 
-// Stub the 3D roller: each mount fires onResult once with a distinct value, so a
-// second mount (a forbidden re-roll) is observably different from the first.
+// Stub the 3D roller: fires onResult only when its "settle" button is clicked
+// (not on mount), so tests can observe the tumbling gap before a roll settles.
+// Each mount's settle value is distinct, so a forbidden re-roll (a second
+// mount) is observably different from the first.
 const ROLL_VALUES = [7, 3];
 let rollMountCount = 0;
 vi.mock("@/features/dice/DiceRoller", () => ({
   default: function MockDiceRoller({ onResult }: { onResult?: (r: RollResult) => void }) {
+    const ordinalRef = useRef(0);
     useEffect(() => {
-      const value = ROLL_VALUES[Math.min(rollMountCount, ROLL_VALUES.length - 1)];
+      ordinalRef.current = rollMountCount;
       rollMountCount += 1;
-      onResult?.({ dice: [{ value, dropped: false }], modifier: 0, total: value, spec: { count: 1, faces: 10 } });
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- mock fires onResult once on mount; empty deps intentional
     }, []);
-    return <div data-testid="dice-roller" />;
+    function handleSettle() {
+      const value = ROLL_VALUES[Math.min(ordinalRef.current, ROLL_VALUES.length - 1)];
+      onResult?.({ dice: [{ value, dropped: false }], modifier: 0, total: value, spec: { count: 1, faces: 10 } });
+    }
+    return (
+      <div data-testid="dice-roller">
+        <button type="button" data-testid="settle" onClick={handleSettle}>
+          Settle
+        </button>
+      </div>
+    );
   },
 }));
 
@@ -148,9 +159,31 @@ describe("HitPointsStep", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
+    await user.click(screen.getByTestId("settle"));
 
     expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
     expect(lastDraft).toEqual({ hp: { method: "roll", roll: 7 } });
+  });
+
+  it("keeps the settled die mounted with the result text", async () => {
+    render(<StatefulStep />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
+    await user.click(screen.getByTestId("settle"));
+
+    expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
+    expect(screen.getByTestId("dice-roller")).toBeInTheDocument();
+  });
+
+  it("reserves result-line space while tumbling", async () => {
+    render(<StatefulStep />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
+
+    const resultLine = screen.getByText(/new maximum hp/i).closest("p");
+    expect(resultLine).toHaveClass("invisible");
   });
 
   it("holds the rolled value across an average↔roll toggle (no re-roll fishing)", async () => {
@@ -158,12 +191,16 @@ describe("HitPointsStep", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
+    await user.click(screen.getByTestId("settle"));
     expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /take average/i }));
     expect(await screen.findByText(/52\s*→\s*58/)).toBeInTheDocument();
+    // The reveal wrapper stays mounted (hidden), not torn down, while average is selected.
+    expect(screen.getByTestId("dice-roller").parentElement).toHaveAttribute("hidden");
 
     await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
+    expect(screen.getByTestId("dice-roller").parentElement).not.toHaveAttribute("hidden");
     // Still 59 (the held 7), not 55 (a fresh mount's 3) — the die never re-rolled.
     expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
     expect(rollMountCount).toBe(1);
@@ -188,11 +225,17 @@ describe("HitPointsStep", () => {
     render(<StatefulStep character={multiCharacter} />);
     const user = userEvent.setup();
 
-    // Default is the primary (fighter, d10).
-    expect(await screen.findByRole("button", { name: /roll 1d10/i })).toBeInTheDocument();
+    // Default is the primary (fighter, d10). Settle its die first.
+    await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
+    await user.click(screen.getByTestId("settle"));
+    expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: /wizard 3 → 4/i }));
     expect(screen.getByTestId("search")).toHaveTextContent("entry=entry-2");
+
+    // The die-swap forces the one legitimate remount (key={math.faces}) so the
+    // wizard's d6 gets a fresh reveal instead of carrying the fighter's roll.
+    expect(rollMountCount).toBe(2);
 
     // The die follows the wizard's d6; average now previews 52 → 56 (+4).
     expect(await screen.findByRole("button", { name: /roll 1d6/i })).toBeInTheDocument();
