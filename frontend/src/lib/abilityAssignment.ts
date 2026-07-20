@@ -5,9 +5,9 @@ import type { AbilityName, AbilityScores } from "@/types/character";
 
 // Pure ability-assignment logic for the creation ability panel (#1161): the
 // point-buy budget maths, pool slot assignment, and the PHB'24 background spread
-// transitions — moved out of the retired AbilityScoreEditor / BackgroundBonusesSection
-// so the panel stays presentation-only. The generation methods themselves (dice,
-// standard array, cost table) still live in abilityGen.
+// transitions — kept out of AbilityAssignmentPanel so it stays presentation-only.
+// The generation methods themselves (dice, standard array, cost table) still
+// live in abilityGen.
 
 export type AbilityAssignments = Record<AbilityName, number | null>;
 

@@ -27,7 +27,7 @@ const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking
 
 /**
  * Inline panel (no modal/dialog component exists anywhere in this app —
- * AbilityScoreEditor's method-tab pattern is the precedent) for gaining a
+ * AbilityAssignmentPanel's method-chip pattern is the precedent) for gaining a
  * new InventoryItem: either picked from the catalog or fully homebrew.
  * Both submit a single `acquire` operation; cost is just an optional field
  * (0 = free, matching the "Add vs Buy" merge) prefilled from the selected
