@@ -15,7 +15,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
-import { deriveResources, type DerivedClassInfo } from "./class-features.js";
+import { deriveEntryScopedResources, type DerivedClassInfo } from "./class-features.js";
 import { toolsByCategory } from "@/lib/srd/srd.js";
 
 // status → the 400 the central `errorHandler` maps (client op-validation error).
@@ -846,6 +846,8 @@ interface ResourceOpContext {
   tx: Prisma.TransactionClient;
   state: ResourcesMutableState;
   derivedInfo: DerivedClassInfo | null;
+  /** The discipline-granting entry's own effective level (#1177) — only the
+   *  learnDiscipline/swapDiscipline handlers read this. */
   level: number;
 }
 
@@ -887,15 +889,16 @@ function snapshotResourcesState(state: ResourcesMutableState): {
 }
 
 // Columns/relations applyResourceOpInTx re-reads per op; the batch wrapper's
-// scaffold row is an existence-only { id: true } check.
+// scaffold row is an existence-only { id: true } check. Every entry (not just
+// the primary) + its level is selected so deriveEntryScopedResources can derive
+// each entry's own choice-cap fields (#1177).
 const RESOURCES_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    take: 1,
-    select: { name: true, subclass: true },
+    select: { name: true, subclass: true, level: true },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -922,16 +925,22 @@ export async function applyResourceOpInTx(
 
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
-  const primaryEntry = row.classEntries[0];
-  const className = primaryEntry?.name ?? "";
-  const subclass = primaryEntry?.subclass ?? undefined;
   const abilityScores = row.abilityScores as Record<string, number>;
-  const derivedInfo = deriveResources(className, subclass, level, abilityScores, profBonus);
+  // Entry-scoped caps (#1177): a secondary Battle Master's maneuver cap and a
+  // secondary Four Elements monk's discipline gate must come from THAT entry's
+  // own effective level, not the primary entry's. disciplineLevel is threaded
+  // as ctx.level below since only the discipline handlers consume it.
+  const { derived: derivedInfo, disciplineLevel } = deriveEntryScopedResources(
+    row.classEntries,
+    level,
+    abilityScores,
+    profBonus,
+  );
 
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = await dispatchResourceOp({ tx, state, derivedInfo, level }, op);
+  const audit = await dispatchResourceOp({ tx, state, derivedInfo, level: disciplineLevel }, op);
 
   // Write the updated state back — always via serializeResourcesState so
   // all keys round-trip (prevents clobbering toolProficienciesKnown when
