@@ -2,6 +2,7 @@
 // tables deriveResources() merges from, and exposes the class-features.ts
 // public surface (resolveClassDie / deriveResources / deriveResourcesForCharacterRow).
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 
 import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";
@@ -179,4 +180,77 @@ export function deriveResourcesForCharacterRow(row: {
     profBonus,
   );
   return { derived, level };
+}
+
+// The five choice-cap fields overlaid per class entry by deriveEntryScopedResources
+// (never the pool `resources`/`features` layer — pools stay primary-at-total-level,
+// #1177 non-goal). Kept as a typed list so the overlay loop and its "has anything to
+// contribute" check share one enumeration.
+const CAP_FIELDS = [
+  "maneuverChoiceCount",
+  "maneuverSaveDC",
+  "disciplineChoiceCount",
+  "disciplineSaveDC",
+  "toolProfChoiceCount",
+] as const satisfies readonly (keyof DerivedClassInfo)[];
+
+// Whether an entry's own-level derivation has any choice-cap field to overlay
+// (a plain class/subclass with only pools/features contributes nothing here).
+function entryContributesCapFields(info: DerivedClassInfo): boolean {
+  return CAP_FIELDS.some((field) => info[field] !== undefined) || info.subclassChoices !== undefined;
+}
+
+// Defined-wins overlay of one entry's choice-cap fields onto the accumulator (a
+// class appears at most once in classEntries, so no cross-entry collision).
+// Creates an empty resources/features shell on first contribution if `derived`
+// is still null (e.g. an empty-featured primary with a capped secondary).
+function overlayCapFields(derived: DerivedClassInfo | null, info: DerivedClassInfo): DerivedClassInfo {
+  const target = derived ?? { resources: [], features: [] };
+  for (const field of CAP_FIELDS) {
+    if (info[field] !== undefined) target[field] = info[field];
+  }
+  if (info.subclassChoices) {
+    target.subclassChoices = [...(target.subclassChoices ?? []), ...info.subclassChoices];
+  }
+  return target;
+}
+
+/**
+ * Entry-scoped resource caps for multiclass level-up (#1177): the pool/feature
+ * layer stays primary-at-total-level (deriveResources unchanged — pool
+ * entry-scoping is explicitly out of scope), but the CHOICE-CAP fields
+ * (maneuverChoiceCount/SaveDC, disciplineChoiceCount/SaveDC, toolProfChoiceCount,
+ * subclassChoices) are re-derived per class entry at that entry's OWN effective
+ * level and overlaid — so a secondary Battle Master's maneuver cap comes from its
+ * own level, not the primary entry's. `effectiveEntryLevel` collapses to the XP-
+ * derived total for single-class characters, so single-class output is byte-
+ * identical to a bare deriveResources() call (see the parity test).
+ *
+ * disciplineLevel is the effective level of whichever entry contributed
+ * disciplineChoiceCount (fallback: totalLevel) — the level the discipline
+ * learn/swap ops must gate against, since it may differ from totalLevel for a
+ * secondary Way of the Four Elements monk.
+ */
+export function deriveEntryScopedResources(
+  classEntries: { name: string; subclass?: string | null; level: number }[],
+  totalLevel: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): { derived: DerivedClassInfo | null; disciplineLevel: number } {
+  const primary = classEntries[0];
+  const base = deriveResources(primary?.name ?? "", primary?.subclass ?? undefined, totalLevel, abilityScores, profBonus);
+
+  let derived: DerivedClassInfo | null = base ? { ...base } : null;
+  let disciplineLevel = totalLevel;
+
+  for (const entry of classEntries) {
+    const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
+    const info = deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus);
+    if (!info || !entryContributesCapFields(info)) continue;
+
+    derived = overlayCapFields(derived, info);
+    if (info.disciplineChoiceCount !== undefined) disciplineLevel = effLevel;
+  }
+
+  return { derived, disciplineLevel };
 }
