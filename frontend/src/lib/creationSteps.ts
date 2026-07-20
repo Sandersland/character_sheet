@@ -43,8 +43,11 @@ function identityMissing(draft: CharacterDraft): string[] {
 }
 
 // The equipment slice is missingRequirements' full output minus its identity
-// prefix — identity items are computed identically in both calls, so the
-// difference is exactly the equipment detail.
+// prefix. Invariant: missingRequirements emits the identity labels first as one
+// contiguous block (never interleaved with equipment), and identity items are
+// computed identically in both calls — so dropping identityMissing's length
+// leaves exactly the equipment detail. If that ordering ever changes, this slice
+// breaks.
 function equipmentMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
   const full = missingRequirements({
     name: draft.name,

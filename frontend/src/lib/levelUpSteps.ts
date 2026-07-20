@@ -1,5 +1,5 @@
-// Pure step model for the level-up ceremony rail (#886) — precedent: stepRail.
-// No JSX; rendered by StepRail / LevelUpCeremony.
+// Pure step model for the level-up ceremony rail (#886) — precedent: ceremonySteps.
+// No JSX; rendered by CeremonyStepRail / LevelUpCeremony.
 
 import { railState as ceremonyRailState, stepPosition as ceremonyStepPosition } from "@/lib/ceremonySteps";
 import type { CeremonyStepState } from "@/lib/ceremonySteps";
