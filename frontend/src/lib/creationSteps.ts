@@ -3,6 +3,7 @@
 // missing-list is a slice of the one creationMissing rule set — no new
 // validation is invented here.
 
+import { ABILITY_ORDER } from "@/lib/abilities";
 import { deriveBackgroundBonuses, resolveBackgroundName } from "@/lib/characterCreation";
 import type { CreationSelections } from "@/lib/characterCreation";
 import { missingRequirements } from "@/lib/characterCreationValidation";
@@ -68,8 +69,20 @@ export function creationStepMissing(
     case "identity":
       return identityMissing(draft);
     case "abilities": {
+      const missing: string[] = [];
+      // Pool methods (roll / standard array) must be rolled and fully assigned
+      // before Continue — the +2/+1 background spread alone no longer clears the
+      // step (#1161). Manual / point-buy always carry six live scores, so they
+      // only gate on the background spread below.
+      if (draft.abilityMethod === "roll" || draft.abilityMethod === "standardArray") {
+        if (!draft.abilityPool) missing.push("Roll ability scores");
+        else if (ABILITY_ORDER.some((a) => draft.abilityAssignments[a] === null)) {
+          missing.push("Assign all ability scores");
+        }
+      }
       const bonuses = deriveBackgroundBonuses(draft, selections);
-      return bonuses.applicable && !bonuses.complete ? ["Background ability scores"] : [];
+      if (bonuses.applicable && !bonuses.complete) missing.push("Background ability scores");
+      return missing;
     }
     case "spells":
       return creationSpellsMissing(creationSpellCounts(selections.class), draft.cantripIds, draft.spellIds);
