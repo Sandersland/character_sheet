@@ -202,8 +202,22 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.body.hitPoints.current).toBe(res.body.hitPoints.max);
     expect(res.body.hitPoints.temp).toBe(0);
     expect(res.body.hitPoints.deathSaves).toEqual({ successes: 0, failures: 0 });
-    // total 2 → recover max(1, floor(2/2))=1 die; spent was 1 → 1-1=0
+    // total 2 → recover max(1, ceil(2/2))=1 die; spent was 1 → 1-1=0
     expect(res.body.hitDice.spent).toBe(0);
+  });
+
+  it.each([
+    { total: 1, spent: 1, after: 0 },
+    { total: 3, spent: 3, after: 1 },
+    { total: 5, spent: 5, after: 2 },
+  ])("longRest: recovers ceil(total/2) hit dice, min 1 (total=$total)", async ({ total, spent, after }) => {
+    await prisma.character.update({
+      where: { id: FIXTURE.id },
+      data: { hitDice: { total, die: "d10", spent } },
+    });
+    const res = await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.hitDice.spent).toBe(after);
   });
 
   it("longRest: removes exactly 1 exhaustion level (#1136)", async () => {
