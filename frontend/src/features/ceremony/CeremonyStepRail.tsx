@@ -24,7 +24,9 @@ export default function CeremonyStepRail({ steps, currentKey }: { steps: RailSte
     currentKey,
   );
   return (
-    <ol className="flex flex-wrap items-center justify-center gap-y-2">
+    // No flex-wrap: below md the ol fills its width and connectors flex/shrink so
+    // any realistic step count stays on one line (#1182); md+ is unchanged.
+    <ol className="flex w-full items-center gap-y-2 md:w-auto md:justify-center">
       {steps.map((step, i) => {
         const state = states[i];
         return (
@@ -32,12 +34,14 @@ export default function CeremonyStepRail({ steps, currentKey }: { steps: RailSte
             key={step.key}
             aria-label={`Step ${i + 1}: ${step.label}`}
             aria-current={state === "active" ? "step" : undefined}
-            className="flex items-center"
+            className={`flex items-center ${i > 0 ? "min-w-0 flex-1 md:flex-none" : ""}`}
           >
-            {i > 0 && <span aria-hidden className="mx-2 h-px w-5 bg-parchment-300 md:w-8" />}
+            {i > 0 && (
+              <span aria-hidden className="mx-1 h-px min-w-1.5 flex-1 bg-parchment-300 md:mx-2 md:w-8 md:flex-none" />
+            )}
             <span
               aria-hidden
-              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold ${DOT_STYLE[state]}`}
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${DOT_STYLE[state]}`}
             >
               {state === "done" ? <Check className="h-4 w-4" /> : i + 1}
             </span>

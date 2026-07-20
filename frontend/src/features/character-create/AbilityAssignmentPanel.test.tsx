@@ -224,6 +224,24 @@ describe("AbilityAssignmentPanel — no-bonus background", () => {
   });
 });
 
+describe("AbilityAssignmentPanel — mobile grid alignment (#1182)", () => {
+  it("renders header + rows as ONE grid so columns align regardless of radio eligibility", () => {
+    // A bonus fixture mixes eligible (radio) and ineligible rows. Separate grids
+    // sized their `auto` tracks independently and misaligned — the regression.
+    const { container } = renderPanel({
+      method: "manual",
+      bonuses: sageBonuses({ constitution: 2, intelligence: 1 }),
+    });
+    expect(container.querySelectorAll('[style*="grid-template-columns"]')).toHaveLength(1);
+  });
+
+  it("shows an abbreviated label below sm and the full label from sm up", () => {
+    renderPanel({ method: "manual", scores: ALL_EIGHT });
+    expect(screen.getByText("STR")).toHaveClass("sm:hidden");
+    expect(screen.getByText("Strength")).toHaveClass("sm:inline");
+  });
+});
+
 describe("AbilityAssignmentPanel — recommended", () => {
   it("marks the single primary-ability row with the class diamond", () => {
     renderPanel({ method: "manual", primaryAbility: ["intelligence"], className: "Wizard" });
