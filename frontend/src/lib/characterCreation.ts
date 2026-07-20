@@ -1,7 +1,6 @@
 import { abilityModifier } from "@/lib/abilities";
 import { draftToInput } from "@/lib/startingEquipment";
-import { missingRequirements } from "@/lib/characterCreationValidation";
-import { creationSpellCounts, creationSpellsMissing } from "@/lib/creationSpells";
+import { creationStepMissing, creationSteps } from "@/lib/creationSteps";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type {
   AbilityName,
@@ -164,25 +163,14 @@ export function derivePreview(
   };
 }
 
+// The whole form's unmet requirements — the concatenation of every step's own
+// missing-list (#1176), so the page's Save gate and the per-step gates can
+// never disagree.
 export function creationMissing(
   draft: CharacterDraft,
   selections: CreationSelections
 ): string[] {
-  const missing = missingRequirements({
-    name: draft.name,
-    alignment: draft.alignment,
-    race: draft.race,
-    className: draft.className,
-    backgroundName: resolveBackgroundName(draft),
-    startingEquipment: selections.class?.startingEquipment ?? null,
-    equipmentDraft: draft.equipmentDraft,
-  });
-  // #1131: a level-1 caster must finish its cantrip + spell picks.
-  missing.push(...creationSpellsMissing(creationSpellCounts(selections.class), draft.cantripIds, draft.spellIds));
-  // A specced background requires a complete ability spread before saving (#1130).
-  const bonuses = deriveBackgroundBonuses(draft, selections);
-  if (bonuses.applicable && !bonuses.complete) missing.push("Background ability scores");
-  return missing;
+  return creationSteps(selections).flatMap((key) => creationStepMissing(key, draft, selections));
 }
 
 export function buildCreatePayload(
