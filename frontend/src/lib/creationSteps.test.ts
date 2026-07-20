@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 
-import { creationMissing } from "@/lib/characterCreation";
 import type { CreationSelections } from "@/lib/characterCreation";
 import {
   CREATION_STEP_LABELS,
+  creationMissing,
   creationStepMissing,
   creationSteps,
   type CreationStepKey,
@@ -248,12 +248,45 @@ describe("aggregate matches creationMissing", () => {
     const selections = sel({ class: wizard, background: specBackground });
     expect(aggregate(draft, selections)).toEqual(creationMissing(draft, selections));
   });
-
   it("unassigned pool draft surfaces the abilities gate", () => {
     const draft = makeDraft({ name: "Mo", className: "Rogue", abilityMethod: "roll", abilityPool: null });
     const selections = sel({ class: rogue });
     const missing = creationMissing(draft, selections);
     expect(missing).toContain("Roll ability scores");
     expect(aggregate(draft, selections)).toEqual(missing);
+  });
+});
+
+describe("creationMissing", () => {
+  it("lists all unmet requirements for an empty draft", () => {
+    expect(creationMissing(makeDraft(), sel())).toEqual(["Name", "Alignment", "Race", "Class", "Background"]);
+  });
+
+  it("is empty for a complete draft with a spec-less background", () => {
+    const draft = makeDraft({ name: "Lidda", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Sage" });
+    expect(creationMissing(draft, sel({ class: rogue }))).toEqual([]);
+  });
+
+  it("blocks save until a specced background's spread is complete (#1130)", () => {
+    const draft = makeDraft({ name: "Lidda", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Criminal" });
+    const selections = sel({ class: rogue, background: specBackground });
+    expect(creationMissing(draft, selections)).toContain("Background ability scores");
+
+    const assigned = makeDraft({ ...draft, backgroundAbilities: { dexterity: 2, constitution: 1 } });
+    expect(creationMissing(assigned, selections)).not.toContain("Background ability scores");
+  });
+
+  it("blocks an incomplete caster's spell picks and passes a complete one (#1131)", () => {
+    const caster = { name: "Mo", alignment: "Neutral Good", race: "Elf", className: "Wizard", background: "Sage" };
+    const incomplete = makeDraft({ ...caster, cantripIds: ["c1"], spellIds: [] });
+    expect(creationMissing(incomplete, sel({ class: wizard }))).toEqual(["Cantrips: choose 3", "Spells: choose 4"]);
+
+    const complete = makeDraft({ ...caster, cantripIds: ["c1", "c2", "c3"], spellIds: ["s1", "s2", "s3", "s4"] });
+    expect(creationMissing(complete, sel({ class: wizard }))).toEqual([]);
+  });
+
+  it("never blocks a non-caster on spells (#1131)", () => {
+    const draft = makeDraft({ name: "F", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Sage" });
+    expect(creationMissing(draft, sel({ class: rogue }))).toEqual([]);
   });
 });

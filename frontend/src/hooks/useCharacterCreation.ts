@@ -6,7 +6,6 @@ import { useToolProficiencyChoices } from "@/features/character-create/useToolPr
 import type { ToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import {
   buildCreatePayload,
-  creationMissing,
   deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
@@ -19,7 +18,7 @@ import type {
   CreationSkillChoices,
 } from "@/lib/characterCreation";
 import { stepPosition } from "@/lib/ceremonySteps";
-import { creationStepMissing, creationSteps } from "@/lib/creationSteps";
+import { creationMissing, creationStepMissing, creationSteps } from "@/lib/creationSteps";
 import type { CreationStepKey } from "@/lib/creationSteps";
 import type { Item, ReferenceData, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
