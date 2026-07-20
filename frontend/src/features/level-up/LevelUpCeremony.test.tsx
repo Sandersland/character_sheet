@@ -136,22 +136,6 @@ describe("LevelUpCeremony", () => {
     expect(screen.queryByText("SHEET")).not.toBeInTheDocument();
   });
 
-  it("renders the #1065 blocked notice (no stepper) for a non-primary resource-backed plan", async () => {
-    planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], {
-        isPrimary: false,
-        subclass: "Battle Master",
-      }),
-    );
-    renderCeremony();
-    const user = userEvent.setup();
-
-    expect(await screen.findByText(/can't be resolved for a non-primary class yet/i)).toBeInTheDocument();
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /back to sheet/i }));
-    expect(screen.getByText("SHEET")).toBeInTheDocument();
-  });
-
   it("has no axe violations", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
     const { container } = renderCeremony();

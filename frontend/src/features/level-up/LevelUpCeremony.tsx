@@ -75,14 +75,6 @@ export default function LevelUpCeremony({ character }: { character: Character })
     content = <PaperNotice title="The ceremony can't begin" body={c.planError} onBack={c.cancel} />;
   } else if (!c.plan || !c.currentStep) {
     content = showSpinner ? <Spinner variant="page" /> : null;
-  } else if (c.blocked) {
-    content = (
-      <PaperNotice
-        title="Not supported here yet"
-        body="This level grants subclass feature picks (maneuvers, disciplines, or similar) that can't be resolved for a non-primary class yet — use the classic Level Up on the sheet."
-        onBack={c.cancel}
-      />
-    );
   } else {
     content = (
       <>
