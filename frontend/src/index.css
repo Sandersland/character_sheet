@@ -205,6 +205,21 @@
   }
 }
 
+/* iOS Safari auto-zooms the visual viewport when a focused input/select/textarea
+   has a computed font-size < 16px, and never zooms back out (#1184). Our controls
+   use text-sm/text-xs, so on touch devices raise every real form control to ≥16px.
+   Un-layered author rule (Tailwind v4 puts utilities in a cascade layer, which
+   plain author CSS outranks) — but !important is kept so it also beats the more
+   specific text-* utilities regardless of source order. `1em` lets any control
+   deliberately larger than 16px keep its size. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 /* Full-bleed list-row divider (#1025): a true hairline on 3x screens, 1px
    elsewhere — for the mobile list rows the density passes build. */
 .divider-hairline {
