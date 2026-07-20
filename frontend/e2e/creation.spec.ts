@@ -1,13 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 import { uniqueName } from "./helpers/api";
 
-// Walks the guided creation form end-to-end and lands on the new sheet. Uses the
-// starting-gold path for the equipment step — a single deterministic choice that
-// completes the package regardless of catalog contents.
-test("creation: guided flow lands on the sheet with the chosen class", async ({ page }) => {
+// The creation ceremony (#1176) walks one step at a time behind a Continue gate;
+// the footer flips to "Create Character" on the Review step.
+function continueStep(page: Page) {
+  return page.getByRole("button", { name: /Continue/ }).click();
+}
+
+// Walks the guided creation ceremony end-to-end and lands on the new sheet. Uses
+// the starting-gold path for the equipment step — a single deterministic choice
+// that completes the package regardless of catalog contents.
+test("creation: guided ceremony lands on the sheet with the chosen class", async ({ page }) => {
   const name = uniqueName("Forged Hero");
 
   await login(page);
@@ -17,26 +23,33 @@ test("creation: guided flow lands on the sheet with the chosen class", async ({ 
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
 
-  // Labels carry a trailing "*" required marker, so anchor at the start; ^Class
-  // also keeps it from matching the Subclass field.
+  // Identity step. Labels carry a trailing "*" required marker, so anchor at the
+  // start; ^Class also keeps it from matching the Subclass field.
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
   await page.getByLabel(/^Race/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Fighter" });
   await page.getByLabel("Background").selectOption({ label: "Soldier" });
+  await continueStep(page);
 
-  // 2024 background ability spread (#1130): Soldier draws from Str/Dex/Con and
-  // grants the Savage Attacker Origin feat. Assign +2 Strength / +1 Dexterity.
+  // Abilities step — 2024 background ability spread (#1130): Soldier draws from
+  // Str/Dex/Con and grants the Savage Attacker Origin feat. Assign +2 Str / +1 Dex.
   await expect(page.getByText("Origin feat: Savage Attacker")).toBeVisible();
   await page.getByLabel(/\+2 to/).selectOption({ label: "Strength" });
   await page.getByLabel(/\+1 to/).selectOption({ label: "Dexterity" });
+  await continueStep(page);
 
-  // Equipment: choose the starting-gold option and roll a valid amount. The gold
-  // roll label carries a ×N multiplier, distinguishing it from the ability "Roll 4d6".
+  // Skills & Tools step — no required picks for this build.
+  await continueStep(page);
+
+  // Equipment step — choose the starting-gold option and roll a valid amount. The
+  // gold roll label carries a ×N multiplier, distinguishing it from "Roll 4d6".
   await page.getByRole("button", { name: /Starting gold/ }).click();
   await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  await continueStep(page);
 
-  await page.getByRole("button", { name: /Save Character/ }).click();
+  // Review step — create.
+  await page.getByRole("button", { name: /Create Character/ }).click();
 
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
   await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
@@ -59,18 +72,23 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
 
+  // Identity step.
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
   await page.getByLabel(/^Race/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Warlock" });
   await page.getByLabel("Background").selectOption({ label: "Sage" });
+  await continueStep(page);
 
-  // 2024 background ability spread (#1130): Sage draws from Con/Int/Wis — assign
-  // it so Save unblocks (a specced background gates the form until it's complete).
+  // Abilities step — Sage draws from Con/Int/Wis; assign it so the step unblocks.
   await page.getByLabel(/\+2 to/).selectOption({ label: "Intelligence" });
   await page.getByLabel(/\+1 to/).selectOption({ label: "Constitution" });
+  await continueStep(page);
 
-  // The Spells section appears for a level-1 caster: 2 cantrips + 2 spells.
+  // Skills & Tools step.
+  await continueStep(page);
+
+  // Spells step: a level-1 warlock picks 2 cantrips + 2 spells.
   await expect(page.getByRole("heading", { name: "Spells" })).toBeVisible();
   await page.getByRole("checkbox", { name: /Eldritch Blast/ }).check();
   await page.getByRole("checkbox", { name: /Poison Spray/ }).check();
@@ -78,12 +96,15 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   // Hideous Laughter is warlock-legal under SRD 5.2; Dissonant Whispers is now
   // bard-only (#1132) and no longer offered in the warlock picker.
   await page.getByRole("checkbox", { name: /Hideous Laughter/ }).check();
+  await continueStep(page);
 
-  // Equipment: the deterministic starting-gold path (as above).
+  // Equipment step — the deterministic starting-gold path (as above).
   await page.getByRole("button", { name: /Starting gold/ }).click();
   await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  await continueStep(page);
 
-  await page.getByRole("button", { name: /Save Character/ }).click();
+  // Review step — create.
+  await page.getByRole("button", { name: /Create Character/ }).click();
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
 
   await page.getByRole("tab", { name: "Magic" }).click();

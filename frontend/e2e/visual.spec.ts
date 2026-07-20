@@ -181,32 +181,34 @@ test("visual: session / turn view", async ({ page }) => {
   });
 });
 
-test("visual: creation flow — steps", async ({ page }) => {
+test("visual: creation ceremony — steps", async ({ page }) => {
   await login(page);
   await pinFonts(page);
   await setTheme(page, "light");
 
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
-  await expect(page.getByRole("heading", { name: "New Character", level: 1 })).toBeVisible();
+  // The ceremony (#1176) opens on the Identity step behind the dark stage.
+  await expect(page.getByLabel(/^Name/)).toBeVisible();
   await ready(page);
 
-  // Step 1 — the empty identity form (a fresh browser context starts draft-free).
-  await expect(page.locator("main")).toHaveScreenshot("creation-step1.png", {
+  // Step 1 — the empty Identity step (a fresh browser context starts draft-free).
+  await expect(page).toHaveScreenshot("creation-step1.png", {
     maxDiffPixelRatio: 0.01,
   });
 
-  // Step 2 — identity chosen, revealing skills, starting equipment, and preview.
-  // A fixed name keeps the pixels stable (the draft is never saved).
+  // Step 2 — identity chosen, advanced to the Abilities step (Soldier's 2024
+  // spread). A fixed name keeps the "Forging · …" kicker pixels stable.
   await page.getByLabel(/^Name/).fill("Aria Brightwood");
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
   await page.getByLabel(/^Race/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Fighter" });
   await page.getByLabel("Background").selectOption({ label: "Soldier" });
-  await expect(page.getByRole("heading", { name: "Starting Equipment" })).toBeVisible();
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await expect(page.getByText("Origin feat: Savage Attacker")).toBeVisible();
   await ready(page);
 
-  await expect(page.locator("main")).toHaveScreenshot("creation-step2.png", {
+  await expect(page).toHaveScreenshot("creation-step2.png", {
     maxDiffPixelRatio: 0.02,
   });
 });
