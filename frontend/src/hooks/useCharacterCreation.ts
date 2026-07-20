@@ -18,6 +18,9 @@ import type {
   CreationSelections,
   CreationSkillChoices,
 } from "@/lib/characterCreation";
+import { stepPosition } from "@/lib/ceremonySteps";
+import { creationStepMissing, creationSteps } from "@/lib/creationSteps";
+import type { CreationStepKey } from "@/lib/creationSteps";
 import type { Item, ReferenceData, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
@@ -46,6 +49,17 @@ export interface CharacterCreation {
   submitting: boolean;
   submitError: boolean;
   save: () => Promise<void>;
+  /** The ceremony walk (#1176) — spells step only for a level-1 caster. */
+  steps: CreationStepKey[];
+  stepIndex: number;
+  currentStep: CreationStepKey;
+  isLast: boolean;
+  /** Whether the current step's own gate is satisfied. */
+  canContinue: boolean;
+  next: () => void;
+  back: () => void;
+  /** Leave the ceremony, keeping the draft for later. */
+  cancel: () => void;
 }
 
 // Orchestrates the character-creation form: draft state, reference-driven
@@ -98,6 +112,24 @@ export function useCharacterCreation(): CharacterCreation {
 
   const missing = creationMissing(draft, selections);
 
+  const steps = creationSteps(selections);
+  const stepIndex = stepPosition(steps, draft.step);
+  const currentStep = steps[stepIndex];
+  const canContinue = creationStepMissing(currentStep, draft, selections).length === 0;
+  const isLast = stepIndex === steps.length - 1;
+
+  function next() {
+    if (canContinue && !isLast) update({ step: steps[stepIndex + 1] });
+  }
+
+  function back() {
+    if (stepIndex > 0) update({ step: steps[stepIndex - 1] });
+  }
+
+  function cancel() {
+    navigate("/");
+  }
+
   async function save() {
     if (missing.length > 0 || submitting) return;
     setSubmitting(true);
@@ -138,5 +170,13 @@ export function useCharacterCreation(): CharacterCreation {
     submitting,
     submitError,
     save,
+    steps,
+    stepIndex,
+    currentStep,
+    isLast,
+    canContinue,
+    next,
+    back,
+    cancel,
   };
 }

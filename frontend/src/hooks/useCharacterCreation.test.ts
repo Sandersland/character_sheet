@@ -42,7 +42,17 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
 
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
-  classes: [makeClass()],
+  classes: [
+    makeClass(),
+    makeClass({
+      id: "class-wiz",
+      name: "Wizard",
+      hitDie: "d6",
+      isSpellcaster: true,
+      skillChoices: ["arcana", "history"],
+      level1SpellPicks: { cantrips: 3, spells: 2 },
+    }),
+  ],
   backgrounds: [
     { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null },
   ],
@@ -281,5 +291,66 @@ describe("useCharacterCreation", () => {
     await waitFor(() => expect(result.current.draft.name).toBe("Renamed"));
     expect(result.current.draft.cantripIds).toEqual(["c1"]);
     expect(result.current.draft.spellIds).toEqual(["s1"]);
+  });
+
+  // #1176: the ceremony walk.
+  it("derives the walk steps, skipping spells for a non-caster", async () => {
+    seedDraft({ className: "Rogue", background: "Sage" });
+    const { result } = await mount();
+    expect(result.current.steps).toEqual(["identity", "abilities", "skills", "equipment", "review"]);
+  });
+
+  it("includes the spells step for a level-1 caster", async () => {
+    seedDraft({ className: "Wizard" });
+    const { result } = await mount();
+    expect(result.current.steps).toContain("spells");
+  });
+
+  it("resumes at the persisted draft step", async () => {
+    seedDraft({ ...validDraft(), step: "skills" });
+    const { result } = await mount();
+    expect(result.current.currentStep).toBe("skills");
+    expect(result.current.stepIndex).toBe(2);
+  });
+
+  it("next() refuses to advance while the current step's gate fails", async () => {
+    seedDraft({});
+    const { result } = await mount();
+    expect(result.current.canContinue).toBe(false);
+    act(() => result.current.next());
+    expect(result.current.currentStep).toBe("identity");
+  });
+
+  it("next() advances and persists the step when the gate passes", async () => {
+    seedDraft(validDraft());
+    const { result } = await mount();
+    expect(result.current.currentStep).toBe("identity");
+    expect(result.current.canContinue).toBe(true);
+
+    act(() => result.current.next());
+    await waitFor(() => expect(result.current.currentStep).toBe("abilities"));
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}").step).toBe("abilities");
+  });
+
+  it("back() returns to the previous step", async () => {
+    seedDraft({ ...validDraft(), step: "skills" });
+    const { result } = await mount();
+    act(() => result.current.back());
+    await waitFor(() => expect(result.current.currentStep).toBe("abilities"));
+  });
+
+  it("drops the spells step when the class changes to a non-caster", async () => {
+    seedDraft({ className: "Wizard" });
+    const { result } = await mount();
+    expect(result.current.steps).toContain("spells");
+    act(() => result.current.update({ className: "Rogue" }));
+    await waitFor(() => expect(result.current.steps).not.toContain("spells"));
+  });
+
+  it("resolves a stale spells step to the first step for a non-caster without crashing", async () => {
+    seedDraft({ className: "Rogue", step: "spells" });
+    const { result } = await mount();
+    expect(result.current.stepIndex).toBe(0);
+    expect(result.current.currentStep).toBe("identity");
   });
 });
