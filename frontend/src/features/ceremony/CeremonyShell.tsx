@@ -54,7 +54,10 @@ interface CeremonyFooterProps {
   confirmLabel: string;
   /** Confirm-button colour variant (level-up = vitality, creation = garnet). */
   confirmClassName: string;
+  /** True while a save is in flight — disables confirm and marks it busy. */
   submitting: boolean;
+  /** True when the form is invalid — a static block distinct from submitting. */
+  confirmDisabled?: boolean;
 }
 
 export function CeremonyFooter({
@@ -68,6 +71,7 @@ export function CeremonyFooter({
   confirmLabel,
   confirmClassName,
   submitting,
+  confirmDisabled = false,
 }: CeremonyFooterProps) {
   return (
     <footer className="mt-6 flex items-center justify-between gap-3 border-t border-parchment-200 pt-4">
@@ -84,7 +88,8 @@ export function CeremonyFooter({
         <button
           type="button"
           onClick={onConfirm}
-          disabled={submitting}
+          disabled={submitting || confirmDisabled}
+          aria-busy={submitting}
           className={`${PRIMARY_BTN} ${confirmClassName}`}
         >
           {confirmLabel}

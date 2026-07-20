@@ -183,7 +183,8 @@ export default function CreationCeremony() {
           onConfirm={() => void c.save()}
           confirmLabel="✓ Create Character"
           confirmClassName="border-garnet-800 bg-garnet-700 hover:bg-garnet-800"
-          submitting={c.submitting || !c.isValid}
+          submitting={c.submitting}
+          confirmDisabled={!c.isValid}
         />
       </CeremonyCard>
     </CeremonyStage>
