@@ -1,34 +1,36 @@
-// The ceremony's adaptive step rail (#886): numbered dots joined by rules,
-// reflecting whatever steps the served plan contains. Presentational only —
-// state comes from railState.
+// The ceremonies' adaptive step rail (#886, generalized #1176): numbered dots
+// joined by rules, reflecting whatever steps the flow contains. Presentational
+// only — state comes from railState.
 
 import { Check } from "lucide-react";
 
-import { railState, stepKey, stepLabel, type LevelUpStepState } from "@/lib/levelUpSteps";
-import type { LevelUpStep } from "@/types/character";
+import { railState, type CeremonyStepState, type RailStep } from "@/lib/ceremonySteps";
 
-const DOT_STYLE: Record<LevelUpStepState, string> = {
+const DOT_STYLE: Record<CeremonyStepState, string> = {
   done: "border-vitality-600 bg-vitality-600 text-parchment-50",
   active: "border-garnet-700 bg-garnet-700 text-parchment-50",
   pending: "border-parchment-300 bg-parchment-50 text-parchment-400",
 };
 
-const NAME_STYLE: Record<LevelUpStepState, string> = {
+const NAME_STYLE: Record<CeremonyStepState, string> = {
   done: "text-parchment-500",
   active: "text-garnet-800",
   pending: "text-parchment-500",
 };
 
-export default function StepRail({ steps, currentKey }: { steps: LevelUpStep[]; currentKey: string }) {
-  const states = railState(steps, currentKey);
+export default function CeremonyStepRail({ steps, currentKey }: { steps: RailStep[]; currentKey: string }) {
+  const states = railState(
+    steps.map((s) => s.key),
+    currentKey,
+  );
   return (
     <ol className="flex flex-wrap items-center justify-center gap-y-2">
       {steps.map((step, i) => {
         const state = states[i];
         return (
           <li
-            key={stepKey(step)}
-            aria-label={`Step ${i + 1}: ${stepLabel(step)}`}
+            key={step.key}
+            aria-label={`Step ${i + 1}: ${step.label}`}
             aria-current={state === "active" ? "step" : undefined}
             className="flex items-center"
           >
@@ -41,7 +43,7 @@ export default function StepRail({ steps, currentKey }: { steps: LevelUpStep[]; 
             </span>
             {/* Names collapse below md — the dots alone carry the rail on phones. */}
             <span aria-hidden className={`ml-2 hidden text-xs font-semibold md:inline ${NAME_STYLE[state]}`}>
-              {stepLabel(step)}
+              {step.label}
             </span>
           </li>
         );

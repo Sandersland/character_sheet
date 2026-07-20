@@ -1,9 +1,11 @@
 // Pure step model for the level-up ceremony rail (#886) — precedent: stepRail.
 // No JSX; rendered by StepRail / LevelUpCeremony.
 
+import { railState as ceremonyRailState, stepPosition as ceremonyStepPosition } from "@/lib/ceremonySteps";
+import type { CeremonyStepState } from "@/lib/ceremonySteps";
 import type { LevelUpPlanResponse, LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
 
-export type LevelUpStepState = "done" | "active" | "pending";
+export type LevelUpStepState = CeremonyStepState;
 
 // The in-progress submission minus its target (owned by useLevelUpCeremony). hp
 // is optional here because the ceremony starts before the player picks it — the
@@ -42,19 +44,14 @@ export function stepLabel(step: LevelUpStep): string {
   return STEP_LABELS[step.kind];
 }
 
-/**
- * The step index `currentKey` names, falling back to the first step when the
- * key is unknown (the current step vanished in a re-plan).
- */
+/** stepPosition over LevelUpStep[], keyed by stepKey — see ceremonySteps. */
 export function stepPosition(steps: LevelUpStep[], currentKey: string): number {
-  const found = steps.findIndex((step) => stepKey(step) === currentKey);
-  return found === -1 ? 0 : found;
+  return ceremonyStepPosition(steps.map(stepKey), currentKey);
 }
 
-/** Per-step rail state, index-aligned with `steps`. */
+/** railState over LevelUpStep[], keyed by stepKey — see ceremonySteps. */
 export function railState(steps: LevelUpStep[], currentKey: string): LevelUpStepState[] {
-  const current = stepPosition(steps, currentKey);
-  return steps.map((_, i) => (i < current ? "done" : i === current ? "active" : "pending"));
+  return ceremonyRailState(steps.map(stepKey), currentKey);
 }
 
 // Mirror of the backend RESOURCE_BACKED set gating applyLevelUpTransaction:
