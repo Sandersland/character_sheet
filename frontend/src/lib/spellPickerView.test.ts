@@ -6,6 +6,7 @@ import {
   effectPillLabel,
   pickerMetaLine,
   pickRowState,
+  spellResolutionLabel,
 } from "@/lib/spellPickerView";
 import type { CatalogSpell } from "@/types/character";
 
@@ -115,5 +116,26 @@ describe("componentsLine", () => {
   it("is null without components", () => {
     expect(componentsLine({ components: null })).toBeNull();
     expect(componentsLine({})).toBeNull();
+  });
+});
+
+describe("spellResolutionLabel", () => {
+  it("names the save ability and half-on-success", () => {
+    expect(spellResolutionLabel({ attackType: "save", saveAbility: "dexterity", saveEffect: "half" })).toBe(
+      "DEX save · half on success",
+    );
+  });
+
+  it("drops the half clause when the save negates fully", () => {
+    expect(spellResolutionLabel({ attackType: "save", saveAbility: "wisdom", saveEffect: "none" })).toBe("WIS save");
+  });
+
+  it("labels a spell attack", () => {
+    expect(spellResolutionLabel({ attackType: "attack" })).toBe("Spell attack");
+  });
+
+  it("is null when the spell neither attacks nor forces a save", () => {
+    expect(spellResolutionLabel({ attackType: null })).toBeNull();
+    expect(spellResolutionLabel({ attackType: "save", saveAbility: null })).toBeNull();
   });
 });

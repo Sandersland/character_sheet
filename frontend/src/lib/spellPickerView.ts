@@ -2,6 +2,7 @@
 // headline, and the row/card display lines. No JSX. Wording is single-sourced —
 // effectPillLabel and componentsLine delegate to the addSpell/spellMeta helpers
 // so the picker never re-encodes it.
+import { abilityAbbr } from "@/lib/abilities";
 import { catalogEffectLine } from "@/lib/addSpell";
 import { componentsLabel, levelLabel } from "@/lib/spellMeta";
 import type { SpellComponents } from "@/types/character";
@@ -56,4 +57,18 @@ export function effectPillLabel(spell: {
 /** "V, S, M" for the detail card's stat grid, null when components are absent. */
 export function componentsLine(spell: { components?: SpellComponents | null }): string | null {
   return componentsLabel(spell)?.replace(/ /g, ", ") ?? null;
+}
+
+/** How the spell resolves ("DEX save · half on success" / "Spell attack"), null
+ *  when it neither attacks nor forces a save. Ability shown via abilityAbbr. */
+export function spellResolutionLabel(spell: {
+  attackType?: "attack" | "save" | null;
+  saveAbility?: string | null;
+  saveEffect?: "half" | "none" | null;
+}): string | null {
+  if (spell.attackType === "save" && spell.saveAbility) {
+    return `${abilityAbbr(spell.saveAbility)} save${spell.saveEffect === "half" ? " · half on success" : ""}`;
+  }
+  if (spell.attackType === "attack") return "Spell attack";
+  return null;
 }

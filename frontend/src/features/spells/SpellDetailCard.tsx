@@ -3,10 +3,9 @@
 // (mobile sheet / desktop dialog) with a single Learn CTA. The spell prop is a
 // structural SpellDetailView so both CatalogSpell and the sheet's Spell satisfy it.
 import BottomSheet from "@/components/ui/BottomSheet";
-import { abilityAbbr } from "@/lib/abilities";
 import { damagePillClass, schoolRibbon } from "@/lib/spellFlavor";
 import { levelLabel, schoolLabel, upcastHint } from "@/lib/spellMeta";
-import { componentsLine, effectPillLabel } from "@/lib/spellPickerView";
+import { componentsLine, effectPillLabel, spellResolutionLabel } from "@/lib/spellPickerView";
 import type { SpellComponents, SpellSchool } from "@/types/character";
 
 export interface SpellDetailView {
@@ -53,12 +52,7 @@ function StatCell({ label, value }: { label: string; value: string }) {
 function ExpectChips({ spell }: { spell: SpellDetailView }) {
   const effect = effectPillLabel(spell);
   const effectTint = spell.effectKind === "heal" ? "bg-vitality-100 text-vitality-800" : damagePillClass(spell.damageType);
-  const resolution =
-    spell.attackType === "save" && spell.saveAbility
-      ? `${abilityAbbr(spell.saveAbility)} save${spell.saveEffect === "half" ? " · half on success" : ""}`
-      : spell.attackType === "attack"
-        ? "Spell attack"
-        : null;
+  const resolution = spellResolutionLabel(spell);
   if (!effect && !resolution) return null;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
