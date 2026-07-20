@@ -86,6 +86,7 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    step: "identity",
   };
   localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...base, ...overrides }));
 }

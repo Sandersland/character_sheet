@@ -88,6 +88,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    step: "identity",
     ...overrides,
   };
 }

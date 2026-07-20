@@ -45,4 +45,24 @@ describe("useCharacterDraft", () => {
     expect(stored.name).toBe("");
     expect(stored.race).toBe("");
   });
+
+  it("rehydrates a legacy draft (no step) to the first step (#1176)", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: "Borin" }));
+    const { result } = renderHook(() => useCharacterDraft());
+    expect(result.current.draft.step).toBe("identity");
+  });
+
+  it("round-trips the current step through localStorage (#1176)", () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    act(() => result.current.update({ step: "equipment" }));
+    expect(result.current.draft.step).toBe("equipment");
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}").step).toBe("equipment");
+  });
+
+  it("clear() resets the step to identity (#1176)", () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    act(() => result.current.update({ step: "review" }));
+    act(() => result.current.clear());
+    expect(result.current.draft.step).toBe("identity");
+  });
 });
