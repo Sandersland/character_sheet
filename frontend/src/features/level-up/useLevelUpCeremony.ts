@@ -7,7 +7,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { fetchLevelUpPlan, submitLevelUp } from "@/api/client";
 import { errorMessage } from "@/lib/errorMessage";
-import { ceremonyBlocked, draftSatisfies, stepKey, stepPosition, type LevelUpDraft } from "@/lib/levelUpSteps";
+import { stepPosition } from "@/lib/ceremonySteps";
+import { ceremonyBlocked, draftSatisfies, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
 import type { Character, LevelUpPlanResponse, LevelUpStep, LevelUpTarget } from "@/types/character";
 
 export interface LevelUpCeremony {
@@ -106,7 +107,7 @@ export function useLevelUpCeremony(character: Character): LevelUpCeremony {
   const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, target, draft, goToSheet);
 
   const steps = plan?.steps ?? [];
-  const stepIndex = stepPosition(steps, currentKey);
+  const stepIndex = stepPosition(steps.map(stepKey), currentKey);
   const currentStep = steps[stepIndex] ?? null;
 
   return {

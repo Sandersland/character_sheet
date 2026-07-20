@@ -1,6 +1,5 @@
 import { abilityModifier } from "@/lib/abilities";
 import { draftToInput } from "@/lib/startingEquipment";
-import { creationStepMissing, creationSteps } from "@/lib/creationSteps";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type {
   AbilityName,
@@ -161,16 +160,6 @@ export function derivePreview(
       ? Math.max(1, hitDieFace(selections.class.hitDie) + conModifier)
       : undefined,
   };
-}
-
-// The whole form's unmet requirements — the concatenation of every step's own
-// missing-list (#1176), so the page's Save gate and the per-step gates can
-// never disagree.
-export function creationMissing(
-  draft: CharacterDraft,
-  selections: CreationSelections
-): string[] {
-  return creationSteps(selections).flatMap((key) => creationStepMissing(key, draft, selections));
 }
 
 export function buildCreatePayload(
