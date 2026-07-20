@@ -1,0 +1,38 @@
+import { expect, test } from "@playwright/test";
+
+import { login } from "./helpers/auth";
+import { collectConsoleErrors } from "./helpers/console";
+import { createCharacter, uniqueName } from "./helpers/api";
+
+// A fresh Fighter parked at L1 threshold (0 XP) with just enough to cross into
+// L2 — the simplest plan (no ASI/subclass at L2), so the ceremony's first and
+// only real step is Hit Points.
+const XP_TO_L2 = 300;
+
+// #1172: the settled die used to unmount the instant it landed. This drives a
+// real roll end-to-end and asserts the 3D die and the settled result text are
+// BOTH visible together, well after the ~1.3s tumble — proving the die lingers
+// instead of vanishing the moment the roll resolves.
+test("levelup: the HP die lingers on its settled face alongside the result", async ({ page }) => {
+  await login(page);
+  const id = await createCharacter(page.request, {
+    name: uniqueName("Rolling Fighter"),
+    className: "Fighter",
+  });
+  await page.request.post(`/api/characters/${id}/experience`, {
+    data: { operations: [{ type: "set", value: XP_TO_L2 }] },
+  });
+
+  const errors = collectConsoleErrors(page);
+  await page.goto(`/characters/${id}/level-up`);
+
+  await expect(page.getByRole("heading", { name: /roll for hit points/i })).toBeVisible();
+  await page.getByRole("button", { name: /^roll 1d/i }).click();
+
+  // Give the ~1.3s tumble plenty of margin, then check both are up together.
+  await page.waitForTimeout(2000);
+  await expect(page.getByRole("status")).toBeVisible();
+  await expect(page.getByText(/new maximum hp/i)).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
