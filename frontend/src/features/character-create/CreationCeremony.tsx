@@ -6,9 +6,9 @@ import Spinner from "@/components/ui/Spinner";
 import AbilityScoresSection from "@/features/character-create/AbilityScoresSection";
 import BackgroundBonusesSection from "@/features/character-create/BackgroundBonusesSection";
 import CreationReviewStep from "@/features/character-create/CreationReviewStep";
+import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
-import SpellSelectionSection from "@/features/character-create/SpellSelectionSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
 import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
 import { CeremonyCard, CeremonyStage, CeremonyFooter } from "@/features/ceremony/CeremonyShell";
@@ -83,7 +83,7 @@ export default function CreationCeremony() {
       break;
     case "spells":
       body = c.selections.class?.level1SpellPicks ? (
-        <SpellSelectionSection
+        <CreationSpellsStep
           className={c.draft.className}
           counts={c.selections.class.level1SpellPicks}
           cantripIds={c.draft.cantripIds}
