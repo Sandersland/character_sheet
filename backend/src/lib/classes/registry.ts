@@ -240,7 +240,14 @@ export function deriveEntryScopedResources(
   const primary = classEntries[0];
   const base = deriveResources(primary?.name ?? "", primary?.subclass ?? undefined, totalLevel, abilityScores, profBonus);
 
-  let derived: DerivedClassInfo | null = base ? { ...base } : null;
+  // Seed from base (pools/features + the two out-of-scope gate booleans —
+  // shadowArtsAvailable/cloakOfShadowsAvailable stay primary-at-total-level,
+  // not part of this overlay). subclassChoices is dropped: the loop below
+  // re-derives the PRIMARY entry too (at its own effective level), and concat
+  // would double-count a primary-only subclass's choices otherwise. The scalar
+  // CAP_FIELDS are safe to carry over as-is — the loop's defined-wins overlay
+  // replaces (never adds to) them.
+  let derived: DerivedClassInfo | null = base ? { ...base, subclassChoices: undefined } : null;
   let disciplineLevel = totalLevel;
 
   for (const entry of classEntries) {
