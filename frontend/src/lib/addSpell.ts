@@ -60,8 +60,16 @@ export function catalogMetaLine(spell: CatalogSpell): string {
 }
 
 // "fire damage — 8d6 + 2" effect preview for a catalog result; null for utility
-// spells and diceless effects (Mage Armor carries effectKind but no dice).
-export function catalogEffectLine(spell: CatalogSpell): string | null {
+// spells and diceless effects (Mage Armor carries effectKind but no dice). The
+// param is structural so both CatalogSpell and the per-character Spell (nullable
+// effect fields) share this one wording (effectPillLabel delegates here).
+export function catalogEffectLine(spell: {
+  effectKind?: "damage" | "heal" | "buff" | null;
+  effectDiceCount?: number | null;
+  effectDiceFaces?: number | null;
+  damageType?: string | null;
+  effectModifier?: number | null;
+}): string | null {
   if (!spell.effectKind || !spell.effectDiceCount || !spell.effectDiceFaces) return null;
   const noun = spell.effectKind === "heal" ? "Healing" : `${spell.damageType ?? ""} damage`;
   const mod = spell.effectModifier ? ` + ${spell.effectModifier}` : "";

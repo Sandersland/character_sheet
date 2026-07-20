@@ -85,6 +85,29 @@
   --color-vitality-800: #0e5814;
   --color-vitality-900: #05400a;
 
+  /* Spell-school ink (#1160): one hue per SRD school, used as both text ink and,
+     at a low-opacity modifier, the ribbon-badge tint. Values are extrapolated —
+     the #1158 mockup tinted every school arcane — so they read as a distinct,
+     harmonized-with-parchment family; darker in light mode for legible ink. */
+  --color-school-abjuration: oklch(0.52 0.13 250);
+  --color-school-conjuration: oklch(0.52 0.16 300);
+  --color-school-divination: oklch(0.52 0.11 85);
+  --color-school-enchantment: oklch(0.54 0.16 350);
+  --color-school-evocation: oklch(0.53 0.16 35);
+  --color-school-illusion: oklch(0.5 0.15 285);
+  --color-school-necromancy: oklch(0.48 0.08 150);
+  --color-school-transmutation: oklch(0.52 0.1 200);
+
+  /* Damage-type pill tints (#1160): a minimal set; several types map onto one
+     token in spellFlavor (acid→poison, lightning/thunder→force). */
+  --color-dmg-fire: oklch(0.55 0.17 35);
+  --color-dmg-cold: oklch(0.58 0.12 230);
+  --color-dmg-poison: oklch(0.52 0.14 150);
+  --color-dmg-necrotic: oklch(0.48 0.09 320);
+  --color-dmg-radiant: oklch(0.62 0.12 90);
+  --color-dmg-psychic: oklch(0.56 0.15 330);
+  --color-dmg-force: oklch(0.55 0.13 290);
+
   /* Fixed dark label for light-ish fills (gold); does not flip. */
   --color-ink: #27241d;
 
@@ -298,6 +321,25 @@
   --color-vitality-700: #98ea9f;
   --color-vitality-800: #c0f2c4;
   --color-vitality-900: #ddf8df;
+
+  /* School/damage inks lift to a light value (#1160) so they read as text on the
+     dark surface and as a legible tint at the /15 ribbon opacity. */
+  --color-school-abjuration: oklch(0.8 0.1 250);
+  --color-school-conjuration: oklch(0.78 0.12 300);
+  --color-school-divination: oklch(0.82 0.11 85);
+  --color-school-enchantment: oklch(0.8 0.12 350);
+  --color-school-evocation: oklch(0.78 0.13 35);
+  --color-school-illusion: oklch(0.78 0.12 285);
+  --color-school-necromancy: oklch(0.8 0.07 150);
+  --color-school-transmutation: oklch(0.8 0.09 200);
+
+  --color-dmg-fire: oklch(0.79 0.13 35);
+  --color-dmg-cold: oklch(0.82 0.1 230);
+  --color-dmg-poison: oklch(0.8 0.12 150);
+  --color-dmg-necrotic: oklch(0.78 0.09 320);
+  --color-dmg-radiant: oklch(0.85 0.11 90);
+  --color-dmg-psychic: oklch(0.8 0.12 330);
+  --color-dmg-force: oklch(0.8 0.11 290);
 
   /* Grain screens (lightens) on dark; fainter than light. */
   --texture-blend: screen;
