@@ -12,14 +12,16 @@ describe("Spinner", () => {
     expect(status).toHaveTextContent("Loading…");
   });
 
-  it("uses a full-screen centered container for the page variant", () => {
+  it("uses a flex-1 centered container with a min-height floor for the page variant", () => {
     const { container } = render(<Spinner variant="page" />);
-    expect(container.firstChild).toHaveClass("min-h-screen");
+    expect(container.firstChild).toHaveClass("flex-1");
+    expect(container.firstChild).toHaveClass("min-h-64");
   });
 
   it("uses an inline container by default", () => {
     const { container } = render(<Spinner />);
-    expect(container.firstChild).not.toHaveClass("min-h-screen");
+    expect(container.firstChild).not.toHaveClass("flex-1");
+    expect(container.firstChild).not.toHaveClass("min-h-64");
   });
 
   it("merges a custom className", () => {

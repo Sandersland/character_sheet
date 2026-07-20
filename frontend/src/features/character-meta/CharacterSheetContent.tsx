@@ -108,8 +108,9 @@ function CharacterSheetWorkspace({
       {/* Mobile: a 100dvh app-shell — fixed header + in-flow bottom nav with the
           panels scrolling in the middle, so iOS Safari's dynamic toolbar can't
           shift a body-scrolled fixed nav (no gap; nav always flush). Desktop
-          reverts to normal min-h-screen body scroll (nav is md:hidden). */}
-      <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:min-h-screen md:overflow-visible">
+          reverts to normal flex-1 body scroll within the app shell (nav is
+          md:hidden, #1171). */}
+      <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:flex-1 md:overflow-visible">
         <CharacterSheetHeader
           character={character}
           onUpdate={life.handleCharacterUpdate}

@@ -32,7 +32,7 @@ export default function EntityPaneRail({
   return (
     <nav
       aria-label="Codex entries"
-      className="hidden flex-col gap-3 lg:sticky lg:top-6 lg:flex lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto"
+      className="hidden flex-col gap-3 lg:sticky lg:top-6 lg:flex lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto"
     >
       <input
         type="search"

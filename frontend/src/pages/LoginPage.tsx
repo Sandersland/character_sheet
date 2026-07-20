@@ -30,7 +30,7 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-parchment-100 p-4">
+    <main className="flex flex-1 items-center justify-center bg-parchment-100 p-4">
       <Card title="Sign in" className="w-full max-w-sm">
         <div className="flex flex-col gap-4 p-6">
           <h1 className="font-display text-2xl text-parchment-800">Character Sheet</h1>
