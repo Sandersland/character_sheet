@@ -1,12 +1,24 @@
 import type { ReactNode } from "react";
 
 import OverviewPanel from "@/features/character-meta/panels/OverviewPanel";
+import ClassPanel from "@/features/character-meta/panels/ClassPanel";
 import CombatPanel from "@/features/character-meta/panels/CombatPanel";
 import InventoryPanel from "@/features/character-meta/panels/InventoryPanel";
 import MagicPanel from "@/features/character-meta/panels/MagicPanel";
 import StoryPanel from "@/features/character-meta/panels/StoryPanel";
-import type { SheetTabId } from "@/features/character-meta/sheetTabs";
+import type { SheetPanelProps, SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { Character, ReferenceData } from "@/types/character";
+
+// Combat is excluded: it has extra live-session conditions handled inline below,
+// not a plain tab→panel mapping. Keyed lookup (vs. a chain of `&&` branches)
+// keeps CharacterSheetBody's complexity down as tabs are added (#1169).
+const STATIC_PANELS: Partial<Record<SheetTabId, (props: SheetPanelProps) => ReactNode>> = {
+  overview: OverviewPanel,
+  class: ClassPanel,
+  inventory: InventoryPanel,
+  magic: MagicPanel,
+  story: StoryPanel,
+};
 
 interface CharacterSheetBodyProps {
   character: Character;
@@ -22,6 +34,10 @@ interface CharacterSheetBodyProps {
   /** True while the live-session status is still resolving — suppress the static
    *  Combat panel for that beat so it doesn't flash before the live panel. */
   sessionLoading?: boolean;
+  /** Live-session status + the header's "jump to Combat" handler — passed through
+   *  to every panel via SheetPanelProps; only Magic's Cast door reads them (#1162). */
+  isLive?: boolean;
+  onGoToCombat?: () => void;
 }
 
 /**
@@ -35,8 +51,11 @@ export default function CharacterSheetBody({
   activeTab,
   livePanel,
   sessionLoading = false,
+  isLive = false,
+  onGoToCombat = () => {},
 }: CharacterSheetBodyProps) {
-  const panelProps = { character, reference, onUpdate };
+  const panelProps = { character, reference, onUpdate, isLive, onGoToCombat };
+  const StaticPanel = STATIC_PANELS[activeTab];
   return (
     // <main> keeps the page's main landmark; the inner tabpanel carries the
     // WAI-ARIA tab↔panel wiring (id + aria-labelledby back to the Tabs button,
@@ -47,13 +66,10 @@ export default function CharacterSheetBody({
         role="tabpanel"
         aria-labelledby={`sheet-tab-${activeTab}`}
       >
-        {activeTab === "overview" && <OverviewPanel {...panelProps} />}
+        {StaticPanel && <StaticPanel {...panelProps} />}
         {/* Combat: the live tracker supersedes the static panel; while the
             live-session status is still loading, render neither (no flash). */}
         {activeTab === "combat" && !livePanel && !sessionLoading && <CombatPanel {...panelProps} />}
-        {activeTab === "inventory" && <InventoryPanel {...panelProps} />}
-        {activeTab === "magic" && <MagicPanel {...panelProps} />}
-        {activeTab === "story" && <StoryPanel {...panelProps} />}
         {/* Mounted-but-hidden off Combat so an in-progress picker + economy
             survive a swipe round-trip (the turn state itself lives in the
             provider; this preserves the open-picker UI state). */}

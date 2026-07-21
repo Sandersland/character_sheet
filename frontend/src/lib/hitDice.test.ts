@@ -98,7 +98,8 @@ describe("hitPointStepMath", () => {
   }
 
   it("derives the advancing die, faces, and average/roll gains with the Con modifier", () => {
-    const math = hitPointStepMath(characterWith(16), refs, "entry-1"); // d10, +3 Con
+    const target: LevelUpTarget = { kind: "existing", classEntryId: "entry-1" };
+    const math = hitPointStepMath(characterWith(16), refs, target); // d10, +3 Con
     expect(math).toMatchObject({
       die: "d10",
       faces: 10,
@@ -113,12 +114,20 @@ describe("hitPointStepMath", () => {
   });
 
   it("follows the selected entry to its class's die (wizard → d6)", () => {
-    const math = hitPointStepMath(characterWith(10), refs, "entry-2"); // d6, +0 Con
+    const target: LevelUpTarget = { kind: "existing", classEntryId: "entry-2" };
+    const math = hitPointStepMath(characterWith(10), refs, target); // d6, +0 Con
     expect(math).toMatchObject({ die: "d6", faces: 6, averageGain: 4, minRoll: 1, maxRoll: 6 });
   });
 
+  it("follows a brand-new multiclass target to its class's die (#1170)", () => {
+    const target: LevelUpTarget = { kind: "new", classId: "cls-wizard" };
+    const math = hitPointStepMath(characterWith(10), refs, target);
+    expect(math).toMatchObject({ die: "d6", faces: 6 });
+  });
+
   it("falls back to the character's own die when reference is empty", () => {
-    const math = hitPointStepMath(characterWith(10), [], "entry-2");
+    const target: LevelUpTarget = { kind: "existing", classEntryId: "entry-2" };
+    const math = hitPointStepMath(characterWith(10), [], target);
     expect(math.die).toBe("d10");
   });
 });

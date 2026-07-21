@@ -13,10 +13,10 @@ const caster = makeCharacter({ spellcasting: { ability: "intelligence" } as neve
 const nonCaster = makeCharacter({ spellcasting: undefined });
 
 describe("SheetBottomNav (#928)", () => {
-  it("renders one nav button per tab (5 for a caster)", () => {
+  it("renders one nav button per tab (6 for a caster, incl. Class #1169)", () => {
     const tabs = getSheetTabs(caster);
     render(<SheetBottomNav tabs={tabs} activeTab="overview" onTabChange={() => {}} />);
-    expect(screen.getAllByRole("button")).toHaveLength(5);
+    expect(screen.getAllByRole("button")).toHaveLength(6);
     for (const t of tabs) expect(screen.getByRole("button", { name: t.label })).toBeInTheDocument();
   });
 
@@ -37,11 +37,12 @@ describe("SheetBottomNav (#928)", () => {
     expect(onTabChange).toHaveBeenCalledWith("magic");
   });
 
-  it("renders 4 items for a non-caster (Magic hidden)", () => {
+  it("renders 5 items for a non-caster (Magic hidden, Class still present)", () => {
     const tabs = getSheetTabs(nonCaster);
     render(<SheetBottomNav tabs={tabs} activeTab="overview" onTabChange={() => {}} />);
-    expect(screen.getAllByRole("button")).toHaveLength(4);
+    expect(screen.getAllByRole("button")).toHaveLength(5);
     expect(screen.queryByRole("button", { name: "Magic" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Class" })).toBeInTheDocument();
   });
 
   // #961: the Combat tab gains a "session live" pip while a session is live.

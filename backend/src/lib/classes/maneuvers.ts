@@ -15,7 +15,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
-import { deriveResourcesForCharacterRow, resolveClassDie } from "./class-features.js";
+import { deriveEntryScopedResourcesForCharacterRow, resolveClassDie } from "./class-features.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
@@ -55,7 +55,9 @@ function maneuverEffectSpec(saveAbility: string | null): EffectSpec {
 }
 
 // Columns/relations re-read per op (5e-rules columns supplied here per the
-// character-transaction contract).
+// character-transaction contract). Every entry (not just the primary) + its
+// level, so a non-primary Battle Master's save DC/pool still resolves via
+// deriveEntryScopedResources (#1072).
 const MANEUVER_SELECT = {
   spellcasting: true,
   resources: true,
@@ -63,8 +65,7 @@ const MANEUVER_SELECT = {
   abilityScores: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    take: 1,
-    select: { name: true, subclass: true },
+    select: { name: true, subclass: true, level: true },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -72,7 +73,7 @@ type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }
 
 // Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
 function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
-  const { derived } = deriveResourcesForCharacterRow(row);
+  const { derived } = deriveEntryScopedResourcesForCharacterRow(row);
 
   const saveDcBase = derived?.maneuverSaveDC;
   const dieFaces = derived ? resolveClassDie("superiorityDice", derived) : null;

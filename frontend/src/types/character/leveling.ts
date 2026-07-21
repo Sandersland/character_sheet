@@ -8,7 +8,7 @@ import type {
   LearnToolProficiencyOperation,
 } from "./classes";
 import type { LevelUpTarget } from "./combat";
-import type { ForgetSpellOperation, LearnSpellOperation } from "./spells";
+import type { ForgetSpellOperation, LearnSpellOperation, SpellSchool } from "./spells";
 
 /**
  * A structured mechanical effect defined on a catalog or custom feat.
@@ -158,8 +158,8 @@ export interface LevelUpPlanResponse {
     isPrimary: boolean;
   };
   steps: LevelUpStep[];
-  /** Subclass spells this level newly grants — always present ([] when none); shown in Review (#1139). */
-  grantedSpells: { name: string; level: number }[];
+  /** Subclass spells this level newly grants — always present ([] when none); shown in Review (#1139, #1159). */
+  grantedSpells: { name: string; level: number; school: SpellSchool }[];
 }
 
 /**

@@ -14,7 +14,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { deriveResourcesForCharacterRow } from "./class-features.js";
+import { deriveEntryScopedResourcesForCharacterRow } from "./class-features.js";
 import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeResourcesMutable } from "./resources.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
@@ -115,7 +115,10 @@ async function resolveDisciplineCast(
   row: KiCastCharacterRow,
   op: CastDisciplineOperation,
 ) {
-  const { derived, level } = deriveResourcesForCharacterRow(row);
+  // disciplineLevel is the Four Elements monk entry's OWN effective level (not
+  // the total character level) — a secondary monk's per-cast ki cap scales to
+  // its own level (PHB'24 p.163), matching the entry-scoped save DC below.
+  const { derived, disciplineLevel } = deriveEntryScopedResourcesForCharacterRow(row);
 
   // Gate: only a Four Elements monk of L3+ has a discipline save DC.
   const saveDc = derived?.disciplineSaveDC;
@@ -137,7 +140,7 @@ async function resolveDisciplineCast(
   }
 
   const cost = readAbilityCost(catalog);
-  assertDisciplineKiSpend(catalog.name, cost, op.kiSpent, level);
+  assertDisciplineKiSpend(catalog.name, cost, op.kiSpent, disciplineLevel);
 
   const effect = disciplineEffectSpec(catalog);
   return { catalog, cost, effect, saveDc };

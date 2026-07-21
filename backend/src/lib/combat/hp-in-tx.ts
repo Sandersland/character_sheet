@@ -1,7 +1,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
-import { advancementSlotsForLevel, deriveFeatBonuses } from "@/lib/srd/srd.js";
+import { characterAdvancementSlots, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources.js";
 import {
   InvalidHitPointOperationError,
@@ -40,9 +40,10 @@ export async function applyHealInTx(
       abilityScores: true,
       experiencePoints: true,
       resources: true,
+      // All entries — the feat-slot cap sums entitlement per class level (#1073),
+      // not just the primary (position 0).
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
         select: { id: true, level: true, name: true, subclass: true },
       },
     },
@@ -55,10 +56,7 @@ export async function applyHealInTx(
   const hd = normalizeHitDice(row.hitDice);
 
   const advState = normalizeResourcesMutable(row.resources);
-  const featSlotCap = advancementSlotsForLevel(
-    row.classEntries[0]?.name ?? "",
-    levelForExperience(row.experiencePoints),
-  );
+  const featSlotCap = characterAdvancementSlots(row.classEntries, levelForExperience(row.experiencePoints));
   // Origin feats are kept regardless of the slot cap (#1130).
   const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advState.advancements, featSlotCap);
   const featBonus = deriveFeatBonuses(inCapAdvancements, hd.total);

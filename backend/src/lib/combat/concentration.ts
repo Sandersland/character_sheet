@@ -4,7 +4,7 @@ import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/exp
 import { logEvent } from "@/lib/activity/events.js";
 import {
   abilityModifier,
-  advancementSlotsForLevel,
+  characterAdvancementSlots,
   concentrationSaveDC,
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
@@ -55,7 +55,7 @@ function computeConcentrationSave(
     experiencePoints: number;
     savingThrowProficiencies: string[];
     resources: Prisma.JsonValue;
-    classEntries: { name: string }[];
+    classEntries: { name: string; level: number }[];
   },
   damage: number,
 ): { saveBonus: number; dc: number } {
@@ -64,7 +64,7 @@ function computeConcentrationSave(
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const advState = normalizeResourcesMutable(row.resources);
-  const featSlotCap = advancementSlotsForLevel(row.classEntries[0]?.name ?? "", level);
+  const featSlotCap = characterAdvancementSlots(row.classEntries, level);
   // Origin feats are kept regardless of the slot cap (#1130).
   const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advState.advancements, featSlotCap);
   const featProf = deriveFeatProficiencies(inCapAdvancements);
@@ -86,10 +86,11 @@ async function readConcentratingStateInTx(tx: Prisma.TransactionClient, characte
       experiencePoints: true,
       savingThrowProficiencies: true,
       resources: true,
+      // All entries — the feat-slot cap sums entitlement per class level (#1073),
+      // not just the primary (position 0).
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true },
+        select: { name: true, level: true },
       },
     },
   });

@@ -34,6 +34,7 @@ import type {
   TallyRowSource,
   TallyVerdict,
 } from "@/lib/attackTallySummary";
+import type { InteractionSpend } from "@/lib/loadoutPicker";
 import type { Character } from "@/types/character";
 
 export type { AttackTallyRow, TallyAttackRoll } from "@/lib/attackTallySummary";
@@ -52,6 +53,24 @@ let rowIdSeq = 0;
 function nextRowId(): string {
   rowIdSeq += 1;
   return `tally-${Date.now().toString(36)}-${rowIdSeq}`;
+}
+
+/** Payload useSpellPicker appends to the cast tally once a cast settles (#1164). */
+export interface RecordedSpellCast {
+  spellName: string;
+  /** Slot level cast at (0 = cantrip). */
+  level: number;
+  /** Rolled damage/heal total; absent for a no-roll (buff/utility) cast. */
+  total?: number;
+  damageType?: string;
+  /** Save DC / half-on-success line to read to the DM, when the cast forced a save. */
+  announce?: string;
+}
+
+/** One row of the turn card's "Spells cast" tally (#1164) — a cast already
+ *  resolved when it lands here, so unlike AttackTallyRow there's no verdict. */
+export interface CastTallyRow extends RecordedSpellCast {
+  id: string;
 }
 
 export type TurnPhase = "idle" | "active";
@@ -90,6 +109,14 @@ export interface TurnState {
    */
   attackTally: AttackTallyRow[];
   /**
+   * Turn-card "Spells cast" tally (#1164): one row per settled cast this turn,
+   * appended by useSpellPicker's `onCastSettled`. Cleared by endTurn/startTurn
+   * and by the banner's dismiss, mirroring attackTally's lifecycle — but NOT
+   * part of the undo snapshot: a cast already committed server-side, so `undo`
+   * (which reverts only local economy spend) leaves its receipt in place.
+   */
+  castTally: CastTallyRow[];
+  /**
    * Tracks what was cast from each slot this turn (set when InlineSpellPicker
    * commits a cast). Used to enforce the 5e bonus-action spell restriction:
    * casting a leveled spell as a bonus action → only cantrips allowed as
@@ -102,6 +129,18 @@ export interface TurnState {
   tookDamageThisTurn: boolean;
   /** Sneak Attack applied this turn — enforces the rogue once-per-turn guard (#902). */
   sneakAttackUsedThisTurn: boolean;
+  /**
+   * Equip/unequip credits earned this turn — one per attack made with the
+   * Attack action (PHB'24: "you can equip or unequip one weapon when you make
+   * this attack as part of the Attack action"). Spent by a mid-turn loadout
+   * swap (#1165); resets each turn.
+   */
+  attackEquipCredits: number;
+  /**
+   * Whether this turn's one free object interaction (SRD 5.2 "Interacting
+   * with Things") has been spent on a loadout swap (#1165). Resets each turn.
+   */
+  freeInteractionUsed: boolean;
   /**
    * Turn-scoped undo stack (#730): a snapshot of the economy is pushed before
    * each consuming mutation and popped by `undo()`. Cleared on every turn/combat
@@ -126,6 +165,8 @@ export type EconomySnapshot = Pick<
   | "bonusAttack"
   | "spellCastThisTurn"
   | "attackTally"
+  | "attackEquipCredits"
+  | "freeInteractionUsed"
 >;
 
 /**
@@ -174,6 +215,10 @@ export interface TurnStateActions {
   setTallyVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
   /** Clear the attack tally (Turn-summary banner dismiss / new action). */
   clearAttackTally: () => void;
+  /** Append a settled cast to the turn card's "Spells cast" tally (#1164). */
+  recordSpellCast: (recorded: RecordedSpellCast) => void;
+  /** Clear the cast tally (its banner's dismiss / new turn). */
+  clearCastTally: () => void;
   /**
    * Cancel the Attack action if no attacks have been rolled yet — refunds the
    * action so the player can choose a different action.
@@ -212,6 +257,13 @@ export interface TurnStateActions {
    * +1 to actionsRemaining, so it shares grantExtraAction's implementation.
    */
   refundAction: () => void;
+  /**
+   * Pay `spend` from the interaction budget (#1165) — the caller (useLoadoutSwap)
+   * computes it via loadoutPicker's planInteractionSpend before dispatching.
+   */
+  spendInteractionBudget: (spend: InteractionSpend) => void;
+  /** Reverse a prior spendInteractionBudget — the loadout-swap Refund surface. */
+  refundInteractionBudget: (spend: InteractionSpend) => void;
   /**
    * Commit the action slot for a spell cast (consumes the action and records the
    * spell kind for the 5e bonus-action restriction). Call on successful cast.
@@ -266,10 +318,13 @@ function initialState(): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    attackEquipCredits: 0,
+    freeInteractionUsed: false,
     history: [],
   };
 }
@@ -284,6 +339,8 @@ function economyOf(s: TurnState): EconomySnapshot {
     bonusAttack: s.bonusAttack,
     spellCastThisTurn: s.spellCastThisTurn,
     attackTally: s.attackTally,
+    attackEquipCredits: s.attackEquipCredits,
+    freeInteractionUsed: s.freeInteractionUsed,
   };
 }
 
@@ -298,7 +355,15 @@ function hydrateTurnState(loaded: TurnState): TurnState {
   return {
     ...base,
     attackTally: backfillRows(base.attackTally),
-    history: (base.history ?? []).map((h) => ({ ...h, attackTally: backfillRows(h.attackTally) })),
+    castTally: base.castTally ?? [],
+    // Pre-#1165 entries lack the interaction-budget fields — default them so a
+    // later undo() spread doesn't overwrite live state with `undefined`.
+    history: (base.history ?? []).map((h) => ({
+      ...h,
+      attackTally: backfillRows(h.attackTally),
+      attackEquipCredits: h.attackEquipCredits ?? 0,
+      freeInteractionUsed: h.freeInteractionUsed ?? false,
+    })),
   };
 }
 
@@ -338,7 +403,10 @@ function recordAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
     !atCap && recorded
       ? [...s.attackTally, tallyRowFor(recorded, "action")]
       : s.attackTally;
-  return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true, attackTally };
+  // PHB'24 Attack action: one equip/unequip credit per genuine attack made
+  // (#1165) — not earned on a clamped over-click, matching the tally guard.
+  const attackEquipCredits = atCap ? s.attackEquipCredits : s.attackEquipCredits + 1;
+  return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true, attackTally, attackEquipCredits };
 }
 
 function tallyRowFor(recorded: RecordedAttack, fallbackSource: TallyRowSource): AttackTallyRow {
@@ -442,6 +510,17 @@ const clearAttackTallyState = (s: TurnState): TurnState => {
   };
 };
 
+// Append a settled cast to the turn card's tally (#1164) — write-through, never
+// pushes an undo snapshot (a cast's economy spend already went through its own
+// commitActionSpell/etc, which IS undoable; the tally row is just its receipt).
+const recordSpellCastState = (s: TurnState, recorded: RecordedSpellCast): TurnState => ({
+  ...s,
+  castTally: [...s.castTally, { ...recorded, id: nextRowId() }],
+});
+
+const clearCastTallyState = (s: TurnState): TurnState =>
+  s.castTally.length === 0 ? s : { ...s, castTally: [] };
+
 function cancelAttackState(s: TurnState): TurnState {
   // Only refund if no attacks have been rolled yet — once rolled, the action
   // is committed per 5e rules. Drop only this action's rows so an earlier
@@ -493,6 +572,21 @@ const cancelTwfState = (s: TurnState): TurnState =>
 const consumeReactionState = (s: TurnState): TurnState =>
   s.reactionUsed ? s : { ...s, reactionUsed: true };
 
+// Interaction-budget spend/refund (#1165) — the caller (useLoadoutSwap) computes
+// `spend` via loadoutPicker's planInteractionSpend and just tells the reducer
+// how to book it; the reducer itself holds no rule knowledge.
+const spendInteractionBudgetState = (s: TurnState, spend: InteractionSpend): TurnState => ({
+  ...s,
+  attackEquipCredits: s.attackEquipCredits - spend.fromAttackCredits,
+  freeInteractionUsed: s.freeInteractionUsed || spend.usedFreeInteraction,
+});
+
+const refundInteractionBudgetState = (s: TurnState, spend: InteractionSpend): TurnState => ({
+  ...s,
+  attackEquipCredits: s.attackEquipCredits + spend.fromAttackCredits,
+  freeInteractionUsed: spend.usedFreeInteraction ? false : s.freeInteractionUsed,
+});
+
 function attachBatchIdState(s: TurnState, batchId: string): TurnState {
   if (s.history.length === 0) return s;
   const history = s.history.slice();
@@ -528,11 +622,14 @@ function endTurnState(s: TurnState): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     round: s.round + 1,
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    attackEquipCredits: 0,
+    freeInteractionUsed: false,
     history: [],
   };
 }
@@ -549,10 +646,13 @@ function startCombatState(): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    attackEquipCredits: 0,
+    freeInteractionUsed: false,
     history: [],
   };
 }
@@ -571,8 +671,11 @@ function startTurnState(s: TurnState): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     sneakAttackUsedThisTurn: false, // once per turn — resets each of your turns
+    attackEquipCredits: 0, // interaction-budget credits reset each of your turns (#1165)
+    freeInteractionUsed: false,
     history: [], // undo never reaches across turns
   };
 }
@@ -625,6 +728,8 @@ type TurnAction =
   | { type: "cancelTwf" }
   | { type: "consumeReaction" }
   | { type: "grantExtraAction" }
+  | { type: "spendInteractionBudget"; spend: InteractionSpend }
+  | { type: "refundInteractionBudget"; spend: InteractionSpend }
   | { type: "commitActionSpell"; spellLevel: number }
   | { type: "commitBonusActionSpell"; spellLevel: number }
   // Non-undoable tally refinements — write through, never push.
@@ -634,6 +739,8 @@ type TurnAction =
   | { type: "addTallyDamageRider"; rowId: string; amount: number }
   | { type: "setTallyVerdict"; index: number; verdict: TallyVerdict | undefined }
   | { type: "clearAttackTally" }
+  | { type: "recordSpellCast"; recorded: RecordedSpellCast }
+  | { type: "clearCastTally" }
   // Meta / effect-driven — write through, never push.
   | { type: "attachBatchId"; batchId: string }
   | { type: "undo" }
@@ -656,6 +763,8 @@ const CONSUMING: ReadonlySet<TurnAction["type"]> = new Set([
   "cancelTwf",
   "consumeReaction",
   "grantExtraAction",
+  "spendInteractionBudget",
+  "refundInteractionBudget",
   "commitActionSpell",
   "commitBonusActionSpell",
 ]);
@@ -683,6 +792,8 @@ const HANDLERS: TurnActionHandlers = {
   cancelTwf: (s) => cancelTwfState(s),
   consumeReaction: (s) => consumeReactionState(s),
   grantExtraAction: (s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }),
+  spendInteractionBudget: (s, a) => spendInteractionBudgetState(s, a.spend),
+  refundInteractionBudget: (s, a) => refundInteractionBudgetState(s, a.spend),
   commitActionSpell: (s, a) => commitActionSpellState(s, a.spellLevel),
   commitBonusActionSpell: (s, a) => commitBonusActionSpellState(s, a.spellLevel),
   setTallyDamage: (s, a) => setTallyDamageState(s, a.rowId, a.damage),
@@ -691,6 +802,8 @@ const HANDLERS: TurnActionHandlers = {
   addTallyDamageRider: (s, a) => addTallyDamageRiderState(s, a.rowId, a.amount),
   setTallyVerdict: (s, a) => setTallyVerdictState(s, a.index, a.verdict),
   clearAttackTally: (s) => clearAttackTallyState(s),
+  recordSpellCast: (s, a) => recordSpellCastState(s, a.recorded),
+  clearCastTally: (s) => clearCastTallyState(s),
   attachBatchId: (s, a) => attachBatchIdState(s, a.batchId),
   undo: (s) => undoState(s),
   markDamageTaken: (s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }),
@@ -796,6 +909,8 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       addTallyDamageRider: (rowId, amount) => dispatch({ type: "addTallyDamageRider", rowId, amount }),
       setTallyVerdict: (index, verdict) => dispatch({ type: "setTallyVerdict", index, verdict }),
       clearAttackTally: () => dispatch({ type: "clearAttackTally" }),
+      recordSpellCast: (recorded) => dispatch({ type: "recordSpellCast", recorded }),
+      clearCastTally: () => dispatch({ type: "clearCastTally" }),
       cancelAttack: () => dispatch({ type: "cancelAttack" }),
       finishAttack: () => dispatch({ type: "finishAttack" }),
       consumeBonusAction: () => dispatch({ type: "consumeBonusAction" }),
@@ -805,6 +920,8 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       consumeReaction: () => dispatch({ type: "consumeReaction" }),
       grantExtraAction: () => dispatch({ type: "grantExtraAction" }),
       refundAction: () => dispatch({ type: "grantExtraAction" }),
+      spendInteractionBudget: (spend) => dispatch({ type: "spendInteractionBudget", spend }),
+      refundInteractionBudget: (spend) => dispatch({ type: "refundInteractionBudget", spend }),
       commitActionSpell: (spellLevel) => dispatch({ type: "commitActionSpell", spellLevel }),
       commitBonusActionSpell: (spellLevel) => dispatch({ type: "commitBonusActionSpell", spellLevel }),
       commitReactionSpell: () => dispatch({ type: "consumeReaction" }),

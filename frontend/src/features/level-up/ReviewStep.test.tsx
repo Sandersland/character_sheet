@@ -44,7 +44,13 @@ const plan: LevelUpPlanResponse = {
 function renderReview(draft: LevelUpDraft, over?: { character?: Character; plan?: LevelUpPlanResponse }) {
   return render(
     <LevelUpStepContext.Provider
-      value={{ character: over?.character ?? character, draft, setDraft: () => {}, plan: over?.plan ?? plan }}
+      value={{
+        character: over?.character ?? character,
+        draft,
+        setDraft: () => {},
+        plan: over?.plan ?? plan,
+        target: { kind: "existing", classEntryId: "entry-1" },
+      }}
     >
       <ReviewStep />
     </LevelUpStepContext.Provider>,
@@ -164,14 +170,31 @@ describe("ReviewStep", () => {
     expect(screen.getByText("Charm Person")).toBeInTheDocument();
   });
 
-  it("lists incoming granted spells from the plan under the granting subclass (#1139)", () => {
+  it("renders granted spells as a school-tinted unlock card, each on its own line with level + school (#1139, #1159)", () => {
     renderReview(
       { hp: { method: "average" } },
-      { plan: { ...plan, grantedSpells: [{ name: "Lesser Restoration", level: 2 }, { name: "Zone of Truth", level: 2 }] } },
+      {
+        plan: {
+          ...plan,
+          grantedSpells: [
+            { name: "Lesser Restoration", level: 2, school: "abjuration" },
+            { name: "Zone of Truth", level: 2, school: "enchantment" },
+          ],
+        },
+      },
     );
     expect(screen.getByText("Granted by Champion")).toBeInTheDocument();
-    expect(screen.getByText("Lesser Restoration")).toBeInTheDocument();
-    expect(screen.getByText("Zone of Truth")).toBeInTheDocument();
+    const restoration = screen.getByText("Lesser Restoration");
+    const truth = screen.getByText("Zone of Truth");
+    expect(restoration).toBeInTheDocument();
+    expect(truth).toBeInTheDocument();
+    // Distinct rows, not a run-together name string.
+    expect(restoration.closest("li")).not.toBe(truth.closest("li"));
+    expect(screen.getByText("Level 2 · Abjuration")).toBeInTheDocument();
+    expect(screen.getByText("Level 2 · Enchantment")).toBeInTheDocument();
+    // School-ink class present on the spell names (school-tinted, not run-together plain text).
+    expect(restoration.className).toContain("text-school-abjuration");
+    expect(truth.className).toContain("text-school-enchantment");
   });
 
   it("has no axe violations", async () => {

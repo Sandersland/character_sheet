@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useSpellPicker, type UseSpellPickerOptions } from "@/features/session/useSpellPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions, logRoll } from "@/api/client";
+import { saveDcLabel } from "@/lib/spellMeta";
 import type { Character, Spell } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -32,6 +33,11 @@ const healSpell: Spell = {
   castingTime: "1 action", range: "Touch", duration: "Instantaneous", description: "",
   effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 8, upcastDicePerLevel: 1,
 };
+const buffSpell: Spell = {
+  id: "sp-buff", name: "Mage Armor", level: 1, prepared: true, school: "abjuration",
+  castingTime: "1 action", range: "Touch", duration: "8 hours", description: "",
+  effectKind: "buff", buffTarget: "acUnarmoredBase", buffModifier: 13,
+};
 
 function makeCharacter(spells: Spell[]): Character {
   return {
@@ -58,6 +64,7 @@ function makeOpts(spells: Spell[], overrides: Partial<UseSpellPickerOptions> = {
     onCommitSlot: vi.fn(),
     spellCastThisTurn: {},
     castingTimeFilter: "1 action",
+    onCastSettled: vi.fn(),
     ...overrides,
   };
 }
@@ -201,5 +208,75 @@ describe("useSpellPicker", () => {
     expect(opts.onCommitSlot).toHaveBeenCalledWith(1);
     expect(mockLogRoll).toHaveBeenCalled();
     expect(result.current.viewFor(attackSpell).castDisabled).toBe(false);
+  });
+});
+
+// #1164: durable post-cast feedback — the result well, the log-symmetry fix
+// (spell damage rolls now log like weapon rolls), and the turn-card tally hook.
+describe("useSpellPicker — post-cast feedback (#1164)", () => {
+  it("has no result well before any cast this sheet-open", () => {
+    const { result } = render(makeOpts([cantrip]));
+    expect(result.current.lastCast).toBeNull();
+  });
+
+  it("logs the cast's damage roll to the session, closing the weapon/spell asymmetry", async () => {
+    const opts = makeOpts([attackSpell]);
+    const { result } = render(opts);
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+    expect(mockLogRoll).toHaveBeenCalledWith(
+      "char-1",
+      "sess-1",
+      expect.objectContaining({ kind: "damage", source: "Chromatic Orb", damageType: "fire" }),
+    );
+  });
+
+  it("settles the result well with kept dice + total after a damage cast", async () => {
+    const opts = makeOpts([attackSpell]);
+    const { result } = render(opts);
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+    expect(result.current.lastCast).toMatchObject({
+      spellId: "sp-attack",
+      spellName: "Chromatic Orb",
+      level: 1,
+      damageType: "fire",
+    });
+    expect(result.current.lastCast?.total).toEqual(expect.any(Number));
+    expect(result.current.lastCast?.dice.length).toBeGreaterThan(0);
+  });
+
+  it("settles a no-roll cast (buff/utility) with a null total and no dice", async () => {
+    const opts = makeOpts([buffSpell]);
+    const { result } = render(opts);
+    await act(async () => {
+      await result.current.handleCast(buffSpell);
+    });
+    expect(result.current.lastCast).toMatchObject({ spellId: "sp-buff", total: null, dice: [] });
+  });
+
+  it("carries the save DC to announce on a save-type cast's settle + onCastSettled", async () => {
+    const opts = makeOpts([cantrip]);
+    const { result } = render(opts);
+    await act(async () => {
+      await result.current.handleCast(cantrip);
+    });
+    const expectedDc = saveDcLabel(cantrip, 14);
+    expect(result.current.lastCast?.announce).toBe(expectedDc);
+    expect(opts.onCastSettled).toHaveBeenCalledWith(
+      expect.objectContaining({ spellName: "Sacred Flame", level: 0, announce: expectedDc }),
+    );
+  });
+
+  it("carries no announce on a non-save cast", async () => {
+    const opts = makeOpts([healSpell]);
+    const { result } = render(opts);
+    await act(async () => {
+      await result.current.handleCast(healSpell);
+    });
+    expect(result.current.lastCast?.announce).toBeNull();
+    expect(opts.onCastSettled).toHaveBeenCalledWith(expect.objectContaining({ announce: undefined }));
   });
 });

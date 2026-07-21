@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useSearchParams } from "react-router-dom";
 
 import { fetchReference } from "@/api/client";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
@@ -10,7 +9,7 @@ import HitPointsStep from "@/features/level-up/HitPointsStep";
 import { LevelUpStepContext, type LevelUpStepContextValue } from "@/features/level-up/useLevelUpStepContext";
 import type { RollResult } from "@/lib/dice";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
-import type { Character, LevelUpPlanResponse, ReferenceData } from "@/types/character";
+import type { Character, LevelUpPlanResponse, LevelUpTarget, ReferenceData } from "@/types/character";
 
 vi.mock("@/api/client", () => ({ fetchReference: vi.fn() }));
 
@@ -59,6 +58,8 @@ const baseCharacter = {
   hitDice: { total: 7, die: "d10", spent: 0 },
 } as unknown as Character;
 
+const FIGHTER_ENTRY_TARGET: LevelUpTarget = { kind: "existing", classEntryId: "entry-1" };
+
 const multiCharacter = {
   ...baseCharacter,
   classes: [
@@ -67,7 +68,7 @@ const multiCharacter = {
   ],
 } as unknown as Character;
 
-// Two classes with different hit dice so a class switch visibly changes the die.
+// Two classes with different hit dice so a target switch visibly changes the die.
 const MULTICLASS_REFERENCE = {
   races: [],
   backgrounds: [],
@@ -84,49 +85,42 @@ const basePlan = {
   steps: [{ kind: "hitPoints" }],
 } as LevelUpPlanResponse;
 
-function renderStep(over?: { draft?: LevelUpDraft; character?: Character; url?: string }) {
+function renderStep(over?: { draft?: LevelUpDraft; character?: Character; target?: LevelUpTarget }) {
   const setDraft = vi.fn();
   const value: LevelUpStepContextValue = {
     character: over?.character ?? baseCharacter,
     draft: over?.draft ?? {},
     setDraft,
     plan: basePlan,
+    target: over?.target ?? FIGHTER_ENTRY_TARGET,
   };
   render(
-    <MemoryRouter initialEntries={[over?.url ?? "/characters/c1/level-up"]}>
-      <LevelUpStepContext.Provider value={value}>
-        <HitPointsStep />
-      </LevelUpStepContext.Provider>
-    </MemoryRouter>,
+    <LevelUpStepContext.Provider value={value}>
+      <HitPointsStep />
+    </LevelUpStepContext.Provider>,
   );
   return { setDraft };
-}
-
-function LocationSearch() {
-  const [sp] = useSearchParams();
-  return <div data-testid="search">{sp.toString()}</div>;
 }
 
 // Stateful host so card clicks and dice results flow through a real setDraft.
 function StatefulStep({
   onDraft,
   character = baseCharacter,
+  target = FIGHTER_ENTRY_TARGET,
 }: {
   onDraft?: (d: LevelUpDraft) => void;
   character?: Character;
+  target?: LevelUpTarget;
 }) {
   const [draft, setDraft] = useState<LevelUpDraft>({});
   useEffect(() => {
     onDraft?.(draft);
   }, [draft, onDraft]);
-  const value: LevelUpStepContextValue = { character, draft, setDraft, plan: basePlan };
+  const value: LevelUpStepContextValue = { character, draft, setDraft, plan: basePlan, target };
   return (
-    <MemoryRouter initialEntries={["/characters/c1/level-up"]}>
-      <LevelUpStepContext.Provider value={value}>
-        <HitPointsStep />
-        <LocationSearch />
-      </LevelUpStepContext.Provider>
-    </MemoryRouter>
+    <LevelUpStepContext.Provider value={value}>
+      <HitPointsStep />
+    </LevelUpStepContext.Provider>
   );
 }
 
@@ -208,41 +202,20 @@ describe("HitPointsStep", () => {
     expect(rollMountCount).toBe(1);
   });
 
-  it("shows no advancing-class selector for a single-class character", async () => {
-    renderStep();
-
-    expect(screen.queryByText(/which class advances/i)).not.toBeInTheDocument();
-  });
-
-  it("renders the advancing-class selector for a multiclass character", async () => {
-    renderStep({ character: multiCharacter });
-
-    expect(await screen.findByText(/which class advances/i)).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /fighter 7 → 8/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /wizard 3 → 4/i })).toBeInTheDocument();
-  });
-
-  it("switching the advancing class updates ?entry=, the die, and the preview", async () => {
+  // #1170: which class advances is now decided upstream by the ceremony's
+  // class-choice step — HitPointsStep just follows whatever `target` it's given.
+  it("follows an existing multiclass entry's die, distinct from the character's own hitDice.die", async () => {
     fetchReferenceMock.mockResolvedValue(MULTICLASS_REFERENCE);
-    render(<StatefulStep character={multiCharacter} />);
-    const user = userEvent.setup();
+    renderStep({ character: multiCharacter, target: { kind: "existing", classEntryId: "entry-2" } });
 
-    // Default is the primary (fighter, d10). Settle its die first.
-    await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
-    await user.click(screen.getByTestId("settle"));
-    expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("radio", { name: /wizard 3 → 4/i }));
-    expect(screen.getByTestId("search")).toHaveTextContent("entry=entry-2");
-
-    // The die-swap forces the one legitimate remount (key={math.faces}) so the
-    // wizard's d6 gets a fresh reveal instead of carrying the fighter's roll.
-    expect(rollMountCount).toBe(2);
-
-    // The die follows the wizard's d6; average now previews 52 → 56 (+4).
     expect(await screen.findByRole("button", { name: /roll 1d6/i })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /take average/i }));
-    expect(await screen.findByText(/52\s*→\s*56/)).toBeInTheDocument();
+  });
+
+  it("follows a brand-new multiclass target's die (adding a class via the ceremony)", async () => {
+    fetchReferenceMock.mockResolvedValue(MULTICLASS_REFERENCE);
+    renderStep({ target: { kind: "new", classId: "cls-wizard" } });
+
+    expect(await screen.findByRole("button", { name: /roll 1d6/i })).toBeInTheDocument();
   });
 
   it("quick dice-roll preference bypasses the 3D die entirely", async () => {

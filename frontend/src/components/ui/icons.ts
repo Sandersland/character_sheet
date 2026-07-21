@@ -57,7 +57,7 @@ export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
   RING: GiRing,
 };
 
-export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal, GiHealthPotion, GiVisoredHelm } from "react-icons/gi";
+export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal, GiHealthPotion, GiVisoredHelm, GiRank3 } from "react-icons/gi";
 // Turn-economy slot glyphs (#729): Action / Bonus Action / Reaction.
 export { GiCrossedSwords, GiSparkles, GiCycle } from "react-icons/gi";
 // Attack-sheet damage-card glyph (#756), surfaced when #864 touched this file.

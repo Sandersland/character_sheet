@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { Character, ReferenceData } from "@/types/character";
 
-export type SheetTabId = "overview" | "combat" | "inventory" | "magic" | "story";
+export type SheetTabId = "overview" | "class" | "combat" | "inventory" | "magic" | "story";
 
 export interface SheetTab {
   id: SheetTabId;
@@ -13,15 +13,22 @@ export interface SheetTab {
 }
 
 /** Props every tab panel receives — the character, loaded reference data, and the
- *  optimistic-update setter threaded down from the sheet page. */
+ *  optimistic-update setter threaded down from the sheet page. isLive/onGoToCombat
+ *  are unused by most panels; Magic's Cast door reads them to defer casting to the
+ *  Combat tab during a live session (#1162). */
 export interface SheetPanelProps {
   character: Character;
   reference: ReferenceData | null;
   onUpdate: (c: Character) => void;
+  isLive?: boolean;
+  onGoToCombat?: () => void;
 }
 
 const ALL_TABS: SheetTab[] = [
   { id: "overview", label: "Overview" },
+  // #1169: class features (roster/subclass/resources/feature text) got their own
+  // tab — a level-7+ multiclass card was dwarfing the rest of Overview.
+  { id: "class", label: "Class" },
   { id: "combat", label: "Combat" },
   { id: "inventory", label: "Inventory" },
   { id: "magic", label: "Magic" },

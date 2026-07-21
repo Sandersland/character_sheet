@@ -31,11 +31,23 @@ function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target
   };
 }
 
-function renderCeremony() {
+function renderCeremony(over?: {
+  character?: Character;
+  onCharacterChange?: (updated: Character) => void;
+  url?: string;
+}) {
   return render(
-    <MemoryRouter initialEntries={["/characters/c1/level-up"]}>
+    <MemoryRouter initialEntries={[over?.url ?? "/characters/c1/level-up"]}>
       <Routes>
-        <Route path="/characters/:id/level-up" element={<LevelUpCeremony character={character} />} />
+        <Route
+          path="/characters/:id/level-up"
+          element={
+            <LevelUpCeremony
+              character={over?.character ?? character}
+              onCharacterChange={over?.onCharacterChange}
+            />
+          }
+        />
         <Route path="/characters/:id" element={<div>SHEET</div>} />
       </Routes>
     </MemoryRouter>,
@@ -154,5 +166,160 @@ describe("LevelUpCeremony", () => {
     const { container } = renderCeremony();
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+// #1170: the class-choice front door replaces the sheet-side AddClassPanel —
+// a multiclass-eligible character sees a chooser before the ceremony's rail.
+describe("LevelUpCeremony — class choice (#1170)", () => {
+  const rogueEligible = {
+    ...character,
+    abilityScores: { strength: 10, dexterity: 14, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+  } as unknown as Character;
+
+  it("shows the chooser first, gating the ineligible class, before the HP step", async () => {
+    referenceMock.mockResolvedValue({
+      races: [],
+      backgrounds: [],
+      alignments: [],
+      artisanTools: [],
+      classes: [
+        {
+          id: "cls-rogue",
+          name: "Rogue",
+          multiclassPrerequisite: { options: [{ dexterity: 13 }], description: "Dexterity 13" },
+        },
+        {
+          id: "cls-wizard",
+          name: "Wizard",
+          multiclassPrerequisite: { options: [{ intelligence: 13 }], description: "Intelligence 13" },
+        },
+      ],
+    } as unknown as ReferenceData);
+    renderCeremony({ character: rogueEligible });
+
+    expect(await screen.findByRole("heading", { name: /which class levels up/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /fighter/i })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "Rogue" })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "Wizard" })).toBeDisabled();
+    expect(planMock).not.toHaveBeenCalled();
+  });
+
+  it("picking the new class and continuing enters that class's ceremony", async () => {
+    referenceMock.mockResolvedValue({
+      races: [],
+      backgrounds: [],
+      alignments: [],
+      artisanTools: [],
+      classes: [
+        {
+          id: "cls-rogue",
+          name: "Rogue",
+          multiclassPrerequisite: { options: [{ dexterity: 13 }], description: "Dexterity 13" },
+        },
+      ],
+    } as unknown as ReferenceData);
+    planMock.mockResolvedValue(
+      plan([{ kind: "hitPoints" }, { kind: "review" }], {
+        isPrimary: false,
+        newLevel: 1,
+        className: "Rogue",
+        subclass: null,
+      }),
+    );
+    const user = userEvent.setup();
+    renderCeremony({ character: rogueEligible });
+
+    await user.click(await screen.findByRole("radio", { name: "Rogue" }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    await waitFor(() =>
+      expect(planMock).toHaveBeenCalledWith("c1", { kind: "new", classId: "cls-rogue" }, undefined),
+    );
+    expect(await screen.findByRole("heading", { name: /level.*0.*→.*1/i })).toBeInTheDocument();
+    expect(screen.getByText("Rogue")).toBeInTheDocument();
+  });
+
+  it("Cancel on the chooser returns to the sheet without submitting", async () => {
+    referenceMock.mockResolvedValue({
+      races: [],
+      backgrounds: [],
+      alignments: [],
+      artisanTools: [],
+      classes: [
+        {
+          id: "cls-rogue",
+          name: "Rogue",
+          multiclassPrerequisite: { options: [{ dexterity: 13 }], description: "Dexterity 13" },
+        },
+      ],
+    } as unknown as ReferenceData);
+    const user = userEvent.setup();
+    renderCeremony({ character: rogueEligible });
+
+    await screen.findByRole("heading", { name: /which class levels up/i });
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    expect(screen.getByText("SHEET")).toBeInTheDocument();
+    expect(submitMock).not.toHaveBeenCalled();
+  });
+});
+
+// #1170: BG3-style per-level choice — Confirm on a level that leaves more
+// pending offers "Level up again" instead of leaving the ceremony.
+describe("LevelUpCeremony — level up again (#1170)", () => {
+  it("shows the interstitial (not the sheet) when levels remain, and updates the character via onCharacterChange", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
+    const onCharacterChange = vi.fn();
+    const user = userEvent.setup();
+    renderCeremony({ onCharacterChange });
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /confirm level up/i }));
+
+    expect(await screen.findByText(/level applied/i)).toBeInTheDocument();
+    expect(screen.getByText(/one more advancement waiting/i)).toBeInTheDocument();
+    expect(onCharacterChange).toHaveBeenCalledWith({ id: "c1", pendingLevelUps: 1 });
+    expect(screen.queryByText("SHEET")).not.toBeInTheDocument();
+  });
+
+  it("'Level up again' re-enters the ceremony's first step with a clean draft", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
+    const user = userEvent.setup();
+    renderCeremony();
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /confirm level up/i }));
+    await screen.findByText(/level applied/i);
+
+    planMock.mockClear();
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    await user.click(screen.getByRole("button", { name: /level up again/i }));
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
+    // Fresh draft — Continue is disabled again until HP is re-chosen.
+    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+  });
+
+  it("'Finish for now' returns to the sheet, keeping the level already applied", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
+    const user = userEvent.setup();
+    renderCeremony();
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /confirm level up/i }));
+    await screen.findByText(/level applied/i);
+
+    await user.click(screen.getByRole("button", { name: /finish for now/i }));
+    expect(await screen.findByText("SHEET")).toBeInTheDocument();
   });
 });

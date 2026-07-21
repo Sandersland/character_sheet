@@ -143,7 +143,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
   // 3. Advancement clamp → effective scores/HP/initiative, then the feat layer
   //    summed over the kept advancements (origin feats + slot-bounded entries).
   const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots } =
-    applyAdvancementClamp(row, primaryClass, progress.level, normalizedHitPoints);
+    applyAdvancementClamp(row, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
     clampedAdvancements,
     hitDice.total,
