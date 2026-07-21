@@ -52,11 +52,11 @@ export async function enterLiveCombat(page: Page): Promise<void> {
   await expect(page).toHaveURL(/[?&]tab=combat/);
 }
 
-// The Magic tab is two mutually-exclusive views: the record block (quick-cast +
-// slot pips) and the grimoire (full spellbook rows: prepare/cast/forget). The
-// spellbook rows live only in the grimoire — open it via "Manage spellbook →"
-// before interacting with a spell row, and close it via "Done" to read the
-// record's slot pips again.
+// The Magic tab is two mutually-exclusive views: the record block (stat bar,
+// slot pips, the Cast door) and the grimoire (full spellbook rows: prepare/
+// swap/forget — view/manage only, #1162). The spellbook rows live only in the
+// grimoire — open it via "Manage spellbook →" before interacting with a spell
+// row, and close it via "Done" to read the record's slot pips again.
 export async function openSpellbook(page: Page): Promise<void> {
   await page.getByRole("button", { name: /manage spellbook/i }).click();
 }
