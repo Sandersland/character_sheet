@@ -31,7 +31,7 @@ export default function CastResultWell({ settle }: { settle: CastSettleView | nu
           <div className="flex items-center gap-1.5">
             {settle.dice.map((value, i) => (
               <span
-                key={i}
+                key={`die-${i}`}
                 className="flex h-7 w-7 items-center justify-center rounded-control border border-vitality-300 bg-parchment-50 font-display text-sm font-semibold text-vitality-700"
               >
                 {value}

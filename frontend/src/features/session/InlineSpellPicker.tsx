@@ -299,7 +299,11 @@ export default function InlineSpellPicker({
   const [focusId, setFocusId] = useState<string | null>(focusSpellId ?? null);
   const focusSpell = picker.sortedSpells.find((s) => s.id === focusId);
 
-  if (picker.isEmpty) {
+  // Once a cast has settled this sheet-open, keep PickerContent (and its
+  // CastResultWell) mounted even if nothing is castable anymore — e.g. the
+  // last leveled spell with no cantrips left. Otherwise the well vanishes the
+  // instant the character update lands, undoing #1164's durable feedback.
+  if (picker.isEmpty && !picker.lastCast) {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-parchment-600">{picker.emptyMessage}</p>

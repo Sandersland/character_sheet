@@ -9,7 +9,10 @@ export default function CastTallyBanner({ rows, onDismiss }: { rows: CastTallyRo
   if (rows.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1 rounded-control border border-arcane-200 bg-arcane-50 px-3 py-2">
+    <div
+      role="status"
+      className="flex flex-col gap-1 rounded-control border border-arcane-200 bg-arcane-50 px-3 py-2"
+    >
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-800">Spells cast</p>
         <button
