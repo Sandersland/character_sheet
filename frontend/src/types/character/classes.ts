@@ -213,9 +213,10 @@ export interface ClassEntry {
  */
 export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
 
-// #1131: the frontend no longer dispatches an addClass op — AddClassPanel routes a
-// multiclass-add through the level-up ceremony (?classId=). The backend addClass op
-// stays for its other callers; the frontend mirror was dead and is dropped.
+// #1131/#1170: the frontend no longer dispatches an addClass op — the level-up
+// ceremony's class-choice step routes a multiclass-add through it (?classId=).
+// The backend addClass op stays for its other callers; the frontend mirror was
+// dead and is dropped.
 // #1137: setFightingStyle is gone — Fighting Style is now a feat taken via the
 // advancement endpoint (fightingStyle slot), not a class-scalar op.
 export type ClassOperation = SetSubclassOperation;

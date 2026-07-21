@@ -1,10 +1,11 @@
 /**
  * InlineLoadoutPicker — the per-hand weapon-swap picker (#789) hosted inside the
  * Action sheet's "Change weapons" resolution (#815). A Main-hand and Off-hand
- * card, each expanding an inline disclosure of deduped bag candidates + a free
- * Stow. Per-option gating (loadoutPicker): swapping a HELD hand costs the
- * Action (blocked at 0), drawing into a FREE hand is free. A committed swap keeps
- * the sheet open and surfaces a Refund (also mirrored under the turn slots).
+ * card, each expanding an inline disclosure of deduped bag candidates + a Stow.
+ * Per-option gating (loadoutPicker, interaction-budget model #1165): each
+ * equip/unequip is paid from the turn's free interaction + attack-earned
+ * credits first, falls back to the Action, else is blocked. A committed swap
+ * keeps the sheet open and surfaces a Refund (also mirrored under the turn slots).
  */
 
 import { useState } from "react";
@@ -23,9 +24,12 @@ import type { Character, EquipSlot, InventoryItem } from "@/types/character";
 
 const HANDS: EquipSlot[] = ["MAIN_HAND", "OFF_HAND"];
 
-function optionVerb(opt: PickerOption): string {
+// The verb names the MECHANIC (does this stow an existing occupant), not the
+// cost — a budget-paid swap into an occupied hand still stows something, so
+// it reads "Swap in" even when it's free (#1165).
+function optionVerb(opt: PickerOption, occupied: boolean): string {
   if (opt.item === null) return "Stow";
-  return opt.costsAction ? "Swap in" : "Equip";
+  return occupied ? "Swap in" : "Equip";
 }
 
 interface HandCardProps {
@@ -40,7 +44,7 @@ interface HandCardProps {
 }
 
 function HandCard({ slot, current, ctx, inventory, busy, expanded, onToggle, onChoose }: HandCardProps) {
-  const buttonDisabled = handButtonDisabledReason(slot, ctx);
+  const buttonDisabled = handButtonDisabledReason(ctx);
   const options = handPickerOptions(inventory, slot, ctx);
 
   return (
@@ -85,7 +89,7 @@ function HandCard({ slot, current, ctx, inventory, busy, expanded, onToggle, onC
                     disabled={busy || Boolean(opt.disabledReason)}
                     className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:cursor-not-allowed disabled:border-parchment-300 disabled:bg-parchment-200 disabled:text-parchment-500"
                   >
-                    {optionVerb(opt)}
+                    {optionVerb(opt, Boolean(current))}
                   </button>
                 </div>
                 {opt.disabledReason && <p className="text-xs text-parchment-500">{opt.disabledReason}</p>}
@@ -109,7 +113,10 @@ export default function InlineLoadoutPicker({ character, turnState, loadout }: I
   const { busy, error, lastSwap, swap, stow, refund } = loadout;
 
   const offHandLocked = isOffHandLocked(character.inventory);
-  const ctx = handContext(character.inventory, turnState.actionsRemaining);
+  const ctx = handContext(character.inventory, turnState.actionsRemaining, {
+    attackEquipCredits: turnState.attackEquipCredits,
+    freeInteractionUsed: turnState.freeInteractionUsed,
+  });
 
   async function choose(slot: EquipSlot, opt: PickerOption) {
     if (opt.disabledReason) return;

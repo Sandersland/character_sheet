@@ -1,26 +1,15 @@
-// Quick-cast list inside the spellcasting block: at-will cantrips + prepared
-// leveled spells, each with a Cast affordance that reuses SpellsSection's cast flow.
+// Read-only roster inside the spellcasting block: at-will cantrips + prepared
+// leveled spells. View/manage only (#1162) — casting moved to the record's
+// single "Cast a spell" door (CastSpellDoor); this list has no affordances.
 import { derivePreparedCastable } from "@/lib/preparedSpells";
 import { slotOrdinal } from "@/lib/spellMeta";
 import type { Character, Spell } from "@/types/character";
 
 interface PreparedSpellListProps {
   spellcasting: NonNullable<Character["spellcasting"]>;
-  busy: boolean;
-  onCast: (spell: Spell) => void;
 }
 
-function QuickCastRow({
-  spell,
-  cantrip,
-  busy,
-  onCast,
-}: {
-  spell: Spell;
-  cantrip: boolean;
-  busy: boolean;
-  onCast: (spell: Spell) => void;
-}) {
+function RosterRow({ spell, cantrip }: { spell: Spell; cantrip: boolean }) {
   const tag = cantrip ? spell.range : `${slotOrdinal(spell.level)} · ${spell.range}`;
   return (
     <div className="flex items-center gap-2.5 border-b border-dotted border-parchment-300 py-1.5 last:border-b-0">
@@ -29,33 +18,12 @@ function QuickCastRow({
         className={`h-3 w-3 shrink-0 rounded-full ${cantrip ? "bg-arcane-500 ring-2 ring-arcane-100" : "bg-garnet-600 ring-2 ring-garnet-50"}`}
       />
       <span className="font-medium text-parchment-900">{spell.name}</span>
-      <span className="text-[10px] uppercase tracking-wide text-parchment-500">{tag}</span>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => onCast(spell)}
-        aria-label={`Cast ${spell.name}`}
-        className="ml-auto rounded-full border border-arcane-200 bg-arcane-50 px-2.5 py-0.5 text-[11px] font-semibold text-arcane-800 hover:bg-arcane-100 disabled:opacity-40"
-      >
-        Cast
-      </button>
+      <span className="ml-auto text-[10px] uppercase tracking-wide text-parchment-500">{tag}</span>
     </div>
   );
 }
 
-function Group({
-  heading,
-  spells,
-  cantrip,
-  busy,
-  onCast,
-}: {
-  heading: string;
-  spells: Spell[];
-  cantrip: boolean;
-  busy: boolean;
-  onCast: (spell: Spell) => void;
-}) {
+function Group({ heading, spells, cantrip }: { heading: string; spells: Spell[]; cantrip: boolean }) {
   if (spells.length === 0) return null;
   return (
     <div>
@@ -63,19 +31,19 @@ function Group({
         {heading}
       </p>
       {spells.map((spell) => (
-        <QuickCastRow key={spell.id} spell={spell} cantrip={cantrip} busy={busy} onCast={onCast} />
+        <RosterRow key={spell.id} spell={spell} cantrip={cantrip} />
       ))}
     </div>
   );
 }
 
-export default function PreparedSpellList({ spellcasting, busy, onCast }: PreparedSpellListProps) {
+export default function PreparedSpellList({ spellcasting }: PreparedSpellListProps) {
   const { cantrips, prepared } = derivePreparedCastable(spellcasting);
   if (cantrips.length === 0 && prepared.length === 0) return null;
   return (
     <div className="text-sm">
-      <Group heading="Cantrips · at will" spells={cantrips} cantrip busy={busy} onCast={onCast} />
-      <Group heading="Prepared · leveled" spells={prepared} cantrip={false} busy={busy} onCast={onCast} />
+      <Group heading="Cantrips · at will" spells={cantrips} cantrip />
+      <Group heading="Prepared · leveled" spells={prepared} cantrip={false} />
     </div>
   );
 }

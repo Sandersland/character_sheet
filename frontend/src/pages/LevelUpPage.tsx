@@ -25,10 +25,12 @@ const FALLBACK_VIEWS: Record<Exclude<LevelUpPageState["kind"], "ready">, (ctx: F
 
 export default function LevelUpPage() {
   const { id } = useParams();
-  const { character, error } = useCharacter(id);
+  const { character, error, setCharacter } = useCharacter(id);
   const state: LevelUpPageState = error ? { kind: "error" } : levelUpPageState(character);
   const showSpinner = useDelayedFlag(state.kind === "loading");
 
-  if (state.kind === "ready") return <LevelUpCeremony character={state.character} />;
+  if (state.kind === "ready") {
+    return <LevelUpCeremony character={state.character} onCharacterChange={setCharacter} />;
+  }
   return FALLBACK_VIEWS[state.kind]({ characterId: id, showSpinner });
 }

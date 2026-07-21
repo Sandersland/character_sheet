@@ -18,6 +18,10 @@ interface Props {
   dispatchView: Dispatch<FeatViewAction>;
   custom: CustomFeatDraft;
   onSubmit: () => void;
+  /** #1173: the level-up ceremony's step body is already the single scroll region
+   *  (post-#1192), so its own inner cap would double-scroll — only the plain sheet
+   *  Overview panel (AdvancementSection, unbounded page flow) needs this list capped. */
+  scrollList?: boolean;
 }
 
 // Named element, not Badge — Badge's gold tone is bg-gold-50; overriding via className is stylesheet-order roulette.
@@ -170,16 +174,44 @@ function FeatListRow({
   );
 }
 
+// Extracted from FeatCatalogList (#1173) so the scrollList ternary and the row
+// .map live outside the parent's branch count — keeps FeatCatalogList under the
+// CRAP gate now that it carries a 5th (scrollList) prop.
+function FeatCatalogRows({
+  filteredCatalog,
+  busy,
+  dispatchView,
+  scrollList,
+}: {
+  filteredCatalog: CatalogFeat[];
+  busy: boolean;
+  dispatchView: Dispatch<FeatViewAction>;
+  scrollList: boolean;
+}) {
+  const listClass = ["pr-3", "thin-scrollbar", scrollList ? "max-h-64 overflow-y-auto" : null]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <ul className={listClass}>
+      {filteredCatalog.map((feat) => (
+        <FeatListRow key={feat.id} feat={feat} busy={busy} onSelect={() => dispatchView({ type: "select", feat })} />
+      ))}
+    </ul>
+  );
+}
+
 function FeatCatalogList({
   feats,
   search,
   busy,
   dispatchView,
+  scrollList,
 }: {
   feats: FeatCatalog;
   search: string;
   busy: boolean;
   dispatchView: Dispatch<FeatViewAction>;
+  scrollList: boolean;
 }) {
   const filteredCatalog = feats.filter(search);
   return (
@@ -199,16 +231,7 @@ function FeatCatalogList({
         </p>
       )}
       {filteredCatalog.length > 0 && (
-        <ul className="max-h-64 overflow-y-auto pr-3 thin-scrollbar">
-          {filteredCatalog.map((feat) => (
-            <FeatListRow
-              key={feat.id}
-              feat={feat}
-              busy={busy}
-              onSelect={() => dispatchView({ type: "select", feat })}
-            />
-          ))}
-        </ul>
+        <FeatCatalogRows filteredCatalog={filteredCatalog} busy={busy} dispatchView={dispatchView} scrollList={scrollList} />
       )}
       <button
         type="button"
@@ -230,6 +253,7 @@ export default function FeatFlow({
   dispatchView,
   custom,
   onSubmit,
+  scrollList = true,
 }: Props) {
   const { search, selectedFeat, customMode, abilityChoice } = view;
 
@@ -260,5 +284,7 @@ export default function FeatFlow({
     );
   }
 
-  return <FeatCatalogList feats={feats} search={search} busy={busy} dispatchView={dispatchView} />;
+  return (
+    <FeatCatalogList feats={feats} search={search} busy={busy} dispatchView={dispatchView} scrollList={scrollList} />
+  );
 }

@@ -9,9 +9,17 @@
 import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
-import { applySpellcastingTransactions, logRoll } from "@/api/client";
-import { computeCastSpec } from "@/lib/spellCast";
-import { formatRollSpec } from "@/lib/dice";
+import { useRollLogger } from "@/features/session/useRollLogger";
+import { applySpellcastingTransactions } from "@/api/client";
+import {
+  buildCastSettle,
+  castAnnounceLine,
+  castApplyPayload,
+  castSpellOp,
+  computeCastSpec,
+  type CastSettleView,
+} from "@/lib/spellCast";
+import type { RollSpec } from "@/lib/dice";
 import {
   SCHOOL_TONE,
   effectPreviewWithMod,
@@ -24,6 +32,7 @@ import {
   type Target,
   type SchoolTone,
 } from "@/lib/spellMeta";
+import { expectedRollView, type ExpectedRoll } from "@/lib/spellPickerView";
 import {
   availableSlotLevels,
   availableArcanaLevels,
@@ -37,6 +46,7 @@ import {
   type EconomySlot,
   type SpellCastThisTurn,
 } from "@/lib/spellPicker";
+import type { RecordedSpellCast } from "@/features/session/useTurnState";
 import type { Character, Spell } from "@/types/character";
 
 /** Per-spell interactive state keyed by spell.id. */
@@ -66,7 +76,14 @@ export interface SpellRowView {
   attackDisabled: boolean;
   isHeal: boolean;
   allies: AllyOption[];
+  /** The cast sheet's "what happens" line (#1163) — plain text + a dice pill. */
+  expected: ExpectedRoll;
 }
+
+// CastSettleView is defined in lib/spellCast.ts (alongside the other pure
+// cast-settle helpers) and re-exported here so callers keep importing it from
+// this hook's module.
+export type { CastSettleView } from "@/lib/spellCast";
 
 export interface UseSpellPickerOptions {
   character: Character;
@@ -80,6 +97,8 @@ export interface UseSpellPickerOptions {
   castingTimeFilter?: string;
   /** Opted-in party members a healing cast can target on their sheet (#462). */
   allies?: AllyOption[];
+  /** Called after a cast settles so the turn card's cast tally can record it (#1164). */
+  onCastSettled?: (recorded: RecordedSpellCast) => void;
 }
 
 export interface UseSpellPicker {
@@ -93,6 +112,8 @@ export interface UseSpellPicker {
   patchRow: (spellId: string, patch: Partial<SpellRowState>) => void;
   handleCast: (spell: Spell) => Promise<void>;
   handleAttackRoll: (spell: Spell) => void;
+  /** The pinned result well's content — null before any cast this sheet-open (#1164). */
+  lastCast: CastSettleView | null;
 }
 
 export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
@@ -107,13 +128,16 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     spellCastThisTurn,
     castingTimeFilter,
     allies = [],
+    onCastSettled,
   } = opts;
 
   const { roll } = useRoll();
+  const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const spellcasting = character.spellcasting!;
   const { slots = [], arcana = [], spells = [], spellSaveDC, spellAttackBonus } = spellcasting;
 
   const [rowStates, setRowStates] = useState<Record<string, SpellRowState>>({});
+  const [lastCast, setLastCast] = useState<CastSettleView | null>(null);
 
   function getRow(spellId: string, spell: Spell, initialSlot: number | undefined): SpellRowState {
     return rowStates[spellId] ?? {
@@ -158,6 +182,15 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     return getRow(spell.id, spell, slotsForSpell[0]);
   }
 
+  // Cast/Attack gating: split out of viewFor so its OR/ternary branches don't
+  // count against that function's complexity budget.
+  function castEligibility(row: SpellRowState, isAttack: boolean): { castDisabled: boolean; attackDisabled: boolean } {
+    return {
+      castDisabled: row.casting || (isAttack ? !row.attackRolled : !slotAvailable),
+      attackDisabled: row.casting || !slotAvailable,
+    };
+  }
+
   function viewFor(spell: Spell, row: SpellRowState = rowFor(spell)): SpellRowView {
     const isCantrip = spell.level === 0;
     const availableSlots = availableSlotsForSpell(spell, slotLevels, arcanaLevels);
@@ -165,6 +198,8 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     const usesArcanum = !isCantrip && isArcanumLevel(spellSlot ?? spell.level, arcanaLevels);
     const isAttack = spell.attackType === "attack";
     const isSave = spell.attackType === "save";
+    const dcLabel = isSave ? saveDcLabel(spell, spellSaveDC ?? 0) : null;
+    const preview = effectPreviewWithMod(spell, character, spellSlot);
     return {
       isCantrip,
       schoolTone: SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral",
@@ -172,33 +207,75 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
       spellSlot,
       usesArcanum,
       locked: targetLocked(spell),
-      preview: effectPreviewWithMod(spell, character, spellSlot),
+      preview,
       compStr: componentsLabel(spell),
       isAttack,
       isSave,
-      dcLabel: isSave ? saveDcLabel(spell, spellSaveDC ?? 0) : null,
+      dcLabel,
       spellAttackBonus: spellAttackBonus ?? 0,
-      castDisabled: row.casting || (isAttack ? !row.attackRolled : !slotAvailable),
-      attackDisabled: row.casting || !slotAvailable,
+      ...castEligibility(row, isAttack),
       isHeal: spell.effectKind === "heal",
       allies,
+      expected: expectedRollView(spell, { dcLabel, spellAttackBonus: spellAttackBonus ?? 0, preview }),
     };
   }
 
-  async function handleCast(spell: Spell) {
-    const isCantrip = spell.level === 0;
+  // Roll the cast's effect dice (if any) via RollContext — surfaces in the
+  // global toast AND (#1164) logs to the session record, closing the
+  // weapon/spell log asymmetry. Split out of handleCast to keep its own
+  // branching (and fallow's complexity gate) in check.
+  function rollAndLogCast(
+    spell: Spell,
+    castSpec: RollSpec | null,
+    targetNote: string,
+  ): { total: number; keptDice: number[] } {
+    if (!castSpec) return { total: 0, keptDice: [] };
+    const kindLabel = spell.effectKind === "heal" ? "healing" : "damage";
+    const result = roll(castSpec, `${spell.name} — ${kindLabel}${targetNote}`);
+    logRollSafe("damage", spell.name, result, castSpec, spell.damageType ?? undefined);
+    return { total: result.total, keptDice: result.dice.filter((d) => !d.dropped).map((d) => d.value) };
+  }
+
+  // Settle the result well (#1164) and notify the turn card's cast tally —
+  // split out of handleCast so its own branching doesn't count against it.
+  function settleCast(
+    spell: Spell,
+    effectiveSlot: number,
+    castSpec: RollSpec | null,
+    rollTotal: number,
+    keptDice: number[],
+  ) {
+    const announce = castAnnounceLine(spell, spellSaveDC);
+    setLastCast(buildCastSettle(spell, effectiveSlot, Boolean(castSpec), rollTotal, keptDice, announce));
+    onCastSettled?.({
+      spellName: spell.name,
+      level: effectiveSlot,
+      total: castSpec ? rollTotal : undefined,
+      damageType: spell.damageType ?? undefined,
+      announce: announce ?? undefined,
+    });
+  }
+
+  // Resolve the row + effective slot for a cast attempt, or null when a
+  // leveled spell's matching slots were exhausted between render and click —
+  // split out of handleCast so this guard's branches don't count against it.
+  function resolveCastRow(spell: Spell): { row: SpellRowState; effectiveSlot: number } | null {
     const row = rowStates[spell.id] ?? {
       ...getRow(spell.id, spell, undefined),
       slotLevel: availableSlotsForSpell(spell, slotLevels, arcanaLevels)[0],
     };
     const spellSlot = resolvedSlot(spell, row.slotLevel, slotLevels, arcanaLevels);
+    if (spell.level > 0 && spellSlot === undefined) return null;
+    return { row, effectiveSlot: spellSlot ?? spell.level };
+  }
 
-    // Leveled spells need a slot; guard when matching slots were exhausted between render and click.
-    if (!isCantrip && spellSlot === undefined) {
+  async function handleCast(spell: Spell) {
+    const resolved = resolveCastRow(spell);
+    if (!resolved) {
       patchRow(spell.id, { casting: false, error: "No spell slot available — all matching slots have been used." });
       return;
     }
-    const effectiveSlot = spellSlot ?? spell.level;
+    const { row, effectiveSlot } = resolved;
 
     patchRow(spell.id, { casting: true, error: null });
 
@@ -206,29 +283,13 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     const ally = isAllyTarget(row.target) ? row.target : null;
     const targetNote = row.target === "self" ? " → your HP" : ally ? ` → ${ally.name}'s HP` : "";
 
-    // Roll damage/heal via RollContext — result surfaces in the global toast.
     const castSpec = computeCastSpec(spell, character, effectiveSlot);
-    let rollTotal = 0;
-    if (castSpec) {
-      const kindLabel = spell.effectKind === "heal" ? "healing" : "damage";
-      const result = roll(castSpec, `${spell.name} — ${kindLabel}${targetNote}`);
-      rollTotal = result.total;
-    }
+    const { total: rollTotal, keptDice } = rollAndLogCast(spell, castSpec, targetNote);
 
     // Apply the rolled effect in the same transaction: self → own HP, an ally →
     // that party member's sheet (heal only). "other" relays to the DM (no apply).
-    let applyPayload;
-    if (castSpec && spell.effectKind) {
-      if (row.target === "self") {
-        applyPayload = { target: "self" as const, kind: spell.effectKind as "heal" | "damage", amount: rollTotal };
-      } else if (ally) {
-        applyPayload = { target: { characterId: ally.characterId }, kind: "heal" as const, amount: rollTotal };
-      }
-    }
-
-    const op = isCantrip
-      ? { type: "castSpell" as const, entryId: spell.id, roll: rollTotal, apply: applyPayload }
-      : { type: "castSpell" as const, entryId: spell.id, slotLevel: effectiveSlot, roll: rollTotal, apply: applyPayload };
+    const apply = castApplyPayload(spell, row.target, rollTotal, Boolean(castSpec));
+    const op = castSpellOp(spell, effectiveSlot, rollTotal, apply);
 
     try {
       const updated = await applySpellcastingTransactions(character.id, [op]);
@@ -238,6 +299,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
       }
       onUpdate(updated);
       patchRow(spell.id, { casting: false, attackRolled: false });
+      settleCast(spell, effectiveSlot, castSpec, rollTotal, keptDice);
     } catch (err) {
       patchRow(spell.id, {
         casting: false,
@@ -251,15 +313,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     onCommitSlot(spell.level);
     const attackSpec = { count: 1, faces: 20, modifier: spellAttackBonus ?? 0 };
     const result = roll(attackSpec, `${spell.name} spell attack`);
-    // Log the spell attack roll (best-effort — never blocks play).
-    logRoll(character.id, sessionId, {
-      kind: "attack",
-      source: spell.name,
-      total: result.total,
-      specLabel: formatRollSpec(attackSpec),
-    })
-      .then(onLogChanged)
-      .catch((e) => console.error("roll log failed", e));
+    logRollSafe("attack", spell.name, result, attackSpec);
     patchRow(spell.id, { attackRolled: true });
   }
 
@@ -277,5 +331,6 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     patchRow,
     handleCast,
     handleAttackRoll,
+    lastCast,
   };
 }

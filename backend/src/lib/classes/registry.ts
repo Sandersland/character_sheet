@@ -182,10 +182,31 @@ export function deriveResourcesForCharacterRow(row: {
   return { derived, level };
 }
 
-// The five choice-cap fields overlaid per class entry by deriveEntryScopedResources
-// (never the pool `resources`/`features` layer — pools stay primary-at-total-level,
-// #1177 non-goal). Kept as a typed list so the overlay loop and its "has anything to
-// contribute" check share one enumeration.
+/**
+ * Row-shaped wrapper over {@link deriveEntryScopedResources}: derives level +
+ * proficiency bonus from XP, then returns the entry-scoped derivation (every
+ * class entry's own caps/pools merged) plus disciplineLevel. Selects need
+ * `classEntries: {name, subclass, level}[]` for EVERY entry (not just the
+ * primary) — used by the ki-cast/maneuver action seams so a secondary Monk's
+ * or Battle Master's own level drives its gate/DC/per-cast cap (#1072).
+ */
+export function deriveEntryScopedResourcesForCharacterRow(row: {
+  experiencePoints: number;
+  abilityScores: unknown;
+  classEntries: { name: string; subclass?: string | null; level: number }[];
+}): { derived: DerivedClassInfo | null; level: number; disciplineLevel: number } {
+  const level = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(level);
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const { derived, disciplineLevel } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus);
+  return { derived, level, disciplineLevel };
+}
+
+// The five choice-cap fields overlaid per class entry by deriveEntryScopedResources.
+// (The pool `resources` layer is entry-scoped separately, below — #1071; `features`
+// stays primary-at-total-level, #1177 non-goal, audited but not expanded by #1071.)
+// Kept as a typed list so the overlay loop and its "has anything to contribute"
+// check share one enumeration.
 const CAP_FIELDS = [
   "maneuverChoiceCount",
   "maneuverSaveDC",
@@ -216,16 +237,49 @@ function overlayCapFields(acc: DerivedClassInfo | null, info: DerivedClassInfo):
   return target;
 }
 
+// Rebuilds the `resources` pool layer (#1071) from EVERY class entry at its own
+// effective level — ki/superiority-dice/rage/sorcery-points all scale to that
+// class's own level (PHB'24 p.163), not the primary entry's or the summed total.
+// Split out of deriveEntryScopedResources to keep that function's branching
+// budget for the (unrelated) choice-cap overlay loop.
+function collectEntryScopedPools(
+  classEntries: { name: string; subclass?: string | null; level: number }[],
+  totalLevel: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): DerivedResource[] {
+  // Pool keys are class-scoped (each class appears at most once in classEntries).
+  const seenPoolKeys = new Set<string>();
+  const pools: DerivedResource[] = [];
+  for (const entry of classEntries) {
+    const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
+    const info = deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus);
+    for (const pool of info?.resources ?? []) {
+      if (seenPoolKeys.has(pool.key)) {
+        throw new Error(`collectEntryScopedPools: duplicate pool key "${pool.key}" from entry "${entry.name}"`);
+      }
+      seenPoolKeys.add(pool.key);
+      pools.push(pool);
+    }
+  }
+  return pools;
+}
+
 /**
- * Entry-scoped resource caps for multiclass level-up (#1177): the pool/feature
- * layer stays primary-at-total-level (deriveResources unchanged — pool
- * entry-scoping is explicitly out of scope), but the CHOICE-CAP fields
- * (maneuverChoiceCount/SaveDC, disciplineChoiceCount/SaveDC, toolProfChoiceCount,
- * subclassChoices) are re-derived per class entry at that entry's OWN effective
- * level and overlaid — so a secondary Battle Master's maneuver cap comes from its
- * own level, not the primary entry's. `effectiveEntryLevel` collapses to the XP-
- * derived total for single-class characters, so single-class output is byte-
- * identical to a bare deriveResources() call (see the parity test).
+ * Entry-scoped resource caps + pools for multiclass level-up (#1177 caps, #1071
+ * pools): both the CHOICE-CAP fields (maneuverChoiceCount/SaveDC,
+ * disciplineChoiceCount/SaveDC, toolProfChoiceCount, subclassChoices) and the
+ * `resources` pool layer (ki, superiority dice, rage, sorcery points, …) are
+ * re-derived per class entry at that entry's OWN effective level and merged —
+ * so a secondary Battle Master's maneuver cap AND its superiority-dice pool
+ * both come from the fighter entry's own level, not the primary entry's or the
+ * summed total (PHB'24 p.163: each class's pool scales to that class's own
+ * level). `features` and the two gate booleans (shadowArtsAvailable/
+ * cloakOfShadowsAvailable) stay primary-at-total-level — audited for #1071 but
+ * deliberately not entry-scoped here; see the issue for the follow-up note.
+ * `effectiveEntryLevel` collapses to the XP-derived total for single-class
+ * characters, so single-class output is byte-identical to a bare
+ * deriveResources() call (see the parity tests).
  *
  * disciplineLevel is the effective level of whichever entry contributed
  * disciplineChoiceCount (fallback: totalLevel) — the level the discipline
@@ -241,16 +295,16 @@ export function deriveEntryScopedResources(
   const primary = classEntries[0];
   const base = deriveResources(primary?.name ?? "", primary?.subclass ?? undefined, totalLevel, abilityScores, profBonus);
 
-  // Seed from base (pools/features + the two out-of-scope gate booleans —
-  // shadowArtsAvailable/cloakOfShadowsAvailable stay primary-at-total-level,
-  // not part of this overlay). subclassChoices is dropped: the loop below
-  // re-derives the PRIMARY entry too (at its own effective level), and concat
-  // would double-count a primary-only subclass's choices otherwise. The scalar
-  // CAP_FIELDS are safe to carry over as-is — the loop's defined-wins overlay
-  // replaces (never adds to) them. resources/features are cloned (not just
-  // spread) so mutating the returned object can never leak back into base.
+  // Seed from base for features + the two out-of-scope gate booleans
+  // (shadowArtsAvailable/cloakOfShadowsAvailable stay primary-at-total-level).
+  // resources/subclassChoices are dropped here: the loop below rebuilds `pools`
+  // from EVERY entry (including the primary) at its own effective level, so
+  // carrying base's totalLevel-scaled resources over would double-count the
+  // primary's pool. The scalar CAP_FIELDS are safe to carry over as-is — the
+  // loop's defined-wins overlay replaces (never adds to) them. features is
+  // cloned (not just spread) so mutating the returned object can't leak into base.
   let derived: DerivedClassInfo | null = base
-    ? { ...base, resources: [...base.resources], features: [...base.features], subclassChoices: undefined }
+    ? { ...base, resources: [], features: [...base.features], subclassChoices: undefined }
     : null;
   // Fallback for characters with no discipline-granting entry; discipline ops on them have no monk level to key off.
   let disciplineLevel = totalLevel;
@@ -262,6 +316,13 @@ export function deriveEntryScopedResources(
 
     derived = overlayCapFields(derived, info);
     if (info.disciplineChoiceCount !== undefined) disciplineLevel = effLevel;
+  }
+
+  const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus);
+  if (derived) {
+    derived.resources = pools;
+  } else if (pools.length > 0) {
+    derived = { resources: pools, features: [] };
   }
 
   return { derived, disciplineLevel };

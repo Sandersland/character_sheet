@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { derivePreparedCastable } from "@/lib/preparedSpells";
+import { deriveCastableSpells, derivePreparedCastable } from "@/lib/preparedSpells";
 import type { Character, Spell } from "@/types/character";
 
 type Spellcasting = NonNullable<Character["spellcasting"]>;
@@ -50,5 +50,45 @@ describe("derivePreparedCastable", () => {
     const result = derivePreparedCastable(sc([]));
     expect(result.cantrips).toEqual([]);
     expect(result.prepared).toEqual([]);
+  });
+});
+
+// The Cast door's castable list (#1162): at-will cantrips + prepared leveled
+// spells that currently have a slot to spend.
+describe("deriveCastableSpells", () => {
+  function character(spells: Spell[]): Character {
+    return { spellcasting: sc(spells) } as unknown as Character;
+  }
+
+  it("always includes cantrips regardless of slots", () => {
+    const result = deriveCastableSpells(character([spell({ name: "Fire Bolt", level: 0 })]), [], []);
+    expect(result.map((s) => s.name)).toEqual(["Fire Bolt"]);
+  });
+
+  it("includes a prepared leveled spell when a matching slot is available", () => {
+    const result = deriveCastableSpells(
+      character([spell({ name: "Shield", level: 1, prepared: true })]),
+      [1],
+      [],
+    );
+    expect(result.map((s) => s.name)).toEqual(["Shield"]);
+  });
+
+  it("excludes a prepared leveled spell with no available slot", () => {
+    const result = deriveCastableSpells(
+      character([spell({ name: "Shield", level: 1, prepared: true })]),
+      [],
+      [],
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("excludes an unprepared leveled spell even with a slot available", () => {
+    const result = deriveCastableSpells(
+      character([spell({ name: "Shield", level: 1, prepared: false })]),
+      [1],
+      [],
+    );
+    expect(result).toEqual([]);
   });
 });

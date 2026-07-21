@@ -14,7 +14,7 @@
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { deriveResourcesForCharacterRow } from "./class-features.js";
+import { deriveEntryScopedResourcesForCharacterRow } from "./class-features.js";
 import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { KI_CAST_CHARACTER_SELECT, emitKiCastEvents } from "./ki-cast.js";
@@ -77,7 +77,10 @@ export async function applyShadowArtsOperations(
     select: KI_CAST_CHARACTER_SELECT,
     notFound: (id) => new InvalidShadowArtOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      const { derived } = deriveResourcesForCharacterRow(row);
+      // shadowArtsAvailable stays primary-at-total-level (#1071 non-goal, not
+      // entry-scoped by deriveEntryScopedResources) — a secondary Way of Shadow
+      // monk's gate is a documented follow-up, out of scope for #1072.
+      const { derived } = deriveEntryScopedResourcesForCharacterRow(row);
 
       // Gate: only a Way of Shadow monk of L3+ can cast Shadow Arts.
       if (!derived?.shadowArtsAvailable) {

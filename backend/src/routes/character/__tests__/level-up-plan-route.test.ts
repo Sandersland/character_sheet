@@ -160,13 +160,15 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(res.body.target).toMatchObject({ className: "Wizard", newLevel: 1, isPrimary: false });
   });
 
-  it("lists the granted spells a gate level newly turns on (#1139)", async () => {
+  it("lists the granted spells a gate level newly turns on, with level + school (#1139, #1159)", async () => {
     await makePaladin({ id: "lvplan-devotion-5", hitDiceTotal: 4, entryLevel: 4, subclass: "Oath of Devotion" });
     const res = await getPlan("lvplan-devotion-5");
     expect(res.status).toBe(200);
     expect(res.body.target.newLevel).toBe(5);
-    expect((res.body.grantedSpells as { name: string }[]).map((g) => g.name).sort()).toEqual([
-      "Lesser Restoration", "Zone of Truth",
+    const granted = res.body.grantedSpells as { name: string; level: number; school: string }[];
+    expect([...granted].sort((a, b) => a.name.localeCompare(b.name))).toEqual([
+      { name: "Lesser Restoration", level: 2, school: "abjuration" },
+      { name: "Zone of Truth", level: 2, school: "enchantment" },
     ]);
   });
 

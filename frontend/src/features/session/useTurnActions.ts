@@ -22,6 +22,7 @@ import {
 } from "@/lib/turnOptions";
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
 import { equippedLoadoutLabel } from "@/lib/paperDoll";
+import { interactionBudgetRemaining } from "@/lib/loadoutPicker";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
@@ -111,6 +112,10 @@ export function useTurnActions({
     hasSpellcasting: character.spellcasting !== undefined,
     classActionOptions: classActions.map(enrich),
     loadoutLabel: equippedLoadoutLabel(character.inventory),
+    interactionBudgetRemaining: interactionBudgetRemaining({
+      attackEquipCredits: turnState.attackEquipCredits,
+      freeInteractionUsed: turnState.freeInteractionUsed,
+    }),
   };
   const bonusSheetModel = {
     classBonusOptions: classBonusActions.map(enrich),

@@ -15,13 +15,11 @@ export interface NewSpellsSelection {
   selectedIds: string[];
   /** The entry id of the spell staged to be swapped out, or null. */
   forgottenEntryId: string | null;
-  atCap: boolean;
   toggle: (spellId: string) => void;
   toggleForget: (entryId: string) => void;
   /** #1131: new cantrips picked this level, kept separate from leveled learns. */
   cantrips: number;
   cantripSelectedIds: string[];
-  cantripsAtCap: boolean;
   toggleCantrip: (spellId: string) => void;
 }
 
@@ -54,7 +52,7 @@ export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
 
   return {
     count, maxSpellLevel, magicalSecrets, canSwap,
-    selectedIds, forgottenEntryId, atCap: selectedIds.length >= cap, toggle, toggleForget,
-    cantrips, cantripSelectedIds, cantripsAtCap: cantripSelectedIds.length >= cantrips, toggleCantrip,
+    selectedIds, forgottenEntryId, toggle, toggleForget,
+    cantrips, cantripSelectedIds, toggleCantrip,
   };
 }

@@ -1,11 +1,11 @@
 // The Hit Points ceremony step (#887): the player takes the fixed average or
 // rolls the advancing class's hit die; a live preview shows the new max HP. The
 // HP math, the roll/selection state, and each sub-view live in their own unit.
+// Which class advances is decided upstream by the ceremony's class-choice step
+// (#1170) — this step just reads `target` off the context.
 
-import AdvancingClassSelector from "@/features/level-up/AdvancingClassSelector";
 import HpChoiceCard from "@/features/level-up/HpChoiceCard";
 import HpDiceReveal from "@/features/level-up/HpDiceReveal";
-import { useAdvancingEntry } from "@/features/level-up/useAdvancingEntry";
 import { useHpRoll } from "@/features/level-up/useHpRoll";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useReferenceData } from "@/hooks/useReferenceData";
@@ -52,20 +52,15 @@ function HpGainPreview({
 }
 
 export default function HitPointsStep() {
-  const { character } = useLevelUpStepContext();
+  const { character, target } = useLevelUpStepContext();
   const { reference } = useReferenceData();
-  const { entries, classEntryId, setEntry } = useAdvancingEntry(character);
 
-  const math = hitPointStepMath(character, reference?.classes ?? [], classEntryId);
+  const math = hitPointStepMath(character, reference?.classes ?? [], target);
   const { roll, method, gain, handleRoll, chooseAverage, chooseRoll } = useHpRoll(math);
   const currentMax = character.hitPoints.max;
 
   return (
     <div>
-      {entries.length > 1 && (
-        <AdvancingClassSelector entries={entries} classEntryId={classEntryId} onSelect={setEntry} />
-      )}
-
       <h2 className="text-center font-display text-xl font-semibold text-parchment-900">
         Roll for hit points, or take the average?
       </h2>

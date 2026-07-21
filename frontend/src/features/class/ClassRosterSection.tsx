@@ -1,20 +1,15 @@
 import { isMulticlass } from "@/lib/multiclass";
-import type { Character, ClassEntry, ClassOption } from "@/types/character";
-import AddClassPanel from "@/features/class/AddClassPanel";
+import type { Character, ClassEntry } from "@/types/character";
 
 interface Props {
   character: Character;
-  referenceClasses: ClassOption[];
   rosterEntries: ClassEntry[];
-  busy: boolean;
 }
 
-export default function ClassRosterSection({
-  character,
-  referenceClasses,
-  rosterEntries,
-  busy,
-}: Props) {
+// #1170: adding a class now happens via the level-up ceremony's class-choice
+// step (LevelUpBanner → /level-up), not an inline picker here — this section
+// is now just the roster readout.
+export default function ClassRosterSection({ character, rosterEntries }: Props) {
   const multiclass = isMulticlass(character.classes);
 
   return (
@@ -41,16 +36,11 @@ export default function ClassRosterSection({
         ))}
       </ul>
       {multiclass && (
-        <p className="mb-3 text-xs text-parchment-600">
+        <p className="text-xs text-parchment-600">
           Total character level{" "}
           <span className="font-semibold text-parchment-900">{character.level}</span>
         </p>
       )}
-      <AddClassPanel
-        character={character}
-        referenceClasses={referenceClasses}
-        busy={busy}
-      />
     </div>
   );
 }

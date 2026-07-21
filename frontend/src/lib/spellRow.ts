@@ -1,5 +1,7 @@
-// Pure per-spell derivations for SpellRow (castability, cast routing, upcast options).
-import { SCHOOL_TONE, effectPreview, type SchoolTone } from "@/lib/spellMeta";
+// Pure per-spell derivations for SpellRow (castability, prepare-rune state).
+// Cast-routing (resolveCastAction/upcastSlotOptions) left with the grimoire's Cast
+// button (#1162) — casting now lives only behind the record view's Cast door.
+import { SCHOOL_TONE, type SchoolTone } from "@/lib/spellMeta";
 import type { Spell } from "@/types/character";
 
 type SpellItem = NonNullable<Spell["item"]>;
@@ -38,36 +40,3 @@ export function runeState(spell: Spell): RuneState {
   return spell.prepared ? "prepared" : "unprepared";
 }
 
-export type CastAction =
-  | { kind: "cast" }
-  | { kind: "castAt"; slotLevel: number }
-  | { kind: "openPicker" };
-
-// Where a Cast click should route: fire immediately, fire at a fixed slot, or open the picker.
-export function resolveCastAction(spell: Spell, availableSlots: number[]): CastAction {
-  const item = spell.source === "item" ? spell.item : undefined;
-  if (item) return { kind: "cast" };
-  if (spell.level === 0) return { kind: "cast" };
-  if (availableSlots.length === 0) return { kind: "castAt", slotLevel: spell.level };
-  if (availableSlots.length === 1) return { kind: "castAt", slotLevel: availableSlots[0] };
-  return { kind: "openPicker" };
-}
-
-export interface SlotOption {
-  slotLevel: number;
-  isUpcast: boolean;
-  effect: string | null;
-}
-
-// Per-slot-level picker options with upcast flag + scaled effect preview.
-export function upcastSlotOptions(
-  spell: Spell,
-  characterLevel: number,
-  availableSlots: number[],
-): SlotOption[] {
-  return availableSlots.map((slotLevel) => ({
-    slotLevel,
-    isUpcast: slotLevel > spell.level,
-    effect: effectPreview(spell, characterLevel, slotLevel),
-  }));
-}

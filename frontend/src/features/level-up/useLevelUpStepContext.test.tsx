@@ -30,8 +30,9 @@ describe("useLevelUpStepContext", () => {
   it("exposes character, draft, setDraft, and plan inside the provider", () => {
     const setDraft = vi.fn();
     const draft: LevelUpDraft = { hp: { method: "average" } };
+    const target = { kind: "existing", classEntryId: "entry-1" } as const;
     render(
-      <LevelUpStepContext.Provider value={{ character: { id: "c1" } as Character, draft, setDraft, plan }}>
+      <LevelUpStepContext.Provider value={{ character: { id: "c1" } as Character, draft, setDraft, plan, target }}>
         <Probe />
       </LevelUpStepContext.Provider>,
     );

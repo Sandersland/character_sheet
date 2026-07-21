@@ -220,18 +220,31 @@ describe("buildLevelUpLedger", () => {
     expect(rowFor(rows, "Forgotten")).toBeUndefined();
   });
 
-  it("lists incoming granted spells under the granting subclass (#1139)", () => {
-    const plan = { ...makePlan(), grantedSpells: [{ name: "Lesser Restoration", level: 2 }, { name: "Zone of Truth", level: 2 }] };
+  it("lists incoming granted spells (name + level + school) under the granting subclass, as an unlock card (#1139, #1159)", () => {
+    const plan = {
+      ...makePlan(),
+      grantedSpells: [
+        { name: "Lesser Restoration", level: 2, school: "abjuration" as const },
+        { name: "Zone of Truth", level: 2, school: "enchantment" as const },
+      ],
+    };
     const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers);
     expect(rowFor(rows, "Granted by Champion")).toMatchObject({
-      items: ["Lesser Restoration", "Zone of Truth"], variant: "list",
+      variant: "grantedSpells",
+      grantedSpells: [
+        { name: "Lesser Restoration", level: 2, school: "abjuration" },
+        { name: "Zone of Truth", level: 2, school: "enchantment" },
+      ],
     });
   });
 
   it("labels the granted-spells row generically when no subclass name is on the plan (#1139)", () => {
-    const plan = { ...makePlan([], null), grantedSpells: [{ name: "Faerie Fire", level: 1 }] };
+    const plan = { ...makePlan([], null), grantedSpells: [{ name: "Faerie Fire", level: 1, school: "evocation" as const }] };
     const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers);
-    expect(rowFor(rows, "Granted Spells")).toMatchObject({ items: ["Faerie Fire"], variant: "list" });
+    expect(rowFor(rows, "Granted Spells")).toMatchObject({
+      variant: "grantedSpells",
+      grantedSpells: [{ name: "Faerie Fire", level: 1, school: "evocation" }],
+    });
   });
 
   it("renders no granted-spells row when none are incoming (#1139)", () => {
