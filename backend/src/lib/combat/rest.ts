@@ -1,7 +1,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import {
   snapshotResources,
   normalizeResourcesMutable,
@@ -9,6 +9,7 @@ import {
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { deriveMulticlassSpellcasting } from "@/lib/srd/spellcasting-tables.js";
 import {
   normalizeConditionsMutable,
   serializeConditionsState,
@@ -151,17 +152,22 @@ function poolRechargesOn(recharge: string, rest: "short" | "long"): boolean {
   return recharge === (rest === "short" ? "shortRest" : "longRest");
 }
 
-/** Derive the primary class entry's resource pools (recharge schedule included). */
+/**
+ * Derive EVERY class entry's resource pools (recharge schedule included), each
+ * scaled to its own effective level (#1072) — reuses #1071's entry-scoped pool
+ * derivation rather than re-deriving from the primary entry alone, so a
+ * secondary class's pools recharge too (PHB'24 p.163: each class's pool scales
+ * to that class's own level).
+ */
 function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
   const level = levelForExperience(row.experiencePoints);
-  const classEntry = row.classEntries[0];
-  return deriveResources(
-    classEntry?.name ?? "",
-    classEntry?.subclass ?? undefined,
+  const { derived } = deriveEntryScopedResources(
+    row.classEntries,
     level,
     row.abilityScores as Record<string, number>,
     proficiencyBonusForLevel(level),
   );
+  return derived;
 }
 
 /**
@@ -198,22 +204,40 @@ function cloneSpellStateForRest(spellState: ReturnType<typeof normalizeSpellcast
 }
 
 /**
- * Warlock Pact Magic slots recharge on a short rest. A pure Warlock's only
- * spell slots are Pact slots, so clearing slotsUsed is safe. Mystic Arcanum is
- * long-rest only and concentration survives a short rest — both preserved.
- * Returns null for non-Warlocks (no spellcasting write, no snapshot).
+ * Warlock Pact Magic slots recharge on a short rest, fired when ANY class
+ * entry is a Warlock (#1072 — used to gate on the primary entry only). A pure
+ * (single-class) Warlock's only spell slots are Pact slots, so clearing
+ * slotsUsed wholesale is safe. Multiclass keeps a shared caster pool alongside
+ * Pact Magic under the same slotsUsed map (#123 already separates them in the
+ * wire view), so only the Warlock entry's own Pact slot-level key is cleared —
+ * the shared pool stays long-rest-only. Mystic Arcanum is long-rest only and
+ * concentration survives a short rest — both preserved either way. Returns
+ * null for non-Warlocks (no spellcasting write, no snapshot).
  */
 function restoreWarlockPactSlots(row: HpOpContext["row"]): {
   beforeSpellState: Record<string, unknown>;
   slotsRestored: number;
   spellcasting: Prisma.InputJsonValue;
 } | null {
-  const className = row.classEntries[0]?.name ?? "";
-  if (className.toLowerCase() !== "warlock") return null;
+  const isWarlock = row.classEntries.some((e) => e.name.toLowerCase() === "warlock");
+  if (!isWarlock) return null;
   const spellState = normalizeSpellcastingMutable(row.spellcasting);
   const beforeSpellState = cloneSpellStateForRest(spellState);
-  const slotsRestored = Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0);
-  spellState.slotsUsed = {};
+
+  let slotsRestored: number;
+  if (row.classEntries.length <= 1) {
+    slotsRestored = Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0);
+    spellState.slotsUsed = {};
+  } else {
+    const abilityScores = row.abilityScores as Record<string, number>;
+    const profBonus = proficiencyBonusForLevel(levelForExperience(row.experiencePoints));
+    const pactSlotLevel = deriveMulticlassSpellcasting(row.classEntries, abilityScores, profBonus).pact?.slotLevel;
+    if (pactSlotLevel === undefined) return null;
+    const key = String(pactSlotLevel);
+    slotsRestored = spellState.slotsUsed[key] ?? 0;
+    delete spellState.slotsUsed[key];
+  }
+
   return {
     beforeSpellState,
     slotsRestored,

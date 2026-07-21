@@ -21,10 +21,11 @@ export const KI_CAST_CHARACTER_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
+  // Every entry (not just the primary) + its level, so a non-primary Monk's
+  // ki/disciplineSaveDC still resolves via deriveEntryScopedResources (#1072).
   classEntries: {
     orderBy: { position: "asc" as const },
-    take: 1,
-    select: { name: true, subclass: true },
+    select: { name: true, subclass: true, level: true },
   },
 } satisfies Prisma.CharacterSelect;
 

@@ -182,6 +182,26 @@ export function deriveResourcesForCharacterRow(row: {
   return { derived, level };
 }
 
+/**
+ * Row-shaped wrapper over {@link deriveEntryScopedResources}: derives level +
+ * proficiency bonus from XP, then returns the entry-scoped derivation (every
+ * class entry's own caps/pools merged) plus disciplineLevel. Selects need
+ * `classEntries: {name, subclass, level}[]` for EVERY entry (not just the
+ * primary) — used by the ki-cast/maneuver action seams so a secondary Monk's
+ * or Battle Master's own level drives its gate/DC/per-cast cap (#1072).
+ */
+export function deriveEntryScopedResourcesForCharacterRow(row: {
+  experiencePoints: number;
+  abilityScores: unknown;
+  classEntries: { name: string; subclass?: string | null; level: number }[];
+}): { derived: DerivedClassInfo | null; level: number; disciplineLevel: number } {
+  const level = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(level);
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const { derived, disciplineLevel } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus);
+  return { derived, level, disciplineLevel };
+}
+
 // The five choice-cap fields overlaid per class entry by deriveEntryScopedResources.
 // (The pool `resources` layer is entry-scoped separately, below — #1071; `features`
 // stays primary-at-total-level, #1177 non-goal, audited but not expanded by #1071.)
