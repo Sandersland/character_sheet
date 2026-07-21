@@ -59,7 +59,7 @@ function stubCatalog(): FeatCatalog {
   };
 }
 
-function Harness({ onSubmit }: { onSubmit: () => void }) {
+function Harness({ onSubmit, scrollList }: { onSubmit: () => void; scrollList?: boolean }) {
   const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
   const custom = useCustomFeatDraft();
   return (
@@ -72,6 +72,7 @@ function Harness({ onSubmit }: { onSubmit: () => void }) {
       dispatchView={dispatchView}
       custom={custom}
       onSubmit={onSubmit}
+      scrollList={scrollList}
     />
   );
 }
@@ -128,6 +129,20 @@ describe("FeatFlow — catalog list (frame A)", () => {
     const list = screen.getByText("Alert").closest("ul")!;
     expect(list.className).toContain("pr-3");
     expect(list.className).toContain("thin-scrollbar");
+  });
+
+  it("caps and scrolls the list by default (the plain sheet Overview panel has no outer scroll region)", () => {
+    render(<Harness onSubmit={vi.fn()} />);
+    const list = screen.getByText("Alert").closest("ul")!;
+    expect(list.className).toContain("max-h-64");
+    expect(list.className).toContain("overflow-y-auto");
+  });
+
+  it("drops its own scroll cap when scrollList=false (#1173: the ceremony step body is already the single scroll region)", () => {
+    render(<Harness onSubmit={vi.fn()} scrollList={false} />);
+    const list = screen.getByText("Alert").closest("ul")!;
+    expect(list.className).not.toContain("max-h-64");
+    expect(list.className).not.toContain("overflow-y-auto");
   });
 
   it("has no axe violations in the list view", async () => {

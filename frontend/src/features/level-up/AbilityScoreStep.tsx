@@ -100,6 +100,7 @@ export default function AbilityScoreStep() {
             dispatchView={dispatchView}
             custom={custom}
             onSubmit={stageFeat}
+            scrollList={false}
           />
         </div>
       )}
