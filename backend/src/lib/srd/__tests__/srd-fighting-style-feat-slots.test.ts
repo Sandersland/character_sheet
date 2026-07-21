@@ -3,6 +3,8 @@ import { describe, it, expect } from "vitest";
 import {
   fightingStyleFeatSlots,
   characterFightingStyleFeatSlots,
+  advancementSlotsForLevel,
+  characterAdvancementSlots,
   deriveRangedAttackRollBonus,
   deriveWeaponAttackBonus,
 } from "@/lib/srd/srd.js";
@@ -45,6 +47,27 @@ describe("characterFightingStyleFeatSlots", () => {
   });
   it("level-0 / empty roster gets 0", () => {
     expect(characterFightingStyleFeatSlots([], 0)).toBe(0);
+  });
+});
+
+// PHB'24 p.163: ASI/feat slots accrue per class level (#1073), not
+// primary-class × total level.
+describe("characterAdvancementSlots", () => {
+  it("Wizard 3 / Fighter 8 gets 3 slots (Fighter's 4/6/8), not the Wizard schedule at total level 11", () => {
+    expect(
+      characterAdvancementSlots([{ name: "Wizard", level: 3 }, { name: "Fighter", level: 8 }], 11),
+    ).toBe(3);
+  });
+  it("single-class collapses to advancementSlotsForLevel (byte-identical)", () => {
+    expect(characterAdvancementSlots([{ name: "Fighter", level: 8 }], 8)).toBe(
+      advancementSlotsForLevel("Fighter", 8),
+    );
+    expect(characterAdvancementSlots([{ name: "Wizard", level: 12 }], 12)).toBe(
+      advancementSlotsForLevel("Wizard", 12),
+    );
+  });
+  it("level-0 / empty roster gets 0", () => {
+    expect(characterAdvancementSlots([], 0)).toBe(0);
   });
 });
 

@@ -46,6 +46,23 @@ export function characterFightingStyleFeatSlots(
   );
 }
 
+// PHB'24 p.163: ASI/feat slots accrue per CLASS level, not primary-class ×
+// total level — a Wizard 3 / Fighter 8 earns the Fighter 4/6/8 slots, not the
+// Wizard schedule at total level 11 (#1073). Same shape as
+// characterFightingStyleFeatSlots: sum each entry's entitlement at its own
+// effective level. The single shared rule for the takeAsi/takeFeat slot cap,
+// reconcileAdvancements, applyAdvancementClamp, and the three featSlotCap
+// readers — never inline a per-entry copy at those sites.
+export function characterAdvancementSlots(
+  entries: readonly { name: string; level: number }[],
+  derivedLevel: number,
+): number {
+  return entries.reduce(
+    (sum, e) => sum + advancementSlotsForLevel(e.name, effectiveEntryLevel(e.level, entries.length, derivedLevel)),
+    0,
+  );
+}
+
 // Adding a level in a NEW class via multiclassing requires a minimum ability
 // score (13). Each class maps to a list of OPTIONS: the prerequisite is met when
 // ANY one option is fully satisfied — abilities within an option are AND-ed,
