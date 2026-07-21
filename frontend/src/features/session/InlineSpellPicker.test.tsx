@@ -103,17 +103,24 @@ interface Spies {
   onClose: ReturnType<typeof vi.fn>;
   onLogChanged: ReturnType<typeof vi.fn>;
   onCommitSlot: ReturnType<typeof vi.fn>;
+  onCastSettled: ReturnType<typeof vi.fn>;
 }
 
 function renderPicker(
   character: Character,
-  opts: { castingTimeFilter?: string; slotAvailable?: boolean; focusSpellId?: string } = {},
+  opts: {
+    castingTimeFilter?: string;
+    slotAvailable?: boolean;
+    focusSpellId?: string;
+    slot?: "action" | "bonusAction" | "reaction";
+  } = {},
 ): Spies {
   const spies: Spies = {
     onUpdate: vi.fn(),
     onClose: vi.fn(),
     onLogChanged: vi.fn(),
     onCommitSlot: vi.fn(),
+    onCastSettled: vi.fn(),
   };
   render(
     <RollProvider>
@@ -123,13 +130,14 @@ function renderPicker(
         onUpdate={spies.onUpdate}
         onClose={spies.onClose}
         onLogChanged={spies.onLogChanged}
-        slot="action"
+        slot={opts.slot ?? "action"}
         slotAvailable={opts.slotAvailable ?? true}
         onCommitSlot={spies.onCommitSlot}
         spellCastThisTurn={{}}
         allies={[]}
         castingTimeFilter={opts.castingTimeFilter ?? "1 action"}
         focusSpellId={opts.focusSpellId}
+        onCastSettled={spies.onCastSettled}
       />
     </RollProvider>,
   );
@@ -169,11 +177,14 @@ describe("InlineSpellPicker — characterization", () => {
     await waitFor(() => expect(spies.onUpdate).toHaveBeenCalledWith(updatedChar));
   });
 
-  it("upcasts a leveled spell at the chosen slot level", async () => {
+  // #1163: upcasting moved into the big spell card — the compact row carries
+  // no slot picker of its own.
+  it("upcasts a leveled spell at the chosen slot level via the big spell card", async () => {
     renderPicker(makeCharacter([healSpell]));
 
+    await userEvent.click(screen.getByRole("button", { name: "Cure Wounds details" }));
     await userEvent.click(screen.getByRole("button", { name: /^L2/ }));
-    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Cast Cure Wounds/ }));
 
     expect(mockApply).toHaveBeenCalledWith("char-1", [
       expect.objectContaining({ type: "castSpell", entryId: "sp-heal", slotLevel: 2 }),
@@ -222,6 +233,46 @@ describe("InlineSpellPicker — characterization", () => {
 
   it("Done closes the panel", async () => {
     const spies = renderPicker(makeCharacter());
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(spies.onClose).toHaveBeenCalled();
+  });
+});
+
+describe("InlineSpellPicker — post-cast feedback (#1164)", () => {
+  it("the result well is a dashed placeholder before any cast", () => {
+    renderPicker(makeCharacter());
+    expect(screen.getByText(/its roll and what to announce land here/i)).toBeInTheDocument();
+  });
+
+  it("casting fills the result well, dims the cast row, and shows the economy strip", async () => {
+    const spies = renderPicker(makeCharacter([cantrip]));
+
+    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
+
+    // Well fills with the cast's result — no more dashed placeholder.
+    expect(screen.queryByText(/its roll and what to announce land here/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Result · Sacred Flame")).toBeInTheDocument();
+
+    // The row swaps to a dimmed receipt instead of its Cast control.
+    expect(screen.getByText("cast")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
+
+    // "Action spent…" economy acknowledgment appears once something is cast.
+    expect(screen.getByText("Action spent. Bonus action & movement remain.")).toBeInTheDocument();
+
+    expect(spies.onCastSettled).toHaveBeenCalledWith(expect.objectContaining({ spellName: "Sacred Flame" }));
+  });
+
+  it("labels the economy strip per economy slot", async () => {
+    renderPicker(makeCharacter([cantrip]), { slot: "bonusAction", castingTimeFilter: "1 action" });
+    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
+    expect(screen.getByText("Bonus action spent. Action & movement remain.")).toBeInTheDocument();
+  });
+
+  it("sheet never auto-closes after a cast — Done stays explicit", async () => {
+    const spies = renderPicker(makeCharacter([cantrip]));
+    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
+    expect(spies.onClose).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(spies.onClose).toHaveBeenCalled();
   });

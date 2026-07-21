@@ -2,8 +2,11 @@ import { describe, it, expect } from "vitest";
 
 import {
   budgetHeadline,
+  castTallyLine,
   componentsLine,
+  economySpentLine,
   effectPillLabel,
+  expectedRollView,
   pickDetailCtaLabel,
   pickerMetaLine,
   pickRowState,
@@ -156,5 +159,92 @@ describe("spellResolutionLabel", () => {
   it("is null when the spell neither attacks nor forces a save", () => {
     expect(spellResolutionLabel({ attackType: null })).toBeNull();
     expect(spellResolutionLabel({ attackType: "save", saveAbility: null })).toBeNull();
+  });
+});
+
+describe("expectedRollView", () => {
+  it("states an attack spell as bonus → dice, no averages", () => {
+    const view = expectedRollView(
+      { attackType: "attack", effectKind: "damage", damageType: "fire" },
+      { dcLabel: null, spellAttackBonus: 7, preview: "1d10 fire" },
+    );
+    expect(view.lead).toBe("Spell attack +7");
+    expect(view.dice).toBe("1d10 fire");
+    expect(view.tail).toBe("");
+  });
+
+  it("states a save spell as DC → dice, with half-on-success as the tail", () => {
+    const view = expectedRollView(
+      { attackType: "save", saveEffect: "half", effectKind: "damage", damageType: "fire" },
+      { dcLabel: "DC 15 DEX save", spellAttackBonus: 0, preview: "3d6 fire" },
+    );
+    expect(view.lead).toBe("Targets make a DC 15 DEX save");
+    expect(view.dice).toBe("3d6 fire");
+    expect(view.tail).toBe("half on success");
+  });
+
+  it("drops the tail when a failed save takes full effect", () => {
+    const view = expectedRollView(
+      { attackType: "save", saveEffect: "none", effectKind: "damage" },
+      { dcLabel: "DC 15 WIS save", spellAttackBonus: 0, preview: null },
+    );
+    expect(view.tail).toBe("");
+  });
+
+  it("labels an unresolved heal as automatic, tinted like healing", () => {
+    const view = expectedRollView(
+      { attackType: null, effectKind: "heal" },
+      { dcLabel: null, spellAttackBonus: 0, preview: "1d8 + 3 healing" },
+    );
+    expect(view.lead).toBe("Heals automatically");
+    expect(view.dice).toBe("1d8 + 3 healing");
+    expect(view.diceTint).toBe("bg-vitality-100 text-vitality-800");
+  });
+
+  it("labels a no-roll utility/buff spell", () => {
+    const view = expectedRollView(
+      { attackType: null, effectKind: "buff" },
+      { dcLabel: null, spellAttackBonus: 0, preview: null },
+    );
+    expect(view.lead).toBe("No roll");
+    expect(view.dice).toBeNull();
+  });
+});
+
+describe("economySpentLine", () => {
+  it("states what was spent and what remains, per economy slot", () => {
+    expect(economySpentLine("action")).toBe("Action spent. Bonus action & movement remain.");
+    expect(economySpentLine("bonusAction")).toBe("Bonus action spent. Action & movement remain.");
+    expect(economySpentLine("reaction")).toBe("Reaction spent.");
+  });
+});
+
+describe("castTallyLine", () => {
+  it("joins spell + level + total + damage type", () => {
+    expect(castTallyLine({ spellName: "Burning Hands", level: 1, total: 14, damageType: "fire" })).toBe(
+      "Burning Hands (L1) — 14 fire",
+    );
+  });
+
+  it("omits the level suffix for a cantrip", () => {
+    expect(castTallyLine({ spellName: "Fire Bolt", level: 0, total: 8, damageType: "fire" })).toBe(
+      "Fire Bolt — 8 fire",
+    );
+  });
+
+  it("omits the total when the cast had no roll", () => {
+    expect(castTallyLine({ spellName: "Mage Armor", level: 1 })).toBe("Mage Armor (L1)");
+  });
+
+  it("appends the announce line when present", () => {
+    expect(
+      castTallyLine({
+        spellName: "Burning Hands",
+        level: 1,
+        total: 14,
+        damageType: "fire",
+        announce: "DC 15 DEX save, half on success",
+      }),
+    ).toBe("Burning Hands (L1) — 14 fire · announce DC 15 DEX save, half on success");
   });
 });
