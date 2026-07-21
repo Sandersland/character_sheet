@@ -34,6 +34,10 @@ interface CharacterSheetBodyProps {
   /** True while the live-session status is still resolving — suppress the static
    *  Combat panel for that beat so it doesn't flash before the live panel. */
   sessionLoading?: boolean;
+  /** Live-session status + the header's "jump to Combat" handler — passed through
+   *  to every panel via SheetPanelProps; only Magic's Cast door reads them (#1162). */
+  isLive?: boolean;
+  onGoToCombat?: () => void;
 }
 
 /**
@@ -47,8 +51,10 @@ export default function CharacterSheetBody({
   activeTab,
   livePanel,
   sessionLoading = false,
+  isLive = false,
+  onGoToCombat = () => {},
 }: CharacterSheetBodyProps) {
-  const panelProps = { character, reference, onUpdate };
+  const panelProps = { character, reference, onUpdate, isLive, onGoToCombat };
   const StaticPanel = STATIC_PANELS[activeTab];
   return (
     // <main> keeps the page's main landmark; the inner tabpanel carries the

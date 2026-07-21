@@ -151,8 +151,9 @@ test("visual: spells section", async ({ page }) => {
   await ready(page);
 
   // The Magic tab's default view is the self-styled spellcasting record block
-  // (quick-cast + slot pips); the grimoire is a separate view behind "Manage
-  // spellbook →". Snapshot the record — the tab panel's default state.
+  // (stat bar, slot pips, the Cast door, #1162); the grimoire is a separate
+  // view behind "Manage spellbook →". Snapshot the record — the tab panel's
+  // default state.
   await expect(page.locator("#sheet-panel-magic")).toHaveScreenshot("spells-section.png", {
     maxDiffPixelRatio: 0.01,
   });

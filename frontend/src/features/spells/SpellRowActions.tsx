@@ -1,4 +1,5 @@
-// Rune prepare-toggle + Cast / Remove controls for a spellbook row.
+// Rune prepare-toggle + Remove controls for a spellbook row. Cast left the
+// grimoire (#1162) — the row's name now opens the shared detail card instead.
 import { canPrepare, type PreparedBudget } from "@/lib/spellList";
 import { runeState, type SpellRowDerived } from "@/lib/spellRow";
 import type { Spell } from "@/types/character";
@@ -10,7 +11,6 @@ interface SpellRowActionsProps {
   busy: boolean;
   onPrepare: (spell: Spell) => void;
   onForget: (spell: Spell) => void;
-  onCastClick: () => void;
 }
 
 function PrepareRune({ spell, budget, busy, onPrepare }: Pick<SpellRowActionsProps, "spell" | "budget" | "busy" | "onPrepare">) {
@@ -50,22 +50,12 @@ function PrepareRune({ spell, budget, busy, onPrepare }: Pick<SpellRowActionsPro
 }
 
 export default function SpellRowActions({
-  spell, derived, budget, busy, onPrepare, onForget, onCastClick,
+  spell, derived, budget, busy, onPrepare, onForget,
 }: SpellRowActionsProps) {
-  const { item, itemExhausted, isCantrip, isGranted } = derived;
+  const { isGranted } = derived;
   return (
     <div className="flex shrink-0 items-center gap-2">
       <PrepareRune spell={spell} budget={budget} busy={busy} onPrepare={onPrepare} />
-
-      <button
-        type="button"
-        disabled={busy || itemExhausted}
-        onClick={onCastClick}
-        className="rounded bg-garnet-600 px-2.5 py-0.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
-        title={item ? `Cast ${spell.name} from ${item.itemName}` : isCantrip ? `Cast ${spell.name}` : `Cast ${spell.name} (choose slot)`}
-      >
-        Cast
-      </button>
 
       {!isGranted && (
         <button

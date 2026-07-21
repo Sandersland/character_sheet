@@ -98,7 +98,8 @@ export function levelLabel(level: number): string {
 
 const SLOT_ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
 
-// Ordinal for a spell/slot level ("3rd") — the slot-pip + quick-cast label form.
+// Ordinal for a spell/slot level ("3rd") — the slot-pip, roster, cast-door
+// picker, and in-session picker level tag.
 export function slotOrdinal(n: number): string {
   return SLOT_ORDINALS[n] ?? `${n}th`;
 }
@@ -184,25 +185,6 @@ export function componentsLabel(spell: { components?: SpellComponents | null }):
  */
 export function isAttackCantrip(spell: Spell): boolean {
   return spell.level === 0 && spell.attackType === "attack";
-}
-
-/**
- * Attack-type line for the expand section.
- * Returns null for utility spells.
- */
-
-export function attackTypeLabel(spell: Spell): string | null {
-  if (!spell.attackType) return null;
-  if (spell.attackType === "attack") return "Ranged/melee spell attack";
-  // save spell
-  const savePart = spell.saveAbility ? abilityLabel(spell.saveAbility) : "—";
-  const effectPart =
-    spell.saveEffect === "half"
-      ? " · half damage on success"
-      : spell.saveEffect === "none"
-        ? " · no effect on success"
-        : "";
-  return `${savePart} saving throw${effectPart}`;
 }
 
 /**

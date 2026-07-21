@@ -1,14 +1,14 @@
-// SpellRow — per-spell view in the spellbook list: badges, actions, slot picker, expand.
-// Derivations live in spellRow; presentational blocks in the sibling subcomponents.
+// SpellRow — per-spell view in the grimoire: badges, prepare/forget actions, and
+// a tap-to-expand into the shared spell detail card. View/manage only (#1162) —
+// casting left this row entirely for the record view's "Cast a spell" door.
 import { useState } from "react";
 
-import type { PreparedBudget } from "@/lib/spellList";
-import { deriveSpellRow, resolveCastAction } from "@/lib/spellRow";
+import { canPrepare, type PreparedBudget } from "@/lib/spellList";
+import { deriveSpellRow, runeState } from "@/lib/spellRow";
 import { effectPreview, componentsLabel } from "@/lib/spellMeta";
+import SpellDetailCard from "@/features/spells/SpellDetailCard";
 import SpellRowActions from "@/features/spells/SpellRowActions";
 import SpellRowBadges from "@/features/spells/SpellRowBadges";
-import SpellRowDetails from "@/features/spells/SpellRowDetails";
-import SpellSlotPicker from "@/features/spells/SpellSlotPicker";
 import type { Spell } from "@/types/character";
 
 interface SpellRowProps {
@@ -16,40 +16,53 @@ interface SpellRowProps {
   characterLevel: number;
   /** True if the spellcasting section is busy (disables buttons). */
   busy: boolean;
-  onCast: (spell: Spell, slotLevel?: number) => void;
   onPrepare: (spell: Spell) => void;
   onForget: (spell: Spell) => void;
   /** Prepared-spell budget (#883) gating the rune toggle. */
   budget: PreparedBudget;
-  /** Available slot levels for the "cast with slot" picker (leveled spells only). */
+  /** Available slot levels — still drives the "no slots" dimming/badge. */
   availableSlots: number[];
   /** True when this spell is the character's active concentration spell. */
   isConcentrating?: boolean;
+}
+
+// The detail card's single CTA mirrors the row's own prepare rune (the grimoire's
+// only mutating action besides Swap/Forget, which stay row-level).
+function prepareCta(
+  spell: Spell,
+  budget: PreparedBudget,
+  busy: boolean,
+  onPrepare: (spell: Spell) => void,
+  onDone: () => void,
+) {
+  const state = runeState(spell);
+  if (state === "locked") {
+    return { label: "Always prepared", disabled: true, onPress: () => {} };
+  }
+  const blocked = state === "unprepared" && !canPrepare(spell, budget);
+  return {
+    label: state === "prepared" ? `Unprepare ${spell.name}` : `Prepare ${spell.name}`,
+    disabled: busy || blocked,
+    onPress: () => {
+      onPrepare(spell);
+      onDone();
+    },
+  };
 }
 
 export default function SpellRow({
   spell,
   characterLevel,
   busy,
-  onCast,
   onPrepare,
   onForget,
   budget,
   availableSlots,
   isConcentrating = false,
 }: SpellRowProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [slotPickerOpen, setSlotPickerOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const derived = deriveSpellRow(spell, availableSlots);
-
-  function handleCastClick() {
-    const action = resolveCastAction(spell, availableSlots);
-    if (action.kind === "openPicker") setSlotPickerOpen((o) => !o);
-    else if (action.kind === "castAt") onCast(spell, action.slotLevel);
-    else onCast(spell);
-  }
-
   const effect = effectPreview(spell, characterLevel);
   const compStr = componentsLabel(spell);
 
@@ -62,8 +75,8 @@ export default function SpellRow({
             <button
               type="button"
               className="text-left text-sm font-medium text-parchment-900 hover:underline"
-              onClick={() => setExpanded((e) => !e)}
-              aria-expanded={expanded}
+              onClick={() => setDetailOpen(true)}
+              aria-label={`Open ${spell.name}`}
             >
               {spell.name}
             </button>
@@ -81,25 +94,16 @@ export default function SpellRow({
           busy={busy}
           onPrepare={onPrepare}
           onForget={onForget}
-          onCastClick={handleCastClick}
         />
       </div>
 
-      {slotPickerOpen && !derived.isCantrip && (
-        <SpellSlotPicker
+      {detailOpen && (
+        <SpellDetailCard
           spell={spell}
-          characterLevel={characterLevel}
-          availableSlots={availableSlots}
-          busy={busy}
-          onPick={(slotLevel) => {
-            setSlotPickerOpen(false);
-            onCast(spell, slotLevel);
-          }}
-          onCancel={() => setSlotPickerOpen(false)}
+          onClose={() => setDetailOpen(false)}
+          cta={prepareCta(spell, budget, busy, onPrepare, () => setDetailOpen(false))}
         />
       )}
-
-      {expanded && <SpellRowDetails spell={spell} />}
     </li>
   );
 }
