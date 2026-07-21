@@ -1,8 +1,10 @@
 // The class-choice step at ceremony start (#1170, BG3-style): pick which class
-// entry advances, or start a new one via multiclassing. Ineligible new-class
-// rows stay listed (disabled) with their unmet prerequisite, replacing the
-// retired AddClassPanel's inline dropdown. Renders as its own CeremonyCard —
-// this runs before a plan exists, so it can't use LevelUpStepContext.
+// entry advances, or start a new one via multiclassing. New-class options are
+// collapsed behind a "New class →" drill-in (#1209) so the common case (advance
+// an existing class) isn't buried among every not-yet-owned reference class;
+// ineligible new-class rows stay listed (disabled) inside the drill-in with
+// their unmet prerequisite. Renders as its own CeremonyCard — this runs before
+// a plan exists, so it can't use LevelUpStepContext.
 
 import { useState } from "react";
 
@@ -20,6 +22,44 @@ function optionKey(target: LevelUpTarget): string {
   return target.kind === "existing" ? `existing:${target.classEntryId}` : `new:${target.classId}`;
 }
 
+function OptionRadio({
+  option,
+  isSelected,
+  onSelect,
+}: {
+  option: ClassChoiceOption;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={isSelected}
+      aria-label={option.name}
+      disabled={!option.eligible}
+      onClick={onSelect}
+      className={`${CARD_BASE} ${
+        !option.eligible ? CARD_DISABLED : isSelected ? CARD_SELECTED : CARD_IDLE
+      }`}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="font-display text-base font-semibold text-parchment-900">{option.name}</span>
+        <span
+          aria-hidden
+          className={`h-3.5 w-3.5 shrink-0 rounded-full border ${
+            isSelected ? "border-garnet-600 bg-garnet-600" : "border-parchment-400"
+          }`}
+        />
+      </span>
+      <span className="text-sm text-parchment-600">{option.levelLine}</span>
+      {!option.eligible && option.requirement && (
+        <span className="text-xs font-semibold text-garnet-700">Requires {option.requirement}</span>
+      )}
+    </button>
+  );
+}
+
 export default function ClassChoiceStep({
   options,
   initialTarget,
@@ -31,9 +71,18 @@ export default function ClassChoiceStep({
   onContinue: (target: LevelUpTarget) => void;
   onCancel: () => void;
 }) {
+  const existingOptions = options.filter((o) => o.target.kind === "existing");
+  const newOptions = options.filter((o) => o.target.kind === "new");
+
   const [selected, setSelected] = useState<LevelUpTarget | null>(
     () => options.find((o) => o.eligible && sameLevelUpTarget(initialTarget, o.target))?.target ?? null,
   );
+  // A ?classId= deep link into a not-yet-owned class should land the player
+  // straight inside the drill-in, even if that option turns out ineligible
+  // (they still need to see *why*, not bounce back to the top view).
+  const [view, setView] = useState<"top" | "new">(() => (initialTarget?.kind === "new" ? "new" : "top"));
+
+  const visibleOptions = view === "top" ? existingOptions : newOptions;
 
   return (
     <CeremonyCard className="flex min-h-0 flex-1 flex-col px-5 py-7 sm:px-10">
@@ -44,44 +93,43 @@ export default function ClassChoiceStep({
         </p>
       </div>
 
-      <div
-        role="radiogroup"
-        aria-label="Class to advance"
-        className="mt-5 min-h-0 flex-1 overflow-y-auto border-t border-parchment-200 pt-4"
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          {options.map((option) => {
-            const isSelected = sameLevelUpTarget(selected, option.target);
-            return (
-              <button
-                key={optionKey(option.target)}
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                aria-label={option.name}
-                disabled={!option.eligible}
-                onClick={() => setSelected(option.target)}
-                className={`${CARD_BASE} ${
-                  !option.eligible ? CARD_DISABLED : isSelected ? CARD_SELECTED : CARD_IDLE
-                }`}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-display text-base font-semibold text-parchment-900">{option.name}</span>
-                  <span
-                    aria-hidden
-                    className={`h-3.5 w-3.5 shrink-0 rounded-full border ${
-                      isSelected ? "border-garnet-600 bg-garnet-600" : "border-parchment-400"
-                    }`}
-                  />
-                </span>
-                <span className="text-sm text-parchment-600">{option.levelLine}</span>
-                {!option.eligible && option.requirement && (
-                  <span className="text-xs font-semibold text-garnet-700">Requires {option.requirement}</span>
-                )}
-              </button>
-            );
-          })}
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto border-t border-parchment-200 pt-4">
+        {view === "new" && (
+          <button
+            type="button"
+            onClick={() => setView("top")}
+            // Accessible name disambiguates from the "New class →" open button,
+            // which shares the visible "Add a new class" wording (#1209 review).
+            aria-label="Back to class selection"
+            className="mb-3 text-sm font-semibold text-garnet-700 hover:text-garnet-800"
+          >
+            ← Add a new class
+          </button>
+        )}
+        <div
+          role="radiogroup"
+          aria-label={view === "top" ? "Class to advance" : "New class to add"}
+          className="grid gap-3 sm:grid-cols-2"
+        >
+          {visibleOptions.map((option) => (
+            <OptionRadio
+              key={optionKey(option.target)}
+              option={option}
+              isSelected={sameLevelUpTarget(selected, option.target)}
+              onSelect={() => setSelected(option.target)}
+            />
+          ))}
         </div>
+        {view === "top" && newOptions.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setView("new")}
+            aria-label="Add a new class"
+            className="mt-3 text-sm font-semibold text-garnet-700 hover:text-garnet-800"
+          >
+            New class →
+          </button>
+        )}
       </div>
 
       {/* onBack/onConfirm/confirmLabel/confirmClassName are inert here — isFirst
@@ -93,7 +141,10 @@ export default function ClassChoiceStep({
         onCancel={onCancel}
         onBack={() => {}}
         onContinue={() => selected && onContinue(selected)}
-        canContinue={selected != null}
+        // Gate on the selection's kind matching the visible view so Continue is
+        // enabled only when the checked radio is actually on screen — a top-level
+        // pick stays live if you peek into the drill-in and back out (#1209 review).
+        canContinue={selected != null && (view === "top" ? selected.kind === "existing" : selected.kind === "new")}
         onConfirm={() => {}}
         confirmLabel=""
         confirmClassName=""
