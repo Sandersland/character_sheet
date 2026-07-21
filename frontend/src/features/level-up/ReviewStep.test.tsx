@@ -44,7 +44,13 @@ const plan: LevelUpPlanResponse = {
 function renderReview(draft: LevelUpDraft, over?: { character?: Character; plan?: LevelUpPlanResponse }) {
   return render(
     <LevelUpStepContext.Provider
-      value={{ character: over?.character ?? character, draft, setDraft: () => {}, plan: over?.plan ?? plan }}
+      value={{
+        character: over?.character ?? character,
+        draft,
+        setDraft: () => {},
+        plan: over?.plan ?? plan,
+        target: { kind: "existing", classEntryId: "entry-1" },
+      }}
     >
       <ReviewStep />
     </LevelUpStepContext.Provider>,

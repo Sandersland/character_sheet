@@ -48,14 +48,10 @@ export interface HitPointStepMath {
 export function hitPointStepMath(
   character: Character,
   referenceClasses: ClassOption[],
-  classEntryId: string | undefined,
+  target: LevelUpTarget | undefined,
 ): HitPointStepMath {
   const conMod = abilityModifier(character.abilityScores.constitution);
-  const die = advancingHitDie(
-    character,
-    referenceClasses,
-    classEntryId ? { kind: "existing", classEntryId } : undefined,
-  );
+  const die = advancingHitDie(character, referenceClasses, target);
   const faces = dieFaces(die);
   const { min, max } = hitPointGainRange(faces, conMod);
   return {

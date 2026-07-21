@@ -59,7 +59,9 @@ function Harness({ step, character }: { step: LevelUpStep; character: Character 
     grantedSpells: [],
   };
   return (
-    <LevelUpStepContext.Provider value={{ character, draft, setDraft, plan }}>
+    <LevelUpStepContext.Provider
+      value={{ character, draft, setDraft, plan, target: { kind: "existing", classEntryId: "entry-1" } }}
+    >
       <NewSpellsStep step={step} />
       <output data-testid="picks">{JSON.stringify(draft.spellsLearned ?? [])}</output>
       <output data-testid="forgets">{JSON.stringify(draft.spellsForgotten ?? [])}</output>

@@ -58,6 +58,7 @@ function Harness({
         draft,
         setDraft,
         plan: planOverride ?? plan,
+        target: { kind: "existing", classEntryId: "entry-1" },
       }}
     >
       <ChoiceStep step={step} />

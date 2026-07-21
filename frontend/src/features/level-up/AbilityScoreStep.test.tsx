@@ -45,7 +45,9 @@ const plan: LevelUpPlanResponse = {
 function renderStep(draft: LevelUpDraft = {} as LevelUpDraft) {
   const setDraft = vi.fn();
   const utils = render(
-    <LevelUpStepContext.Provider value={{ character, draft, setDraft, plan }}>
+    <LevelUpStepContext.Provider
+      value={{ character, draft, setDraft, plan, target: { kind: "existing", classEntryId: "entry-1" } }}
+    >
       <AbilityScoreStep />
     </LevelUpStepContext.Provider>,
   );
