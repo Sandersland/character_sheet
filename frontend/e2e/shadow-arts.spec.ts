@@ -21,6 +21,9 @@ test("shadow arts: a Way of Shadow monk casts Shadow Arts, taking concentration 
   await page.goto(`/characters/${id}`);
   await expect(page.getByRole("heading", { name: /Shadow Monk/, level: 1 })).toBeVisible();
 
+  // Class features (incl. Shadow Arts) moved to their own tab (#1169).
+  await page.getByRole("tab", { name: "Class" }).click();
+
   // The Shadow Arts block renders with the 4 flat 2-ki arts.
   await expect(page.getByRole("heading", { name: "Shadow Arts" })).toBeVisible();
   const darknessRow = page

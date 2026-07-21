@@ -2,6 +2,7 @@ import type { IconType } from "react-icons";
 
 import {
   GiVisoredHelm,
+  GiRank3,
   GiCrossedSwords,
   GiKnapsack,
   GiSpellBook,
@@ -20,6 +21,7 @@ interface SheetBottomNavProps {
 // One flavor glyph per tab; the label stays the accessible name.
 const TAB_ICONS: Record<SheetTabId, IconType> = {
   overview: GiVisoredHelm,
+  class: GiRank3,
   combat: GiCrossedSwords,
   inventory: GiKnapsack,
   magic: GiSpellBook,

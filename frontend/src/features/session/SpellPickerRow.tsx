@@ -1,9 +1,16 @@
-/** One castable-spell row: metadata, slot/target controls, and Attack/Cast buttons. */
+/**
+ * One castable-spell row (#1163): name + school ink + the plain-language
+ * "what happens" line, Attack/Cast on the right. The info dot (or the row
+ * body) opens the big spell card for the full description + slot picker —
+ * level and slot selection live there, not echoed per row (#1163). Once this
+ * spell settles a cast this sheet-open, the row swaps to a quiet dimmed
+ * receipt (#1164) instead of its normal controls.
+ */
 
 import { formatModifier } from "@/lib/abilities";
-import { castCostBadge } from "@/lib/spellPicker";
-import Badge from "@/components/ui/Badge";
-import SlotLevelSelector from "@/features/session/SlotLevelSelector";
+import { schoolInk } from "@/lib/spellFlavor";
+import { schoolLabel, slotOrdinal } from "@/lib/spellMeta";
+import type { ExpectedRoll } from "@/lib/spellPickerView";
 import SpellTargetToggle from "@/features/session/SpellTargetToggle";
 import type { SpellRowState, SpellRowView } from "@/features/session/useSpellPicker";
 import type { Spell } from "@/types/character";
@@ -15,49 +22,66 @@ interface SpellPickerRowProps {
   onPatch: (patch: Partial<SpellRowState>) => void;
   onCast: () => void;
   onAttackRoll: () => void;
+  onOpenDetail: () => void;
+  /** Set once this spell settles a cast this sheet-open (#1164) — swaps to CastRow. */
+  justCastLevel?: number;
 }
 
-/** Cast button label: casting state > cantrip > arcanum > slotted level. */
-function castButtonLabel(spell: Spell, view: SpellRowView, casting: boolean): string {
-  if (casting) return "Casting…";
-  if (view.isCantrip) return "Cast";
-  if (view.usesArcanum) return "Cast (Arcanum)";
-  return `Cast (L${view.spellSlot ?? spell.level})`;
-}
-
-/** Left column: name + badge cluster + casting-time/range/preview meta lines.
- *  (Spell level reads off the section header — no per-row level badge.) */
-function SpellRowHeader({ spell, view }: { spell: Spell; view: SpellRowView }) {
+function InfoDot({ label, onOpen }: { label: string; onOpen: () => void }) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <div className="flex flex-wrap items-baseline gap-2">
+    <button
+      type="button"
+      aria-label={`${label} details`}
+      onClick={onOpen}
+      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-parchment-300 text-[11px] font-bold text-parchment-500 transition-colors hover:bg-parchment-100"
+    >
+      i
+    </button>
+  );
+}
+
+/** The cast sheet's "what happens" line (#1163): plain text + a tinted dice pill. */
+function ExpectedLine({ expected }: { expected: ExpectedRoll }) {
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-parchment-600">
+      <span>{expected.lead}</span>
+      {expected.dice && (
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${expected.diceTint}`}>
+          {expected.dice}
+        </span>
+      )}
+      {expected.tail && <span>{expected.tail}</span>}
+    </p>
+  );
+}
+
+/** Post-cast receipt (#1164): the row dims with a ✓ tick instead of its controls. */
+function CastRow({ spell, level }: { spell: Spell; level: number }) {
+  return (
+    <div className="flex items-center gap-2.5 py-3 opacity-60 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-parchment-200">
+      <span
+        aria-hidden
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-vitality-500 text-vitality-700"
+      >
+        ✓
+      </span>
+      <div className="min-w-0 flex-1">
         <span className="text-sm font-medium text-parchment-900">{spell.name}</span>
-        <div className="flex flex-wrap items-center gap-1">
-          <Badge tone={view.schoolTone}>{spell.school}</Badge>
-          {view.isAttack && <Badge tone="garnet">attack roll</Badge>}
-          {spell.concentration && <Badge tone="arcane">conc</Badge>}
-          {spell.ritual && <Badge tone="gold">ritual</Badge>}
-          {view.usesArcanum && <Badge tone="gold">arcanum</Badge>}
-        </div>
+        <p className="text-xs text-parchment-600">
+          {level > 0 ? `cast at ${slotOrdinal(level)} level · slot spent` : "cast"}
+        </p>
       </div>
-      <p className="text-xs text-parchment-600">
-        {spell.castingTime} · {spell.range}
-      </p>
-      {view.preview && <p className="text-xs text-parchment-600">{view.preview}</p>}
-      {view.compStr && <p className="text-[11px] text-parchment-600">{view.compStr}</p>}
     </div>
   );
 }
 
-/** Bottom-right row: save-DC info, the attack two-step, and the Cast button. */
+/** Bottom-right column: the attack two-step, then Cast. */
 function SpellRowCastButtons({
-  spell,
   view,
   casting,
   onCast,
   onAttackRoll,
 }: {
-  spell: Spell;
   view: SpellRowView;
   casting: boolean;
   onCast: () => void;
@@ -65,16 +89,6 @@ function SpellRowCastButtons({
 }) {
   return (
     <div className="flex items-center gap-2">
-      {view.isSave && view.dcLabel && (
-        <span className="rounded bg-arcane-50 px-2 py-0.5 text-[11px] font-semibold text-arcane-700">
-          {view.dcLabel}
-        </span>
-      )}
-
-      {view.isSave && spell.saveEffect === "half" && (
-        <span className="text-[11px] text-parchment-600">½ on save</span>
-      )}
-
       {view.isAttack && (
         <button
           type="button"
@@ -92,30 +106,40 @@ function SpellRowCastButtons({
         onClick={onCast}
         className="rounded-control bg-arcane-700 px-2.5 py-1 text-xs font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {castButtonLabel(spell, view, casting)}
+        {casting ? "Casting…" : "Cast"}
       </button>
     </div>
   );
 }
 
-export default function SpellPickerRow({ spell, view, row, onPatch, onCast, onAttackRoll }: SpellPickerRowProps) {
+export default function SpellPickerRow({
+  spell,
+  view,
+  row,
+  onPatch,
+  onCast,
+  onAttackRoll,
+  onOpenDetail,
+  justCastLevel,
+}: SpellPickerRowProps) {
+  if (justCastLevel !== undefined) return <CastRow spell={spell} level={justCastLevel} />;
+
   return (
-    <div className="flex flex-col gap-1.5 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-parchment-200">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <SpellRowHeader spell={spell} view={view} />
+    <div className="flex flex-col gap-1 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-parchment-200">
+      <div className="flex items-start gap-2.5">
+        <InfoDot label={spell.name} onOpen={onOpenDetail} />
+
+        <button type="button" onClick={onOpenDetail} className="min-w-0 flex-1 text-left">
+          <span className="flex flex-wrap items-baseline gap-2">
+            <span className="text-sm font-medium text-parchment-900">{spell.name}</span>
+            <span className={`text-[11px] font-semibold uppercase tracking-wide ${schoolInk(spell.school)}`}>
+              {schoolLabel(spell.school)}
+            </span>
+          </span>
+          <ExpectedLine expected={view.expected} />
+        </button>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Badge tone={view.isCantrip ? "neutral" : "gold"}>{castCostBadge(spell)}</Badge>
-          {!view.isCantrip && (
-            <SlotLevelSelector
-              spell={spell}
-              availableSlots={view.availableSlots}
-              spellSlot={view.spellSlot}
-              usesArcanum={view.usesArcanum}
-              onSelect={(lvl) => onPatch({ slotLevel: lvl })}
-            />
-          )}
-
           {spell.effectKind && (
             <SpellTargetToggle
               target={row.target}
@@ -127,13 +151,7 @@ export default function SpellPickerRow({ spell, view, row, onPatch, onCast, onAt
             />
           )}
 
-          <SpellRowCastButtons
-            spell={spell}
-            view={view}
-            casting={row.casting}
-            onCast={onCast}
-            onAttackRoll={onAttackRoll}
-          />
+          <SpellRowCastButtons view={view} casting={row.casting} onCast={onCast} onAttackRoll={onAttackRoll} />
         </div>
       </div>
 

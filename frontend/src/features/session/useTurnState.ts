@@ -55,6 +55,24 @@ function nextRowId(): string {
   return `tally-${Date.now().toString(36)}-${rowIdSeq}`;
 }
 
+/** Payload useSpellPicker appends to the cast tally once a cast settles (#1164). */
+export interface RecordedSpellCast {
+  spellName: string;
+  /** Slot level cast at (0 = cantrip). */
+  level: number;
+  /** Rolled damage/heal total; absent for a no-roll (buff/utility) cast. */
+  total?: number;
+  damageType?: string;
+  /** Save DC / half-on-success line to read to the DM, when the cast forced a save. */
+  announce?: string;
+}
+
+/** One row of the turn card's "Spells cast" tally (#1164) — a cast already
+ *  resolved when it lands here, so unlike AttackTallyRow there's no verdict. */
+export interface CastTallyRow extends RecordedSpellCast {
+  id: string;
+}
+
 export type TurnPhase = "idle" | "active";
 
 /** State of the Extra-Attack counter while the Attack action is in progress. */
@@ -90,6 +108,14 @@ export interface TurnState {
    * entering a NEW Attack action. Snapshotted for undo alongside the economy.
    */
   attackTally: AttackTallyRow[];
+  /**
+   * Turn-card "Spells cast" tally (#1164): one row per settled cast this turn,
+   * appended by useSpellPicker's `onCastSettled`. Cleared by endTurn/startTurn
+   * and by the banner's dismiss, mirroring attackTally's lifecycle — but NOT
+   * part of the undo snapshot: a cast already committed server-side, so `undo`
+   * (which reverts only local economy spend) leaves its receipt in place.
+   */
+  castTally: CastTallyRow[];
   /**
    * Tracks what was cast from each slot this turn (set when InlineSpellPicker
    * commits a cast). Used to enforce the 5e bonus-action spell restriction:
@@ -189,6 +215,10 @@ export interface TurnStateActions {
   setTallyVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
   /** Clear the attack tally (Turn-summary banner dismiss / new action). */
   clearAttackTally: () => void;
+  /** Append a settled cast to the turn card's "Spells cast" tally (#1164). */
+  recordSpellCast: (recorded: RecordedSpellCast) => void;
+  /** Clear the cast tally (its banner's dismiss / new turn). */
+  clearCastTally: () => void;
   /**
    * Cancel the Attack action if no attacks have been rolled yet — refunds the
    * action so the player can choose a different action.
@@ -288,6 +318,7 @@ function initialState(): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
@@ -324,6 +355,7 @@ function hydrateTurnState(loaded: TurnState): TurnState {
   return {
     ...base,
     attackTally: backfillRows(base.attackTally),
+    castTally: base.castTally ?? [],
     // Pre-#1165 entries lack the interaction-budget fields — default them so a
     // later undo() spread doesn't overwrite live state with `undefined`.
     history: (base.history ?? []).map((h) => ({
@@ -478,6 +510,17 @@ const clearAttackTallyState = (s: TurnState): TurnState => {
   };
 };
 
+// Append a settled cast to the turn card's tally (#1164) — write-through, never
+// pushes an undo snapshot (a cast's economy spend already went through its own
+// commitActionSpell/etc, which IS undoable; the tally row is just its receipt).
+const recordSpellCastState = (s: TurnState, recorded: RecordedSpellCast): TurnState => ({
+  ...s,
+  castTally: [...s.castTally, { ...recorded, id: nextRowId() }],
+});
+
+const clearCastTallyState = (s: TurnState): TurnState =>
+  s.castTally.length === 0 ? s : { ...s, castTally: [] };
+
 function cancelAttackState(s: TurnState): TurnState {
   // Only refund if no attacks have been rolled yet — once rolled, the action
   // is committed per 5e rules. Drop only this action's rows so an earlier
@@ -579,6 +622,7 @@ function endTurnState(s: TurnState): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     round: s.round + 1,
     attackedThisTurn: false,
@@ -602,6 +646,7 @@ function startCombatState(): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
@@ -626,6 +671,7 @@ function startTurnState(s: TurnState): TurnState {
     attack: null,
     bonusAttack: null,
     attackTally: [],
+    castTally: [],
     spellCastThisTurn: {},
     sneakAttackUsedThisTurn: false, // once per turn — resets each of your turns
     attackEquipCredits: 0, // interaction-budget credits reset each of your turns (#1165)
@@ -693,6 +739,8 @@ type TurnAction =
   | { type: "addTallyDamageRider"; rowId: string; amount: number }
   | { type: "setTallyVerdict"; index: number; verdict: TallyVerdict | undefined }
   | { type: "clearAttackTally" }
+  | { type: "recordSpellCast"; recorded: RecordedSpellCast }
+  | { type: "clearCastTally" }
   // Meta / effect-driven — write through, never push.
   | { type: "attachBatchId"; batchId: string }
   | { type: "undo" }
@@ -754,6 +802,8 @@ const HANDLERS: TurnActionHandlers = {
   addTallyDamageRider: (s, a) => addTallyDamageRiderState(s, a.rowId, a.amount),
   setTallyVerdict: (s, a) => setTallyVerdictState(s, a.index, a.verdict),
   clearAttackTally: (s) => clearAttackTallyState(s),
+  recordSpellCast: (s, a) => recordSpellCastState(s, a.recorded),
+  clearCastTally: (s) => clearCastTallyState(s),
   attachBatchId: (s, a) => attachBatchIdState(s, a.batchId),
   undo: (s) => undoState(s),
   markDamageTaken: (s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }),
@@ -859,6 +909,8 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       addTallyDamageRider: (rowId, amount) => dispatch({ type: "addTallyDamageRider", rowId, amount }),
       setTallyVerdict: (index, verdict) => dispatch({ type: "setTallyVerdict", index, verdict }),
       clearAttackTally: () => dispatch({ type: "clearAttackTally" }),
+      recordSpellCast: (recorded) => dispatch({ type: "recordSpellCast", recorded }),
+      clearCastTally: () => dispatch({ type: "clearCastTally" }),
       cancelAttack: () => dispatch({ type: "cancelAttack" }),
       finishAttack: () => dispatch({ type: "finishAttack" }),
       consumeBonusAction: () => dispatch({ type: "consumeBonusAction" }),

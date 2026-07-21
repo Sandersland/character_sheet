@@ -9,7 +9,6 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 // Stub the heavy domain sections so the smoke test targets only the layout.
 vi.mock("@/features/abilities/AbilityScoresPanel", () => ({ default: () => <div>abilities</div> }));
 vi.mock("@/features/experience/ExperienceTracker", () => ({ default: () => <div>xp</div> }));
-vi.mock("@/features/class/ClassFeaturesSection", () => ({ default: () => <div>features</div> }));
 vi.mock("@/features/advancement/AdvancementSection", () => ({ default: () => <div>advancements</div> }));
 vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => <div>proficiencies</div> }));
 
@@ -58,10 +57,9 @@ describe("OverviewPanel", () => {
     // Left column: Skills + Proficiencies.
     expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.getByText("proficiencies")).toBeInTheDocument();
-    // Right column: XP, Spell Slots (caster), Class Features, Advancements.
+    // Right column: XP, Spell Slots (caster), Advancements.
     expect(screen.getByText("xp")).toBeInTheDocument();
     expect(screen.getByText("Spell Slots")).toBeInTheDocument();
-    expect(screen.getByText("features")).toBeInTheDocument();
     expect(screen.getByText("advancements")).toBeInTheDocument();
     // Equipped gear now lives on the Inventory tab (#1086).
     expect(screen.queryByText("Equipped")).toBeNull();
@@ -72,6 +70,14 @@ describe("OverviewPanel", () => {
     expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.queryByText("Spell Slots")).not.toBeInTheDocument();
     expect(screen.queryByText("Equipped")).toBeNull();
+  });
+
+  // #1169: Class Features moved to its own tab — Overview no longer renders it,
+  // but AdvancementSection stays (it's cross-class, not per-class).
+  it("no longer renders Class Features — it moved to the Class tab", () => {
+    renderPanel(makeCharacter({ spellcasting: undefined }));
+    expect(screen.queryByText("Class Features")).toBeNull();
+    expect(screen.getByText("advancements")).toBeInTheDocument();
   });
 
   it("keeps the #advancement-card anchor so HP notices can deep-link to it", () => {

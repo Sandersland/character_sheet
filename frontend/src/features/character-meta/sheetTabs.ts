@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { Character, ReferenceData } from "@/types/character";
 
-export type SheetTabId = "overview" | "combat" | "inventory" | "magic" | "story";
+export type SheetTabId = "overview" | "class" | "combat" | "inventory" | "magic" | "story";
 
 export interface SheetTab {
   id: SheetTabId;
@@ -22,6 +22,9 @@ export interface SheetPanelProps {
 
 const ALL_TABS: SheetTab[] = [
   { id: "overview", label: "Overview" },
+  // #1169: class features (roster/subclass/resources/feature text) got their own
+  // tab — a level-7+ multiclass card was dwarfing the rest of Overview.
+  { id: "class", label: "Class" },
   { id: "combat", label: "Combat" },
   { id: "inventory", label: "Inventory" },
   { id: "magic", label: "Magic" },

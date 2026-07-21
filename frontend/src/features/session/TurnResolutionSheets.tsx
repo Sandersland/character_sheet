@@ -272,6 +272,7 @@ function SpellResolutionSheet({
         allies={allies}
         castingTimeFilter={SPELL_CASTING_TIME[slot]}
         focusSpellId={focusSpellId}
+        onCastSettled={turnState.recordSpellCast}
       />
     </BottomSheet>
   );

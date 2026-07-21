@@ -1,7 +1,9 @@
 // The "big spell card" for the shared spell picker (#1160): the full description,
 // a stat grid, and a what-to-expect line, presented in the responsive BottomSheet
-// (mobile sheet / desktop dialog) with a single Learn CTA. The spell prop is a
+// (mobile sheet / desktop dialog) with a single CTA. The spell prop is a
 // structural SpellDetailView so both CatalogSpell and the sheet's Spell satisfy it.
+import type { ReactNode } from "react";
+
 import BottomSheet from "@/components/ui/BottomSheet";
 import { damagePillClass, schoolRibbon } from "@/lib/spellFlavor";
 import { levelLabel, schoolLabel, upcastHint } from "@/lib/spellMeta";
@@ -69,10 +71,14 @@ export default function SpellDetailCard({
   spell,
   cta,
   onClose,
+  belowDescription,
 }: {
   spell: SpellDetailView;
   cta: CtaSlot;
   onClose: () => void;
+  /** Extra controls between the description and the CTA (e.g. the in-session
+   *  cast sheet's upcast slot picker, #1163) — omitted by the plain picker use. */
+  belowDescription?: ReactNode;
 }) {
   const upcast = upcastHint(spell);
   return (
@@ -104,7 +110,8 @@ export default function SpellDetailCard({
       <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-parchment-700">{spell.description}</p>
       {upcast && <p className="mt-2 text-xs text-arcane-700">{upcast}</p>}
 
-      <div className="sticky bottom-0 mt-4 -mx-4 border-t border-parchment-200 bg-parchment-50 px-4 pb-1 pt-3">
+      <div className="sticky bottom-0 mt-4 -mx-4 flex flex-col gap-2 border-t border-parchment-200 bg-parchment-50 px-4 pb-1 pt-3">
+        {belowDescription}
         <button
           type="button"
           disabled={cta.disabled}

@@ -38,6 +38,9 @@ test("disciplines: a Four Elements monk casts an elemental discipline, spending 
   await page.goto(`/characters/${id}`);
   await expect(page.getByRole("heading", { name: /Four Elements Monk/, level: 1 })).toBeVisible();
 
+  // Class features (incl. Elemental Disciplines) moved to their own tab (#1169).
+  await page.getByRole("tab", { name: "Class" }).click();
+
   // The Elemental Disciplines block renders for a Four Elements monk, with the
   // always-known Elemental Attunement and the learned Fangs of the Fire Snake.
   await expect(page.getByRole("heading", { name: "Elemental Disciplines" })).toBeVisible();
