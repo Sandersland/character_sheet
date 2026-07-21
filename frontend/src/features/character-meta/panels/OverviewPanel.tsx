@@ -3,7 +3,6 @@ import AllSkillsCard from "@/features/abilities/AllSkillsCard";
 import ConditionRollBanner from "@/features/conditions/ConditionRollBanner";
 import MobileQuickBar from "@/features/character-meta/MobileQuickBar";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
-import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import SpellSlotSummary from "@/features/spells/SpellSlotSummary";
@@ -14,8 +13,10 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 /**
  * Overview tab — abilities + saves full-width on top, then a 3fr/2fr grid (#1086):
  * left is the two-up all-18 skills + proficiencies; right is the XP · spell slots ·
- * features · advancements stack. Equipped gear moved to the Inventory tab. Saving
- * throws stay inside AbilityScoresPanel; full slot/spell management is on Magic.
+ * advancements stack. Equipped gear moved to the Inventory tab; class features
+ * moved to their own Class tab (#1169) — it was dwarfing this page on multiclass
+ * characters. Saving throws stay inside AbilityScoresPanel; full slot/spell
+ * management is on Magic.
  */
 export default function OverviewPanel({ character, reference, onUpdate }: SheetPanelProps) {
   return (
@@ -54,16 +55,6 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
           {character.spellcasting && (
             <Card title="Spell Slots" className="p-4">
               <SpellSlotSummary slots={character.spellcasting.slots} />
-            </Card>
-          )}
-
-          {character.class && (
-            <Card title="Class Features" className="p-4">
-              <ClassFeaturesSection
-                character={character}
-                referenceClasses={reference?.classes ?? []}
-                onUpdate={onUpdate}
-              />
             </Card>
           )}
 
