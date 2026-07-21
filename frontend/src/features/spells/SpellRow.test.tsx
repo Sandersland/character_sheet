@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import SpellRow from "@/features/spells/SpellRow";
@@ -27,19 +27,6 @@ const mockCantrip: Spell = {
   school: "evocation",
 };
 
-// Fireball with structured damage + upcast scaling (8d6 base, +1d6 per level above 3rd).
-const mockUpcastSpell: Spell = {
-  ...mockSpell,
-  id: "spell-3",
-  name: "Fireball",
-  level: 3,
-  effectKind: "damage",
-  effectDiceCount: 8,
-  effectDiceFaces: 6,
-  damageType: "fire",
-  upcastDicePerLevel: 1,
-};
-
 const UNBOUNDED = { count: 0, limit: null, atLimit: false };
 
 function defaultProps(spell: Spell, overrides = {}) {
@@ -48,7 +35,6 @@ function defaultProps(spell: Spell, overrides = {}) {
     characterLevel: 5,
     busy: false,
     budget: UNBOUNDED,
-    onCast: vi.fn(),
     onPrepare: vi.fn(),
     onForget: vi.fn(),
     availableSlots: [3],
@@ -84,23 +70,6 @@ describe("SpellRow", () => {
     expect(screen.getByLabelText("Always prepared")).toBeInTheDocument();
   });
 
-  it("calls onCast when Cast is clicked (single available slot)", async () => {
-    const user = userEvent.setup();
-    const onCast = vi.fn();
-    render(<ul><SpellRow {...defaultProps(mockSpell, { onCast, availableSlots: [3] })} /></ul>);
-    await user.click(screen.getByRole("button", { name: "Cast" }));
-    expect(onCast).toHaveBeenCalledOnce();
-  });
-
-  it("calls onCast directly for cantrips (no slot needed)", async () => {
-    const user = userEvent.setup();
-    const onCast = vi.fn();
-    render(<ul><SpellRow {...defaultProps(mockCantrip, { onCast, availableSlots: [] })} /></ul>);
-    await user.click(screen.getByRole("button", { name: "Cast" }));
-    // Cantrips call onCast with just the spell, no slot arg.
-    expect(onCast).toHaveBeenCalledWith(mockCantrip);
-  });
-
   it("calls onPrepare with the spell when the rune is toggled", async () => {
     const user = userEvent.setup();
     const onPrepare = vi.fn();
@@ -117,10 +86,55 @@ describe("SpellRow", () => {
     expect(onForget).toHaveBeenCalledWith(mockSpell);
   });
 
-  it("disables Cast and the prepare rune when busy", () => {
+  it("disables the prepare rune when busy", () => {
     render(<ul><SpellRow {...defaultProps(mockSpell, { busy: true })} /></ul>);
-    expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Prepare Fireball/i })).toBeDisabled();
+  });
+
+  describe("detail card (view/manage only, #1162)", () => {
+    it("opens the shared spell detail card when the name is clicked", async () => {
+      const user = userEvent.setup();
+      render(<ul><SpellRow {...defaultProps(mockSpell)} /></ul>);
+      await user.click(screen.getByRole("button", { name: "Open Fireball" }));
+      expect(screen.getByRole("heading", { name: "Fireball" })).toBeInTheDocument();
+      expect(
+        screen.getByText("A bright streak flashes from your pointing finger."),
+      ).toBeInTheDocument();
+    });
+
+    it("renders no Cast affordance anywhere on the row", () => {
+      render(<ul><SpellRow {...defaultProps(mockSpell)} /></ul>);
+      expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
+    });
+
+    it("the detail card's CTA prepares an unprepared spell, then closes", async () => {
+      const user = userEvent.setup();
+      const onPrepare = vi.fn();
+      render(<ul><SpellRow {...defaultProps(mockSpell, { onPrepare })} /></ul>);
+      await user.click(screen.getByRole("button", { name: "Open Fireball" }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Prepare Fireball" }));
+      expect(onPrepare).toHaveBeenCalledWith(mockSpell);
+      expect(screen.queryByRole("heading", { name: "Fireball" })).not.toBeInTheDocument();
+    });
+
+    it("the detail card's CTA reads Unprepare for an already-prepared spell", async () => {
+      const user = userEvent.setup();
+      const prepared: Spell = { ...mockSpell, prepared: true };
+      render(<ul><SpellRow {...defaultProps(prepared)} /></ul>);
+      await user.click(screen.getByRole("button", { name: "Open Fireball" }));
+      expect(
+        within(screen.getByRole("dialog")).getByRole("button", { name: "Unprepare Fireball" }),
+      ).toBeInTheDocument();
+    });
+
+    it("locks the detail card's CTA to a disabled 'Always prepared' for a cantrip", async () => {
+      const user = userEvent.setup();
+      render(<ul><SpellRow {...defaultProps(mockCantrip)} /></ul>);
+      await user.click(screen.getByRole("button", { name: "Open Fire Bolt" }));
+      expect(
+        within(screen.getByRole("dialog")).getByRole("button", { name: "Always prepared" }),
+      ).toBeDisabled();
+    });
   });
 
   describe("concentration badge", () => {
@@ -169,14 +183,6 @@ describe("SpellRow", () => {
       expect(screen.queryByRole("button", { name: /Remove Minor Illusion/ })).not.toBeInTheDocument();
     });
 
-    it("keeps Cast working", async () => {
-      const user = userEvent.setup();
-      const onCast = vi.fn();
-      render(<ul><SpellRow {...defaultProps(grantedCantrip, { onCast, availableSlots: [] })} /></ul>);
-      await user.click(screen.getByRole("button", { name: "Cast" }));
-      expect(onCast).toHaveBeenCalledWith(grantedCantrip);
-    });
-
     it("still shows the Remove ✕ for a normal (non-granted) spell", () => {
       render(<ul><SpellRow {...defaultProps(mockSpell)} /></ul>);
       expect(screen.getByRole("button", { name: /Remove Fireball/ })).toBeInTheDocument();
@@ -218,14 +224,6 @@ describe("SpellRow", () => {
       expect(screen.queryByRole("button", { name: /Remove Witch Bolt/ })).not.toBeInTheDocument();
     });
 
-    it("casts directly with the spell (no slot picker) even at level 1", async () => {
-      const user = userEvent.setup();
-      const onCast = vi.fn();
-      render(<ul><SpellRow {...defaultProps(itemSpell, { onCast, availableSlots: [] })} /></ul>);
-      await user.click(screen.getByRole("button", { name: "Cast" }));
-      expect(onCast).toHaveBeenCalledWith(itemSpell);
-    });
-
     it("shows 'at will' and never a uses count for an at-will item spell", () => {
       // Wire reality: JSON.stringify(Infinity) === null, so an at-will item's
       // numeric use counts arrive as 0/null, NOT Infinity. Gate must key off
@@ -236,17 +234,15 @@ describe("SpellRow", () => {
       };
       render(<ul><SpellRow {...defaultProps(atWill, { availableSlots: [] })} /></ul>);
       expect(screen.getByText("at will")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Cast" })).not.toBeDisabled();
     });
 
-    it("disables Cast and shows 'no uses' once the item resource is spent", () => {
+    it("shows 'no uses' once the item resource is spent", () => {
       const spent: Spell = {
         ...itemSpell,
         item: { ...itemSpell.item!, usesRemaining: 0, usesTotal: 1 },
       };
       render(<ul><SpellRow {...defaultProps(spent, { availableSlots: [] })} /></ul>);
       expect(screen.getByText("no uses")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
     });
 
     describe("charges-costed cast (#555)", () => {
@@ -259,77 +255,16 @@ describe("SpellRow", () => {
         render(<ul><SpellRow {...defaultProps(chargesSpell, { availableSlots: [] })} /></ul>);
         expect(screen.getByText("4/7")).toBeInTheDocument();
         expect(screen.getByText("3 charges")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Cast" })).not.toBeDisabled();
       });
 
-      it("disables Cast when remaining charges can't cover the cost (not just at 0)", () => {
+      it("shows 'no charges' when remaining can't cover the cost (not just at 0)", () => {
         const low: Spell = {
           ...chargesSpell,
           item: { ...chargesSpell.item!, usesRemaining: 2 },
         };
         render(<ul><SpellRow {...defaultProps(low, { availableSlots: [] })} /></ul>);
         expect(screen.getByText("no charges")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
       });
-    });
-  });
-
-  describe("upcast slot picker", () => {
-    it("opens a slot button for each available level when multiple slots exist", async () => {
-      const user = userEvent.setup();
-      render(
-        <ul>
-          <SpellRow {...defaultProps(mockUpcastSpell, { availableSlots: [3, 4, 5] })} />
-        </ul>,
-      );
-      // Multiple slots → Cast opens the picker rather than casting immediately.
-      await user.click(screen.getByRole("button", { name: "Cast" }));
-      expect(screen.getByRole("button", { name: /L3/ })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /L4/ })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /L5/ })).toBeInTheDocument();
-    });
-
-    it("marks upcast slots (above the spell's base level) with an ↑ indicator", async () => {
-      const user = userEvent.setup();
-      render(
-        <ul>
-          <SpellRow {...defaultProps(mockUpcastSpell, { availableSlots: [3, 4, 5] })} />
-        </ul>,
-      );
-      await user.click(screen.getByRole("button", { name: "Cast" }));
-      // Base level (3) is not an upcast → no ↑.
-      expect(screen.getByRole("button", { name: /L3/ })).not.toHaveTextContent("↑");
-      // Higher slots are upcasts → ↑.
-      expect(screen.getByRole("button", { name: /L4/ })).toHaveTextContent("↑");
-      expect(screen.getByRole("button", { name: /L5/ })).toHaveTextContent("↑");
-    });
-
-    it("shows the scaled effect preview on upcast buttons", async () => {
-      const user = userEvent.setup();
-      render(
-        <ul>
-          <SpellRow {...defaultProps(mockUpcastSpell, { availableSlots: [3, 4, 5] })} />
-        </ul>,
-      );
-      await user.click(screen.getByRole("button", { name: "Cast" }));
-      // effectPreview renders "<count>d<faces> <damageType>" (the damage type stands in for "damage").
-      // 8d6 base + 2 levels above 3rd × 1d6 = 10d6 at L5.
-      expect(screen.getByRole("button", { name: /L5/ })).toHaveTextContent("10d6 fire");
-      // L4 → 9d6.
-      expect(screen.getByRole("button", { name: /L4/ })).toHaveTextContent("9d6 fire");
-    });
-
-    it("calls onCast with the chosen upcast slot level", async () => {
-      const user = userEvent.setup();
-      const onCast = vi.fn();
-      render(
-        <ul>
-          <SpellRow {...defaultProps(mockUpcastSpell, { onCast, availableSlots: [3, 4, 5] })} />
-        </ul>,
-      );
-      await user.click(screen.getByRole("button", { name: "Cast" }));
-      await user.click(screen.getByRole("button", { name: /L5/ }));
-      expect(onCast).toHaveBeenCalledWith(mockUpcastSpell, 5);
     });
   });
 });

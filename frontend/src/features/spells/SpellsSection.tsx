@@ -53,7 +53,6 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
           budget={budget}
           busy={busy}
           concentratingOnEntryId={concentratingOn?.entryId ?? null}
-          onCast={handleCast}
           onPrepare={handlePrepare}
           onSwap={handleSwap}
           onForget={handleForget}
