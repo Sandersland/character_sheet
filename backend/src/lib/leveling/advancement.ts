@@ -544,8 +544,8 @@ const ADVANCEMENT_SELECT = {
   experiencePoints: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    // All entries (name + level) — the fs-slot cap sums entitlement across every
-    // class entry (#1137); the ASI cap still reads only the primary (position 0).
+    // All entries (name + level) — both the fs-slot cap (#1137) and the ASI/feat
+    // slot cap (#1073) sum entitlement per class entry, not just the primary.
     select: { name: true, level: true },
   },
 } satisfies Prisma.CharacterSelect;
