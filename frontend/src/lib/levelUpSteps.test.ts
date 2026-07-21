@@ -1,21 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ceremonyBlocked,
-  draftSatisfies,
-  railState,
-  stepKey,
-  stepLabel,
-  stepPosition,
-  type LevelUpDraft,
-} from "@/lib/levelUpSteps";
-import type { LevelUpPlanResponse, LevelUpStep } from "@/types/character";
-
-const PLAN: LevelUpStep[] = [
-  { kind: "hitPoints" },
-  { kind: "advancement", count: 1 },
-  { kind: "review" },
-];
+import { draftSatisfies, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
+import type { LevelUpStep } from "@/types/character";
 
 describe("stepKey", () => {
   it("is the kind for singleton steps", () => {
@@ -46,49 +32,6 @@ describe("stepLabel", () => {
     expect(stepLabel({ kind: "subclassChoice", meta: { key: "huntersPrey", label: "Hunter's Prey" } })).toBe(
       "Hunter's Prey",
     );
-  });
-});
-
-describe("railState", () => {
-  it("marks steps before the current key done, the current active, the rest pending", () => {
-    expect(railState(PLAN, "advancement")).toEqual(["done", "active", "pending"]);
-    expect(railState(PLAN, "hitPoints")).toEqual(["active", "pending", "pending"]);
-    expect(railState(PLAN, "review")).toEqual(["done", "done", "active"]);
-  });
-
-  it("falls back to the first step when the key is unknown (e.g. after a re-plan)", () => {
-    expect(railState(PLAN, "gone")).toEqual(["active", "pending", "pending"]);
-  });
-});
-
-describe("stepPosition", () => {
-  it("finds the index of the named step, falling back to 0 for an unknown key", () => {
-    expect(stepPosition(PLAN, "advancement")).toBe(1);
-    expect(stepPosition(PLAN, "review")).toBe(2);
-    expect(stepPosition(PLAN, "gone")).toBe(0);
-    expect(stepPosition([], "hitPoints")).toBe(0);
-  });
-});
-
-describe("ceremonyBlocked", () => {
-  function plan(steps: LevelUpStep[], isPrimary: boolean): LevelUpPlanResponse {
-    return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps, grantedSpells: [] };
-  }
-
-  it("blocks a non-primary plan containing a resource-backed step (#1065)", () => {
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], false))).toBe(true);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "disciplines", count: 1 }], false))).toBe(true);
-    expect(ceremonyBlocked(plan([{ kind: "toolProficiency", count: 1 }], false))).toBe(true);
-    expect(
-      ceremonyBlocked(plan([{ kind: "subclassChoice", count: 1, meta: { key: "huntersPrey", label: "Hunter's Prey" } }], false)),
-    ).toBe(true);
-  });
-
-  it("does not block subclass/fightingStyle steps (entry-aware since #1065), primary plans, or a missing plan", () => {
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], false))).toBe(false);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyleFeat", count: 1 }], false))).toBe(false);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], true))).toBe(false);
-    expect(ceremonyBlocked(null)).toBe(false);
   });
 });
 

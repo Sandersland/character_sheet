@@ -41,6 +41,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    step: "identity",
     ...overrides,
   };
 }
@@ -62,6 +63,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolChoices: [],
     toolChoiceCount: 0,
     level1SpellPicks: null,
+    primaryAbility: [],
     ...overrides,
   };
 }

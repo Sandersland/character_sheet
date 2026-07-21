@@ -49,9 +49,7 @@ export interface LevelUpContext {
   planCharacter: LevelUpPlanCharacter;
   targetEntry: TargetClassEntry;
   chosenSubclassName: string | null;
-  // applyResourceOpInTx derives choice caps from the position-0 entry only, so
-  // resource-backed steps are only legal when the target IS the primary entry
-  // (the subclass/fightingStyle seams are entry-aware since #1065).
+  /** Display-only (#1177) — surfaced on the plan route's `target.isPrimary`. */
   targetIsPrimary: boolean;
 }
 
@@ -192,14 +190,6 @@ const LEVEL_UP_OP_APPLIERS: Record<
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),
 };
 
-// applyResourceOpInTx derives choice caps from the primary entry only, and the
-// resource-pool read-clamp mirrors that — a non-primary pick would be written
-// uncapped and then hidden on read, so reject these steps up front until that
-// seam is entry-aware.
-const RESOURCE_BACKED: ReadonlySet<LevelUpStepKind> = new Set([
-  "maneuvers", "disciplines", "toolProficiency", "subclassChoice",
-]);
-
 // #1131: cantrip picks must reference level-0 spells and leveled picks level-1+.
 // One catalog read validates both id lists before the tx opens (the count check
 // in validateLevelUpSubmission can't see spell levels). Unknown ids fall through
@@ -238,17 +228,11 @@ export async function applyLevelUpTransaction(
   submission: LevelUpSubmission,
   userId: string,
 ): Promise<void> {
-  const { planCharacter, targetEntry, chosenSubclassName, targetIsPrimary } =
+  const { planCharacter, targetEntry, chosenSubclassName } =
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
   await assertPickSpellLevels(submission);
-
-  if (!targetIsPrimary && steps.some((s) => RESOURCE_BACKED.has(s.kind))) {
-    throw new InvalidLevelUpError(
-      "Subclass features that grant maneuvers, disciplines, or other picks are not supported for a non-primary class yet",
-    );
-  }
 
   const ops = buildLevelUpOps(steps, submission);
 

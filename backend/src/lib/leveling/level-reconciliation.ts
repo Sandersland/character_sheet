@@ -47,7 +47,7 @@ import {
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
 import { advancementSlotsForLevel, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
-import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { clampPreparedToLimit, normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
@@ -319,8 +319,10 @@ interface KnownListConfig {
 // Shared preamble for the resources-based reconcilers (reconcileKnownList and
 // reconcileSubclassChoices): fetch the row, normalize the mutable state, and
 // derive class info at the new level. Returns null when the row is gone
-// (caller returns early). deriveResources is pure/in-memory, so deriving even
-// when the caller will bail on an empty list is negligible.
+// (caller returns early). Every entry (not just the primary) + its level is
+// selected so deriveEntryScopedResources can derive each entry's own choice-cap
+// fields (#1177) — deriveEntryScopedResources is pure/in-memory, so deriving
+// even when the caller will bail on an empty list is negligible.
 async function loadResourcesReconcileState(
   ctx: ReconcileContext,
 ): Promise<{ state: ResourcesMutableState; derived: DerivedClassInfo | null } | null> {
@@ -333,8 +335,7 @@ async function loadResourcesReconcileState(
       abilityScores: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
+        select: { name: true, subclass: true, level: true },
       },
     },
   });
@@ -343,14 +344,7 @@ async function loadResourcesReconcileState(
   const state = normalizeResourcesMutable(row.resources);
   const abilityScores = row.abilityScores as Record<string, number>;
   const profBonus = proficiencyBonusForLevel(newDerivedLevel);
-  const primaryEntry = row.classEntries[0];
-  const derived = deriveResources(
-    primaryEntry?.name ?? "",
-    primaryEntry?.subclass ?? undefined,
-    newDerivedLevel,
-    abilityScores,
-    profBonus,
-  );
+  const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus);
   return { state, derived };
 }
 

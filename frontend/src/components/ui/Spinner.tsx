@@ -10,7 +10,7 @@ interface SpinnerProps {
 export default function Spinner({ variant = "inline", className }: SpinnerProps) {
   const page = variant === "page";
   const wrapper = page
-    ? "flex min-h-screen items-center justify-center bg-parchment-100"
+    ? "flex min-h-64 flex-1 items-center justify-center bg-parchment-100"
     : "flex items-center justify-center py-4";
 
   return (

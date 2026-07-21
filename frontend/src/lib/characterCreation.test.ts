@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildCreatePayload,
-  creationMissing,
   deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
@@ -30,6 +29,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolChoices: [],
     toolChoiceCount: 0,
     level1SpellPicks: null,
+    primaryAbility: [],
     ...overrides,
   };
 }
@@ -88,6 +88,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    step: "identity",
     ...overrides,
   };
 }
@@ -176,30 +177,6 @@ describe("derivePreview", () => {
   });
 });
 
-describe("creationMissing", () => {
-  it("lists all unmet requirements for an empty draft", () => {
-    const draft = makeDraft({});
-    expect(creationMissing(draft, resolveSelections(reference, draft))).toEqual([
-      "Name",
-      "Alignment",
-      "Race",
-      "Class",
-      "Background",
-    ]);
-  });
-
-  it("is empty for a complete draft", () => {
-    const draft = makeDraft({
-      name: "Lidda",
-      alignment: "Neutral Good",
-      race: "Elf",
-      className: "Rogue",
-      background: "Sage",
-    });
-    expect(creationMissing(draft, resolveSelections(reference, draft))).toEqual([]);
-  });
-});
-
 describe("deriveBackgroundBonuses (#1130)", () => {
   it("is inert for a custom background", () => {
     const draft = makeDraft({ background: "Criminal", useCustomBackground: true });
@@ -257,33 +234,6 @@ describe("derivePreview with background bonuses", () => {
   });
 });
 
-describe("creationMissing with background bonuses", () => {
-  it("blocks save until a specced background's spread is complete", () => {
-    const draft = makeDraft({
-      name: "Lidda",
-      alignment: "Neutral Good",
-      race: "Elf",
-      className: "Rogue",
-      background: "Criminal",
-    });
-    expect(creationMissing(draft, resolveSelections(reference, draft))).toContain("Background ability scores");
-
-    const assigned = makeDraft({ ...draft, backgroundAbilities: { dexterity: 2, constitution: 1 } });
-    expect(creationMissing(assigned, resolveSelections(reference, assigned))).not.toContain("Background ability scores");
-  });
-
-  it("does not list the spread for a spec-less background", () => {
-    const draft = makeDraft({
-      name: "Lidda",
-      alignment: "Neutral Good",
-      race: "Elf",
-      className: "Rogue",
-      background: "Sage",
-    });
-    expect(creationMissing(draft, resolveSelections(reference, draft))).toEqual([]);
-  });
-});
-
 describe("buildCreatePayload", () => {
   it("sends backgroundAbilities only when the spread is complete", () => {
     const draft = makeDraft({ name: "X", className: "Rogue", background: "Criminal", backgroundAbilities: { dexterity: 2, intelligence: 1 } });
@@ -334,24 +284,6 @@ describe("buildCreatePayload", () => {
 describe("creation spells (#1131)", () => {
   const caster = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4 } });
   const casterSelections = { race: undefined, class: caster, background: undefined };
-  const completeCaster = {
-    name: "Mo", alignment: "Neutral Good", race: "Elf", className: "Wizard", background: "Sage",
-  };
-
-  it("creationMissing blocks an incomplete caster's spell picks", () => {
-    const draft = makeDraft({ ...completeCaster, cantripIds: ["c1"], spellIds: [] });
-    expect(creationMissing(draft, casterSelections)).toEqual(["Cantrips: choose 3", "Spells: choose 4"]);
-  });
-
-  it("creationMissing passes a complete caster", () => {
-    const draft = makeDraft({ ...completeCaster, cantripIds: ["c1", "c2", "c3"], spellIds: ["s1", "s2", "s3", "s4"] });
-    expect(creationMissing(draft, casterSelections)).toEqual([]);
-  });
-
-  it("creationMissing never blocks a non-caster on spells", () => {
-    const draft = makeDraft({ name: "F", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Sage" });
-    expect(creationMissing(draft, resolveSelections(reference, draft))).toEqual([]);
-  });
 
   it("buildCreatePayload includes spells for a caster", () => {
     const draft = makeDraft({ name: "Mo", className: "Wizard", cantripIds: ["c1"], spellIds: ["s1"] });

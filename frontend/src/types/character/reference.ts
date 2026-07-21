@@ -100,6 +100,8 @@ export interface ClassOption {
   toolChoiceCount: number;
   /** #1131: level-1 creation pick counts (SRD 5.2); null for a non-caster. */
   level1SpellPicks: { cantrips: number; spells: number } | null;
+  /** #1161: PHB'24 primary ability/abilities the creation panel recommends; [] for homebrew. */
+  primaryAbility: AbilityName[];
 }
 
 /** A background's Origin feat (PHB'24), served by GET /api/reference. */

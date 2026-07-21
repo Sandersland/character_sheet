@@ -8,7 +8,7 @@ import { createCharacter, fetchItems, fetchReference, fetchSpells } from "@/api/
 import type { ReferenceData } from "@/types/character";
 
 // Real: useCharacterDraft, useReferenceData, the ability/skill/tool DOM. Mock the
-// router navigate, the API client, and BackendStatus (skips its health side-effect).
+// router navigate and the API client.
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -22,8 +22,6 @@ vi.mock("@/api/client", () => ({
   fetchSpells: vi.fn(),
   createCharacter: vi.fn(),
 }));
-
-vi.mock("@/features/character-meta/BackendStatus", () => ({ default: () => null }));
 
 const mockFetchReference = vi.mocked(fetchReference);
 const mockFetchItems = vi.mocked(fetchItems);
@@ -55,6 +53,7 @@ const referenceFixture: ReferenceData = {
       toolChoices: ["Lute", "Drum", "Flute"],
       toolChoiceCount: 2,
       level1SpellPicks: { cantrips: 1, spells: 1 },
+      primaryAbility: ["charisma"],
     },
     {
       id: "class-fighter",
@@ -72,6 +71,7 @@ const referenceFixture: ReferenceData = {
       toolChoices: [],
       toolChoiceCount: 0,
       level1SpellPicks: null,
+      primaryAbility: ["strength", "dexterity"],
     },
   ],
   backgrounds: [
@@ -114,32 +114,58 @@ function renderPage() {
   );
 }
 
-describe("CharacterCreatePage (#253)", () => {
-  it("builds the create payload from the form and navigates on save", async () => {
-    const user = userEvent.setup();
+const user = () => userEvent.setup();
+
+function railLabels(): (string | null)[] {
+  return screen.getAllByRole("listitem").map((li) => li.getAttribute("aria-label"));
+}
+
+async function continueStep(u: ReturnType<typeof userEvent.setup>) {
+  await u.click(screen.getByRole("button", { name: /continue/i }));
+}
+
+async function fillIdentity(
+  u: ReturnType<typeof userEvent.setup>,
+  { className = "Bard", background = "Sage" } = {},
+) {
+  await u.type(await screen.findByLabelText(/name/i), "Alric");
+  await u.selectOptions(screen.getByLabelText(/alignment/i), "Lawful Good");
+  await u.selectOptions(screen.getByLabelText(/race/i), "Human");
+  await u.selectOptions(screen.getByLabelText(/class/i), className);
+  await u.selectOptions(screen.getByLabelText("Background"), background);
+}
+
+describe("CharacterCreatePage (#1176 ceremony)", () => {
+  it("walks the rail and builds the create payload, navigating on confirm", async () => {
+    const u = user();
     renderPage();
 
-    const nameInput = await screen.findByLabelText(/name/i);
-    expect(screen.getByRole("button", { name: "Save Character" })).toBeDisabled();
+    // Identity: Continue is disabled until the five fields are set.
+    await screen.findByLabelText(/name/i);
+    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
-    await user.type(nameInput, "Alric ");
-    await user.selectOptions(screen.getByLabelText(/alignment/i), "Lawful Good");
-    await user.selectOptions(screen.getByLabelText(/race/i), "Human");
-    await user.selectOptions(screen.getByLabelText(/class/i), "Bard");
-    await user.selectOptions(screen.getByLabelText("Background"), "Sage");
+    await fillIdentity(u, { className: "Bard", background: "Sage" });
+    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
 
-    await user.click(screen.getByRole("checkbox", { name: "Acrobatics" }));
-    await user.click(screen.getByRole("checkbox", { name: "Arcana" }));
-    await user.click(screen.getByRole("checkbox", { name: "Lute" }));
-    await user.click(screen.getByRole("checkbox", { name: "Drum" }));
+    await continueStep(u); // → Abilities
+    await continueStep(u); // → Skills & Tools
 
-    // #1131: Bard casts at level 1 — pick its one cantrip + one spell.
-    await user.click(await screen.findByRole("checkbox", { name: /Vicious Mockery/ }));
-    await user.click(screen.getByRole("checkbox", { name: /Charm Person/ }));
+    await u.click(screen.getByRole("checkbox", { name: "Acrobatics" }));
+    await u.click(screen.getByRole("checkbox", { name: "Arcana" }));
+    await u.click(screen.getByRole("checkbox", { name: "Lute" }));
+    await u.click(screen.getByRole("checkbox", { name: "Drum" }));
+    await continueStep(u); // → Spells
 
-    const saveButton = screen.getByRole("button", { name: "Save Character" });
-    expect(saveButton).toBeEnabled();
-    await user.click(saveButton);
+    // Spells step (#1160): add straight from the row pills.
+    await u.click(await screen.findByRole("button", { name: "Add Vicious Mockery" }));
+    await u.click(screen.getByRole("button", { name: "Add Charm Person" }));
+    await continueStep(u); // → Equipment
+    await continueStep(u); // → Review
+
+    // Nothing is created until Review's confirm.
+    expect(mockCreateCharacter).not.toHaveBeenCalled();
+
+    await u.click(screen.getByRole("button", { name: /create character/i }));
 
     await waitFor(() => expect(mockCreateCharacter).toHaveBeenCalledTimes(1));
     expect(mockCreateCharacter).toHaveBeenCalledWith({
@@ -163,69 +189,68 @@ describe("CharacterCreatePage (#253)", () => {
       spells: { cantripIds: ["sp-mockery"], spellIds: ["sp-charm"] },
     });
 
-    await waitFor(() =>
-      expect(navigateMock).toHaveBeenCalledWith("/characters/new-1", { replace: true }),
-    );
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/characters/new-1", { replace: true }));
   });
 
-  it("shows the Spells section for a level-1 caster (#1131)", async () => {
-    const user = userEvent.setup();
+  it("shows a Spells step in the rail for a level-1 caster (#1131)", async () => {
+    const u = user();
     renderPage();
-    await user.selectOptions(await screen.findByLabelText(/class/i), "Bard");
-    expect(await screen.findByRole("heading", { name: "Spells" })).toBeInTheDocument();
+    await u.selectOptions(await screen.findByLabelText(/class/i), "Bard");
+    expect(railLabels()).toContain("Step 4: Spells");
   });
 
-  it("hides the Spells section for a non-caster (#1131)", async () => {
-    const user = userEvent.setup();
+  it("has no Spells step in the rail for a non-caster (#1131)", async () => {
+    const u = user();
     renderPage();
-    await user.selectOptions(await screen.findByLabelText(/class/i), "Fighter");
-    expect(screen.queryByRole("heading", { name: "Spells" })).not.toBeInTheDocument();
+    await u.selectOptions(await screen.findByLabelText(/class/i), "Fighter");
+    expect(railLabels().some((l) => l?.includes("Spells"))).toBe(false);
   });
 
-  it("surfaces the ability spread + origin feat for a specced background and hides it on reset (#1130)", async () => {
-    const user = userEvent.setup();
+  it("surfaces the ability spread + origin feat on the Abilities step and hides it on reset (#1130)", async () => {
+    const u = user();
     renderPage();
-    await screen.findByLabelText(/name/i);
+    await fillIdentity(u, { background: "Criminal" });
+    await continueStep(u); // → Abilities
 
-    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
     expect(screen.getByRole("button", { name: "+2 / +1" })).toBeInTheDocument();
     expect(screen.getByText(/Origin feat: Alert/i)).toBeInTheDocument();
 
-    // Switching to a spec-less background removes the section (draft reset).
-    await user.selectOptions(screen.getByLabelText("Background"), "Sage");
+    // Back to Identity, switch to a spec-less background — the spread is gone.
+    await u.click(screen.getByRole("button", { name: /back/i }));
+    await u.selectOptions(screen.getByLabelText("Background"), "Sage");
+    await continueStep(u); // → Abilities
     expect(screen.queryByRole("button", { name: "+2 / +1" })).not.toBeInTheDocument();
   });
 
   it("resets the spread mode when switching between two specced backgrounds (#1130)", async () => {
-    const user = userEvent.setup();
+    const u = user();
     renderPage();
-    await screen.findByLabelText(/name/i);
+    await fillIdentity(u, { background: "Criminal" });
+    await continueStep(u); // → Abilities
 
-    // Pick Criminal, switch to the +1/+1/+1 mode (which looks complete).
-    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
-    await user.click(screen.getByRole("button", { name: "+1 / +1 / +1" }));
+    await u.click(screen.getByRole("button", { name: "+1 / +1 / +1" }));
     expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "true");
 
-    // Switching to another specced background must remount the picker back to the
-    // default +2/+1 mode — not leave the stale "+1/+1/+1" selection showing.
-    await user.selectOptions(screen.getByLabelText("Background"), "Soldier");
+    await u.click(screen.getByRole("button", { name: /back/i }));
+    await u.selectOptions(screen.getByLabelText("Background"), "Soldier");
+    await continueStep(u); // → Abilities
+
     expect(screen.getByText("Origin feat: Savage Attacker")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "+2 / +1" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("keeps the +2/+1 selections when the already-active mode button is clicked (#1130)", async () => {
-    const user = userEvent.setup();
+    const u = user();
     renderPage();
-    await screen.findByLabelText(/name/i);
+    await fillIdentity(u, { background: "Criminal" });
+    await continueStep(u); // → Abilities
 
-    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
-    await user.selectOptions(screen.getByLabelText(/\+2 to/), "dexterity");
-    await user.selectOptions(screen.getByLabelText(/\+1 to/), "intelligence");
+    await u.click(screen.getByRole("radio", { name: "+2 to Dexterity" }));
+    await u.click(screen.getByRole("radio", { name: "+1 to Intelligence" }));
 
-    // Re-clicking the already-active "+2 / +1" mode must be a no-op, not a wipe.
-    await user.click(screen.getByRole("button", { name: "+2 / +1" }));
-    expect((screen.getByLabelText(/\+2 to/) as HTMLSelectElement).value).toBe("dexterity");
-    expect((screen.getByLabelText(/\+1 to/) as HTMLSelectElement).value).toBe("intelligence");
+    await u.click(screen.getByRole("button", { name: "+2 / +1" }));
+    expect((screen.getByRole("radio", { name: "+2 to Dexterity" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "+1 to Intelligence" }) as HTMLInputElement).checked).toBe(true);
   });
 });

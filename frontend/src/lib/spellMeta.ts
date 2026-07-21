@@ -10,7 +10,7 @@
 
 import { abilityLabel, abilityModifier } from "@/lib/abilities";
 import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
-import type { AbilityName, Character, Session, Spell, SpellSchool } from "@/types/character";
+import type { AbilityName, Character, Session, Spell, SpellComponents, SpellSchool } from "@/types/character";
 
 /** Title-case display label for a spell school (never render the raw key). */
 const SCHOOL_LABELS: Record<SpellSchool, string> = {
@@ -168,7 +168,7 @@ function effectKindLabel(spell: Spell): string {
  * Component letters for the "V S M" components line.
  * Returns null when spell.components is absent (legacy spells).
  */
-export function componentsLabel(spell: Spell): string | null {
+export function componentsLabel(spell: { components?: SpellComponents | null }): string | null {
   if (!spell.components) return null;
   const parts: string[] = [];
   if (spell.components.verbal) parts.push("V");
@@ -216,7 +216,9 @@ export function saveDcLabel(spell: Spell, spellSaveDC: number): string | null {
 /**
  * Upcast hint line (e.g. "+1d6 per level above 3rd").
  */
-export function upcastHint(spell: Spell): string | null {
+export function upcastHint(
+  spell: Pick<Spell, "level" | "upcastDicePerLevel" | "effectDiceFaces">,
+): string | null {
   if (spell.level === 0 || !spell.upcastDicePerLevel || !spell.effectDiceFaces) return null;
   return `Upcast: +${spell.upcastDicePerLevel}d${spell.effectDiceFaces} per slot level above ${spell.level}`;
 }

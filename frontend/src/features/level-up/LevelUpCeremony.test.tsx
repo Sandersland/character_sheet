@@ -136,20 +136,17 @@ describe("LevelUpCeremony", () => {
     expect(screen.queryByText("SHEET")).not.toBeInTheDocument();
   });
 
-  it("renders the #1065 blocked notice (no stepper) for a non-primary resource-backed plan", async () => {
-    planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], {
-        isPrimary: false,
-        subclass: "Battle Master",
-      }),
-    );
+  it("scrolls the step body within a viewport-locked card, footer outside the scroller (#1171)", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
     renderCeremony();
-    const user = userEvent.setup();
 
-    expect(await screen.findByText(/can't be resolved for a non-primary class yet/i)).toBeInTheDocument();
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /back to sheet/i }));
-    expect(screen.getByText("SHEET")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    const scroller = document.querySelector(".overflow-y-auto");
+    expect(scroller).not.toBeNull();
+    expect(scroller?.className).toContain("min-h-0");
+    expect(scroller?.className).toContain("flex-1");
+    const footer = screen.getByRole("button", { name: /cancel/i }).closest("footer");
+    expect(scroller?.contains(footer)).toBe(false);
   });
 
   it("has no axe violations", async () => {
