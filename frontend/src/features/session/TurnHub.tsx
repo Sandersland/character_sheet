@@ -23,6 +23,7 @@ import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
 import LoadoutRefundStrip from "@/features/session/LoadoutRefundStrip";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
+import CastTallyBanner from "@/features/session/CastTallyBanner";
 import TurnSummaryBanner from "@/features/session/TurnSummaryBanner";
 import { useTallyResolve } from "@/features/session/useTallyResolve";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
@@ -373,10 +374,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     attack,
     bonusAttack,
     attackTally,
+    castTally,
     twfAvailable,
     consumeBonusAction,
     consumeReaction,
     clearAttackTally,
+    clearCastTally,
     history,
   } = turnState;
 
@@ -515,6 +518,9 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       {!activeResolution && (
         <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} resolve={tallyResolve} />
       )}
+      {/* "Spells cast" tally (#1164) — the cast sheet's post-cast receipts,
+          same shelf as the attack summary, once the sheet is closed. */}
+      {!activeResolution && <CastTallyBanner rows={castTally} onDismiss={clearCastTally} />}
     </>
   );
   const trailingAfterSurge = (

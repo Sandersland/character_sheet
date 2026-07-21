@@ -1,10 +1,13 @@
-// Pure view logic for the shared spell picker (#1160): row tri-state, the budget
-// headline, and the row/card display lines. No JSX. Wording is single-sourced —
-// effectPillLabel and componentsLine delegate to the addSpell/spellMeta helpers
-// so the picker never re-encodes it.
-import { abilityAbbr } from "@/lib/abilities";
+// Pure view logic for the shared spell picker (#1160) and the in-session cast
+// sheet (#1163/#1164): row tri-state, the budget headline, and the row/card
+// display lines. No JSX. Wording is single-sourced — effectPillLabel and
+// componentsLine delegate to the addSpell/spellMeta helpers so the picker never
+// re-encodes it.
+import { abilityAbbr, formatModifier } from "@/lib/abilities";
 import { catalogEffectLine } from "@/lib/addSpell";
+import { damagePillClass } from "@/lib/spellFlavor";
 import { componentsLabel, levelLabel } from "@/lib/spellMeta";
+import type { EconomySlot } from "@/lib/spellPicker";
 import type { SpellComponents } from "@/types/character";
 
 export type SpellPickRowState = "known" | "selected" | "select";
@@ -88,4 +91,76 @@ export function spellResolutionLabel(spell: {
   }
   if (spell.attackType === "attack") return "Spell attack";
   return null;
+}
+
+/** The cast sheet's "what happens" line (#1163): roll type + bonus/DC as plain
+ *  text (`lead`/`tail`), dice + type as a separately-tinted pill (`dice`/
+ *  `diceTint`) so the row can render the dice clause as a badge. No averages —
+ *  callers pass the already-rolled-shape preview string (e.g. "3d6 fire"). */
+export interface ExpectedRoll {
+  lead: string;
+  dice: string | null;
+  diceTint: string;
+  tail: string;
+}
+
+export function expectedRollView(
+  spell: {
+    attackType?: "attack" | "save" | null;
+    saveEffect?: "half" | "none" | null;
+    effectKind?: "damage" | "heal" | "buff" | null;
+    damageType?: string | null;
+  },
+  opts: { dcLabel: string | null; spellAttackBonus: number; preview: string | null },
+): ExpectedRoll {
+  const diceTint =
+    spell.effectKind === "heal" ? "bg-vitality-100 text-vitality-800" : damagePillClass(spell.damageType);
+
+  if (spell.attackType === "attack") {
+    return { lead: `Spell attack ${formatModifier(opts.spellAttackBonus)}`, dice: opts.preview, diceTint, tail: "" };
+  }
+  if (spell.attackType === "save" && opts.dcLabel) {
+    return {
+      lead: `Targets make a ${opts.dcLabel}`,
+      dice: opts.preview,
+      diceTint,
+      tail: spell.saveEffect === "half" ? "half on success" : "",
+    };
+  }
+  if (opts.preview) {
+    return {
+      lead: spell.effectKind === "heal" ? "Heals automatically" : "Hits automatically",
+      dice: opts.preview,
+      diceTint,
+      tail: "",
+    };
+  }
+  return { lead: "No roll", dice: null, diceTint: "", tail: "" };
+}
+
+// "Action spent. Bonus action & movement remain." — the post-cast economy
+// acknowledgment (#1164): what THIS slot cost, and what's left to spend.
+const ECONOMY_SPENT_LINE: Record<EconomySlot, string> = {
+  action: "Action spent. Bonus action & movement remain.",
+  bonusAction: "Bonus action spent. Action & movement remain.",
+  reaction: "Reaction spent.",
+};
+
+export function economySpentLine(slot: EconomySlot): string {
+  return ECONOMY_SPENT_LINE[slot];
+}
+
+/** One line of the turn card's cast tally (#1164): spell + level + total +
+ *  damage type, with the save/DC "announce" line folded on when present. */
+export function castTallyLine(row: {
+  spellName: string;
+  level: number;
+  total?: number;
+  damageType?: string | null;
+  announce?: string | null;
+}): string {
+  const levelPart = row.level > 0 ? ` (L${row.level})` : "";
+  const totalPart = row.total !== undefined ? ` — ${row.total}${row.damageType ? ` ${row.damageType}` : ""}` : "";
+  const announcePart = row.announce ? ` · announce ${row.announce}` : "";
+  return `${row.spellName}${levelPart}${totalPart}${announcePart}`;
 }

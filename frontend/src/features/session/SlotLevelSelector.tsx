@@ -1,4 +1,8 @@
-/** Upcast slot selector: a level strip when several slots are available, else a label. */
+/**
+ * Upcast slot picker (#1163): the level already reads off the section header,
+ * so this renders nothing in the single-slot case — only when a spell has
+ * more than one legal slot does the player need to choose one.
+ */
 
 import type { Spell } from "@/types/character";
 
@@ -6,7 +10,6 @@ interface SlotLevelSelectorProps {
   spell: Spell;
   availableSlots: number[];
   spellSlot: number | undefined;
-  usesArcanum: boolean;
   onSelect: (level: number) => void;
 }
 
@@ -14,18 +17,9 @@ export default function SlotLevelSelector({
   spell,
   availableSlots,
   spellSlot,
-  usesArcanum,
   onSelect,
 }: SlotLevelSelectorProps) {
-  if (availableSlots.length === 0) return null;
-
-  if (availableSlots.length === 1) {
-    return (
-      <span className="text-[11px] text-parchment-600">
-        {usesArcanum ? "Mystic Arcanum" : `Slot: L${availableSlots[0]}`}
-      </span>
-    );
-  }
+  if (availableSlots.length <= 1) return null;
 
   return (
     <div className="flex items-center gap-1.5">

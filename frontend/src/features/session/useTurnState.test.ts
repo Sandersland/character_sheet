@@ -925,6 +925,55 @@ describe("spell commits", () => {
   });
 });
 
+// #1164: the turn card's "Spells cast" tally — a cast's receipt, appended by
+// useSpellPicker's onCastSettled once a cast resolves.
+describe("cast tally", () => {
+  function inActiveTurn() {
+    const hook = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { hook.result.current.startCombat(); });
+    act(() => { hook.result.current.startTurn(); });
+    return hook;
+  }
+
+  it("recordSpellCast appends a row with a minted id", () => {
+    const { result } = inActiveTurn();
+    act(() => {
+      result.current.recordSpellCast({ spellName: "Burning Hands", level: 1, total: 14, damageType: "fire" });
+    });
+    expect(result.current.castTally).toHaveLength(1);
+    expect(result.current.castTally[0]).toMatchObject({ spellName: "Burning Hands", level: 1, total: 14 });
+    expect(result.current.castTally[0].id).toEqual(expect.any(String));
+  });
+
+  it("clearCastTally empties the tally", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.recordSpellCast({ spellName: "Fire Bolt", level: 0 }); });
+    act(() => { result.current.clearCastTally(); });
+    expect(result.current.castTally).toHaveLength(0);
+  });
+
+  it("startTurn clears the previous turn's cast tally", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.recordSpellCast({ spellName: "Fire Bolt", level: 0 }); });
+    act(() => { result.current.endTurn(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.castTally).toHaveLength(0);
+  });
+
+  it("does not push an undo snapshot — undo leaves the cast receipt in place", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.commitActionSpell(1); });
+    act(() => { result.current.recordSpellCast({ spellName: "Burning Hands", level: 1, total: 14 }); });
+    expect(result.current.actionsRemaining).toBe(0);
+    act(() => { result.current.undo(); });
+    // Undo restores the pre-commitActionSpell economy snapshot (the last CONSUMING
+    // action)...
+    expect(result.current.actionsRemaining).toBe(1);
+    // ...but the cast tally isn't part of that snapshot, so the receipt survives.
+    expect(result.current.castTally).toHaveLength(1);
+  });
+});
+
 describe("localStorage persistence", () => {
   const STORAGE_KEY = `cs:turn:${SESSION_ID}`;
 
