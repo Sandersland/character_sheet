@@ -210,6 +210,7 @@ function overlayCapFields(derived: DerivedClassInfo | null, info: DerivedClassIn
     if (info[field] !== undefined) target[field] = info[field];
   }
   if (info.subclassChoices) {
+    // Concat can't collide: choice keys are subclass-specific and each class appears at most once per character.
     target.subclassChoices = [...(target.subclassChoices ?? []), ...info.subclassChoices];
   }
   return target;
@@ -246,8 +247,12 @@ export function deriveEntryScopedResources(
   // re-derives the PRIMARY entry too (at its own effective level), and concat
   // would double-count a primary-only subclass's choices otherwise. The scalar
   // CAP_FIELDS are safe to carry over as-is — the loop's defined-wins overlay
-  // replaces (never adds to) them.
-  let derived: DerivedClassInfo | null = base ? { ...base, subclassChoices: undefined } : null;
+  // replaces (never adds to) them. resources/features are cloned (not just
+  // spread) so mutating the returned object can never leak back into base.
+  let derived: DerivedClassInfo | null = base
+    ? { ...base, resources: [...base.resources], features: [...base.features], subclassChoices: undefined }
+    : null;
+  // Fallback for characters with no discipline-granting entry; discipline ops on them have no monk level to key off.
   let disciplineLevel = totalLevel;
 
   for (const entry of classEntries) {

@@ -99,6 +99,57 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
     });
   });
 
+  describe("wizard 7 (primary) / Battle Master fighter 3 (secondary) — tool proficiency cap", () => {
+    const CHAR_ID = "test-1177-mc-toolprof";
+    const resourcesUrl = `/api/characters/${CHAR_ID}/resources/transactions`;
+
+    beforeEach(async () => {
+      const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+      const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+      await prisma.character.create({
+        data: {
+          ...BASE,
+          id: CHAR_ID,
+          name: "Res Caps MC ToolProf",
+          ownerId: OWNER_ID,
+          experiencePoints: 64000, // total level 10 (wizard 7 + fighter 3), no pending level-up
+          hitDice: { total: 10, die: "d8", spent: 0 },
+          abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 16, wisdom: 10, charisma: 10 },
+          spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+          resources: Prisma.JsonNull,
+          classEntries: {
+            create: [
+              { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 7 },
+              { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 3 },
+            ],
+          },
+        },
+      });
+    });
+
+    afterEach(async () => {
+      await prisma.character.deleteMany({ where: { id: CHAR_ID } });
+    });
+
+    // Closes a coverage gap (not a red-first case: the write-side cap check
+    // already goes through the same deriveEntryScopedResources/overlayCapFields
+    // path the maneuver test above exercises, so this passes on the current fix).
+    it("caps learnToolProficiency at the SECONDARY fighter entry's Student of War count (1)", async () => {
+      const first = await agent()
+        .post(resourcesUrl)
+        .send({ operations: [{ type: "learnToolProficiency", name: "Smith's Tools" }] });
+      expect(first.status).toBe(200);
+
+      const second = await agent()
+        .post(resourcesUrl)
+        .send({ operations: [{ type: "learnToolProficiency", name: "Woodcarver's Tools" }] });
+      expect(second.status).toBe(400);
+
+      const final = await agent().get(`/api/characters/${CHAR_ID}`);
+      expect(final.body.resources.toolProficienciesKnown).toHaveLength(1);
+    });
+  });
+
   describe("fighter 7 (primary) / Way of the Four Elements monk 3 (secondary) — discipline level gate", () => {
     const CHAR_ID = "test-1177-mc-disciplines";
     const resourcesUrl = `/api/characters/${CHAR_ID}/resources/transactions`;
