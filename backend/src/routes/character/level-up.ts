@@ -112,7 +112,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
         isPrimary: context.targetIsPrimary,
       },
       steps,
-      grantedSpells: gained.map((s) => ({ name: s.name, level: s.level })),
+      grantedSpells: gained.map((s) => ({ name: s.name, level: s.level, school: s.school })),
     });
   } catch (error) {
     if (error instanceof InvalidLevelUpError) {

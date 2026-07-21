@@ -10,6 +10,8 @@ import { fetchDisciplines, fetchFeats, fetchManeuvers, fetchSpells } from "@/api
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { buildLevelUpLedger, type LedgerResolvers, type LedgerRow } from "@/lib/levelUpLedger";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
+import { schoolInk } from "@/lib/spellFlavor";
+import { levelLabel, schoolLabel } from "@/lib/spellMeta";
 
 type CatalogFetcher = (() => Promise<{ id: string; name: string }[]>) | undefined;
 
@@ -89,9 +91,36 @@ function ListRow({ row, resolving }: { row: LedgerRow; resolving: boolean }) {
   );
 }
 
+// The subclass-granted-spells "unlock card" (#1159): gold celebratory framing,
+// distinguishing it from the plain before→after ledger rows since a free spell
+// grant is a bigger deal than a delta. One line per spell (school-tinted name +
+// "Level N · School"), never a run-together name list.
+function GrantedSpellsCard({ row }: { row: LedgerRow }) {
+  return (
+    <div className="mt-2 rounded-card border border-gold-300 bg-gradient-to-r from-gold-50 to-gold-100 p-4">
+      <p className="flex items-center gap-1.5 font-display text-sm font-semibold text-gold-900">
+        <span aria-hidden="true">✦</span>
+        {row.label}
+      </p>
+      <ul className="mt-2 divide-y divide-gold-200/60">
+        {(row.grantedSpells ?? []).map((s, i) => (
+          <li key={`${s.name}-${i}`} className="flex items-baseline justify-between gap-3 py-1.5 first:pt-0 last:pb-0">
+            <span className={`text-sm font-semibold ${schoolInk(s.school)}`}>{s.name}</span>
+            <span className={`shrink-0 text-xs ${schoolInk(s.school)}`}>
+              {levelLabel(s.level)} · {schoolLabel(s.school)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-gold-800">Always prepared — doesn't count against your spells known.</p>
+    </div>
+  );
+}
+
 function LedgerRowView({ row, resolving }: { row: LedgerRow; resolving: boolean }) {
   if (row.variant === "note") return <NoteRow row={row} />;
   if (row.variant === "list") return <ListRow row={row} resolving={resolving} />;
+  if (row.variant === "grantedSpells") return <GrantedSpellsCard row={row} />;
   return <DeltaRow row={row} />;
 }
 
