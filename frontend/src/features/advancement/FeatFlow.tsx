@@ -188,8 +188,11 @@ function FeatCatalogRows({
   dispatchView: Dispatch<FeatViewAction>;
   scrollList: boolean;
 }) {
+  const listClass = ["pr-3", "thin-scrollbar", scrollList ? "max-h-64 overflow-y-auto" : null]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <ul className={`pr-3 thin-scrollbar ${scrollList ? "max-h-64 overflow-y-auto" : ""}`}>
+    <ul className={listClass}>
       {filteredCatalog.map((feat) => (
         <FeatListRow key={feat.id} feat={feat} busy={busy} onSelect={() => dispatchView({ type: "select", feat })} />
       ))}

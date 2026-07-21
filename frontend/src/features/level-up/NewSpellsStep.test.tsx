@@ -21,7 +21,7 @@ function spell(id: string, level: number, classes: string[], description = ""): 
 }
 
 const CATALOG: CatalogSpell[] = [
-  spell("Firebolt", 0, ["wizard"]),        // cantrip — excluded
+  spell("Firebolt", 0, ["wizard"], "A mote of fire streaks toward a creature or object within range."),
   spell("Shield", 1, ["wizard"], "An invisible barrier of magical force appears and protects you."),
   spell("MistyStep", 2, ["wizard"]),
   spell("Fireball", 3, ["wizard"]),        // above a level-2 ceiling
@@ -157,6 +157,19 @@ describe("NewSpellsStep — cantrip picks (#1131)", () => {
     expect(screen.queryByLabelText("Search spells")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Firebolt" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add Shield" })).not.toBeInTheDocument();
+  });
+
+  it("opens the shared detail card with the full description for a cantrip row too (#1158)", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, cantrips: 1 })} character={caster()} />);
+    await user.click(await screen.findByRole("button", { name: "Open Firebolt" }));
+    expect(screen.getByText(/mote of fire streaks toward/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Learn Firebolt/ }));
+    expect(screen.getByTestId("cantrips")).toHaveTextContent(
+      JSON.stringify([{ type: "learnSpell", spellId: "Firebolt" }]),
+    );
+    expect(screen.queryByText(/mote of fire streaks toward/)).not.toBeInTheDocument();
   });
 
   it("opens the shared detail card with the full description on row tap; the CTA learns and closes it (#1158)", async () => {
