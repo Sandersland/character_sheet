@@ -12,9 +12,9 @@ import { CHOICE_KIND_CONFIGS } from "@/lib/levelUpChoices";
 import type { LevelUpStep } from "@/types/character";
 
 export default function ChoiceStep({ step }: { step: LevelUpStep }) {
-  const { character } = useLevelUpStepContext();
+  const { character, plan } = useLevelUpStepContext();
   const config = CHOICE_KIND_CONFIGS[step.kind];
-  const catalog = useChoiceCatalog(config, character);
+  const catalog = useChoiceCatalog(config, character, plan.target.newLevel);
   const { selectedIds, single, count, atCap, toggle } = useChoiceSelection(config, step);
 
   if (!config) return null;

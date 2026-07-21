@@ -135,7 +135,6 @@ export function serializeCharacter(row: CharacterWithRelations) {
   );
   const { resources } = buildResourcesView(
     row,
-    primaryClass,
     progress.level,
     abilityScoresMap,
     progress.proficiencyBonus,

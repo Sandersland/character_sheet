@@ -63,7 +63,7 @@ export default function CharacterListPage() {
   const showSpinner = useDelayedFlag(characters === null && !error);
 
   return (
-    <div className="min-h-screen bg-parchment-100">
+    <div className="flex-1 bg-parchment-100">
       <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
           <div>

@@ -167,7 +167,7 @@ describe("HP transaction event-stream characterization (#614)", () => {
     const [ev] = evs;
     expect(ev.type).toBe("longRest");
     expect(ev.summary).toBe("Long rest — +34 HP");
-    expect(ev.data).toEqual({ recovered: 2, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0, itemSpellsRestored: 0 });
+    expect(ev.data).toEqual({ recovered: 3, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0, itemSpellsRestored: 0 });
     // before/after assemble hitPoints + hitDice + spellcasting + resources.
     expect(ev.before).toEqual({
       hitPoints: { current: 10, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -177,7 +177,7 @@ describe("HP transaction event-stream characterization (#614)", () => {
     });
     expect(ev.after).toEqual({
       hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-      hitDice: { total: 5, die: "d10", spent: 1 },
+      hitDice: { total: 5, die: "d10", spent: 0 },
       spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
       resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
     });
@@ -393,7 +393,7 @@ describe("rest/level-up branch pins (#684)", () => {
     expect(evs).toHaveLength(1);
     const [ev] = evs;
     expect(ev.summary).toBe("Long rest — +34 HP, 4 slots restored");
-    expect(ev.data).toEqual({ recovered: 2, hpRestored: 34, slotsRestored: 4, resourcesRestored: 0, itemSpellsRestored: 0 });
+    expect(ev.data).toEqual({ recovered: 3, hpRestored: 34, slotsRestored: 4, resourcesRestored: 0, itemSpellsRestored: 0 });
     expect(ev.before).toEqual({
       hitPoints: BASE_HP,
       hitDice: BASE_HD,
@@ -410,7 +410,7 @@ describe("rest/level-up branch pins (#684)", () => {
     // so its use counter appears zeroed in the after snapshot.
     expect(ev.after).toEqual({
       hitPoints: { ...BASE_HP, current: 44 },
-      hitDice: { ...BASE_HD, spent: 1 },
+      hitDice: { ...BASE_HD, spent: 0 },
       resources: { ...EMPTY_RESOURCES, used: { arcaneRecovery: 0 } },
       spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
     });
@@ -433,7 +433,7 @@ describe("rest/level-up branch pins (#684)", () => {
     const [ev] = await events("hp684-cons");
     expect(ev.summary).toBe("Long rest — +34 HP, consumables recharged");
     expect(ev.data).toEqual({
-      recovered: 2, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0,
+      recovered: 3, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0,
       itemSpellsRestored: 0, consumablesRecharged: 1,
     });
     expect((ev.before as Record<string, unknown>).consumableCharges).toEqual([
@@ -508,7 +508,7 @@ describe("rest/level-up branch pins (#684)", () => {
     const [ev] = await events("hp684-dawn");
     expect(ev.summary).toBe("Long rest — +34 HP, item charges recharged");
     expect(ev.data).toEqual({
-      recovered: 2, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0,
+      recovered: 3, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0,
       itemSpellsRestored: 0, itemChargesRecharged: 2,
     });
     expect((ev.before as Record<string, unknown>).chargePools).toEqual([

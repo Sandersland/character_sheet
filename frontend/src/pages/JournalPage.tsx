@@ -163,7 +163,7 @@ function JournalDesktopView(props: JournalViewProps) {
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
 
   return (
-    <div className="min-h-screen bg-parchment-100">
+    <div className="flex-1 bg-parchment-100">
       <div className="mx-auto max-w-6xl px-6 py-6">
         <div className="mb-4 flex items-center justify-between">
           <BackLink character={character} />
@@ -211,7 +211,7 @@ function JournalMobileView(props: JournalViewProps) {
   }
 
   return (
-    <div className="min-h-screen bg-parchment-100 p-4 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+    <div className="flex-1 bg-parchment-100 p-4 pb-[calc(4rem+env(safe-area-inset-bottom))]">
       {pageOpen ? (
         <div className="relative">
           <button

@@ -108,6 +108,27 @@ describe("ReviewStep", () => {
     expect(await screen.findByText("Archery")).toBeInTheDocument();
   });
 
+  it("resolves cantrip names via the spell catalog (#1157)", async () => {
+    renderReview({
+      hp: { method: "average" },
+      cantripsLearned: [{ type: "learnSpell", spellId: "s1" }],
+    });
+    expect(await screen.findByText("New Cantrips")).toBeInTheDocument();
+    expect(await screen.findByText("Fireball")).toBeInTheDocument();
+    expect(fetchSpells).toHaveBeenCalled();
+  });
+
+  it("shares a single spell-catalog fetch across cantrips and spells (#1157)", async () => {
+    renderReview({
+      hp: { method: "average" },
+      cantripsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+    });
+    expect(await screen.findByText("New Cantrips")).toBeInTheDocument();
+    expect(await screen.findByText("New Spells")).toBeInTheDocument();
+    expect(fetchSpells).toHaveBeenCalledTimes(1);
+  });
+
   it("fetches nothing for a plain HP + ASI draft", () => {
     renderReview({
       hp: { method: "average" },

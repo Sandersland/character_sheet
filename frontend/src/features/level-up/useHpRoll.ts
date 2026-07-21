@@ -1,8 +1,10 @@
-// Roll + selection state for the HP step (#887). Holds the rolled hit die
-// locally so toggling average↔roll reuses the same roll — the die only re-mounts
-// (and re-rolls) while `roll` is null. Drops a held roll when the advancing class
-// (hence the die) changes, so a d10 roll never carries onto a d6 class; the
-// re-mounted die then auto-rolls the new one. Owns every draft write for the step.
+// Roll + selection state for the HP step (#887, #1172). Holds the rolled hit
+// die locally so toggling average↔roll reuses the same roll — HitPointsStep
+// keeps the reveal mounted (hidden, not torn down) so a settled die lingers.
+// Drops a held roll when the advancing class (hence the die) changes, so a d10
+// roll never carries onto a d6 class; the reveal's `key={math.faces}` then
+// forces the one legitimate remount, re-rolling the new die. Owns every draft
+// write for the step.
 
 import { useEffect, useState } from "react";
 

@@ -8,7 +8,7 @@ interface CharacterLoadErrorProps {
 export default function CharacterLoadError({ variant, characterId }: CharacterLoadErrorProps) {
   const isError = variant === "error";
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
       <h1
         className={`font-display text-2xl font-semibold ${
           isError ? "text-garnet-800" : "text-parchment-900"
