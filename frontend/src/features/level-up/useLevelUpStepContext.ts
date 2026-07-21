@@ -5,7 +5,7 @@
 import { createContext, useContext } from "react";
 
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
-import type { Character, LevelUpPlanResponse } from "@/types/character";
+import type { Character, LevelUpPlanResponse, LevelUpTarget } from "@/types/character";
 
 export interface LevelUpStepContextValue {
   character: Character;
@@ -13,6 +13,8 @@ export interface LevelUpStepContextValue {
   setDraft: React.Dispatch<React.SetStateAction<LevelUpDraft>>;
   /** Non-null: the provider mounts only inside the shell's plan-loaded branch. */
   plan: LevelUpPlanResponse;
+  /** Which class entry/new-class this ceremony instance advances (#1170). */
+  target: LevelUpTarget;
 }
 
 export const LevelUpStepContext = createContext<LevelUpStepContextValue | null>(null);

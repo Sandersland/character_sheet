@@ -47,6 +47,7 @@ function renderStep({ draft: initial, setDraft }: { draft?: LevelUpDraft; setDra
       plan,
       draft: setDraft ? seed : liveDraft,
       setDraft: setDraft ?? liveSetDraft,
+      target: { kind: "existing", classEntryId: "entry-1" },
     };
     return (
       <LevelUpStepContext.Provider value={value}>
