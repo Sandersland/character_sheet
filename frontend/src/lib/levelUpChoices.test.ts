@@ -15,7 +15,9 @@ vi.mock("@/api/client", () => ({
     { id: "m2", name: "Trip Attack", description: "trip" },
   ]),
   fetchDisciplines: vi.fn(async () => [
-    { id: "d1", name: "Fangs of the Fire Snake", description: "fire" },
+    { id: "elemental-attunement", name: "Elemental Attunement", description: "attune", minLevel: 3, alwaysKnown: true },
+    { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire", minLevel: 3, alwaysKnown: false },
+    { id: "ride-the-wind", name: "Ride the Wind", description: "fly", minLevel: 6, alwaysKnown: false },
   ]),
   fetchReference: vi.fn(async () => ({ artisanTools: [{ name: "Smith's Tools", category: "artisan" }] })),
   fetchFeats: vi.fn(async () => [
@@ -36,7 +38,7 @@ describe("CHOICE_KIND_CONFIGS", () => {
     const cfg = CHOICE_KIND_CONFIGS.maneuvers!;
 
     it("loads catalog options", async () => {
-      expect(await cfg.loadOptions()).toEqual([
+      expect(await cfg.loadOptions({ targetLevel: 1 })).toEqual([
         { id: "m1", name: "Riposte", description: "riposte" },
         { id: "m2", name: "Trip Attack", description: "trip" },
       ]);
@@ -69,7 +71,7 @@ describe("CHOICE_KIND_CONFIGS", () => {
     });
 
     it("loads only the catalog's fighting_style feats", async () => {
-      const opts = await cfg.loadOptions();
+      const opts = await cfg.loadOptions({ targetLevel: 1 });
       expect(opts).toEqual([
         { id: "archery", name: "Archery", description: "arch" },
         { id: "defense", name: "Defense", description: "def" },
@@ -103,7 +105,7 @@ describe("CHOICE_KIND_CONFIGS", () => {
     const cfg = CHOICE_KIND_CONFIGS.toolProficiency!;
 
     it("uses the tool name as id", async () => {
-      expect(await cfg.loadOptions()).toEqual([{ id: "Smith's Tools", name: "Smith's Tools" }]);
+      expect(await cfg.loadOptions({ targetLevel: 1 })).toEqual([{ id: "Smith's Tools", name: "Smith's Tools" }]);
     });
 
     it("round-trips select → selected as learnToolProficiency ops", () => {
@@ -122,6 +124,21 @@ describe("CHOICE_KIND_CONFIGS", () => {
 
   describe("disciplines", () => {
     const cfg = CHOICE_KIND_CONFIGS.disciplines!;
+
+    it("gates by target level, drops alwaysKnown options, and tags the L-gate at level 3", async () => {
+      const opts = await cfg.loadOptions({ targetLevel: 3 });
+      expect(opts).toEqual([
+        { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire", tag: "L3+" },
+      ]);
+    });
+
+    it("includes higher minLevel options once the target level reaches them", async () => {
+      const opts = await cfg.loadOptions({ targetLevel: 6 });
+      expect(opts.map((o) => ({ id: o.id, tag: o.tag }))).toEqual([
+        { id: "fangs-of-the-fire-snake", tag: "L3+" },
+        { id: "ride-the-wind", tag: "L6+" },
+      ]);
+    });
 
     it("round-trips select → selected as learnDiscipline ops", () => {
       const patch = cfg.select(baseDraft, ["d1"]);
