@@ -39,13 +39,24 @@ function makeChar(inventory: InventoryItem[]): Character {
   return { id: "c1", inventory } as unknown as Character;
 }
 
-function makeTurnState(actionsRemaining: number): TurnState & TurnStateActions {
+/** budget defaults to a FRESH turn: the once-per-turn free interaction unspent, no attack credits. */
+function makeTurnState(
+  actionsRemaining: number,
+  budget: { attackEquipCredits?: number; freeInteractionUsed?: boolean } = {},
+): TurnState & TurnStateActions {
   return {
     actionsRemaining,
+    attackEquipCredits: budget.attackEquipCredits ?? 0,
+    freeInteractionUsed: budget.freeInteractionUsed ?? false,
     consumeAction: vi.fn(),
     refundAction: vi.fn(),
+    spendInteractionBudget: vi.fn(),
+    refundInteractionBudget: vi.fn(),
   } as unknown as TurnState & TurnStateActions;
 }
+
+// Fully exhausted: no free interaction, no attack credits, no action.
+const EXHAUSTED_BUDGET = { attackEquipCredits: 0, freeInteractionUsed: true };
 
 // Hosts the picker with the real useLoadoutSwap hook — the same swap economy the
 // production Action-sheet resolution wires, so the ops/consume/refund assertions
@@ -74,7 +85,7 @@ function handCard(heading: string) {
   return within(label.closest('[data-testid="hand-card"]') as HTMLElement);
 }
 
-describe("InlineLoadoutPicker (#815)", () => {
+describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
   it("shows the current loadout label and per-hand occupants", () => {
     renderPicker(makeChar([longsword, dagger]), makeTurnState(1));
     expect(screen.getByText(/Now wielding/)).toBeInTheDocument();
@@ -93,9 +104,9 @@ describe("InlineLoadoutPicker (#815)", () => {
     expect(main.getAllByText("Dagger").length).toBeGreaterThan(0);
   });
 
-  it("swapping into the occupied main hand spends the Action and posts the swap batch", async () => {
+  it("swapping into the occupied main hand costs the Action when the budget can't cover 2 units", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1);
+    const turnState = makeTurnState(1); // fresh budget: only 1 unit (the free interaction)
     const onUpdate = vi.fn();
     renderPicker(makeChar([longsword, dagger]), turnState, onUpdate);
 
@@ -109,42 +120,57 @@ describe("InlineLoadoutPicker (#815)", () => {
       { type: "equip", inventoryItemId: "dg", slot: "MAIN_HAND" },
     ]);
     expect(turnState.consumeAction).toHaveBeenCalledOnce();
+    expect(turnState.spendInteractionBudget).not.toHaveBeenCalled();
     expect(onUpdate).toHaveBeenCalled();
     await waitFor(() => expect(screen.getByRole("button", { name: /Refund/ })).toBeInTheDocument());
   });
 
-  it("at 0 actions with both hands occupied: both hands disabled with a reason, no swap reachable", async () => {
-    renderPicker(makeChar([longsword, shield, dagger]), makeTurnState(0));
-    // Both hand toggles disabled with the text reason — a held swap needs the Action.
-    expect(handCard("Main hand").getByRole("button", { name: "Change" })).toBeDisabled();
-    expect(handCard("Off hand").getByRole("button", { name: "Change" })).toBeDisabled();
-    expect(screen.getAllByText(/No action left/).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Swap in" })).not.toBeInTheDocument();
-  });
-
-  it("at 0 actions with one hand free: occupied hand disabled, free hand draws for free", async () => {
+  it("swapping into the occupied main hand is FREE when it rides an attack credit + the free interaction", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(0);
-    // Longsword in main, off hand empty, a bag dagger that fits the off hand.
+    const turnState = makeTurnState(1, { attackEquipCredits: 1 }); // 1 attack made this turn
     renderPicker(makeChar([longsword, dagger]), turnState);
 
     const main = handCard("Main hand");
-    expect(main.getByRole("button", { name: "Change" })).toBeDisabled();
-    expect(main.getByText(/No action left — swapping a held item costs your Action/)).toBeInTheDocument();
+    await user.click(main.getByRole("button", { name: "Change" }));
+    await user.click(main.getByRole("button", { name: "Swap in" }));
 
-    // Free off-hand Equip works: draws the dagger for free.
-    const off = handCard("Off hand");
-    await user.click(off.getByRole("button", { name: "Equip" })); // expand off hand
-    await user.click(within(off.getByRole("list")).getByRole("button", { name: "Equip" })); // the dagger option
-    await waitFor(() =>
-      expect(mockApply).toHaveBeenCalledWith("c1", [{ type: "equip", inventoryItemId: "dg", slot: "OFF_HAND" }]),
-    );
+    await waitFor(() => expect(mockApply).toHaveBeenCalled());
+    expect(turnState.spendInteractionBudget).toHaveBeenCalledWith({
+      fromAttackCredits: 1,
+      usedFreeInteraction: true,
+    });
     expect(turnState.consumeAction).not.toHaveBeenCalled();
   });
 
-  it("filling an EMPTY hand is free (no Action spent)", async () => {
+  it("fully exhausted budget + 0 actions: both hand toggles are blocked, no swap reachable", async () => {
+    renderPicker(makeChar([longsword, shield, dagger]), makeTurnState(0, EXHAUSTED_BUDGET));
+    expect(handCard("Main hand").getByRole("button", { name: "Change" })).toBeDisabled();
+    expect(handCard("Off hand").getByRole("button", { name: "Change" })).toBeDisabled();
+    expect(screen.getAllByText(/No free interaction or Action left/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Swap in" })).not.toBeInTheDocument();
+  });
+
+  it("0 actions with a fresh budget: the occupied hand toggle stays reachable — Stow is free, a full swap is blocked", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1);
+    renderPicker(makeChar([longsword, dagger]), makeTurnState(0)); // fresh budget: 1 unit left
+
+    const main = handCard("Main hand");
+    const toggle = main.getByRole("button", { name: "Change" });
+    expect(toggle).toBeEnabled(); // 1 unit still covers the cheapest interaction (Stow)
+    await user.click(toggle);
+
+    // The dagger swap needs 2 units (stow + draw) — budget only has 1 → blocked.
+    const swapRow = within(main.getByRole("list")).getByText("Dagger").closest("li") as HTMLElement;
+    expect(within(swapRow).getByRole("button")).toBeDisabled();
+    expect(within(swapRow).getByText(/No free interaction or Action left/)).toBeInTheDocument();
+
+    // Stow only needs 1 unit — still free and clickable.
+    expect(main.getByRole("button", { name: "Stow" })).toBeEnabled();
+  });
+
+  it("filling an EMPTY hand is free (paid from the interaction budget, no Action spent)", async () => {
+    const user = userEvent.setup();
+    const turnState = makeTurnState(1); // fresh budget
     renderPicker(makeChar([dagger]), turnState); // both hands empty
 
     const main = handCard("Main hand");
@@ -154,10 +180,14 @@ describe("InlineLoadoutPicker (#815)", () => {
     await waitFor(() =>
       expect(mockApply).toHaveBeenCalledWith("c1", [{ type: "equip", inventoryItemId: "dg", slot: "MAIN_HAND" }]),
     );
+    expect(turnState.spendInteractionBudget).toHaveBeenCalledWith({
+      fromAttackCredits: 0,
+      usedFreeInteraction: true,
+    });
     expect(turnState.consumeAction).not.toHaveBeenCalled();
   });
 
-  it("swapping in a two-handed weapon stows BOTH hands", async () => {
+  it("swapping in a two-handed weapon stows BOTH hands (3 units → costs the Action on a fresh budget)", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(1);
     const offDagger = weapon({ id: "off", name: "Dagger", equipped: true, equippedSlot: "OFF_HAND" });
@@ -189,7 +219,7 @@ describe("InlineLoadoutPicker (#815)", () => {
     expect(main.getByText("×2")).toBeInTheDocument();
   });
 
-  it("Stow empties the hand for free", async () => {
+  it("Stow is paid from the budget on a fresh turn — no Action spent", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(1);
     renderPicker(makeChar([longsword]), turnState);
@@ -201,12 +231,16 @@ describe("InlineLoadoutPicker (#815)", () => {
     await waitFor(() =>
       expect(mockApply).toHaveBeenCalledWith("c1", [{ type: "setEquipped", inventoryItemId: "ls", equipped: false }]),
     );
+    expect(turnState.spendInteractionBudget).toHaveBeenCalledWith({
+      fromAttackCredits: 0,
+      usedFreeInteraction: true,
+    });
     expect(turnState.consumeAction).not.toHaveBeenCalled();
   });
 
-  it("refund reverses the swap and returns the Action", async () => {
+  it("refund reverses an Action-paid swap and returns the Action", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1);
+    const turnState = makeTurnState(1); // fresh budget → occupied swap costs the Action
     renderPicker(makeChar([longsword, dagger]), turnState);
 
     const main = handCard("Main hand");
@@ -224,5 +258,27 @@ describe("InlineLoadoutPicker (#815)", () => {
       ]),
     );
     expect(turnState.refundAction).toHaveBeenCalledOnce();
+    expect(turnState.refundInteractionBudget).not.toHaveBeenCalled();
+  });
+
+  it("refund reverses a budget-paid swap and returns the interaction budget", async () => {
+    const user = userEvent.setup();
+    const turnState = makeTurnState(1, { attackEquipCredits: 1 }); // rides the attack credit + free interaction
+    renderPicker(makeChar([longsword, dagger]), turnState);
+
+    const main = handCard("Main hand");
+    await user.click(main.getByRole("button", { name: "Change" }));
+    await user.click(main.getByRole("button", { name: "Swap in" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Refund/ })).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: /Refund/ }));
+
+    await waitFor(() =>
+      expect(turnState.refundInteractionBudget).toHaveBeenCalledWith({
+        fromAttackCredits: 1,
+        usedFreeInteraction: true,
+      }),
+    );
+    expect(turnState.refundAction).not.toHaveBeenCalled();
   });
 });

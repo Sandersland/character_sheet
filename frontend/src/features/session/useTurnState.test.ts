@@ -238,6 +238,78 @@ describe("action slot consumption", () => {
   });
 });
 
+describe("interaction budget (#1165)", () => {
+  function inActiveTurn(character = makeCharacter({ attacksPerAction: 2 })) {
+    const hook = renderHook(() => useTurnState(character, SESSION_ID));
+    act(() => { hook.result.current.startCombat(); });
+    act(() => { hook.result.current.startTurn(); });
+    return hook;
+  }
+
+  it("starts a turn with no earned credits and the free interaction unspent", () => {
+    const { result } = inActiveTurn();
+    expect(result.current.attackEquipCredits).toBe(0);
+    expect(result.current.freeInteractionUsed).toBe(false);
+  });
+
+  it("recordAttack earns one equip/unequip credit per genuine new attack", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterAttackMode(); });
+    act(() => { result.current.recordAttack(); });
+    expect(result.current.attackEquipCredits).toBe(1);
+    act(() => { result.current.recordAttack(); });
+    expect(result.current.attackEquipCredits).toBe(2);
+    // Clamped over-click records no new attack → no extra credit.
+    act(() => { result.current.recordAttack(); });
+    expect(result.current.attackEquipCredits).toBe(2);
+  });
+
+  it("spendInteractionBudget consumes attack credits and/or the free interaction", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterAttackMode(); });
+    act(() => { result.current.recordAttack(); });
+    expect(result.current.attackEquipCredits).toBe(1);
+
+    act(() => {
+      result.current.spendInteractionBudget({ fromAttackCredits: 1, usedFreeInteraction: true });
+    });
+    expect(result.current.attackEquipCredits).toBe(0);
+    expect(result.current.freeInteractionUsed).toBe(true);
+  });
+
+  it("refundInteractionBudget reverses a spend", () => {
+    const { result } = inActiveTurn();
+    act(() => {
+      result.current.spendInteractionBudget({ fromAttackCredits: 0, usedFreeInteraction: true });
+    });
+    expect(result.current.freeInteractionUsed).toBe(true);
+
+    act(() => {
+      result.current.refundInteractionBudget({ fromAttackCredits: 0, usedFreeInteraction: true });
+    });
+    expect(result.current.freeInteractionUsed).toBe(false);
+  });
+
+  it("resets both fields at startTurn and at endTurn", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterAttackMode(); });
+    act(() => { result.current.recordAttack(); });
+    act(() => {
+      result.current.spendInteractionBudget({ fromAttackCredits: 0, usedFreeInteraction: true });
+    });
+    expect(result.current.freeInteractionUsed).toBe(true);
+    expect(result.current.attackEquipCredits).toBe(1);
+
+    act(() => { result.current.endTurn(); });
+    expect(result.current.freeInteractionUsed).toBe(false);
+    expect(result.current.attackEquipCredits).toBe(0);
+
+    act(() => { result.current.startTurn(); });
+    expect(result.current.freeInteractionUsed).toBe(false);
+    expect(result.current.attackEquipCredits).toBe(0);
+  });
+});
+
 describe("attack mode flow", () => {
   it("enterAttackMode spends an action and sets attack state (attacksPerAction 2 → total 2)", () => {
     const character = makeCharacter({ attacksPerAction: 2 });
@@ -1026,6 +1098,42 @@ describe("localStorage persistence", () => {
     expect(result.current.actionsRemaining).toBe(1);
   });
 
+  it("backfills attackEquipCredits/freeInteractionUsed on a stale pre-#1165 snapshot (top-level + undo entries)", () => {
+    // Pre-interaction-budget schema: neither field existed yet.
+    const stale = {
+      inCombat: true,
+      round: 2,
+      phase: "active",
+      actionsRemaining: 1,
+      bonusActionUsed: false,
+      reactionUsed: false,
+      attack: null,
+      bonusAttack: null,
+      spellCastThisTurn: {},
+      attackedThisTurn: false,
+      tookDamageThisTurn: false,
+      history: [
+        {
+          actionsRemaining: 1,
+          bonusActionUsed: false,
+          reactionUsed: false,
+          attack: null,
+          bonusAttack: null,
+          spellCastThisTurn: {},
+        },
+      ],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stale));
+
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    expect(result.current.attackEquipCredits).toBe(0);
+    expect(result.current.freeInteractionUsed).toBe(false);
+    // Undo must not restore `undefined` over the budget fields — the entry was backfilled.
+    act(() => { result.current.undo(); });
+    expect(result.current.attackEquipCredits).toBe(0);
+    expect(result.current.freeInteractionUsed).toBe(false);
+  });
+
   it("backfills id + source on a pre-#813 tally row (top-level + undo entries)", () => {
     // Pre-#813 rows carry no `id`/`source` (only `action` existed then).
     const legacyRow = { formId: "w1", formName: "Longsword", attack: { total: 17, keptFace: 14, nat20: false, nat1: false }, verdict: "hit", damage: 9 };
@@ -1075,6 +1183,8 @@ describe("localStorage persistence", () => {
       bonusAttack: null,
       spellCastThisTurn: {},
       attackTally: [],
+      attackEquipCredits: 0,
+      freeInteractionUsed: false,
     };
     const current = {
       inCombat: true,
@@ -1088,6 +1198,8 @@ describe("localStorage persistence", () => {
       spellCastThisTurn: { action: "leveled" as const },
       attackedThisTurn: true,
       tookDamageThisTurn: false,
+      attackEquipCredits: 0,
+      freeInteractionUsed: false,
       history: [snapshot],
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
