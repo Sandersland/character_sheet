@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -7,6 +8,7 @@ import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
 import { applyInventoryTransactions } from "@/api/client";
 import type { Character, InventoryItem } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import type { InteractionSpend } from "@/lib/loadoutPicker";
 
 vi.mock("@/api/client", () => ({
   applyInventoryTransactions: vi.fn(),
@@ -77,6 +79,50 @@ function Harness({
 function renderPicker(character: Character, turnState: TurnState & TurnStateActions, onUpdate = vi.fn()) {
   mockApply.mockResolvedValue(character); // returned char isn't asserted here
   return render(<Harness character={character} turnState={turnState} onUpdate={onUpdate} />);
+}
+
+// A turnState whose spend/consume mocks actually mutate the object (mirroring
+// the useTurnState reducer) — needed for a two-swap-in-one-test regression:
+// the plain vi.fn() stub in makeTurnState never updates, so a second swap in
+// the same test would never see the first swap's spend.
+function makeLiveTurnState(
+  actionsRemaining: number,
+  budget: { attackEquipCredits?: number; freeInteractionUsed?: boolean } = {},
+): TurnState & TurnStateActions {
+  const state = {
+    actionsRemaining,
+    attackEquipCredits: budget.attackEquipCredits ?? 0,
+    freeInteractionUsed: budget.freeInteractionUsed ?? false,
+    consumeAction: vi.fn(() => {
+      state.actionsRemaining -= 1;
+    }),
+    refundAction: vi.fn(() => {
+      state.actionsRemaining += 1;
+    }),
+    spendInteractionBudget: vi.fn((spend: InteractionSpend) => {
+      state.attackEquipCredits -= spend.fromAttackCredits;
+      state.freeInteractionUsed = state.freeInteractionUsed || spend.usedFreeInteraction;
+    }),
+    refundInteractionBudget: vi.fn((spend: InteractionSpend) => {
+      state.attackEquipCredits += spend.fromAttackCredits;
+      if (spend.usedFreeInteraction) state.freeInteractionUsed = false;
+    }),
+  } as unknown as TurnState & TurnStateActions;
+  return state;
+}
+
+// Re-renders on each swap's onUpdate — needed so a second interaction in the
+// same test sees the hand-occupancy change from the first.
+function LiveHarness({
+  initialCharacter,
+  turnState,
+}: {
+  initialCharacter: Character;
+  turnState: TurnState & TurnStateActions;
+}) {
+  const [character, setCharacter] = useState(initialCharacter);
+  const loadout = useLoadoutSwap(character, turnState, setCharacter);
+  return <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadout} />;
 }
 
 /** Scope queries to one hand's card ("Main hand" / "Off hand"). */
@@ -280,5 +326,46 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
       }),
     );
     expect(turnState.refundAction).not.toHaveBeenCalled();
+  });
+
+  it("a second swap after the free interaction is spent falls back to the Action, and refund restores exactly what it paid (review regression)", async () => {
+    const user = userEvent.setup();
+    const ls = weapon({ id: "ls", name: "Longsword", equipped: true, equippedSlot: "MAIN_HAND" });
+    const dg = weapon({ id: "dg", name: "Dagger" });
+    const afterStow = makeChar([{ ...ls, equipped: false, equippedSlot: undefined }, dg]);
+    mockApply.mockResolvedValue(afterStow);
+
+    const turnState = makeLiveTurnState(1); // fresh: 1 action, the free interaction unspent, no attack credits
+    render(<LiveHarness initialCharacter={makeChar([ls, dg])} turnState={turnState} />);
+
+    // First: Stow the main hand (1 unit) — paid from the free interaction.
+    await user.click(handCard("Main hand").getByRole("button", { name: "Change" }));
+    await user.click(handCard("Main hand").getByRole("button", { name: "Stow" }));
+    await waitFor(() =>
+      expect(turnState.spendInteractionBudget).toHaveBeenCalledWith({
+        fromAttackCredits: 0,
+        usedFreeInteraction: true,
+      }),
+    );
+    expect(turnState.freeInteractionUsed).toBe(true);
+
+    // Second: draw the dagger into the now-empty main hand (1 unit) — the
+    // free interaction is spent and no attack credits were earned, so this
+    // falls back to the Action rather than blocking. The bag now also offers
+    // the just-stowed Longsword, so scope to the Dagger row specifically.
+    await user.click(handCard("Main hand").getByRole("button", { name: "Equip" }));
+    const daggerRow = within(handCard("Main hand").getByRole("list"))
+      .getByText("Dagger")
+      .closest("li") as HTMLElement;
+    await user.click(within(daggerRow).getByRole("button", { name: "Equip" }));
+    await waitFor(() => expect(turnState.consumeAction).toHaveBeenCalledOnce());
+    expect(turnState.spendInteractionBudget).toHaveBeenCalledOnce(); // only the FIRST swap used it
+
+    // Refund reverses the SECOND (Action-paid) swap, not the first.
+    await user.click(await screen.findByRole("button", { name: /Refund/ }));
+    await waitFor(() => expect(turnState.refundAction).toHaveBeenCalledOnce());
+    expect(turnState.refundInteractionBudget).not.toHaveBeenCalled();
+    // The first spend is irrecoverable — the free interaction stays spent.
+    expect(turnState.freeInteractionUsed).toBe(true);
   });
 });

@@ -75,7 +75,12 @@ export default function ActionSlot({
         used={view.used}
         badge={view.badge}
         onUse={() => setShowActionMenu(true)}
-        useLabel="Use Action"
+        // Once the Action is spent, the button stays tappable for interaction-
+        // budget options (#1165) but must NOT keep announcing "Use Action" —
+        // a screen-reader user shouldn't hear an offer to use an action that
+        // isn't there. Rename the accessible name to match what's actually
+        // still reachable.
+        useLabel={view.available ? "Use Action" : "Interaction options"}
         // Once the Action is spent, the menu still opens in free-only mode
         // (interaction budget, #1165) — replaces the old standalone
         // "Change weapons" strip that existed only as an escape hatch (#815).
@@ -95,7 +100,7 @@ export default function ActionSlot({
           subtitle={
             view.available
               ? "Pick one — nothing is spent until you choose"
-              : "Action spent — free interaction options only"
+              : "Action spent — interaction budget options only"
           }
           onClose={() => setShowActionMenu(false)}
         >

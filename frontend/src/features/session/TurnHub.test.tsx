@@ -881,14 +881,17 @@ describe("TurnHub — mid-turn weapon change (#815, interaction-budget model #11
     await startTurn(user);
 
     // Spend the Action — no standalone strip exists any more (#1165); the
-    // Action button itself must stay tappable to reach the free interaction.
+    // slot button itself must stay tappable to reach the free interaction,
+    // but must stop announcing "Use Action" once there's no action to use
+    // (a11y — a screen-reader user shouldn't hear an offer that isn't real).
     await user.click(screen.getByRole("button", { name: /Use Action/ }));
     await user.click(screen.getByRole("button", { name: "Dodge" }));
-    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use Action" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Interaction options" })).toBeInTheDocument();
 
     // Reopen — the menu opens in free-only mode, Change weapons is still the
     // way in, and the turn's free interaction still covers a bare draw.
-    await user.click(screen.getByRole("button", { name: "Use Action" }));
+    await user.click(screen.getByRole("button", { name: "Interaction options" }));
     await user.click(screen.getByRole("button", { name: "Change weapons" }));
     const sheet = within(screen.getByRole("dialog"));
     const main = sheet.getByText(/^Main hand/).closest('[data-testid="hand-card"]') as HTMLElement;
