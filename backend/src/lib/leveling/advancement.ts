@@ -5,7 +5,7 @@
  * plus the side-effected columns `abilityScores`, `hitPoints`, and
  * `initiativeBonus` (which are updated atomically in the same transaction).
  *
- * What is derived at read time: the total slot count (advancementSlotsForLevel
+ * What is derived at read time: the total slot count (characterAdvancementSlots
  * in srd/srd.ts) and the clamped display values in serializeCharacter.
  *
  * Design notes:
@@ -33,7 +33,7 @@ import {
   type FeatImprovement,
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
-import { advancementSlotsForLevel, abilityModifier, characterFightingStyleFeatSlots } from "@/lib/srd/srd.js";
+import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots } from "@/lib/srd/srd.js";
 import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
 import { normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 
@@ -574,7 +574,6 @@ export async function applyAdvancementOpInTx(
 
   const level = levelForExperience(character.experiencePoints);
   proficiencyBonusForLevel(level); // validate level is reachable (side-effect-free)
-  const className = character.classEntries[0]?.name ?? "";
 
   const ctx: AdvancementOpContext = {
     tx,
@@ -584,7 +583,7 @@ export async function applyAdvancementOpInTx(
     initBonus: character.initiativeBonus,
     state: normalizeResourcesMutable(character.resources),
     level,
-    totalSlots: advancementSlotsForLevel(className, level),
+    totalSlots: characterAdvancementSlots(character.classEntries, level),
     fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level),
   };
 

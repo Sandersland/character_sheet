@@ -46,7 +46,7 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
-import { advancementSlotsForLevel, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
+import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -537,8 +537,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   const state = normalizeResourcesMutable(row.resources);
   if (state.advancements.length === 0) return; // nothing to trim
 
-  const className = row.classEntries[0]?.name ?? "";
-  const allowed = advancementSlotsForLevel(className, newDerivedLevel);
+  const allowed = characterAdvancementSlots(row.classEntries, newDerivedLevel);
   const fightingStyleAllowed = characterFightingStyleFeatSlots(row.classEntries, newDerivedLevel);
 
   // Origin feats are exempt from both caps and never reversed (#1130); ASI feats
