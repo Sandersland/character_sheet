@@ -526,8 +526,8 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
       initiativeBonus: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        // All entries — the ASI cap reads the primary (position 0), the fs cap
-        // sums entitlement across every class entry (#1137).
+        // All entries (name + level) — both the ASI/feat-slot cap (#1073) and
+        // the fs cap (#1137) sum entitlement per class entry, not just the primary.
         select: { name: true, level: true },
       },
     },
