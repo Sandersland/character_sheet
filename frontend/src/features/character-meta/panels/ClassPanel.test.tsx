@@ -30,4 +30,13 @@ describe("ClassPanel", () => {
     const { container } = renderPanel(makeCharacter({ class: undefined }));
     expect(container).toBeEmptyDOMElement();
   });
+
+  // #1208: mobile Class tab ran edge-to-edge — CharacterSheetBody has zero
+  // horizontal padding on mobile (md:px-6 only), so ClassPanel must supply its
+  // own gutter to match sibling tabs' p-4 cards.
+  it("wraps ClassFeaturesSection in a mobile gutter that collapses on desktop", () => {
+    renderPanel(makeCharacter({}));
+    const sentinel = screen.getByText("class-features-section");
+    expect(sentinel.parentElement).toHaveClass("px-4", "md:px-0");
+  });
 });

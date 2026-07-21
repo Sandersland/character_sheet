@@ -12,10 +12,14 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 export default function ClassPanel({ character, reference, onUpdate }: SheetPanelProps) {
   if (!character.class) return null;
   return (
-    <ClassFeaturesSection
-      character={character}
-      referenceClasses={reference?.classes ?? []}
-      onUpdate={onUpdate}
-    />
+    // #1208: CharacterSheetBody has zero mobile gutter (px-0, md:px-6 only), so
+    // this panel supplies its own 16px inset to match the p-4 cards sibling tabs use.
+    <div className="px-4 md:px-0">
+      <ClassFeaturesSection
+        character={character}
+        referenceClasses={reference?.classes ?? []}
+        onUpdate={onUpdate}
+      />
+    </div>
   );
 }
