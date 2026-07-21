@@ -848,7 +848,7 @@ interface ResourceOpContext {
   derivedInfo: DerivedClassInfo | null;
   /** The discipline-granting entry's own effective level (#1177) — only the
    *  learnDiscipline/swapDiscipline handlers read this. */
-  level: number;
+  disciplineLevel: number;
 }
 
 type ResourceOpResult = ResourceOpAudit | Promise<ResourceOpAudit>;
@@ -863,9 +863,9 @@ const RESOURCE_OP_HANDLERS: {
   restoreResource: (ctx, op) => applyRestoreResourceOp(ctx.state, op, ctx.derivedInfo),
   learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
   forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
-  learnDiscipline: (ctx, op) => applyLearnDisciplineOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.level),
+  learnDiscipline: (ctx, op) => applyLearnDisciplineOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.disciplineLevel),
   forgetDiscipline: (ctx, op) => applyForgetDisciplineOp(ctx.state, op),
-  swapDiscipline: (ctx, op) => applySwapDisciplineOp(ctx.tx, ctx.state, op, ctx.level),
+  swapDiscipline: (ctx, op) => applySwapDisciplineOp(ctx.tx, ctx.state, op, ctx.disciplineLevel),
   learnToolProficiency: (ctx, op) => applyLearnToolProficiencyOp(ctx.state, op, ctx.derivedInfo),
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
   learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
@@ -928,8 +928,7 @@ export async function applyResourceOpInTx(
   const abilityScores = row.abilityScores as Record<string, number>;
   // Entry-scoped caps (#1177): a secondary Battle Master's maneuver cap and a
   // secondary Four Elements monk's discipline gate must come from THAT entry's
-  // own effective level, not the primary entry's. disciplineLevel is threaded
-  // as ctx.level below since only the discipline handlers consume it.
+  // own effective level, not the primary entry's.
   const { derived: derivedInfo, disciplineLevel } = deriveEntryScopedResources(
     row.classEntries,
     level,
@@ -940,7 +939,7 @@ export async function applyResourceOpInTx(
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = await dispatchResourceOp({ tx, state, derivedInfo, level: disciplineLevel }, op);
+  const audit = await dispatchResourceOp({ tx, state, derivedInfo, disciplineLevel }, op);
 
   // Write the updated state back — always via serializeResourcesState so
   // all keys round-trip (prevents clobbering toolProficienciesKnown when

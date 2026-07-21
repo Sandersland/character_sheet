@@ -204,8 +204,8 @@ function entryContributesCapFields(info: DerivedClassInfo): boolean {
 // class appears at most once in classEntries, so no cross-entry collision).
 // Creates an empty resources/features shell on first contribution if `derived`
 // is still null (e.g. an empty-featured primary with a capped secondary).
-function overlayCapFields(derived: DerivedClassInfo | null, info: DerivedClassInfo): DerivedClassInfo {
-  const target = derived ?? { resources: [], features: [] };
+function overlayCapFields(acc: DerivedClassInfo | null, info: DerivedClassInfo): DerivedClassInfo {
+  const target = acc ?? { resources: [], features: [] };
   for (const field of CAP_FIELDS) {
     if (info[field] !== undefined) target[field] = info[field];
   }
