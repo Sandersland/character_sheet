@@ -54,7 +54,7 @@ export default function CampaignsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-parchment-100">
+    <div className="flex-1 bg-parchment-100">
       <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto max-w-4xl px-6 py-5">
           <p className="font-sans text-xs font-semibold uppercase tracking-wide text-garnet-700">

@@ -5,15 +5,18 @@ import AccountMenu from "@/features/auth/AccountMenu";
 // Slim app chrome shown when signed in: top-level nav links plus an
 // avatar-triggered account menu (identity, theme toggle, logout).
 export default function AppHeader() {
-  // The creation ceremony is a full-screen immersive route (#1176) with its own
-  // chrome — hide the global bar entirely, on every viewport.
+  // The creation and level-up ceremonies are full-screen immersive routes
+  // (#1176, #1171) with their own chrome — hide the global bar entirely, on
+  // every viewport. useMatch("/characters/:id") below is exact and does NOT
+  // match the nested /level-up path, so it needs its own match.
   const creating = useMatch("/characters/new");
+  const levelingUp = useMatch("/characters/:id/level-up");
   // The mobile character sheet is an immersive 100dvh app-shell with its own
   // header (back link) + bottom nav, so hide this global bar there on phones.
   const sheet = useMatch("/characters/:id");
   const immersiveMobile = Boolean(sheet);
 
-  if (creating) return null;
+  if (creating || levelingUp) return null;
 
   return (
     <header

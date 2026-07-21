@@ -9,9 +9,9 @@ import type { ReactNode } from "react";
 // riding the tokens flipped it to light-cream in dark theme under a dark nav.
 // The gold-400 step kicker keeps ≥6:1 contrast on it in both themes.
 const STAGE_BG = "bg-[radial-gradient(ellipse_70%_55%_at_50%_12%,#4a4230,#1c1913_68%)]";
-const STAGE_PAGE = `min-h-screen ${STAGE_BG} px-4 py-8 sm:px-6 sm:py-12`;
+const STAGE_PAGE = `min-h-dvh ${STAGE_BG} px-4 py-8 sm:px-6 sm:py-12`;
 // Viewport: pin the whole ceremony to the dynamic viewport so the rail + footer
-// stay on screen and only the card body scrolls (creation's longer steps).
+// stay on screen and only the card body scrolls (creation's and level-up's longer steps).
 const STAGE_VIEWPORT = `flex h-dvh flex-col ${STAGE_BG} px-4 py-6 sm:px-6 sm:py-8`;
 
 // The mockup's paper card: outer rule + a second rule inset 8px (the ::after).

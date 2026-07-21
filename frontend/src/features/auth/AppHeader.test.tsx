@@ -71,6 +71,12 @@ describe("AppHeader", () => {
     expect(screen.queryByRole("button", { name: "Account" })).toBeNull();
   });
 
+  it("renders nothing on the level-up ceremony route (#1171)", () => {
+    renderAt("/characters/abc/level-up");
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Account" })).toBeNull();
+  });
+
   it("still renders on the character list and on a sheet (#1176)", () => {
     const { unmount } = renderAt("/");
     expect(screen.getByRole("link", { name: "Characters" })).toBeInTheDocument();

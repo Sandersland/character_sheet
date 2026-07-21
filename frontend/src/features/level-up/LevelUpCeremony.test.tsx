@@ -136,6 +136,19 @@ describe("LevelUpCeremony", () => {
     expect(screen.queryByText("SHEET")).not.toBeInTheDocument();
   });
 
+  it("scrolls the step body within a viewport-locked card, footer outside the scroller (#1171)", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
+    renderCeremony();
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    const scroller = document.querySelector(".overflow-y-auto");
+    expect(scroller).not.toBeNull();
+    expect(scroller?.className).toContain("min-h-0");
+    expect(scroller?.className).toContain("flex-1");
+    const footer = screen.getByRole("button", { name: /cancel/i }).closest("footer");
+    expect(scroller?.contains(footer)).toBe(false);
+  });
+
   it("has no axe violations", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
     const { container } = renderCeremony();

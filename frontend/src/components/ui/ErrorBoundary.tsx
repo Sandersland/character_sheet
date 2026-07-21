@@ -51,7 +51,7 @@ export default class ErrorBoundary extends Component<
       // Friendly recovery screen. Uses existing design tokens only
       // (parchment surface, garnet primary action).
       return (
-        <div className="flex min-h-screen items-center justify-center bg-parchment-100 p-4">
+        <div className="flex min-h-dvh items-center justify-center bg-parchment-100 p-4">
           <Card className="max-w-md p-6 text-center">
             <h1 className="font-display text-xl font-semibold text-garnet-800">
               Something went wrong

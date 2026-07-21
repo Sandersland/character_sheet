@@ -414,8 +414,8 @@ export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   hp.current = effMax;
   hp.temp = 0;
   hp.deathSaves = { successes: 0, failures: 0 };
-  // Recover hit dice equal to half your total (round down, min 1).
-  const recovered = Math.max(1, Math.floor(hd.total / 2));
+  // Recover hit dice equal to half your total, rounded up (SRD 5.2 Long Rest), min 1.
+  const recovered = Math.max(1, Math.ceil(hd.total / 2));
   hd.spent = Math.max(0, hd.spent - recovered);
 
   const spells = resetLongRestSpellcasting(row);
