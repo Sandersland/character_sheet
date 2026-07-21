@@ -236,7 +236,7 @@ function collectEntryScopedPools(
     const info = deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus);
     for (const pool of info?.resources ?? []) {
       if (seenPoolKeys.has(pool.key)) {
-        throw new Error(`deriveEntryScopedResources: duplicate pool key "${pool.key}" from entry "${entry.name}"`);
+        throw new Error(`collectEntryScopedPools: duplicate pool key "${pool.key}" from entry "${entry.name}"`);
       }
       seenPoolKeys.add(pool.key);
       pools.push(pool);

@@ -113,8 +113,6 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
     const view = await serialize(CHAR_ID);
     const ki = view.resources?.pools.find((p) => p.key === "ki");
 
-    expect(ki?.total).toBe(2);
-    expect(ki?.used).toBeLessThanOrEqual(2);
-    expect(ki?.remaining).toBe(0);
+    expect(ki).toMatchObject({ total: 2, used: 2, remaining: 0 });
   });
 });
