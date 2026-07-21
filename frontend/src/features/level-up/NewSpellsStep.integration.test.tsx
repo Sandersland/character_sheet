@@ -84,10 +84,10 @@ describe("NewSpellsStep in the ceremony", () => {
     expect(screen.queryByText("Fireball")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    await user.click(screen.getByRole("button", { name: "Add Shield" }));
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: /MistyStep/ }));
+    await user.click(screen.getByRole("button", { name: "Add MistyStep" }));
     const cont = screen.getByRole("button", { name: /continue/i });
     await waitFor(() => expect(cont).toBeEnabled());
 
@@ -137,8 +137,8 @@ describe("NewSpellsStep in the ceremony", () => {
     await user.click(await screen.findByRole("button", { name: /swap a known spell/i }));
     await user.click(await screen.findByRole("button", { name: /OldKnown/ }));
     // Now the cap is 2 — pick both.
-    await user.click(screen.getByRole("button", { name: /Shield/ }));
-    await user.click(screen.getByRole("button", { name: /MistyStep/ }));
+    await user.click(screen.getByRole("button", { name: "Add Shield" }));
+    await user.click(screen.getByRole("button", { name: "Add MistyStep" }));
 
     const cont = screen.getByRole("button", { name: /continue/i });
     await waitFor(() => expect(cont).toBeEnabled());
