@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ceremonyBlocked, draftSatisfies, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
-import type { LevelUpPlanResponse, LevelUpStep } from "@/types/character";
+import { draftSatisfies, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
+import type { LevelUpStep } from "@/types/character";
 
 describe("stepKey", () => {
   it("is the kind for singleton steps", () => {
@@ -32,28 +32,6 @@ describe("stepLabel", () => {
     expect(stepLabel({ kind: "subclassChoice", meta: { key: "huntersPrey", label: "Hunter's Prey" } })).toBe(
       "Hunter's Prey",
     );
-  });
-});
-
-describe("ceremonyBlocked", () => {
-  function plan(steps: LevelUpStep[], isPrimary: boolean): LevelUpPlanResponse {
-    return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps, grantedSpells: [] };
-  }
-
-  it("blocks a non-primary plan containing a resource-backed step (#1065)", () => {
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], false))).toBe(true);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "disciplines", count: 1 }], false))).toBe(true);
-    expect(ceremonyBlocked(plan([{ kind: "toolProficiency", count: 1 }], false))).toBe(true);
-    expect(
-      ceremonyBlocked(plan([{ kind: "subclassChoice", count: 1, meta: { key: "huntersPrey", label: "Hunter's Prey" } }], false)),
-    ).toBe(true);
-  });
-
-  it("does not block subclass/fightingStyle steps (entry-aware since #1065), primary plans, or a missing plan", () => {
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], false))).toBe(false);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyleFeat", count: 1 }], false))).toBe(false);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], true))).toBe(false);
-    expect(ceremonyBlocked(null)).toBe(false);
   });
 });
 

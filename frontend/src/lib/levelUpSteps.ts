@@ -2,7 +2,7 @@
 // Continue-gating. Rail-state math is shared in ceremonySteps. No JSX; consumed
 // by useLevelUpCeremony / LevelUpCeremony (which build the rail via CeremonyStepRail).
 
-import type { LevelUpPlanResponse, LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
+import type { LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
 
 // The in-progress submission minus its target (owned by useLevelUpCeremony). hp
 // is optional here because the ceremony starts before the player picks it — the
@@ -39,22 +39,6 @@ export function stepLabel(step: LevelUpStep): string {
   const label = step.meta?.label;
   if (step.kind === "subclassChoice" && typeof label === "string") return label;
   return STEP_LABELS[step.kind];
-}
-
-// Mirror of the backend RESOURCE_BACKED set gating applyLevelUpTransaction:
-// these picks derive their caps from the primary entry, so a non-primary plan
-// containing them can't commit yet (#1065). This mirror must never be NARROWER
-// than the backend guard, or users hit a raw 400 instead of the notice.
-const RESOURCE_BACKED_KINDS: ReadonlySet<LevelUpStepKind> = new Set([
-  "maneuvers",
-  "disciplines",
-  "toolProficiency",
-  "subclassChoice",
-]);
-
-/** Whether the shell must show the #1065 notice instead of the stepper. */
-export function ceremonyBlocked(plan: LevelUpPlanResponse | null): boolean {
-  return plan != null && !plan.target.isPrimary && plan.steps.some((s) => RESOURCE_BACKED_KINDS.has(s.kind));
 }
 
 // Draft entries that can satisfy a list step, by kind. subclassChoice narrows

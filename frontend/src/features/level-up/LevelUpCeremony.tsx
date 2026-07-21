@@ -49,19 +49,6 @@ function PaperNotice({ title, body, onBack }: { title: string; body: string; onB
   );
 }
 
-function NoticeCard({ c }: { c: Ceremony }) {
-  if (c.planError) {
-    return <PaperNotice title="The ceremony can't begin" body={c.planError} onBack={c.cancel} />;
-  }
-  return (
-    <PaperNotice
-      title="Not supported here yet"
-      body="This level grants subclass feature picks (maneuvers, disciplines, or similar) that can't be resolved for a non-primary class yet — use the classic Level Up on the sheet."
-      onBack={c.cancel}
-    />
-  );
-}
-
 function CeremonyHeader({ target }: { target: NonNullable<Ceremony["plan"]>["target"] }) {
   return (
     <header className="text-center">
@@ -81,16 +68,16 @@ function CeremonyHeader({ target }: { target: NonNullable<Ceremony["plan"]>["tar
 
 type CeremonyPhase =
   | { kind: "loading" }
-  | { kind: "notice" }
+  | { kind: "notice"; planError: string }
   | { kind: "ready"; plan: NonNullable<Ceremony["plan"]>; currentStep: LevelUpStep };
 
 // Reduces the ceremony hook's flat field set to one of three mutually exclusive
 // render phases, so the component below picks a branch instead of re-deriving it.
 function ceremonyPhase(c: Ceremony): CeremonyPhase {
-  if (c.plan && c.currentStep && !c.planError && !c.blocked) {
+  if (c.plan && c.currentStep && !c.planError) {
     return { kind: "ready", plan: c.plan, currentStep: c.currentStep };
   }
-  if (c.planError || c.blocked) return { kind: "notice" };
+  if (c.planError) return { kind: "notice", planError: c.planError };
   return { kind: "loading" };
 }
 
@@ -144,7 +131,7 @@ export default function LevelUpCeremony({ character }: { character: Character })
   if (phase.kind === "notice") {
     return (
       <CeremonyStage layout="page">
-        <NoticeCard c={c} />
+        <PaperNotice title="The ceremony can't begin" body={phase.planError} onBack={c.cancel} />
       </CeremonyStage>
     );
   }

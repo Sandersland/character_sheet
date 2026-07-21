@@ -698,7 +698,7 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
   });
 
 
-  it("400: a subclass choice on a NON-primary multiclass entry is not supported", async () => {
+  it("a subclass choice on a NON-primary multiclass entry commits — subclass + maneuvers + tool land on the secondary entry (#1177)", async () => {
     const CHAR_ID = "lvtx-rej-multiclass";
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await fighterClass();
@@ -708,9 +708,9 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
         ownerId: OWNER_ID,
         id: CHAR_ID,
         name: "LevelUpTx Rej Multiclass",
-        experiencePoints: 2700, // total level 4; multiclass path uses entry.level+1
+        experiencePoints: 6500, // total level 5; multiclass path uses entry.level+1 (2→3, entries sum 4→5)
         hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-        hitDice: { total: 3, die: "d8", spent: 0 }, // < derived → a pending level exists
+        hitDice: { total: 4, die: "d8", spent: 0 }, // < derived → a pending level exists
         abilityScores: { strength: 14, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
         classEntries: {
@@ -726,9 +726,6 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     const battleMaster = await prisma.subclass.findFirstOrThrow({ where: { name: "Battle Master" } });
     const maneuvers = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 3, select: { id: true } });
 
-    // A COMPLETE, valid Battle Master ceremony so submission validation passes —
-    // the rejection then comes from the post-validation non-primary guard, not a
-    // count mismatch.
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: secondary.id },
       hp: { method: "average" },
@@ -736,8 +733,17 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
       maneuvers: maneuvers.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
       toolProficiencies: [{ type: "learnToolProficiency", name: "Smith's Tools" }],
     });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/non-primary class/i);
+    expect(res.status).toBe(200);
+    expect(res.body.classes[1]).toMatchObject({ name: "fighter", level: 3, subclass: "Battle Master" });
+    expect(res.body.resources.maneuverChoiceCount).toBe(3); // fighter-3 Battle Master cap
+    expect(res.body.resources.maneuversKnown).toHaveLength(3);
+    expect(res.body.resources.toolProficienciesKnown.map((t: { name: string }) => t.name)).toContain("Smith's Tools");
+
+    const batchIds = await distinctBatchIds(CHAR_ID);
+    expect(batchIds).toHaveLength(1);
+
+    const persisted = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: secondary.id } });
+    expect(persisted.subclass).toBe("Battle Master");
   });
 
   // Status-only asserts, matching the authorization.test.ts access-guard convention.
@@ -894,10 +900,10 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     expect(primary.subclass).toBe("School of Evocation");
   });
 
-  // Pins the RESOURCE_BACKED guard for an ALREADY-subclassed non-primary entry:
-  // Battle Master Fighter 6→7 grants only maneuvers (no subclass step), so this
-  // is the path a subclass-step-only guard would miss (#886 review).
-  it("400: a non-primary Battle Master 6→7 (maneuvers-only plan) is rejected by the resource-backed guard", async () => {
+  // An ALREADY-subclassed non-primary entry: Battle Master Fighter 6→7 grants
+  // only maneuvers (no subclass step) — the entry-scoped cap must come from
+  // the fighter entry's own level 7, not the wizard primary (#1177).
+  it("a non-primary Battle Master 6→7 (maneuvers-only plan) commits and caps at the fighter-7 count; single revert restores everything", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
     const CHAR_ID = "lvtx-mc-bm-maneuvers";
@@ -918,18 +924,118 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
       },
     });
     const secondary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+    // Fighter 6→7 grants a delta of 2 new maneuver picks (5 at L7 minus 3 at L6).
     const maneuvers = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 2, select: { id: true } });
     expect(maneuvers).toHaveLength(2);
 
-    // Complete, count-valid submission — the rejection must come from the
-    // non-primary guard, not a validation mismatch.
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: secondary.id },
       hp: { method: "average" },
       maneuvers: maneuvers.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
     });
+    expect(res.status).toBe(200);
+    expect(res.body.classes[1]).toMatchObject({ name: "fighter", level: 7 });
+    expect(res.body.resources.maneuverChoiceCount).toBe(5); // fighter-7 Battle Master cap
+    expect(res.body.resources.maneuversKnown).toHaveLength(2); // the ceremony's own delta
+
+    const batchIds = await distinctBatchIds(CHAR_ID);
+    expect(batchIds).toHaveLength(1);
+
+    const undo = await revert(CHAR_ID, await latestBatchId(CHAR_ID));
+    expect(undo.status).toBe(200);
+    expect(undo.body.classes[1].level).toBe(6);
+    expect(undo.body.resources.maneuversKnown).toHaveLength(0);
+    expect(undo.body.pendingLevelUps).toBe(1);
+  });
+
+  it("a monk-secondary Way of the Four Elements ceremony (monk 2→3) records the discipline at the monk entry's own level (3), not total level", async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
+    const fourElements = await prisma.subclass.findFirstOrThrow({ where: { name: "Way of the Four Elements" } });
+    const CHAR_ID = "lvtx-mc-monk-disciplines";
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx MC Monk Disciplines",
+        experiencePoints: 34000, // level 8 threshold; entries sum 7 (fighter 5 + monk 2) → 1 pending
+        hitPoints: { current: 50, max: 50, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 7, die: "d8", spent: 0 },
+        abilityScores: { strength: 14, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 15, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: {
+          create: [
+            { name: "fighter", subclass: "Champion", classId: fighter.id, position: 0, level: 5 },
+            { name: "monk", subclass: null, classId: monk.id, position: 1, level: 2 },
+          ],
+        },
+      },
+    });
+    const secondary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+
+    const plan = await supertest(app)
+      .get(`/api/characters/${CHAR_ID}/level-up/plan`)
+      .query({ classEntryId: secondary.id, subclassId: fourElements.id })
+      .set("Cookie", COOKIE);
+    expect(plan.status).toBe(200);
+    const disciplineStep = (plan.body.steps as Array<{ kind: string; count?: number }>).find((s) => s.kind === "disciplines");
+    expect(disciplineStep?.count).toBe(1); // Four Elements grants 1 discipline at monk L3
+
+    const discipline = await prisma.grantedAbility.findFirstOrThrow({
+      where: { source: "discipline", alwaysKnown: false, minLevel: { lte: 3 } },
+      select: { id: true },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: secondary.id },
+      hp: { method: "average" },
+      subclassId: fourElements.id,
+      disciplines: [{ type: "learnDiscipline", disciplineId: discipline.id }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.classes[1]).toMatchObject({ name: "monk", level: 3, subclass: "Way of the Four Elements" });
+    const known = res.body.resources.disciplinesKnown as Array<{ disciplineId?: string; learnedAtLevel: number }>;
+    const entry = known.find((d) => d.disciplineId === discipline.id);
+    expect(entry?.learnedAtLevel).toBe(3);
+  });
+
+  it("atomicity: a bogus maneuverId 400s the whole ceremony — entry level unchanged, zero events", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-mc-bm-atomicity";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC BM Atomicity",
+        experiencePoints: 64000, // level 10 threshold; entries sum 9 → 1 pending
+        hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 9, die: "d6", spent: 0 },
+        classEntries: {
+          create: [
+            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
+            { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 6 },
+          ],
+        },
+      },
+    });
+    const secondary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+    const [real] = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 1, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: secondary.id },
+      hp: { method: "average" },
+      maneuvers: [
+        { type: "learnManeuver", maneuverId: real.id },
+        { type: "learnManeuver", maneuverId: "not-a-real-maneuver-id" },
+      ],
+    });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/not supported for a non-primary class/i);
+
+    const persisted = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: secondary.id } });
+    expect(persisted.level).toBe(6);
+    expect(await eventCount(CHAR_ID)).toBe(0);
   });
 });
 

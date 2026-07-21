@@ -111,29 +111,6 @@ describe("useLevelUpCeremony", () => {
     expect(result.current.stepIndex).toBe(1);
   });
 
-  it("flags a non-primary plan containing resource-backed steps as blocked (#1065)", async () => {
-    planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], {
-        isPrimary: false,
-        subclass: "Battle Master",
-      }),
-    );
-    const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
-
-    await waitFor(() => expect(result.current.plan).not.toBeNull());
-    expect(result.current.blocked).toBe(true);
-  });
-
-  it("does not block a non-primary subclass/fightingStyle plan (entry-aware since #1065)", async () => {
-    planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], { isPrimary: false, subclass: null }),
-    );
-    const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
-
-    await waitFor(() => expect(result.current.plan).not.toBeNull());
-    expect(result.current.blocked).toBe(false);
-  });
-
   it("confirm submits exactly { target, ...draft }", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1" } as Character);

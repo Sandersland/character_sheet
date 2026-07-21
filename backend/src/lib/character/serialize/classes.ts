@@ -6,7 +6,7 @@ import {
   deriveFeatBonuses,
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
-import { deriveResources } from "@/lib/classes/class-features.js";
+import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
@@ -20,20 +20,16 @@ export type PrimaryClass = CharacterWithRelations["classEntries"][number] | unde
 // layer stored `used` counts and known lists (clamped to caps). Returns the
 // resources view (undefined for classes with no pools). Fighting Style is a feat
 // now (#1137) — surfaced via top-level fightingStyleSlots + advancements, not here.
+// The choice-cap fields are entry-scoped (#1177) via deriveEntryScopedResources —
+// mirrors loadResourcesReconcileState (level-reconciliation.ts) so both sides
+// compute the legal limit through the one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
-  primaryClass: PrimaryClass,
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
 ): { resources: object | undefined } {
-  const derivedRes = deriveResources(
-    primaryClass?.name ?? "",
-    primaryClass?.subclass ?? undefined,
-    level,
-    abilityScores,
-    proficiencyBonus,
-  );
+  const { derived: derivedRes } = deriveEntryScopedResources(row.classEntries, level, abilityScores, proficiencyBonus);
 
   const resources = derivedRes
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
@@ -46,7 +42,7 @@ export function buildResourcesView(
 // state, clamping each level-gated list to its derived count (defense-in-depth
 // for characters who haven't had a reconciling XP op since their level dropped).
 function buildResourcesPayload(
-  derivedRes: NonNullable<ReturnType<typeof deriveResources>>,
+  derivedRes: DerivedClassInfo,
   stored: ReturnType<typeof normalizeResourcesMutable>,
 ): object {
   const clampedManeuversKnown =
