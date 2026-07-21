@@ -12,17 +12,17 @@ import type { CatalogSpell, Character, LevelUpPlanResponse, LevelUpStep } from "
 vi.mock("@/api/client", () => ({ fetchSpells: vi.fn() }));
 const fetchMock = vi.mocked(fetchSpells);
 
-function spell(id: string, level: number, classes: string[]): CatalogSpell {
+function spell(id: string, level: number, classes: string[], description = ""): CatalogSpell {
   return {
     id, name: id, level, school: "evocation", castingTime: "1 action",
-    range: "60 ft", duration: "Instant", description: "", concentration: false,
+    range: "60 ft", duration: "Instant", description, concentration: false,
     ritual: false, classes, cantripScaling: false,
   };
 }
 
 const CATALOG: CatalogSpell[] = [
-  spell("Firebolt", 0, ["wizard"]),        // cantrip — excluded
-  spell("Shield", 1, ["wizard"]),
+  spell("Firebolt", 0, ["wizard"], "A mote of fire streaks toward a creature or object within range."),
+  spell("Shield", 1, ["wizard"], "An invisible barrier of magical force appears and protects you."),
   spell("MistyStep", 2, ["wizard"]),
   spell("Fireball", 3, ["wizard"]),        // above a level-2 ceiling
   spell("CureWounds", 1, ["cleric"]),      // off-class for a wizard
@@ -85,7 +85,7 @@ describe("NewSpellsStep", () => {
 
   it("marks an already-known spell as disabled", async () => {
     render(<Harness step={newSpellsStep()} character={caster("Shield")} />);
-    const known = await screen.findByRole("button", { name: /Shield/ });
+    const known = await screen.findByRole("button", { name: "Shield already known" });
     expect(known).toBeDisabled();
     expect(screen.getByText("Known")).toBeInTheDocument();
   });
@@ -95,7 +95,7 @@ describe("NewSpellsStep", () => {
     render(<Harness step={newSpellsStep()} character={caster()} />);
     expect(await screen.findByText(/0 of 2/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    await user.click(await screen.findByRole("button", { name: "Add Shield" }));
 
     await waitFor(() => expect(screen.getByText(/1 of 2/)).toBeInTheDocument());
     expect(screen.getByTestId("picks")).toHaveTextContent(
@@ -106,10 +106,10 @@ describe("NewSpellsStep", () => {
   it("hard-caps selection at the count (the N+1th is disabled)", async () => {
     const user = userEvent.setup();
     render(<Harness step={newSpellsStep(1)} character={caster()} />);
-    await user.click(await screen.findByRole("button", { name: /Shield/ }));
+    await user.click(await screen.findByRole("button", { name: "Add Shield" }));
 
     await waitFor(() => expect(screen.getByText(/1 of 1/)).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: /MistyStep/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add MistyStep" })).toBeDisabled();
   });
 
   it("under Magical Secrets, off-class spells are offered", async () => {
@@ -137,15 +137,15 @@ describe("NewSpellsStep — cantrip picks (#1131)", () => {
     render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, cantrips: 1 })} character={caster()} />);
     expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
     // The cantrip (Firebolt) is offered in the cantrip section; the leveled picker still lists Shield.
-    await user.click(await screen.findByRole("button", { name: /Firebolt/ }));
+    await user.click(await screen.findByRole("button", { name: "Add Firebolt" }));
     await waitFor(() =>
       expect(screen.getByTestId("cantrips")).toHaveTextContent(
         JSON.stringify([{ type: "learnSpell", spellId: "Firebolt" }]),
       ),
     );
-    expect(screen.getByRole("button", { name: /Shield/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Shield" })).toBeInTheDocument();
     // A leveled pick stays in spellsLearned, never in cantripsLearned.
-    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    await user.click(screen.getByRole("button", { name: "Add Shield" }));
     expect(screen.getByTestId("picks")).toHaveTextContent(
       JSON.stringify([{ type: "learnSpell", spellId: "Shield" }]),
     );
@@ -155,8 +155,34 @@ describe("NewSpellsStep — cantrip picks (#1131)", () => {
     render(<Harness step={newSpellsStep(0, { cantrips: 1 })} character={caster()} />);
     expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Search spells")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Firebolt/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Shield/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Firebolt" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add Shield" })).not.toBeInTheDocument();
+  });
+
+  it("opens the shared detail card with the full description for a cantrip row too (#1158)", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, cantrips: 1 })} character={caster()} />);
+    await user.click(await screen.findByRole("button", { name: "Open Firebolt" }));
+    expect(screen.getByText(/mote of fire streaks toward/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Learn Firebolt/ }));
+    expect(screen.getByTestId("cantrips")).toHaveTextContent(
+      JSON.stringify([{ type: "learnSpell", spellId: "Firebolt" }]),
+    );
+    expect(screen.queryByText(/mote of fire streaks toward/)).not.toBeInTheDocument();
+  });
+
+  it("opens the shared detail card with the full description on row tap; the CTA learns and closes it (#1158)", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep()} character={caster()} />);
+    await user.click(await screen.findByRole("button", { name: "Open Shield" }));
+    expect(screen.getByText(/invisible barrier of magical force/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Learn Shield/ }));
+    expect(screen.getByTestId("picks")).toHaveTextContent(
+      JSON.stringify([{ type: "learnSpell", spellId: "Shield" }]),
+    );
+    expect(screen.queryByText(/invisible barrier of magical force/)).not.toBeInTheDocument();
   });
 });
 
@@ -200,8 +226,8 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
     expect(screen.getByTestId("forgets")).toHaveTextContent(JSON.stringify([{ type: "forgetSpell", entryId: "k-old" }]));
 
     // The cap is now 2 — both catalog picks are allowed.
-    await user.click(screen.getByRole("button", { name: /Shield/ }));
-    await user.click(screen.getByRole("button", { name: /MistyStep/ }));
+    await user.click(screen.getByRole("button", { name: "Add Shield" }));
+    await user.click(screen.getByRole("button", { name: "Add MistyStep" }));
     expect(screen.getByTestId("picks")).toHaveTextContent(
       JSON.stringify([{ type: "learnSpell", spellId: "Shield" }, { type: "learnSpell", spellId: "MistyStep" }]),
     );
@@ -213,8 +239,8 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
     const toggle = await screen.findByRole("button", { name: /swap a known spell/i });
     await user.click(toggle);
     await user.click(await screen.findByRole("button", { name: /OldChant/ }));
-    await user.click(screen.getByRole("button", { name: /Shield/ }));
-    await user.click(screen.getByRole("button", { name: /MistyStep/ }));
+    await user.click(screen.getByRole("button", { name: "Add Shield" }));
+    await user.click(screen.getByRole("button", { name: "Add MistyStep" }));
     // Deselect the swap — cap drops to 1, so one learn is trimmed.
     await user.click(screen.getByRole("button", { name: /OldChant/ }));
 

@@ -4,6 +4,7 @@ import {
   budgetHeadline,
   componentsLine,
   effectPillLabel,
+  pickDetailCtaLabel,
   pickerMetaLine,
   pickRowState,
   spellResolutionLabel,
@@ -116,6 +117,24 @@ describe("componentsLine", () => {
   it("is null without components", () => {
     expect(componentsLine({ components: null })).toBeNull();
     expect(componentsLine({})).toBeNull();
+  });
+});
+
+describe("pickDetailCtaLabel", () => {
+  it("reads 'already known' for a known spell, disabled or not", () => {
+    expect(pickDetailCtaLabel("Fire Bolt", "known", true, 2, 0, "Learn")).toBe("Fire Bolt is already known");
+  });
+
+  it("reads 'Remove' for a selected spell even at cap", () => {
+    expect(pickDetailCtaLabel("Fire Bolt", "selected", false, 2, 2, "Learn")).toBe("Remove Fire Bolt");
+  });
+
+  it("drops the count once the group is at cap and unselected", () => {
+    expect(pickDetailCtaLabel("Fire Bolt", "select", true, 2, 2, "Learn")).toBe("Learn Fire Bolt");
+  });
+
+  it("shows the next-of-cap count below cap", () => {
+    expect(pickDetailCtaLabel("Fire Bolt", "select", false, 2, 0, "Learn")).toBe("Learn Fire Bolt · 1 of 2");
   });
 });
 

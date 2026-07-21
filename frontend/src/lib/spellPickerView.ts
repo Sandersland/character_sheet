@@ -38,6 +38,23 @@ export function budgetHeadline(groups: BudgetGroup[]): string {
     .join(" · ");
 }
 
+/** Detail-card CTA label for a row's (state, disabled) pair — the single source
+ *  both SpellPicker and level-up's New Spells step (#1158) read from, so the
+ *  wording never drifts between the two surfaces. */
+export function pickDetailCtaLabel(
+  name: string,
+  state: SpellPickRowState,
+  disabled: boolean,
+  cap: number,
+  selectedCount: number,
+  verb: string,
+): string {
+  if (state === "known") return `${name} is already known`;
+  if (state === "selected") return `Remove ${name}`;
+  if (disabled) return `${verb} ${name}`;
+  return `${verb} ${name} · ${selectedCount + 1} of ${cap}`;
+}
+
 /** "Cantrip · 1 action · 60 ft." / "Level 2 · Bonus action · Self" — the row meta. */
 export function pickerMetaLine(spell: { level: number; castingTime: string; range: string }): string {
   return `${levelLabel(spell.level)} · ${spell.castingTime} · ${spell.range}`;

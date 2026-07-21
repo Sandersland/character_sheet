@@ -2,11 +2,14 @@
 // gated to the plan's count and the class's spell-level ceiling (both from the
 // backend via step.meta). Eligibility + the hard cap live in lib/newSpells and
 // useNewSpellsSelection; this component only wires the catalog fetch, search, and
-// the tri-state rows.
+// the tri-state rows. Rows + the full-description detail card (#1158) are the
+// same shared SpellPickerRow/SpellDetailCard the creation Spells step (#1160)
+// uses — never a level-up-specific copy.
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
-import NewSpellRow, { type NewSpellRowState } from "@/features/level-up/NewSpellRow";
+import SpellDetailCard from "@/features/spells/SpellDetailCard";
+import SpellPickerRow from "@/features/spells/SpellPickerRow";
 import SwapPanel from "@/features/level-up/SwapPanel";
 import { useNewSpellsSelection, type NewSpellsSelection } from "@/features/level-up/useNewSpellsSelection";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
@@ -14,6 +17,7 @@ import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
 import { INPUT_CLS, filterCatalog } from "@/lib/addSpell";
 import { eligibleNewCantrips, eligibleNewSpells, swappableKnownSpells } from "@/lib/newSpells";
 import { deriveSpellList } from "@/lib/spellList";
+import { pickDetailCtaLabel, pickRowState } from "@/lib/spellPickerView";
 import type { CatalogSpell, Character, LevelUpStep } from "@/types/character";
 
 const NO_KNOWN: ReadonlySet<string> = new Set();
@@ -36,36 +40,59 @@ function learnSummary(count: number, canSwap: boolean): string | null {
   return `You learn ${count} new spell${count === 1 ? "" : "s"}.${swap}`;
 }
 
-// Tri-state of one catalog row: an already-known spell is disabled, a picked one
-// is pressed, and an unpicked one disables once the (swap-aware) cap is hit.
-function catalogRowState(
-  spell: CatalogSpell,
-  learnedIds: ReadonlySet<string>,
-  selectedIds: string[],
-  atCap: boolean,
-): { state: NewSpellRowState; disabled: boolean } {
-  if (learnedIds.has(spell.id)) return { state: "known", disabled: true };
-  const selected = selectedIds.includes(spell.id);
-  return { state: selected ? "selected" : "select", disabled: !selected && atCap };
-}
-
-// The shared tri-state row list (leveled spells + #1131 cantrips both use it).
+// The shared tri-state row list (leveled spells + #1131 cantrips both use it):
+// SpellPickerRow renders each quiet row, and a row/ⓘ tap opens the shared
+// SpellDetailCard (#1158) with the full description and a Learn CTA — the same
+// components the creation Spells step (#1160) renders, so the two ceremonies
+// never drift. `spells` is the unfiltered eligible list, kept separate from
+// `filtered` so the open detail card survives a search-text edit.
 function SpellRowList({
-  filtered, learnedSpellIds, selectedIds, atCap, onToggle,
+  spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
 }: {
+  spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
   selectedIds: string[];
-  atCap: boolean;
+  cap: number;
   onToggle: (spellId: string) => void;
 }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const atCap = selectedIds.length >= cap;
+  const openSpell = openId ? spells.find((s) => s.id === openId) : undefined;
+  const openState = openSpell ? pickRowState(openSpell, learnedSpellIds, selectedIds, atCap) : null;
+
   return (
-    <ul className="mt-2 max-h-[320px] overflow-y-auto">
-      {filtered.map((spell) => {
-        const { state, disabled } = catalogRowState(spell, learnedSpellIds, selectedIds, atCap);
-        return <NewSpellRow key={spell.id} spell={spell} state={state} disabled={disabled} onToggle={onToggle} />;
-      })}
-    </ul>
+    <>
+      <ul className="mt-2 flex flex-col gap-2">
+        {filtered.map((spell) => {
+          const { state, disabled } = pickRowState(spell, learnedSpellIds, selectedIds, atCap);
+          return (
+            <SpellPickerRow
+              key={spell.id}
+              spell={spell}
+              state={state}
+              disabled={disabled}
+              onToggle={onToggle}
+              onOpen={() => setOpenId(spell.id)}
+            />
+          );
+        })}
+      </ul>
+      {openSpell && openState && (
+        <SpellDetailCard
+          spell={openSpell}
+          cta={{
+            label: pickDetailCtaLabel(openSpell.name, openState.state, openState.disabled, cap, selectedIds.length, "Learn"),
+            disabled: openState.disabled,
+            onPress: () => {
+              if (openState.state !== "known") onToggle(openSpell.id);
+              setOpenId(null);
+            },
+          }}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -73,15 +100,16 @@ function SpellRowList({
 // Extracted so NewSpellsStep stays under the complexity gate once the #1101 swap
 // panel is layered on top.
 function SpellResults({
-  catalog, error, showSpinner, filtered, learnedSpellIds, selectedIds, atCap, onToggle,
+  catalog, error, showSpinner, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
 }: {
   catalog: CatalogSpell[] | null;
   error: string | null;
   showSpinner: boolean;
+  spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
   selectedIds: string[];
-  atCap: boolean;
+  cap: number;
   onToggle: (spellId: string) => void;
 }) {
   return (
@@ -92,10 +120,11 @@ function SpellResults({
         <p className="mt-3 py-2 text-center text-xs text-parchment-600">No spells match your filter.</p>
       )}
       <SpellRowList
+        spells={spells}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
         selectedIds={selectedIds}
-        atCap={atCap}
+        cap={cap}
         onToggle={onToggle}
       />
     </>
@@ -105,13 +134,13 @@ function SpellResults({
 // #1131: the cantrip subsection shown above the leveled picker when the level
 // grants new cantrips. Its own search + hard cap, disjoint from the spell learns.
 function CantripSection({
-  cantrips, filtered, learnedSpellIds, selectedIds, atCap, onToggle, search, setSearch,
+  cantrips, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
 }: {
   cantrips: number;
+  spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
   selectedIds: string[];
-  atCap: boolean;
   onToggle: (spellId: string) => void;
   search: string;
   setSearch: (v: string) => void;
@@ -130,10 +159,11 @@ function CantripSection({
         className={`${INPUT_CLS} mt-2`}
       />
       <SpellRowList
+        spells={spells}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
         selectedIds={selectedIds}
-        atCap={atCap}
+        cap={cantrips}
         onToggle={onToggle}
       />
     </div>
@@ -155,12 +185,14 @@ function LeveledSpellsSection({
   learnedSpellIds: ReadonlySet<string>;
   framed: boolean;
 }) {
-  const { count, maxSpellLevel, magicalSecrets, canSwap, selectedIds, forgottenEntryId, atCap, toggle, toggleForget } = selection;
+  const { count, maxSpellLevel, magicalSecrets, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget } = selection;
   const [search, setSearch] = useState("");
   const eligible = eligibleNewSpells(catalog, { className, maxSpellLevel, magicalSecrets });
   const filtered = filterCatalog(eligible, search, "");
   const swapCandidates = swappableKnownSpells(character.spellcasting?.spells ?? []);
   const learnCopy = learnSummary(count, canSwap);
+  // #1101: a staged swap raises the learn cap by one (mirrors useNewSpellsSelection's cap).
+  const cap = count + (forgottenEntryId != null ? 1 : 0);
 
   return (
     <div className={framed ? "mt-4 border-t border-parchment-200 pt-4" : ""}>
@@ -188,10 +220,11 @@ function LeveledSpellsSection({
         catalog={catalog}
         error={error}
         showSpinner={showSpinner}
+        spells={eligible}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
         selectedIds={selectedIds}
-        atCap={atCap}
+        cap={cap}
         onToggle={toggle}
       />
     </div>
@@ -205,7 +238,8 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
   const [cantripSearch, setCantripSearch] = useState("");
 
   const learnedSpellIds = character.spellcasting ? deriveSpellList(character).learnedSpellIds : NO_KNOWN;
-  const filteredCantrips = filterCatalog(eligibleNewCantrips(catalog, plan.target.className), cantripSearch, "");
+  const eligibleCantrips = eligibleNewCantrips(catalog, plan.target.className);
+  const filteredCantrips = filterCatalog(eligibleCantrips, cantripSearch, "");
   // A cantrips-only level (Cleric/Druid at 4/10) has no leveled picker or swap.
   const showLeveled = selection.count > 0 || selection.canSwap;
 
@@ -214,10 +248,10 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
       {selection.cantrips > 0 && (
         <CantripSection
           cantrips={selection.cantrips}
+          spells={eligibleCantrips}
           filtered={filteredCantrips}
           learnedSpellIds={learnedSpellIds}
           selectedIds={selection.cantripSelectedIds}
-          atCap={selection.cantripsAtCap}
           onToggle={selection.toggleCantrip}
           search={cantripSearch}
           setSearch={setCantripSearch}

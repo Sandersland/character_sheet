@@ -8,7 +8,7 @@ import { useState } from "react";
 import SpellDetailCard from "@/features/spells/SpellDetailCard";
 import SpellPickerRow from "@/features/spells/SpellPickerRow";
 import { INPUT_CLS, filterCatalog } from "@/lib/addSpell";
-import { budgetHeadline, pickRowState } from "@/lib/spellPickerView";
+import { budgetHeadline, pickDetailCtaLabel, pickRowState } from "@/lib/spellPickerView";
 import type { CatalogSpell } from "@/types/character";
 
 export interface SpellPickerGroup {
@@ -45,17 +45,14 @@ export default function SpellPicker({ groups, knownSpellIds = NO_KNOWN, headline
   const openSpell = openGroup?.options.find((s) => s.id === open?.spellId);
 
   function ctaFor(group: SpellPickerGroup, spell: CatalogSpell): { label: string; disabled: boolean; onPress: () => void } {
-    const known = knownSpellIds.has(spell.id);
-    const selected = group.selectedIds.includes(spell.id);
     const atCap = group.selectedIds.length >= group.cap;
+    const { state, disabled } = pickRowState(spell, knownSpellIds, group.selectedIds, atCap);
     const onPress = () => {
-      if (!known) group.onToggle(spell.id);
+      if (state !== "known") group.onToggle(spell.id);
       setOpen(null);
     };
-    if (known) return { label: `${spell.name} is already known`, disabled: true, onPress };
-    if (selected) return { label: `Remove ${spell.name}`, disabled: false, onPress };
-    if (atCap) return { label: `${ctaVerb} ${spell.name}`, disabled: true, onPress };
-    return { label: `${ctaVerb} ${spell.name} · ${group.selectedIds.length + 1} of ${group.cap}`, disabled: false, onPress };
+    const label = pickDetailCtaLabel(spell.name, state, disabled, group.cap, group.selectedIds.length, ctaVerb);
+    return { label, disabled, onPress };
   }
 
   return (
