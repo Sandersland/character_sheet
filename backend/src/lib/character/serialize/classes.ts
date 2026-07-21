@@ -1,7 +1,7 @@
 // Clamp-on-read blocks here pair 1:1 with LEVEL_GATED_RECONCILERS (lib/leveling/level-reconciliation.ts).
 
 import {
-  advancementSlotsForLevel,
+  characterAdvancementSlots,
   characterFightingStyleFeatSlots,
   deriveFeatBonuses,
   deriveFeatProficiencies,
@@ -100,7 +100,6 @@ function buildResourcesPayload(
 // list + slot total + the effective values.
 export function applyAdvancementClamp(
   row: CharacterWithRelations,
-  primaryClass: PrimaryClass,
   level: number,
   hitPoints: ReturnType<typeof normalizeHitPoints>,
 ): {
@@ -114,7 +113,7 @@ export function applyAdvancementClamp(
   usedFightingStyleSlots: number;
 } {
   const storedForAdv = normalizeResourcesMutable(row.resources);
-  const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", level);
+  const advSlotTotal = characterAdvancementSlots(row.classEntries, level);
   // Fighting Style feat cap across all class entries (#1137) — its own partition.
   const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level);
   let effectiveScores = row.abilityScores as Record<string, number>;

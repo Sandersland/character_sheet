@@ -167,12 +167,16 @@ describe("derived armorClass", () => {
 
   it("a feat armorClass improvement stacks on the derived base", async () => {
     await acquire(chainMail); // 16
-    // Level 4 (2700 XP) grants one advancement slot, so the injected feat isn't clamped out.
+    // Level 4 (2700 XP) grants one advancement slot, so the injected feat isn't
+    // clamped out. Needs a real classEntries row (#1073: the slot cap sums per
+    // class entry — a class-less character earns no slots, unlike the former
+    // primary-class × total fallback).
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
         experiencePoints: 2700,
         hitDice: { total: 4, die: "d8", spent: 0 },
+        classEntries: { create: [{ name: "Wizard", position: 0, level: 4 }] },
         resources: {
           used: {},
           maneuversKnown: [],
