@@ -18,6 +18,10 @@ test("levelup: the HP die lingers on its settled face alongside the result", asy
   const id = await createCharacter(page.request, {
     name: uniqueName("Rolling Fighter"),
     className: "Fighter",
+    // #1170: flat 10s so no other class clears its multiclass prerequisite —
+    // the ceremony's class-choice step auto-skips (single option: Fighter
+    // itself), landing straight on Hit Points like this spec expects.
+    abilityScores: { strength: 10, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
   });
   await page.request.post(`/api/characters/${id}/experience`, {
     data: { operations: [{ type: "set", value: XP_TO_L2 }] },

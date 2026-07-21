@@ -30,12 +30,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
         </p>
       )}
 
-      <ClassRosterSection
-        character={character}
-        referenceClasses={referenceClasses}
-        rosterEntries={view.rosterEntries}
-        busy={busy}
-      />
+      <ClassRosterSection character={character} rosterEntries={view.rosterEntries} />
 
       <SubclassSection
         character={character}
