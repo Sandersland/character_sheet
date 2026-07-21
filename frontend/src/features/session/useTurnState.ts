@@ -34,6 +34,7 @@ import type {
   TallyRowSource,
   TallyVerdict,
 } from "@/lib/attackTallySummary";
+import type { InteractionSpend } from "@/lib/loadoutPicker";
 import type { Character } from "@/types/character";
 
 export type { AttackTallyRow, TallyAttackRoll } from "@/lib/attackTallySummary";
@@ -129,6 +130,18 @@ export interface TurnState {
   /** Sneak Attack applied this turn — enforces the rogue once-per-turn guard (#902). */
   sneakAttackUsedThisTurn: boolean;
   /**
+   * Equip/unequip credits earned this turn — one per attack made with the
+   * Attack action (PHB'24: "you can equip or unequip one weapon when you make
+   * this attack as part of the Attack action"). Spent by a mid-turn loadout
+   * swap (#1165); resets each turn.
+   */
+  attackEquipCredits: number;
+  /**
+   * Whether this turn's one free object interaction (SRD 5.2 "Interacting
+   * with Things") has been spent on a loadout swap (#1165). Resets each turn.
+   */
+  freeInteractionUsed: boolean;
+  /**
    * Turn-scoped undo stack (#730): a snapshot of the economy is pushed before
    * each consuming mutation and popped by `undo()`. Cleared on every turn/combat
    * boundary so undo never reaches across turns.
@@ -152,6 +165,8 @@ export type EconomySnapshot = Pick<
   | "bonusAttack"
   | "spellCastThisTurn"
   | "attackTally"
+  | "attackEquipCredits"
+  | "freeInteractionUsed"
 >;
 
 /**
@@ -243,6 +258,13 @@ export interface TurnStateActions {
    */
   refundAction: () => void;
   /**
+   * Pay `spend` from the interaction budget (#1165) — the caller (useLoadoutSwap)
+   * computes it via loadoutPicker's planInteractionSpend before dispatching.
+   */
+  spendInteractionBudget: (spend: InteractionSpend) => void;
+  /** Reverse a prior spendInteractionBudget — the loadout-swap Refund surface. */
+  refundInteractionBudget: (spend: InteractionSpend) => void;
+  /**
    * Commit the action slot for a spell cast (consumes the action and records the
    * spell kind for the 5e bonus-action restriction). Call on successful cast.
    */
@@ -301,6 +323,8 @@ function initialState(): TurnState {
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    attackEquipCredits: 0,
+    freeInteractionUsed: false,
     history: [],
   };
 }
@@ -315,6 +339,8 @@ function economyOf(s: TurnState): EconomySnapshot {
     bonusAttack: s.bonusAttack,
     spellCastThisTurn: s.spellCastThisTurn,
     attackTally: s.attackTally,
+    attackEquipCredits: s.attackEquipCredits,
+    freeInteractionUsed: s.freeInteractionUsed,
   };
 }
 
@@ -330,7 +356,14 @@ function hydrateTurnState(loaded: TurnState): TurnState {
     ...base,
     attackTally: backfillRows(base.attackTally),
     castTally: base.castTally ?? [],
-    history: (base.history ?? []).map((h) => ({ ...h, attackTally: backfillRows(h.attackTally) })),
+    // Pre-#1165 entries lack the interaction-budget fields — default them so a
+    // later undo() spread doesn't overwrite live state with `undefined`.
+    history: (base.history ?? []).map((h) => ({
+      ...h,
+      attackTally: backfillRows(h.attackTally),
+      attackEquipCredits: h.attackEquipCredits ?? 0,
+      freeInteractionUsed: h.freeInteractionUsed ?? false,
+    })),
   };
 }
 
@@ -370,7 +403,10 @@ function recordAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
     !atCap && recorded
       ? [...s.attackTally, tallyRowFor(recorded, "action")]
       : s.attackTally;
-  return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true, attackTally };
+  // PHB'24 Attack action: one equip/unequip credit per genuine attack made
+  // (#1165) — not earned on a clamped over-click, matching the tally guard.
+  const attackEquipCredits = atCap ? s.attackEquipCredits : s.attackEquipCredits + 1;
+  return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true, attackTally, attackEquipCredits };
 }
 
 function tallyRowFor(recorded: RecordedAttack, fallbackSource: TallyRowSource): AttackTallyRow {
@@ -536,6 +572,21 @@ const cancelTwfState = (s: TurnState): TurnState =>
 const consumeReactionState = (s: TurnState): TurnState =>
   s.reactionUsed ? s : { ...s, reactionUsed: true };
 
+// Interaction-budget spend/refund (#1165) — the caller (useLoadoutSwap) computes
+// `spend` via loadoutPicker's planInteractionSpend and just tells the reducer
+// how to book it; the reducer itself holds no rule knowledge.
+const spendInteractionBudgetState = (s: TurnState, spend: InteractionSpend): TurnState => ({
+  ...s,
+  attackEquipCredits: s.attackEquipCredits - spend.fromAttackCredits,
+  freeInteractionUsed: s.freeInteractionUsed || spend.usedFreeInteraction,
+});
+
+const refundInteractionBudgetState = (s: TurnState, spend: InteractionSpend): TurnState => ({
+  ...s,
+  attackEquipCredits: s.attackEquipCredits + spend.fromAttackCredits,
+  freeInteractionUsed: spend.usedFreeInteraction ? false : s.freeInteractionUsed,
+});
+
 function attachBatchIdState(s: TurnState, batchId: string): TurnState {
   if (s.history.length === 0) return s;
   const history = s.history.slice();
@@ -577,6 +628,8 @@ function endTurnState(s: TurnState): TurnState {
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    attackEquipCredits: 0,
+    freeInteractionUsed: false,
     history: [],
   };
 }
@@ -598,6 +651,8 @@ function startCombatState(): TurnState {
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    attackEquipCredits: 0,
+    freeInteractionUsed: false,
     history: [],
   };
 }
@@ -619,6 +674,8 @@ function startTurnState(s: TurnState): TurnState {
     castTally: [],
     spellCastThisTurn: {},
     sneakAttackUsedThisTurn: false, // once per turn — resets each of your turns
+    attackEquipCredits: 0, // interaction-budget credits reset each of your turns (#1165)
+    freeInteractionUsed: false,
     history: [], // undo never reaches across turns
   };
 }
@@ -671,6 +728,8 @@ type TurnAction =
   | { type: "cancelTwf" }
   | { type: "consumeReaction" }
   | { type: "grantExtraAction" }
+  | { type: "spendInteractionBudget"; spend: InteractionSpend }
+  | { type: "refundInteractionBudget"; spend: InteractionSpend }
   | { type: "commitActionSpell"; spellLevel: number }
   | { type: "commitBonusActionSpell"; spellLevel: number }
   // Non-undoable tally refinements — write through, never push.
@@ -704,6 +763,8 @@ const CONSUMING: ReadonlySet<TurnAction["type"]> = new Set([
   "cancelTwf",
   "consumeReaction",
   "grantExtraAction",
+  "spendInteractionBudget",
+  "refundInteractionBudget",
   "commitActionSpell",
   "commitBonusActionSpell",
 ]);
@@ -731,6 +792,8 @@ const HANDLERS: TurnActionHandlers = {
   cancelTwf: (s) => cancelTwfState(s),
   consumeReaction: (s) => consumeReactionState(s),
   grantExtraAction: (s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }),
+  spendInteractionBudget: (s, a) => spendInteractionBudgetState(s, a.spend),
+  refundInteractionBudget: (s, a) => refundInteractionBudgetState(s, a.spend),
   commitActionSpell: (s, a) => commitActionSpellState(s, a.spellLevel),
   commitBonusActionSpell: (s, a) => commitBonusActionSpellState(s, a.spellLevel),
   setTallyDamage: (s, a) => setTallyDamageState(s, a.rowId, a.damage),
@@ -857,6 +920,8 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       consumeReaction: () => dispatch({ type: "consumeReaction" }),
       grantExtraAction: () => dispatch({ type: "grantExtraAction" }),
       refundAction: () => dispatch({ type: "grantExtraAction" }),
+      spendInteractionBudget: (spend) => dispatch({ type: "spendInteractionBudget", spend }),
+      refundInteractionBudget: (spend) => dispatch({ type: "refundInteractionBudget", spend }),
       commitActionSpell: (spellLevel) => dispatch({ type: "commitActionSpell", spellLevel }),
       commitBonusActionSpell: (spellLevel) => dispatch({ type: "commitBonusActionSpell", spellLevel }),
       commitReactionSpell: () => dispatch({ type: "consumeReaction" }),

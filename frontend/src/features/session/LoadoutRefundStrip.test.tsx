@@ -8,7 +8,7 @@ function controls(over: Partial<LoadoutSwapControls> = {}): LoadoutSwapControls 
   return {
     busy: false,
     error: null,
-    lastSwap: { inverseOps: [], spentAction: true, previousLabel: "Longsword" },
+    lastSwap: { inverseOps: [], spend: null, previousLabel: "Longsword" },
     swap: vi.fn(),
     stow: vi.fn(),
     refund: vi.fn(),
