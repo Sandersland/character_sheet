@@ -187,25 +187,6 @@ export function isAttackCantrip(spell: Spell): boolean {
 }
 
 /**
- * Attack-type line for the expand section.
- * Returns null for utility spells.
- */
-
-export function attackTypeLabel(spell: Spell): string | null {
-  if (!spell.attackType) return null;
-  if (spell.attackType === "attack") return "Ranged/melee spell attack";
-  // save spell
-  const savePart = spell.saveAbility ? abilityLabel(spell.saveAbility) : "—";
-  const effectPart =
-    spell.saveEffect === "half"
-      ? " · half damage on success"
-      : spell.saveEffect === "none"
-        ? " · no effect on success"
-        : "";
-  return `${savePart} saving throw${effectPart}`;
-}
-
-/**
  * Save DC display string (for InlineSpellPicker attack-vs-save surface).
  */
 export function saveDcLabel(spell: Spell, spellSaveDC: number): string | null {

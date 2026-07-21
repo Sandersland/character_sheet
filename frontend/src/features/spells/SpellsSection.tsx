@@ -5,7 +5,7 @@
  * the presentational subcomponents (overview, spellbook list, add-spell panel).
  *
  * Two mutually-exclusive views (caster-spellbook.html §1 vs §2/§4): the record block
- * (SpellcastingOverview, quick-cast) is the default; "Manage spellbook →" opens the
+ * (SpellcastingOverview, Cast door) is the default; "Manage spellbook →" opens the
  * grimoire (SpellbookList) as its own view with a Done control. They are never stacked.
  */
 

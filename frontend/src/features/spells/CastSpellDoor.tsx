@@ -119,7 +119,9 @@ export default function CastSpellDoor({ character, derived, busy, isLive, onCast
       </button>
 
       {isLive && <LiveNotice />}
-      {pickerOpen && !isLive && <CastPickerList castable={castable} onOpen={openDetail} />}
+      {/* handleDoorClick only ever sets pickerOpen while !isLive, so isLive &&
+          pickerOpen is unreachable — no extra guard needed here. */}
+      {pickerOpen && <CastPickerList castable={castable} onOpen={openDetail} />}
 
       {detailSpell && (
         <SpellDetailCard

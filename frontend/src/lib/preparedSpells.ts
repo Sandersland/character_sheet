@@ -1,5 +1,7 @@
 // The castable spells shown in the spellcasting block: at-will cantrips plus
-// prepared leveled spells, each sorted for the quick-cast list.
+// prepared leveled spells, each sorted. derivePreparedCastable feeds both the
+// read-only prepared roster and (narrowed further by slot availability, via
+// deriveCastableSpells) the Cast door's picker (#1162).
 import { deriveSpellRow } from "@/lib/spellRow";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
