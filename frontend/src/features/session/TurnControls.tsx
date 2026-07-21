@@ -38,6 +38,12 @@ interface TurnSlotCardProps {
   onUse?: () => void;
   /** Accessible name for the Use affordance — "Use Action/Bonus/Reaction" for tests + a11y. */
   useLabel: string;
+  /**
+   * Keep the Use affordance tappable even when `used` is true — the Action
+   * slot needs this so its free-only menu mode (interaction budget, #1165)
+   * stays reachable after the Action itself is spent.
+   */
+  alwaysTappable?: boolean;
   children?: React.ReactNode;
 }
 
@@ -64,10 +70,11 @@ function MobileSlotRow({
   badge,
   onUse,
   useLabel,
+  alwaysTappable,
   children,
 }: TurnSlotCardProps) {
   const t = SLOT_TONES[tone];
-  const tappable = Boolean(onUse) && !used;
+  const tappable = Boolean(onUse) && (!used || alwaysTappable);
   const rowInner = (
     <>
       <span aria-hidden="true" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-control ${t.tile}`}>
@@ -121,6 +128,7 @@ function DesktopSlotCard({
   badge,
   onUse,
   useLabel,
+  alwaysTappable,
   children,
 }: TurnSlotCardProps) {
   const t = SLOT_TONES[tone];
@@ -148,7 +156,7 @@ function DesktopSlotCard({
           </p>
           <p className="truncate text-xs text-parchment-600">{used ? usedLabel : preview}</p>
         </div>
-        {onUse && !used && (
+        {onUse && (!used || alwaysTappable) && (
           <button
             type="button"
             onClick={onUse}

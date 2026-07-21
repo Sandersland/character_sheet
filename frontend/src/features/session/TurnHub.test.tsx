@@ -863,7 +863,7 @@ describe("TurnHub — Rage turn-hook (#457)", () => {
   });
 });
 
-describe("TurnHub — mid-turn weapon change (#815)", () => {
+describe("TurnHub — mid-turn weapon change (#815, interaction-budget model #1165)", () => {
   function weapon(over: Partial<Character["inventory"][number]>): Character["inventory"][number] {
     return {
       category: "weapon",
@@ -874,19 +874,22 @@ describe("TurnHub — mid-turn weapon change (#815)", () => {
     } as unknown as Character["inventory"][number];
   }
 
-  it("keeps free-hand weapon changes reachable after the Action is spent (0 actions)", async () => {
+  it("keeps the Action menu reachable in free-only mode after the Action is spent (0 actions)", async () => {
     const user = userEvent.setup();
     const dagger = weapon({ id: "dg", name: "Dagger" }); // bag, both hands empty
     renderHub(makeCharacter({ inventory: [dagger] }));
     await startTurn(user);
 
-    // Spend the Action — the full Action sheet is now gated shut.
+    // Spend the Action — no standalone strip exists any more (#1165); the
+    // Action button itself must stay tappable to reach the free interaction.
     await user.click(screen.getByRole("button", { name: /Use Action/ }));
     await user.click(screen.getByRole("button", { name: "Dodge" }));
-    expect(screen.queryByRole("button", { name: "Use Action" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
 
-    // The free-move weapon-change button remains, and a free draw still commits.
-    await user.click(screen.getByRole("button", { name: /Change weapons — free-hand/ }));
+    // Reopen — the menu opens in free-only mode, Change weapons is still the
+    // way in, and the turn's free interaction still covers a bare draw.
+    await user.click(screen.getByRole("button", { name: "Use Action" }));
+    await user.click(screen.getByRole("button", { name: "Change weapons" }));
     const sheet = within(screen.getByRole("dialog"));
     const main = sheet.getByText(/^Main hand/).closest('[data-testid="hand-card"]') as HTMLElement;
     await user.click(within(main).getByRole("button", { name: "Equip" })); // expand

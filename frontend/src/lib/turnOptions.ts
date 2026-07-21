@@ -208,6 +208,8 @@ export interface ActionSheetModel {
   classActionOptions: ClassActionOption[];
   /** Current hands summary for the "Change weapons" card (#815). */
   loadoutLabel: string;
+  /** Free interaction units left this turn (#1165) — gates the Change weapons card independent of the Action. */
+  interactionBudgetRemaining: number;
 }
 
 export interface BonusSheetModel {
