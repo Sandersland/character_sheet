@@ -45,7 +45,7 @@ export default function CampaignDetailPage() {
 
   if (campaign === null) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
         <h1 className="font-display text-2xl font-semibold text-parchment-900">Campaign not found</h1>
         <p className="text-sm text-parchment-600">
           You may not be a member of this campaign, or it no longer exists.
@@ -61,7 +61,7 @@ export default function CampaignDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-parchment-100">
+    <div className="flex-1 bg-parchment-100">
       <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto max-w-4xl px-6 py-5">
           <Link to="/campaigns" className="text-xs font-semibold text-garnet-700 hover:underline">

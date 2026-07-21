@@ -198,7 +198,7 @@ export default function EntityDetailPage() {
     );
 
   return (
-    <div className="min-h-screen bg-parchment-100">
+    <div className="flex-1 bg-parchment-100">
       <main className="mx-auto flex max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-8">
         <EntityPaneRail
           campaignId={campaignId ?? ""}

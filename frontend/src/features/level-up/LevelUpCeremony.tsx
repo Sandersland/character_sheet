@@ -49,6 +49,19 @@ function PaperNotice({ title, body, onBack }: { title: string; body: string; onB
   );
 }
 
+function NoticeCard({ c }: { c: Ceremony }) {
+  if (c.planError) {
+    return <PaperNotice title="The ceremony can't begin" body={c.planError} onBack={c.cancel} />;
+  }
+  return (
+    <PaperNotice
+      title="Not supported here yet"
+      body="This level grants subclass feature picks (maneuvers, disciplines, or similar) that can't be resolved for a non-primary class yet — use the classic Level Up on the sheet."
+      onBack={c.cancel}
+    />
+  );
+}
+
 function CeremonyHeader({ target }: { target: NonNullable<Ceremony["plan"]>["target"] }) {
   return (
     <header className="text-center">
@@ -66,63 +79,82 @@ function CeremonyHeader({ target }: { target: NonNullable<Ceremony["plan"]>["tar
   );
 }
 
+type CeremonyPhase =
+  | { kind: "loading" }
+  | { kind: "notice" }
+  | { kind: "ready"; plan: NonNullable<Ceremony["plan"]>; currentStep: LevelUpStep };
+
+// Reduces the ceremony hook's flat field set to one of three mutually exclusive
+// render phases, so the component below picks a branch instead of re-deriving it.
+function ceremonyPhase(c: Ceremony): CeremonyPhase {
+  if (c.plan && c.currentStep && !c.planError && !c.blocked) {
+    return { kind: "ready", plan: c.plan, currentStep: c.currentStep };
+  }
+  if (c.planError || c.blocked) return { kind: "notice" };
+  return { kind: "loading" };
+}
+
+function ReadyStep({ character, c, plan, currentStep }: { character: Character; c: Ceremony; plan: NonNullable<Ceremony["plan"]>; currentStep: LevelUpStep }) {
+  return (
+    <CeremonyCard className="flex min-h-0 flex-1 flex-col px-5 py-7 sm:px-10">
+      <div className="shrink-0">
+        <CeremonyHeader target={plan.target} />
+        <div className="mt-5">
+          <CeremonyStepRail
+            steps={c.steps.map((s) => ({ key: stepKey(s), label: stepLabel(s) }))}
+            currentKey={c.currentKey}
+          />
+        </div>
+      </div>
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto border-t border-parchment-200 pt-4">
+        <LevelUpStepContext.Provider value={{ character, draft: c.draft, setDraft: c.setDraft, plan }}>
+          <StepBody step={currentStep} />
+        </LevelUpStepContext.Provider>
+      </div>
+      {c.submitError && (
+        <p role="alert" className="mt-2 text-center text-sm font-semibold text-garnet-700">
+          {c.submitError}
+        </p>
+      )}
+      <CeremonyFooter
+        isFirst={c.stepIndex === 0}
+        isLast={c.isLast}
+        onCancel={c.cancel}
+        onBack={c.back}
+        onContinue={c.next}
+        canContinue={c.canContinue}
+        onConfirm={() => void c.confirm()}
+        confirmLabel="✓ Confirm Level Up"
+        confirmClassName="border-vitality-700 bg-vitality-700 hover:bg-vitality-800"
+        submitting={c.submitting}
+      />
+    </CeremonyCard>
+  );
+}
+
 export default function LevelUpCeremony({ character }: { character: Character }) {
   const c = useLevelUpCeremony(character);
   const showSpinner = useDelayedFlag(c.plan === null && !c.planError);
+  const phase = ceremonyPhase(c);
 
-  let content: React.ReactNode;
-  if (c.planError) {
-    content = <PaperNotice title="The ceremony can't begin" body={c.planError} onBack={c.cancel} />;
-  } else if (!c.plan || !c.currentStep) {
-    content = showSpinner ? <Spinner variant="page" /> : null;
-  } else if (c.blocked) {
-    content = (
-      <PaperNotice
-        title="Not supported here yet"
-        body="This level grants subclass feature picks (maneuvers, disciplines, or similar) that can't be resolved for a non-primary class yet — use the classic Level Up on the sheet."
-        onBack={c.cancel}
-      />
-    );
-  } else {
-    content = (
-      <>
-        <p className="mb-3 text-center text-[11px] font-bold uppercase tracking-widest text-gold-400">
-          Step {c.stepIndex + 1} of {c.steps.length}
-        </p>
-        <CeremonyCard className="px-5 py-7 sm:px-10">
-          <CeremonyHeader target={c.plan.target} />
-          <div className="mt-5">
-            <CeremonyStepRail
-              steps={c.steps.map((s) => ({ key: stepKey(s), label: stepLabel(s) }))}
-              currentKey={c.currentKey}
-            />
-          </div>
-          <div className="mt-5 border-t border-parchment-200 pt-4">
-            <LevelUpStepContext.Provider value={{ character, draft: c.draft, setDraft: c.setDraft, plan: c.plan }}>
-              <StepBody step={c.currentStep} />
-            </LevelUpStepContext.Provider>
-          </div>
-          {c.submitError && (
-            <p role="alert" className="mt-2 text-center text-sm font-semibold text-garnet-700">
-              {c.submitError}
-            </p>
-          )}
-          <CeremonyFooter
-            isFirst={c.stepIndex === 0}
-            isLast={c.isLast}
-            onCancel={c.cancel}
-            onBack={c.back}
-            onContinue={c.next}
-            canContinue={c.canContinue}
-            onConfirm={() => void c.confirm()}
-            confirmLabel="✓ Confirm Level Up"
-            confirmClassName="border-vitality-700 bg-vitality-700 hover:bg-vitality-800"
-            submitting={c.submitting}
-          />
-        </CeremonyCard>
-      </>
+  // Loading renders bare (no stage chrome) — matches CreationCeremony so a slow
+  // plan fetch doesn't flash the dark stage before there's anything to show on it.
+  if (phase.kind === "loading") return showSpinner ? <Spinner variant="page" /> : null;
+
+  if (phase.kind === "notice") {
+    return (
+      <CeremonyStage layout="page">
+        <NoticeCard c={c} />
+      </CeremonyStage>
     );
   }
 
-  return <CeremonyStage layout="page">{content}</CeremonyStage>;
+  return (
+    <CeremonyStage layout="viewport">
+      <p className="mb-3 shrink-0 text-center text-[11px] font-bold uppercase tracking-widest text-gold-400">
+        Step {c.stepIndex + 1} of {c.steps.length}
+      </p>
+      <ReadyStep character={character} c={c} plan={phase.plan} currentStep={phase.currentStep} />
+    </CeremonyStage>
+  );
 }
