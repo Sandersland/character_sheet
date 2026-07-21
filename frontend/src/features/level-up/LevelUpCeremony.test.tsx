@@ -196,10 +196,14 @@ describe("LevelUpCeremony — class choice (#1170)", () => {
         },
       ],
     } as unknown as ReferenceData);
+    const user = userEvent.setup();
     renderCeremony({ character: rogueEligible });
 
     expect(await screen.findByRole("heading", { name: /which class levels up/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /fighter/i })).toBeEnabled();
+    // New classes are collapsed behind the drill-in (#1209) — open it to reach them.
+    expect(screen.queryByRole("radio", { name: "Rogue" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /add a new class/i }));
     expect(screen.getByRole("radio", { name: "Rogue" })).toBeEnabled();
     expect(screen.getByRole("radio", { name: "Wizard" })).toBeDisabled();
     expect(planMock).not.toHaveBeenCalled();
@@ -230,7 +234,8 @@ describe("LevelUpCeremony — class choice (#1170)", () => {
     const user = userEvent.setup();
     renderCeremony({ character: rogueEligible });
 
-    await user.click(await screen.findByRole("radio", { name: "Rogue" }));
+    await user.click(await screen.findByRole("button", { name: /add a new class/i }));
+    await user.click(screen.getByRole("radio", { name: "Rogue" }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     await waitFor(() =>
