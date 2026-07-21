@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 
 import PreparedSpellList from "@/features/spells/PreparedSpellList";
 import type { Character, Spell } from "@/types/character";
@@ -33,8 +32,6 @@ describe("PreparedSpellList", () => {
           spell({ name: "Fire Bolt", level: 0 }),
           spell({ name: "Fireball", level: 3, prepared: true }),
         ])}
-        busy={false}
-        onCast={vi.fn()}
       />,
     );
     expect(screen.getByText("Cantrips · at will")).toBeInTheDocument();
@@ -43,24 +40,19 @@ describe("PreparedSpellList", () => {
     expect(screen.getByText("Fireball")).toBeInTheDocument();
   });
 
-  it("casts the spell via the Cast affordance", async () => {
-    const user = userEvent.setup();
-    const onCast = vi.fn();
+  // Casting left the roster for the record's single "Cast a spell" door (#1162);
+  // this list is read-only.
+  it("renders no Cast affordance", () => {
     render(
       <PreparedSpellList
         spellcasting={sc([spell({ name: "Fireball", level: 3, prepared: true })])}
-        busy={false}
-        onCast={onCast}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "Cast Fireball" }));
-    expect(onCast).toHaveBeenCalledWith(expect.objectContaining({ name: "Fireball" }));
+    expect(screen.queryByRole("button", { name: /Cast/ })).not.toBeInTheDocument();
   });
 
   it("renders nothing when there are no castable spells", () => {
-    const { container } = render(
-      <PreparedSpellList spellcasting={sc([])} busy={false} onCast={vi.fn()} />,
-    );
+    const { container } = render(<PreparedSpellList spellcasting={sc([])} />);
     expect(container).toBeEmptyDOMElement();
   });
 });

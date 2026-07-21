@@ -13,11 +13,15 @@ export interface SheetTab {
 }
 
 /** Props every tab panel receives — the character, loaded reference data, and the
- *  optimistic-update setter threaded down from the sheet page. */
+ *  optimistic-update setter threaded down from the sheet page. isLive/onGoToCombat
+ *  are unused by most panels; Magic's Cast door reads them to defer casting to the
+ *  Combat tab during a live session (#1162). */
 export interface SheetPanelProps {
   character: Character;
   reference: ReferenceData | null;
   onUpdate: (c: Character) => void;
+  isLive?: boolean;
+  onGoToCombat?: () => void;
 }
 
 const ALL_TABS: SheetTab[] = [

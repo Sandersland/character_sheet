@@ -180,6 +180,8 @@ function CharacterSheetWorkspace({
             activeTab={activeTab}
             livePanel={livePanel}
             sessionLoading={live.status === "loading"}
+            isLive={isLive}
+            onGoToCombat={goToCombat}
           />
         </div>
         <WorkspaceSessionModals characterId={character.id} live={live} life={life} onUpdate={onUpdate} />

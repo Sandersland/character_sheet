@@ -23,9 +23,17 @@ import { useSpellcasting } from "@/features/spells/useSpellcasting";
 interface SpellsSectionProps {
   character: Character;
   onUpdate: (character: Character) => void;
+  /** A live session is active — the Cast door defers to the Combat tab (#1162). */
+  isLive?: boolean;
+  onGoToCombat?: () => void;
 }
 
-export default function SpellsSection({ character, onUpdate }: SpellsSectionProps) {
+export default function SpellsSection({
+  character,
+  onUpdate,
+  isLive = false,
+  onGoToCombat = () => {},
+}: SpellsSectionProps) {
   const spellcasting = character.spellcasting!;
   const { slots = [], spells = [] } = spellcasting;
   const concentratingOn = spellcasting.concentratingOn ?? null;
@@ -109,9 +117,11 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       busy={busy}
       error={error}
       castResult={castResult}
+      isLive={isLive}
       onExpend={(level) => send([{ type: "expendSlot", level }])}
       onRestore={(level) => send([{ type: "restoreSlot", level }])}
       onCast={handleCast}
+      onGoToCombat={onGoToCombat}
       onManageSpellbook={() => setGrimoireOpen(true)}
       onDropConcentration={() => send([{ type: "dropConcentration" }])}
       onDismissBuff={(entryId) => send([{ type: "dismissBuff", entryId }])}
