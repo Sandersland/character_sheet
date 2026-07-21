@@ -98,12 +98,19 @@ export default function ClassChoiceStep({
           <button
             type="button"
             onClick={() => setView("top")}
+            // Accessible name disambiguates from the "New class →" open button,
+            // which shares the visible "Add a new class" wording (#1209 review).
+            aria-label="Back to class selection"
             className="mb-3 text-sm font-semibold text-garnet-700 hover:text-garnet-800"
           >
             ← Add a new class
           </button>
         )}
-        <div role="radiogroup" aria-label="Class to advance" className="grid gap-3 sm:grid-cols-2">
+        <div
+          role="radiogroup"
+          aria-label={view === "top" ? "Class to advance" : "New class to add"}
+          className="grid gap-3 sm:grid-cols-2"
+        >
           {visibleOptions.map((option) => (
             <OptionRadio
               key={optionKey(option.target)}
@@ -134,7 +141,10 @@ export default function ClassChoiceStep({
         onCancel={onCancel}
         onBack={() => {}}
         onContinue={() => selected && onContinue(selected)}
-        canContinue={selected != null}
+        // Gate on the selection's kind matching the visible view so Continue is
+        // enabled only when the checked radio is actually on screen — a top-level
+        // pick stays live if you peek into the drill-in and back out (#1209 review).
+        canContinue={selected != null && (view === "top" ? selected.kind === "existing" : selected.kind === "new")}
         onConfirm={() => {}}
         confirmLabel=""
         confirmClassName=""

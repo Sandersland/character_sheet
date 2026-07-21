@@ -58,7 +58,7 @@ describe("ClassChoiceStep", () => {
     const wizard = screen.getByRole("radio", { name: "Wizard" });
     expect(wizard).toBeDisabled();
     expect(screen.getByText(/requires intelligence 13/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add a new class/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /back to class selection/i })).toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "Fighter" })).not.toBeInTheDocument();
   });
 
@@ -71,10 +71,45 @@ describe("ClassChoiceStep", () => {
     await user.click(screen.getByRole("button", { name: /new class/i }));
     expect(screen.getByRole("radio", { name: "Rogue" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /add a new class/i }));
+    await user.click(screen.getByRole("button", { name: /back to class selection/i }));
 
     expect(screen.getByRole("radio", { name: "Fighter" })).toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "Rogue" })).not.toBeInTheDocument();
+  });
+
+  it("gates Continue off after a drill-in pick is left behind by going back (#1209 review)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ClassChoiceStep options={OPTIONS} initialTarget={null} onContinue={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /new class/i }));
+    await user.click(screen.getByRole("radio", { name: "Rogue" }));
+    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
+
+    // Back in the top view the Rogue pick isn't on screen, so Continue can't
+    // silently submit it — the enabled state must track the visible selection.
+    await user.click(screen.getByRole("button", { name: /back to class selection/i }));
+    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+  });
+
+  it("keeps a top-level pick live across an incidental drill-in visit (#1209 review)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ClassChoiceStep options={OPTIONS} initialTarget={null} onContinue={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "Fighter" }));
+    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
+
+    // Peeking into the drill-in gates Continue off (Fighter isn't shown there)…
+    await user.click(screen.getByRole("button", { name: /new class/i }));
+    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+
+    // …and returning restores the Fighter selection rather than dropping it.
+    await user.click(screen.getByRole("button", { name: /back to class selection/i }));
+    expect(screen.getByRole("radio", { name: "Fighter" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
   });
 
   it("Continue is disabled until an option is picked, when there's no initial selection", () => {
