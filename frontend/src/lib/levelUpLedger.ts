@@ -9,10 +9,11 @@ import type {
   Character,
   LearnSubclassChoiceOperation,
   LevelUpPlanResponse,
+  SpellSchool,
   TakeFeatOperation,
 } from "@/types/character";
 
-export type LedgerRowVariant = "delta" | "note" | "list";
+export type LedgerRowVariant = "delta" | "note" | "list" | "grantedSpells";
 
 export interface LedgerRow {
   label: string;
@@ -24,6 +25,8 @@ export interface LedgerRow {
   note?: string;
   /** Resolved display names (list rows). */
   items?: string[];
+  /** Per-spell name/level/school (grantedSpells rows only — #1159 unlock card). */
+  grantedSpells?: { name: string; level: number; school: SpellSchool }[];
   variant: LedgerRowVariant;
 }
 
@@ -108,6 +111,18 @@ function listRow(label: string, items: string[]): LedgerRow | null {
   return items.length ? { label, items, variant: "list" } : null;
 }
 
+// Auto-granted subclass spells get their own card variant (#1159) rather than the
+// bare name-list `listRow` — Review needs each spell's level + school to render
+// the unlock-card treatment, not just a resolved display string.
+function grantedSpellsRow(plan: LevelUpPlanResponse): LedgerRow | null {
+  if (!plan.grantedSpells.length) return null;
+  return {
+    label: plan.target.subclass ? `Granted by ${plan.target.subclass}` : "Granted Spells",
+    grantedSpells: plan.grantedSpells,
+    variant: "grantedSpells",
+  };
+}
+
 // #1101: a forgotten spell is a per-character ENTRY id, so its name resolves from
 // the character's own spellbook — not resolvers.spell (which is catalog-id space).
 function forgottenNames(draft: LevelUpDraft, character: Character): string[] {
@@ -168,10 +183,7 @@ export function buildLevelUpLedger(
     ...learnedListRows(draft, plan, resolvers, character),
     // Auto-granted subclass spells are derived on the plan, not the draft — surface
     // them so Review's "applied together" claim covers them too (#1139).
-    listRow(
-      plan.target.subclass ? `Granted by ${plan.target.subclass}` : "Granted Spells",
-      plan.grantedSpells.map((g) => g.name),
-    ),
+    grantedSpellsRow(plan),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);
 }
