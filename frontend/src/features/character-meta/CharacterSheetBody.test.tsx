@@ -6,6 +6,7 @@ import type { Character } from "@/types/character";
 
 // Stub the panels so we assert only the combat-branch routing (#960 slot logic).
 vi.mock("@/features/character-meta/panels/OverviewPanel", () => ({ default: () => <div>overview-panel</div> }));
+vi.mock("@/features/character-meta/panels/ClassPanel", () => ({ default: () => <div>class-panel</div> }));
 vi.mock("@/features/character-meta/panels/CombatPanel", () => ({ default: () => <div>static-combat-panel</div> }));
 vi.mock("@/features/character-meta/panels/InventoryPanel", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/panels/MagicPanel", () => ({ default: () => null }));
@@ -42,6 +43,14 @@ describe("CharacterSheetBody combat slot (#960)", () => {
     expect(live).toBeInTheDocument();
     expect(live.closest("[hidden]")).not.toBeNull();
     expect(screen.getByText("overview-panel")).toBeInTheDocument();
+  });
+});
+
+// #1169: the Class tab routes to its own panel.
+describe("CharacterSheetBody Class tab (#1169)", () => {
+  it("renders ClassPanel when activeTab is class", () => {
+    render(<CharacterSheetBody {...props} activeTab="class" />);
+    expect(screen.getByText("class-panel")).toBeInTheDocument();
   });
 });
 
