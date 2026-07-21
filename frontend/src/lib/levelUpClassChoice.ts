@@ -57,15 +57,35 @@ export function selectableClassChoiceCount(options: readonly ClassChoiceOption[]
   return options.filter((o) => o.eligible).length;
 }
 
+/** The id a LevelUpTarget carries, regardless of its kind. */
+function targetId(target: LevelUpTarget): string {
+  return target.kind === "existing" ? target.classEntryId : target.classId;
+}
+
 /** Structural equality for two LevelUpTargets — used to preselect a deep-linked option. */
 export function sameLevelUpTarget(
   a: LevelUpTarget | null | undefined,
   b: LevelUpTarget,
 ): boolean {
-  if (!a || a.kind !== b.kind) return false;
-  return a.kind === "existing" && b.kind === "existing"
-    ? a.classEntryId === b.classEntryId
-    : a.kind === "new" && b.kind === "new"
-      ? a.classId === b.classId
-      : false;
+  return a != null && a.kind === b.kind && targetId(a) === targetId(b);
+}
+
+/**
+ * The auto-skip target when the chooser isn't needed (single eligible option):
+ * trust the deep link unless it's found among the options and POSITIVELY
+ * confirmed ineligible (e.g. ?classId= for a class whose prereqs aren't met),
+ * in which case fall back to the one eligible option instead. A deep link not
+ * found in the options at all (reference still loading, or an ?entry= the
+ * frontend doesn't have full data for) is trusted as before — absence isn't
+ * evidence of ineligibility.
+ */
+export function resolveAutoSkipTarget(
+  deepLinkTarget: LevelUpTarget | null,
+  options: readonly ClassChoiceOption[],
+): LevelUpTarget | null {
+  const deepLinkOption = options.find((o) => sameLevelUpTarget(deepLinkTarget, o.target));
+  if (deepLinkOption && !deepLinkOption.eligible) {
+    return options.find((o) => o.eligible)?.target ?? null;
+  }
+  return deepLinkTarget;
 }

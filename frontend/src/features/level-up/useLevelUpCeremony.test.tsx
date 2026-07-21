@@ -272,6 +272,42 @@ describe("useLevelUpCeremony — class choice (#1170)", () => {
     await waitFor(() => expect(result.current.classChoice).not.toBeNull());
     expect(result.current.classChoice!.options.map((o) => o.name)).toEqual(["fighter", "wizard"]);
   });
+
+  // Review finding: decisionReady's `referenceError` arm exists so a failed
+  // reference fetch doesn't hang the ceremony forever — it degrades to
+  // existing-entries-only, same as an empty reference response.
+  it("auto-skips (doesn't hang) when the reference fetch fails, for a single-class character", async () => {
+    referenceMock.mockRejectedValue(new Error("network error"));
+    planMock.mockResolvedValue(plan(HP_ADV_REVIEW));
+    const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
+
+    await waitFor(() => expect(result.current.plan).not.toBeNull());
+    expect(result.current.classChoice).toBeNull();
+    expect(planMock).toHaveBeenCalledWith("c1", { kind: "existing", classEntryId: "entry-1" }, undefined);
+  });
+
+  // Review finding: an ineligible `?classId=` deep link (prereq not met) must
+  // not be routed through as the target just because it's the only *deep-link*
+  // candidate — the auto-skip path should still land on the sole ELIGIBLE
+  // option (here, the character's own primary class).
+  it("ignores an ineligible ?classId= deep link, falling back to the sole eligible option", async () => {
+    referenceWithClasses([
+      {
+        id: "cls-wizard",
+        name: "Wizard",
+        multiclassPrerequisite: { options: [{ intelligence: 13 }], description: "Intelligence 13" },
+      },
+    ]);
+    planMock.mockResolvedValue(plan(HP_ADV_REVIEW));
+    const { result } = renderHook(() => useLevelUpCeremony(character), {
+      wrapper: makeWrapper("/characters/c1/level-up?classId=cls-wizard"),
+    });
+
+    await waitFor(() => expect(result.current.plan).not.toBeNull());
+    expect(result.current.classChoice).toBeNull();
+    expect(planMock).toHaveBeenCalledWith("c1", { kind: "existing", classEntryId: "entry-1" }, undefined);
+    expect(planMock).not.toHaveBeenCalledWith("c1", { kind: "new", classId: "cls-wizard" }, undefined);
+  });
 });
 
 // #1170: BG3-style per-level choice — Confirm loops back to the chooser instead
@@ -322,5 +358,47 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     expect(result.current.levelAgain).toBeNull();
     expect(result.current.draft).toEqual({});
     await waitFor(() => expect(planMock).toHaveBeenCalledTimes(1));
+  });
+
+  // Review finding: the prior "level up again" tests only used the
+  // single-class fixture, which auto-skips the chooser — the actual BG3
+  // headline scenario (a multiclassed character re-choosing per level) was
+  // never exercised end-to-end.
+  it("re-enters the class chooser after 'Level up again' for a multiclassed character", async () => {
+    const multiChar = {
+      ...character,
+      classes: [
+        { id: "entry-1", name: "fighter", level: 7 },
+        { id: "entry-2", name: "wizard", level: 3 },
+      ],
+    } as unknown as Character;
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
+    const { result } = renderHook(() => useLevelUpCeremony(multiChar), { wrapper: makeWrapper() });
+
+    // First level: pick the fighter entry from the chooser, then complete it.
+    await waitFor(() => expect(result.current.classChoice).not.toBeNull());
+    act(() => result.current.classChoice!.onChoose({ kind: "existing", classEntryId: "entry-1" }));
+    await waitFor(() => expect(result.current.plan).not.toBeNull());
+
+    act(() => result.current.setDraft((d) => ({ ...d, hp: { method: "average" } })));
+    await act(() => result.current.confirm());
+    expect(result.current.levelAgain).not.toBeNull();
+
+    planMock.mockClear();
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    act(() => result.current.levelAgain!.onContinue());
+
+    // The headline scenario: the chooser reappears for the next pending level
+    // instead of silently re-advancing whatever was picked last time.
+    expect(result.current.classChoice).not.toBeNull();
+    expect(planMock).not.toHaveBeenCalled();
+
+    act(() => result.current.classChoice!.onChoose({ kind: "existing", classEntryId: "entry-2" }));
+
+    expect(result.current.classChoice).toBeNull();
+    await waitFor(() =>
+      expect(planMock).toHaveBeenCalledWith("c1", { kind: "existing", classEntryId: "entry-2" }, undefined),
+    );
   });
 });

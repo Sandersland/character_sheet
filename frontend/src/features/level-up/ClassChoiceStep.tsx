@@ -84,6 +84,9 @@ export default function ClassChoiceStep({
         </div>
       </div>
 
+      {/* onBack/onConfirm/confirmLabel/confirmClassName are inert here — isFirst
+          && !isLast always renders the Cancel/Continue pair, never Back/Confirm.
+          CeremonyFooterProps requires them for the ceremonies that do reach isLast. */}
       <CeremonyFooter
         isFirst
         isLast={false}

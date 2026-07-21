@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildClassChoiceOptions,
+  resolveAutoSkipTarget,
   sameLevelUpTarget,
   selectableClassChoiceCount,
+  type ClassChoiceOption,
 } from "@/lib/levelUpClassChoice";
 import type { AbilityScores, Character, ClassOption } from "@/types/character";
 
@@ -128,5 +130,43 @@ describe("sameLevelUpTarget", () => {
   it("is false against null/undefined", () => {
     expect(sameLevelUpTarget(null, { kind: "new", classId: "c1" })).toBe(false);
     expect(sameLevelUpTarget(undefined, { kind: "existing", classEntryId: "e1" })).toBe(false);
+  });
+});
+
+describe("resolveAutoSkipTarget", () => {
+  const eligibleExisting: ClassChoiceOption = {
+    target: { kind: "existing", classEntryId: "entry-1" },
+    name: "Fighter",
+    levelLine: "Level 5 → 6",
+    eligible: true,
+  };
+  const ineligibleNew: ClassChoiceOption = {
+    target: { kind: "new", classId: "cls-wizard" },
+    name: "Wizard",
+    levelLine: "New class — Level 1",
+    eligible: false,
+    requirement: "Intelligence 13",
+  };
+
+  it("trusts the deep link when it matches an eligible option", () => {
+    const target = resolveAutoSkipTarget({ kind: "existing", classEntryId: "entry-1" }, [
+      eligibleExisting,
+      ineligibleNew,
+    ]);
+    expect(target).toEqual({ kind: "existing", classEntryId: "entry-1" });
+  });
+
+  it("falls back to the sole eligible option when the deep link is a confirmed-ineligible new class", () => {
+    const target = resolveAutoSkipTarget({ kind: "new", classId: "cls-wizard" }, [eligibleExisting, ineligibleNew]);
+    expect(target).toEqual({ kind: "existing", classEntryId: "entry-1" });
+  });
+
+  it("trusts a deep link that isn't found in the options at all (e.g. reference still loading)", () => {
+    const target = resolveAutoSkipTarget({ kind: "new", classId: "cls-unknown" }, [eligibleExisting]);
+    expect(target).toEqual({ kind: "new", classId: "cls-unknown" });
+  });
+
+  it("passes a null deep link through unchanged", () => {
+    expect(resolveAutoSkipTarget(null, [eligibleExisting])).toBeNull();
   });
 });

@@ -14,6 +14,7 @@ import { errorMessage } from "@/lib/errorMessage";
 import { stepPosition } from "@/lib/ceremonySteps";
 import {
   buildClassChoiceOptions,
+  resolveAutoSkipTarget,
   selectableClassChoiceCount,
   type ClassChoiceOption,
 } from "@/lib/levelUpClassChoice";
@@ -87,7 +88,10 @@ function useClassChoice(
   const resetChoice = () => setChosenTarget(null);
 
   if (!decisionReady) return { status: "deciding", target: null, classChoice: null, resetChoice };
-  if (!needsClassChoice) return { status: "resolved", target: deepLinkTarget, classChoice: null, resetChoice };
+  if (!needsClassChoice) {
+    const target = resolveAutoSkipTarget(deepLinkTarget, classChoiceOptions);
+    return { status: "resolved", target, classChoice: null, resetChoice };
+  }
   if (chosenTarget) return { status: "resolved", target: chosenTarget, classChoice: null, resetChoice };
   return {
     status: "choosing",
