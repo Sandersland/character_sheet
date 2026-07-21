@@ -79,8 +79,9 @@ interface ProficiencyRowProps {
   /** Accepts the full ProficiencySource union; narrowed types (weapon/armor/tool)
    *  are all subsets so TypeScript is happy at each call site. */
   source: ProficiencySource;
-  /** "+2" etc. — tools only. When omitted a fixed-width spacer keeps chip geometry
-   *  identical to tool chips, so columns align across mixed sections. */
+  /** "+3" etc. — tool rows only. When omitted the slot is skipped entirely;
+   *  weapon/armor rows reclaim that width for the label instead of reserving
+   *  a spacer (#1168). */
   bonus?: string;
   /** Forget callback — subclass-granted tools only. */
   onForget?: () => void;
