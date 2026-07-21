@@ -1,6 +1,6 @@
 import { ChevronDown, Shield } from "lucide-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import MeterBar from "@/components/ui/MeterBar";
 import OverflowMenu from "@/components/ui/OverflowMenu";
@@ -368,16 +368,6 @@ function ExpandedSheetHeader({ character, onUpdate, pill, menuItems, onOpenSwitc
           {levelPill}
         </span>
         {pill}
-        {/* Campaign-less characters have no doorway, so keep the Join invite here. */}
-        {!character.campaignId && (
-          <Link
-            to="/campaigns"
-            title="Join a campaign to play a shared session"
-            className="flex-none rounded-control border border-parchment-300 px-2.5 py-1 text-[11px] font-semibold text-garnet-700 transition-colors hover:bg-parchment-100"
-          >
-            Join campaign
-          </Link>
-        )}
         <OverflowMenu label="Sheet actions" items={menuItems} />
       </div>
 
