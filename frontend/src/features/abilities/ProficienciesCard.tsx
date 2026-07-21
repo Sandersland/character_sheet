@@ -2,9 +2,11 @@
  * ProficienciesCard — unified display of weapon, armor, and tool proficiencies.
  *
  * All three sub-sections (Weapons / Armor / tool categories) use the same
- * `ProficiencyRow` chip in a responsive multi-column grid, so every row has
- * identical geometry (dot · name · source pill · [+PB] · [✕]) and the card
- * fills its horizontal space instead of stretching one centered column.
+ * `ProficiencyRow` chip (dot · name · source pill · optional [+PB] · optional
+ * [✕]) so the card fills its horizontal space instead of stretching one
+ * centered column. Weapon/armor rows omit the bonus and forget slots
+ * entirely rather than reserving a spacer for cross-section alignment —
+ * that width goes to the label instead (#1168).
  *
  * Tool interactivity (Student-of-War picker, forget buttons) is folded in here
  * so the call site can render a single component. Weapons and armor are derived
@@ -18,6 +20,7 @@ import {
   ARMOR_CATEGORY_LABELS,
   ARMOR_CATEGORY_ORDER,
   SOURCE_LABELS,
+  sourcePillLabel,
   type ProficiencySource,
 } from "@/lib/abilities";
 import type {
@@ -99,42 +102,44 @@ function ProficiencyRow({
         aria-hidden="true"
       />
 
-      {/* Name — left-aligned; title tooltip ensures the full name is
-          reachable if a future label still truncates at narrow widths */}
+      {/* Name — left-aligned, wraps instead of truncating so long labels
+          (category names, subclass-granted tools) are always fully
+          readable (#1168); title tooltip is a hover backstop */}
       <span
-        className="min-w-0 flex-1 truncate text-sm font-medium text-parchment-900"
+        className="min-w-0 flex-1 text-sm font-medium text-parchment-900"
         title={label}
       >
         {label}
       </span>
 
-      {/* Source pill — muted metadata tag, quieter than the primary Badge component */}
-      <span className="shrink-0 rounded-full bg-parchment-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-parchment-600">
-        {SOURCE_LABELS[source]}
+      {/* Source pill — abbreviates when the source label is long (e.g. a
+          subclass name) so it can't crowd out the proficiency label; the
+          full label is still reachable via title (#1168) */}
+      <span
+        className="shrink-0 rounded-full bg-parchment-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-parchment-600"
+        title={SOURCE_LABELS[source]}
+      >
+        {sourcePillLabel(source)}
       </span>
 
-      {/* Bonus slot — fixed width so weapon/armor chips align with tool chips */}
-      {bonus !== undefined ? (
-        <span className="w-7 shrink-0 text-right text-sm font-semibold tabular-nums text-parchment-900">
+      {/* Bonus — tools only; weapon/armor rows omit it rather than reserve a spacer */}
+      {bonus !== undefined && (
+        <span className="shrink-0 text-right text-sm font-semibold tabular-nums text-parchment-900">
           {bonus}
         </span>
-      ) : (
-        <span className="w-7 shrink-0" aria-hidden="true" />
       )}
 
-      {/* Forget slot — fixed width spacer keeps columns aligned when absent */}
-      {onForget ? (
+      {/* Forget — subclass-granted tools only; omitted (no spacer) everywhere else */}
+      {onForget && (
         <button
           onClick={onForget}
           disabled={disabled}
           title="Remove this tool proficiency choice"
           aria-label={`Remove proficiency: ${label}`}
-          className="w-5 shrink-0 rounded-control text-center text-[10px] text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
+          className="shrink-0 rounded-control text-center text-[10px] text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
         >
           ✕
         </button>
-      ) : (
-        <span className="w-5 shrink-0" aria-hidden="true" />
       )}
     </div>
   );
@@ -148,15 +153,15 @@ function ProficiencySection({
   children: React.ReactNode;
 }) {
   return (
-    <div>
+    <div className="@container">
       <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
         {title}
       </h4>
-      {/* Responsive chip grid — fills horizontal space so names don't float
-          in the center of a ~1900px-wide card (the old table-fixed problem).
-          Capped at 3 columns so the widest source pill ("BATTLE MASTER")
-          doesn't squeeze long tool names into truncation at 4-col density. */}
-      <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Chip grid sized off the card's own rendered width via container
+          queries, not viewport breakpoints — a narrow Overview sub-column
+          used to still get the wide-viewport column count and clip labels
+          (#1168). Capped at 2 columns; 1 below @sm. */}
+      <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 @sm:grid-cols-2">
         {children}
       </div>
     </div>

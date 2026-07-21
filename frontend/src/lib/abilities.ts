@@ -129,6 +129,14 @@ export const SOURCE_LABELS: Record<ProficiencySource, string> = {
   item:       "Item",
 };
 
+/** Compact pill text for a proficiency source chip. Multi-word labels (e.g.
+ *  a subclass name) abbreviate to initials so the pill can't crowd out the
+ *  proficiency label; the full label stays reachable via `title` (#1168). */
+export function sourcePillLabel(source: ProficiencySource): string {
+  const words = SOURCE_LABELS[source].split(" ");
+  return words.length > 1 ? words.map((w) => w[0]).join("").toUpperCase() : words[0];
+}
+
 /** Three-letter uppercase ability abbreviation (e.g. "strength" → "STR"). */
 export function abilityAbbr(key: string): string {
   return abilityLabel(key).slice(0, 3).toUpperCase();
