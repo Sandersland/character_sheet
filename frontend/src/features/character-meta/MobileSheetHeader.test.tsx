@@ -101,9 +101,10 @@ describe("MobileSheetHeader", () => {
     expect(screen.queryByRole("link", { name: /join campaign/i })).not.toBeInTheDocument();
   });
 
-  it("offers 'Join campaign' when the character is in no campaign", () => {
+  it("does not render a 'Join campaign' affordance even when the character is in no campaign", () => {
     renderHeader({ character: makeCharacter({ campaignId: undefined }) });
-    expect(screen.getByRole("link", { name: /join campaign/i })).toHaveAttribute("href", "/campaigns");
+    expect(screen.queryByRole("link", { name: /join campaign/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /join campaign/i })).not.toBeInTheDocument();
   });
 
   it("adds Leave / End Session to the menu while joined, and fires their handlers", () => {
