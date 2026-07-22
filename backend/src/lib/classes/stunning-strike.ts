@@ -3,8 +3,8 @@
 // with an Unarmed Strike or a monk weapon, spend 1 focus to force a
 // Constitution save against the monk's focus save DC (8 + prof + Wis): fail →
 // Stunned until the start of the monk's next turn; success (2024 rule) → the
-// target's speed is halved and the monk's attacks against it have advantage,
-// both until the start of the monk's next turn.
+// target's speed is halved until the start of the monk's next turn, and the
+// next attack roll against it before then has advantage.
 //
 // Target-rider modeling choice (#1242): this app has no NPC/monster Combatant
 // model — Session/SessionParticipant track only the party's own Characters,
@@ -55,7 +55,7 @@ export function canAttemptStunningStrike(input: { usedThisTurn: boolean }): bool
   return !input.usedThisTurn;
 }
 
-/** SRD 5.2 Constitution save: fail (roll < DC) is Stunned; success halves speed + grants advantage. */
+/** SRD 5.2 Constitution save: fail (roll < DC) is Stunned; success halves speed + grants advantage on the next attack roll against it. */
 export function resolveStunningStrikeOutcome(roll: number, dc: number): StunningStrikeOutcome {
   return roll >= dc ? "success" : "fail";
 }
@@ -64,7 +64,7 @@ function stunningStrikeSummary(dc: number, roll: number, outcome: StunningStrike
   const base = `Stunning Strike — DC ${dc}, target rolled ${roll}`;
   return outcome === "fail"
     ? `${base}: failed the save — Stunned until the start of your next turn.`
-    : `${base}: made the save — its speed is halved and your attacks against it have advantage until the start of your next turn.`;
+    : `${base}: made the save — its speed is halved until the start of your next turn, and the next attack roll against it before then has advantage.`;
 }
 
 const STUNNING_STRIKE_SELECT = {

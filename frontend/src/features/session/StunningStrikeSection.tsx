@@ -3,7 +3,7 @@
 // Constitution save against the focus DC. The server rolls the save (flat
 // d20 — the target's ability scores aren't tracked by this app, see
 // stunning-strike.ts) and returns the fail(Stunned)/success(half-speed +
-// advantage) outcome, surfaced inline exactly like SneakAttackSection — no
+// next-attack advantage) outcome, surfaced inline exactly like SneakAttackSection — no
 // toast: the app has no forced-result toast primitive (#956 retired the old
 // RollResultToast in favor of the player-rolled-only RollResultSeal), so the
 // result reads inline here plus the persisted session-log event.
@@ -108,7 +108,7 @@ export default function StunningStrikeSection({
           Rolled {result.roll} vs DC {result.dc} —{" "}
           {result.outcome === "fail"
             ? "failed: Stunned until the start of your next turn."
-            : "made it: its speed is halved and your attacks against it have advantage until the start of your next turn."}
+            : "made it: its speed is halved until the start of your next turn, and the next attack roll against it before then has advantage."}
         </p>
       )}
     </div>
