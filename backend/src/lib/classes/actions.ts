@@ -106,10 +106,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "actionSurge", name: "Action Surge", cost: "special", grantClass: "fighter", grantLevel: 2, resourceKey: "actionSurge", resourceAmount: 1 },
 
   // Monk
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 2 },
-  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
-  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
-  { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "ki", resourceAmount: 1 },
+  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 2 },
+  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
+  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
+  { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "focus", resourceAmount: 1 },
   // Way of Shadow reminder actions (#440) — no resourceKey, no server effect; reminder is the deliverable.
   { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
   { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17, reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction." },
@@ -284,10 +284,10 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   actionSurge: () => [{ type: "spendResource", key: "actionSurge" }],
 
   // Monk
-  flurryOfBlows: () => [{ type: "spendResource", key: "ki", amount: 2 }],
-  patientDefense: () => [{ type: "spendResource", key: "ki" }],
-  stepOfTheWind: () => [{ type: "spendResource", key: "ki" }],
-  stunningStrike: () => [{ type: "spendResource", key: "ki" }],
+  flurryOfBlows: () => [{ type: "spendResource", key: "focus", amount: 2 }],
+  patientDefense: () => [{ type: "spendResource", key: "focus" }],
+  stepOfTheWind: () => [{ type: "spendResource", key: "focus" }],
+  stunningStrike: () => [{ type: "spendResource", key: "focus" }],
 
   // Paladin
   divineSense: () => [{ type: "spendResource", key: "divineSense" }],

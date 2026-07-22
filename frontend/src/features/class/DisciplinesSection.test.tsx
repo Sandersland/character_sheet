@@ -18,7 +18,7 @@ const CATALOG: CatalogDiscipline[] = [
     alwaysKnown: true,
     saveAbility: null,
     cost: { kind: "none" },
-    effect: { effectType: "utility", damageType: null, attackType: null, saveAbility: null, saveEffect: null, scaling: { mode: "ki", dicePerStep: 0 } },
+    effect: { effectType: "utility", damageType: null, attackType: null, saveAbility: null, saveEffect: null, scaling: { mode: "focus", dicePerStep: 0 } },
   },
   {
     id: "fangs",
@@ -27,8 +27,8 @@ const CATALOG: CatalogDiscipline[] = [
     minLevel: 3,
     alwaysKnown: false,
     saveAbility: null,
-    cost: { kind: "pool", key: "ki", base: 1, perStep: 1 },
-    effect: { effectType: "damage", dice: { count: 1, faces: 10, modifier: 0 }, damageType: "fire", attackType: "attack", saveAbility: null, saveEffect: null, scaling: { mode: "ki", dicePerStep: 1 } },
+    cost: { kind: "pool", key: "focus", base: 1, perStep: 1 },
+    effect: { effectType: "damage", dice: { count: 1, faces: 10, modifier: 0 }, damageType: "fire", attackType: "attack", saveAbility: null, saveEffect: null, scaling: { mode: "focus", dicePerStep: 1 } },
   },
   {
     id: "thunders",
@@ -37,19 +37,19 @@ const CATALOG: CatalogDiscipline[] = [
     minLevel: 3,
     alwaysKnown: false,
     saveAbility: "constitution",
-    cost: { kind: "pool", key: "ki", base: 2 },
-    effect: { effectType: "damage", dice: { count: 3, faces: 8, modifier: 0 }, damageType: "thunder", attackType: "save", saveAbility: "constitution", saveEffect: "half", scaling: { mode: "ki", dicePerStep: 0 } },
+    cost: { kind: "pool", key: "focus", base: 2 },
+    effect: { effectType: "damage", dice: { count: 3, faces: 8, modifier: 0 }, damageType: "thunder", attackType: "save", saveAbility: "constitution", saveEffect: "half", scaling: { mode: "focus", dicePerStep: 0 } },
   },
 ];
 
-function makeCharacter(kiRemaining: number): Character {
+function makeCharacter(focusRemaining: number): Character {
   return {
     id: "char-1",
     class: "Monk",
     level: 6,
     resources: {
       features: [],
-      pools: [{ key: "ki", label: "Ki", total: 6, recharge: "shortRest", used: 6 - kiRemaining, remaining: kiRemaining }],
+      pools: [{ key: "focus", label: "Focus", total: 6, recharge: "shortRest", used: 6 - focusRemaining, remaining: focusRemaining }],
       maneuversKnown: [],
       disciplinesKnown: [],
       toolProficienciesKnown: [],
@@ -88,9 +88,9 @@ beforeEach(() => {
 });
 
 describe("DisciplinesSection", () => {
-  it("shows ki save DC, ki remaining, the learned + always-known rows, and known count", async () => {
+  it("shows focus save DC, focus remaining, the learned + always-known rows, and known count", async () => {
     renderSection();
-    expect(screen.getByText("Ki Save DC:")).toBeInTheDocument();
+    expect(screen.getByText("Focus Save DC:")).toBeInTheDocument();
     expect(screen.getByText("13")).toBeInTheDocument();
     // Learned + always-known both listed once the catalog loads.
     await waitFor(() => expect(screen.getByText("Elemental Attunement")).toBeInTheDocument());
@@ -108,12 +108,12 @@ describe("DisciplinesSection", () => {
 
     expect(handlers.onCast).toHaveBeenCalledTimes(1);
     const op = handlers.onCast.mock.calls[0][0];
-    expect(op).toMatchObject({ type: "castDiscipline", disciplineId: "fangs", kiSpent: 1 });
+    expect(op).toMatchObject({ type: "castDiscipline", disciplineId: "fangs", focusSpent: 1 });
     expect(op.roll).toBeGreaterThanOrEqual(1);
     expect(op.roll).toBeLessThanOrEqual(10);
   });
 
-  it("lets a scalable discipline choose extra ki before casting", async () => {
+  it("lets a scalable discipline choose extra focus before casting", async () => {
     const user = userEvent.setup();
     const handlers = renderSection();
     await waitFor(() => expect(screen.getByText("Fangs of the Fire Snake")).toBeInTheDocument());
@@ -123,8 +123,8 @@ describe("DisciplinesSection", () => {
     await user.click(within(fangsRow).getByRole("button", { name: "Cast" }));
 
     const op = handlers.onCast.mock.calls[0][0];
-    expect(op.kiSpent).toBe(3);
-    // 3 ki → base 1 + 2 extra steps → 3d10, so at least 3.
+    expect(op.focusSpent).toBe(3);
+    // 3 focus → base 1 + 2 extra steps → 3d10, so at least 3.
     expect(op.roll).toBeGreaterThanOrEqual(3);
   });
 

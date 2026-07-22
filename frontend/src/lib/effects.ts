@@ -10,9 +10,9 @@ import type { RollSpec } from "@/lib/dice";
 export type EffectType = "damage" | "heal" | "utility" | "buff";
 
 // How the dice count grows: cantrips scale by character level, leveled spells by
-// slot upcast steps, ki-fuelled abilities by ki spent above the base cost.
+// slot upcast steps, focus-fuelled abilities by focus spent above the base cost.
 export interface EffectScaling {
-  mode: "none" | "slotUpcast" | "cantripLevel" | "ki";
+  mode: "none" | "slotUpcast" | "cantripLevel" | "focus";
   dicePerStep?: number;
 }
 
@@ -102,7 +102,7 @@ export function readEffectSpec(row: EffectRow): EffectSpec {
 }
 
 // Resolve a spec to a concrete RollSpec. `effectiveStep` is the scaling step
-// count (upcast levels above base / ki above base cost; 0 for cantrips). Returns
+// count (upcast levels above base / focus above base cost; 0 for cantrips). Returns
 // null when the effect carries no dice.
 export function resolveEffectSpec(
   spec: EffectSpec,
@@ -116,7 +116,7 @@ export function resolveEffectSpec(
     if (ctx.characterLevel >= 17) count *= 4;
     else if (ctx.characterLevel >= 11) count *= 3;
     else if (ctx.characterLevel >= 5) count *= 2;
-  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "ki") {
+  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "focus") {
     count += effectiveStep * (spec.scaling.dicePerStep ?? 0);
   }
 

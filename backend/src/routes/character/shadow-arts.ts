@@ -13,7 +13,7 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 export const shadowArtsRouter = Router({ mergeParams: true });
 
 // Feeds the Way of Shadow monk's Shadow Arts picker — mirrors GET /api/disciplines.
-// Each row carries its embedded ki cost (AbilityCost) and flat EffectSpec.
+// Each row carries its embedded focus cost (AbilityCost) and flat EffectSpec.
 shadowArtsRouter.get("/", async (_req, res) => {
   const arts = await prisma.grantedAbility.findMany({
     where: { source: "shadowArts" },
@@ -47,7 +47,7 @@ const transactionsRequestSchema = z.object({
  * POST /api/characters/:id/shadow-arts/transactions
  * Intent-bearing batch mutation for Shadow Arts — mirrors the disciplines
  * endpoint. The one op today:
- *   castShadowArt — spend a flat 2 ki, apply concentration/buff, log the cast.
+ *   castShadowArt — spend a flat 2 focus, apply concentration/buff, log the cast.
  */
 makeTransactionsEndpoint({
   router: shadowArtsRouter,

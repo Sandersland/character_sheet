@@ -3,7 +3,7 @@
  *
  * The pool branch delegates to applySpendResourceInTx, which reads the
  * character + derives the pool from class/level, so it needs Postgres. Seeds a
- * level-5 Monk (ki total 5) and pays a ki cost inside a real transaction.
+ * level-5 Monk (focus total 5) and pays a focus cost inside a real transaction.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -16,7 +16,7 @@ import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 
 const OWNER_ID = "owner-ability-cost-pool";
 
-// Level-5 Monk: XP 6500 → level 5 → ki total 5.
+// Level-5 Monk: XP 6500 → level 5 → focus total 5.
 const MONK_L5 = {
   name: "Ability Cost Pool Test Monk",
   alignment: "Lawful Neutral",
@@ -53,27 +53,27 @@ describe("payAbilityCostInTx — pool branch (DB-backed)", () => {
     await prisma.character.deleteMany({ where: { id: characterId } });
   });
 
-  it("pays 3 ki from base 2 → effectiveStep 1, persists used.ki=3, logs a spendResource event", async () => {
+  it("pays 3 focus from base 2 → effectiveStep 1, persists used.focus=3, logs a spendResource event", async () => {
     const paid = await prisma.$transaction((tx) =>
       payAbilityCostInTx(
         { tx, characterId, batchId: "batch-pool-1", sessionId: null },
-        { kind: "pool", key: "ki", base: 2 },
+        { kind: "pool", key: "focus", base: 2 },
         3
       )
     );
 
     expect(paid.effectiveStep).toBe(1);
-    expect(paid.label).toBe("Spent 3 Ki — 2/5 remaining");
+    expect(paid.label).toBe("Spent 3 Focus Points — 2/5 remaining");
 
     const row = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
     const state = row.resources as { used: Record<string, number> };
-    expect(state.used.ki).toBe(3);
+    expect(state.used.focus).toBe(3);
 
     const events = await prisma.characterEvent.findMany({
       where: { characterId, category: "resources", type: "spendResource" },
     });
     expect(events).toHaveLength(1);
-    expect((events[0].data as Record<string, unknown>).key).toBe("ki");
+    expect((events[0].data as Record<string, unknown>).key).toBe("focus");
     expect((events[0].data as Record<string, unknown>).amount).toBe(3);
   });
 
@@ -82,7 +82,7 @@ describe("payAbilityCostInTx — pool branch (DB-backed)", () => {
       prisma.$transaction((tx) =>
         payAbilityCostInTx(
           { tx, characterId, batchId: "batch-pool-2", sessionId: null },
-          { kind: "pool", key: "ki", base: 2 },
+          { kind: "pool", key: "focus", base: 2 },
           6
         )
       )

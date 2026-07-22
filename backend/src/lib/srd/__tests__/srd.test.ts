@@ -225,24 +225,24 @@ describe("deriveResources — Fighter base pools", () => {
   });
 });
 
-// ── Monk — Ki ─────────────────────────────────────────────────────────────────
+// ── Monk — Focus (2024 rename of Ki, #1222) ───────────────────────────────────
 
-describe("deriveResources — Monk Ki", () => {
-  it("no ki pool below level 2", () => {
+describe("deriveResources — Monk Focus", () => {
+  it("no focus pool below level 2", () => {
     const result = deriveResources("monk", undefined, 1, ABILITY_SCORES, PROF_2);
-    expect(result!.resources.find((r) => r.key === "ki")).toBeUndefined();
+    expect(result!.resources.find((r) => r.key === "focus")).toBeUndefined();
   });
 
-  it("ki total equals monk level", () => {
+  it("focus total equals monk level", () => {
     for (const level of [2, 5, 10, 17, 20]) {
       const result = deriveResources("monk", undefined, level, ABILITY_SCORES, PROF_2);
-      expect(result!.resources.find((r) => r.key === "ki")!.total).toBe(level);
+      expect(result!.resources.find((r) => r.key === "focus")!.total).toBe(level);
     }
   });
 
-  it("ki recharges on short-or-long rest", () => {
+  it("focus recharges on short-or-long rest", () => {
     const result = deriveResources("monk", undefined, 5, ABILITY_SCORES, PROF_3);
-    expect(result!.resources.find((r) => r.key === "ki")!.recharge).toBe("short-or-long");
+    expect(result!.resources.find((r) => r.key === "focus")!.recharge).toBe("short-or-long");
   });
 });
 

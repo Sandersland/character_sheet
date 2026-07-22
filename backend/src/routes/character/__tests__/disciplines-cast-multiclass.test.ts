@@ -1,7 +1,7 @@
 /**
  * Elemental Discipline casting where Way of the Four Elements Monk is a
- * SECONDARY class entry (#1072). KI_CAST_CHARACTER_SELECT used take: 1 on
- * classEntries, so a non-primary monk's disciplineSaveDC/ki cap were
+ * SECONDARY class entry (#1072). FOCUS_CAST_CHARACTER_SELECT used take: 1 on
+ * classEntries, so a non-primary monk's disciplineSaveDC/focus cap were
  * invisible to the op — resolveDisciplineCast threw "Only a ... monk".
  */
 
@@ -19,10 +19,10 @@ let COOKIE: string;
 const FIXTURE_ID = "test-disc-cast-multiclass-1072";
 
 // Fighter 2 / Monk (Way of the Four Elements) 3 — total level 5, prof +3.
-// Monk's OWN effective level (3, entry-scoped) drives the ki pool (3), the
-// per-cast ki cap (maxKiPerDiscipline(3) = 2), and disciplineSaveDC
+// Monk's OWN effective level (3, entry-scoped) drives the focus pool (3), the
+// per-cast focus cap (maxFocusPerDiscipline(3) = 2), and disciplineSaveDC
 // (8 + prof 3 + Wis mod 2 = 13) — NOT the total character level (5), which
-// would wrongly permit a 3-ki cast and derive a different DC.
+// would wrongly permit a 3-focus cast and derive a different DC.
 const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Discipline Cast Multiclass Test",
@@ -76,25 +76,25 @@ describe("castDiscipline — Way of the Four Elements Monk as a SECONDARY class 
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
 
-  it("casts a learned discipline, spends ki from the monk pool, DC derived from the monk entry's own level", async () => {
+  it("casts a learned discipline, spends focus from the monk pool, DC derived from the monk entry's own level", async () => {
     await learn(waterWhipId);
 
-    const res = await agent().post(url).send({ operations: [{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 2, roll: 15 }] });
+    const res = await agent().post(url).send({ operations: [{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 2, roll: 15 }] });
     expect(res.status).toBe(200);
 
-    const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(ki.total).toBe(3); // monk's own effective level 3
-    expect(ki.used).toBe(2);
+    const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+    expect(focus.total).toBe(3); // monk's own effective level 3
+    expect(focus.used).toBe(2);
 
     const activityRes = await agent().get(`/api/characters/${FIXTURE_ID}/activity?category=resources`);
     const castEvent = (activityRes.body as Array<{ type: string; data?: Record<string, unknown> }>).find((e) => e.type === "castDiscipline")!;
-    expect(castEvent.data).toMatchObject({ disciplineId: waterWhipId, kiSpent: 2, roll: 15, saveDc: 13 });
+    expect(castEvent.data).toMatchObject({ disciplineId: waterWhipId, focusSpent: 2, roll: 15, saveDc: 13 });
   });
 
-  it("rejects ki above the MONK ENTRY's own per-cast cap (2 at monk level 3), even though total character level (5) would allow 3", async () => {
+  it("rejects focus above the MONK ENTRY's own per-cast cap (2 at monk level 3), even though total character level (5) would allow 3", async () => {
     await learn(waterWhipId);
 
-    const res = await agent().post(url).send({ operations: [{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 3, roll: 30 }] });
+    const res = await agent().post(url).send({ operations: [{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 3, roll: 30 }] });
     expect(res.status).toBe(400);
   });
 });

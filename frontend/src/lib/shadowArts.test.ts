@@ -8,7 +8,7 @@ const art = (over: Partial<CatalogShadowArt> = {}): CatalogShadowArt => ({
   name: "Shadow Arts: Darkness",
   description: "Magical darkness.",
   minLevel: 3,
-  cost: { kind: "pool", key: "ki", base: 2 },
+  cost: { kind: "pool", key: "focus", base: 2 },
   effect: {
     effectType: "utility",
     damageType: null,
@@ -25,14 +25,14 @@ describe("shadowArtView (#688)", () => {
   it("strips the name prefix and gates affordability on the pool cost", () => {
     const view = shadowArtView(art(), 4, false, null);
     expect(view.displayName).toBe("Darkness");
-    expect(view.kiCost).toBe(2);
+    expect(view.focusCost).toBe(2);
     expect(view.canAfford).toBe(true);
     expect(shadowArtView(art(), 1, false, null).canAfford).toBe(false);
   });
 
   it("a none-cost art costs 0 and is always affordable", () => {
     const view = shadowArtView(art({ cost: { kind: "none" } }), 0, false, null);
-    expect(view.kiCost).toBe(0);
+    expect(view.focusCost).toBe(0);
     expect(view.canAfford).toBe(true);
   });
 

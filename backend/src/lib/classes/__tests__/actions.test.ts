@@ -125,15 +125,15 @@ describe("deriveActions — resource gating", () => {
     expect(rage?.disabledReason).toBe("No rage remaining");
   });
 
-  it("flurryOfBlows needs ki×2: disabled with 'Need 2 ki, have 1' when ki=1", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("ki", 1)]);
+  it("flurryOfBlows needs focus×2: disabled with 'Need 2 focus, have 1' when focus=1", () => {
+    const actions = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(false);
-    expect(flurry?.disabledReason).toBe("Need 2 ki, have 1");
+    expect(flurry?.disabledReason).toBe("Need 2 focus, have 1");
   });
 
-  it("flurryOfBlows is enabled when ki >= 2", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("ki", 3)]);
+  it("flurryOfBlows is enabled when focus >= 2", () => {
+    const actions = deriveActions("monk", undefined, 2, [pool("focus", 3)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(true);
   });
@@ -236,28 +236,28 @@ describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
   });
 });
 
-describe("ACTION_EFFECT_FN — monk ki actions", () => {
-  it("flurryOfBlows → spendResource ki amount:2", () => {
+describe("ACTION_EFFECT_FN — monk focus actions", () => {
+  it("flurryOfBlows → spendResource focus amount:2", () => {
     expect(ACTION_EFFECT_FN.flurryOfBlows({})).toEqual([
-      { type: "spendResource", key: "ki", amount: 2 },
+      { type: "spendResource", key: "focus", amount: 2 },
     ]);
   });
 
-  it("patientDefense → spendResource ki (no amount)", () => {
+  it("patientDefense → spendResource focus (no amount)", () => {
     expect(ACTION_EFFECT_FN.patientDefense({})).toEqual([
-      { type: "spendResource", key: "ki" },
+      { type: "spendResource", key: "focus" },
     ]);
   });
 
-  it("stepOfTheWind → spendResource ki", () => {
+  it("stepOfTheWind → spendResource focus", () => {
     expect(ACTION_EFFECT_FN.stepOfTheWind({})).toEqual([
-      { type: "spendResource", key: "ki" },
+      { type: "spendResource", key: "focus" },
     ]);
   });
 
-  it("stunningStrike → spendResource ki", () => {
+  it("stunningStrike → spendResource focus", () => {
     expect(ACTION_EFFECT_FN.stunningStrike({})).toEqual([
-      { type: "spendResource", key: "ki" },
+      { type: "spendResource", key: "focus" },
     ]);
   });
 });
@@ -271,12 +271,12 @@ describe("Monk Stunning Strike — combat feature wiring (#392)", () => {
     expect(keys(deriveActions("monk", undefined, 4, []))).not.toContain("stunningStrike");
   });
 
-  it("spends 1 ki when invoked", () => {
+  it("spends 1 focus when invoked", () => {
     const ops = ACTION_EFFECT_FN.stunningStrike({});
     expect(ops).toHaveLength(1);
     const [op] = ops as Array<{ type: string; key: string; amount?: number }>;
     expect(op.type).toBe("spendResource");
-    expect(op.key).toBe("ki");
+    expect(op.key).toBe("focus");
     // amount omitted defaults to 1 in the spendResource handler.
     expect(op.amount ?? 1).toBe(1);
   });

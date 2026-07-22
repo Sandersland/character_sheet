@@ -1,6 +1,6 @@
 /**
  * Resource + maneuver transaction handler — the analog to applySpellcastingOperations
- * for trackable class/subclass resources (superiority dice, ki, rage) and
+ * for trackable class/subclass resources (superiority dice, focus, rage) and
  * known-maneuver lists.
  *
  * What is persisted: `used` counts per resource key and the `maneuversKnown`

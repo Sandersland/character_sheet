@@ -141,20 +141,20 @@ describe("Shadow Arts cast endpoint", () => {
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
 
-  it("casts each of the 4 Shadow Arts for 2 ki", async () => {
+  it("casts each of the 4 Shadow Arts for 2 focus", async () => {
     for (const id of [darknessId, silenceId, passWithoutTraceId, darkvisionId]) {
       await createMonk(XP_L3, "way of shadow");
       const res = await cast([{ type: "castShadowArt", shadowArtId: id }]);
       expect(res.status).toBe(200);
       // The serialized character surfaces the Shadow Arts gate flag for the FE panel.
       expect(res.body.resources.shadowArtsAvailable).toBe(true);
-      const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-      expect(ki.used).toBe(2);
+      const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+      expect(focus.used).toBe(2);
 
       const events = await activity();
       const castEvent = events.find((e) => e.type === "castShadowArt")!;
       expect(castEvent).toBeDefined();
-      expect(castEvent.data).toMatchObject({ shadowArtId: id, kiSpent: 2 });
+      expect(castEvent.data).toMatchObject({ shadowArtId: id, focusSpent: 2 });
       expect(events.some((e) => e.type === "spendResource")).toBe(true);
 
       await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
@@ -185,7 +185,7 @@ describe("Shadow Arts cast endpoint", () => {
     expect(concentratingOn).toBeNull();
   });
 
-  // Byte-identical oracle for the shared ki-cast event tail (#642): pins the full
+  // Byte-identical oracle for the shared focus-cast event tail (#642): pins the full
   // castShadowArt event payloads (before/after/summary/data) so the extraction of
   // snapshotSpellcasting + the event-emitting tail into a shared helper stays exact.
   it("pins the castShadowArt event payloads exactly (before/after/summary/data)", async () => {
@@ -218,7 +218,7 @@ describe("Shadow Arts cast endpoint", () => {
     expect(castEvent).not.toBeNull();
     expect(castEvent!.before).toBeNull();
     expect(castEvent!.after).toBeNull();
-    expect(castEvent!.data).toEqual({ shadowArtId: darknessId, kiSpent: 2 });
+    expect(castEvent!.data).toEqual({ shadowArtId: darknessId, focusSpent: 2 });
   });
 
   it("applies +10 Stealth buff for Pass without Trace and clears it on concentration break", async () => {
@@ -242,16 +242,16 @@ describe("Shadow Arts cast endpoint", () => {
     expect(remaining.some((b) => b.sourceEntryId === prefixedPwt)).toBe(false);
   });
 
-  it("logs an undoable cast: revert refunds ki and restores concentration to null", async () => {
+  it("logs an undoable cast: revert refunds focus and restores concentration to null", async () => {
     await createMonk(XP_L3, "way of shadow");
     const casted = await cast([{ type: "castShadowArt", shadowArtId: passWithoutTraceId }]);
-    expect(casted.body.resources.pools.find((p: { key: string }) => p.key === "ki").used).toBe(2);
+    expect(casted.body.resources.pools.find((p: { key: string }) => p.key === "focus").used).toBe(2);
 
     const events = await activity();
     const batchId = events.find((e) => e.type === "castShadowArt")!.batchId!;
     const undo = await agent().post(`/api/characters/${FIXTURE_ID}/events/${batchId}/revert`);
     expect(undo.status).toBe(200);
-    expect(undo.body.resources.pools.find((p: { key: string }) => p.key === "ki").used).toBe(0);
+    expect(undo.body.resources.pools.find((p: { key: string }) => p.key === "focus").used).toBe(0);
 
     const reverted = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { spellcasting: true, activeEffects: true } });
     expect((reverted!.spellcasting as { concentratingOn: unknown }).concentratingOn).toBeNull();
@@ -402,7 +402,7 @@ describe("Shadow Arts source guard", () => {
     sourceClassId = cls.id;
     const row = await prisma.grantedAbility.upsert({
       where: { name: NON_SHADOW_NAME },
-      create: { name: NON_SHADOW_NAME, description: "A discipline, not a Shadow Art.", source: "discipline", minLevel: 3, costKind: "pool", costPoolKey: "ki", costBase: 2 },
+      create: { name: NON_SHADOW_NAME, description: "A discipline, not a Shadow Art.", source: "discipline", minLevel: 3, costKind: "pool", costPoolKey: "focus", costBase: 2 },
       update: { source: "discipline" },
     });
     nonShadowId = row.id;

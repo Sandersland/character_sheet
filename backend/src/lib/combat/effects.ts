@@ -7,9 +7,9 @@
 export type EffectType = "damage" | "heal" | "utility" | "buff";
 
 // How the dice count grows: cantrips scale by character level, leveled spells by
-// slot upcast steps, ki-fuelled abilities by ki spent above the base cost.
+// slot upcast steps, focus-fuelled abilities by focus spent above the base cost.
 export interface EffectScaling {
-  mode: "none" | "slotUpcast" | "cantripLevel" | "ki";
+  mode: "none" | "slotUpcast" | "cantripLevel" | "focus";
   dicePerStep?: number;
 }
 
@@ -114,7 +114,7 @@ export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): E
   };
 }
 
-// Catalog columns a ki-fuelled ability (discipline, Shadow Art) maps to an
+// Catalog columns a focus-fuelled ability (discipline, Shadow Art) maps to an
 // EffectSpec. The row carries the dice/damage/save fields OR the buff fields; the
 // caller supplies the two genuine per-subclass differences via CatalogEffectConfig.
 export interface CatalogEffectRow {
@@ -131,15 +131,15 @@ export interface CatalogEffectRow {
   buffModifier?: number | null;
 }
 
-// The genuine differences between ki-cast subclasses: how the effect scales (ki
-// vs flat) and which ability names concentrate (a per-name set membership test).
+// The genuine differences between focus-cast subclasses: how the effect scales
+// (focus vs flat) and which ability names concentrate (a per-name set membership test).
 export interface CatalogEffectConfig {
   scaling: EffectScaling;
   concentrates: (name: string) => boolean;
 }
 
-// Build a ki-fuelled ability's EffectSpec from its catalog row. Disciplines pass
-// { mode: "ki", dicePerStep } + their concentration set; Shadow Arts pass
+// Build a focus-fuelled ability's EffectSpec from its catalog row. Disciplines pass
+// { mode: "focus", dicePerStep } + their concentration set; Shadow Arts pass
 // { mode: "none" } + theirs. Kept deliberately thin — the declarative subclass
 // engine (#416) will subsume this row→spec mapping.
 export function catalogEffectSpec(row: CatalogEffectRow, config: CatalogEffectConfig): EffectSpec {
@@ -177,7 +177,7 @@ export function resolveBuffSpec(spec: EffectSpec): BuffDescriptor | null {
 }
 
 // Resolve a spec to a concrete dice roll. `effectiveStep` is the scaling step
-// count (upcast levels above base / ki above base cost; 0 for cantrips). Returns
+// count (upcast levels above base / focus above base cost; 0 for cantrips). Returns
 // null when the effect carries no dice.
 export function resolveEffectSpec(
   spec: EffectSpec,
@@ -191,7 +191,7 @@ export function resolveEffectSpec(
     if (ctx.characterLevel >= 17) count *= 4;
     else if (ctx.characterLevel >= 11) count *= 3;
     else if (ctx.characterLevel >= 5) count *= 2;
-  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "ki") {
+  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "focus") {
     count += effectiveStep * (spec.scaling.dicePerStep ?? 0);
   }
 

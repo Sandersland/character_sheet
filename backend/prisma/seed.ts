@@ -191,7 +191,7 @@ async function seedDisciplines(prisma: PrismaClient) {
   }
 }
 
-// Seed Shadow Arts catalog — upsert by unique name. Flat 2-ki, no scaling.
+// Seed Shadow Arts catalog — upsert by unique name. Flat 2-focus, no scaling.
 async function seedShadowArts(prisma: PrismaClient) {
   for (const art of SHADOW_ARTS) {
     const data = {
@@ -201,7 +201,7 @@ async function seedShadowArts(prisma: PrismaClient) {
       minLevel: 3,
       alwaysKnown: true,
       costKind: "pool",
-      costPoolKey: "ki",
+      costPoolKey: "focus",
       costBase: 2,
       costPerStep: null,
       effectKind: orNull(art.effectKind),

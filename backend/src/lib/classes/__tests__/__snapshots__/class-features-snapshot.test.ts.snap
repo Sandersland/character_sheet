@@ -20766,9 +20766,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -20812,9 +20812,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -20864,9 +20864,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -20928,9 +20928,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -20998,9 +20998,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -21080,9 +21080,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -21162,9 +21162,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -21244,9 +21244,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -21332,9 +21332,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -21420,9 +21420,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -21508,9 +21508,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -21602,9 +21602,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -21702,9 +21702,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -21808,9 +21808,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -21914,9 +21914,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -22020,9 +22020,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -22132,9 +22132,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -22244,9 +22244,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -22362,9 +22362,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 20,
         },
@@ -22427,9 +22427,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -22479,9 +22479,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -22538,9 +22538,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -22609,9 +22609,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -22692,9 +22692,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -22787,9 +22787,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -22882,9 +22882,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -22977,9 +22977,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -23078,9 +23078,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -23186,9 +23186,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -23294,9 +23294,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -23408,9 +23408,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -23528,9 +23528,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -23654,9 +23654,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -23780,9 +23780,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -23912,9 +23912,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -24050,9 +24050,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -24188,9 +24188,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -24332,9 +24332,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 20,
         },
@@ -24398,9 +24398,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -24452,9 +24452,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -24512,9 +24512,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -24584,9 +24584,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -24668,9 +24668,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -24764,9 +24764,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -24860,9 +24860,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -24956,9 +24956,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -25058,9 +25058,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -25166,9 +25166,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -25274,9 +25274,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -25388,9 +25388,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -25508,9 +25508,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -25634,9 +25634,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -25760,9 +25760,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -25892,9 +25892,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -26030,9 +26030,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -26168,9 +26168,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -26312,9 +26312,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 20,
         },
@@ -26377,9 +26377,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -26429,9 +26429,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -26487,9 +26487,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -26557,9 +26557,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -26639,9 +26639,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -26740,9 +26740,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -26841,9 +26841,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -26942,9 +26942,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -27049,9 +27049,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -27162,9 +27162,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -27275,9 +27275,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -27394,9 +27394,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -27519,9 +27519,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -27650,9 +27650,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -27781,9 +27781,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -27918,9 +27918,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -28061,9 +28061,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -28204,9 +28204,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -28353,9 +28353,9 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       ],
       "resources": [
         {
-          "description": "Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
-          "key": "ki",
-          "label": "Ki",
+          "description": "Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
           "recharge": "short-or-long",
           "total": 20,
         },

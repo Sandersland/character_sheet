@@ -225,12 +225,12 @@ export async function applySpellcastingTransactions(
   return postTransactions(characterId, "spellcasting", operations, "Failed to apply spellcasting operations");
 }
 
-// Feeds the Four Elements monk's discipline picker (min level + ki cost + ki-scaled effect).
+// Feeds the Four Elements monk's discipline picker (min level + focus cost + focus-scaled effect).
 export async function fetchDisciplines(): Promise<CatalogDiscipline[]> {
   return request<CatalogDiscipline[]>("/disciplines", undefined, "Failed to fetch discipline catalog");
 }
 
-// Applies a batch of discipline operations atomically: castDiscipline (spend ki,
+// Applies a batch of discipline operations atomically: castDiscipline (spend focus,
 // roll the discipline's EffectSpec). Full updated Character returned on success.
 export async function applyDisciplineTransactions(
   characterId: string,
@@ -239,13 +239,13 @@ export async function applyDisciplineTransactions(
   return postTransactions(characterId, "disciplines", operations, "Failed to apply discipline operations");
 }
 
-// Feeds the Way of Shadow monk's Shadow Arts picker — 4 flat 2-ki ki-cast spells.
+// Feeds the Way of Shadow monk's Shadow Arts picker — 4 flat 2-focus focus-cast spells.
 export async function fetchShadowArts(): Promise<CatalogShadowArt[]> {
   return request<CatalogShadowArt[]>("/shadow-arts", undefined, "Failed to fetch shadow arts catalog");
 }
 
 // Applies a batch of Shadow Arts operations atomically: castShadowArt (spend a
-// flat 2 ki, apply concentration/buff). Full updated Character returned on success.
+// flat 2 focus, apply concentration/buff). Full updated Character returned on success.
 export async function applyShadowArtsTransactions(
   characterId: string,
   operations: ShadowArtOperation[]

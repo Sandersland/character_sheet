@@ -105,10 +105,10 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   },
   actionSurge:       { key: "actionSurge",       kind: "simple-confirm", slot: "special",     serverEffect: true,  resourceKey: "actionSurge" },
 
-  flurryOfBlows:     { key: "flurryOfBlows",     kind: "attack-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "ki", resourceAmount: 2 },
-  patientDefense:    { key: "patientDefense",    kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
-  stepOfTheWind:     { key: "stepOfTheWind",     kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
-  stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "ki" },
+  flurryOfBlows:     { key: "flurryOfBlows",     kind: "attack-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 2 },
+  patientDefense:    { key: "patientDefense",    kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  stepOfTheWind:     { key: "stepOfTheWind",     kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "focus" },
   // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },

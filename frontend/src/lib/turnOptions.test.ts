@@ -165,8 +165,8 @@ describe("poolBadgeFor", () => {
 
   it("undefined when the key or pool is missing", () => {
     expect(poolBadgeFor(undefined, [pool({})])).toBeUndefined();
-    expect(poolBadgeFor("ki", [pool({})])).toBeUndefined();
-    expect(poolBadgeFor("ki", undefined)).toBeUndefined();
+    expect(poolBadgeFor("focus", [pool({})])).toBeUndefined();
+    expect(poolBadgeFor("focus", undefined)).toBeUndefined();
   });
 });
 

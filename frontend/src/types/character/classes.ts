@@ -4,7 +4,7 @@
 
 import type { EffectSpec } from "@/lib/effects";
 
-/** Ki (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
+/** Focus (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
 export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
   | { kind: "none" };
@@ -21,7 +21,7 @@ export interface CatalogDiscipline {
   effect: EffectSpec;
 }
 
-/** A Way of Shadow Shadow Art from GET /api/shadow-arts (flat 2-ki ki-cast spell). */
+/** A Way of Shadow Shadow Art from GET /api/shadow-arts (flat 2-focus focus-cast spell). */
 export interface CatalogShadowArt {
   id: string;
   name: string;
@@ -180,9 +180,9 @@ export interface CharacterResources {
   maneuverSaveDC?: number;
   /** Way of the Four Elements: elemental disciplines known at this level. */
   disciplineChoiceCount?: number;
-  /** Way of the Four Elements: ki save DC for discipline effects (8 + prof + Wis mod). */
+  /** Way of the Four Elements: focus save DC for discipline effects (8 + prof + Wis mod). */
   disciplineSaveDC?: number;
-  /** Way of Shadow: whether the L3+ Shadow Arts ki-cast spells are available. */
+  /** Way of Shadow: whether the L3+ Shadow Arts focus-cast spells are available. */
   shadowArtsAvailable?: boolean;
   /** Way of Shadow: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
   cloakOfShadowsAvailable?: boolean;
@@ -273,12 +273,12 @@ export type ResourceOperation =
  * Discipline operation types — mirror of `applyDisciplineOperations`. Sent as
  * `{ operations: DisciplineOperation[] }` to POST /api/characters/:id/disciplines/transactions.
  *
- * Cast a known elemental discipline: spend ki, send the client-computed roll total (0 for utility).
+ * Cast a known elemental discipline: spend focus, send the client-computed roll total (0 for utility).
  */
 export interface CastDisciplineOperation {
   type: "castDiscipline";
   disciplineId: string;
-  kiSpent: number;
+  focusSpent: number;
   roll: number;
 }
 
@@ -288,7 +288,7 @@ export type DisciplineOperation = CastDisciplineOperation;
  * Shadow Arts operation types — mirror of `applyShadowArtsOperations`. Sent as
  * `{ operations: ShadowArtOperation[] }` to POST /api/characters/:id/shadow-arts/transactions.
  *
- * Cast a Shadow Art (Way of Shadow): spend a flat 2 ki, apply concentration/buff.
+ * Cast a Shadow Art (Way of Shadow): spend a flat 2 focus, apply concentration/buff.
  */
 export interface CastShadowArtOperation {
   type: "castShadowArt";

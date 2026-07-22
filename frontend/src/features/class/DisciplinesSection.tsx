@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchDisciplines } from "@/api/client";
-import { kiRemaining } from "@/lib/disciplines";
+import { focusRemaining } from "@/lib/disciplines";
 import type {
   CastDisciplineOperation,
   CatalogDiscipline,
@@ -61,7 +61,7 @@ export default function DisciplinesSection({
 
   const level = character.level;
   const catalogById = new Map((catalog ?? []).map((d) => [d.id, d]));
-  const kiAvailable = kiRemaining(character.resources);
+  const focusAvailable = focusRemaining(character.resources);
 
   // Always-known disciplines (Elemental Attunement) — free, uncapped, not forgettable.
   const alwaysKnownRows: DisciplineEntry[] = (catalog ?? [])
@@ -96,9 +96,9 @@ export default function DisciplinesSection({
 
       {saveDC !== undefined && (
         <p className="mb-3 text-xs text-parchment-600">
-          Ki Save DC:{" "}
+          Focus Save DC:{" "}
           <span className="font-semibold text-parchment-900">{saveDC}</span>
-          <span className="ml-2">Ki remaining: <span className="font-semibold text-gold-800">{kiAvailable}</span></span>
+          <span className="ml-2">Focus remaining: <span className="font-semibold text-gold-800">{focusAvailable}</span></span>
         </p>
       )}
 
@@ -109,7 +109,7 @@ export default function DisciplinesSection({
             entry={entry}
             catalog={catalogById.get(entry.disciplineId ?? "")}
             characterLevel={level}
-            kiAvailable={kiAvailable}
+            focusAvailable={focusAvailable}
             saveDC={saveDC}
             forgettable={false}
             busy={busy}
@@ -124,7 +124,7 @@ export default function DisciplinesSection({
             entry={entry}
             catalog={entry.disciplineId ? catalogById.get(entry.disciplineId) : undefined}
             characterLevel={level}
-            kiAvailable={kiAvailable}
+            focusAvailable={focusAvailable}
             saveDC={saveDC}
             forgettable
             busy={busy}
