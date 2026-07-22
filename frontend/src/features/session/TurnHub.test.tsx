@@ -1048,3 +1048,112 @@ describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
     expect(card).toHaveAttribute("title", "Requires no armor or Shield");
   });
 });
+
+describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
+  function deflectMonk(overrides: Partial<Character> = {}): Character {
+    return makeCharacter({
+      class: "Monk",
+      subclass: undefined,
+      level: 5,
+      abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10 },
+      unarmedStrike: {
+        attackBonus: 6,
+        damage: { count: 1, faces: 8, modifier: 3, damageType: "bludgeoning" },
+      },
+      availableActions: [
+        {
+          key: "deflectAttacks",
+          name: "Deflect Attacks",
+          cost: "reaction",
+          enabled: true,
+          reminder:
+            "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+        },
+        { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+      ],
+      resources: {
+        features: [],
+        pools: [{ key: "focus", label: "Focus Points", total: 5, recharge: "short-or-long", used: 0, remaining: 5 }],
+        maneuversKnown: [],
+        toolProficienciesKnown: [],
+      },
+      ...overrides,
+    } as unknown as Partial<Character>);
+  }
+
+  it("rolls the reduction on click, shows the toast, and consumes the reaction (no server call)", async () => {
+    const user = userEvent.setup();
+    renderHub(deflectMonk());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    expect(screen.getByText(/1d10 \+ Dex modifier \+ monk level/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    expect(screen.queryByRole("button", { name: "Use Reaction" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Deflect Attacks — reduce bludgeoning, piercing, or slashing damage/)).toBeInTheDocument();
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+  });
+
+  it("offers the redirect option after the base roll, and spends 1 Focus on click", async () => {
+    const user = userEvent.setup();
+    renderHub(deflectMonk());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    const redirectButton = await screen.findByRole("button", { name: /Redirect/ });
+    await user.click(redirectButton);
+
+    await waitFor(() =>
+      expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
+        { type: "executeAction", actionKey: "deflectAttacksRedirect" },
+      ]),
+    );
+    expect(await screen.findByText(/Dexterity sav/i)).toBeInTheDocument();
+    // The redirect is one-shot per reaction — the button doesn't linger.
+    expect(screen.queryByRole("button", { name: /Redirect/ })).not.toBeInTheDocument();
+  });
+
+  it("does not offer the redirect option when no Focus remains", async () => {
+    const user = userEvent.setup();
+    renderHub(
+      deflectMonk({
+        availableActions: [
+          {
+            key: "deflectAttacks",
+            name: "Deflect Attacks",
+            cost: "reaction",
+            enabled: true,
+          },
+          { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: false, disabledReason: "No focus remaining" },
+        ],
+        resources: {
+          features: [],
+          pools: [{ key: "focus", label: "Focus Points", total: 5, recharge: "short-or-long", used: 5, remaining: 0 }],
+          maneuversKnown: [],
+          toolProficienciesKnown: [],
+        },
+      } as unknown as Partial<Character>),
+    );
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    expect(screen.queryByRole("button", { name: /Redirect/ })).not.toBeInTheDocument();
+  });
+
+  it("names 'any damage type' at monk L13 (Deflect Energy)", async () => {
+    const user = userEvent.setup();
+    renderHub(deflectMonk({ level: 13 }));
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    expect(screen.getByText(/Deflect Attacks — reduce any damage type/)).toBeInTheDocument();
+  });
+});

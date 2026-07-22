@@ -22,6 +22,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "secondWind", "actionSurge",
   "bonusUnarmedStrike",
   "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus", "stunningStrike",
+  "deflectAttacksRedirect",
   "divineSense", "layOnHands", "channelDivinityPaladin",
   "cunningAction",
   "metamagic",
@@ -122,6 +123,21 @@ describe("actionResolvers", () => {
     expect(stepFocus).toBeDefined();
     expect(stepFocus!.serverEffect).toBe(true);
     expect(stepFocus!.resourceKey).toBe("focus");
+  });
+
+  it("Deflect Attacks base reduction is a reaction reminder; the redirect is a real Focus spend (#1241)", () => {
+    const deflect = resolverFor("deflectAttacks");
+    expect(deflect).toBeDefined();
+    expect(deflect!.kind).toBe("simple-confirm");
+    expect(deflect!.slot).toBe("reaction");
+    expect(deflect!.serverEffect).toBe(false); // reminder only — the dynamic roll is bespoke in useTurnActions
+
+    const redirect = resolverFor("deflectAttacksRedirect");
+    expect(redirect).toBeDefined();
+    expect(redirect!.kind).toBe("simple-confirm");
+    expect(redirect!.slot).toBe("free"); // decided within the same reaction, not its own slot
+    expect(redirect!.serverEffect).toBe(true);
+    expect(redirect!.resourceKey).toBe("focus");
   });
 
   it("all resolvers have a valid slot", () => {

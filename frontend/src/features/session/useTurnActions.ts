@@ -414,6 +414,10 @@ export function useTurnActions({
     busy,
     error,
     reactionMessage,
+    // Exposed alongside the value (#1241) so TurnHub can compose the sibling
+    // useDeflectAttacksReaction hook (see that file's header for why it's a
+    // sibling rather than nested in here) and write into the same result strip.
+    setReactionMessage,
     effectMessage,
     showActionMenu,
     setShowActionMenu,

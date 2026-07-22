@@ -449,6 +449,61 @@ describe("Way of Shadow — Shadow Step / Opportunist (#440)", () => {
   });
 });
 
+describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
+  it("is granted at monk L3 as a reaction with no resourceKey (free reminder, base reduction costs nothing)", () => {
+    expect(keys(deriveActions("monk", undefined, 2, []))).not.toContain("deflectAttacks");
+    const l3 = deriveActions("monk", undefined, 3, []);
+    const deflect = l3.find((a) => a.key === "deflectAttacks");
+    expect(deflect).toBeDefined();
+    expect(deflect?.cost).toBe("reaction");
+    expect(deflect?.enabled).toBe(true);
+    expect(deflect?.disabledReason).toBeUndefined();
+  });
+
+  it("carries its rule text as a reminder for in-session surfacing", () => {
+    const deflect = deriveActions("monk", undefined, 3, []).find((a) => a.key === "deflectAttacks");
+    expect(deflect?.reminder).toMatch(/bludgeoning, piercing, or slashing/i);
+    expect(deflect?.reminder).toMatch(/reaction/i);
+  });
+
+  it("is a pure reminder action — no server effect fn for the base reduction", () => {
+    // Mirrors Way of Shadow's shadowStep/opportunist (#440): the client rolls
+    // 1d10 + Dex + monk level and never calls the transactions endpoint for the
+    // base reduction (nothing persisted). Only the redirect spends Focus.
+    expect(ACTION_EFFECT_FN.deflectAttacks).toBeUndefined();
+    expect(ACTION_CAST_FN.deflectAttacks).toBeUndefined();
+  });
+
+  it("deflectAttacksRedirect is granted at monk L3 as a free-cost Focus spend", () => {
+    expect(keys(deriveActions("monk", undefined, 2, []))).not.toContain("deflectAttacksRedirect");
+    const l3 = deriveActions("monk", undefined, 3, [pool("focus", 3)]);
+    const redirect = l3.find((a) => a.key === "deflectAttacksRedirect");
+    expect(redirect).toBeDefined();
+    expect(redirect?.cost).toBe("free");
+    expect(redirect?.enabled).toBe(true);
+  });
+
+  it("deflectAttacksRedirect is disabled with no Focus remaining", () => {
+    const redirect = deriveActions("monk", undefined, 3, [pool("focus", 0)]).find(
+      (a) => a.key === "deflectAttacksRedirect",
+    );
+    expect(redirect?.enabled).toBe(false);
+    expect(redirect?.disabledReason).toBe("No focus remaining");
+  });
+
+  it("deflectAttacksRedirect spends 1 focus", () => {
+    expect(ACTION_EFFECT_FN.deflectAttacksRedirect({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("class gate: a non-monk gets neither key", () => {
+    const fighter = keys(deriveActions("fighter", undefined, 20, []));
+    expect(fighter).not.toContain("deflectAttacks");
+    expect(fighter).not.toContain("deflectAttacksRedirect");
+  });
+});
+
 describe("ACTION_CAST_FN — secondWind (#420)", () => {
   it("is a cast-core action, not an op-list action", () => {
     // The migration moved Second Wind off ACTION_EFFECT_FN onto the cast core.
