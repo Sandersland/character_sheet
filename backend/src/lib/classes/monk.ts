@@ -35,7 +35,7 @@ const MONK_FEATURES: DerivedFeature[] = [
     level: 2,
     source: "class",
     description:
-      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (2 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
   },
   {
     name: "Unarmored Movement",
@@ -97,7 +97,7 @@ const MONK_FEATURES: DerivedFeature[] = [
     level: 10,
     source: "class",
     description:
-      "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes for 1 focus (instead of two); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+      "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
   },
   {
     name: "Self-Restoration",
@@ -244,7 +244,7 @@ export const monk: ClassDefinition = {
         label: "Focus Points",
         total: level,
         recharge: "short-or-long",
-        description: `Fuel focus features: Flurry of Blows (2 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC ${focusDC}. Regain all focus on a short or long rest.`,
+        description: `Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC ${focusDC}. Regain all focus on a short or long rest.`,
       },
     ];
   },

@@ -131,15 +131,15 @@ describe("deriveActions — resource gating", () => {
     expect(rage?.disabledReason).toBe("No rage remaining");
   });
 
-  it("flurryOfBlows needs focus×2: disabled with 'Need 2 focus, have 1' when focus=1", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+  it("flurryOfBlows needs 1 focus: disabled with 'No focus remaining' at 0 (#1217)", () => {
+    const actions = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(false);
-    expect(flurry?.disabledReason).toBe("Need 2 focus, have 1");
+    expect(flurry?.disabledReason).toBe("No focus remaining");
   });
 
-  it("flurryOfBlows is enabled when focus >= 2", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("focus", 3)]);
+  it("flurryOfBlows is enabled when focus >= 1 (still usable without the Attack action)", () => {
+    const actions = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(true);
   });
@@ -274,9 +274,9 @@ describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
 });
 
 describe("ACTION_EFFECT_FN — monk focus actions", () => {
-  it("flurryOfBlows → spendResource focus amount:2", () => {
+  it("flurryOfBlows → spendResource focus (1, no amount override) (#1217)", () => {
     expect(ACTION_EFFECT_FN.flurryOfBlows({})).toEqual([
-      { type: "spendResource", key: "focus", amount: 2 },
+      { type: "spendResource", key: "focus" },
     ]);
   });
 

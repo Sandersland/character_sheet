@@ -115,7 +115,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // or Shield), not on the Attack action. Distinct from Flurry of Blows (#1217,
   // the two-strike Focus version).
   { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 2 },
+  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
   // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
   // TWO menu entries — a free variant and a 1-Focus variant — rather than the
   // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
@@ -323,7 +323,9 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // bonusUnarmedStrike is economy-only, like `attack`/`twf` — no server state
   // to spend, the gate is already applied at derive time (requiresUnarmored).
   bonusUnarmedStrike: () => [],
-  flurryOfBlows: () => [{ type: "spendResource", key: "focus", amount: 2 }],
+  // SRD 5.2 Focus: Flurry expends 1 Focus Point to make two Unarmed Strikes
+  // (#1217 — was miscoded at 2 Focus, a 2014-rules holdover).
+  flurryOfBlows: () => [{ type: "spendResource", key: "focus" }],
   // patientDefense / stepOfTheWind (the FREE variants) have no ACTION_EFFECT_FN
   // entry — like Shadow Step/Opportunist, they're economy-only (consume the
   // bonus action, spend nothing); planActionClick never calls send() for a

@@ -40,12 +40,21 @@ describe("actionResolvers", () => {
 
   it("all resolvers have a valid kind", () => {
     const VALID_KINDS = new Set([
-      "attack-picker", "twf-picker", "spell-picker", "item-picker",
+      "attack-picker", "twf-picker", "flurry-picker", "spell-picker", "item-picker",
       "heal-roll", "heal-input", "simple-confirm", "loadout-picker",
     ]);
     for (const r of Object.values(ACTION_RESOLVERS)) {
       expect(VALID_KINDS.has(r.kind), `${r.key} has invalid kind: ${r.kind}`).toBe(true);
     }
+  });
+
+  it("Flurry of Blows resolves Unarmed Strikes only for 1 Focus, not the weapon attack-picker (#1217)", () => {
+    const r = resolverFor("flurryOfBlows");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("flurry-picker");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.resourceKey).toBe("focus");
+    expect(r!.resourceAmount).toBe(1);
   });
 
   it("the twf off-hand resolver is an economy-only bonus-action picker (#732)", () => {

@@ -805,6 +805,148 @@ describe("bonus action and TWF", () => {
   });
 });
 
+// Flurry of Blows (#1217): 2 Unarmed Strikes for 1 Focus, resolved via its own
+// bonusAttack counter — shares the field with TWF (mutually exclusive, both
+// spend the single bonus-action slot) but increments across strikes like
+// recordAttackState rather than TWF's always-1 single-swing shape. The bonus
+// action itself is consumed by consumeBonusAction (the generic click path)
+// BEFORE enterFlurryMode arms the counter — mirroring how handleFlurryAction
+// dispatches in production.
+describe("Flurry of Blows (#1217)", () => {
+  function inActiveTurn() {
+    const hook = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { hook.result.current.startCombat(); });
+    act(() => { hook.result.current.startTurn(); });
+    return hook;
+  }
+
+  it("enterFlurryMode arms the strike counter after the bonus action is consumed", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    expect(result.current.bonusActionUsed).toBe(true);
+    expect(result.current.bonusAttack).toEqual({ total: 2, used: 0 });
+  });
+
+  it("enterFlurryMode is a no-op when a bonus-attack resolution is already live", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterTwfMode(); }); // bonusAttack: {1, 0}
+    act(() => { result.current.enterFlurryMode(2); }); // guarded — never resets progress
+    expect(result.current.bonusAttack).toEqual({ total: 1, used: 0 });
+  });
+
+  it("recordFlurryAttack increments used and stays live until the total is reached", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    act(() => { result.current.recordFlurryAttack(); });
+    expect(result.current.bonusAttack).toEqual({ total: 2, used: 1 });
+    act(() => { result.current.recordFlurryAttack(); });
+    expect(result.current.bonusAttack).toEqual({ total: 2, used: 2 });
+  });
+
+  it("recordFlurryAttack with a payload appends one bonusAction-source tally row per strike", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    act(() => {
+      result.current.recordFlurryAttack({
+        formId: "unarmed",
+        formName: "Unarmed Strike",
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+      });
+    });
+    act(() => {
+      result.current.recordFlurryAttack({
+        formId: "unarmed",
+        formName: "Unarmed Strike",
+        attack: { total: 11, keptFace: 6, nat20: false, nat1: false },
+      });
+    });
+    expect(result.current.attackTally).toHaveLength(2);
+    expect(result.current.attackTally.every((r) => r.source === "bonusAction")).toBe(true);
+  });
+
+  it("recordFlurryAttack clamps at total — an over-click adds no new row", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    const strike = {
+      formId: "unarmed",
+      formName: "Unarmed Strike",
+      attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+    };
+    act(() => { result.current.recordFlurryAttack(strike); });
+    act(() => { result.current.recordFlurryAttack(strike); });
+    act(() => { result.current.recordFlurryAttack(strike); }); // over-click
+    expect(result.current.bonusAttack).toEqual({ total: 2, used: 2 });
+    expect(result.current.attackTally).toHaveLength(2);
+  });
+
+  it("recordFlurryAttack does not grant an Attack-action equip credit (#1217 — that credit is tied to the Attack action only)", () => {
+    const { result } = inActiveTurn();
+    const before = result.current.attackEquipCredits;
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    act(() => { result.current.recordFlurryAttack(); });
+    expect(result.current.attackEquipCredits).toBe(before);
+  });
+
+  it("finishFlurry clears the counter once both strikes are done; the bonus action stays spent", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    act(() => { result.current.recordFlurryAttack(); });
+    act(() => { result.current.recordFlurryAttack(); });
+    act(() => { result.current.finishFlurry(); });
+    expect(result.current.bonusAttack).toBeNull();
+    expect(result.current.bonusActionUsed).toBe(true);
+  });
+
+  it("cancelFlurry refunds the bonus action when no strike has landed yet", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    act(() => { result.current.cancelFlurry(); });
+    expect(result.current.bonusActionUsed).toBe(false);
+    expect(result.current.bonusAttack).toBeNull();
+  });
+
+  it("cancelFlurry is a no-op once a strike has landed — stays live mid-flurry", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    act(() => { result.current.recordFlurryAttack(); });
+    act(() => { result.current.cancelFlurry(); });
+    expect(result.current.bonusActionUsed).toBe(true);
+    expect(result.current.bonusAttack).toEqual({ total: 2, used: 1 });
+  });
+
+  it("undo of the second strike removes its tally row and restores the 1-of-2 counter", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.enterFlurryMode(2); });
+    act(() => {
+      result.current.recordFlurryAttack({
+        formId: "unarmed",
+        formName: "Unarmed Strike",
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+      });
+    });
+    act(() => {
+      result.current.recordFlurryAttack({
+        formId: "unarmed",
+        formName: "Unarmed Strike",
+        attack: { total: 11, keptFace: 6, nat20: false, nat1: false },
+      });
+    });
+    expect(result.current.attackTally).toHaveLength(2);
+    act(() => { result.current.undo(); });
+    expect(result.current.attackTally).toHaveLength(1);
+    expect(result.current.bonusAttack).toEqual({ total: 2, used: 1 });
+  });
+});
+
 describe("reaction", () => {
   it("consumeReaction → reactionUsed:true", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));

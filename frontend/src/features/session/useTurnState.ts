@@ -100,7 +100,12 @@ export interface TurnState {
   reactionUsed: boolean;
   /** Non-null while the current action is an Attack action. */
   attack: AttackState | null;
-  /** Non-null while the bonus action is an off-hand TWF attack. */
+  /**
+   * Non-null while the bonus action is a multi-swing attack resolution — the
+   * TWF off-hand (always total 1) or Flurry of Blows (total 2, or 3 at
+   * Heightened Focus monk L10, #1244). The two never coexist: both consume
+   * the single bonus-action slot, so only one resolver is ever live.
+   */
   bonusAttack: AttackState | null;
   /**
    * Per-attack tally for the CURRENT Attack action (#802). One row per rolled
@@ -244,6 +249,29 @@ export interface TurnStateActions {
    * action so the player can choose a different bonus action. Mirrors cancelAttack.
    */
   cancelTwf: () => void;
+  /**
+   * Arm the `bonusAttack` strike counter for Flurry of Blows (#1217) — the bonus
+   * action itself is already consumed by the generic action-click path (like
+   * Rage), so this only opens the counter. `count` is the caller-supplied
+   * strike total (2 today; the Heightened Focus seam, #1244, just passes a
+   * different number). No-ops if a bonus-attack resolution is already live
+   * (e.g. a rehydrated mid-flurry snapshot), so it never resets progress.
+   */
+  enterFlurryMode: (count: number) => void;
+  /**
+   * Record one Flurry of Blows strike (auto-increments the counter, clamped at
+   * total). When a `RecordedAttack` payload is passed, appends a
+   * `bonusAction`-source tally row — mirrors recordAttack's multi-attack loop,
+   * not recordTwfAttack's single-swing shape, since Flurry resolves 2+ strikes.
+   */
+  recordFlurryAttack: (recorded?: RecordedAttack) => void;
+  /** Cancel Flurry if no strikes have landed yet — refunds the bonus action. */
+  cancelFlurry: () => void;
+  /**
+   * Finalize Flurry after at least one strike was rolled — clears the counter
+   * (bonus action stays spent) without refunding. Mirrors finishAttack.
+   */
+  finishFlurry: () => void;
   /** Mark the reaction as used. Can be called at any time. */
   consumeReaction: () => void;
   /**
@@ -535,7 +563,7 @@ function cancelAttackState(s: TurnState): TurnState {
 }
 
 // Clear the attack counter (action stays spent). No-op when attack is null
-// (class pickers like Flurry that don't use the enterAttackMode path).
+// (a resolver that never called enterAttackMode, e.g. an opportunity attack).
 const finishAttackState = (s: TurnState): TurnState => (s.attack ? { ...s, attack: null } : s);
 
 const consumeBonusActionState = (s: TurnState): TurnState =>
@@ -568,6 +596,45 @@ function recordTwfAttackState(s: TurnState, recorded?: RecordedAttack): TurnStat
 // recordTwfAttack has cleared it to null, the bonus action stays committed.
 const cancelTwfState = (s: TurnState): TurnState =>
   s.bonusAttack ? { ...s, bonusActionUsed: false, bonusAttack: null } : s;
+
+// Arm Flurry's strike counter. Guarded on bonusAttack already being non-null
+// (rather than on bonusActionUsed, unlike enterTwfModeState) because the bonus
+// action slot was already consumed by the generic action-click path before
+// this fires — the guard here only protects against re-arming over a
+// rehydrated, in-progress flurry and resetting its used count.
+function enterFlurryModeState(s: TurnState, count: number): TurnState {
+  if (s.bonusAttack) return s;
+  return {
+    ...s,
+    bonusAttack: { total: count, used: 0 },
+    attackTally: s.attackTally.filter((r) => r.source !== "bonusAction"),
+  };
+}
+
+// Increment-and-clamp, like recordAttackState — Flurry resolves 2+ strikes in
+// one bonus action, unlike TWF's always-1 single swing, so it can't reuse
+// recordTwfAttackState's unconditional null-out. Deliberately omits the
+// Attack-action's attackEquipCredits grant (PHB'24 ties that credit to the
+// Attack action specifically, not to Flurry).
+function recordFlurryAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
+  if (!s.bonusAttack) return s;
+  const atCap = s.bonusAttack.used >= s.bonusAttack.total;
+  const used = Math.min(s.bonusAttack.used + 1, s.bonusAttack.total);
+  const attackTally =
+    !atCap && recorded ? [...s.attackTally, tallyRowFor(recorded, "bonusAction")] : s.attackTally;
+  return { ...s, bonusAttack: { ...s.bonusAttack, used }, attackedThisTurn: true, attackTally };
+}
+
+// Mirror cancelAttackState: refund the bonus action only if no strike has
+// landed yet. Once a strike is recorded, the bonus action stays committed.
+const cancelFlurryState = (s: TurnState): TurnState =>
+  s.bonusAttack && s.bonusAttack.used === 0
+    ? { ...s, bonusActionUsed: false, bonusAttack: null }
+    : s;
+
+// Mirror finishAttackState: clear the counter — the bonus action stays spent.
+const finishFlurryState = (s: TurnState): TurnState =>
+  s.bonusAttack ? { ...s, bonusAttack: null } : s;
 
 const consumeReactionState = (s: TurnState): TurnState =>
   s.reactionUsed ? s : { ...s, reactionUsed: true };
@@ -726,6 +793,10 @@ type TurnAction =
   | { type: "enterTwfMode" }
   | { type: "recordTwfAttack"; recorded?: RecordedAttack }
   | { type: "cancelTwf" }
+  | { type: "enterFlurryMode"; count: number }
+  | { type: "recordFlurryAttack"; recorded?: RecordedAttack }
+  | { type: "cancelFlurry" }
+  | { type: "finishFlurry" }
   | { type: "consumeReaction" }
   | { type: "grantExtraAction" }
   | { type: "spendInteractionBudget"; spend: InteractionSpend }
@@ -761,6 +832,10 @@ const CONSUMING: ReadonlySet<TurnAction["type"]> = new Set([
   "enterTwfMode",
   "recordTwfAttack",
   "cancelTwf",
+  "enterFlurryMode",
+  "recordFlurryAttack",
+  "cancelFlurry",
+  "finishFlurry",
   "consumeReaction",
   "grantExtraAction",
   "spendInteractionBudget",
@@ -790,6 +865,10 @@ const HANDLERS: TurnActionHandlers = {
   enterTwfMode: (s) => enterTwfModeState(s),
   recordTwfAttack: (s, a) => recordTwfAttackState(s, a.recorded),
   cancelTwf: (s) => cancelTwfState(s),
+  enterFlurryMode: (s, a) => enterFlurryModeState(s, a.count),
+  recordFlurryAttack: (s, a) => recordFlurryAttackState(s, a.recorded),
+  cancelFlurry: (s) => cancelFlurryState(s),
+  finishFlurry: (s) => finishFlurryState(s),
   consumeReaction: (s) => consumeReactionState(s),
   grantExtraAction: (s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }),
   spendInteractionBudget: (s, a) => spendInteractionBudgetState(s, a.spend),
@@ -917,6 +996,10 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       enterTwfMode: () => dispatch({ type: "enterTwfMode" }),
       recordTwfAttack: (recorded) => dispatch({ type: "recordTwfAttack", recorded }),
       cancelTwf: () => dispatch({ type: "cancelTwf" }),
+      enterFlurryMode: (count) => dispatch({ type: "enterFlurryMode", count }),
+      recordFlurryAttack: (recorded) => dispatch({ type: "recordFlurryAttack", recorded }),
+      cancelFlurry: () => dispatch({ type: "cancelFlurry" }),
+      finishFlurry: () => dispatch({ type: "finishFlurry" }),
       consumeReaction: () => dispatch({ type: "consumeReaction" }),
       grantExtraAction: () => dispatch({ type: "grantExtraAction" }),
       refundAction: () => dispatch({ type: "grantExtraAction" }),

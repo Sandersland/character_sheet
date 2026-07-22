@@ -163,14 +163,18 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
   });
 
   it("spending both patientDefenseFocus and flurryOfBlows in the same turn draws down the shared focus pool correctly", async () => {
-    // Level-2 monk: 2 focus total. Patient Defense (1) + would-be Flurry (2)
-    // exceeds the pool — proves the two Focus-spending bonus actions share one
-    // real pool, not independent budgets.
+    // Level-2 monk: 2 focus total. Patient Defense (1) + Flurry (1, #1217) drains
+    // the pool to 0 — proves the two Focus-spending bonus actions share one real
+    // pool, not independent budgets. A third Focus spend then 400s (empty pool).
     const first = await executeAction("patientDefenseFocus");
     expect(first.status).toBe(200);
     expect(pool(first.body, "focus")).toMatchObject({ used: 1, remaining: 1 });
 
     const second = await executeAction("flurryOfBlows");
-    expect(second.status).toBe(400); // only 1 focus remains; Flurry needs 2
+    expect(second.status).toBe(200);
+    expect(pool(second.body, "focus")).toMatchObject({ used: 2, remaining: 0 });
+
+    const third = await executeAction("stepOfTheWindFocus");
+    expect(third.status).toBe(400); // pool exhausted — no focus remains
   });
 });

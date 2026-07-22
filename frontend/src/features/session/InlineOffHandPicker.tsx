@@ -7,6 +7,9 @@
 // attack), and the shared footer. No Resume/counter pips: the bonus action is a
 // single swing. Rolls record a `bonusAction`-source tally row so they land in
 // the turn-summary banner and resolve inline exactly like an Attack-action row.
+// The roll/miss/crit/skip/next wiring is shared with InlineFlurryPicker via
+// useBonusAttackSheet (#1217) — this file owns only the off-hand-specific form
+// (buildOffHandEntry, which may be null) and its footer/layout composition.
 //
 // Off-hand damage omits the ability modifier unless the character has the
 // Two-Weapon Fighting style — that adjustment lives in buildOffHandEntry.
@@ -15,22 +18,15 @@
 // `variant="unarmed"`: same single-swing tally/counter path, just locked to
 // the Unarmed Strike profile (buildBonusSwingEntry, attackMath.ts) instead of
 // the off-hand weapon — no weapon/improvised toggle, matching the rule
-// (Flurry of Blows, #1217, is the two-strike Focus version and stays on the
-// separate attack-picker path).
-
-import { useState } from "react";
+// (Flurry of Blows, #1217, is the two-strike Focus version and resolves via
+// the separate flurry-picker path, InlineFlurryPicker).
 
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
-import { useRoll } from "@/features/dice/RollContext";
-import { buildBonusSwingEntry, hasSuperiorityDice } from "@/lib/attackMath";
-import { useManeuverDie } from "@/features/session/useManeuverDie";
-import { useRollLogger } from "@/features/session/useRollLogger";
-import { useAttackRolls } from "@/features/session/useAttackRolls";
+import { buildBonusSwingEntry } from "@/lib/attackMath";
+import { useBonusAttackSheet } from "@/features/session/useBonusAttackSheet";
 import AttackStepCard from "@/features/session/AttackStepCard";
-import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
-import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
@@ -61,32 +57,36 @@ export default function InlineOffHandPicker({
   onLogChanged,
   variant = "twf",
 }: InlineOffHandPickerProps) {
-  const { roll } = useRoll();
-  const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
-  const die = useManeuverDie(character, onUpdate);
-  const [rolledId, setRolledId] = useState<string | null>(null);
-
+  // variant-aware entry (#1218): off-hand weapon for "twf", Unarmed Strike for
+  // "unarmed"; the useBonusAttackSheet shell (#1217) is otherwise identical.
   const entry = buildBonusSwingEntry(character, variant);
+  // recordTwfAttack clears bonusAttack once the single swing lands — "rolled"
+  // doubles as "exhausted" for a swing that only ever happens once.
+  const rolled = turnState.bonusAttack === null;
 
-  // Bind steps 2–3 to the last bonusAction row — the tally also holds the Attack
-  // action's rows, so "last row overall" would misattribute (#813).
-  const currentRowIndex = turnState.attackTally.map((r) => r.source).lastIndexOf("bonusAction");
-  const currentRow = currentRowIndex >= 0 ? turnState.attackTally[currentRowIndex] : null;
-
-  const { riderTotals, viewFor } = useAttackRolls({
-    roll,
-    logRollSafe,
-    recordAttack: (recorded) => turnState.recordTwfAttack(recorded),
-    setTallyDamage: turnState.setTallyDamage,
-    setTallyAttackTotal: turnState.setTallyAttackTotal,
-    addTallyDamageRider: turnState.addTallyDamageRider,
+  const {
     currentRow,
-    source: "bonusAction",
+    riderTotals,
+    viewFor,
+    boundView,
+    handleRollToHit,
+    handleCallMiss,
+    handleCallCrit,
+    handleSkip,
+    handleNext,
+    tallyStrip,
+    maneuversDisclosure,
+  } = useBonusAttackSheet({
+    character,
+    turnState,
+    sessionId,
+    entry,
+    recordAttack: turnState.recordTwfAttack,
+    attacksExhausted: rolled,
+    onUpdate,
+    onLogChanged,
   });
 
-  const showManeuvers = hasSuperiorityDice(character);
-  // recordTwfAttack clears bonusAttack once the single swing lands.
-  const rolled = turnState.bonusAttack === null;
   const isMobile = useIsBelowMd();
 
   const footer = (
@@ -110,53 +110,6 @@ export default function InlineOffHandPicker({
     );
   }
 
-  const boundView = rolledId ? viewFor(entry) : null;
-
-  // Roll the single off-hand swing and bind steps 2–3 to it.
-  function handleRollToHit() {
-    setRolledId(entry!.id);
-    viewFor(entry!).onAttack();
-  }
-
-  // "it Missed" — write the miss verdict; the row dims into the tally.
-  function handleCallMiss() {
-    if (currentRowIndex >= 0) turnState.setTallyVerdict(currentRowIndex, "miss");
-    setRolledId(null);
-  }
-
-  function handleCallCrit() {
-    if (currentRowIndex >= 0) turnState.setTallyVerdict(currentRowIndex, "crit");
-  }
-
-  function handleSkip() {
-    setRolledId(null);
-  }
-
-  // "Next" — re-arms step 1 after a resolved swing (#834). The bonus action is
-  // a single swing, so ContinueOrSkip never renders once it's spent, but the
-  // prop is still required by AttackStepCard's interface.
-  function handleNext() {
-    setRolledId(null);
-  }
-
-  const tallyStrip = (
-    <AttackTallyStrip
-      rows={turnState.attackTally}
-      onSetVerdict={turnState.setTallyVerdict}
-      source="bonusAction"
-      heading="This bonus action"
-    />
-  );
-  const maneuversDisclosure = showManeuvers && (
-    <ManeuversDisclosure
-      character={character}
-      turnState={turnState}
-      view={boundView}
-      attacksExhausted={rolled}
-      die={die}
-      onUpdate={onUpdate}
-    />
-  );
   const stepCard = (
     <AttackStepCard
       forms={[entry]}

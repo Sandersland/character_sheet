@@ -6,8 +6,10 @@ import {
   buildAttackForms,
   buildEquippedWeaponEntries,
   buildOffHandEntry,
+  buildUnarmedOnlyForms,
   capabilitiesActive,
   critDamageSpec,
+  flurryStrikeCount,
   hasSuperiorityDice,
   unarmedDamageDisplay,
   weaponDamageRiders,
@@ -343,6 +345,31 @@ describe("buildAttackForms (#786)", () => {
       ] as unknown as Character["inventory"],
     });
     expect(buildAttackForms(character)[0].name).toBe("Longsword");
+  });
+});
+
+describe("buildUnarmedOnlyForms (#1217)", () => {
+  it("returns exactly one form — Unarmed Strike — even with weapons equipped", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 6, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing" }, "Shortsword", "inv-1"),
+      ] as unknown as Character["inventory"],
+    });
+    const forms = buildUnarmedOnlyForms(character);
+    expect(forms).toHaveLength(1);
+    expect(forms[0].id).toBe("unarmed");
+    expect(forms[0].name).toBe("Unarmed Strike");
+  });
+
+  it("never includes Improvised Weapon (2024 Flurry grants no weapon choice)", () => {
+    const forms = buildUnarmedOnlyForms(makeCharacter());
+    expect(forms.some((f) => f.id === "improvised")).toBe(false);
+  });
+});
+
+describe("flurryStrikeCount (#1217)", () => {
+  it("is 2 (Heightened Focus's 3-strike upgrade at monk L10 is a separate seam, #1244)", () => {
+    expect(flurryStrikeCount()).toBe(2);
   });
 });
 

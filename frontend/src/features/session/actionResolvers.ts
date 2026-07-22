@@ -21,6 +21,7 @@ import type { RollSpec } from "@/lib/dice";
 /**
  * What inline tool the TurnHub renders when this action is selected.
  *  attack-picker  — equipped weapons + Unarmed + Improvised, with Attack/Damage rolls.
+ *  flurry-picker  — Unarmed Strike only, no weapon choice (2024 Flurry of Blows, #1217).
  *  spell-picker   — prepared/known spells, slot-gated cast surface.
  *  item-picker    — consumable inventory items with heal rolls.
  *  heal-roll      — single self-heal dice roll (Second Wind: 1d10+level).
@@ -31,6 +32,7 @@ import type { RollSpec } from "@/lib/dice";
 export type ResolutionKind =
   | "attack-picker"
   | "twf-picker"
+  | "flurry-picker"
   | "spell-picker"
   | "item-picker"
   | "heal-roll"
@@ -117,7 +119,9 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // path (single bonusAction-source swing), locked to the Unarmed Strike
   // profile. Gated server-side by requiresUnarmored, not a resource pool.
   bonusUnarmedStrike: { key: "bonusUnarmedStrike", kind: "twf-picker", slot: "bonusAction", serverEffect: false, subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)." },
-  flurryOfBlows:     { key: "flurryOfBlows",     kind: "attack-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 2 },
+  // Dispatched via its own handleFlurryAction (like twf), not planActionClick —
+  // 2024 Flurry is Unarmed Strikes only (#1217), so it never opens the weapon picker.
+  flurryOfBlows:     { key: "flurryOfBlows",     kind: "flurry-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 1 },
   // Patient Defense / Step of the Wind (#1240) — free vs 1-Focus variants, each
   // its own menu entry (mirrors rage/endRage). The free entries are
   // economy-only, like Shadow Step/Opportunist: no backend ACTION_EFFECT_FN,
