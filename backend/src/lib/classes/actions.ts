@@ -185,6 +185,28 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Way of Shadow reminder actions (#440) — no resourceKey, no server effect; reminder is the deliverable.
   { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
   { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17, reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction." },
+  // Warrior of the Open Hand (#1245): Open Hand Technique (Flurry-hit rider)
+  // and Quivering Palm (set/trigger) are post-hit riders with their own
+  // dedicated verticals (open-hand-technique.ts / quivering-palm.ts), exactly
+  // like Stunning Strike bypasses this catalog — neither is a selectable action.
+  // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
+  // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
+  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclass: "Open Hand", grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
+  // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
+  // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
+  // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
+  // with Wholeness of Body/Flurry/Bonus Unarmed Strike for the same bonus
+  // action. Full automation of "which bonus action did you just take" is heavy
+  // for a one-line rider — the reminder is the deliverable (ticket #1245).
+  {
+    key: "fleetStep",
+    name: "Fleet Step",
+    cost: "free",
+    grantClass: "monk",
+    grantSubclass: "Open Hand",
+    grantLevel: 11,
+    reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
+  },
 
   // Paladin
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
@@ -411,6 +433,19 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // it's surfaced only via the level-gated reminder text above, not here.
   stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
   // stunningStrike is not here — it's a post-hit rider in stunning-strike.ts (#1242).
+  // Warrior of the Open Hand (#1245): Wholeness of Body mirrors layOnHands'
+  // shape (spend the pool, heal the client-rolled amount) but spends a flat 1
+  // use rather than a variable HP-pool draw. Open Hand Technique / Quivering
+  // Palm have no entry here — see the DERIVED_ACTIONS comment above.
+  wholenessOfBody: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "wholenessOfBody" }];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
+  // fleetStep has no entry here — it's a pure reminder (cost:"free") like
+  // recklessAttack/metamagic: no server state to spend.
   // deflectAttacks (the base reduction) has no entry here — it's a pure reminder
   // action like shadowStep/opportunist: the client rolls 1d10 + Dex + monk level
   // and never calls the transactions endpoint (nothing persisted). Only the

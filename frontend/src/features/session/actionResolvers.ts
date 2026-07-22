@@ -15,6 +15,7 @@
  * ⚑ Keep in sync with the backend ACTION_EFFECT_FN table.
  */
 
+import { abilityModifier } from "@/lib/abilities";
 import type { Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
 
@@ -143,6 +144,22 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },
+  // Warrior of the Open Hand (#1245): Open Hand Technique / Quivering Palm have
+  // no resolver here — they're post-hit riders rendered by their own sections
+  // (OpenHandTechniqueSection / QuiveringPalmSection), mirroring how Stunning
+  // Strike bypasses this registry (#1242). Wholeness of Body reuses the
+  // heal-roll kind (Second Wind's shape): Martial Arts die + Wis modifier.
+  wholenessOfBody: {
+    key: "wholenessOfBody",
+    kind: "heal-roll",
+    slot: "bonusAction",
+    serverEffect: true,
+    resourceKey: "wholenessOfBody",
+    healRoll: (c) => ({ count: 1, faces: c.unarmedStrike.damage.faces, modifier: abilityModifier(c.abilityScores.wisdom) }),
+  },
+  // Fleet Step (L11) is a pure reminder (cost:"free", no server effect), like
+  // Reckless Attack/Metamagic — see the DERIVED_ACTIONS comment in actions.ts.
+  fleetStep: { key: "fleetStep", kind: "simple-confirm", slot: "free", serverEffect: false },
 
   divineSense:       { key: "divineSense",       kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "divineSense" },
   layOnHands:        { key: "layOnHands",        kind: "heal-input",     slot: "action",      serverEffect: true,  resourceKey: "layOnHands" },

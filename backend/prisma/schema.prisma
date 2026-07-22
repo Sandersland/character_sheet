@@ -1436,6 +1436,9 @@ enum CharacterEventType {
   castShadowArt
   castChannelDivinity
   castStunningStrike
+  imposeOpenHandRider
+  setQuiveringPalm
+  triggerQuiveringPalm
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled

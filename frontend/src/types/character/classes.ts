@@ -132,6 +132,37 @@ export interface StunningStrikeAttemptResult {
   summary: string;
 }
 
+/** Warrior of the Open Hand's Flurry-of-Blows rider choice (#1245). */
+export type OpenHandRider = "addle" | "push" | "topple";
+
+/** Per-op result from POST …/open-hand-technique/transactions — Addle has no roll. */
+export interface OpenHandRiderResult {
+  rider: OpenHandRider;
+  dc: number;
+  roll?: number;
+  outcome: "applied" | "resisted";
+  summary: string;
+}
+
+/** Per-op result from POST …/quivering-palm/transactions — setQuiveringPalm. */
+export interface SetQuiveringPalmResult {
+  active: true;
+  daysRemaining: number;
+  summary: string;
+}
+
+/** Per-op result from POST …/quivering-palm/transactions — triggerQuiveringPalm. */
+export interface TriggerQuiveringPalmResult {
+  dc: number;
+  saveRoll: number;
+  outcome: "fail" | "success";
+  rawDamage: number;
+  appliedDamage: number;
+  summary: string;
+}
+
+export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmResult;
+
 /** A known elemental discipline entry on a character (Way of the Four Elements). */
 export interface DisciplineEntry {
   id: string;

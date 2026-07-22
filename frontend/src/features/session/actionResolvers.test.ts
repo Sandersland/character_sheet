@@ -23,6 +23,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "bonusUnarmedStrike",
   "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus",
   "deflectAttacksRedirect",
+  "wholenessOfBody",
   "divineSense", "layOnHands", "channelDivinityPaladin",
   "cunningAction",
   "metamagic",
@@ -144,6 +145,29 @@ describe("actionResolvers", () => {
     expect(redirect!.resourceKey).toBe("focus");
   });
 
+  it("Warrior of the Open Hand: Wholeness of Body is a heal-roll bonus action (#1245)", () => {
+    const r = resolverFor("wholenessOfBody");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("heal-roll");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.serverEffect).toBe(true);
+    expect(r!.resourceKey).toBe("wholenessOfBody");
+    expect(r!.healRoll).toBeDefined();
+  });
+
+  it("Warrior of the Open Hand: Fleet Step is a pure free-cost reminder (#1245)", () => {
+    const r = resolverFor("fleetStep");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("simple-confirm");
+    expect(r!.slot).toBe("free");
+    expect(r!.serverEffect).toBe(false);
+  });
+
+  it("Open Hand Technique / Quivering Palm have no resolver — post-hit riders with their own sections (#1245)", () => {
+    expect(resolverFor("openHandTechnique")).toBeUndefined();
+    expect(resolverFor("quiveringPalm")).toBeUndefined();
+  });
+
   it("all resolvers have a valid slot", () => {
     const VALID_SLOTS = new Set(["action", "bonusAction", "reaction", "free", "special"]);
     for (const r of Object.values(ACTION_RESOLVERS)) {
@@ -165,6 +189,17 @@ describe("actionResolvers", () => {
     const healRoll = resolver!.healRoll!;
     const spec = healRoll({ level: 5 } as Parameters<typeof healRoll>[0]);
     expect(spec).toEqual({ count: 1, faces: 10, modifier: 5 });
+  });
+
+  it("wholenessOfBody healRoll produces Martial Arts die + Wis modifier (#1245)", () => {
+    const resolver = resolverFor("wholenessOfBody");
+    expect(resolver).toBeDefined();
+    const healRoll = resolver!.healRoll!;
+    const mock = {
+      unarmedStrike: { damage: { faces: 8 } },
+      abilityScores: { wisdom: 14 },
+    } as Parameters<typeof healRoll>[0];
+    expect(healRoll(mock)).toEqual({ count: 1, faces: 8, modifier: 2 });
   });
 
   it("resolverFor returns undefined for unknown keys", () => {

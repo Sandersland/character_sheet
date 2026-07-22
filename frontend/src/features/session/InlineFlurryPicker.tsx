@@ -23,6 +23,7 @@ import { attacksExhausted as computeAttacksExhausted, buildUnarmedOnlyForms } fr
 import { useBonusAttackSheet } from "@/features/session/useBonusAttackSheet";
 import AttackStepCard, { AttackKickerPips } from "@/features/session/AttackStepCard";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
+import OpenHandTechniqueSection from "@/features/session/OpenHandTechniqueSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
@@ -88,6 +89,15 @@ export default function InlineFlurryPicker({
 
   const isMobile = useIsBelowMd();
 
+  const openHandTechnique = boundView && (
+    <OpenHandTechniqueSection
+      character={character}
+      turnState={turnState}
+      currentRow={currentRow}
+      onUpdate={onUpdate}
+    />
+  );
+
   const rollModeRow = (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
@@ -132,6 +142,7 @@ export default function InlineFlurryPicker({
         {rollModeRow}
         {stepCard}
         {maneuversDisclosure}
+        {openHandTechnique}
         {footer}
       </div>
     );
@@ -147,6 +158,7 @@ export default function InlineFlurryPicker({
       <div className="flex w-60 shrink-0 flex-col gap-2">
         <AttackKickerPips attack={attack} />
         {tallyStrip}
+        {openHandTechnique}
         {maneuversDisclosure}
       </div>
     </div>
