@@ -127,7 +127,6 @@ async function createPlain(id: string, overrides: Record<string, unknown> = {}) 
 const EMPTY_RESOURCES = {
   used: {},
   maneuversKnown: [],
-  disciplinesKnown: [],
   toolProficienciesKnown: [],
   choicesKnown: {},
   advancements: [],

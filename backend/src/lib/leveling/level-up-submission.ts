@@ -8,7 +8,6 @@ import type { AdvancementOperation, TakeFeatOperation } from "@/lib/leveling/adv
 import type { LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import type {
   LearnManeuverOperation,
-  LearnDisciplineOperation,
   LearnToolProficiencyOperation,
   LearnSubclassChoiceOperation,
 } from "@/lib/classes/resources.js";
@@ -40,7 +39,6 @@ export interface LevelUpSubmission {
   // slot:"fightingStyle" server-side so it lands in the fs partition.
   fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
-  disciplines?: LearnDisciplineOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
@@ -56,7 +54,7 @@ export interface LevelUpSubmission {
 // subclass step is spliced back at this rank after a re-plan (which omits it).
 const KIND_ORDER: LevelUpStepKind[] = [
   "hitPoints", "advancement", "subclass", "maneuvers", "fightingStyleFeat",
-  "disciplines", "toolProficiency", "subclassChoice", "newSpells", "review",
+  "toolProficiency", "subclassChoice", "newSpells", "review",
 ];
 
 // One count-checkable submission domain that maps 1:1 to a plan step kind.
@@ -73,7 +71,6 @@ const SIMPLE_DOMAINS: SimpleDomain[] = [
   { kind: "advancement", provided: (s) => (s.advancement ? 1 : 0), noun: "advancement", absentMessage: "this level-up does not include an ability score improvement or feat" },
   { kind: "fightingStyleFeat", provided: (s) => (s.fightingStyleFeat ? 1 : 0), noun: "fighting style", absentMessage: "this level-up does not include a fighting style choice" },
   { kind: "maneuvers", provided: (s) => s.maneuvers?.length ?? 0, noun: "maneuvers", absentMessage: "this level-up does not grant maneuvers" },
-  { kind: "disciplines", provided: (s) => s.disciplines?.length ?? 0, noun: "disciplines", absentMessage: "this level-up does not grant disciplines" },
   { kind: "toolProficiency", provided: (s) => s.toolProficiencies?.length ?? 0, noun: "tool proficiencies", absentMessage: "this level-up does not grant a tool proficiency" },
   { kind: "newSpells", provided: (s) => s.spellsLearned?.length ?? 0, noun: "new spells", absentMessage: "this level-up does not grant new spells" },
 ];

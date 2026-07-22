@@ -1,6 +1,6 @@
 /**
- * Battle Master maneuver cast handler — the maneuver counterpart to
- * applyDisciplineOperations. A maneuver is a superiority-die-fuelled activated ability
+ * Battle Master maneuver cast handler — a focus/die-cast handler alongside
+ * applyShadowArtsOperations. A maneuver is a superiority-die-fuelled activated ability
  * catalogued in GrantedAbility (source "maneuver"); casting one spends one die
  * via the shared payAbilityCostInTx pool path, rolls it server-side, and (for
  * Rally) applies self temp HP through the core's self-apply path.
@@ -208,7 +208,7 @@ async function castManeuver(
 
 /**
  * Applies a batch of maneuver operations atomically. Mirrors
- * applyDisciplineOperations: one batchId, LIFO-undoable events, state re-read
+ * applyShadowArtsOperations: one batchId, LIFO-undoable events, state re-read
  * per op. Each cast: the pool payer logs its own spendResource event (refunds
  * the die on revert); the resources-category castManeuver event carries the
  * roll + announced DC. Returns one ManeuverCastResult per op (client folds the

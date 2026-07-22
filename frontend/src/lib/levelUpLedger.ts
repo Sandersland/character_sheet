@@ -33,7 +33,6 @@ export interface LedgerRow {
 /** Catalog id→name lookups injected by the ReviewStep so the builder stays pure. */
 export interface LedgerResolvers {
   maneuver: (id: string) => string | undefined;
-  discipline: (id: string) => string | undefined;
   spell: (id: string) => string | undefined;
   feat: (id: string) => string | undefined;
 }
@@ -138,10 +137,6 @@ function learnedListRows(
 ): LedgerRow[] {
   const rows = [
     listRow("Maneuvers", (draft.maneuvers ?? []).map((op) => resolvedName(op.maneuverId, op.custom, r.maneuver))),
-    listRow(
-      "Disciplines",
-      (draft.disciplines ?? []).map((op) => resolvedName(op.disciplineId, op.custom, r.discipline)),
-    ),
     listRow("Tool Proficiencies", (draft.toolProficiencies ?? []).map((op) => op.name)),
     listRow("Subclass Features", (draft.subclassChoices ?? []).map((op) => subclassChoiceName(op, plan))),
     listRow("Forgotten", forgottenNames(draft, character)),

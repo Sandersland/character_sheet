@@ -5,7 +5,7 @@
  *   castShadowArt          — the L3 Shadow Arts feature's 1-focus Darkness cast.
  *                             A GrantedAbility row (source "shadowArts") read from
  *                             the catalog, routed through castAbilityInTx like a
- *                             discipline/Channel Divinity cast.
+ *                             Channel Divinity cast.
  *   activateCloakOfShadows — the L17 Cloak of Shadows feature: spend 3 focus,
  *                             self-apply the invisible condition. No catalog row
  *                             (a single fixed feature, not a "choose one" menu),
@@ -79,7 +79,7 @@ export interface ShadowArtEffectRow {
  * flat (scaling.mode "none"), always concentrates — 2024 Shadow Arts has exactly
  * one cast and it's Darkness (SRD 5.2). Kept on the shared row→spec mapping
  * (lib/combat/effects.ts, #817) rather than inlined, since the same builder also
- * serves disciplines/Channel Divinity.
+ * serves Channel Divinity.
  */
 export function shadowArtEffectSpec(row: ShadowArtEffectRow): EffectSpec {
   return catalogEffectSpec(row, {
@@ -190,9 +190,12 @@ async function applyActivateCloakOfShadows(
 }
 
 /**
- * Applies a batch of Warrior of Shadow operations atomically. Mirrors
- * applyDisciplineOperations: one batchId, LIFO-undoable events, state re-read
- * per op.
+ * Applies a batch of Shadow Arts operations atomically. Mirrors
+ * applyManeuverOperations: one batchId, LIFO-undoable events, state re-read
+ * per op. Per cast: the pool payer logs its own spendResource event (refunds
+ * focus on revert); a concentration Shadow Art logs a spellcasting-category event
+ * (restores concentratingOn on revert); the resources-category castShadowArt
+ * event records the cast.
  */
 export async function applyShadowArtsOperations(
   characterId: string,

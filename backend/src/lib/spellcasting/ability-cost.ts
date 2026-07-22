@@ -25,7 +25,7 @@ export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
   | { kind: "none" };
 
-// Flat cost columns snapshotted from a catalog row (Discipline today).
+// Flat cost columns snapshotted from a catalog row (a GrantedAbility catalog row).
 export interface AbilityCostColumns {
   costKind?: string | null;
   costPoolKey?: string | null;

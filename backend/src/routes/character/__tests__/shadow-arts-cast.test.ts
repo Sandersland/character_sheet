@@ -352,7 +352,7 @@ describe("shadowArtEffectSpec", () => {
   it("still resolves the generic buff shape (shared catalogEffectSpec builder) for a hypothetical buff row", () => {
     // No current Shadow Art carries a buff (the 2014 Pass without Trace option
     // is retired, #1246) — this pins that the shared row→spec mapping still
-    // works, since it's reused by disciplines/Channel Divinity too.
+    // works, since it's reused by Channel Divinity too.
     const spec = shadowArtEffectSpec({
       name: "Shadow Arts: Hypothetical Buff",
       effectKind: "buff",
@@ -384,8 +384,8 @@ describe("Shadow Arts source guard", () => {
     sourceClassId = cls.id;
     const row = await prisma.grantedAbility.upsert({
       where: { name: NON_SHADOW_NAME },
-      create: { name: NON_SHADOW_NAME, description: "A discipline, not a Shadow Art.", source: "discipline", minLevel: 3, costKind: "pool", costPoolKey: "focus", costBase: 2 },
-      update: { source: "discipline" },
+      create: { name: NON_SHADOW_NAME, description: "A maneuver, not a Shadow Art.", source: "maneuver", minLevel: 3, costKind: "pool", costPoolKey: "focus", costBase: 2 },
+      update: { source: "maneuver" },
     });
     nonShadowId = row.id;
   });

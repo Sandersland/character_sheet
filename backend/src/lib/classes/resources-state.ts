@@ -27,20 +27,6 @@ export interface ManeuverEntry {
   actionSlot?: string | null;
 }
 
-/**
- * A known elemental discipline (Way of the Four Elements). Mirrors ManeuverEntry.
- * learnedAtLevel/lastSwapLevel are recorded to support #397's one-swap-per-level
- * rule (2026-07-03 decision); lastSwapLevel is null until the entry is first swapped.
- */
-export interface DisciplineEntry {
-  id: string;              // per-character entry UUID (operation target)
-  disciplineId?: string;   // catalog provenance — undefined for custom disciplines
-  name: string;
-  description: string;
-  learnedAtLevel: number;
-  lastSwapLevel: number | null;
-}
-
 /** A tool proficiency granted by a level-gated subclass feature (Student of War). */
 export interface ToolProfEntry {
   id: string;   // per-character entry UUID (operation target)
@@ -127,8 +113,6 @@ export interface AdvancementEntry {
 export interface ResourcesMutableState {
   used: Record<string, number>;
   maneuversKnown: ManeuverEntry[];
-  /** Level-gated elemental disciplines (Way of the Four Elements). */
-  disciplinesKnown: DisciplineEntry[];
   /** Level-gated tool proficiency choices (currently: Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
   /**
@@ -209,7 +193,6 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
     return {
       used: {},
       maneuversKnown: [],
-      disciplinesKnown: [],
       toolProficienciesKnown: [],
       choicesKnown: {},
       advancements: [],
@@ -224,7 +207,6 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
   return {
     used: (obj.used as Record<string, number>) ?? {},
     maneuversKnown: (obj.maneuversKnown as ManeuverEntry[]) ?? [],
-    disciplinesKnown: (obj.disciplinesKnown as DisciplineEntry[]) ?? [],
     toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
     choicesKnown,
     advancements: (obj.advancements as AdvancementEntry[]) ?? [],
@@ -240,7 +222,6 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
   return {
     used: state.used,
     maneuversKnown: state.maneuversKnown,
-    disciplinesKnown: state.disciplinesKnown,
     toolProficienciesKnown: state.toolProficienciesKnown,
     choicesKnown: state.choicesKnown,
     advancements: state.advancements,
@@ -258,7 +239,6 @@ export function snapshotResources(state: ResourcesMutableState): ResourcesMutabl
   return {
     used: { ...state.used },
     maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
-    disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
     toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
     choicesKnown: Object.fromEntries(
       Object.entries(state.choicesKnown).map(([key, entries]) => [key, entries.map((e) => ({ ...e }))]),

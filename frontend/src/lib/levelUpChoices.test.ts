@@ -14,11 +14,6 @@ vi.mock("@/api/client", () => ({
     { id: "m1", name: "Riposte", description: "riposte" },
     { id: "m2", name: "Trip Attack", description: "trip" },
   ]),
-  fetchDisciplines: vi.fn(async () => [
-    { id: "elemental-attunement", name: "Elemental Attunement", description: "attune", minLevel: 3, alwaysKnown: true },
-    { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire", minLevel: 3, alwaysKnown: false },
-    { id: "ride-the-wind", name: "Ride the Wind", description: "fly", minLevel: 6, alwaysKnown: false },
-  ]),
   fetchReference: vi.fn(async () => ({ artisanTools: [{ name: "Smith's Tools", category: "artisan" }] })),
   fetchFeats: vi.fn(async () => [
     { id: "archery", name: "Archery", description: "arch", category: "fighting_style" },
@@ -119,38 +114,6 @@ describe("CHOICE_KIND_CONFIGS", () => {
         toolProficienciesKnown: [{ id: "t1", name: "Smith's Tools" }],
       } as Character["resources"]);
       expect([...cfg.fromCharacter(character)]).toEqual(["Smith's Tools"]);
-    });
-  });
-
-  describe("disciplines", () => {
-    const cfg = CHOICE_KIND_CONFIGS.disciplines!;
-
-    it("gates by target level, drops alwaysKnown options, and tags the L-gate at level 3", async () => {
-      const opts = await cfg.loadOptions({ targetLevel: 3 });
-      expect(opts).toEqual([
-        { id: "fangs-of-the-fire-snake", name: "Fangs of the Fire Snake", description: "fire", tag: "L3+" },
-      ]);
-    });
-
-    it("includes higher minLevel options once the target level reaches them", async () => {
-      const opts = await cfg.loadOptions({ targetLevel: 6 });
-      expect(opts.map((o) => ({ id: o.id, tag: o.tag }))).toEqual([
-        { id: "fangs-of-the-fire-snake", tag: "L3+" },
-        { id: "ride-the-wind", tag: "L6+" },
-      ]);
-    });
-
-    it("round-trips select → selected as learnDiscipline ops", () => {
-      const patch = cfg.select(baseDraft, ["d1"]);
-      expect(patch).toEqual({ disciplines: [{ type: "learnDiscipline", disciplineId: "d1" }] });
-      expect(cfg.selected(patch as LevelUpDraft)).toEqual(["d1"]);
-    });
-
-    it("extracts known discipline ids", () => {
-      const character = characterWith({
-        disciplinesKnown: [{ id: "e1", disciplineId: "d1", name: "", description: "" }],
-      } as Character["resources"]);
-      expect([...cfg.fromCharacter(character)]).toEqual(["d1"]);
     });
   });
 

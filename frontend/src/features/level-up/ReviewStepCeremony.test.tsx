@@ -12,7 +12,6 @@ vi.mock("@/api/client", () => ({
   submitLevelUp: vi.fn(),
   fetchFeats: vi.fn().mockResolvedValue([]),
   fetchManeuvers: vi.fn().mockResolvedValue([]),
-  fetchDisciplines: vi.fn().mockResolvedValue([]),
   fetchSpells: vi.fn().mockResolvedValue([]),
   fetchReference: vi.fn().mockResolvedValue({ races: [], backgrounds: [], alignments: [], artisanTools: [], classes: [] }),
 }));

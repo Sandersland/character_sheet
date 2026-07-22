@@ -12,7 +12,7 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const shadowArtsRouter = Router({ mergeParams: true });
 
-// Feeds the Warrior of Shadow monk's Shadow Arts picker — mirrors GET /api/disciplines.
+// Feeds the Warrior of Shadow monk's Shadow Arts picker — mirrors GET /api/maneuvers.
 // Each row carries its embedded focus cost (AbilityCost) and flat EffectSpec.
 shadowArtsRouter.get("/", async (_req, res) => {
   const arts = await prisma.grantedAbility.findMany({

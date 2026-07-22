@@ -54,8 +54,6 @@ interface Persona {
   subclassName?: string;
   // Battle Master maneuver to learn (by catalog name).
   maneuverName?: string;
-  // Four Elements discipline to learn (by catalog name).
-  disciplineName?: string;
   // A dedicated solo campaign to attach to (name); enables live sessions.
   campaignName?: string;
   // #1131: a caster's level-1 creation picks, by spell name. Counts must match the
@@ -120,15 +118,14 @@ const ROSTER: Persona[] = [
     campaignName: "E2E Solo — Monk L6",
   },
   {
-    name: "Four Elements Monk",
+    name: "Elements Monk",
     race: "Human",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
     classLevel: 6,
-    subclassName: "Way of the Four Elements",
-    disciplineName: "Fangs of the Fire Snake",
-    campaignName: "E2E Solo — Four Elements Monk",
+    subclassName: "Warrior of the Elements",
+    campaignName: "E2E Solo — Elements Monk",
   },
   {
     name: "Shadow Monk",
@@ -304,21 +301,6 @@ async function seedManeuver(cookie: string, id: string, persona: Persona): Promi
   if (!res.ok) throw new Error(`Failed to learn maneuver for ${persona.name}: ${res.status}`);
 }
 
-// Elemental disciplines are learned via the resource transactions endpoint.
-async function seedDiscipline(cookie: string, id: string, persona: Persona): Promise<void> {
-  if (!persona.disciplineName) return;
-  const dResponse = await api(cookie, "/api/disciplines");
-  if (!dResponse.ok) throw new Error(`Failed to load disciplines: ${dResponse.status}`);
-  const catalog = (await dResponse.json()) as { id: string; name: string }[];
-  const match = catalog.find((d) => d.name === persona.disciplineName);
-  if (!match) throw new Error(`Discipline not found: ${persona.disciplineName}`);
-  const res = await api(cookie, `/api/characters/${id}/resources/transactions`, {
-    method: "POST",
-    body: JSON.stringify({ operations: [{ type: "learnDiscipline", disciplineId: match.id }] }),
-  });
-  if (!res.ok) throw new Error(`Failed to learn discipline for ${persona.name}: ${res.status}`);
-}
-
 // Attach to a dedicated campaign so the persona can start a live session.
 async function attachToCampaign(cookie: string, id: string, persona: Persona): Promise<void> {
   if (!persona.campaignName) return;
@@ -339,7 +321,6 @@ async function createPersona(cookie: string, persona: Persona): Promise<void> {
   await seedLevelUps(cookie, id, persona);
   await seedSubclass(cookie, id, persona);
   await seedManeuver(cookie, id, persona);
-  await seedDiscipline(cookie, id, persona);
   await attachToCampaign(cookie, id, persona);
 }
 

@@ -29,8 +29,8 @@ const DARKNESS: CatalogShadowArt = {
 };
 
 // Synthetic fixture exercising ShadowArtRow's generic buff-chip path (shared
-// with disciplines/Channel Divinity via catalogEffectSpec) — no current Shadow
-// Art carries a buff (the 2014 Pass without Trace option is retired, #1246).
+// with Channel Divinity via catalogEffectSpec) — no current Shadow Art carries
+// a buff (the 2014 Pass without Trace option is retired, #1246).
 const BUFF_ART_FIXTURE: CatalogShadowArt = {
   id: "sa-test-buff",
   name: "Shadow Arts: Test Buff",

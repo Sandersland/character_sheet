@@ -2,7 +2,6 @@
  * Advancement / feat / XP / level-up-ceremony wire types and their operations.
  */
 import type {
-  LearnDisciplineOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -134,7 +133,6 @@ export type LevelUpStepKind =
   | "subclass"
   | "maneuvers"
   | "fightingStyleFeat"
-  | "disciplines"
   | "toolProficiency"
   | "subclassChoice"
   | "newSpells"
@@ -175,7 +173,6 @@ export interface LevelUpSubmission {
   /** #1137: a Fighting Style feat pick — a takeFeat op (server forces the fs slot). */
   fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
-  disciplines?: LearnDisciplineOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];

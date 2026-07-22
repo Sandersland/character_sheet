@@ -1,6 +1,6 @@
 // Subclass pick step for the level-up ceremony (#889). Its only job is to write
 // draft.subclassId; useLevelUpCeremony re-plans around the new pick (a chosen
-// subclass can insert maneuver/discipline steps into the rail).
+// subclass can insert maneuver/tool-proficiency steps into the rail).
 
 import Spinner from "@/components/ui/Spinner";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
@@ -31,7 +31,6 @@ export default function SubclassStep() {
             ...d,
             subclassId,
             maneuvers: undefined,
-            disciplines: undefined,
             toolProficiencies: undefined,
             subclassChoices: undefined,
           },

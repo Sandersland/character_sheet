@@ -2,11 +2,10 @@
  * Characterization lock for the level-gated reconcilers (#617).
  *
  * Asserts the EXACT bytes (summary strings, event `data`, and before/after
- * `resources` payloads) that maneuvers/disciplines/tool-proficiency
- * reconciliation emits.
+ * `resources` payloads) that maneuvers/tool-proficiency reconciliation emits.
  *
- * Since #818 every reconciler snapshots the SAME canonical 6-key resources shape
- * via snapshotResources(): { used, maneuversKnown, disciplinesKnown,
+ * Since #818 every reconciler snapshots the SAME canonical resources shape
+ * via snapshotResources(): { used, maneuversKnown,
  * toolProficienciesKnown, advancements, fightingStyle }. The former per-site
  * divergence (maneuvers/toolProfs emitted a partial 4-key object) was an
  * undo-correctness bug — an omitted key wiped on wholesale revert — now fixed.
@@ -40,8 +39,6 @@ const XP_LVL_17 = 225000;
 // Unique catalog names so we never collide with seeded rows.
 const FIGHTER_CLASS_NAME = "Test Fighter (Recon Char Suite)";
 const BM_SUBCLASS_NAME = "battle master"; // exact lowercase key deriveResources reads
-const MONK_CLASS_NAME = "Test Monk (Recon Char Suite)";
-const FE_SUBCLASS_NAME = "way of the four elements"; // exact lowercase key
 
 const BASE_ABILITY_SCORES = {
   strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10,
@@ -71,14 +68,6 @@ function fiveManeuvers() {
 function oneToolProf() {
   return [{ id: "tp1", name: "Smith's Tools" }];
 }
-function fourDisciplines() {
-  return [
-    { id: "d1", name: "Fangs of the Fire Snake", description: "Reach + fire damage.", learnedAtLevel: 3, lastSwapLevel: null },
-    { id: "d2", name: "Water Whip", description: "Pull or knock prone.", learnedAtLevel: 6, lastSwapLevel: null },
-    { id: "d3", name: "Fist of Unbroken Air", description: "Push and knock prone.", learnedAtLevel: 11, lastSwapLevel: null },
-    { id: "d4", name: "Rush of the Gale Spirits", description: "Cast Gust of Wind.", learnedAtLevel: 17, lastSwapLevel: null },
-  ];
-}
 
 async function postXp(characterId: string, body: object) {
   return supertest(app).post(`/api/characters/${characterId}/experience`).set("Cookie", COOKIE).send(body);
@@ -87,7 +76,6 @@ async function postXp(characterId: string, body: object) {
 // Raw event rows (not the serialized activity feed) so before/after are byte-exact.
 type ReconEventType =
   | "maneuversReconciled"
-  | "disciplinesReconciled"
   | "toolProficienciesReconciled"
   | "advancementsReconciled";
 async function eventsByType(characterId: string, type: ReconEventType) {
@@ -105,8 +93,6 @@ async function allEvents(characterId: string) {
 
 let fighterClassId: string;
 let bmSubclassId: string;
-let monkClassId: string;
-let feSubclassId: string;
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
@@ -127,27 +113,11 @@ beforeAll(async () => {
     update: {},
   });
   bmSubclassId = bm.id;
-
-  const monk = await prisma.characterClass.upsert({
-    where: { name: MONK_CLASS_NAME },
-    create: {
-      name: MONK_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"],
-      skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false, subclassLevel: 3,
-    },
-    update: { subclassLevel: 3 },
-  });
-  monkClassId = monk.id;
-  const fe = await prisma.subclass.upsert({
-    where: { classId_name: { classId: monk.id, name: FE_SUBCLASS_NAME } },
-    create: { classId: monk.id, name: FE_SUBCLASS_NAME, description: "Elemental disciplines." },
-    update: {},
-  });
-  feSubclassId = fe.id;
 });
 
 afterAll(async () => {
-  await prisma.subclass.deleteMany({ where: { name: { in: [BM_SUBCLASS_NAME, FE_SUBCLASS_NAME] } } });
-  await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, MONK_CLASS_NAME] } } });
+  await prisma.subclass.deleteMany({ where: { name: { in: [BM_SUBCLASS_NAME] } } });
+  await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME] } } });
 });
 
 afterEach(async () => {
@@ -168,25 +138,6 @@ async function createBattleMaster(id: string) {
       resources: { used: {}, maneuversKnown: fiveManeuvers(), toolProficienciesKnown: oneToolProf() },
       classEntries: {
         create: [{ name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 0, level: 7, subclassId: bmSubclassId, subclass: BM_SUBCLASS_NAME }],
-      },
-    },
-  });
-}
-
-async function createFourElementsMonk(id: string) {
-  return prisma.character.create({
-    data: {
-      ...BASE_CHARACTER,
-      ownerId: OWNER_ID,
-      id,
-      name: `ReconChar ${id}`,
-      experiencePoints: XP_LVL_17,
-      hitPoints: { current: 100, max: 100, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-      hitDice: { total: 17, die: "d8", spent: 0 },
-      spellcasting: Prisma.JsonNull,
-      resources: { used: {}, disciplinesKnown: fourDisciplines() },
-      classEntries: {
-        create: [{ name: MONK_CLASS_NAME, classId: monkClassId, position: 0, level: 17, subclassId: feSubclassId, subclass: FE_SUBCLASS_NAME }],
       },
     },
   });
@@ -243,7 +194,6 @@ describe("level-reconciliation characterization (#617)", () => {
       resources: {
         used: {},
         maneuversKnown: fiveManeuvers(),
-        disciplinesKnown: [],
         toolProficienciesKnown: oneToolProf(),
         choicesKnown: {},
         advancements: [],
@@ -253,7 +203,6 @@ describe("level-reconciliation characterization (#617)", () => {
       resources: {
         used: {},
         maneuversKnown: fiveManeuvers().slice(0, 3),
-        disciplinesKnown: [],
         toolProficienciesKnown: oneToolProf(),
         choicesKnown: {},
         advancements: [],
@@ -273,10 +222,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(man.summary).toBe("All 5 maneuvers removed — subclass no longer available");
     expect(man.data).toEqual({ removedCount: 5, allowed: 0 });
     expect(man.before).toEqual({
-      resources: { used: {}, maneuversKnown: fiveManeuvers(), disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: fiveManeuvers(), toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
     expect(man.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
 
     const [tool] = await eventsByType("recon-full", "toolProficienciesReconciled");
@@ -285,10 +234,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(tool.data).toEqual({ removedCount: 1, allowed: 0 });
     // Ordering interaction: maneuvers already trimmed → maneuversKnown is [] here.
     expect(tool.before).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
     });
     expect(tool.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
     });
 
     // Registry order: maneuvers event precedes toolProfs event within the batch.
@@ -300,60 +249,6 @@ describe("level-reconciliation characterization (#617)", () => {
     // Both share the XP op's batch.
     expect(man.batchId).toBe(tool.batchId);
     expect(man.batchId).toBeTruthy();
-  });
-
-  // ── disciplines: partial trim — full serializeResourcesState blob (6 keys) ───
-  it("disciplinesReconciled: partial trim 4→2 on level 17→6, full-blob payload", async () => {
-    await createFourElementsMonk("recon-disc-partial");
-    const res = await postXp("recon-disc-partial", { operations: [{ type: "set", value: XP_LVL_6 }] });
-    expect(res.status).toBe(200);
-
-    const [ev] = await eventsByType("recon-disc-partial", "disciplinesReconciled");
-    expect(ev.category).toBe("resources");
-    expect(ev.summary).toBe("2 elemental disciplines removed — level cap reduced to 2");
-    expect(ev.data).toEqual({ removedCount: 2, allowed: 2 });
-    // Full blob: includes advancements + fightingStyle (the shape divergence #617 preserves).
-    expect(ev.before).toEqual({
-      resources: {
-        used: {},
-        maneuversKnown: [],
-        disciplinesKnown: fourDisciplines(),
-        toolProficienciesKnown: [],
-        choicesKnown: {},
-        advancements: [],
-      },
-    });
-    expect(ev.after).toEqual({
-      resources: {
-        used: {},
-        maneuversKnown: [],
-        disciplinesKnown: fourDisciplines().slice(0, 2),
-        toolProficienciesKnown: [],
-        choicesKnown: {},
-        advancements: [],
-      },
-    });
-  });
-
-  // ── disciplines: full clear (subclass removed) ───────────────────────────────
-  it("disciplinesReconciled: full clear on level 17→1", async () => {
-    await createFourElementsMonk("recon-disc-full");
-    const res = await postXp("recon-disc-full", { operations: [{ type: "set", value: XP_LVL_1 }] });
-    expect(res.status).toBe(200);
-
-    const [ev] = await eventsByType("recon-disc-full", "disciplinesReconciled");
-    expect(ev.summary).toBe("All 4 elemental disciplines removed — subclass no longer available");
-    expect(ev.data).toEqual({ removedCount: 4, allowed: 0 });
-    expect(ev.after).toEqual({
-      resources: {
-        used: {},
-        maneuversKnown: [],
-        disciplinesKnown: [],
-        toolProficienciesKnown: [],
-        choicesKnown: {},
-        advancements: [],
-      },
-    });
   });
 
   // ── advancements: partial trim (level cap reduced, not below first ASI) ───────

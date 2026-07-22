@@ -41,7 +41,6 @@ function makeCharacter(focusRemaining: number, concentratingOn: { entryId: strin
       shadowArtsAvailable: true,
       pools: [{ key: "focus", label: "Focus", total: 3, recharge: "shortRest", used: 3 - focusRemaining, remaining: focusRemaining }],
       maneuversKnown: [],
-      disciplinesKnown: [],
       toolProficienciesKnown: [],
     },
     spellcasting: concentratingOn ? { concentratingOn } : undefined,

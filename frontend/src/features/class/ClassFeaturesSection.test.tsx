@@ -1,19 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
-import { RollProvider } from "@/features/dice/RollContext";
 import * as client from "@/api/client";
-import type { AdvancementEntry, CatalogDiscipline, CatalogFeat, Character } from "@/types/character";
+import type { AdvancementEntry, CatalogFeat, Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   applyClassTransactions: vi.fn(),
   applyAdvancementTransactions: vi.fn(),
   applyResourceTransactions: vi.fn(),
-  applyDisciplineTransactions: vi.fn(),
   applyShadowArtsTransactions: vi.fn(),
-  fetchDisciplines: vi.fn(),
   fetchFeats: vi.fn(),
 }));
 
@@ -134,93 +131,5 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
     );
     expect(screen.queryByText("Cloak of Shadows")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Become Invisible" })).not.toBeInTheDocument();
-  });
-});
-
-describe("ClassFeaturesSection — Elemental Disciplines", () => {
-  const DISCIPLINE_CATALOG: CatalogDiscipline[] = [
-    {
-      id: "fangs",
-      name: "Fangs of the Fire Snake",
-      description: "Extend reach and deal fire damage.",
-      minLevel: 3,
-      alwaysKnown: false,
-      saveAbility: null,
-      cost: { kind: "pool", key: "focus", base: 1, perStep: 1 },
-      effect: { effectType: "damage", dice: { count: 1, faces: 10, modifier: 0 }, damageType: "fire", attackType: "attack", saveAbility: null, saveEffect: null, scaling: { mode: "focus", dicePerStep: 1 } },
-    },
-    {
-      id: "thunders",
-      name: "Fist of Four Thunders",
-      description: "Cast thunderwave.",
-      minLevel: 3,
-      alwaysKnown: false,
-      saveAbility: "constitution",
-      cost: { kind: "pool", key: "focus", base: 2 },
-      effect: { effectType: "damage", dice: { count: 3, faces: 8, modifier: 0 }, damageType: "thunder", attackType: "save", saveAbility: "constitution", saveEffect: "half", scaling: { mode: "focus", dicePerStep: 0 } },
-    },
-  ];
-
-  function makeMonk(): Character {
-    return {
-      id: "char-1",
-      class: "Monk",
-      level: 6,
-      subclass: "Way of the Four Elements",
-      resources: {
-        features: [],
-        pools: [{ key: "focus", label: "Focus", total: 6, recharge: "shortRest", used: 0, remaining: 6 }],
-        maneuversKnown: [],
-        toolProficienciesKnown: [],
-        disciplineChoiceCount: 2,
-        disciplineSaveDC: 13,
-        disciplinesKnown: [{ id: "entry-1", disciplineId: "fangs", name: "Fangs of the Fire Snake", description: "Extend reach and deal fire damage." }],
-      },
-    } as unknown as Character;
-  }
-
-  beforeEach(() => {
-    vi.mocked(client.fetchDisciplines).mockResolvedValue(DISCIPLINE_CATALOG);
-  });
-
-  it("renders the discipline block for a Four Elements monk and casts through applyDisciplineTransactions", async () => {
-    const user = userEvent.setup();
-    vi.mocked(client.applyDisciplineTransactions).mockResolvedValue(makeMonk());
-
-    render(
-      <RollProvider>
-        <ClassFeaturesSection character={makeMonk()} referenceClasses={[]} onUpdate={vi.fn()} />
-      </RollProvider>,
-    );
-
-    expect(screen.getByText("Elemental Disciplines")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("Fangs of the Fire Snake")).toBeInTheDocument());
-
-    const fangsRow = screen.getByText("Fangs of the Fire Snake").closest("li")!;
-    await user.click(within(fangsRow).getByRole("button", { name: "Cast" }));
-
-    await waitFor(() => expect(client.applyDisciplineTransactions).toHaveBeenCalledTimes(1));
-    const [, ops] = vi.mocked(client.applyDisciplineTransactions).mock.calls[0];
-    expect(ops[0]).toMatchObject({ type: "castDiscipline", disciplineId: "fangs", focusSpent: 1 });
-  });
-
-  it("learns a discipline through applyResourceTransactions", async () => {
-    const user = userEvent.setup();
-    vi.mocked(client.applyResourceTransactions).mockResolvedValue(makeMonk());
-
-    render(
-      <RollProvider>
-        <ClassFeaturesSection character={makeMonk()} referenceClasses={[]} onUpdate={vi.fn()} />
-      </RollProvider>,
-    );
-
-    await waitFor(() => expect(screen.getByRole("button", { name: /learn discipline/i })).toBeInTheDocument());
-    await user.click(screen.getByRole("button", { name: /learn discipline/i }));
-    const thunderRow = screen.getByText("Fist of Four Thunders").closest("li")!;
-    await user.click(within(thunderRow).getByRole("button", { name: "Learn" }));
-
-    expect(client.applyResourceTransactions).toHaveBeenCalledWith("char-1", [
-      { type: "learnDiscipline", disciplineId: "thunders" },
-    ]);
   });
 });

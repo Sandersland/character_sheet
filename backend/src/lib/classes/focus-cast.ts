@@ -1,9 +1,9 @@
 /**
- * Shared scaffolding for the Monk focus-cast handlers (disciplines, shadow-arts).
- * Both wrap castAbilityInTx with an identical character-select and audit-event
- * tail; only their 5e rules (effect specs, level gates, focus costs) differ and
- * stay in their own files. Full unification of those divergent parts is the job
- * of the declarative subclass engine (#416) — this module only removes the
+ * Shared scaffolding for the Monk focus-cast handlers (currently: shadow-arts).
+ * Wraps castAbilityInTx with a shared character-select and audit-event tail; the
+ * per-subclass 5e rules (effect specs, level gates, focus costs) stay in their
+ * own files. Full unification of those divergent parts is the job of the
+ * declarative subclass engine (#416) — this module only removes the
  * byte-for-byte clone (fallow dup:a64b5a27).
  */
 
@@ -22,18 +22,15 @@ export const FOCUS_CAST_CHARACTER_SELECT = {
   experiencePoints: true,
   abilityScores: true,
   // Every entry (not just the primary) + its level, so a non-primary Monk's
-  // focus/disciplineSaveDC still resolves via deriveEntryScopedResources (#1072).
+  // focus gate still resolves via deriveEntryScopedResources (#1072).
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, subclass: true, level: true },
   },
 } satisfies Prisma.CharacterSelect;
 
-/** The character row shape both focus-cast handlers receive (from FOCUS_CAST_CHARACTER_SELECT). */
-export type FocusCastCharacterRow = Prisma.CharacterGetPayload<{ select: typeof FOCUS_CAST_CHARACTER_SELECT }>;
-
-/** The two audit-event `type`s emitted by the shared focus-cast tail. */
-type FocusCastEventType = Extract<EventType, "castDiscipline" | "castShadowArt">;
+/** The audit-event `type`s emitted by the shared focus-cast tail. */
+type FocusCastEventType = Extract<EventType, "castShadowArt">;
 
 export interface EmitFocusCastEventsParams {
   characterId: string;
@@ -59,8 +56,8 @@ export interface EmitFocusCastEventsParams {
  * Emit the shared audit tail for a focus cast: when the ability concentrates, persist
  * the spellcasting write-back and log the undoable spellcasting-category event
  * (before/after snapshots restore `concentratingOn` on revert); always log the
- * resources-category cast record. Payloads stay byte-identical across both handlers
- * — pinned by the disciplines-cast / shadow-arts-cast characterization tests.
+ * resources-category cast record. Payloads are pinned by the shadow-arts-cast
+ * characterization tests.
  */
 export async function emitFocusCastEvents(
   tx: Prisma.TransactionClient,

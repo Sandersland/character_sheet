@@ -87,10 +87,10 @@ export interface DerivedClassInfo {
    * Undefined when no subclass feature grants a tool choice.
    */
   toolProfChoiceCount?: number;
-  /** Way of the Four Elements only: number of elemental disciplines known at this level. */
-  disciplineChoiceCount?: number;
-  /** Way of the Four Elements only: focus save DC for discipline effects (8 + prof + Wis mod). */
-  disciplineSaveDC?: number;
+  /** Warrior of the Elements only: whether the L3+ Elemental Attunement toggle is available. */
+  elementalAttunementAvailable?: boolean;
+  /** Warrior of the Elements only: whether the L6+ Elemental Burst action is available. */
+  elementalBurstAvailable?: boolean;
   /** Warrior of Shadow only: whether the L3+ 1-focus Darkness cast is available. */
   shadowArtsAvailable?: boolean;
   /** Warrior of Shadow only: whether the L17+ Cloak of Shadows self-invisible toggle is available (moved from L11 in the 2024 rewrite, #1246). */
@@ -110,7 +110,7 @@ export interface DerivedClassInfo {
  * (issue #899) — e.g. Ranger's Hunter's Prey, Barbarian totems. Its only
  * persisted state is the selection (ResourcesMutableState.choicesKnown[key]);
  * the option catalog lives as GrantedAbility rows keyed by `catalogSource`.
- * Distinct from the bespoke maneuvers/disciplines/tool-prof lists, which carry
+ * Distinct from the bespoke maneuvers/tool-prof lists, which carry
  * extra mechanics (save DCs, cast/swap ops) and stay hand-rolled.
  */
 export interface SubclassChoice {

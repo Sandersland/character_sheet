@@ -38,7 +38,6 @@ function makeCharacter(cdRemaining: number): Character {
       features: [],
       pools: [{ key: "channelDivinity", label: "Channel Divinity", total: 1, recharge: "shortRest", used: 1 - cdRemaining, remaining: cdRemaining }],
       maneuversKnown: [],
-      disciplinesKnown: [],
       toolProficienciesKnown: [],
     },
   } as unknown as Character;

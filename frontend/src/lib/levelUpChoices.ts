@@ -2,7 +2,7 @@
 // choice kind maps a shared UI (ChoiceStep) to its catalog source, the
 // character's already-known set, and the draft field it writes. No JSX.
 
-import { fetchDisciplines, fetchFeats, fetchManeuvers, fetchReference } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchReference } from "@/api/client";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type { Character, LevelUpStepKind } from "@/types/character";
 
@@ -10,7 +10,7 @@ export interface ChoiceOption {
   id: string;
   name: string;
   description?: string;
-  /** Short gate label rendered after the name, e.g. "L3+" (disciplines). */
+  /** Short gate label rendered after the name, e.g. "L3+". */
   tag?: string;
 }
 
@@ -79,30 +79,10 @@ const toolProficiency: ChoiceKindConfig = {
   }),
 };
 
-const disciplines: ChoiceKindConfig = {
-  loadOptions: (ctx) =>
-    fetchDisciplines().then((list) =>
-      list
-        // 2014 gates enforced at the ceremony's target level (#1174); 2024 Four Elements rework = #1133.
-        .filter((d) => !d.alwaysKnown && d.minLevel <= ctx.targetLevel)
-        .map((d) => ({ id: d.id, name: d.name, description: d.description, tag: `L${d.minLevel}+` })),
-    ),
-  fromCharacter: (character) =>
-    new Set(
-      (character.resources?.disciplinesKnown ?? [])
-        .map((e) => e.disciplineId)
-        .filter((id): id is string => id != null),
-    ),
-  selected: (draft) =>
-    (draft.disciplines ?? []).map((op) => op.disciplineId).filter((id): id is string => id != null),
-  select: (_draft, ids) => ({ disciplines: ids.map((id) => ({ type: "learnDiscipline", disciplineId: id })) }),
-};
-
 export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConfig>> = {
   maneuvers,
   fightingStyleFeat,
   toolProficiency,
-  disciplines,
 };
 
 /**

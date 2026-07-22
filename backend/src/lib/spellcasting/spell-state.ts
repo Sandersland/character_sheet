@@ -172,7 +172,7 @@ export function clampPreparedToLimit(
 
 /**
  * Deep-copy the spellcasting state into a before/after event snapshot. Shared by
- * the focus-cast handlers (disciplines, shadow-arts) so their audit-event snapshots
+ * the focus-cast handlers (shadow-arts) so their audit-event snapshots
  * are byte-identical (the payload feeds LIFO undo via activity.ts).
  */
 export function snapshotSpellcasting(state: SpellcastingMutableState) {

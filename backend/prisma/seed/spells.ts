@@ -161,6 +161,22 @@ export const SPELLS: CatalogSpell[] = [
     // SRD 5.2: components are S, M only — no verbal (fixes a pre-existing seed bug).
     components: { verbal: false, somatic: true, material: true, materialDescription: "a bit of fleece" },
   },
+  // #1247: Warrior of the Elements' Manipulate Elements grants Elementalism, the
+  // 2024 utility cantrip (PHB'24). No roll — it produces one of several minor
+  // elemental effects (a sensory flourish, snuff/light a flame, shape earth or
+  // mist, etc.). Wisdom is the monk's casting ability for it (set at grant time).
+  {
+    name: "Elementalism",
+    level: 0,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "30 ft",
+    duration: "Instantaneous",
+    description:
+      "You exert control over the elements, creating one of the following effects within range: send a harmless burst of wind (extinguish small flames or push light objects), create a spectral elemental shape, warm or chill up to 1 cubic foot of nonliving material, light or snuff a candle-sized flame, or momentarily shape earth, fire, water, or mist no larger than a 1-foot cube.",
+    classes: ["monk"],
+    components: { verbal: true, somatic: true, material: false },
+  },
   // #1131: SRD 5.2 (2024) cantrips added so every caster's creation picker has
   // real choice. Eldritch Blast is the issue's acceptance-criterion warlock spell.
   {

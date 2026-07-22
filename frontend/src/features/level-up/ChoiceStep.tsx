@@ -1,5 +1,5 @@
 // Generic Choose-N ceremony body (#896): one component drives every
-// catalog-backed level-up pick — maneuvers, disciplines, tool proficiencies,
+// catalog-backed level-up pick — maneuvers, tool proficiencies,
 // and (single-select) fighting style — off the CHOICE_KIND_CONFIGS wiring.
 // Enforces the plan's exact count; already-known options are hidden. The
 // catalog fetch, selection, and list rendering each live in their own unit.

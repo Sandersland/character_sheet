@@ -27,7 +27,6 @@ const STEP_LABELS: Record<LevelUpStepKind, string> = {
   subclass: "Subclass",
   maneuvers: "Maneuvers",
   fightingStyleFeat: "Fighting Style",
-  disciplines: "Disciplines",
   toolProficiency: "Tool Proficiency",
   subclassChoice: "Subclass Choice",
   newSpells: "New Spells",
@@ -47,7 +46,6 @@ const LIST_ENTRIES: Partial<
   Record<LevelUpStepKind, (step: LevelUpStep, draft: LevelUpDraft) => readonly unknown[] | undefined>
 > = {
   maneuvers: (_step, draft) => draft.maneuvers,
-  disciplines: (_step, draft) => draft.disciplines,
   toolProficiency: (_step, draft) => draft.toolProficiencies,
   subclassChoice: (step, draft) => draft.subclassChoices?.filter((c) => c.choiceKey === step.meta?.key),
   newSpells: (_step, draft) => draft.spellsLearned,
