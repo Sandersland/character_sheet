@@ -15,6 +15,14 @@
 //                     session.spec can start/resume a live session in-spec.
 //   Monk L6         — Monk, 14000 XP (L6), own campaign; unarmed.spec asserts
 //                     the Empowered Strikes "Magical" badge in a live session.
+//   Elements Monk   — Monk, L6, Warrior of the Elements, own campaign;
+//                     Elemental Attunement/Burst live-play automation.
+//   Shadow Monk     — Monk, L6, Warrior of Shadow, own campaign; shadow-arts.spec
+//                     and shadow-step.spec exercise Shadow Arts/Shadow Step.
+//   Open Hand Monk L11 — Monk, 85000 XP (L11), Warrior of the Open Hand, own
+//                     campaign; #1250's e2e drives Deflect Attacks, Stunning
+//                     Strike, 3-strike Flurry (Heightened Focus, L10), Patient
+//                     Defense/Step of the Wind, and the Open Hand Technique rider.
 //
 // Personas that need a live session each get a DEDICATED campaign: a campaign
 // allows only one active session at a time, so sharing one would make the
@@ -40,6 +48,9 @@ const ABILITY_SCORES = {
 const LEVEL_5_XP = 6500;
 // L6 threshold — gates Monk Empowered Strikes (magical unarmed strikes).
 const LEVEL_6_XP = 14000;
+// L11 threshold — gates Monk Heightened Focus's 3-strike Flurry (granted at L10,
+// so any L11+ classLevel exercises it) plus subclass L11 features.
+const LEVEL_11_XP = 85000;
 
 interface Persona {
   name: string;
@@ -136,6 +147,20 @@ const ROSTER: Persona[] = [
     classLevel: 6,
     subclassName: "Warrior of Shadow",
     campaignName: "E2E Solo — Shadow Monk",
+  },
+  {
+    // #1249/#1250: L11+ so Heightened Focus (L10, 3-strike Flurry) and Open Hand
+    // Technique (subclass, L3+) are both live, exercising Deflect Attacks (L3),
+    // Stunning Strike (L5), Flurry/Patient Defense/Step of the Wind, and the
+    // Open Hand Technique rider (Addle/Push/Topple) in one persona.
+    name: "Open Hand Monk L11",
+    race: "Human",
+    background: "Soldier",
+    className: "Monk",
+    experiencePoints: LEVEL_11_XP,
+    classLevel: 11,
+    subclassName: "Warrior of the Open Hand",
+    campaignName: "E2E Solo — Open Hand Monk",
   },
 ];
 
