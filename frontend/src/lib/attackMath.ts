@@ -298,10 +298,10 @@ export function buildUnarmedOnlyForms(character: Character): AttackEntry[] {
 }
 
 // Flurry of Blows strike count (SRD 5.2 "Focus"): expend 1 Focus Point to make
-// two Unarmed Strikes as a bonus action. Hardcoded — Heightened Focus (monk
-// L10) raises this to three; that seam (#1244) only needs to change this fn.
-export function flurryStrikeCount(): number {
-  return 2;
+// two Unarmed Strikes as a bonus action — three at Heightened Focus (monk L10,
+// #1244).
+export function flurryStrikeCount(character: Character): number {
+  return character.level >= 10 ? 3 : 2;
 }
 
 // The "Attacking with" form options for the single attack card (#786): deduped

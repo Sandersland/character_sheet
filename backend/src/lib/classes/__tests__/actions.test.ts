@@ -353,6 +353,43 @@ describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (
   });
 });
 
+describe("Heightened Focus (monk L10, #1244) — Patient Defense temp HP + reminder upgrades", () => {
+  it("patientDefenseFocus adds a tempHp op when ctx carries a pre-rolled heightenedFocusTempHp amount", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseFocus({ heightenedFocusTempHp: 11 })).toEqual([
+      { type: "spendResource", key: "focus" },
+      { type: "tempHp", amount: 11 },
+    ]);
+  });
+
+  it("patientDefenseFocus adds no tempHp op when ctx omits heightenedFocusTempHp (below L10)", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseFocus({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("stepOfTheWindFocus has no server effect change — the move-ally rider is narrated only", () => {
+    expect(ACTION_EFFECT_FN.stepOfTheWindFocus({ heightenedFocusTempHp: 11 })).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("patientDefenseFocus reminder names the temp-HP rider only at monk L10+", () => {
+    const l9 = deriveActions("monk", undefined, 9, [pool("focus", 1)]);
+    const l10 = deriveActions("monk", undefined, 10, [pool("focus", 1)]);
+    expect(l9.find((a) => a.key === "patientDefenseFocus")?.reminder).not.toMatch(/temporary hit points/i);
+    expect(l10.find((a) => a.key === "patientDefenseFocus")?.reminder).toMatch(/temporary hit points/i);
+    expect(l10.find((a) => a.key === "patientDefenseFocus")?.reminder).toMatch(/martial arts die/i);
+  });
+
+  it("stepOfTheWindFocus reminder names the move-a-willing-creature rider only at monk L10+", () => {
+    const l9 = deriveActions("monk", undefined, 9, [pool("focus", 1)]);
+    const l10 = deriveActions("monk", undefined, 10, [pool("focus", 1)]);
+    expect(l9.find((a) => a.key === "stepOfTheWindFocus")?.reminder).not.toMatch(/creature/i);
+    expect(l10.find((a) => a.key === "stepOfTheWindFocus")?.reminder).toMatch(/creature/i);
+    expect(l10.find((a) => a.key === "stepOfTheWindFocus")?.reminder).toMatch(/opportunity attack/i);
+  });
+});
+
 // Stunning Strike (#392's bare-spend stub) is superseded by the dedicated
 // stunning-strike.ts vertical (#1242) — see stunning-strike.test.ts for its
 // once-per-turn guard, DC math, and fail/success outcome coverage.

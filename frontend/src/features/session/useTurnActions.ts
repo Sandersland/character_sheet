@@ -265,7 +265,7 @@ export function useTurnActions({
   // only via InlineFlurryPicker, never the weapon attack-picker.
   function handleFlurryAction() {
     consumeBonusAction();
-    enterFlurryMode(flurryStrikeCount());
+    enterFlurryMode(flurryStrikeCount(character));
     openResolution("flurryOfBlows");
     setShowBonusMenu(false);
   }

@@ -228,7 +228,7 @@ function FlurryResolutionSheet({
     else turnState.cancelFlurry();
     closeResolution();
   };
-  const strikeCount = attack?.total ?? flurryStrikeCount();
+  const strikeCount = attack?.total ?? flurryStrikeCount(character);
   return (
     <BottomSheet
       title="Flurry of Blows"

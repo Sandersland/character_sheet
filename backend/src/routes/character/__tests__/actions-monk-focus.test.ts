@@ -27,12 +27,15 @@ const OWNER_ID = "owner-actions-monk-focus";
 let COOKIE: string;
 
 const MONK_ID = "test-actions-monk-focus";
+const HEIGHTENED_MONK_ID = "test-actions-monk-focus-heightened";
 const MONK_CATALOG_NAME = "Actions Monk Focus Test Monk";
 let monkClassId: string;
 
 // XP threshold for level 2 (single-class): both Patient Defense and Step of
 // the Wind grant at monk L2.
 const L2_XP = 300;
+// XP threshold for level 10 (single-class): Heightened Focus (#1244).
+const L10_XP = 64000;
 
 const MONK_BASE = {
   id: MONK_ID,
@@ -73,17 +76,32 @@ async function createMonk() {
   });
 }
 
-async function activity(): Promise<ActivityEvent[]> {
-  const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}/activity`);
+// Heightened Focus (monk L10, #1244) fixture — a separate character/id so the
+// L2 tests above stay untouched.
+async function createHeightenedMonk() {
+  await prisma.character.create({
+    data: {
+      ...MONK_BASE,
+      id: HEIGHTENED_MONK_ID,
+      name: "Actions Monk Focus Test (Heightened)",
+      experiencePoints: L10_XP,
+      ownerId: OWNER_ID,
+      classEntries: { create: [{ name: "monk", classId: monkClassId, position: 0, level: 10 }] },
+    },
+  });
+}
+
+async function activity(characterId: string = MONK_ID): Promise<ActivityEvent[]> {
+  const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${characterId}/activity`);
   expect(res.status).toBe(200);
   return res.body as ActivityEvent[];
 }
 
-function executeAction(actionKey: string) {
+function executeAction(actionKey: string, characterId: string = MONK_ID) {
   return supertest
     .agent(app())
     .set("Cookie", COOKIE)
-    .post(`/api/characters/${MONK_ID}/actions/transactions`)
+    .post(`/api/characters/${characterId}/actions/transactions`)
     .send({ operations: [{ type: "executeAction", actionKey }] });
 }
 
@@ -124,6 +142,14 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
     const res = await executeAction("patientDefenseFocus");
     expect(res.status).toBe(200);
     expect(pool(res.body, "focus")).toMatchObject({ used: 1, remaining: 1 });
+  });
+
+  // Heightened Focus (monk L10, #1244) grants no temp HP below L10 — see the
+  // dedicated describe block below for the L10+ roll.
+  it("patientDefenseFocus grants no temp HP below monk L10", async () => {
+    const res = await executeAction("patientDefenseFocus");
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.temp).toBe(0);
   });
 
   it("stepOfTheWindFocus spends exactly 1 focus", async () => {
@@ -176,5 +202,59 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
 
     const third = await executeAction("stepOfTheWindFocus");
     expect(third.status).toBe(400); // pool exhausted — no focus remains
+  });
+});
+
+describe("POST /:id/actions/transactions — Heightened Focus temp HP (monk L10, #1244)", () => {
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: MONK_CATALOG_NAME },
+      create: {
+        name: MONK_CATALOG_NAME,
+        hitDie: "d8",
+        savingThrows: ["strength", "dexterity"],
+        skillChoiceCount: 2,
+        skillChoices: ["acrobatics", "stealth"],
+        isSpellcaster: false,
+        subclassLevel: 3,
+      },
+      update: {},
+    });
+    monkClassId = cls.id;
+    await createHeightenedMonk();
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: HEIGHTENED_MONK_ID } });
+  });
+
+  // Martial Arts die at monk L10 is 1d8 (deriveMartialArtsDie), so two rolls
+  // land in [2, 16] — the server rolls both dice itself (rollDie, no client
+  // input), like Uncanny Metabolism's bonusHeal (#1243).
+  it("patientDefenseFocus grants temp HP = two Martial Arts die rolls (2-16) at monk L10+", async () => {
+    const res = await executeAction("patientDefenseFocus", HEIGHTENED_MONK_ID);
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.temp).toBeGreaterThanOrEqual(2);
+    expect(res.body.hitPoints.temp).toBeLessThanOrEqual(16);
+  });
+
+  it("the temp HP grant is logged as a session/activity setTemp event", async () => {
+    await executeAction("patientDefenseFocus", HEIGHTENED_MONK_ID);
+    const events = await activity(HEIGHTENED_MONK_ID);
+    const setTemp = events.find((e) => e.type === "setTemp");
+    expect(setTemp).toBeDefined();
+  });
+
+  it("stepOfTheWindFocus still spends exactly 1 focus and grants no temp HP (the move-ally rider is narrated only)", async () => {
+    const res = await executeAction("stepOfTheWindFocus", HEIGHTENED_MONK_ID);
+    expect(res.status).toBe(200);
+    expect(pool(res.body, "focus")).toMatchObject({ used: 1, remaining: 9 });
+    expect(res.body.hitPoints.temp).toBe(0);
   });
 });

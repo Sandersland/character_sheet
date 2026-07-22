@@ -11,9 +11,10 @@
  *    CLASS_RESOURCE_FN / deriveResources pattern from class-features.ts.
  *
  * 2. `ACTION_EFFECT_FN` — hardcoded TS dispatch table keyed by action `key`.
- *    Returns existing op types (spendResource, adjustQuantity, heal) for the
- *    Phase-C orchestrator endpoint (POST /actions/transactions). This is the
- *    `CLASS_RESOURCE_FN` analog — no interpreted JSON engine.
+ *    Returns existing op types (spendResource, adjustQuantity, heal, tempHp,
+ *    applyBuff, clearBuff) for the Phase-C orchestrator endpoint (POST
+ *    /actions/transactions). This is the `CLASS_RESOURCE_FN` analog — no
+ *    interpreted JSON engine.
  *
  * Adding a new mechanical action:
  *   • Append a row to ACTIONS in `prisma/seed.ts` (display + gating data for
@@ -58,7 +59,10 @@ interface DerivedActionRecord {
   grantLevel?: number;   // min level for this action
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
-  reminder?: string;     // in-play rule text for no-server-effect reminder actions
+  // In-play rule text for no-server-effect reminder actions. A function form
+  // (Heightened Focus, monk L10, #1244) lets patientDefenseFocus/
+  // stepOfTheWindFocus swap in their L10 rider text without a second row.
+  reminder?: string | ((level: number) => string);
   // Martial Arts' blanket condition (Bonus Unarmed Strike, #1218): gates on
   // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
   // future Martial-Arts-conditioned action can reuse the same gate.
@@ -121,13 +125,40 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
   // action, so both are cost:"bonusAction"; the free entry has no resourceKey
   // (always enabled, like Dodge/Dash themselves) while the Focus entry gates
-  // on the focus pool like any other spend. Seam for #1244 (Heightened Focus,
-  // L10): extend the *Focus effect fn (temp HP roll / move-a-creature rider)
-  // without touching the free entries.
+  // on the focus pool like any other spend. Heightened Focus (monk L10,
+  // #1244) upgrades both *Focus entries without touching the free ones:
+  // patientDefenseFocus's reminder + ACTION_EFFECT_FN entry gain a level-gated
+  // temp-HP roll; stepOfTheWindFocus's reminder gains a narrated move-a-
+  // willing-creature rider (no server state — this app has no ally/NPC
+  // combatant model to move).
   { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Disengage (free bonus action)." },
-  { key: "patientDefenseFocus", name: "Patient Defense (1 Focus)", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, reminder: "Disengage + Dodge (spend 1 Focus)." },
+  {
+    key: "patientDefenseFocus",
+    name: "Patient Defense (1 Focus)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: (level) =>
+      level >= 10
+        ? "Disengage + Dodge (spend 1 Focus). Heightened Focus (L10): also gain temporary hit points equal to two Martial Arts die rolls."
+        : "Disengage + Dodge (spend 1 Focus).",
+  },
   { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Dash (free bonus action)." },
-  { key: "stepOfTheWindFocus", name: "Step of the Wind (1 Focus)", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, reminder: "Disengage + Dash, jump distance doubled this turn (spend 1 Focus)." },
+  {
+    key: "stepOfTheWindFocus",
+    name: "Step of the Wind (1 Focus)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: (level) =>
+      level >= 10
+        ? "Disengage + Dash, jump distance doubled this turn (spend 1 Focus). Heightened Focus (L10): also bring one willing creature within 5 ft along with you, moving it up to your Speed — it doesn't provoke opportunity attacks."
+        : "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
+  },
   // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
   // (spend + Con save + fail/success outcome), built as its own dedicated
   // vertical in stunning-strike.ts, exactly like Sneak Attack bypasses this
@@ -209,13 +240,14 @@ export function deriveActions(
     })
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
+      const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
       return {
         key: a.key,
         name: a.name,
         cost: a.cost,
         enabled,
         ...(disabledReason ? { disabledReason } : {}),
-        ...(a.reminder ? { reminder: a.reminder } : {}),
+        ...(reminder ? { reminder } : {}),
       };
     });
 }
@@ -255,7 +287,11 @@ function resolveEnablement(
 //  - Return op arrays, never side-effect directly.
 //  - If a roll was performed client-side, receive it via `ctx.roll`; validate
 //    range server-side rather than recomputing (same pattern as castSpell.roll).
-//  - Use ONLY existing op types (spendResource, adjustQuantity, heal).
+//  - A roll made server-side with no client input (e.g. Heightened Focus's
+//    temp-HP roll) is precomputed by the route before dispatch and passed in
+//    via its own ctx field, same shape as `rageDamageBonus` below.
+//  - Use ONLY existing op types (spendResource, adjustQuantity, heal, tempHp,
+//    applyBuff, clearBuff).
 
 interface ActionContext {
   /** Arbitrary dice roll total supplied by the client (e.g. potion healing). */
@@ -264,14 +300,22 @@ interface ActionContext {
   inventoryItemId?: string;
   /** Level-derived Rage melee-damage bonus, computed by the route from barbarian level. */
   rageDamageBonus?: number;
+  /**
+   * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): temp HP for
+   * Patient Defense's Focus variant, rolled server-side (two Martial Arts die
+   * rolls, no client input) by the route before dispatch. Undefined/0 below
+   * L10, so patientDefenseFocus simply omits the tempHp op.
+   */
+  heightenedFocusTempHp?: number;
 }
 
 type SpendResourceOp = { type: "spendResource"; key: string; amount?: number };
 type AdjustQuantityOp = { type: "adjustQuantity"; inventoryItemId: string; delta: number };
 type HealOp = { type: "heal"; amount: number };
+type TempHpOp = { type: "tempHp"; amount: number };
 type ApplyBuffOp = { type: "applyBuff"; buff: Omit<ActiveBuff, "id"> };
 type ClearBuffOp = { type: "clearBuff"; key: string; reason: string };
-type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | ApplyBuffOp | ClearBuffOp;
+type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
@@ -352,7 +396,19 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // entry — like Shadow Step/Opportunist, they're economy-only (consume the
   // bonus action, spend nothing); planActionClick never calls send() for a
   // serverEffect:false resolver, so no dispatch entry is needed here.
-  patientDefenseFocus: () => [{ type: "spendResource", key: "focus" }],
+  patientDefenseFocus: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "focus" }];
+    // Heightened Focus (monk L10, #1244): the route pre-rolls two Martial Arts
+    // die rolls into ctx.heightenedFocusTempHp (0/undefined below L10), so the
+    // tempHp op is simply omitted rather than pushed at amount 0.
+    if (ctx.heightenedFocusTempHp) {
+      ops.push({ type: "tempHp", amount: ctx.heightenedFocusTempHp });
+    }
+    return ops;
+  },
+  // stepOfTheWindFocus's Heightened Focus rider (move a willing creature) has
+  // no server state to apply — this app has no NPC/ally combatant model — so
+  // it's surfaced only via the level-gated reminder text above, not here.
   stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
   // stunningStrike is not here — it's a post-hit rider in stunning-strike.ts (#1242).
   // deflectAttacks (the base reduction) has no entry here — it's a pure reminder
