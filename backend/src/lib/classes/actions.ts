@@ -107,8 +107,18 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
 
   // Monk
   { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 2 },
-  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
-  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
+  // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
+  // TWO menu entries — a free variant and a 1-Focus variant — rather than the
+  // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
+  // action, so both are cost:"bonusAction"; the free entry has no resourceKey
+  // (always enabled, like Dodge/Dash themselves) while the Focus entry gates
+  // on the focus pool like any other spend. Seam for #1244 (Heightened Focus,
+  // L10): extend the *Focus effect fn (temp HP roll / move-a-creature rider)
+  // without touching the free entries.
+  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Disengage (free bonus action)." },
+  { key: "patientDefenseFocus", name: "Patient Defense (1 Focus)", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, reminder: "Disengage + Dodge (spend 1 Focus)." },
+  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Dash (free bonus action)." },
+  { key: "stepOfTheWindFocus", name: "Step of the Wind (1 Focus)", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, reminder: "Disengage + Dash, jump distance doubled this turn (spend 1 Focus)." },
   { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "focus", resourceAmount: 1 },
   // Way of Shadow reminder actions (#440) — no resourceKey, no server effect; reminder is the deliverable.
   { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
@@ -285,8 +295,12 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
 
   // Monk
   flurryOfBlows: () => [{ type: "spendResource", key: "focus", amount: 2 }],
-  patientDefense: () => [{ type: "spendResource", key: "focus" }],
-  stepOfTheWind: () => [{ type: "spendResource", key: "focus" }],
+  // patientDefense / stepOfTheWind (the FREE variants) have no ACTION_EFFECT_FN
+  // entry — like Shadow Step/Opportunist, they're economy-only (consume the
+  // bonus action, spend nothing); planActionClick never calls send() for a
+  // serverEffect:false resolver, so no dispatch entry is needed here.
+  patientDefenseFocus: () => [{ type: "spendResource", key: "focus" }],
+  stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
   stunningStrike: () => [{ type: "spendResource", key: "focus" }],
 
   // Paladin

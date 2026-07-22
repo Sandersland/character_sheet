@@ -106,8 +106,14 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   actionSurge:       { key: "actionSurge",       kind: "simple-confirm", slot: "special",     serverEffect: true,  resourceKey: "actionSurge" },
 
   flurryOfBlows:     { key: "flurryOfBlows",     kind: "attack-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 2 },
-  patientDefense:    { key: "patientDefense",    kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
-  stepOfTheWind:     { key: "stepOfTheWind",     kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  // Patient Defense / Step of the Wind (#1240) — free vs 1-Focus variants, each
+  // its own menu entry (mirrors rage/endRage). The free entries are
+  // economy-only, like Shadow Step/Opportunist: no backend ACTION_EFFECT_FN,
+  // so serverEffect:false and no resourceKey.
+  patientDefense:      { key: "patientDefense",      kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+  patientDefenseFocus: { key: "patientDefenseFocus", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  stepOfTheWind:       { key: "stepOfTheWind",       kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+  stepOfTheWindFocus:  { key: "stepOfTheWindFocus",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
   stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "focus" },
   // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
