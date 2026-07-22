@@ -18,8 +18,8 @@
 // `variant="unarmed"`: same single-swing tally/counter path, just locked to
 // the Unarmed Strike profile (buildBonusSwingEntry, attackMath.ts) instead of
 // the off-hand weapon — no weapon/improvised toggle, matching the rule
-// (Flurry of Blows, #1217, is the two-strike Focus version and stays on the
-// separate attack-picker path).
+// (Flurry of Blows, #1217, is the two-strike Focus version and resolves via
+// the separate flurry-picker path, InlineFlurryPicker).
 
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 

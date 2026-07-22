@@ -256,12 +256,15 @@ export function useTurnActions({
 
   // Special path for Flurry of Blows (#1217) — bypasses the generic
   // handleActionClick/planActionClick path (like handleTwfAction) because it
-  // needs to arm the strike counter via enterFlurryMode in addition to
-  // spending the bonus action + 1 Focus. Always resolves as Unarmed Strikes
+  // needs to arm the strike counter via enterFlurryMode. The bonus action is
+  // consumed here (reversibly — cancelFlurry refunds it pre-roll, like TWF),
+  // but the 1 Focus is deliberately NOT spent here: InlineFlurryPicker fires it
+  // exactly once, on the first strike roll, so a cancel-before-rolling loses
+  // nothing (a cancel-time "refund" that couldn't return an already-spent
+  // Focus Point would lie to the player). Always resolves as Unarmed Strikes
   // only via InlineFlurryPicker, never the weapon attack-picker.
   function handleFlurryAction() {
     consumeBonusAction();
-    void send("flurryOfBlows");
     enterFlurryMode(flurryStrikeCount());
     openResolution("flurryOfBlows");
     setShowBonusMenu(false);

@@ -7,6 +7,11 @@
 // renders — no weapon toggle, matching the 2024 rule (unlike the pre-#1217
 // generic attack-picker this replaced). The roll/miss/crit/skip/next wiring is
 // shared with InlineOffHandPicker via useBonusAttackSheet.
+//
+// The 1 Focus spend is deferred to the first strike roll (onCommitFocusSpend,
+// wired to useBonusAttackSheet's onFirstStrike) rather than fired when the
+// sheet opens — opening the sheet only consumes the (reversible) bonus
+// action, so cancelling before rolling any strike costs no Focus at all.
 
 import { useState } from "react";
 
@@ -26,14 +31,16 @@ interface InlineFlurryPickerProps {
   turnState: TurnState & TurnStateActions;
   /** Active session id — attack/damage rolls are logged against it. */
   sessionId: string;
-  /** Commit and dismiss (bonus action already spent on open). */
+  /** Commit and dismiss (bonus action already spent on open; Focus was spent on the first strike, if any). */
   onClose: () => void;
-  /** Back out before rolling any strike — refunds the bonus action + Focus spend. */
+  /** Back out before rolling any strike — refunds the bonus action. No Focus is spent yet, so there's nothing to refund there. */
   onCancel: () => void;
   /** Required for ManeuversDisclosure to push resource spend results back up. */
   onUpdate: (c: Character) => void;
   /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
+  /** Spends the 1 Focus Point — fired once, on the first strike roll (#1217). */
+  onCommitFocusSpend: () => void;
 }
 
 export default function InlineFlurryPicker({
@@ -44,6 +51,7 @@ export default function InlineFlurryPicker({
   onCancel,
   onUpdate,
   onLogChanged,
+  onCommitFocusSpend,
 }: InlineFlurryPickerProps) {
   // The sheet's own ADV/DIS choice (#958), same as the main Attack sheet.
   const [attackMode, setAttackMode] = useState<RollMode>("normal");
@@ -72,6 +80,7 @@ export default function InlineFlurryPicker({
     entry,
     recordAttack: turnState.recordFlurryAttack,
     attacksExhausted,
+    onFirstStrike: onCommitFocusSpend,
     onUpdate,
     onLogChanged,
     manualMode: attackMode,

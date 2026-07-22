@@ -67,7 +67,7 @@ function monkCharacter(overrides: Partial<Character> = {}): Character {
 function renderPicker(
   character: Character,
   turnState: TurnState & TurnStateActions,
-  handlers: Partial<{ onClose: () => void; onCancel: () => void }> = {},
+  handlers: Partial<{ onClose: () => void; onCancel: () => void; onCommitFocusSpend: () => void }> = {},
 ) {
   return render(
     <RollProvider>
@@ -79,6 +79,7 @@ function renderPicker(
         onCancel={handlers.onCancel ?? vi.fn()}
         onUpdate={vi.fn()}
         onLogChanged={vi.fn()}
+        onCommitFocusSpend={handlers.onCommitFocusSpend ?? vi.fn()}
       />
     </RollProvider>,
   );
@@ -119,6 +120,37 @@ describe("InlineFlurryPicker (#1217)", () => {
     renderPicker(monkCharacter(), makeTurnState({ total: 2, used: 0 }), { onCancel });
     expect(screen.getByRole("button", { name: /Cancel — refund bonus action/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Done$/ })).not.toBeInTheDocument();
+  });
+
+  // Review finding (#1256): opening the sheet must not spend Focus — only a
+  // rolled strike commits it. Otherwise "Cancel — refund bonus action" would
+  // lie: the bonus action comes back, but an already-spent Focus Point can't.
+  it("cancelling before any strike is rolled spends no Focus", async () => {
+    const onCancel = vi.fn();
+    const onCommitFocusSpend = vi.fn();
+    renderPicker(monkCharacter(), makeTurnState({ total: 2, used: 0 }), { onCancel, onCommitFocusSpend });
+
+    await userEvent.click(screen.getByRole("button", { name: /Cancel — refund bonus action/ }));
+
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onCommitFocusSpend).not.toHaveBeenCalled();
+  });
+
+  it("spends Focus exactly once across a full 2-strike flurry — not per strike", async () => {
+    const turnState = makeTurnState({ total: 2, used: 0 });
+    const onCommitFocusSpend = vi.fn();
+    renderPicker(monkCharacter(), turnState, { onCommitFocusSpend });
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(onCommitFocusSpend).toHaveBeenCalledOnce();
+
+    // Re-arm (Next — the mocked recordFlurryAttack never actually decrements
+    // the static `used` prop, so Roll to hit reappears for the 2nd strike).
+    await userEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+
+    expect(turnState.recordFlurryAttack).toHaveBeenCalledTimes(2);
+    expect(onCommitFocusSpend).toHaveBeenCalledOnce();
   });
 
   it("shows Close (not Done) after one of two strikes — the second is still pending", () => {

@@ -6,8 +6,14 @@
 // both pickers would otherwise duplicate — each picker still owns its own
 // forms/footer/kicker composition, which genuinely differ (TWF is a single
 // swing with no Resume; Flurry loops over 2+ strikes with a live counter).
+//
+// Split into useBonusAttackRoll (the roll/miss/crit/skip/next handlers) and
+// useBonusAttackSheet (adds the tally-strip/maneuvers JSX on top) so neither
+// function's own closure count trips the complexity gate — fallow scores a
+// hook's cognitive load by its delegating closures, so branch-only extraction
+// doesn't help; splitting the closures across two hooks does.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
 import { hasSuperiorityDice, type AttackEntry } from "@/lib/attackMath";
@@ -20,7 +26,7 @@ import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
 import type { RecordedAttack, TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
-interface UseBonusAttackSheetArgs {
+interface UseBonusAttackRollArgs {
   character: Character;
   turnState: TurnState & TurnStateActions;
   sessionId: string;
@@ -28,29 +34,34 @@ interface UseBonusAttackSheetArgs {
   entry: AttackEntry | null;
   /** Spends the bonus-attack counter; recordTwfAttack or recordFlurryAttack. */
   recordAttack: (recorded?: RecordedAttack) => void;
-  /** Whether Roll to hit should be disabled — each caller defines its own "spent" rule. */
-  attacksExhausted: boolean;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   /** The sheet's own ADV/DIS choice (#958) — Flurry has one, TWF doesn't yet. */
   manualMode?: RollMode;
+  /**
+   * Fires exactly once, on the FIRST strike roll — the deferred-commit point
+   * for a resource spend that must survive a pre-roll cancel (Flurry's 1
+   * Focus, #1217: opening the sheet must not spend it, since cancelling
+   * before any roll can't give back an already-spent Focus Point). Omit for
+   * a sheet with no deferred spend (TWF, Bonus Unarmed Strike).
+   */
+  onFirstStrike?: () => void;
 }
 
-export function useBonusAttackSheet({
+/** The roll/miss/crit/skip/next core — no tally-strip/maneuvers JSX (that's useBonusAttackSheet's job). */
+function useBonusAttackRoll({
   character,
   turnState,
   sessionId,
   entry,
   recordAttack,
-  attacksExhausted,
-  onUpdate,
   onLogChanged,
   manualMode,
-}: UseBonusAttackSheetArgs) {
+  onFirstStrike,
+}: UseBonusAttackRollArgs) {
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
-  const die = useManeuverDie(character, onUpdate);
   const [rolledId, setRolledId] = useState<string | null>(null);
+  const committedRef = useRef(false);
 
   // Bind steps 2–3 to the last bonusAction row — the tally also holds the
   // Attack action's rows, so "last row overall" would misattribute (#813).
@@ -73,9 +84,16 @@ export function useBonusAttackSheet({
 
   // Roll to hit with the (only) form and bind steps 2–3 to it. No-ops when
   // there's no form (TWF with no off-hand equipped — the caller renders a
-  // fallback message instead of the step card in that case).
+  // fallback message instead of the step card in that case). The deferred
+  // spend (if any) commits on this FIRST roll only — a `committedRef` guard
+  // rather than a re-derivable condition, since "first" must survive across
+  // this sheet's 2+ strikes without re-firing on strike 2.
   function handleRollToHit() {
     if (!entry) return;
+    if (onFirstStrike && !committedRef.current) {
+      committedRef.current = true;
+      onFirstStrike();
+    }
     setRolledId(entry.id);
     viewFor(entry).onAttack();
   }
@@ -98,6 +116,49 @@ export function useBonusAttackSheet({
     setRolledId(null);
   }
 
+  return {
+    currentRow,
+    riderTotals,
+    viewFor,
+    boundView,
+    handleRollToHit,
+    handleCallMiss,
+    handleCallCrit,
+    handleSkip,
+    handleNext,
+  };
+}
+
+interface UseBonusAttackSheetArgs extends UseBonusAttackRollArgs {
+  /** Whether Roll to hit should be disabled — each caller defines its own "spent" rule. */
+  attacksExhausted: boolean;
+  onUpdate: (c: Character) => void;
+}
+
+export function useBonusAttackSheet({
+  character,
+  turnState,
+  sessionId,
+  entry,
+  recordAttack,
+  attacksExhausted,
+  onUpdate,
+  onLogChanged,
+  manualMode,
+  onFirstStrike,
+}: UseBonusAttackSheetArgs) {
+  const die = useManeuverDie(character, onUpdate);
+  const roll = useBonusAttackRoll({
+    character,
+    turnState,
+    sessionId,
+    entry,
+    recordAttack,
+    onLogChanged,
+    manualMode,
+    onFirstStrike,
+  });
+
   const tallyStrip = (
     <AttackTallyStrip
       rows={turnState.attackTally}
@@ -110,24 +171,12 @@ export function useBonusAttackSheet({
     <ManeuversDisclosure
       character={character}
       turnState={turnState}
-      view={boundView}
+      view={roll.boundView}
       attacksExhausted={attacksExhausted}
       die={die}
       onUpdate={onUpdate}
     />
   );
 
-  return {
-    currentRow,
-    riderTotals,
-    viewFor,
-    boundView,
-    handleRollToHit,
-    handleCallMiss,
-    handleCallCrit,
-    handleSkip,
-    handleNext,
-    tallyStrip,
-    maneuversDisclosure,
-  };
+  return { ...roll, tallyStrip, maneuversDisclosure };
 }

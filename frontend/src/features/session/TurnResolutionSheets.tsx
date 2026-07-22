@@ -196,6 +196,11 @@ function TwfResolutionSheet({
 // exactly-1 swing, Flurry's 2 strikes mean a mid-way close is reachable — it
 // just leaves the counter live with no explicit resume affordance (cosmetic
 // only: the bonus action stays correctly spent either way).
+//
+// The 1 Focus spend is deliberately deferred to the FIRST strike roll, not
+// opened here — `send` fires the same executeAction("flurryOfBlows") the
+// generic click path uses elsewhere, just wired as InlineFlurryPicker's
+// onCommitFocusSpend so a pre-roll cancel truly costs nothing.
 function FlurryResolutionSheet({
   character,
   sessionId,
@@ -204,6 +209,7 @@ function FlurryResolutionSheet({
   setShowBonusMenu,
   onUpdate,
   onLogChanged,
+  send,
 }: Pick<
   TurnResolutionSheetsProps,
   | "character"
@@ -213,6 +219,7 @@ function FlurryResolutionSheet({
   | "setShowBonusMenu"
   | "onUpdate"
   | "onLogChanged"
+  | "send"
 >) {
   const attack = turnState.bonusAttack;
   const exhausted = attack !== null && attack.used >= attack.total;
@@ -241,6 +248,9 @@ function FlurryResolutionSheet({
         }}
         onUpdate={onUpdate}
         onLogChanged={onLogChanged}
+        onCommitFocusSpend={() => {
+          void send("flurryOfBlows");
+        }}
       />
     </BottomSheet>
   );
