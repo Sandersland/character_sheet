@@ -13,8 +13,8 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 export const disciplinesRouter = Router({ mergeParams: true });
 
 // Feeds the Four Elements monk's "learn a discipline" picker — same role as
-// GET /api/maneuvers. Each row carries its min monk level, embedded ki cost
-// (AbilityCost), and roll (EffectSpec, ki-scaled). Ordered by min level then name.
+// GET /api/maneuvers. Each row carries its min monk level, embedded focus cost
+// (AbilityCost), and roll (EffectSpec, focus-scaled). Ordered by min level then name.
 disciplinesRouter.get("/", async (_req, res) => {
   const disciplines = await prisma.grantedAbility.findMany({
     where: { source: "discipline" },
@@ -38,7 +38,7 @@ disciplinesRouter.get("/", async (_req, res) => {
 const castDisciplineOpSchema = z.object({
   type: z.literal("castDiscipline"),
   disciplineId: z.string().min(1),
-  kiSpent: z.number().int().min(0).max(6),
+  focusSpent: z.number().int().min(0).max(6),
   roll: z.number().int().min(0),
 });
 
@@ -52,7 +52,7 @@ const transactionsRequestSchema = z.object({
  * POST /api/characters/:id/disciplines/transactions
  * Intent-bearing batch mutation for elemental disciplines — mirrors the
  * spellcasting/resources transaction endpoints. The one op today:
- *   castDiscipline — spend ki, roll the discipline's EffectSpec, log the cast.
+ *   castDiscipline — spend focus, roll the discipline's EffectSpec, log the cast.
  */
 makeTransactionsEndpoint({
   router: disciplinesRouter,

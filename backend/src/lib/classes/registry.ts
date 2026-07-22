@@ -137,7 +137,7 @@ export function deriveResources(
   const result: DerivedClassInfo = { resources, features };
 
   // Subclass-specific extra derived fields (e.g. Battle Master maneuvers,
-  // Way of the Four Elements disciplines, Way of Shadow ki-cast unlocks).
+  // Way of the Four Elements disciplines, Way of Shadow focus-cast unlocks).
   if (sub.active && sub.def?.deriveExtras) {
     Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus));
   }
@@ -187,7 +187,7 @@ export function deriveResourcesForCharacterRow(row: {
  * proficiency bonus from XP, then returns the entry-scoped derivation (every
  * class entry's own caps/pools merged) plus disciplineLevel. Selects need
  * `classEntries: {name, subclass, level}[]` for EVERY entry (not just the
- * primary) — used by the ki-cast/maneuver action seams so a secondary Monk's
+ * primary) — used by the focus-cast/maneuver action seams so a secondary Monk's
  * or Battle Master's own level drives its gate/DC/per-cast cap (#1072).
  */
 export function deriveEntryScopedResourcesForCharacterRow(row: {
@@ -238,7 +238,7 @@ function overlayCapFields(acc: DerivedClassInfo | null, info: DerivedClassInfo):
 }
 
 // Rebuilds the `resources` pool layer (#1071) from EVERY class entry at its own
-// effective level — ki/superiority-dice/rage/sorcery-points all scale to that
+// effective level — focus/superiority-dice/rage/sorcery-points all scale to that
 // class's own level (PHB'24 p.163), not the primary entry's or the summed total.
 // Split out of deriveEntryScopedResources to keep that function's branching
 // budget for the (unrelated) choice-cap overlay loop.
@@ -269,7 +269,7 @@ function collectEntryScopedPools(
  * Entry-scoped resource caps + pools for multiclass level-up (#1177 caps, #1071
  * pools): both the CHOICE-CAP fields (maneuverChoiceCount/SaveDC,
  * disciplineChoiceCount/SaveDC, toolProfChoiceCount, subclassChoices) and the
- * `resources` pool layer (ki, superiority dice, rage, sorcery points, …) are
+ * `resources` pool layer (focus, superiority dice, rage, sorcery points, …) are
  * re-derived per class entry at that entry's OWN effective level and merged —
  * so a secondary Battle Master's maneuver cap AND its superiority-dice pool
  * both come from the fighter entry's own level, not the primary entry's or the

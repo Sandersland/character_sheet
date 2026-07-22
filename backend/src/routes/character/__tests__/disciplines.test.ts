@@ -185,7 +185,7 @@ describe("Elemental disciplines", () => {
     const rows = res.body as Array<{ name: string; cost: unknown; effect: unknown }>;
     const fireball = rows.find((r) => r.name === "Flames of the Phoenix");
     expect(fireball).toBeDefined();
-    expect(fireball!.cost).toMatchObject({ kind: "pool", key: "ki", base: 4 });
+    expect(fireball!.cost).toMatchObject({ kind: "pool", key: "focus", base: 4 });
     expect(fireball!.effect).toMatchObject({ effectType: "damage", saveAbility: "dexterity" });
   });
 

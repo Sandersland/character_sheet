@@ -30,7 +30,7 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
     await prisma.character.deleteMany({ where: { id: CHAR_ID } });
   });
 
-  it("Monk 5 / Fighter (Battle Master) 3: resources.pools has ki=5 AND superiorityDice=4 simultaneously", async () => {
+  it("Monk 5 / Fighter (Battle Master) 3: resources.pools has focus=5 AND superiorityDice=4 simultaneously", async () => {
     await prisma.character.create({
       data: {
         id: CHAR_ID,
@@ -48,7 +48,7 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
         ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
-        resources: { used: { ki: 5, superiorityDice: 4 } } as Prisma.InputJsonValue,
+        resources: { used: { focus: 5, superiorityDice: 4 } } as Prisma.InputJsonValue,
         classEntries: {
           create: [
             { name: "monk", position: 0, level: 5 },
@@ -61,8 +61,8 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
     const view = await serialize(CHAR_ID);
     const pools = view.resources?.pools ?? [];
 
-    const ki = pools.find((p) => p.key === "ki");
-    expect(ki).toMatchObject({ total: 5, used: 5, remaining: 0 });
+    const focus = pools.find((p) => p.key === "focus");
+    expect(focus).toMatchObject({ total: 5, used: 5, remaining: 0 });
 
     const superiorityDice = pools.find((p) => p.key === "superiorityDice");
     expect(superiorityDice).toMatchObject({ total: 4, used: 4, remaining: 0 });
@@ -72,7 +72,7 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
     expect(pools.find((p) => p.key === "actionSurge")).toBeDefined();
   });
 
-  it("leveling the secondary monk entry down shrinks its ki pool via clamp-on-read, with no orphaned used beyond the new total", async () => {
+  it("leveling the secondary monk entry down shrinks its focus pool via clamp-on-read, with no orphaned used beyond the new total", async () => {
     await prisma.character.create({
       data: {
         id: CHAR_ID,
@@ -90,8 +90,8 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
         ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
-        // Ki fully spent at the original monk level 5 total.
-        resources: { used: { ki: 5 } } as Prisma.InputJsonValue,
+        // Focus fully spent at the original monk level 5 total.
+        resources: { used: { focus: 5 } } as Prisma.InputJsonValue,
         classEntries: {
           create: [
             { name: "monk", position: 0, level: 5 },
@@ -111,8 +111,8 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
     await prisma.character.update({ where: { id: CHAR_ID }, data: { experiencePoints: 6500 } });
 
     const view = await serialize(CHAR_ID);
-    const ki = view.resources?.pools.find((p) => p.key === "ki");
+    const focus = view.resources?.pools.find((p) => p.key === "focus");
 
-    expect(ki).toMatchObject({ total: 2, used: 2, remaining: 0 });
+    expect(focus).toMatchObject({ total: 2, used: 2, remaining: 0 });
   });
 });

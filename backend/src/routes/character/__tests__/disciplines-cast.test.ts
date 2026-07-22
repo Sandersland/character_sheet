@@ -1,7 +1,7 @@
 /**
  * Elemental Discipline cast endpoint (issue #398): POST /disciplines/transactions.
  * Real Postgres + supertest. Fixture is a Way of the Four Elements monk whose XP
- * (level → ki total + per-cast ki cap + save DC) is chosen per test. Disciplines
+ * (level → focus total + per-cast focus cap + save DC) is chosen per test. Disciplines
  * are read from the seeded catalog by name.
  */
 
@@ -10,7 +10,7 @@ import supertest from "supertest";
 
 import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
-import { disciplineEffectSpec, maxKiPerDiscipline } from "@/lib/classes/disciplines.js";
+import { disciplineEffectSpec, maxFocusPerDiscipline } from "@/lib/classes/disciplines.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -68,8 +68,8 @@ async function activity(): Promise<ActivityEvent[]> {
 }
 
 let classId: string;
-let waterWhipId: string;   // L3, base 2, dex save, 3d10 +1d10/ki
-let attunementId: string;  // alwaysKnown, no ki, utility
+let waterWhipId: string;   // L3, base 2, dex save, 3d10 +1d10/focus
+let attunementId: string;  // alwaysKnown, no focus, utility
 let galeSpiritsId: string; // L3, base 2, gust of wind (concentration)
 
 async function createMonk(experiencePoints: number) {
@@ -123,55 +123,55 @@ describe("Discipline cast endpoint", () => {
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
 
-  it("casts a learned L3 discipline: spends ki via the pool path, logs the roll + ki DC", async () => {
+  it("casts a learned L3 discipline: spends focus via the pool path, logs the roll + focus DC", async () => {
     await createMonk(XP_L3);
     await learn(waterWhipId);
 
-    const res = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 2, roll: 15 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 2, roll: 15 }]);
     expect(res.status).toBe(200);
 
-    const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(ki.used).toBe(2);
+    const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+    expect(focus.used).toBe(2);
 
     const events = await activity();
     const castEvent = events.find((e) => e.type === "castDiscipline")!;
     expect(castEvent).toBeDefined();
-    // Ki DC = 8 + prof(2 at L3) + Wis mod(+2) = 12.
-    expect(castEvent.data).toMatchObject({ disciplineId: waterWhipId, kiSpent: 2, roll: 15, saveDc: 12 });
+    // Focus DC = 8 + prof(2 at L3) + Wis mod(+2) = 12.
+    expect(castEvent.data).toMatchObject({ disciplineId: waterWhipId, focusSpent: 2, roll: 15, saveDc: 12 });
     expect(castEvent.summary).toMatch(/save DC 12/);
     // The pool path logs its own spendResource event in the same batch.
     expect(events.some((e) => e.type === "spendResource")).toBe(true);
   });
 
-  it("rejects ki below the base cost and above the per-cast cap", async () => {
+  it("rejects focus below the base cost and above the per-cast cap", async () => {
     await createMonk(XP_L3);
     await learn(waterWhipId);
 
-    const tooLow = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 1, roll: 10 }]);
+    const tooLow = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 1, roll: 10 }]);
     expect(tooLow.status).toBe(400);
-    // At L3 the per-cast cap is 2 ki; 3 is rejected.
-    const tooHigh = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 3, roll: 30 }]);
+    // At L3 the per-cast cap is 2 focus; 3 is rejected.
+    const tooHigh = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 3, roll: 30 }]);
     expect(tooHigh.status).toBe(400);
   });
 
-  it("allows extra ki up to the cap at higher level (scaling headroom)", async () => {
+  it("allows extra focus up to the cap at higher level (scaling headroom)", async () => {
     await createMonk(XP_L5);
     await learn(waterWhipId);
 
-    // At L5 the cap is 3 ki; base 2 + 1 extra step is allowed.
-    const res = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 3, roll: 22 }]);
+    // At L5 the cap is 3 focus; base 2 + 1 extra step is allowed.
+    const res = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 3, roll: 22 }]);
     expect(res.status).toBe(200);
-    const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(ki.used).toBe(3);
+    const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+    expect(focus.used).toBe(3);
   });
 
-  it("casts a utility (always-known) discipline with no ki and no dice", async () => {
+  it("casts a utility (always-known) discipline with no focus and no dice", async () => {
     await createMonk(XP_L3);
     // Elemental Attunement is always known — no learn step needed.
-    const res = await cast([{ type: "castDiscipline", disciplineId: attunementId, kiSpent: 0, roll: 0 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: attunementId, focusSpent: 0, roll: 0 }]);
     expect(res.status).toBe(200);
-    const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(ki.used).toBe(0);
+    const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+    expect(focus.used).toBe(0);
 
     const events = await activity();
     expect(events.some((e) => e.type === "castDiscipline")).toBe(true);
@@ -179,7 +179,7 @@ describe("Discipline cast endpoint", () => {
 
   it("rejects casting a discipline the monk hasn't learned", async () => {
     await createMonk(XP_L3);
-    const res = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 2, roll: 15 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 2, roll: 15 }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not known/i);
   });
@@ -199,7 +199,7 @@ describe("Discipline cast endpoint", () => {
       },
     });
 
-    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, kiSpent: 2, roll: 0 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, focusSpent: 2, roll: 0 }]);
     expect(res.status).toBe(200);
 
     // Concentration is recorded on the discipline in the stored blob.
@@ -217,7 +217,7 @@ describe("Discipline cast endpoint", () => {
     await learn(galeSpiritsId);
 
     // No prior concentration — a fresh one is established by the cast.
-    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, kiSpent: 2, roll: 0 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, focusSpent: 2, roll: 0 }]);
     expect(res.status).toBe(200);
     const afterCast = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { spellcasting: true } });
     expect((afterCast!.spellcasting as { concentratingOn: unknown }).concentratingOn).toMatchObject({ entryId: galeSpiritsId });
@@ -231,13 +231,13 @@ describe("Discipline cast endpoint", () => {
     expect((reverted!.spellcasting as { concentratingOn: unknown }).concentratingOn).toBeNull();
   });
 
-  // Byte-identical oracle for the shared ki-cast event tail (#642): pins the full
+  // Byte-identical oracle for the shared focus-cast event tail (#642): pins the full
   // castDiscipline event payloads (before/after/summary/data) so the extraction of
   // snapshotSpellcasting + the event-emitting tail into a shared helper stays exact.
   it("pins the castDiscipline event payloads exactly (before/after/summary/data)", async () => {
     await createMonk(XP_L3);
     await learn(galeSpiritsId);
-    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, kiSpent: 2, roll: 0 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, focusSpent: 2, roll: 0 }]);
     expect(res.status).toBe(200);
 
     // Concentration (spellcasting-category) event — carries the before/after snapshot.
@@ -264,22 +264,22 @@ describe("Discipline cast endpoint", () => {
     expect(castEvent).not.toBeNull();
     expect(castEvent!.before).toBeNull();
     expect(castEvent!.after).toBeNull();
-    expect(castEvent!.data).toEqual({ disciplineId: galeSpiritsId, kiSpent: 2, roll: 0, saveDc: 12 });
+    expect(castEvent!.data).toEqual({ disciplineId: galeSpiritsId, focusSpent: 2, roll: 0, saveDc: 12 });
   });
 
-  it("logs an undoable castDiscipline batch (revert restores the spent ki)", async () => {
+  it("logs an undoable castDiscipline batch (revert restores the spent focus)", async () => {
     await createMonk(XP_L3);
     await learn(waterWhipId);
-    const casted = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, kiSpent: 2, roll: 15 }]);
-    const kiBefore = casted.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(kiBefore.used).toBe(2);
+    const casted = await cast([{ type: "castDiscipline", disciplineId: waterWhipId, focusSpent: 2, roll: 15 }]);
+    const focusBefore = casted.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+    expect(focusBefore.used).toBe(2);
 
     const events = await activity();
     const batchId = events.find((e) => e.type === "castDiscipline")!.batchId!;
     const undo = await agent().post(`/api/characters/${FIXTURE_ID}/events/${batchId}/revert`);
     expect(undo.status).toBe(200);
-    const ki = undo.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(ki.used).toBe(0);
+    const focus = undo.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+    expect(focus.used).toBe(0);
   });
 
   it("rejects a discipline cast from a non-Four-Elements character", async () => {
@@ -292,7 +292,7 @@ describe("Discipline cast endpoint", () => {
         classEntries: { create: [{ name: "monk", subclass: null, classId, position: 0 }] },
       },
     });
-    const res = await cast([{ type: "castDiscipline", disciplineId: attunementId, kiSpent: 0, roll: 0 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: attunementId, focusSpent: 0, roll: 0 }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/Four Elements/i);
   });
@@ -308,7 +308,7 @@ describe("Discipline cast endpoint", () => {
     dc?: number; // only save-bearing disciplines log a DC
   }
 
-  // dc = 8 + prof + Wis mod(+2); cap = maxKiPerDiscipline(level).
+  // dc = 8 + prof + Wis mod(+2); cap = maxFocusPerDiscipline(level).
   const HIGH_LEVEL: HighLevelCase[] = [
     { name: "Clench of the North Wind", xp: XP_L6, level: 6, base: 3, cap: 3, dc: 13 },
     { name: "Gong of the Summit", xp: XP_L6, level: 6, base: 3, cap: 3, dc: 13 },
@@ -322,24 +322,24 @@ describe("Discipline cast endpoint", () => {
   ];
 
   for (const c of HIGH_LEVEL) {
-    it(`casts ${c.name} at its base ki cost with the right cap and DC`, async () => {
+    it(`casts ${c.name} at its base focus cost with the right cap and DC`, async () => {
       await createMonk(c.xp);
       const disc = await prisma.grantedAbility.findUnique({ where: { name: c.name } });
       expect(disc).not.toBeNull();
       await learn(disc!.id);
 
-      expect(maxKiPerDiscipline(c.level)).toBe(c.cap);
-      const res = await cast([{ type: "castDiscipline", disciplineId: disc!.id, kiSpent: c.base, roll: c.dc ? 20 : 0 }]);
+      expect(maxFocusPerDiscipline(c.level)).toBe(c.cap);
+      const res = await cast([{ type: "castDiscipline", disciplineId: disc!.id, focusSpent: c.base, roll: c.dc ? 20 : 0 }]);
       expect(res.status).toBe(200);
-      const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
-      expect(ki.used).toBe(c.base);
+      const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+      expect(focus.used).toBe(c.base);
 
       const events = await activity();
       const castEvent = events.find(
         (e) => e.type === "castDiscipline" && (e.data as { disciplineId?: string })?.disciplineId === disc!.id,
       )!;
       expect(castEvent).toBeDefined();
-      expect(castEvent.data).toMatchObject({ disciplineId: disc!.id, kiSpent: c.base });
+      expect(castEvent.data).toMatchObject({ disciplineId: disc!.id, focusSpent: c.base });
       if (c.dc !== undefined) {
         expect(castEvent.data).toMatchObject({ saveDc: c.dc });
         expect(castEvent.summary).toMatch(new RegExp(`save DC ${c.dc}`));
@@ -347,11 +347,11 @@ describe("Discipline cast endpoint", () => {
     });
   }
 
-  it("rejects ki above the per-cast cap for a high-level discipline", async () => {
-    await createMonk(XP_L6); // per-cast cap is 3 ki at L6
+  it("rejects focus above the per-cast cap for a high-level discipline", async () => {
+    await createMonk(XP_L6); // per-cast cap is 3 focus at L6
     const gong = await prisma.grantedAbility.findUnique({ where: { name: "Gong of the Summit" } });
     await learn(gong!.id);
-    const res = await cast([{ type: "castDiscipline", disciplineId: gong!.id, kiSpent: 4, roll: 20 }]);
+    const res = await cast([{ type: "castDiscipline", disciplineId: gong!.id, focusSpent: 4, roll: 20 }]);
     expect(res.status).toBe(400);
   });
 
@@ -365,7 +365,7 @@ describe("Discipline cast endpoint", () => {
   ];
 
   for (const m of SPELL_MAPPED) {
-    it(`${m.discipline} rolls identical dice to ${m.spell} via a ki-scaled EffectSpec`, async () => {
+    it(`${m.discipline} rolls identical dice to ${m.spell} via a focus-scaled EffectSpec`, async () => {
       const [disc, spell] = await Promise.all([
         prisma.grantedAbility.findUnique({ where: { name: m.discipline } }),
         prisma.spell.findUnique({ where: { name: m.spell } }),
@@ -377,7 +377,7 @@ describe("Discipline cast endpoint", () => {
       expect(effect.effectType).toBe("damage");
       expect(effect.dice).toMatchObject({ count: spell!.effectDiceCount, faces: spell!.effectDiceFaces });
       expect(effect.damageType).toBe(spell!.damageType);
-      expect(effect.scaling).toMatchObject({ mode: "ki" });
+      expect(effect.scaling).toMatchObject({ mode: "focus" });
     });
   }
 });
@@ -435,7 +435,7 @@ describe("GrantedAbility source discriminator", () => {
     });
     const res = await agent()
       .post(`/api/characters/${SHADOW_FIXTURE_ID}/disciplines/transactions`)
-      .send({ operations: [{ type: "castDiscipline", disciplineId: shadowId, kiSpent: 2, roll: 10 }] });
+      .send({ operations: [{ type: "castDiscipline", disciplineId: shadowId, focusSpent: 2, roll: 10 }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not found in catalog/);
   });

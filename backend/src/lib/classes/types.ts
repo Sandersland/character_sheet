@@ -34,9 +34,9 @@ export interface DerivedClassInfo {
   toolProfChoiceCount?: number;
   /** Way of the Four Elements only: number of elemental disciplines known at this level. */
   disciplineChoiceCount?: number;
-  /** Way of the Four Elements only: ki save DC for discipline effects (8 + prof + Wis mod). */
+  /** Way of the Four Elements only: focus save DC for discipline effects (8 + prof + Wis mod). */
   disciplineSaveDC?: number;
-  /** Way of Shadow only: whether the L3+ Shadow Arts ki-cast spells are available. */
+  /** Way of Shadow only: whether the L3+ Shadow Arts focus-cast spells are available. */
   shadowArtsAvailable?: boolean;
   /** Way of Shadow only: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
   cloakOfShadowsAvailable?: boolean;

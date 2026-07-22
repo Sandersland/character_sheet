@@ -146,8 +146,8 @@ describe("ClassFeaturesSection — Elemental Disciplines", () => {
       minLevel: 3,
       alwaysKnown: false,
       saveAbility: null,
-      cost: { kind: "pool", key: "ki", base: 1, perStep: 1 },
-      effect: { effectType: "damage", dice: { count: 1, faces: 10, modifier: 0 }, damageType: "fire", attackType: "attack", saveAbility: null, saveEffect: null, scaling: { mode: "ki", dicePerStep: 1 } },
+      cost: { kind: "pool", key: "focus", base: 1, perStep: 1 },
+      effect: { effectType: "damage", dice: { count: 1, faces: 10, modifier: 0 }, damageType: "fire", attackType: "attack", saveAbility: null, saveEffect: null, scaling: { mode: "focus", dicePerStep: 1 } },
     },
     {
       id: "thunders",
@@ -156,8 +156,8 @@ describe("ClassFeaturesSection — Elemental Disciplines", () => {
       minLevel: 3,
       alwaysKnown: false,
       saveAbility: "constitution",
-      cost: { kind: "pool", key: "ki", base: 2 },
-      effect: { effectType: "damage", dice: { count: 3, faces: 8, modifier: 0 }, damageType: "thunder", attackType: "save", saveAbility: "constitution", saveEffect: "half", scaling: { mode: "ki", dicePerStep: 0 } },
+      cost: { kind: "pool", key: "focus", base: 2 },
+      effect: { effectType: "damage", dice: { count: 3, faces: 8, modifier: 0 }, damageType: "thunder", attackType: "save", saveAbility: "constitution", saveEffect: "half", scaling: { mode: "focus", dicePerStep: 0 } },
     },
   ];
 
@@ -169,7 +169,7 @@ describe("ClassFeaturesSection — Elemental Disciplines", () => {
       subclass: "Way of the Four Elements",
       resources: {
         features: [],
-        pools: [{ key: "ki", label: "Ki", total: 6, recharge: "shortRest", used: 0, remaining: 6 }],
+        pools: [{ key: "focus", label: "Focus", total: 6, recharge: "shortRest", used: 0, remaining: 6 }],
         maneuversKnown: [],
         toolProficienciesKnown: [],
         disciplineChoiceCount: 2,
@@ -201,7 +201,7 @@ describe("ClassFeaturesSection — Elemental Disciplines", () => {
 
     await waitFor(() => expect(client.applyDisciplineTransactions).toHaveBeenCalledTimes(1));
     const [, ops] = vi.mocked(client.applyDisciplineTransactions).mock.calls[0];
-    expect(ops[0]).toMatchObject({ type: "castDiscipline", disciplineId: "fangs", kiSpent: 1 });
+    expect(ops[0]).toMatchObject({ type: "castDiscipline", disciplineId: "fangs", focusSpent: 1 });
   });
 
   it("learns a discipline through applyResourceTransactions", async () => {

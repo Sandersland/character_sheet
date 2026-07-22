@@ -1,7 +1,7 @@
 /**
  * Direct DisciplineRow pins (#688) — before this file the row was covered only
  * transitively through DisciplinesSection.test.tsx. Pins the cast affordance
- * (affordability gating + disabled title), ki-scaling select, Forget confirm,
+ * (affordability gating + disabled title), focus-scaling select, Forget confirm,
  * Swap, and the expandable description/roll preview, so the shared-row-shell
  * extraction can't silently change behavior.
  */
@@ -27,7 +27,7 @@ const FANGS: CatalogDiscipline = {
   minLevel: 3,
   alwaysKnown: false,
   saveAbility: null,
-  cost: { kind: "pool", key: "ki", base: 1, perStep: 1 },
+  cost: { kind: "pool", key: "focus", base: 1, perStep: 1 },
   effect: {
     effectType: "damage",
     dice: { count: 1, faces: 10, modifier: 0 },
@@ -35,7 +35,7 @@ const FANGS: CatalogDiscipline = {
     attackType: "attack",
     saveAbility: null,
     saveEffect: null,
-    scaling: { mode: "ki", dicePerStep: 1 },
+    scaling: { mode: "focus", dicePerStep: 1 },
   },
 };
 
@@ -46,7 +46,7 @@ const THUNDERS: CatalogDiscipline = {
   minLevel: 3,
   alwaysKnown: false,
   saveAbility: "constitution",
-  cost: { kind: "pool", key: "ki", base: 2 },
+  cost: { kind: "pool", key: "focus", base: 2 },
   effect: {
     effectType: "damage",
     dice: { count: 3, faces: 8, modifier: 0 },
@@ -54,7 +54,7 @@ const THUNDERS: CatalogDiscipline = {
     attackType: "save",
     saveAbility: "constitution",
     saveEffect: "half",
-    scaling: { mode: "ki", dicePerStep: 0 },
+    scaling: { mode: "focus", dicePerStep: 0 },
   },
 };
 
@@ -69,7 +69,7 @@ function renderRow(over: Partial<Parameters<typeof DisciplineRow>[0]> = {}) {
           entry={ENTRY}
           catalog={FANGS}
           characterLevel={6}
-          kiAvailable={4}
+          focusAvailable={4}
           saveDC={13}
           forgettable={false}
           busy={false}
@@ -89,28 +89,28 @@ beforeEach(() => {
 });
 
 describe("DisciplineRow (#688)", () => {
-  it("casts with the selected ki and reports a rolled total", async () => {
+  it("casts with the selected focus and reports a rolled total", async () => {
     const user = userEvent.setup();
     const { onCast } = renderRow();
 
-    await user.selectOptions(screen.getByRole("combobox", { name: /Ki to spend/ }), "3");
+    await user.selectOptions(screen.getByRole("combobox", { name: /Focus to spend/ }), "3");
     await user.click(screen.getByRole("button", { name: "Cast" }));
 
     expect(onCast).toHaveBeenCalledTimes(1);
     const op = onCast.mock.calls[0][0];
-    expect(op).toMatchObject({ type: "castDiscipline", disciplineId: "fangs", kiSpent: 3 });
+    expect(op).toMatchObject({ type: "castDiscipline", disciplineId: "fangs", focusSpent: 3 });
     expect(op.roll).toBeGreaterThan(0); // 3d10 through RollContext
   });
 
   it("disables Cast below the base cost with the needs-N title", () => {
-    const { onCast } = renderRow({ catalog: THUNDERS, kiAvailable: 1 });
+    const { onCast } = renderRow({ catalog: THUNDERS, focusAvailable: 1 });
     const cast = screen.getByRole("button", { name: "Cast" });
     expect(cast).toBeDisabled();
-    expect(cast).toHaveAttribute("title", "Not enough ki (needs 2)");
+    expect(cast).toHaveAttribute("title", "Not enough focus (needs 2)");
     expect(onCast).not.toHaveBeenCalled();
   });
 
-  it("hides the ki select for a flat-cost discipline", () => {
+  it("hides the focus select for a flat-cost discipline", () => {
     renderRow({ catalog: THUNDERS });
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
@@ -140,7 +140,7 @@ describe("DisciplineRow (#688)", () => {
 
   it("expands to the description with roll and save-DC preview", async () => {
     const user = userEvent.setup();
-    renderRow({ catalog: THUNDERS, kiAvailable: 4 });
+    renderRow({ catalog: THUNDERS, focusAvailable: 4 });
 
     // The toggle renders entry.name (the learned entry), not the catalog name.
     const toggle = screen.getByRole("button", { name: /Fangs of the Fire Snake/ });

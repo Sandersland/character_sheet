@@ -1,7 +1,7 @@
 /**
  * ShadowArtsSection — Way of Shadow's Shadow Arts block inside ClassFeaturesSection.
  * Fetches the 4-spell catalog once and wires each cast up to the orchestrator.
- * Mirrors DisciplinesSection; casts are flat 2-ki, roll-less, and route their
+ * Mirrors DisciplinesSection; casts are flat 2-focus, roll-less, and route their
  * concentration/buff results through the re-rendered character (Stealth row +
  * concentration banner) rather than a dice toast.
  */
@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchShadowArts } from "@/api/client";
-import { kiRemaining } from "@/lib/disciplines";
+import { focusRemaining } from "@/lib/disciplines";
 import type {
   CastShadowArtOperation,
   CatalogShadowArt,
@@ -36,7 +36,7 @@ export default function ShadowArtsSection({ character, busy, onCast }: Props) {
     return () => { mounted = false; };
   }, []);
 
-  const kiAvailable = kiRemaining(character.resources);
+  const focusAvailable = focusRemaining(character.resources);
   const concentratingOn = character.spellcasting?.concentratingOn ?? null;
   // A cast Shadow Art's concentration entryId is prefixed (disjoint from Spell.id) on the backend.
   const concentratingArtId = concentratingOn?.entryId?.startsWith("shadow-art:")
@@ -53,9 +53,9 @@ export default function ShadowArtsSection({ character, busy, onCast }: Props) {
       </div>
 
       <p className="mb-3 text-xs text-parchment-600">
-        Each Shadow Art costs 2 ki.
+        Each Shadow Art costs 2 focus.
         <span className="ml-2">
-          Ki remaining: <span className="font-semibold text-gold-800">{kiAvailable}</span>
+          Focus remaining: <span className="font-semibold text-gold-800">{focusAvailable}</span>
         </span>
       </p>
 
@@ -75,7 +75,7 @@ export default function ShadowArtsSection({ character, busy, onCast }: Props) {
             <ShadowArtRow
               key={art.id}
               art={art}
-              kiAvailable={kiAvailable}
+              focusAvailable={focusAvailable}
               busy={busy}
               isConcentrating={concentratingArtId === art.id}
               concentratingOnName={concentratingOn?.spellName ?? null}

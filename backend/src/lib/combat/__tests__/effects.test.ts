@@ -102,11 +102,11 @@ describe("resolveEffectSpec — golden byte-parity", () => {
 });
 
 // #817 pins: the shared catalog-row→EffectSpec builder consumed by both the
-// disciplineEffectSpec (ki scaling) and shadowArtEffectSpec (flat) wrappers.
-describe("catalogEffectSpec — shared ki-cast row→spec builder (#817)", () => {
-  const kiScaling: EffectScaling = { mode: "ki", dicePerStep: 2 };
+// disciplineEffectSpec (focus scaling) and shadowArtEffectSpec (flat) wrappers.
+describe("catalogEffectSpec — shared focus-cast row→spec builder (#817)", () => {
+  const focusScaling: EffectScaling = { mode: "focus", dicePerStep: 2 };
 
-  it("maps a ki-scaled damage row with dice (discipline shape)", () => {
+  it("maps a focus-scaled damage row with dice (discipline shape)", () => {
     const spec = catalogEffectSpec(
       {
         name: "Flames of the Phoenix",
@@ -119,7 +119,7 @@ describe("catalogEffectSpec — shared ki-cast row→spec builder (#817)", () =>
         saveAbility: "dexterity",
         saveEffect: "half",
       },
-      { scaling: kiScaling, concentrates: () => false },
+      { scaling: focusScaling, concentrates: () => false },
     );
     expect(spec).toEqual({
       effectType: "damage",
@@ -128,7 +128,7 @@ describe("catalogEffectSpec — shared ki-cast row→spec builder (#817)", () =>
       attackType: "save",
       saveAbility: "dexterity",
       saveEffect: "half",
-      scaling: { mode: "ki", dicePerStep: 2 },
+      scaling: { mode: "focus", dicePerStep: 2 },
       concentration: false,
       buffTarget: null,
       buffModifier: null,
@@ -138,7 +138,7 @@ describe("catalogEffectSpec — shared ki-cast row→spec builder (#817)", () =>
   it("leaves dice undefined for a utility row and honors the concentration predicate", () => {
     const spec = catalogEffectSpec(
       { name: "Mist Stance" },
-      { scaling: { mode: "ki", dicePerStep: 0 }, concentrates: (name) => name === "Mist Stance" },
+      { scaling: { mode: "focus", dicePerStep: 0 }, concentrates: (name) => name === "Mist Stance" },
     );
     expect(spec.dice).toBeUndefined();
     expect(spec.effectType).toBe("utility");
@@ -175,17 +175,17 @@ describe("catalogEffectSpec — shared ki-cast row→spec builder (#817)", () =>
     expect(spec.concentration).toBe(false);
   });
 
-  it("maps a heal row to heal but never adds the ability modifier (ki abilities roll flat)", () => {
+  it("maps a heal row to heal but never adds the ability modifier (focus abilities roll flat)", () => {
     const spec = catalogEffectSpec(
       { name: "H", effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 8 },
-      { scaling: { mode: "ki", dicePerStep: 1 }, concentrates: () => false },
+      { scaling: { mode: "focus", dicePerStep: 1 }, concentrates: () => false },
     );
     expect(spec.effectType).toBe("heal");
     expect(spec.addAbilityModToHeal).toBeUndefined();
   });
 
   it("reads dice-less when either the count or the faces is missing", () => {
-    const cfg = { scaling: kiScaling, concentrates: () => false };
+    const cfg = { scaling: focusScaling, concentrates: () => false };
     expect(catalogEffectSpec({ name: "X", effectKind: "damage", effectDiceCount: 8 }, cfg).dice).toBeUndefined();
     expect(catalogEffectSpec({ name: "X", effectKind: "damage", effectDiceFaces: 6 }, cfg).dice).toBeUndefined();
   });

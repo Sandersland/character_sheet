@@ -10,8 +10,8 @@ function fourElementsDisciplineCount(level: number): number {
   return 1;
 }
 
-/** Ki save DC (Monk) — used by Stunning Strike, ki features, and elemental disciplines. */
-function kiSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
+/** Focus save DC (Monk) — used by Stunning Strike, focus features, and elemental disciplines. */
+function focusSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
   return 8 + profBonus + abilityModifier(abilityScores.wisdom ?? 10);
 }
 
@@ -230,14 +230,14 @@ export const monk: ClassDefinition = {
   features: MONK_FEATURES,
   resourceFn: (level, abilityScores, profBonus) => {
     if (level < 2) return [];
-    const kiDC = kiSaveDC(abilityScores, profBonus);
+    const focusDC = focusSaveDC(abilityScores, profBonus);
     return [
       {
-        key: "ki",
-        label: "Ki",
+        key: "focus",
+        label: "Focus Points",
         total: level,
         recharge: "short-or-long",
-        description: `Fuel ki features: Flurry of Blows (2 ki), Patient Defense (1 ki), Step of the Wind (1 ki), and subclass abilities. Ki save DC ${kiDC}. Regain all ki on a short or long rest.`,
+        description: `Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC ${focusDC}. Regain all focus on a short or long rest.`,
       },
     ];
   },
@@ -273,7 +273,7 @@ export const monk: ClassDefinition = {
       features: FOUR_ELEMENTS_FEATURES,
       deriveExtras: (level, abilityScores, profBonus) => ({
         disciplineChoiceCount: fourElementsDisciplineCount(level),
-        disciplineSaveDC: kiSaveDC(abilityScores, profBonus),
+        disciplineSaveDC: focusSaveDC(abilityScores, profBonus),
       }),
     },
   },

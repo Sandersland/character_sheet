@@ -112,9 +112,9 @@ describe("deriveEntryScopedResources", () => {
     expect(derived?.subclassChoices?.some((c) => c.key === "defensiveTactics")).toBe(false);
   });
 
-  // #1071: pools (ki/superiority dice/rage/sorcery points/etc.) must scale to
+  // #1071: pools (focus/superiority dice/rage/sorcery points/etc.) must scale to
   // each class entry's OWN level, not the primary entry's total-level pool set.
-  it("Monk 5 / Fighter (Battle Master) 3: ki pool (monk L5) and superiority dice (fighter L3) both appear simultaneously", () => {
+  it("Monk 5 / Fighter (Battle Master) 3: focus pool (monk L5) and superiority dice (fighter L3) both appear simultaneously", () => {
     const totalLevel = 8; // monk 5 + fighter 3
     const profBonus = proficiencyBonusForLevel(totalLevel);
     const entries = [
@@ -124,9 +124,9 @@ describe("deriveEntryScopedResources", () => {
 
     const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
 
-    const ki = derived?.resources.find((r) => r.key === "ki");
-    // Ki total = monk level (5), NOT total character level (8).
-    expect(ki?.total).toBe(5);
+    const focus = derived?.resources.find((r) => r.key === "focus");
+    // Focus total = monk level (5), NOT total character level (8).
+    expect(focus?.total).toBe(5);
 
     const superiorityDice = derived?.resources.find((r) => r.key === "superiorityDice");
     // Superiority dice count at fighter level 3 (battleMasterDiceCount(3) === 4).

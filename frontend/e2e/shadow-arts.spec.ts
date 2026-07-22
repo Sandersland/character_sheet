@@ -6,16 +6,16 @@ import { closeSpellbook, findCharacterByName, gotoSheet, openSpellbook, restoreR
 
 // The Shadow Monk persona (seeded in global-setup) is Monk L6 with the Way of
 // Shadow subclass — Shadow Arts unlock at L3, and Minor Illusion is granted.
-async function kiRemaining(request: APIRequestContext, id: string): Promise<number> {
+async function focusRemaining(request: APIRequestContext, id: string): Promise<number> {
   const res = await request.get(`/api/characters/${id}`);
   const body = (await res.json()) as { resources?: { pools?: { key: string; remaining: number }[] } };
-  return body.resources?.pools?.find((p) => p.key === "ki")?.remaining ?? 0;
+  return body.resources?.pools?.find((p) => p.key === "focus")?.remaining ?? 0;
 }
 
 test("shadow arts: a Way of Shadow monk casts Shadow Arts, taking concentration + a Stealth buff", async ({ page }) => {
   await login(page);
   const id = await findCharacterByName(page.request, "Shadow Monk");
-  await restoreResourcePool(page.request, id, "ki");
+  await restoreResourcePool(page.request, id, "focus");
 
   const errors = collectConsoleErrors(page);
   await page.goto(`/characters/${id}`);
@@ -24,7 +24,7 @@ test("shadow arts: a Way of Shadow monk casts Shadow Arts, taking concentration 
   // Class features (incl. Shadow Arts) moved to their own tab (#1169).
   await page.getByRole("tab", { name: "Class" }).click();
 
-  // The Shadow Arts block renders with the 4 flat 2-ki arts.
+  // The Shadow Arts block renders with the 4 flat 2-focus arts.
   await expect(page.getByRole("heading", { name: "Shadow Arts" })).toBeVisible();
   const darknessRow = page
     .locator("li")
@@ -33,10 +33,10 @@ test("shadow arts: a Way of Shadow monk casts Shadow Arts, taking concentration 
     .first();
   await expect(darknessRow).toBeVisible();
 
-  // ── Cast Darkness: ki drops and the concentration handoff appears ──
-  const kiBefore = await kiRemaining(page.request, id);
+  // ── Cast Darkness: focus drops and the concentration handoff appears ──
+  const focusBefore = await focusRemaining(page.request, id);
   await darknessRow.getByRole("button", { name: "Cast" }).click();
-  await expect.poll(() => kiRemaining(page.request, id)).toBe(kiBefore - 2);
+  await expect.poll(() => focusRemaining(page.request, id)).toBe(focusBefore - 2);
   await expect(page.getByText(/Shadow Arts: Darkness/).first()).toBeVisible();
 
   // ── Cast Pass without Trace: its +10 Stealth shows on the Stealth row ──

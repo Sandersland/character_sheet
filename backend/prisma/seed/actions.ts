@@ -207,10 +207,10 @@ export const ACTIONS: ActionSeed[] = [
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
-    resourceKey: "ki",
+    resourceKey: "focus",
     resourceAmount: 2,
     description:
-      "Immediately after taking the Attack action, spend 2 ki to make two unarmed strikes as a bonus action.",
+      "Immediately after taking the Attack action, spend 2 focus to make two unarmed strikes as a bonus action.",
   },
   {
     key: "patientDefense",
@@ -218,10 +218,10 @@ export const ACTIONS: ActionSeed[] = [
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
-    resourceKey: "ki",
+    resourceKey: "focus",
     resourceAmount: 1,
     description:
-      "Spend 1 ki point to take the Dodge action as a bonus action.",
+      "Spend 1 focus point to take the Dodge action as a bonus action.",
   },
   {
     key: "stepOfTheWind",
@@ -229,10 +229,10 @@ export const ACTIONS: ActionSeed[] = [
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
-    resourceKey: "ki",
+    resourceKey: "focus",
     resourceAmount: 1,
     description:
-      "Spend 1 ki to take the Disengage or Dash action as a bonus action. Your jump distance doubles for the turn.",
+      "Spend 1 focus to take the Disengage or Dash action as a bonus action. Your jump distance doubles for the turn.",
   },
   {
     key: "stunningStrike",
@@ -240,10 +240,10 @@ export const ACTIONS: ActionSeed[] = [
     cost: "free",
     grantClass: "monk",
     grantLevel: 5,
-    resourceKey: "ki",
+    resourceKey: "focus",
     resourceAmount: 1,
     description:
-      "After hitting with a melee weapon attack, spend 1 ki to force the target to make a Constitution save or be stunned until end of your next turn.",
+      "After hitting with a melee weapon attack, spend 1 focus to force the target to make a Constitution save or be stunned until end of your next turn.",
   },
 
   // ── Subclass: Way of Shadow monk ─────────────────────────────────────────

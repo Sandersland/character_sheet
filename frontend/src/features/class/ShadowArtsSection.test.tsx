@@ -24,7 +24,7 @@ const CATALOG: CatalogShadowArt[] = [
     name: "Shadow Arts: Darkness",
     description: "Cast darkness.",
     minLevel: 3,
-    cost: { kind: "pool", key: "ki", base: 2 },
+    cost: { kind: "pool", key: "focus", base: 2 },
     effect: { effectType: "utility", concentration: true, ...baseEffect },
   },
   {
@@ -32,7 +32,7 @@ const CATALOG: CatalogShadowArt[] = [
     name: "Shadow Arts: Silence",
     description: "Cast silence.",
     minLevel: 3,
-    cost: { kind: "pool", key: "ki", base: 2 },
+    cost: { kind: "pool", key: "focus", base: 2 },
     effect: { effectType: "utility", concentration: true, ...baseEffect },
   },
   {
@@ -40,7 +40,7 @@ const CATALOG: CatalogShadowArt[] = [
     name: "Shadow Arts: Pass without Trace",
     description: "Cast pass without trace.",
     minLevel: 3,
-    cost: { kind: "pool", key: "ki", base: 2 },
+    cost: { kind: "pool", key: "focus", base: 2 },
     effect: { effectType: "buff", concentration: true, ...baseEffect, buffTarget: "stealth", buffModifier: 10 },
   },
   {
@@ -48,12 +48,12 @@ const CATALOG: CatalogShadowArt[] = [
     name: "Shadow Arts: Darkvision",
     description: "Cast darkvision.",
     minLevel: 3,
-    cost: { kind: "pool", key: "ki", base: 2 },
+    cost: { kind: "pool", key: "focus", base: 2 },
     effect: { effectType: "utility", concentration: false, ...baseEffect },
   },
 ];
 
-function makeCharacter(kiRemaining: number, concentratingOn: { entryId: string; spellName: string } | null = null): Character {
+function makeCharacter(focusRemaining: number, concentratingOn: { entryId: string; spellName: string } | null = null): Character {
   return {
     id: "char-1",
     class: "Monk",
@@ -61,7 +61,7 @@ function makeCharacter(kiRemaining: number, concentratingOn: { entryId: string; 
     resources: {
       features: [],
       shadowArtsAvailable: true,
-      pools: [{ key: "ki", label: "Ki", total: 3, recharge: "shortRest", used: 3 - kiRemaining, remaining: kiRemaining }],
+      pools: [{ key: "focus", label: "Focus", total: 3, recharge: "shortRest", used: 3 - focusRemaining, remaining: focusRemaining }],
       maneuversKnown: [],
       disciplinesKnown: [],
       toolProficienciesKnown: [],
@@ -82,13 +82,13 @@ beforeEach(() => {
 });
 
 describe("ShadowArtsSection", () => {
-  it("lists the 4 Shadow Arts at a flat 2-ki cost with ki remaining", async () => {
+  it("lists the 4 Shadow Arts at a flat 2-focus cost with focus remaining", async () => {
     renderSection(makeCharacter(3));
     await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
     expect(screen.getByText("Silence")).toBeInTheDocument();
     expect(screen.getByText("Pass without Trace")).toBeInTheDocument();
     expect(screen.getByText("Darkvision")).toBeInTheDocument();
-    // Ki remaining surfaced.
+    // Focus remaining surfaced.
     expect(screen.getByText("3")).toBeInTheDocument();
   });
 
@@ -103,7 +103,7 @@ describe("ShadowArtsSection", () => {
     expect(onCast).toHaveBeenCalledWith({ type: "castShadowArt", shadowArtId: "darkness" });
   });
 
-  it("disables Cast when the character can't afford 2 ki", async () => {
+  it("disables Cast when the character can't afford 2 focus", async () => {
     renderSection(makeCharacter(1));
     await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
     const row = screen.getByText("Darkness").closest("li")!;

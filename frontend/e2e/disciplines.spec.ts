@@ -5,7 +5,7 @@ import { collectConsoleErrors } from "./helpers/console";
 import { findCharacterByName, restoreResourcePool } from "./helpers/api";
 
 // The Four Elements Monk persona (seeded in global-setup) is Monk L6 with the
-// Way of the Four Elements subclass — 2 discipline slots and a ki pool. We
+// Way of the Four Elements subclass — 2 discipline slots and a focus pool. We
 // provision Fangs of the Fire Snake through the API so the cast flow is
 // deterministic regardless of prior run state.
 async function ensureFangsKnown(request: APIRequestContext, id: string): Promise<void> {
@@ -22,17 +22,17 @@ async function ensureFangsKnown(request: APIRequestContext, id: string): Promise
   });
 }
 
-async function kiRemaining(request: APIRequestContext, id: string): Promise<number> {
+async function focusRemaining(request: APIRequestContext, id: string): Promise<number> {
   const res = await request.get(`/api/characters/${id}`);
   const body = (await res.json()) as { resources?: { pools?: { key: string; remaining: number }[] } };
-  return body.resources?.pools?.find((p) => p.key === "ki")?.remaining ?? 0;
+  return body.resources?.pools?.find((p) => p.key === "focus")?.remaining ?? 0;
 }
 
-test("disciplines: a Four Elements monk casts an elemental discipline, spending ki", async ({ page }) => {
+test("disciplines: a Four Elements monk casts an elemental discipline, spending focus", async ({ page }) => {
   await login(page);
   const id = await findCharacterByName(page.request, "Four Elements Monk");
   await ensureFangsKnown(page.request, id);
-  await restoreResourcePool(page.request, id, "ki");
+  await restoreResourcePool(page.request, id, "focus");
 
   const errors = collectConsoleErrors(page);
   await page.goto(`/characters/${id}`);
@@ -57,8 +57,8 @@ test("disciplines: a Four Elements monk casts an elemental discipline, spending 
   await page.getByRole("button", { name: /Learn discipline/i }).click();
   await expect(page.getByRole("heading", { name: /Learn a Discipline/ })).toBeVisible();
 
-  // ── Cast: spending ki surfaces a roll toast, and ki drops ──
-  const kiBefore = await kiRemaining(page.request, id);
+  // ── Cast: spending focus surfaces a roll toast, and focus drops ──
+  const focusBefore = await focusRemaining(page.request, id);
   const castButton = fangsRow.getByRole("button", { name: "Cast" });
   await expect(castButton).toBeEnabled();
   await castButton.click();
@@ -67,7 +67,7 @@ test("disciplines: a Four Elements monk casts an elemental discipline, spending 
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(/fire damage/);
 
-  await expect.poll(() => kiRemaining(page.request, id)).toBe(kiBefore - 1);
+  await expect.poll(() => focusRemaining(page.request, id)).toBe(focusBefore - 1);
 
   expect(errors).toEqual([]);
 });

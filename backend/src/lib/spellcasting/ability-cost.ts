@@ -3,7 +3,7 @@
  *
  * Decouples "cast a spell / use an ability" from "spend the resource it costs".
  * A cost is declared as a slot (level-N spell slot, with Mystic Arcanum
- * fallback), a pool spend (ki, superiority dice, …), or none (cantrips). The
+ * fallback), a pool spend (focus, superiority dice, …), or none (cantrips). The
  * single payer payAbilityCostInTx() charges it inside a caller-supplied
  * transaction and returns a human label + the effective upcast/overspend step.
  *

@@ -1,6 +1,6 @@
 /**
  * DisciplineRow — a single known elemental discipline with an expandable
- * description, a ki-scaling cast affordance, and Forget / Swap actions. Renders
+ * description, a focus-scaling cast affordance, and Forget / Swap actions. Renders
  * through AbilityRowShell (shared with ManeuverRow/ShadowArtRow); the cast path
  * rolls through RollContext (→ RollResultSeal), the same player-driven roll
  * path as spell casting.
@@ -16,7 +16,7 @@ import {
   disciplineCastView,
   disciplineRollLabel,
   disciplineRollSpec,
-  effectiveKiSelection,
+  effectiveFocusSelection,
 } from "@/lib/disciplines";
 import type {
   CastDisciplineOperation,
@@ -28,7 +28,7 @@ interface Props {
   entry: DisciplineEntry;
   catalog?: CatalogDiscipline;
   characterLevel: number;
-  kiAvailable: number;
+  focusAvailable: number;
   saveDC?: number;
   forgettable: boolean;
   busy: boolean;
@@ -41,7 +41,7 @@ export default function DisciplineRow({
   entry,
   catalog,
   characterLevel,
-  kiAvailable,
+  focusAvailable,
   saveDC,
   forgettable,
   busy,
@@ -51,9 +51,9 @@ export default function DisciplineRow({
 }: Props) {
   const { roll } = useRoll();
 
-  const view = disciplineCastView(catalog, characterLevel, kiAvailable);
-  const [selectedKi, setSelectedKi] = useState(view.base);
-  const effectiveKi = effectiveKiSelection(view, selectedKi);
+  const view = disciplineCastView(catalog, characterLevel, focusAvailable);
+  const [selectedFocus, setSelectedFocus] = useState(view.base);
+  const effectiveFocus = effectiveFocusSelection(view, selectedFocus);
   const isSave = Boolean(catalog?.effect.saveAbility);
 
   function handleForget() {
@@ -63,9 +63,9 @@ export default function DisciplineRow({
 
   function handleCast() {
     if (!catalog || busy || !view.canAfford) return;
-    const spec = disciplineRollSpec(catalog, effectiveKi, characterLevel);
+    const spec = disciplineRollSpec(catalog, effectiveFocus, characterLevel);
     const total = spec ? roll(spec, disciplineRollLabel(catalog)).total : 0;
-    onCast({ type: "castDiscipline", disciplineId: catalog.id, kiSpent: effectiveKi, roll: total });
+    onCast({ type: "castDiscipline", disciplineId: catalog.id, focusSpent: effectiveFocus, roll: total });
   }
 
   return (
@@ -73,22 +73,22 @@ export default function DisciplineRow({
       name={entry.name}
       chips={
         <span className="text-[10px] text-gold-700" aria-hidden="true">
-          {view.kiLabel}
+          {view.focusLabel}
         </span>
       }
       actions={
         <>
           {view.scalable && (
             <select
-              value={effectiveKi}
-              onChange={(e) => setSelectedKi(Number(e.target.value))}
+              value={effectiveFocus}
+              onChange={(e) => setSelectedFocus(Number(e.target.value))}
               disabled={busy}
-              aria-label={`Ki to spend on ${entry.name}`}
+              aria-label={`Focus to spend on ${entry.name}`}
               className="rounded-control border border-gold-300 bg-parchment-50 px-1.5 py-0.5 text-xs text-parchment-800 focus:outline-none focus:ring-1 focus:ring-gold-400"
             >
-              {view.options.map((ki) => (
-                <option key={ki} value={ki}>
-                  {ki} ki
+              {view.options.map((focus) => (
+                <option key={focus} value={focus}>
+                  {focus} focus
                 </option>
               ))}
             </select>
@@ -96,7 +96,7 @@ export default function DisciplineRow({
           <CastAbilityButton
             disabled={busy || !view.canAfford || !catalog}
             onClick={handleCast}
-            title={disciplineCastTitle(view, entry.name, effectiveKi)}
+            title={disciplineCastTitle(view, entry.name, effectiveFocus)}
           />
           {forgettable && (
             <>
@@ -126,7 +126,7 @@ export default function DisciplineRow({
       <p className="text-xs leading-relaxed text-parchment-600">{entry.description}</p>
       <DisciplineRollPreview
         catalog={catalog}
-        effectiveKi={effectiveKi}
+        effectiveFocus={effectiveFocus}
         characterLevel={characterLevel}
         isSave={isSave}
         saveDC={saveDC}
@@ -138,13 +138,13 @@ export default function DisciplineRow({
 /** The expanded row's "Rolls 3d8 · save DC 13" preview line. */
 function DisciplineRollPreview({
   catalog,
-  effectiveKi,
+  effectiveFocus,
   characterLevel,
   isSave,
   saveDC,
 }: {
   catalog?: CatalogDiscipline;
-  effectiveKi: number;
+  effectiveFocus: number;
   characterLevel: number;
   isSave: boolean;
   saveDC?: number;
@@ -153,7 +153,7 @@ function DisciplineRollPreview({
   return (
     <p className="mt-1 text-[11px] text-gold-800">
       {catalog.effect.dice && (
-        <>Rolls {formatRollSpec(disciplineRollSpec(catalog, effectiveKi, characterLevel)!)}</>
+        <>Rolls {formatRollSpec(disciplineRollSpec(catalog, effectiveFocus, characterLevel)!)}</>
       )}
       {isSave && saveDC !== undefined && (
         <> · save DC {saveDC}</>
