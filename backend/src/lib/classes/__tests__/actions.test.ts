@@ -50,11 +50,13 @@ describe("deriveActions — class gates", () => {
     expect(l2).toContain("recklessAttack");
   });
 
-  it("Monk L2 gets flurryOfBlows/patientDefense/stepOfTheWind; L5 adds stunningStrike", () => {
+  it("Monk L2 gets flurryOfBlows/patientDefense(+Focus)/stepOfTheWind(+Focus); L5 adds stunningStrike", () => {
     const l2 = keys(deriveActions("monk", undefined, 2, []));
     expect(l2).toContain("flurryOfBlows");
     expect(l2).toContain("patientDefense");
+    expect(l2).toContain("patientDefenseFocus");
     expect(l2).toContain("stepOfTheWind");
+    expect(l2).toContain("stepOfTheWindFocus");
     expect(l2).not.toContain("stunningStrike");
 
     const l5 = keys(deriveActions("monk", undefined, 5, []));
@@ -243,20 +245,79 @@ describe("ACTION_EFFECT_FN — monk focus actions", () => {
     ]);
   });
 
-  it("patientDefense → spendResource focus (no amount)", () => {
-    expect(ACTION_EFFECT_FN.patientDefense({})).toEqual([
-      { type: "spendResource", key: "focus" },
-    ]);
-  });
-
-  it("stepOfTheWind → spendResource focus", () => {
-    expect(ACTION_EFFECT_FN.stepOfTheWind({})).toEqual([
-      { type: "spendResource", key: "focus" },
-    ]);
-  });
-
   it("stunningStrike → spendResource focus", () => {
     expect(ACTION_EFFECT_FN.stunningStrike({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+});
+
+describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (#1240)", () => {
+  it("both are granted at monk L2, in both the free and Focus-spend forms", () => {
+    const l2 = keys(deriveActions("monk", undefined, 2, []));
+    expect(l2).toEqual(
+      expect.arrayContaining(["patientDefense", "patientDefenseFocus", "stepOfTheWind", "stepOfTheWindFocus"]),
+    );
+  });
+
+  it("free variants are always enabled — no resourceKey gate — regardless of remaining focus", () => {
+    const noFocus = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
+    const patientFree = noFocus.find((a) => a.key === "patientDefense");
+    const stepFree = noFocus.find((a) => a.key === "stepOfTheWind");
+    expect(patientFree?.enabled).toBe(true);
+    expect(stepFree?.enabled).toBe(true);
+  });
+
+  it("Focus variants are gated on 1 remaining focus, like any other resource-gated action", () => {
+    const noFocus = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "patientDefenseFocus")?.enabled).toBe(false);
+    expect(noFocus.find((a) => a.key === "stepOfTheWindFocus")?.enabled).toBe(false);
+
+    const withFocus = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    expect(withFocus.find((a) => a.key === "patientDefenseFocus")?.enabled).toBe(true);
+    expect(withFocus.find((a) => a.key === "stepOfTheWindFocus")?.enabled).toBe(true);
+  });
+
+  it("Patient Defense reminders name Disengage-only free vs Disengage+Dodge paid", () => {
+    const l2 = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const patientFree = l2.find((a) => a.key === "patientDefense");
+    const patientFocus = l2.find((a) => a.key === "patientDefenseFocus");
+    expect(patientFree).toBeDefined();
+    expect(patientFocus).toBeDefined();
+    expect(patientFree!.reminder).toMatch(/disengage/i);
+    expect(patientFree!.reminder).not.toMatch(/dodge/i);
+    expect(patientFocus!.reminder).toMatch(/disengage/i);
+    expect(patientFocus!.reminder).toMatch(/dodge/i);
+  });
+
+  it("Step of the Wind reminders name Dash-only free vs Disengage+Dash+doubled-jump paid", () => {
+    const l2 = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const stepFree = l2.find((a) => a.key === "stepOfTheWind");
+    const stepFocus = l2.find((a) => a.key === "stepOfTheWindFocus");
+    expect(stepFree).toBeDefined();
+    expect(stepFocus).toBeDefined();
+    expect(stepFree!.reminder).toMatch(/dash/i);
+    expect(stepFree!.reminder).not.toMatch(/disengage/i);
+    expect(stepFocus!.reminder).toMatch(/disengage/i);
+    expect(stepFocus!.reminder).toMatch(/dash/i);
+    expect(stepFocus!.reminder).toMatch(/jump/i);
+  });
+
+  it("free variants are pure reminder actions — no server effect fn (like Shadow Step/Opportunist)", () => {
+    expect(ACTION_EFFECT_FN.patientDefense).toBeUndefined();
+    expect(ACTION_CAST_FN.patientDefense).toBeUndefined();
+    expect(ACTION_EFFECT_FN.stepOfTheWind).toBeUndefined();
+    expect(ACTION_CAST_FN.stepOfTheWind).toBeUndefined();
+  });
+
+  it("patientDefenseFocus spends exactly 1 focus", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseFocus({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("stepOfTheWindFocus spends exactly 1 focus", () => {
+    expect(ACTION_EFFECT_FN.stepOfTheWindFocus({})).toEqual([
       { type: "spendResource", key: "focus" },
     ]);
   });

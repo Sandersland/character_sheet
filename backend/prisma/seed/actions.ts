@@ -212,16 +212,27 @@ export const ACTIONS: ActionSeed[] = [
     description:
       "Immediately after taking the Attack action, spend 2 focus to make two unarmed strikes as a bonus action.",
   },
+  // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240): each has
+  // a free variant and a 1-Focus variant that does more — not the 2014 SRD's
+  // flat "always costs 1 ki" shape.
   {
     key: "patientDefense",
     name: "Patient Defense",
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
+    description: "Take the Disengage action as a bonus action, for free.",
+  },
+  {
+    key: "patientDefenseFocus",
+    name: "Patient Defense (1 Focus)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
     resourceKey: "focus",
     resourceAmount: 1,
     description:
-      "Spend 1 focus point to take the Dodge action as a bonus action.",
+      "Spend 1 focus to take the Disengage action and the Dodge action as a bonus action.",
   },
   {
     key: "stepOfTheWind",
@@ -229,10 +240,18 @@ export const ACTIONS: ActionSeed[] = [
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
+    description: "Take the Dash action as a bonus action, for free.",
+  },
+  {
+    key: "stepOfTheWindFocus",
+    name: "Step of the Wind (1 Focus)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
     resourceKey: "focus",
     resourceAmount: 1,
     description:
-      "Spend 1 focus to take the Disengage or Dash action as a bonus action. Your jump distance doubles for the turn.",
+      "Spend 1 focus to take the Disengage action and the Dash action as a bonus action. Your jump distance doubles for the turn.",
   },
   {
     key: "stunningStrike",

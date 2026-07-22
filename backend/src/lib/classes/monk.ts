@@ -35,7 +35,7 @@ const MONK_FEATURES: DerivedFeature[] = [
     level: 2,
     source: "class",
     description:
-      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (2 focus — two bonus unarmed strikes), Patient Defense (1 focus — Dodge as bonus action), Step of the Wind (1 focus — Disengage or Dash as bonus action, jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (2 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
   },
   {
     name: "Unarmored Movement",
@@ -244,7 +244,7 @@ export const monk: ClassDefinition = {
         label: "Focus Points",
         total: level,
         recharge: "short-or-long",
-        description: `Fuel focus features: Flurry of Blows (2 focus), Patient Defense (1 focus), Step of the Wind (1 focus), and subclass abilities. Focus save DC ${focusDC}. Regain all focus on a short or long rest.`,
+        description: `Fuel focus features: Flurry of Blows (2 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC ${focusDC}. Regain all focus on a short or long rest.`,
       },
     ];
   },

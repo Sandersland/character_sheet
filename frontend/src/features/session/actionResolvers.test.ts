@@ -20,7 +20,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "channelDivinityCleric",
   "wildShape",
   "secondWind", "actionSurge",
-  "flurryOfBlows", "patientDefense", "stepOfTheWind", "stunningStrike",
+  "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus", "stunningStrike",
   "divineSense", "layOnHands", "channelDivinityPaladin",
   "cunningAction",
   "metamagic",
@@ -74,6 +74,34 @@ describe("actionResolvers", () => {
     expect(opp!.kind).toBe("simple-confirm");
     expect(opp!.slot).toBe("reaction");
     expect(opp!.serverEffect).toBe(false);
+  });
+
+  it("Patient Defense / Step of the Wind free variants are economy-only simple-confirm reminders (#1240)", () => {
+    const patient = resolverFor("patientDefense");
+    expect(patient).toBeDefined();
+    expect(patient!.kind).toBe("simple-confirm");
+    expect(patient!.slot).toBe("bonusAction");
+    expect(patient!.serverEffect).toBe(false); // free variant — no backend ACTION_EFFECT_FN
+    expect(patient!.resourceKey).toBeUndefined();
+
+    const step = resolverFor("stepOfTheWind");
+    expect(step).toBeDefined();
+    expect(step!.kind).toBe("simple-confirm");
+    expect(step!.slot).toBe("bonusAction");
+    expect(step!.serverEffect).toBe(false);
+    expect(step!.resourceKey).toBeUndefined();
+  });
+
+  it("Patient Defense / Step of the Wind 1-Focus variants spend the focus pool (#1240)", () => {
+    const patientFocus = resolverFor("patientDefenseFocus");
+    expect(patientFocus).toBeDefined();
+    expect(patientFocus!.serverEffect).toBe(true);
+    expect(patientFocus!.resourceKey).toBe("focus");
+
+    const stepFocus = resolverFor("stepOfTheWindFocus");
+    expect(stepFocus).toBeDefined();
+    expect(stepFocus!.serverEffect).toBe(true);
+    expect(stepFocus!.resourceKey).toBe("focus");
   });
 
   it("all resolvers have a valid slot", () => {
