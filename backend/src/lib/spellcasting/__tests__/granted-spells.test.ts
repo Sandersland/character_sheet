@@ -93,7 +93,7 @@ describe("deriveGrantedSpells", () => {
   });
 
   it("grants nothing for a subclass with an empty grant list", () => {
-    expect(deriveGrantedSpells({ name: "Way of the Open Hand", grantedSpells: [] }, 20)).toEqual([]);
+    expect(deriveGrantedSpells({ name: "Warrior of the Open Hand", grantedSpells: [] }, 20)).toEqual([]);
   });
 
   it("returns independent nested components objects across calls", () => {
@@ -196,7 +196,7 @@ describe("deriveGrantedCastingAbility", () => {
   });
 
   it("defaults to wisdom for a source with no grants", () => {
-    expect(deriveGrantedCastingAbility({ name: "Way of the Open Hand", grantedSpells: [] })).toBe("wisdom");
+    expect(deriveGrantedCastingAbility({ name: "Warrior of the Open Hand", grantedSpells: [] })).toBe("wisdom");
   });
 
   it("defaults to wisdom when no source is set", () => {

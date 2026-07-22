@@ -705,15 +705,15 @@ describe("subclass-granted spells", () => {
 
     // Way of Shadow grants Minor Illusion at L3 as data (#898): a catalog Subclass
     // row under this test class + a SubclassGrantedSpell → the seeded Minor Illusion.
-    // Way of the Open Hand exists as a catalog row but grants nothing.
+    // Warrior of the Open Hand exists as a catalog row but grants nothing.
     const shadow = await prisma.subclass.upsert({
       where: { classId_name: { classId: monkClassId, name: "Way of Shadow" } },
       create: { classId: monkClassId, name: "Way of Shadow", description: "Test subclass" },
       update: {},
     });
     await prisma.subclass.upsert({
-      where: { classId_name: { classId: monkClassId, name: "Way of the Open Hand" } },
-      create: { classId: monkClassId, name: "Way of the Open Hand", description: "Test subclass" },
+      where: { classId_name: { classId: monkClassId, name: "Warrior of the Open Hand" } },
+      create: { classId: monkClassId, name: "Warrior of the Open Hand", description: "Test subclass" },
       update: {},
     });
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
@@ -796,7 +796,7 @@ describe("subclass-granted spells", () => {
   });
 
   it("does NOT grant Minor Illusion to a different subclass", async () => {
-    await createMonk({ xp: 900, subclass: "Way of the Open Hand" }); // L3
+    await createMonk({ xp: 900, subclass: "Warrior of the Open Hand" }); // L3
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(getSpells(res.body).find((s) => s.name === "Minor Illusion")).toBeUndefined();
   });

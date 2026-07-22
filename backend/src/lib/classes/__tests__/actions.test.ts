@@ -312,7 +312,7 @@ describe("Way of Shadow — Shadow Step / Opportunist (#440)", () => {
   });
 
   it("subclass gate: a non-Shadow monk gets neither at L17", () => {
-    const openHand = keys(deriveActions("monk", "Way of the Open Hand", 17, []));
+    const openHand = keys(deriveActions("monk", "Warrior of the Open Hand", 17, []));
     expect(openHand).not.toContain("shadowStep");
     expect(openHand).not.toContain("opportunist");
     const noSub = keys(deriveActions("monk", undefined, 17, []));

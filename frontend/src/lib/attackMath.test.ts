@@ -248,7 +248,7 @@ describe("buildAttackEntries", () => {
     expect(unarmed.magical).toBe(false);
   });
 
-  it("flags the unarmed row magical when the strike is magical (Ki-Empowered Strikes)", () => {
+  it("flags the unarmed row magical when the strike is magical (Empowered Strikes)", () => {
     const character = makeCharacter({
       unarmedStrike: {
         attackBonus: 5,

@@ -9,7 +9,7 @@
  */
 export interface DerivedAttack {
   attackBonus: number;
-  /** Strike counts as magical (Monk Ki-Empowered Strikes at level 6+). */
+  /** Strike counts as magical (Monk Empowered Strikes at level 6+). */
   magical?: boolean;
   damage: {
     count: number;
