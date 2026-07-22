@@ -1,6 +1,6 @@
-import { abilityModifier } from "@/lib/srd/srd.js";
+import { abilityModifier, deriveMartialArtsDie } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { ClassDefinition, DerivedFeature, InitiativeRegen } from "./types.js";
 
 /** Elemental discipline count by Monk level (Way of the Four Elements). */
 function fourElementsDisciplineCount(level: number): number {
@@ -240,12 +240,34 @@ export const monk: ClassDefinition = {
   resourceFn: (level, abilityScores, profBonus) => {
     if (level < 2) return [];
     const focusDC = focusSaveDC(abilityScores, profBonus);
+    // Uncanny Metabolism (L2, SRD 5.2): on rolling Initiative, regain all
+    // expended Focus once per long rest, plus heal monk level + a Martial Arts
+    // die roll (the roll itself happens in the impure rollInitiative op —
+    // resourceFn only declares the descriptor). Perfect Focus (L15) layers on
+    // top: every combat, top Focus up to 4 when at 3 or fewer. #1243 needs BOTH
+    // behaviors on this one pool at different levels, hence the array.
+    const onInitiative: InitiativeRegen[] = [
+      {
+        id: "uncannyMetabolism",
+        amount: "all",
+        oncePerLongRest: true,
+        bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: deriveMartialArtsDie(level), flatBonus: level },
+      },
+    ];
+    if (level >= 15) {
+      // "if you have 3 or fewer focus points, you regain focus points until you
+      // have 4" — amount:4 already encodes the "3 or fewer" trigger (a pool
+      // at/above the target is a no-op in applyInitiativeRegen), so no separate
+      // threshold check is needed here.
+      onInitiative.push({ id: "perfectFocus", amount: 4 });
+    }
     return [
       {
         key: "focus",
         label: "Focus Points",
         total: level,
         recharge: "short-or-long",
+        onInitiative,
         description: `Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC ${focusDC}. Regain all focus on a short or long rest.`,
       },
     ];

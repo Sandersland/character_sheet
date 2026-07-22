@@ -144,11 +144,15 @@ const transactionsRequestSchema = z.object({
  *   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)
  *   forgetSubclassChoice  — undo a subclass-choice pick by entry id
  *
- * Returns the full updated character on success.
+ * Returns the full updated character on success, plus a top-level `results`
+ * array (one ResourceOpAudit per op) so a roll-driven op's outcome — today,
+ * rollInitiative's Focus-regen + Uncanny Metabolism heal summary (#1243) —
+ * reaches the client for its toast. Mirrors inventory.ts's `useResults`.
  */
 makeTransactionsEndpoint({
   router: resourcesRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyResourceOperations(characterId, data.operations),
   domainErrors: [InvalidResourceOperationError],
+  respond: (character, results) => ({ ...character, results }),
 });

@@ -15,6 +15,7 @@ import {
   advanceCombatRound,
   applyInventoryTransactions,
   logRoll,
+  rollInitiativeTransaction,
 } from "@/api/client";
 import { axe } from "@/test/axe";
 import type { Character } from "@/types/character";
@@ -29,6 +30,7 @@ vi.mock("@/api/client", () => ({
   advanceCombatRound: vi.fn(),
   applyInventoryTransactions: vi.fn(),
   logRoll: vi.fn(),
+  rollInitiativeTransaction: vi.fn(),
 }));
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
@@ -130,6 +132,9 @@ beforeEach(() => {
   vi.mocked(endCombat).mockResolvedValue(undefined);
   vi.mocked(advanceCombatRound).mockResolvedValue(undefined);
   vi.mocked(logRoll).mockResolvedValue(undefined);
+  // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
+  // call would report an empty regen, same as this default (#1239/#1243).
+  vi.mocked(rollInitiativeTransaction).mockResolvedValue({ ...updated, results: [] });
 });
 
 describe("TurnHub — combat lifecycle", () => {

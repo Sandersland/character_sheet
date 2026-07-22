@@ -20775,6 +20775,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -20827,6 +20839,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -20885,6 +20909,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -20955,6 +20991,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -21031,6 +21079,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -21113,6 +21173,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -21195,6 +21267,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -21277,6 +21361,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -21371,6 +21467,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -21465,6 +21573,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -21559,6 +21679,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -21659,6 +21791,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -21765,6 +21909,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -21877,6 +22033,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -21989,6 +22161,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -22101,6 +22289,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -22219,6 +22423,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -22337,6 +22557,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -22461,6 +22697,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 20,
         },
@@ -22532,6 +22784,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -22590,6 +22854,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -22654,6 +22930,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -22730,6 +23018,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -22818,6 +23118,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -22919,6 +23231,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -23020,6 +23344,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -23121,6 +23457,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -23234,6 +23582,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -23353,6 +23713,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -23472,6 +23844,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -23597,6 +23981,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -23728,6 +24124,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -23865,6 +24273,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -24002,6 +24426,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -24145,6 +24585,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -24294,6 +24750,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -24443,6 +24915,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -24598,6 +25086,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 20,
         },
@@ -24676,6 +25180,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -24734,6 +25250,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -24799,6 +25327,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -24876,6 +25416,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -24965,6 +25517,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -25060,6 +25624,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -25155,6 +25731,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -25250,6 +25838,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -25357,6 +25957,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -25471,6 +26083,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -25585,6 +26209,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -25705,6 +26341,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -25831,6 +26479,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -25963,6 +26623,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -26095,6 +26771,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -26233,6 +26925,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -26377,6 +27085,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -26521,6 +27245,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -26671,6 +27411,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 20,
         },
@@ -26743,6 +27499,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 2,
         },
@@ -26803,6 +27571,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 3,
         },
@@ -26869,6 +27649,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 4,
         },
@@ -26947,6 +27739,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 5,
         },
@@ -27037,6 +27841,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 6,
         },
@@ -27133,6 +27949,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 7,
         },
@@ -27229,6 +28057,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 8,
         },
@@ -27325,6 +28165,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 9,
         },
@@ -27433,6 +28285,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 10,
         },
@@ -27547,6 +28411,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 11,
         },
@@ -27661,6 +28537,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 12,
         },
@@ -27781,6 +28669,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 13,
         },
@@ -27907,6 +28807,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
           "recharge": "short-or-long",
           "total": 14,
         },
@@ -28039,6 +28951,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 15,
         },
@@ -28171,6 +29099,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 16,
         },
@@ -28309,6 +29253,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 17,
         },
@@ -28453,6 +29413,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 18,
         },
@@ -28597,6 +29573,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 19,
         },
@@ -28747,6 +29739,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
           "key": "focus",
           "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
           "recharge": "short-or-long",
           "total": 20,
         },

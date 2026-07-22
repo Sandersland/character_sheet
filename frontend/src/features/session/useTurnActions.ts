@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 
-import { applyActionTransactions, revertBatch, startCombat, endCombat, advanceCombatRound } from "@/api/client";
+import { applyActionTransactions, revertBatch, startCombat, endCombat, advanceCombatRound, rollInitiativeTransaction } from "@/api/client";
 import { flurryStrikeCount } from "@/lib/attackMath";
 import { rollSpec } from "@/lib/dice";
 import { planActionClick, type ActionClickPlan } from "@/lib/turnActionPlan";
@@ -299,6 +299,23 @@ export function useTurnActions({
   // Combat lifecycle — local state first, best-effort audit log after.
   async function handleStartCombat() {
     startCombatState();
+    setReactionMessage(null);
+    setEffectMessage(null);
+    setError(null);
+    // Automatic combat-start resource regen (#1239/#1243): fires every pool's
+    // onInitiative descriptor (today, Monk Uncanny Metabolism/Perfect Focus) —
+    // harmless no-op for every other class/level. Separate try/catch from the
+    // audit-log call below so one failing best-effort call doesn't block the other.
+    try {
+      const updated = await rollInitiativeTransaction(character.id);
+      onUpdate(updated);
+      // eventData.regenerated is only non-empty when a descriptor actually
+      // fired (#1243) — a plain "no resources to regain" roll stays silent.
+      const regenerated = updated.results[0]?.eventData.regenerated as unknown[] | undefined;
+      if (regenerated && regenerated.length > 0) setEffectMessage(updated.results[0].summary);
+    } catch (e) {
+      console.error("initiative regen failed (startCombat)", e);
+    }
     try {
       await startCombat(character.id, sessionId);
       onLogChanged();

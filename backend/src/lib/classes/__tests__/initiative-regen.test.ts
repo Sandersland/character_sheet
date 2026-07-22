@@ -1,7 +1,7 @@
-// Unit tests for the generic onInitiative regen mechanism (#1239). Pure —
-// no DB. Uses test-fixture pools rather than the real Monk Focus pool: the
-// L2-vs-L15 (Uncanny Metabolism vs Perfect Focus) descriptor split is #1243's
-// job, so nothing declares onInitiative on a real class pool yet.
+// Unit tests for the generic onInitiative regen mechanism (#1239/#1243). Pure —
+// no DB. Uses synthetic test-fixture pools, not the real Monk Focus pool — the
+// real L2/L15 (Uncanny Metabolism / Perfect Focus) split is covered by
+// monk-initiative-regen.test.ts, which exercises monk.ts's actual resourceFn.
 
 import { describe, it, expect } from "vitest";
 
@@ -112,5 +112,62 @@ describe("applyInitiativeRegen (#1239)", () => {
     const before = JSON.stringify(state);
     expect(applyInitiativeRegen(state, null)).toEqual([]);
     expect(JSON.stringify(state)).toBe(before);
+  });
+});
+
+// Generic multi-descriptor + bonusHeal mechanism (#1243) — the shape a real
+// pool needs to combine Uncanny Metabolism-like (once/long-rest, full refill +
+// heal) and Perfect Focus-like (every combat, plain top-up) behavior on ONE
+// pool at different levels. Uses a synthetic "grit" pool, not the real Monk
+// Focus pool (that combination is covered by monk-initiative-regen.test.ts).
+const combinedPool: DerivedResource = {
+  key: "grit",
+  label: "Grit Points",
+  total: 6,
+  recharge: "short-or-long",
+  onInitiative: [
+    {
+      id: "restCap",
+      amount: "all",
+      oncePerLongRest: true,
+      bonusHeal: { sourceName: "Test Surge", dieFaces: 8, flatBonus: 2 },
+    },
+    { id: "topUp", amount: 3 },
+  ],
+};
+
+describe("applyInitiativeRegen — multiple onInitiative descriptors on one pool (#1243)", () => {
+  it("fires the once-per-rest descriptor first combat since a long rest; the plain top-up is a no-op once the pool is already full", () => {
+    const state = stateWithUsed({ grit: 6 });
+    const regained = applyInitiativeRegen(state, info([combinedPool]));
+    expect(state.used.grit).toBe(0);
+    expect(regained).toEqual([
+      {
+        key: "grit", label: "Grit Points", restored: 6, remaining: 6,
+        bonusHeal: { sourceName: "Test Surge", dieFaces: 8, flatBonus: 2 },
+      },
+    ]);
+  });
+
+  it("once the once-per-rest use is spent this cycle, the plain top-up descriptor still fires every combat", () => {
+    const state = stateWithUsed({ grit: 6 });
+    applyInitiativeRegen(state, info([combinedPool])); // consumes restCap for this rest cycle
+    state.used.grit = 5; // spend back down to 1 available (below topUp's floor of 3)
+    const regained = applyInitiativeRegen(state, info([combinedPool]));
+    // restCap already used this rest — only topUp fires, restoring to 3 available.
+    expect(state.used.grit).toBe(3);
+    expect(regained).toEqual([{ key: "grit", label: "Grit Points", restored: 2, remaining: 3 }]);
+  });
+
+  it("a oncePerLongRest descriptor with a bonusHeal reports even when nothing was expended to regain", () => {
+    const state = stateWithUsed({ grit: 0 }); // already full — nothing for either descriptor to restore
+    const regained = applyInitiativeRegen(state, info([combinedPool]));
+    expect(state.used.grit).toBe(0);
+    expect(regained).toEqual([
+      {
+        key: "grit", label: "Grit Points", restored: 0, remaining: 6,
+        bonusHeal: { sourceName: "Test Surge", dieFaces: 8, flatBonus: 2 },
+      },
+    ]);
   });
 });

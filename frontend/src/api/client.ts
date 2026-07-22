@@ -46,6 +46,7 @@ import type {
   StunningStrikeAttemptResult,
   ReferenceData,
   ResourceOperation,
+  ResourceOpResult,
   Session,
   SessionDoorwayState,
   SpellcastingOperation,
@@ -459,6 +460,23 @@ export async function applyResourceTransactions(
   operations: ResourceOperation[]
 ): Promise<Character> {
   return postTransactions(characterId, "resources", operations, "Failed to apply resource operations");
+}
+
+// Rolls Initiative / combat start (#1239/#1243): applies every onInitiative-
+// declaring pool's regen (Monk Uncanny Metabolism's Focus refill + HP heal,
+// Perfect Focus's top-up) server-side and returns the updated Character plus
+// the per-op result the caller reads for its combat-start toast. A dedicated
+// call (not the generic applyResourceTransactions) since existing callers of
+// that one expect a bare Character; results rides alongside here the same way
+// castManeuverTransaction's does.
+export async function rollInitiativeTransaction(
+  characterId: string,
+): Promise<Character & { results: ResourceOpResult[] }> {
+  return request<Character & { results: ResourceOpResult[] }>(
+    `/characters/${characterId}/resources/transactions`,
+    jsonBody({ operations: [{ type: "rollInitiative" }] }),
+    "Failed to roll initiative",
+  );
 }
 
 // Applies a batch of condition operations atomically (apply/remove a status
