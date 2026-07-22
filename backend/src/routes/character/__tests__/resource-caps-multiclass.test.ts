@@ -130,7 +130,7 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
     });
 
     // Closes a coverage gap (not a red-first case: the write-side cap check
-    // already goes through the same deriveEntryScopedResources/overlayCapFields
+    // already goes through the same deriveEntryScopedResources/overlayExtrasFields
     // path the maneuver test above exercises, so this passes on the current fix).
     it("caps learnToolProficiency at the SECONDARY fighter entry's Student of War count (1)", async () => {
       const first = await agent()

@@ -205,10 +205,9 @@ export async function applyShadowArtsOperations(
     select: FOCUS_CAST_CHARACTER_SELECT,
     notFound: (id) => new InvalidShadowArtOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      // shadowArtsAvailable/cloakOfShadowsAvailable stay primary-at-total-level
-      // (#1071 non-goal, not entry-scoped by deriveEntryScopedResources) — a
-      // secondary Warrior of Shadow monk's gate is a documented follow-up, out
-      // of scope for #1072.
+      // shadowArtsAvailable/cloakOfShadowsAvailable are entry-scoped (#1206):
+      // they key off the MONK entry's own level, so a secondary Warrior of
+      // Shadow monk's gate is set correctly even when another class is primary.
       const { derived } = deriveEntryScopedResourcesForCharacterRow(row);
 
       if (op.type === "activateCloakOfShadows") {

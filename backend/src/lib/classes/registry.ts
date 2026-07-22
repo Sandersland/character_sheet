@@ -202,37 +202,70 @@ export function deriveEntryScopedResourcesForCharacterRow(row: {
   return { derived, level };
 }
 
-// The five choice-cap fields overlaid per class entry by deriveEntryScopedResources.
-// (The pool `resources` layer is entry-scoped separately, below — #1071; `features`
-// stays primary-at-total-level, #1177 non-goal, audited but not expanded by #1071.)
-// Kept as a typed list so the overlay loop and its "has anything to contribute"
-// check share one enumeration.
-const CAP_FIELDS = [
+// Every scalar/boolean field a class/subclass's deriveExtras can contribute
+// (choice-cap fields like maneuverChoiceCount, and gate booleans like
+// shadowArtsAvailable/elementalBurstAvailable), overlaid per class entry by
+// deriveEntryScopedResources. Generic over whatever ExtrasFn returns (#1206) —
+// a class appears at most once in classEntries, so listing every such field
+// here needs no per-field cross-entry collision handling. `subclassChoices` is
+// excluded: it concats across entries instead of overlaying (below). The pool
+// `resources` and `features` layers are entry-scoped separately (#1071, #1206).
+// Kept as a typed list so the overlay loop and its "has anything to
+// contribute" check share one enumeration.
+const EXTRAS_FIELDS = [
   "maneuverChoiceCount",
   "maneuverSaveDC",
   "toolProfChoiceCount",
-] as const satisfies readonly (keyof DerivedClassInfo)[];
+  "elementalAttunementAvailable",
+  "elementalBurstAvailable",
+  "shadowArtsAvailable",
+  "cloakOfShadowsAvailable",
+] as const satisfies readonly (keyof Omit<DerivedClassInfo, "resources" | "features" | "subclassChoices">)[];
 
-// Whether an entry's own-level derivation has any choice-cap field to overlay
+// Whether an entry's own-level derivation has any extras field to overlay
 // (a plain class/subclass with only pools/features contributes nothing here).
-function entryContributesCapFields(info: DerivedClassInfo): boolean {
-  return CAP_FIELDS.some((field) => info[field] !== undefined) || info.subclassChoices !== undefined;
+function entryContributesExtras(info: DerivedClassInfo): boolean {
+  return EXTRAS_FIELDS.some((field) => info[field] !== undefined) || info.subclassChoices !== undefined;
 }
 
-// Defined-wins overlay of one entry's choice-cap fields onto the accumulator (a
+// Assigns through a generic key so TS correlates each EXTRAS_FIELDS entry's
+// key with its own value type — a plain `target[field] = info[field]` inside
+// the loop below doesn't typecheck because EXTRAS_FIELDS mixes numeric
+// (maneuverChoiceCount) and boolean (shadowArtsAvailable) fields, and a
+// non-generic union-typed key can't be correlated to a union-typed value.
+function assignDefined<T, K extends keyof T>(target: T, key: K, value: T[K] | undefined): void {
+  if (value !== undefined) target[key] = value;
+}
+
+// Defined-wins overlay of one entry's extras fields onto the accumulator (a
 // class appears at most once in classEntries, so no cross-entry collision).
 // Creates an empty resources/features shell on first contribution if `derived`
 // is still null (e.g. an empty-featured primary with a capped secondary).
-function overlayCapFields(acc: DerivedClassInfo | null, info: DerivedClassInfo): DerivedClassInfo {
+function overlayExtrasFields(acc: DerivedClassInfo | null, info: DerivedClassInfo): DerivedClassInfo {
   const target = acc ?? { resources: [], features: [] };
-  for (const field of CAP_FIELDS) {
-    if (info[field] !== undefined) target[field] = info[field];
+  for (const field of EXTRAS_FIELDS) {
+    assignDefined(target, field, info[field]);
   }
   if (info.subclassChoices) {
     // Concat can't collide: choice keys are subclass-specific and each class appears at most once per character.
     target.subclassChoices = [...(target.subclassChoices ?? []), ...info.subclassChoices];
   }
   return target;
+}
+
+// One class entry's own DerivedClassInfo at ITS OWN effective level (not the
+// primary's or the summed total) — the single derivation the pools/features
+// collectors and the extras-overlay loop below all key off, so the
+// effectiveEntryLevel + deriveResources call lives in exactly one place.
+function deriveEntryInfo(
+  entry: { name: string; subclass?: string | null; level: number },
+  entryCount: number,
+  totalLevel: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): DerivedClassInfo | null {
+  const effLevel = effectiveEntryLevel(entry.level, entryCount, totalLevel);
+  return deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus);
 }
 
 // Rebuilds the `resources` pool layer (#1071) from EVERY class entry at its own
@@ -250,8 +283,7 @@ function collectEntryScopedPools(
   const seenPoolKeys = new Set<string>();
   const pools: DerivedResource[] = [];
   for (const entry of classEntries) {
-    const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
-    const info = deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus);
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus);
     for (const pool of info?.resources ?? []) {
       if (seenPoolKeys.has(pool.key)) {
         throw new Error(`collectEntryScopedPools: duplicate pool key "${pool.key}" from entry "${entry.name}"`);
@@ -263,21 +295,53 @@ function collectEntryScopedPools(
   return pools;
 }
 
+// Entry-scoped `features` layer (#1206): each entry's static feature list at
+// that entry's OWN effective level, concatenated then deduped by `name` with
+// the PRIMARY entry winning ties (classEntries[0] is processed first, so its
+// features are kept over any later entry's same-named feature) — mirrors
+// mergeLayers' base-wins-on-pool-key policy — then sorted by level (ties by
+// name) exactly like mergeLayers. Fixes a Monk 5 / Fighter 3 multiclass
+// surfacing the monk's level-7 features (previously seeded from the primary
+// entry at total level). Features carry no `source`-class tag today, so a
+// same-named feature from a different class collapses into one entry rather
+// than being attributed to both — if per-class attribution is later needed,
+// that's a separate change.
+function collectEntryScopedFeatures(
+  classEntries: { name: string; subclass?: string | null; level: number }[],
+  totalLevel: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): DerivedFeature[] {
+  const seenNames = new Set<string>();
+  const features: DerivedFeature[] = [];
+  for (const entry of classEntries) {
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus);
+    for (const feature of info?.features ?? []) {
+      if (seenNames.has(feature.name)) continue;
+      seenNames.add(feature.name);
+      features.push(feature);
+    }
+  }
+  return features.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+}
+
 /**
- * Entry-scoped resource caps + pools for multiclass level-up (#1177 caps, #1071
- * pools): both the CHOICE-CAP fields (maneuverChoiceCount/SaveDC,
- * toolProfChoiceCount, subclassChoices) and the
- * `resources` pool layer (focus, superiority dice, rage, sorcery points, …) are
- * re-derived per class entry at that entry's OWN effective level and merged —
- * so a secondary Battle Master's maneuver cap AND its superiority-dice pool
- * both come from the fighter entry's own level, not the primary entry's or the
- * summed total (PHB'24 p.163: each class's pool scales to that class's own
- * level). `features` and the two gate booleans (shadowArtsAvailable/
- * cloakOfShadowsAvailable) stay primary-at-total-level — audited for #1071 but
- * deliberately not entry-scoped here; see the issue for the follow-up note.
- * `effectiveEntryLevel` collapses to the XP-derived total for single-class
- * characters, so single-class output is byte-identical to a bare
- * deriveResources() call (see the parity tests).
+ * Entry-scoped resource caps + pools + features for multiclass level-up
+ * (#1177 caps, #1071 pools, #1206 features + extras): the EXTRAS_FIELDS
+ * (maneuverChoiceCount/SaveDC, toolProfChoiceCount, subclassChoices, and gate
+ * booleans like shadowArtsAvailable/elementalBurstAvailable), the `resources`
+ * pool layer (focus, superiority dice, rage, sorcery points, …), and the
+ * `features` list are all re-derived per class entry at that entry's OWN
+ * effective level and merged — so a secondary Battle Master's maneuver cap,
+ * its superiority-dice pool, AND its features all come from the fighter
+ * entry's own level, not the primary entry's or the summed total (PHB'24
+ * p.163: each class's pool scales to that class's own level). This also means
+ * a secondary Warrior of Shadow monk's shadowArtsAvailable/
+ * cloakOfShadowsAvailable now key off the MONK entry's own level rather than
+ * never appearing (the old primary-only overlay). `effectiveEntryLevel`
+ * collapses to the XP-derived total for single-class characters, so
+ * single-class output is byte-identical to a bare deriveResources() call (see
+ * the parity tests).
  */
 export function deriveEntryScopedResources(
   classEntries: { name: string; subclass?: string | null; level: number }[],
@@ -285,34 +349,23 @@ export function deriveEntryScopedResources(
   abilityScores: Record<string, number>,
   profBonus: number,
 ): { derived: DerivedClassInfo | null } {
-  const primary = classEntries[0];
-  const base = deriveResources(primary?.name ?? "", primary?.subclass ?? undefined, totalLevel, abilityScores, profBonus);
-
-  // Seed from base for features + the two out-of-scope gate booleans
-  // (shadowArtsAvailable/cloakOfShadowsAvailable stay primary-at-total-level).
-  // resources/subclassChoices are dropped here: the loop below rebuilds `pools`
-  // from EVERY entry (including the primary) at its own effective level, so
-  // carrying base's totalLevel-scaled resources over would double-count the
-  // primary's pool. The scalar CAP_FIELDS are safe to carry over as-is — the
-  // loop's defined-wins overlay replaces (never adds to) them. features is
-  // cloned (not just spread) so mutating the returned object can't leak into base.
-  let derived: DerivedClassInfo | null = base
-    ? { ...base, resources: [], features: [...base.features], subclassChoices: undefined }
-    : null;
+  let derived: DerivedClassInfo | null = null;
 
   for (const entry of classEntries) {
-    const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
-    const info = deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus);
-    if (!info || !entryContributesCapFields(info)) continue;
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus);
+    if (!info || !entryContributesExtras(info)) continue;
 
-    derived = overlayCapFields(derived, info);
+    derived = overlayExtrasFields(derived, info);
   }
 
   const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus);
+  const features = collectEntryScopedFeatures(classEntries, totalLevel, abilityScores, profBonus);
+
   if (derived) {
     derived.resources = pools;
-  } else if (pools.length > 0) {
-    derived = { resources: pools, features: [] };
+    derived.features = features;
+  } else if (pools.length > 0 || features.length > 0) {
+    derived = { resources: pools, features };
   }
 
   return { derived };
