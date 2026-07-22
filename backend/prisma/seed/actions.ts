@@ -202,6 +202,15 @@ export const ACTIONS: ActionSeed[] = [
 
   // ── Class: Monk ──────────────────────────────────────────────────────────
   {
+    key: "bonusUnarmedStrike",
+    name: "Bonus Unarmed Strike",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 1,
+    description:
+      "Martial Arts: make one Unarmed Strike as a bonus action. Requires no armor or Shield. No resource cost, no Attack-action prerequisite.",
+  },
+  {
     key: "flurryOfBlows",
     name: "Flurry of Blows",
     cost: "bonusAction",

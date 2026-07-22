@@ -230,6 +230,36 @@ describe("classActionOption", () => {
     expect(option.enabled).toBe(false);
     expect(option.disabledReason).toBe("No uses remaining");
   });
+
+  it("uses the resolver's static subtitle for Bonus Unarmed Strike, not the backend reminder (#1218)", () => {
+    const option = classActionOption(
+      available({ key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike" }),
+      resolverFor("bonusUnarmedStrike"),
+      makeCharacter(),
+    );
+    expect(option).toEqual({
+      key: "bonusUnarmedStrike",
+      title: "Bonus Unarmed Strike",
+      enabled: true,
+      subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die).",
+      heal: false,
+    });
+  });
+
+  it("passes through the armor/Shield disabledReason for Bonus Unarmed Strike (#1218)", () => {
+    const option = classActionOption(
+      available({
+        key: "bonusUnarmedStrike",
+        name: "Bonus Unarmed Strike",
+        enabled: false,
+        disabledReason: "Requires no armor or Shield",
+      }),
+      resolverFor("bonusUnarmedStrike"),
+      makeCharacter(),
+    );
+    expect(option.enabled).toBe(false);
+    expect(option.disabledReason).toBe("Requires no armor or Shield");
+  });
 });
 
 describe("bonusSpellOptions", () => {

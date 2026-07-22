@@ -983,3 +983,68 @@ describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
     expect(applyActionTransactions).not.toHaveBeenCalled();
   });
 });
+
+describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
+  function monkWithBonusUnarmedStrike(
+    actionOverrides: Partial<NonNullable<Character["availableActions"]>[number]> = {},
+  ): Character {
+    return makeCharacter({
+      class: "Monk",
+      level: 1,
+      availableActions: [
+        {
+          key: "bonusUnarmedStrike",
+          name: "Bonus Unarmed Strike",
+          cost: "bonusAction",
+          enabled: true,
+          ...actionOverrides,
+        },
+      ],
+    } as unknown as Partial<Character>);
+  }
+
+  it("offers the card with its rule-text subtitle, no resource badge", async () => {
+    const user = userEvent.setup();
+    renderHub(monkWithBonusUnarmedStrike());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    expect(
+      screen.getByText("One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)."),
+    ).toBeInTheDocument();
+  });
+
+  it("resolves one Unarmed Strike (no weapon toggle), marks the bonus action used, and fires no server effect", async () => {
+    const user = userEvent.setup();
+    renderHub(monkWithBonusUnarmedStrike());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    await user.click(screen.getByRole("button", { name: "Bonus Unarmed Strike" }));
+
+    // The resolution sheet opened for the unarmed profile — single form, no toggle.
+    expect(screen.getByText("Martial Arts · bonus action")).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    // Bonus action is spent; exclusivity blocks re-opening the menu.
+    expect(screen.queryByRole("button", { name: "Use Bonus" })).not.toBeInTheDocument();
+  });
+
+  it("is disabled with 'Requires no armor or Shield' when the backend gate fails", async () => {
+    const user = userEvent.setup();
+    renderHub(
+      monkWithBonusUnarmedStrike({ enabled: false, disabledReason: "Requires no armor or Shield" }),
+    );
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    const card = screen.getByRole("button", { name: /Bonus Unarmed Strike/ });
+    expect(card).toBeDisabled();
+    expect(card).toHaveAttribute("title", "Requires no armor or Shield");
+  });
+});

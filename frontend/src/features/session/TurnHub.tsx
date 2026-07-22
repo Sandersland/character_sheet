@@ -445,10 +445,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       handleActionClick={handleActionClick}
     />
   );
+  // The pending-swing counter is shared by TWF and Bonus Unarmed Strike
+  // (#1218, same bonusAttack state) — label it from whichever resolution is
+  // actually open rather than hardcoding "Off-hand attack".
+  const bonusAttackLabel =
+    activeResolution?.resolver.key === "bonusUnarmedStrike" ? "Bonus Unarmed Strike" : "Off-hand attack";
   const bonusSlot = (
     <BonusActionSlot
       bonusActionUsed={bonusActionUsed}
       bonusAttack={bonusAttack}
+      bonusAttackLabel={bonusAttackLabel}
       showBonusMenu={showBonusMenu}
       setShowBonusMenu={setShowBonusMenu}
       twfAvailable={twfAvailable}

@@ -55,6 +55,14 @@ export interface ActionResolver {
    */
   healRoll?: (character: Character) => RollSpec;
   /**
+   * Static option-card subtitle for economy-only actions with fixed rule text
+   * (Bonus Unarmed Strike). Takes priority over the backend AvailableAction's
+   * `reminder` in classActionOption — unlike Shadow Step/Opportunist, this
+   * action opens a picker, so its rule text belongs on the card, not an
+   * on-click toast (which `reminder` would also trigger).
+   */
+  subtitle?: string;
+  /**
    * Whether this resolver fires applyActionTransactions after resolution.
    * false = ephemeral only (attack economy bookkeeping, Dodge, Reckless Attack).
    * true  = hits the backend to spend resources / heal / consume items.
@@ -105,6 +113,10 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   },
   actionSurge:       { key: "actionSurge",       kind: "simple-confirm", slot: "special",     serverEffect: true,  resourceKey: "actionSurge" },
 
+  // Martial Arts Bonus Unarmed Strike (#1218) — reuses the twf-picker economy
+  // path (single bonusAction-source swing), locked to the Unarmed Strike
+  // profile. Gated server-side by requiresUnarmored, not a resource pool.
+  bonusUnarmedStrike: { key: "bonusUnarmedStrike", kind: "twf-picker", slot: "bonusAction", serverEffect: false, subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)." },
   flurryOfBlows:     { key: "flurryOfBlows",     kind: "attack-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 2 },
   // Patient Defense / Step of the Wind (#1240) — free vs 1-Focus variants, each
   // its own menu entry (mirrors rage/endRage). The free entries are

@@ -139,6 +139,7 @@ function TwfResolutionSheet({
   character,
   sessionId,
   turnState,
+  activeResolution,
   closeResolution,
   setShowBonusMenu,
   onUpdate,
@@ -148,15 +149,20 @@ function TwfResolutionSheet({
   | "character"
   | "sessionId"
   | "turnState"
+  | "activeResolution"
   | "closeResolution"
   | "setShowBonusMenu"
   | "onUpdate"
   | "onLogChanged"
 >) {
+  // Martial Arts Bonus Unarmed Strike (#1218) shares this sheet + the TWF
+  // single-swing bonusAttack path — only the entry built (buildUnarmedEntry vs
+  // buildOffHandEntry) and this title/subtitle differ.
+  const isUnarmed = activeResolution?.resolver.key === "bonusUnarmedStrike";
   return (
     <BottomSheet
-      title="Off-hand attack"
-      subtitle="Two-Weapon Fighting · bonus action"
+      title={isUnarmed ? "Bonus Unarmed Strike" : "Off-hand attack"}
+      subtitle={isUnarmed ? "Martial Arts · bonus action" : "Two-Weapon Fighting · bonus action"}
       wide
       onClose={() => {
         turnState.cancelTwf();
@@ -167,6 +173,7 @@ function TwfResolutionSheet({
         character={character}
         turnState={turnState}
         sessionId={sessionId}
+        variant={isUnarmed ? "unarmed" : "twf"}
         onClose={closeResolution}
         onCancel={() => {
           turnState.cancelTwf();

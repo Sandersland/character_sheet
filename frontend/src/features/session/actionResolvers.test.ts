@@ -20,6 +20,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "channelDivinityCleric",
   "wildShape",
   "secondWind", "actionSurge",
+  "bonusUnarmedStrike",
   "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus", "stunningStrike",
   "divineSense", "layOnHands", "channelDivinityPaladin",
   "cunningAction",
@@ -53,6 +54,16 @@ describe("actionResolvers", () => {
     expect(r!.kind).toBe("twf-picker");
     expect(r!.slot).toBe("bonusAction");
     expect(r!.serverEffect).toBe(false); // local roll, like `attack` — not in backend ACTION_EFFECT_FN
+  });
+
+  it("bonusUnarmedStrike reuses the twf-picker economy path, locked-in subtitle (#1218)", () => {
+    const r = resolverFor("bonusUnarmedStrike");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("twf-picker");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.serverEffect).toBe(false); // gated at derive time (requiresUnarmored), not spent server-side
+    expect(r!.resourceKey).toBeUndefined();
+    expect(r!.subtitle).toBe("One Unarmed Strike as a Bonus Action (Dex + Martial Arts die).");
   });
 
   it("the changeWeapons resolver is a local loadout-picker (no backend effect, #815)", () => {
