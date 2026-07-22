@@ -367,9 +367,13 @@ describe("buildUnarmedOnlyForms (#1217)", () => {
   });
 });
 
-describe("flurryStrikeCount (#1217)", () => {
-  it("is 2 (Heightened Focus's 3-strike upgrade at monk L10 is a separate seam, #1244)", () => {
-    expect(flurryStrikeCount()).toBe(2);
+describe("flurryStrikeCount (#1217, Heightened Focus upgrade #1244)", () => {
+  it("is 2 below monk L10", () => {
+    expect(flurryStrikeCount(makeCharacter({ level: 9 }))).toBe(2);
+  });
+
+  it("is 3 at monk L10+ (Heightened Focus)", () => {
+    expect(flurryStrikeCount(makeCharacter({ level: 10 }))).toBe(3);
   });
 });
 
