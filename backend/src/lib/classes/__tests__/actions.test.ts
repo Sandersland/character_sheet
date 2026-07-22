@@ -598,6 +598,70 @@ describe("ACTION_EFFECT_FN — metamagic", () => {
   });
 });
 
+describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", () => {
+  const OPEN_HAND = "Warrior of the Open Hand";
+
+  it("Open Hand monk gets wholenessOfBody as a bonus action at L6, not at L5", () => {
+    expect(keys(deriveActions("monk", OPEN_HAND, 5, []))).not.toContain("wholenessOfBody");
+    const l6 = deriveActions("monk", OPEN_HAND, 6, []);
+    const wholeness = l6.find((a) => a.key === "wholenessOfBody");
+    expect(wholeness).toBeDefined();
+    expect(wholeness?.cost).toBe("bonusAction");
+  });
+
+  it("wholenessOfBody is gated on the wholenessOfBody pool like any other resource-gated action", () => {
+    const noUses = deriveActions("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 0)]);
+    expect(noUses.find((a) => a.key === "wholenessOfBody")?.enabled).toBe(false);
+    const withUses = deriveActions("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 1)]);
+    expect(withUses.find((a) => a.key === "wholenessOfBody")?.enabled).toBe(true);
+  });
+
+  it("wholenessOfBody: with roll=8, spends 1 use and heals 8", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBody({ roll: 8 })).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+      { type: "heal", amount: 8 },
+    ]);
+  });
+
+  it("wholenessOfBody: without a roll, spends the use but heals nothing", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBody({})).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+    ]);
+  });
+
+  it("Open Hand monk gets fleetStep as a free-cost reminder at L11, not at L10", () => {
+    expect(keys(deriveActions("monk", OPEN_HAND, 10, []))).not.toContain("fleetStep");
+    const l11 = deriveActions("monk", OPEN_HAND, 11, []);
+    const fleetStep = l11.find((a) => a.key === "fleetStep");
+    expect(fleetStep).toBeDefined();
+    expect(fleetStep?.cost).toBe("free");
+    expect(fleetStep?.enabled).toBe(true);
+    expect(fleetStep?.reminder).toMatch(/step of the wind/i);
+  });
+
+  it("fleetStep is a pure reminder — no server effect fn (like recklessAttack/metamagic's free cost siblings)", () => {
+    expect(ACTION_EFFECT_FN.fleetStep).toBeUndefined();
+    expect(ACTION_CAST_FN.fleetStep).toBeUndefined();
+  });
+
+  it("subclass gate: a non-Open-Hand monk gets neither at L11+", () => {
+    const shadow = keys(deriveActions("monk", "Way of Shadow", 17, []));
+    expect(shadow).not.toContain("wholenessOfBody");
+    expect(shadow).not.toContain("fleetStep");
+    const noSub = keys(deriveActions("monk", undefined, 17, []));
+    expect(noSub).not.toContain("wholenessOfBody");
+    expect(noSub).not.toContain("fleetStep");
+  });
+
+  it("Open Hand Technique and Quivering Palm are post-hit riders, not catalog actions", () => {
+    const l20 = keys(deriveActions("monk", OPEN_HAND, 20, []));
+    expect(l20).not.toContain("openHandTechnique");
+    expect(l20).not.toContain("quiveringPalm");
+    expect(ACTION_EFFECT_FN.openHandTechnique).toBeUndefined();
+    expect(ACTION_EFFECT_FN.quiveringPalm).toBeUndefined();
+  });
+});
+
 describe("ACTION_EFFECT_FN — useObject", () => {
   it("with inventoryItemId + roll: decrements quantity and heals", () => {
     expect(ACTION_EFFECT_FN.useObject({ inventoryItemId: "item-x", roll: 4 })).toEqual([

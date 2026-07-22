@@ -38,6 +38,8 @@ import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
 import { sneakAttackRouter } from "@/routes/character/sneak-attack.js";
 import { stunningStrikeRouter } from "@/routes/character/stunning-strike.js";
+import { openHandTechniqueRouter } from "@/routes/character/open-hand-technique.js";
+import { quiveringPalmRouter } from "@/routes/character/quivering-palm.js";
 import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
@@ -120,6 +122,8 @@ export function createApp() {
   app.use(["/api/maneuvers", "/api/characters/:id/maneuvers"], maneuversRouter);
   app.use("/api/characters/:id/sneak-attack", sneakAttackRouter);
   app.use("/api/characters/:id/stunning-strike", stunningStrikeRouter);
+  app.use("/api/characters/:id/open-hand-technique", openHandTechniqueRouter);
+  app.use("/api/characters/:id/quivering-palm", quiveringPalmRouter);
   app.use(["/api/disciplines", "/api/characters/:id/disciplines"], disciplinesRouter);
   app.use(["/api/shadow-arts", "/api/characters/:id/shadow-arts"], shadowArtsRouter);
   app.use("/api/subclass-choices", subclassChoicesRouter);

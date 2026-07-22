@@ -33,6 +33,8 @@ const mockCharacter: Character = {
   proficiencyBonus: 2,
   sneakAttack: null,
   stunningStrike: null,
+  openHandTechnique: null,
+  quiveringPalm: null,
   hitPoints: { current: 28, max: 36, temp: 0, deathSaves: { successes: 0, failures: 0 } },
   hitDice: { total: 4, die: "d10", spent: 0 },
   abilityScores: {

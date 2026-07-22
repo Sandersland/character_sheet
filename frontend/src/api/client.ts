@@ -44,6 +44,9 @@ import type {
   ManeuverCastResult,
   SneakAttackRollResult,
   StunningStrikeAttemptResult,
+  OpenHandRider,
+  OpenHandRiderResult,
+  QuiveringPalmResult,
   ReferenceData,
   ResourceOperation,
   ResourceOpResult,
@@ -450,6 +453,49 @@ export async function attemptStunningStrikeTransaction(
     `/characters/${characterId}/stunning-strike/transactions`,
     jsonBody({ operations: [{ type: "attemptStunningStrike", usedThisTurn }] }),
     "Failed to attempt Stunning Strike",
+  );
+}
+
+// Imposes one Flurry-of-Blows rider (Addle/Push/Topple, #1245). Addle never
+// rolls (no save); Push/Topple roll a flat d20 vs the monk's focus save DC
+// server-side. Returns the updated Character plus the rider/DC/roll/outcome so
+// the caller surfaces it inline, mirroring attemptStunningStrikeTransaction.
+export async function imposeOpenHandRiderTransaction(
+  characterId: string,
+  rider: OpenHandRider,
+  usedThisTurn: boolean,
+): Promise<{ character: Character; results: OpenHandRiderResult[] }> {
+  return request<{ character: Character; results: OpenHandRiderResult[] }>(
+    `/characters/${characterId}/open-hand-technique/transactions`,
+    jsonBody({ operations: [{ type: "imposeOpenHandRider", rider, usedThisTurn }] }),
+    "Failed to impose Open Hand Technique rider",
+  );
+}
+
+// Spends 4 focus to set Quivering Palm's vibrations (#1245). Returns the
+// updated Character plus { active, daysRemaining, summary }.
+export async function setQuiveringPalmTransaction(
+  characterId: string,
+): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
+  return request<{ character: Character; results: QuiveringPalmResult[] }>(
+    `/characters/${characterId}/quivering-palm/transactions`,
+    jsonBody({ operations: [{ type: "setQuiveringPalm" }] }),
+    "Failed to set Quivering Palm",
+  );
+}
+
+// Ends Quivering Palm's vibrations as a Magic action (#1245): the server rolls
+// the target's Constitution save against the monk's focus save DC and halves
+// the client-rolled 10d12 total (`roll`) on a success. Returns the updated
+// Character plus { dc, saveRoll, outcome, rawDamage, appliedDamage, summary }.
+export async function triggerQuiveringPalmTransaction(
+  characterId: string,
+  roll: number,
+): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
+  return request<{ character: Character; results: QuiveringPalmResult[] }>(
+    `/characters/${characterId}/quivering-palm/transactions`,
+    jsonBody({ operations: [{ type: "triggerQuiveringPalm", roll }] }),
+    "Failed to trigger Quivering Palm",
   );
 }
 
