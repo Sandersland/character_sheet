@@ -3,12 +3,35 @@
 
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
 
+/**
+ * Regain-on-rolling-Initiative descriptor (SRD 5.2). Declared on a pool that
+ * refills at combat start, applied by the `rollInitiative` resource op — e.g.
+ * Uncanny Metabolism ({ amount: "all", oncePerLongRest: true }) or Perfect Focus
+ * ({ amount: 3 }). Orthogonal to `recharge` and independent of any future
+ * short-rest-regain field (#1221) — resources may declare both.
+ */
+export interface InitiativeRegen {
+  /**
+   * "all" fully refills the pool. A number tops the pool up to *at least* that
+   * many available (never spends), e.g. Perfect Focus regains until you have 3.
+   */
+  amount: "all" | number;
+  /**
+   * When true the regen fires at most once between long rests (Uncanny
+   * Metabolism's 1/long-rest cap). Tracked by a marker in `used`, cleared on a
+   * long rest by clearInitiativeRegenMarkers. Absent ⇒ fires every combat.
+   */
+  oncePerLongRest?: boolean;
+}
+
 export interface DerivedResource {
   key: string;          // stable machine key, e.g. "superiorityDice"
   label: string;        // display label, e.g. "Superiority Dice"
   total: number;        // maximum count at this level
   die?: string;         // die size string, e.g. "d8" — absent for simple counters
   recharge: RechargeOn; // when the pool fully recharges
+  /** Regain on rolling Initiative / combat start (#1239). Inert when absent. */
+  onInitiative?: InitiativeRegen;
   description?: string;
 }
 
