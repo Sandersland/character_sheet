@@ -129,6 +129,25 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Dash (free bonus action)." },
   { key: "stepOfTheWindFocus", name: "Step of the Wind (1 Focus)", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, reminder: "Disengage + Dash, jump distance doubled this turn (spend 1 Focus)." },
   { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "focus", resourceAmount: 1 },
+  // Deflect Attacks (#1241, SRD 5.2 L3, renamed from 2014 Deflect Missiles): the base
+  // reduction (1d10 + Dex + monk level) costs nothing, so — like the Way of Shadow
+  // reminders below — it carries no resourceKey and the client rolls it directly (see
+  // ACTION_EFFECT_FN comment). Deflect Energy (L13) just widens the damage-type clause
+  // in the reminder text; it isn't a separate action key.
+  {
+    key: "deflectAttacks",
+    name: "Deflect Attacks",
+    cost: "reaction",
+    grantClass: "monk",
+    grantLevel: 3,
+    reminder:
+      "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+  },
+  // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a "free"
+  // follow-up decision within the same reaction (mirrors Stunning Strike's shape),
+  // not its own action-economy slot. Spends the persisted Focus resource, unlike
+  // the free base reduction above.
+  { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1 },
   // Way of Shadow reminder actions (#440) — no resourceKey, no server effect; reminder is the deliverable.
   { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
   { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17, reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction." },
@@ -333,6 +352,11 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   patientDefenseFocus: () => [{ type: "spendResource", key: "focus" }],
   stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
   stunningStrike: () => [{ type: "spendResource", key: "focus" }],
+  // deflectAttacks (the base reduction) has no entry here — it's a pure reminder
+  // action like shadowStep/opportunist: the client rolls 1d10 + Dex + monk level
+  // and never calls the transactions endpoint (nothing persisted). Only the
+  // redirect below is real, persisted state.
+  deflectAttacksRedirect: () => [{ type: "spendResource", key: "focus" }],
 
   // Paladin
   divineSense: () => [{ type: "spendResource", key: "divineSense" }],

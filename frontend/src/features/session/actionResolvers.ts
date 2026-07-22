@@ -131,6 +131,13 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   stepOfTheWind:       { key: "stepOfTheWind",       kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   stepOfTheWindFocus:  { key: "stepOfTheWindFocus",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
   stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "focus" },
+  // Deflect Attacks (#1241, SRD 5.2 L3) — reminder-only reaction like shadowStep/
+  // opportunist below; the dynamic 1d10+Dex+level roll is computed by
+  // useTurnActions' bespoke handleDeflectAttacks, not this generic dispatch.
+  deflectAttacks:    { key: "deflectAttacks",    kind: "simple-confirm", slot: "reaction",    serverEffect: false },
+  // Redirect rider — a "free" decision within the same reaction (not its own
+  // slot), spending 1 Focus server-side once a ranged hit is reduced to 0.
+  deflectAttacksRedirect: { key: "deflectAttacksRedirect", kind: "simple-confirm", slot: "free", serverEffect: true, resourceKey: "focus" },
   // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },
