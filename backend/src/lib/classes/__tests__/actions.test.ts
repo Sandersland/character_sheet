@@ -662,6 +662,68 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
   });
 });
 
+describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
+  const MERCY = "Warrior of Mercy";
+
+  it("Warrior of Mercy monk gets handOfHealing (action) and handOfHealingFlurry (bonus action) at L3", () => {
+    const l3 = deriveActions("monk", MERCY, 3, []);
+    const healing = l3.find((a) => a.key === "handOfHealing");
+    expect(healing).toBeDefined();
+    expect(healing?.cost).toBe("action");
+    const flurry = l3.find((a) => a.key === "handOfHealingFlurry");
+    expect(flurry).toBeDefined();
+    expect(flurry?.cost).toBe("bonusAction");
+  });
+
+  it("handOfHealing is gated on the focus pool like any other resource-gated action", () => {
+    const noFocus = deriveActions("monk", MERCY, 3, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "handOfHealing")?.enabled).toBe(false);
+    const withFocus = deriveActions("monk", MERCY, 3, [pool("focus", 1)]);
+    expect(withFocus.find((a) => a.key === "handOfHealing")?.enabled).toBe(true);
+  });
+
+  it("handOfHealingFlurry has no resource gate — it's always enabled once granted", () => {
+    const noFocus = deriveActions("monk", MERCY, 3, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "handOfHealingFlurry")?.enabled).toBe(true);
+  });
+
+  it("handOfHealing: with roll=8, spends 1 focus and heals 8", () => {
+    expect(ACTION_EFFECT_FN.handOfHealing({ roll: 8 })).toEqual([
+      { type: "spendResource", key: "focus" },
+      { type: "heal", amount: 8 },
+    ]);
+  });
+
+  it("handOfHealing: without a roll, spends focus but heals nothing", () => {
+    expect(ACTION_EFFECT_FN.handOfHealing({})).toEqual([{ type: "spendResource", key: "focus" }]);
+  });
+
+  it("handOfHealingFlurry: with roll=8, heals 8 and spends no focus", () => {
+    expect(ACTION_EFFECT_FN.handOfHealingFlurry({ roll: 8 })).toEqual([{ type: "heal", amount: 8 }]);
+  });
+
+  it("handOfHealingFlurry: without a roll, does nothing", () => {
+    expect(ACTION_EFFECT_FN.handOfHealingFlurry({})).toEqual([]);
+  });
+
+  it("subclass gate: a non-Warrior-of-Mercy monk gets neither at L3+", () => {
+    const shadow = keys(deriveActions("monk", "Way of Shadow", 20, []));
+    expect(shadow).not.toContain("handOfHealing");
+    expect(shadow).not.toContain("handOfHealingFlurry");
+    const noSub = keys(deriveActions("monk", undefined, 20, []));
+    expect(noSub).not.toContain("handOfHealing");
+    expect(noSub).not.toContain("handOfHealingFlurry");
+  });
+
+  it("Hand of Harm and Hand of Ultimate Mercy are dedicated verticals, not catalog actions", () => {
+    const l20 = keys(deriveActions("monk", MERCY, 20, []));
+    expect(l20).not.toContain("handOfHarm");
+    expect(l20).not.toContain("handOfUltimateMercy");
+    expect(ACTION_EFFECT_FN.handOfHarm).toBeUndefined();
+    expect(ACTION_EFFECT_FN.handOfUltimateMercy).toBeUndefined();
+  });
+});
+
 describe("ACTION_EFFECT_FN — useObject", () => {
   it("with inventoryItemId + roll: decrements quantity and heals", () => {
     expect(ACTION_EFFECT_FN.useObject({ inventoryItemId: "item-x", roll: 4 })).toEqual([

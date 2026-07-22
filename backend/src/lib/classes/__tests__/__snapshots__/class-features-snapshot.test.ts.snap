@@ -22723,6 +22723,2611 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 ]
 `;
 
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > monk / warrior of mercy 1`] = `
+[
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+      ],
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+          "level": 14,
+          "name": "Disciplined Survivor",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+          "level": 14,
+          "name": "Disciplined Survivor",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
+          "level": 15,
+          "name": "Perfect Focus",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+          "level": 14,
+          "name": "Disciplined Survivor",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
+          "level": 15,
+          "name": "Perfect Focus",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+          "level": 14,
+          "name": "Disciplined Survivor",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
+          "level": 15,
+          "name": "Perfect Focus",
+          "source": "class",
+        },
+        {
+          "description": "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+          "level": 17,
+          "name": "Hand of Ultimate Mercy",
+          "source": "subclass",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Magic action, 5 focus: touch a creature dead no more than 24 hours to return it to life with 4d10 + Wisdom modifier hit points, ending Blinded, Deafened, Paralyzed, Poisoned, and Stunned. Once per long rest.",
+          "key": "handOfUltimateMercy",
+          "label": "Hand of Ultimate Mercy",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+          "level": 14,
+          "name": "Disciplined Survivor",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
+          "level": 15,
+          "name": "Perfect Focus",
+          "source": "class",
+        },
+        {
+          "description": "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+          "level": 17,
+          "name": "Hand of Ultimate Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "At the start of your turn, spend 3 focus to bolster yourself for 1 minute or until you're incapacitated: during that time you have resistance to all damage except force damage.",
+          "level": 18,
+          "name": "Superior Defense",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Magic action, 5 focus: touch a creature dead no more than 24 hours to return it to life with 4d10 + Wisdom modifier hit points, ending Blinded, Deafened, Paralyzed, Poisoned, and Stunned. Once per long rest.",
+          "key": "handOfUltimateMercy",
+          "label": "Hand of Ultimate Mercy",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+          "level": 14,
+          "name": "Disciplined Survivor",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
+          "level": 15,
+          "name": "Perfect Focus",
+          "source": "class",
+        },
+        {
+          "description": "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+          "level": 17,
+          "name": "Hand of Ultimate Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "At the start of your turn, spend 3 focus to bolster yourself for 1 minute or until you're incapacitated: during that time you have resistance to all damage except force damage.",
+          "level": 18,
+          "name": "Superior Defense",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Magic action, 5 focus: touch a creature dead no more than 24 hours to return it to life with 4d10 + Wisdom modifier hit points, ending Blinded, Deafened, Paralyzed, Poisoned, and Stunned. Once per long rest.",
+          "key": "handOfUltimateMercy",
+          "label": "Hand of Ultimate Mercy",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "features": [
+        {
+          "description": "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+          "level": 1,
+          "name": "Martial Arts",
+          "source": "class",
+        },
+        {
+          "description": "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+          "level": 1,
+          "name": "Unarmored Defense",
+          "source": "class",
+        },
+        {
+          "description": "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+          "level": 2,
+          "name": "Focus",
+          "source": "class",
+        },
+        {
+          "description": "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+          "level": 2,
+          "name": "Unarmored Movement",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+          "level": 2,
+          "name": "Uncanny Metabolism",
+          "source": "class",
+        },
+        {
+          "description": "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+          "level": 3,
+          "name": "Deflect Attacks",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+          "level": 3,
+          "name": "Hand of Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+          "level": 3,
+          "name": "Hand of Healing",
+          "source": "subclass",
+        },
+        {
+          "description": "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+          "level": 3,
+          "name": "Implements of Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "Use your reaction to reduce falling damage by 5 × your monk level.",
+          "level": 4,
+          "name": "Slow Fall",
+          "source": "class",
+        },
+        {
+          "description": "You can attack twice whenever you take the Attack action on your turn.",
+          "level": 5,
+          "name": "Extra Attack",
+          "source": "class",
+        },
+        {
+          "description": "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+          "level": 5,
+          "name": "Stunning Strike",
+          "source": "class",
+        },
+        {
+          "description": "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+          "level": 6,
+          "name": "Empowered Strikes",
+          "source": "class",
+        },
+        {
+          "description": "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+          "level": 6,
+          "name": "Physician's Touch",
+          "source": "subclass",
+        },
+        {
+          "description": "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+          "level": 7,
+          "name": "Evasion",
+          "source": "class",
+        },
+        {
+          "description": "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+          "level": 10,
+          "name": "Heightened Focus",
+          "source": "class",
+        },
+        {
+          "description": "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+          "level": 10,
+          "name": "Self-Restoration",
+          "source": "class",
+        },
+        {
+          "description": "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+          "level": 11,
+          "name": "Flurry of Healing and Harm",
+          "source": "subclass",
+        },
+        {
+          "description": "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+          "level": 13,
+          "name": "Deflect Energy",
+          "source": "class",
+        },
+        {
+          "description": "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+          "level": 14,
+          "name": "Disciplined Survivor",
+          "source": "class",
+        },
+        {
+          "description": "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
+          "level": 15,
+          "name": "Perfect Focus",
+          "source": "class",
+        },
+        {
+          "description": "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+          "level": 17,
+          "name": "Hand of Ultimate Mercy",
+          "source": "subclass",
+        },
+        {
+          "description": "At the start of your turn, spend 3 focus to bolster yourself for 1 minute or until you're incapacitated: during that time you have resistance to all damage except force damage.",
+          "level": 18,
+          "name": "Superior Defense",
+          "source": "class",
+        },
+        {
+          "description": "Your Dexterity and Wisdom scores each increase by 4, to a maximum of 25.",
+          "level": 20,
+          "name": "Body and Mind",
+          "source": "class",
+        },
+      ],
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+        {
+          "description": "During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. 1 use(s) per long rest.",
+          "key": "flurryOfHealingAndHarm",
+          "label": "Flurry of Healing and Harm",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Magic action, 5 focus: touch a creature dead no more than 24 hours to return it to life with 4d10 + Wisdom modifier hit points, ending Blinded, Deafened, Paralyzed, Poisoned, and Stunned. Once per long rest.",
+          "key": "handOfUltimateMercy",
+          "label": "Hand of Ultimate Mercy",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > monk / warrior of the open hand 1`] = `
 [
   {
@@ -59765,6 +62370,91 @@ exports[`resolveClassDie snapshot — every class-die pool across all classes/su
 `;
 
 exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > monk / (no subclass) 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > monk / warrior of mercy 1`] = `
 [
   {
     "dice": {},

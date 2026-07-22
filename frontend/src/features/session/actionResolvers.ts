@@ -160,6 +160,27 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Fleet Step (L11) is a pure reminder (cost:"free", no server effect), like
   // Reckless Attack/Metamagic — see the DERIVED_ACTIONS comment in actions.ts.
   fleetStep: { key: "fleetStep", kind: "simple-confirm", slot: "free", serverEffect: false },
+  // Warrior of Mercy (#1248): Hand of Harm / Hand of Ultimate Mercy have no
+  // resolver here — they're their own dedicated verticals (mirrors Stunning
+  // Strike / Quivering Palm's bypass above). Hand of Healing reuses Wholeness
+  // of Body's heal-roll shape (Martial Arts die + Wis mod); the Flurry-
+  // replacement variant heals the same but spends no Focus of its own
+  // (Flurry's own flurryOfBlows action already paid it).
+  handOfHealing: {
+    key: "handOfHealing",
+    kind: "heal-roll",
+    slot: "action",
+    serverEffect: true,
+    resourceKey: "focus",
+    healRoll: (c) => ({ count: 1, faces: c.unarmedStrike.damage.faces, modifier: abilityModifier(c.abilityScores.wisdom) }),
+  },
+  handOfHealingFlurry: {
+    key: "handOfHealingFlurry",
+    kind: "heal-roll",
+    slot: "bonusAction",
+    serverEffect: true,
+    healRoll: (c) => ({ count: 1, faces: c.unarmedStrike.damage.faces, modifier: abilityModifier(c.abilityScores.wisdom) }),
+  },
 
   divineSense:       { key: "divineSense",       kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "divineSense" },
   layOnHands:        { key: "layOnHands",        kind: "heal-input",     slot: "action",      serverEffect: true,  resourceKey: "layOnHands" },

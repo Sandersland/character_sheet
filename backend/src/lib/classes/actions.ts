@@ -207,6 +207,38 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantLevel: 11,
     reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
   },
+  // Warrior of Mercy (#1248): Hand of Healing is a Magic-action heal spending
+  // 1 Focus (mirrors Wholeness of Body's shape) plus a free Flurry-strike
+  // replacement variant. Hand of Harm and Hand of Ultimate Mercy are their
+  // own dedicated verticals (hand-of-harm.ts / hand-of-ultimate-mercy.ts) —
+  // like Stunning Strike / Quivering Palm — since they carry once-per-turn /
+  // once-per-long-rest mechanics this catalog doesn't model.
+  {
+    key: "handOfHealing",
+    name: "Hand of Healing",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclass: "Mercy",
+    grantLevel: 3,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: (level) =>
+      level >= 6
+        ? "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod). Physician's Touch (L6): also ends one of Blinded/Deafened/Paralyzed/Poisoned/Stunned."
+        : "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod).",
+  },
+  // The Flurry-replacement variant swaps in for one of Flurry of Blows' own
+  // unarmed strikes, so it costs no Focus of its own (Flurry already spent
+  // its 1 Focus via the separate flurryOfBlows action) — hence no resourceKey.
+  {
+    key: "handOfHealingFlurry",
+    name: "Hand of Healing (Flurry replacement)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantSubclass: "Mercy",
+    grantLevel: 3,
+    reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
+  },
 
   // Paladin
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
@@ -446,6 +478,28 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   },
   // fleetStep has no entry here — it's a pure reminder (cost:"free") like
   // recklessAttack/metamagic: no server state to spend.
+  // Warrior of Mercy (#1248): Hand of Healing's rule text is "touch a
+  // creature", but — like layOnHands/wholenessOfBody above — this app has no
+  // cross-character heal path via the actions endpoint, so it applies to the
+  // acting character only; the client-rolled amount already includes the
+  // Martial Arts die + Wis mod. Physician's Touch's condition-cure (L6+) is
+  // narrated via the reminder text only (no persisted target condition).
+  handOfHealing: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "focus" }];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
+  // Flurry-replacement variant: no Focus spend (Flurry's own flurryOfBlows
+  // action already paid it) — just the same client-rolled heal.
+  handOfHealingFlurry: (ctx) => {
+    const ops: ActionOp[] = [];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
   // deflectAttacks (the base reduction) has no entry here — it's a pure reminder
   // action like shadowStep/opportunist: the client rolls 1d10 + Dex + monk level
   // and never calls the transactions endpoint (nothing persisted). Only the

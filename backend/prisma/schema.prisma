@@ -1439,6 +1439,8 @@ enum CharacterEventType {
   imposeOpenHandRider
   setQuiveringPalm
   triggerQuiveringPalm
+  dealHandOfHarm
+  useHandOfUltimateMercy
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled
