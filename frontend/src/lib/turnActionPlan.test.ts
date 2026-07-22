@@ -20,7 +20,7 @@ describe("planActionClick", () => {
     expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "none" });
   });
 
-  it("attack-picker with serverEffect sends plain (e.g. flurryOfBlows)", () => {
+  it("flurry-picker shares the attack-picker send shape (unreachable at runtime — Flurry actually dispatches via handleFlurryAction, #1217)", () => {
     const plan = planActionClick(resolverFor("flurryOfBlows"), character);
     expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "plain" });
   });

@@ -399,8 +399,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     actionSheetModel, bonusSheetModel, reactionSheetModel,
   } = turn;
   const {
-    handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleActionSurge,
-    handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
+    handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleFlurryAction,
+    handleActionSurge, handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
 
   // Inline banner resolve (#811): verdict writes + on-line damage rolls for
@@ -462,6 +462,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       sheetModel={bonusSheetModel}
       busy={busy}
       handleTwfAction={handleTwfAction}
+      handleFlurryAction={handleFlurryAction}
       handleActionClick={handleActionClick}
       handleBonusSpellCast={handleBonusSpellCast}
       consumeBonusAction={consumeBonusAction}

@@ -22,6 +22,7 @@ export default function BonusActionSheetBody({
   twfAvailable,
   busy,
   handleTwfAction,
+  handleFlurryAction,
   handleActionClick,
   handleBonusSpellCast,
   onOther,
@@ -30,6 +31,7 @@ export default function BonusActionSheetBody({
   twfAvailable: boolean;
   busy: boolean;
   handleTwfAction: () => void;
+  handleFlurryAction: () => void;
   handleActionClick: (key: string, cost: "bonusAction") => void;
   handleBonusSpellCast: (spellId: string) => void;
   /** "Other bonus action" — consume the slot and close the sheet. */
@@ -52,7 +54,14 @@ export default function BonusActionSheetBody({
           key={option.key}
           option={option}
           busy={busy}
-          onClick={() => handleActionClick(option.key, "bonusAction")}
+          // Flurry needs its own dispatch path (arms the strike counter via
+          // enterFlurryMode, #1217) — every other class bonus action still
+          // goes through the generic handleActionClick.
+          onClick={
+            option.key === "flurryOfBlows"
+              ? handleFlurryAction
+              : () => handleActionClick(option.key, "bonusAction")
+          }
         />
       ))}
 

@@ -260,6 +260,22 @@ describe("classActionOption", () => {
     expect(option.enabled).toBe(false);
     expect(option.disabledReason).toBe("Requires no armor or Shield");
   });
+  it("surfaces Flurry of Blows' 1-Focus spend as the subtitle, not just the remaining-pool badge (#1217)", () => {
+    const c = makeCharacter({
+      resources: {
+        pools: [{ key: "focus", label: "Focus Points", total: 3, used: 0, remaining: 3, recharge: "short-or-long" }],
+      },
+    } as Partial<Character>);
+    const option = classActionOption(
+      available({ key: "flurryOfBlows", name: "Flurry of Blows" }),
+      resolverFor("flurryOfBlows"),
+      c,
+    );
+    expect(option).toMatchObject({
+      subtitle: "Spend 1 Focus Points",
+      badge: "3 / rest",
+    });
+  });
 });
 
 describe("bonusSpellOptions", () => {

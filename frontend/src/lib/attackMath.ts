@@ -291,6 +291,19 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
   ];
 }
 
+// Flurry of Blows' single form — 2024 rules grant no weapon choice, so unlike
+// buildAttackForms this never includes equipped weapons or Improvised (#1217).
+export function buildUnarmedOnlyForms(character: Character): AttackEntry[] {
+  return [buildUnarmedEntry(character)];
+}
+
+// Flurry of Blows strike count (SRD 5.2 "Focus"): expend 1 Focus Point to make
+// two Unarmed Strikes as a bonus action. Hardcoded — Heightened Focus (monk
+// L10) raises this to three; that seam (#1244) only needs to change this fn.
+export function flurryStrikeCount(): number {
+  return 2;
+}
+
 // The "Attacking with" form options for the single attack card (#786): deduped
 // equipped weapons, then Unarmed Strike, then Improvised Weapon. The first row is
 // the main-hand weapon (or Unarmed when nothing is equipped) — the default form.
