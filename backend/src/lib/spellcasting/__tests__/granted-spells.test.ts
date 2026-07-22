@@ -40,9 +40,9 @@ function catalogSpell(over: Partial<GrantedSpellCatalogSpell> = {}): GrantedSpel
   };
 }
 
-// Way of Shadow → Minor Illusion, as the loaded subclassRef would supply it.
-const wayOfShadow: GrantedSpellSource = {
-  name: "Way of Shadow",
+// Warrior of Shadow → Minor Illusion, as the loaded subclassRef would supply it.
+const warriorOfShadow: GrantedSpellSource = {
+  name: "Warrior of Shadow",
   grantedSpells: [{ gateLevel: 3, castingAbility: "wisdom", spell: catalogSpell() }],
 };
 
@@ -68,8 +68,8 @@ function castSpellCap(id: string, spellId: string, over: Partial<ItemSpellSource
 }
 
 describe("deriveGrantedSpells", () => {
-  it("grants Minor Illusion to a Way of Shadow monk at level 3 (parity with the retired snapshot)", () => {
-    const granted = deriveGrantedSpells(wayOfShadow, 3);
+  it("grants Minor Illusion to a Warrior of Shadow monk at level 3 (parity with the retired snapshot)", () => {
+    const granted = deriveGrantedSpells(warriorOfShadow, 3);
     expect(granted).toHaveLength(1);
     const [spell] = granted;
     expect(spell.name).toBe("Minor Illusion");
@@ -77,14 +77,14 @@ describe("deriveGrantedSpells", () => {
     expect(spell.school).toBe("illusion");
     expect(spell.source).toBe("subclass");
     expect(spell.prepared).toBe(true);
-    expect(spell.id).toBe("granted:way-of-shadow:minor-illusion");
+    expect(spell.id).toBe("granted:warrior-of-shadow:minor-illusion");
     // A utility grant carries no concentration/effect keys (byte-shape parity).
     expect(spell.concentration).toBeUndefined();
     expect(spell.effectKind).toBeUndefined();
   });
 
   it("grants nothing below the gate level", () => {
-    expect(deriveGrantedSpells(wayOfShadow, 2)).toEqual([]);
+    expect(deriveGrantedSpells(warriorOfShadow, 2)).toEqual([]);
   });
 
   it("grants nothing for a null source (no subclass / homebrew without a catalog row)", () => {
@@ -97,8 +97,8 @@ describe("deriveGrantedSpells", () => {
   });
 
   it("returns independent nested components objects across calls", () => {
-    const first = deriveGrantedSpells(wayOfShadow, 3);
-    const second = deriveGrantedSpells(wayOfShadow, 3);
+    const first = deriveGrantedSpells(warriorOfShadow, 3);
+    const second = deriveGrantedSpells(warriorOfShadow, 3);
     expect(first[0].components).not.toBe(second[0].components);
     first[0].components!.verbal = false;
     expect(second[0].components!.verbal).toBe(true);
@@ -192,7 +192,7 @@ describe("deriveItemSpells (#528)", () => {
 
 describe("deriveGrantedCastingAbility", () => {
   it("returns the grant's casting ability", () => {
-    expect(deriveGrantedCastingAbility(wayOfShadow)).toBe("wisdom");
+    expect(deriveGrantedCastingAbility(warriorOfShadow)).toBe("wisdom");
   });
 
   it("defaults to wisdom for a source with no grants", () => {

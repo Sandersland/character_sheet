@@ -266,7 +266,10 @@ export const ACTIONS: ActionSeed[] = [
   // Con save + fail/success outcome), not a selectable catalog action. See
   // stunning-strike.ts (#1242 supersedes the #392 bare-spend stub formerly here).
 
-  // ── Subclass: Way of Shadow monk ─────────────────────────────────────────
+  // ── Subclass: Warrior of Shadow monk (2024 rewrite, #1246) ───────────────
+  // Opportunist (2014 L17 reaction) is retired — 2024 replaces it with Cloak
+  // of Shadows at L17 (a resourceKey-gated cast, see shadow-arts.ts), not a
+  // catalog reminder action.
   {
     key: "shadowStep",
     name: "Shadow Step",
@@ -275,17 +278,7 @@ export const ACTIONS: ActionSeed[] = [
     grantSubclass: "Shadow",
     grantLevel: 6,
     description:
-      "When in dim light or darkness, teleport up to 60 ft as a bonus action to an unoccupied space you can see that is also in dim light or darkness. You have advantage on the first melee attack you make before the end of this turn.",
-  },
-  {
-    key: "opportunist",
-    name: "Opportunist",
-    cost: "reaction",
-    grantClass: "monk",
-    grantSubclass: "Shadow",
-    grantLevel: 17,
-    description:
-      "When a creature within 5 ft of you is hit by an attack made by another creature, use your reaction to make a melee attack against that creature.",
+      "While in dim light or darkness, teleport up to 60 ft as a bonus action to an unoccupied space you can see that is also in dim light or darkness, then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of this turn.",
   },
 
   // ── Class: Paladin ──────────────────────────────────────────────────────

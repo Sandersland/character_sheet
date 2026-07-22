@@ -106,9 +106,9 @@ function buildCasterSpellcastingView(
   };
 }
 
-// Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
-// of Shadow monk's Minor Illusion). Slotless view so the grant renders; the
-// casting ability is derived per rule (Wisdom is the default).
+// Non-caster class that nonetheless gets a subclass-granted spell (e.g. a
+// Warrior of Shadow monk's Minor Illusion). Slotless view so the grant renders;
+// the casting ability is derived per rule (Wisdom is the default).
 function buildGrantedOnlySpellcastingView(
   row: CharacterWithRelations,
   primaryClass: PrimaryClass,

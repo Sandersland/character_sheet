@@ -191,7 +191,10 @@ async function seedDisciplines(prisma: PrismaClient) {
   }
 }
 
-// Seed Shadow Arts catalog — upsert by unique name. Flat 2-focus, no scaling.
+// Seed the Shadow Arts catalog — upsert by unique name. Flat 1-focus, no scaling
+// (2024 rewrite, #1246: was flat 2-focus across a 4-spell menu; now a single
+// always-concentrating Darkness cast, so effectKind/buffTarget/buffModifier are
+// fixed nulls rather than per-row fields).
 async function seedShadowArts(prisma: PrismaClient) {
   for (const art of SHADOW_ARTS) {
     const data = {
@@ -202,11 +205,11 @@ async function seedShadowArts(prisma: PrismaClient) {
       alwaysKnown: true,
       costKind: "pool",
       costPoolKey: "focus",
-      costBase: 2,
+      costBase: 1,
       costPerStep: null,
-      effectKind: orNull(art.effectKind),
-      buffTarget: orNull(art.buffTarget),
-      buffModifier: orNull(art.buffModifier),
+      effectKind: null,
+      buffTarget: null,
+      buffModifier: null,
     };
     await prisma.grantedAbility.upsert({
       where: { name: art.name },
@@ -214,6 +217,16 @@ async function seedShadowArts(prisma: PrismaClient) {
       update: data,
     });
   }
+  // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — mirrors
+  // seedFeats' stale-row cleanup. Scoped to source "shadowArts" so this never
+  // touches maneuvers/disciplines/channelDivinity rows sharing the same table.
+  const staleNames = SHADOW_ARTS.map((a) => a.name);
+  const stale = await prisma.grantedAbility.findMany({
+    where: { source: "shadowArts", name: { notIn: staleNames } },
+    select: { name: true },
+  });
+  if (stale.length) console.log(`seedShadowArts: dropping stale catalog rows: ${stale.map((a) => a.name).join(", ")}`);
+  await prisma.grantedAbility.deleteMany({ where: { source: "shadowArts", name: { notIn: staleNames } } });
 }
 
 // Seed generic subclass "choose N" options (#899) as GrantedAbility rows keyed

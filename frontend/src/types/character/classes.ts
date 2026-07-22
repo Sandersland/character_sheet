@@ -21,7 +21,7 @@ export interface CatalogDiscipline {
   effect: EffectSpec;
 }
 
-/** A Way of Shadow Shadow Art from GET /api/shadow-arts (flat 2-focus focus-cast spell). */
+/** The Warrior of Shadow Shadow Art (Darkness) from GET /api/shadow-arts (flat 1-focus focus-cast spell). */
 export interface CatalogShadowArt {
   id: string;
   name: string;
@@ -221,9 +221,9 @@ export interface CharacterResources {
   disciplineChoiceCount?: number;
   /** Way of the Four Elements: focus save DC for discipline effects (8 + prof + Wis mod). */
   disciplineSaveDC?: number;
-  /** Way of Shadow: whether the L3+ Shadow Arts focus-cast spells are available. */
+  /** Warrior of Shadow: whether the L3+ 1-focus Darkness cast is available. */
   shadowArtsAvailable?: boolean;
-  /** Way of Shadow: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
+  /** Warrior of Shadow: whether the L17+ Cloak of Shadows self-invisible toggle is available (moved from L11 in the 2024 rewrite). */
   cloakOfShadowsAvailable?: boolean;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
@@ -341,17 +341,23 @@ export interface CastDisciplineOperation {
 export type DisciplineOperation = CastDisciplineOperation;
 
 /**
- * Shadow Arts operation types — mirror of `applyShadowArtsOperations`. Sent as
- * `{ operations: ShadowArtOperation[] }` to POST /api/characters/:id/shadow-arts/transactions.
+ * Warrior of Shadow operation types — mirror of `applyShadowArtsOperations`.
+ * Sent as `{ operations: ShadowArtOperation[] }` to
+ * POST /api/characters/:id/shadow-arts/transactions.
  *
- * Cast a Shadow Art (Way of Shadow): spend a flat 2 focus, apply concentration/buff.
+ *   castShadowArt          — cast Shadow Arts' Darkness (1 focus, concentration).
+ *   activateCloakOfShadows — L17: spend 3 focus, become invisible.
  */
 export interface CastShadowArtOperation {
   type: "castShadowArt";
   shadowArtId: string;
 }
 
-export type ShadowArtOperation = CastShadowArtOperation;
+export interface ActivateCloakOfShadowsOperation {
+  type: "activateCloakOfShadows";
+}
+
+export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
 
 /**
  * Channel Divinity operation types — mirror of `applyChannelDivinityOperations`.

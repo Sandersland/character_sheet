@@ -137,7 +137,7 @@ const ROSTER: Persona[] = [
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
     classLevel: 6,
-    subclassName: "Way of Shadow",
+    subclassName: "Warrior of Shadow",
     campaignName: "E2E Solo — Shadow Monk",
   },
 ];

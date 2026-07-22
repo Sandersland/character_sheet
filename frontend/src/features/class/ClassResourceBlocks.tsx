@@ -1,6 +1,5 @@
 import {
   applyChannelDivinityTransactions,
-  applyConditionTransactions,
   applyDisciplineTransactions,
   applyResourceTransactions,
   applyShadowArtsTransactions,
@@ -14,9 +13,11 @@ import type {
   LearnDisciplineOperation,
   LearnManeuverOperation,
   ResourceOperation,
+  ShadowArtOperation,
   SwapDisciplineOperation,
 } from "@/types/character";
 import type { ClassFeatureView } from "@/lib/classFeatures";
+import { focusRemaining } from "@/lib/disciplines";
 import ChannelDivinitySection from "@/features/class/ChannelDivinitySection";
 import CloakOfShadowsSection from "@/features/class/CloakOfShadowsSection";
 import DisciplinesSection from "@/features/class/DisciplinesSection";
@@ -95,8 +96,15 @@ export default function ClassResourceBlocks({ character, view, busy, run }: Prop
       {view.hasCloakOfShadows && (
         <CloakOfShadowsSection
           character={character}
+          focusAvailable={focusRemaining(resources)}
           busy={busy}
-          onActivate={() => run(() => applyConditionTransactions(character.id, [{ type: "applyCondition", key: "invisible", source: "Cloak of Shadows" }]))}
+          onActivate={() =>
+            run(() =>
+              applyShadowArtsTransactions(character.id, [
+                { type: "activateCloakOfShadows" } satisfies ShadowArtOperation,
+              ]),
+            )
+          }
         />
       )}
     </>

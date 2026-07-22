@@ -16,7 +16,7 @@ const DARKNESS: CatalogShadowArt = {
   name: "Shadow Arts: Darkness",
   description: "Magical darkness spreads from a point you choose.",
   minLevel: 3,
-  cost: { kind: "pool", key: "focus", base: 2 },
+  cost: { kind: "pool", key: "focus", base: 1 },
   effect: {
     effectType: "utility",
     damageType: null,
@@ -28,12 +28,15 @@ const DARKNESS: CatalogShadowArt = {
   },
 };
 
-const PASS_WITHOUT_TRACE: CatalogShadowArt = {
-  id: "sa-pwt",
-  name: "Shadow Arts: Pass without Trace",
-  description: "A veil of shadows shrouds your party.",
+// Synthetic fixture exercising ShadowArtRow's generic buff-chip path (shared
+// with disciplines/Channel Divinity via catalogEffectSpec) — no current Shadow
+// Art carries a buff (the 2014 Pass without Trace option is retired, #1246).
+const BUFF_ART_FIXTURE: CatalogShadowArt = {
+  id: "sa-test-buff",
+  name: "Shadow Arts: Test Buff",
+  description: "A synthetic buff art for row-shell coverage.",
   minLevel: 3,
-  cost: { kind: "pool", key: "focus", base: 2 },
+  cost: { kind: "pool", key: "focus", base: 1 },
   effect: {
     effectType: "buff",
     damageType: null,
@@ -78,10 +81,10 @@ describe("ShadowArtRow (#688)", () => {
 
   it("disables Cast below the focus cost with the needs-N title", async () => {
     const user = userEvent.setup();
-    const { onCast } = renderRow({ focusAvailable: 1 });
+    const { onCast } = renderRow({ focusAvailable: 0 });
     const cast = screen.getByRole("button", { name: "Cast" });
     expect(cast).toBeDisabled();
-    expect(cast).toHaveAttribute("title", "Not enough focus (needs 2)");
+    expect(cast).toHaveAttribute("title", "Not enough focus (needs 1)");
     await user.click(cast).catch(() => undefined);
     expect(onCast).not.toHaveBeenCalled();
   });
@@ -105,7 +108,7 @@ describe("ShadowArtRow (#688)", () => {
   });
 
   it("renders the buff chip through skillLabel", () => {
-    renderRow({ art: PASS_WITHOUT_TRACE });
+    renderRow({ art: BUFF_ART_FIXTURE });
     expect(screen.getByText("+10 Stealth")).toBeInTheDocument();
   });
 

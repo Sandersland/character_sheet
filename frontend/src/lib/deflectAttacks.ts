@@ -5,8 +5,8 @@
  * (the dynamic per-use 1d10 roll doesn't fit the generic ACTION_RESOLVERS
  * "kind" dispatch, so — like Parry/Riposte — it's handled outside it).
  *
- * The base reduction is free (no persisted resource, mirrors the Way of Shadow
- * reminder actions in actionResolvers.ts); only the optional redirect spends 1
+ * The base reduction is free (no persisted resource, mirrors the Warrior of Shadow
+ * shadowStep reminder in actionResolvers.ts); only the optional redirect spends 1
  * Focus, via the deflectAttacksRedirect ACTION_EFFECT_FN entry. SRD 5.2 redirects
  * via a Dexterity saving throw the target makes (not an attack roll — verified
  * against the 2024 text; the 2014 Deflect Missiles redirect used an attack roll).

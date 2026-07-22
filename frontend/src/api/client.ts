@@ -244,13 +244,15 @@ export async function applyDisciplineTransactions(
   return postTransactions(characterId, "disciplines", operations, "Failed to apply discipline operations");
 }
 
-// Feeds the Way of Shadow monk's Shadow Arts picker — 4 flat 2-focus focus-cast spells.
+// Feeds the Warrior of Shadow monk's Shadow Arts picker — the single flat
+// 1-focus Darkness cast (2024 rewrite, #1246).
 export async function fetchShadowArts(): Promise<CatalogShadowArt[]> {
   return request<CatalogShadowArt[]>("/shadow-arts", undefined, "Failed to fetch shadow arts catalog");
 }
 
-// Applies a batch of Shadow Arts operations atomically: castShadowArt (spend a
-// flat 2 focus, apply concentration/buff). Full updated Character returned on success.
+// Applies a batch of Warrior of Shadow operations atomically: castShadowArt
+// (spend 1 focus, concentration) or activateCloakOfShadows (L17: spend 3
+// focus, become invisible). Full updated Character returned on success.
 export async function applyShadowArtsTransactions(
   characterId: string,
   operations: ShadowArtOperation[]

@@ -176,34 +176,38 @@ const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const WAY_OF_SHADOW_FEATURES: DerivedFeature[] = [
+// 2024 rewrite (SRD 5.2, #1246): Shadow Arts drops the 2014 flat-2-focus/4-spell
+// menu for a single 1-focus Darkness cast + passive Minor Illusion/Darkvision
+// grants; Cloak of Shadows moves 11 -> 17 (replacing Opportunist, retired —
+// no 2024 equivalent) and Improved Shadow Step fills the vacated L11 slot.
+const WARRIOR_OF_SHADOW_FEATURES: DerivedFeature[] = [
   {
     name: "Shadow Arts",
     level: 3,
     source: "subclass",
     description:
-      "Spend 2 focus to cast Darkness, Darkvision, Pass without Trace, or Silence — without material components. You also know the Minor Illusion cantrip.",
+      "You know the Minor Illusion cantrip (Wisdom). Spend 1 focus to cast Darkness without material components; you can see through the darkness you create, and while it persists you can move it up to 30 ft as a bonus action. You also have Darkvision out to 60 ft, or your Darkvision's range increases by 60 ft if you already have it.",
   },
   {
     name: "Shadow Step",
     level: 6,
     source: "subclass",
     description:
-      "When in dim light or darkness, teleport as a bonus action to an unoccupied space you can see that is also in dim light or darkness (up to 60 ft). You have advantage on the first melee attack you make before the end of the turn.",
+      "While in dim light or darkness, teleport as a bonus action to an unoccupied space you can see that is also in dim light or darkness (up to 60 ft), then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of the turn.",
   },
   {
-    name: "Cloak of Shadows",
+    name: "Improved Shadow Step",
     level: 11,
     source: "subclass",
     description:
-      "When in an area of dim light or darkness, use your action to become invisible. Ends when you attack or cast a spell.",
+      "When you Shadow Step, you can spend 1 focus to ignore the requirement that your destination be in dim light or darkness.",
   },
   {
-    name: "Opportunist",
+    name: "Cloak of Shadows",
     level: 17,
     source: "subclass",
     description:
-      "When a creature within 5 ft is hit by an attack by another creature, use your reaction to make a melee attack against that creature.",
+      "Spend 3 focus and use your action to become invisible and able to move through other creatures and objects as if they were difficult terrain, for 1 minute or until you're incapacitated. The invisibility ends early if you attack or cast a spell. While it lasts, Flurry of Blows costs no focus.",
   },
 ];
 
@@ -348,13 +352,16 @@ export const monk: ClassDefinition = {
         ];
       },
     },
-    "way of shadow": {
+    "warrior of shadow": {
       grantLevel: 3,
-      features: WAY_OF_SHADOW_FEATURES,
+      features: WARRIOR_OF_SHADOW_FEATURES,
       deriveExtras: (level) => {
         const extras: { shadowArtsAvailable?: boolean; cloakOfShadowsAvailable?: boolean } = {};
         if (level >= 3) extras.shadowArtsAvailable = true;
-        if (level >= 11) extras.cloakOfShadowsAvailable = true;
+        // Cloak of Shadows moved 11 -> 17 in the 2024 rewrite (#1246): L11 is now
+        // Improved Shadow Step, a reminder-only Shadow Step upgrade with no gate
+        // boolean of its own (mirrors Shadow Step itself).
+        if (level >= 17) extras.cloakOfShadowsAvailable = true;
         return extras;
       },
     },

@@ -6,8 +6,8 @@
  * occasionally-used reaction; mirrors useManeuverDie's shape (owns its own
  * API call and busy/error state rather than routing through useTurnActions).
  *
- * The base reduction is free (no persisted resource, like the Way of Shadow
- * reminder actions in actionResolvers.ts): the client rolls 1d10 + Dex + monk
+ * The base reduction is free (no persisted resource, like the Warrior of Shadow
+ * shadowStep reminder in actionResolvers.ts): the client rolls 1d10 + Dex + monk
  * level and never calls the transactions endpoint. Only the optional redirect —
  * once a ranged hit is reduced to 0 — spends 1 Focus, a real persisted spend.
  *

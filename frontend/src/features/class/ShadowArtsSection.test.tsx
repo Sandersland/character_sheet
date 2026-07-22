@@ -18,38 +18,16 @@ const baseEffect = {
   buffModifier: null,
 };
 
+// 2024 rewrite (#1246): Shadow Arts is a single 1-focus Darkness cast — the
+// 2014 4-spell menu (Silence/Pass without Trace/Darkvision) is retired.
 const CATALOG: CatalogShadowArt[] = [
   {
     id: "darkness",
     name: "Shadow Arts: Darkness",
     description: "Cast darkness.",
     minLevel: 3,
-    cost: { kind: "pool", key: "focus", base: 2 },
+    cost: { kind: "pool", key: "focus", base: 1 },
     effect: { effectType: "utility", concentration: true, ...baseEffect },
-  },
-  {
-    id: "silence",
-    name: "Shadow Arts: Silence",
-    description: "Cast silence.",
-    minLevel: 3,
-    cost: { kind: "pool", key: "focus", base: 2 },
-    effect: { effectType: "utility", concentration: true, ...baseEffect },
-  },
-  {
-    id: "pwt",
-    name: "Shadow Arts: Pass without Trace",
-    description: "Cast pass without trace.",
-    minLevel: 3,
-    cost: { kind: "pool", key: "focus", base: 2 },
-    effect: { effectType: "buff", concentration: true, ...baseEffect, buffTarget: "stealth", buffModifier: 10 },
-  },
-  {
-    id: "darkvision",
-    name: "Shadow Arts: Darkvision",
-    description: "Cast darkvision.",
-    minLevel: 3,
-    cost: { kind: "pool", key: "focus", base: 2 },
-    effect: { effectType: "utility", concentration: false, ...baseEffect },
   },
 ];
 
@@ -82,17 +60,15 @@ beforeEach(() => {
 });
 
 describe("ShadowArtsSection", () => {
-  it("lists the 4 Shadow Arts at a flat 2-focus cost with focus remaining", async () => {
+  it("lists Darkness at a flat 1-focus cost with focus remaining", async () => {
     renderSection(makeCharacter(3));
     await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
-    expect(screen.getByText("Silence")).toBeInTheDocument();
-    expect(screen.getByText("Pass without Trace")).toBeInTheDocument();
-    expect(screen.getByText("Darkvision")).toBeInTheDocument();
+    expect(screen.getByText(/Cast Darkness for 1 focus/)).toBeInTheDocument();
     // Focus remaining surfaced.
     expect(screen.getByText("3")).toBeInTheDocument();
   });
 
-  it("casts a Shadow Art as a castShadowArt op", async () => {
+  it("casts Darkness as a castShadowArt op", async () => {
     const user = userEvent.setup();
     const { onCast } = renderSection(makeCharacter(3));
     await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
@@ -103,41 +79,30 @@ describe("ShadowArtsSection", () => {
     expect(onCast).toHaveBeenCalledWith({ type: "castShadowArt", shadowArtId: "darkness" });
   });
 
-  it("disables Cast when the character can't afford 2 focus", async () => {
-    renderSection(makeCharacter(1));
+  it("disables Cast when the character can't afford 1 focus", async () => {
+    renderSection(makeCharacter(0));
     await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
     const row = screen.getByText("Darkness").closest("li")!;
     expect(within(row).getByRole("button", { name: "Cast" })).toBeDisabled();
   });
 
-  it("shows the +10 Stealth buff chip on Pass without Trace via skillLabel", async () => {
-    renderSection(makeCharacter(3));
-    await waitFor(() => expect(screen.getByText("Pass without Trace")).toBeInTheDocument());
-    const row = screen.getByText("Pass without Trace").closest("li")!;
-    expect(within(row).getByText(/\+10 Stealth/)).toBeInTheDocument();
-  });
-
-  it("marks concentration Shadow Arts and surfaces the current concentration handoff", async () => {
+  it("marks Darkness concentrating and surfaces the current concentration handoff", async () => {
     // The backend stamps a Shadow Art's concentration entryId with the shadow-art: prefix.
     renderSection(makeCharacter(3, { entryId: "shadow-art:darkness", spellName: "Shadow Arts: Darkness" }));
     await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
 
-    // The active-concentration art shows the 'concentrating' badge.
     const darknessRow = screen.getByText("Darkness").closest("li")!;
     expect(within(darknessRow).getByText("concentrating")).toBeInTheDocument();
 
-    // Non-active concentration arts show the static 'conc' badge.
-    const silenceRow = screen.getByText("Silence").closest("li")!;
-    expect(within(silenceRow).getByText("conc")).toBeInTheDocument();
-    // …and warn (before expand) that casting replaces the current concentration.
-    expect(within(silenceRow).getByText(/Casting replaces concentration on/)).toBeInTheDocument();
-
-    // Darkvision (no concentration) shows neither badge.
-    const dvRow = screen.getByText("Darkvision").closest("li")!;
-    expect(within(dvRow).queryByText(/^conc/)).not.toBeInTheDocument();
-
     // Handoff banner names the current concentration.
     expect(screen.getByText(/Concentrating on/)).toBeInTheDocument();
+  });
+
+  it("warns that casting replaces a DIFFERENT active concentration", async () => {
+    renderSection(makeCharacter(3, { entryId: "spellbook:bless", spellName: "Bless" }));
+    await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
+    const darknessRow = screen.getByText("Darkness").closest("li")!;
+    expect(within(darknessRow).getByText(/Casting replaces concentration on/)).toBeInTheDocument();
   });
 
   it("surfaces a catalog load error", async () => {

@@ -933,11 +933,11 @@ describe("TurnHub — mid-turn weapon change (#815, interaction-budget model #11
   });
 });
 
-describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
+describe("TurnHub — Warrior of Shadow reminder actions (2024 rewrite, #1246)", () => {
   function shadowMonk(): Character {
     return makeCharacter({
       class: "Monk",
-      subclass: "Way of Shadow",
+      subclass: "Warrior of Shadow",
       level: 17,
       availableActions: [
         {
@@ -945,14 +945,7 @@ describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
           name: "Shadow Step",
           cost: "bonusAction",
           enabled: true,
-          reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn.",
-        },
-        {
-          key: "opportunist",
-          name: "Opportunist",
-          cost: "reaction",
-          enabled: true,
-          reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction.",
+          reminder: "Teleport up to 60 ft between areas of dim light or darkness (or, for 1 focus, ignore the dim/dark destination requirement); advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
         },
       ],
     } as unknown as Partial<Character>);
@@ -971,20 +964,6 @@ describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
     // Bonus consumed + reminder surfaced on use; no backend effect fires.
     expect(screen.queryByRole("button", { name: "Use Bonus" })).not.toBeInTheDocument();
     expect(screen.getByText(/Teleport up to 60 ft/i)).toBeInTheDocument();
-    expect(applyActionTransactions).not.toHaveBeenCalled();
-  });
-
-  it("Opportunist shows its reminder in the Reaction sheet and after use", async () => {
-    const user = userEvent.setup();
-    renderHub(shadowMonk());
-    await startTurn(user);
-
-    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
-    expect(screen.getByText(/within 5 ft of you is hit/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Opportunist" }));
-    expect(screen.getByText("Reaction used")).toBeInTheDocument();
-    expect(screen.getByText(/within 5 ft of you is hit/i)).toBeInTheDocument();
     expect(applyActionTransactions).not.toHaveBeenCalled();
   });
 });

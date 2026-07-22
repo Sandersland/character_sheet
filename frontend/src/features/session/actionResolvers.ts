@@ -125,8 +125,8 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   flurryOfBlows:     { key: "flurryOfBlows",     kind: "flurry-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 1 },
   // Patient Defense / Step of the Wind (#1240) — free vs 1-Focus variants, each
   // its own menu entry (mirrors rage/endRage). The free entries are
-  // economy-only, like Shadow Step/Opportunist: no backend ACTION_EFFECT_FN,
-  // so serverEffect:false and no resourceKey.
+  // economy-only, like Shadow Step: no backend ACTION_EFFECT_FN, so
+  // serverEffect:false and no resourceKey.
   patientDefense:      { key: "patientDefense",      kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   patientDefenseFocus: { key: "patientDefenseFocus", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
   stepOfTheWind:       { key: "stepOfTheWind",       kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
@@ -134,16 +134,18 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Stunning Strike (L5) has no resolver here — it's a post-hit rider rendered
   // by StunningStrikeSection (mirrors SneakAttackSection), not a selectable
   // action (#1242 supersedes the #392 bare-spend stub formerly here).
-  // Deflect Attacks (#1241, SRD 5.2 L3) — reminder-only reaction like shadowStep/
-  // opportunist below; the dynamic 1d10+Dex+level roll is computed by
-  // useTurnActions' bespoke handleDeflectAttacks, not this generic dispatch.
+  // Deflect Attacks (#1241, SRD 5.2 L3) — reminder-only reaction like shadowStep
+  // below; the dynamic 1d10+Dex+level roll is computed by useTurnActions'
+  // bespoke handleDeflectAttacks, not this generic dispatch.
   deflectAttacks:    { key: "deflectAttacks",    kind: "simple-confirm", slot: "reaction",    serverEffect: false },
   // Redirect rider — a "free" decision within the same reaction (not its own
   // slot), spending 1 Focus server-side once a ranged hit is reduced to 0.
   deflectAttacksRedirect: { key: "deflectAttacksRedirect", kind: "simple-confirm", slot: "free", serverEffect: true, resourceKey: "focus" },
-  // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
+  // Warrior of Shadow reminder action (2024 rewrite, #1246) — economy-only, like
+  // twf; no backend effect fn. Opportunist (2014 L17) is retired — Cloak of
+  // Shadows (L17) is a real cast now, wired through ClassResourceBlocks'
+  // shadow-arts transactions, not this reaction-slot registry.
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
-  opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },
   // Warrior of the Open Hand (#1245): Open Hand Technique / Quivering Palm have
   // no resolver here — they're post-hit riders rendered by their own sections
   // (OpenHandTechniqueSection / QuiveringPalmSection), mirroring how Stunning

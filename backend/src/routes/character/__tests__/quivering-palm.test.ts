@@ -144,7 +144,7 @@ describe("Quivering Palm for an under-level or off-subclass monk", () => {
   });
 
   it("rejects a level-17+ monk of a different subclass", async () => {
-    await createMonk(20, "Way of Shadow");
+    await createMonk(20, "Warrior of Shadow");
     const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/warrior of the open hand/i);

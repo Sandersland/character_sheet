@@ -147,7 +147,7 @@ describe("catalogEffectSpec — shared focus-cast row→spec builder (#817)", ()
 
   it("maps a flat buff row (shadow-art shape) with buff fields and no dice/save", () => {
     const spec = catalogEffectSpec(
-      { name: "Shadow Arts: Pass without Trace", effectKind: "buff", buffTarget: "stealth", buffModifier: 10 },
+      { name: "Test Buff Art", effectKind: "buff", buffTarget: "stealth", buffModifier: 10 },
       { scaling: { mode: "none" }, concentrates: () => true },
     );
     expect(spec).toEqual({
@@ -166,7 +166,7 @@ describe("catalogEffectSpec — shared focus-cast row→spec builder (#817)", ()
 
   it("treats a missing/unknown effectKind as roll-less utility with null buff fields", () => {
     const spec = catalogEffectSpec(
-      { name: "Shadow Arts: Darkvision" },
+      { name: "Test Utility Art" },
       { scaling: { mode: "none" }, concentrates: () => false },
     );
     expect(spec.effectType).toBe("utility");

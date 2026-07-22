@@ -212,8 +212,8 @@ export function useTurnActions({
     }
   }
 
-  // No-server-effect reminder actions (Shadow Step, Opportunist): the rule
-  // text is the whole deliverable, so surface it on use.
+  // No-server-effect reminder actions (e.g. Shadow Step): the rule text is the
+  // whole deliverable, so surface it on use.
   function surfaceReminder(key: string, cost: "action" | "bonusAction" | "reaction") {
     const reminder = availableActions.find((a) => a.key === key)?.reminder;
     if (!reminder) return;

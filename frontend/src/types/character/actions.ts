@@ -24,7 +24,7 @@ export interface AvailableAction {
   enabled: boolean;
   /** Human-readable reason why `enabled` is false; absent when enabled. */
   disabledReason?: string;
-  /** In-play rule text for no-server-effect reminder actions (Shadow Step, Opportunist). */
+  /** In-play rule text for no-server-effect reminder actions (e.g. Shadow Step). */
   reminder?: string;
 }
 

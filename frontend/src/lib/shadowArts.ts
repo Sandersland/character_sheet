@@ -1,4 +1,4 @@
-// Pure Way of Shadow row derivations — extracted from ShadowArtRow (#688). No JSX.
+// Pure Warrior of Shadow row derivations — extracted from ShadowArtRow (#688). No JSX.
 
 import { skillLabel } from "@/lib/abilities";
 import type { CatalogShadowArt, SkillName } from "@/types/character";

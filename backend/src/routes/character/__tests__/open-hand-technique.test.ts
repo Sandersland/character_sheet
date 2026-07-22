@@ -141,7 +141,7 @@ describe("Open Hand Technique for an under-level or off-subclass monk", () => {
   });
 
   it("rejects a level-3+ monk of a different subclass", async () => {
-    await createMonk(5, "Way of Shadow");
+    await createMonk(5, "Warrior of Shadow");
     const res = await agent()
       .post(url)
       .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });

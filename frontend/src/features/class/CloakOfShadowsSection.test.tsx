@@ -9,22 +9,23 @@ function makeCharacter(active: ConditionEntry[] = []): Character {
   return {
     id: "char-1",
     class: "Monk",
-    level: 11,
+    level: 17,
     conditions: { active, exhaustion: 0 },
   } as unknown as Character;
 }
 
 function renderSection(character: Character, props: Partial<React.ComponentProps<typeof CloakOfShadowsSection>> = {}) {
   const onActivate = vi.fn();
-  render(<CloakOfShadowsSection character={character} busy={false} onActivate={onActivate} {...props} />);
+  render(<CloakOfShadowsSection character={character} focusAvailable={3} busy={false} onActivate={onActivate} {...props} />);
   return { onActivate };
 }
 
 describe("CloakOfShadowsSection", () => {
-  it("offers the activation control and shows the break-condition reminder", () => {
+  it("offers the activation control and shows the 3-focus cost + break-condition reminder", () => {
     renderSection(makeCharacter());
     expect(screen.getByRole("button", { name: "Become Invisible" })).toBeInTheDocument();
-    expect(screen.getByText(/Ends when you attack, cast a spell, or enter an area of bright light/)).toBeInTheDocument();
+    expect(screen.getByText(/Spend 3 focus/)).toBeInTheDocument();
+    expect(screen.getByText(/Ends early if you attack or cast a spell/)).toBeInTheDocument();
   });
 
   it("fires onActivate when the button is clicked", async () => {
@@ -45,5 +46,15 @@ describe("CloakOfShadowsSection", () => {
   it("disables the activation control while busy", () => {
     renderSection(makeCharacter(), { busy: true });
     expect(screen.getByRole("button", { name: "Become Invisible" })).toBeDisabled();
+  });
+
+  it("disables the activation control below 3 focus", async () => {
+    const user = userEvent.setup();
+    const { onActivate } = renderSection(makeCharacter(), { focusAvailable: 2 });
+    const button = screen.getByRole("button", { name: "Become Invisible" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("title", "Not enough focus (needs 3)");
+    await user.click(button).catch(() => undefined);
+    expect(onActivate).not.toHaveBeenCalled();
   });
 });

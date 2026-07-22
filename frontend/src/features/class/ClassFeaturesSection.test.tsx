@@ -12,7 +12,7 @@ vi.mock("@/api/client", () => ({
   applyAdvancementTransactions: vi.fn(),
   applyResourceTransactions: vi.fn(),
   applyDisciplineTransactions: vi.fn(),
-  applyConditionTransactions: vi.fn(),
+  applyShadowArtsTransactions: vi.fn(),
   fetchDisciplines: vi.fn(),
   fetchFeats: vi.fn(),
 }));
@@ -94,17 +94,17 @@ describe("ClassFeaturesSection — Fighting Style", () => {
   });
 });
 
-describe("ClassFeaturesSection — Cloak of Shadows", () => {
+describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 -> L17)", () => {
   function makeShadowMonk(cloakOfShadowsAvailable: boolean): Character {
     return {
       id: "char-1",
       class: "Monk",
-      level: cloakOfShadowsAvailable ? 11 : 6,
-      subclass: "Way of Shadow",
+      level: cloakOfShadowsAvailable ? 17 : 11,
+      subclass: "Warrior of Shadow",
       conditions: { active: [], exhaustion: 0 },
       resources: {
         features: [],
-        pools: [],
+        pools: [{ key: "focus", label: "Focus", total: 17, recharge: "shortRest", used: 0, remaining: 17 }],
         maneuversKnown: [],
         toolProficienciesKnown: [],
         cloakOfShadowsAvailable: cloakOfShadowsAvailable || undefined,
@@ -112,9 +112,9 @@ describe("ClassFeaturesSection — Cloak of Shadows", () => {
     } as unknown as Character;
   }
 
-  it("offers the Cloak of Shadows control at L11 and applies invisible via applyConditionTransactions", async () => {
+  it("offers the Cloak of Shadows control at L17 and spends 3 focus via applyShadowArtsTransactions", async () => {
     const user = userEvent.setup();
-    vi.mocked(client.applyConditionTransactions).mockResolvedValue(makeShadowMonk(true));
+    vi.mocked(client.applyShadowArtsTransactions).mockResolvedValue(makeShadowMonk(true));
 
     render(
       <ClassFeaturesSection character={makeShadowMonk(true)} referenceClasses={[]} onUpdate={vi.fn()} />,
@@ -123,12 +123,12 @@ describe("ClassFeaturesSection — Cloak of Shadows", () => {
     expect(screen.getByText("Cloak of Shadows")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Become Invisible" }));
 
-    expect(client.applyConditionTransactions).toHaveBeenCalledWith("char-1", [
-      { type: "applyCondition", key: "invisible", source: "Cloak of Shadows" },
+    expect(client.applyShadowArtsTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "activateCloakOfShadows" },
     ]);
   });
 
-  it("does NOT offer Cloak of Shadows below L11 (flag absent)", () => {
+  it("does NOT offer Cloak of Shadows below L17 (flag absent — L11 is Improved Shadow Step instead)", () => {
     render(
       <ClassFeaturesSection character={makeShadowMonk(false)} referenceClasses={[]} onUpdate={vi.fn()} />,
     );

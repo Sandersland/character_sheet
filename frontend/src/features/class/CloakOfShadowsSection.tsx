@@ -1,21 +1,27 @@
 /**
- * CloakOfShadowsSection — Way of Shadow's L11 self-invisible toggle inside
- * ClassFeaturesSection. Activation applies the `invisible` condition through the
- * conditions transaction path (source "Cloak of Shadows"), which logs the audit
- * event. Breaking (attack / cast a spell / bright light) is manual: the player
- * clears the condition from the Conditions section.
+ * CloakOfShadowsSection — Warrior of Shadow's L17 self-invisible toggle inside
+ * ClassFeaturesSection (2024 rewrite, #1246: moved from L11, now costs 3 focus).
+ * Activation posts an activateCloakOfShadows op through the shadow-arts
+ * transaction path (backend spends focus + self-applies invisible atomically).
+ * Breaking (attack / cast a spell / bright light) is manual: the player clears
+ * the condition from the Conditions section.
  */
 
 import type { Character } from "@/types/character";
 
+const FOCUS_COST = 3;
+
 interface Props {
   character: Character;
+  /** Focus remaining on hand — gates the activation button, mirrors ShadowArtRow. */
+  focusAvailable: number;
   busy: boolean;
   onActivate: () => void;
 }
 
-export default function CloakOfShadowsSection({ character, busy, onActivate }: Props) {
+export default function CloakOfShadowsSection({ character, focusAvailable, busy, onActivate }: Props) {
   const isInvisible = (character.conditions?.active ?? []).some((c) => c.key === "invisible");
+  const canAfford = focusAvailable >= FOCUS_COST;
 
   return (
     <div>
@@ -27,8 +33,10 @@ export default function CloakOfShadowsSection({ character, busy, onActivate }: P
       </div>
 
       <p className="mb-3 text-xs leading-relaxed text-parchment-600">
-        In dim light or darkness, use your action to become invisible. Ends when you attack, cast a
-        spell, or enter an area of bright light — clear it manually from Conditions when it breaks.
+        Spend {FOCUS_COST} focus to become invisible and move through creatures and objects as
+        difficult terrain, for 1 minute or until incapacitated. Ends early if you attack or cast a
+        spell — clear it manually from Conditions when it breaks. While active, Flurry of Blows
+        costs no focus.
       </p>
 
       {isInvisible ? (
@@ -38,10 +46,10 @@ export default function CloakOfShadowsSection({ character, busy, onActivate }: P
       ) : (
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !canAfford}
           onClick={onActivate}
           className="rounded-control bg-gold-400 px-3 py-1 text-[11px] font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
-          title="Become invisible (Cloak of Shadows)"
+          title={canAfford ? `Become invisible (${FOCUS_COST} focus)` : `Not enough focus (needs ${FOCUS_COST})`}
         >
           Become Invisible
         </button>
