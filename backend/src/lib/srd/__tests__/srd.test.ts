@@ -280,42 +280,64 @@ describe("deriveResources — Way of the Four Elements", () => {
   });
 });
 
-// ── Monk — Way of Shadow ──────────────────────────────────────────────────────
+// ── Monk — Warrior of Shadow (2024 rewrite, SRD 5.2, #1246) ──────────────────
 
-describe("deriveResources — Way of Shadow", () => {
+describe("deriveResources — Warrior of Shadow", () => {
   it("does not set shadowArtsAvailable below grant level 3", () => {
-    const result = deriveResources("monk", "way of shadow", 2, ABILITY_SCORES, PROF_2);
+    const result = deriveResources("monk", "warrior of shadow", 2, ABILITY_SCORES, PROF_2);
     expect(result!.shadowArtsAvailable).toBeUndefined();
   });
 
-  it("sets shadowArtsAvailable at level 3", () => {
-    const result = deriveResources("monk", "way of shadow", 3, ABILITY_SCORES, PROF_2);
+  it("sets shadowArtsAvailable at level 3, describing the 1-focus Darkness cast plus Minor Illusion + Darkvision", () => {
+    const result = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, PROF_2);
     expect(result!.shadowArtsAvailable).toBe(true);
+    const feature = result!.features.find((f) => f.name === "Shadow Arts");
+    expect(feature?.description).toMatch(/1 focus/i);
+    expect(feature?.description).toMatch(/darkness/i);
+    expect(feature?.description).toMatch(/minor illusion/i);
+    expect(feature?.description).toMatch(/darkvision/i);
   });
 
-  it("does not set cloakOfShadowsAvailable below level 11", () => {
-    for (const level of [3, 6, 10]) {
-      const result = deriveResources("monk", "way of shadow", level, ABILITY_SCORES, PROF_4);
+  it("surfaces Improved Shadow Step at level 11 (replaces the 2014 Cloak of Shadows slot)", () => {
+    const below = deriveResources("monk", "warrior of shadow", 10, ABILITY_SCORES, PROF_4);
+    expect(below!.features.some((f) => f.name === "Improved Shadow Step")).toBe(false);
+    const result = deriveResources("monk", "warrior of shadow", 11, ABILITY_SCORES, PROF_4);
+    expect(result!.features.some((f) => f.name === "Improved Shadow Step")).toBe(true);
+    // Cloak of Shadows hasn't unlocked yet at L11 — it moved to L17.
+    expect(result!.features.some((f) => f.name === "Cloak of Shadows")).toBe(false);
+    expect(result!.cloakOfShadowsAvailable).toBeUndefined();
+  });
+
+  it("does not set cloakOfShadowsAvailable below level 17", () => {
+    for (const level of [3, 6, 11, 16]) {
+      const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4);
       expect(result!.cloakOfShadowsAvailable).toBeUndefined();
     }
   });
 
-  it("sets cloakOfShadowsAvailable at level 11 and above", () => {
-    for (const level of [11, 17, 20]) {
-      const result = deriveResources("monk", "way of shadow", level, ABILITY_SCORES, PROF_4);
+  it("sets cloakOfShadowsAvailable at level 17 and above (moved from L11 in the 2024 rewrite)", () => {
+    for (const level of [17, 20]) {
+      const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4);
       expect(result!.cloakOfShadowsAvailable).toBe(true);
     }
   });
 
-  it("surfaces the Cloak of Shadows feature at level 11", () => {
-    const result = deriveResources("monk", "way of shadow", 11, ABILITY_SCORES, PROF_4);
+  it("surfaces the Cloak of Shadows feature at level 17", () => {
+    const result = deriveResources("monk", "warrior of shadow", 17, ABILITY_SCORES, PROF_4);
     expect(result!.features.some((f) => f.name === "Cloak of Shadows")).toBe(true);
   });
 
+  it("no Opportunist feature at any level (2014 L17 feature retired)", () => {
+    for (const level of [17, 20]) {
+      const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4);
+      expect(result!.features.some((f) => f.name === "Opportunist")).toBe(false);
+    }
+  });
+
   it("leaves other monks unaffected (no cloakOfShadowsAvailable)", () => {
-    const openHand = deriveResources("monk", "warrior of the open hand", 11, ABILITY_SCORES, PROF_4);
+    const openHand = deriveResources("monk", "warrior of the open hand", 17, ABILITY_SCORES, PROF_4);
     expect(openHand!.cloakOfShadowsAvailable).toBeUndefined();
-    const noSub = deriveResources("monk", undefined, 11, ABILITY_SCORES, PROF_4);
+    const noSub = deriveResources("monk", undefined, 17, ABILITY_SCORES, PROF_4);
     expect(noSub!.cloakOfShadowsAvailable).toBeUndefined();
   });
 });

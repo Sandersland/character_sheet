@@ -103,7 +103,7 @@ export function classActionOption(
   // (Bonus Unarmed Strike, #1218) wins next; Flurry surfaces its Focus cost
   // (#1217, singled out rather than generalized to every resource-costing
   // action — a broader "spend N" caption is a separate design call); every
-  // other reminder-only action (Shadow Step, Opportunist) shows its rule text.
+  // other reminder-only action (e.g. Shadow Step) shows its rule text.
   const subtitle =
     resolver?.kind === "heal-roll" && resolver.healRoll
       ? `Regain ${formatRollSpec(resolver.healRoll(character))} HP`

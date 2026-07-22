@@ -1,8 +1,9 @@
 /**
- * ShadowArtRow — a single Way of Shadow Shadow Art with an expandable
- * description and a flat 2-focus cast affordance. Renders through AbilityRowShell
- * (shared with ManeuverRow/DisciplineRow); Shadow Arts are flat-cost,
- * roll-less utility/buff spells, so there is no focus scaling here.
+ * ShadowArtRow — the Warrior of Shadow Shadow Art (Darkness) with an expandable
+ * description and a flat 1-focus cast affordance (#1246). Renders through
+ * AbilityRowShell (shared with ManeuverRow/DisciplineRow); the buff-chip path
+ * stays generic (shared with disciplines/Channel Divinity) even though no
+ * current Shadow Art uses it.
  */
 
 import AbilityRowShell, { CastAbilityButton } from "@/features/class/AbilityRowShell";

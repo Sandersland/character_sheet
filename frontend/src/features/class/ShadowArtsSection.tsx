@@ -1,9 +1,10 @@
 /**
- * ShadowArtsSection — Way of Shadow's Shadow Arts block inside ClassFeaturesSection.
- * Fetches the 4-spell catalog once and wires each cast up to the orchestrator.
- * Mirrors DisciplinesSection; casts are flat 2-focus, roll-less, and route their
- * concentration/buff results through the re-rendered character (Stealth row +
- * concentration banner) rather than a dice toast.
+ * ShadowArtsSection — Warrior of Shadow's Shadow Arts block inside
+ * ClassFeaturesSection. Fetches the single-item Darkness catalog (2024 rewrite,
+ * #1246 — the 2014 4-spell menu is retired) and wires the cast up to the
+ * orchestrator. Mirrors DisciplinesSection; the cast is flat 1-focus, roll-less,
+ * and routes its concentration result through the re-rendered character
+ * (concentration banner) rather than a dice toast.
  */
 
 import { useEffect, useState } from "react";
@@ -53,7 +54,7 @@ export default function ShadowArtsSection({ character, busy, onCast }: Props) {
       </div>
 
       <p className="mb-3 text-xs text-parchment-600">
-        Each Shadow Art costs 2 focus.
+        Cast Darkness for 1 focus.
         <span className="ml-2">
           Focus remaining: <span className="font-semibold text-gold-800">{focusAvailable}</span>
         </span>

@@ -27,7 +27,7 @@ const FIGHTER_CLASS_NAME = "Test Fighter (Serialize Suite)";
 const BM_SUBCLASS_NAME = "battle master";
 const WARLOCK_CLASS_NAME = "Test Warlock (Serialize Suite)";
 const MONK_CLASS_NAME = "Test Monk (Serialize Suite)";
-const SHADOW_SUBCLASS_NAME = "Way of Shadow";
+const SHADOW_SUBCLASS_NAME = "Warrior of Shadow";
 let fighterClassId: string;
 let bmSubclassId: string;
 let shadowSubclassId: string;
@@ -71,7 +71,7 @@ beforeAll(async () => {
     update: {},
   });
   shadowSubclassId = shadow.id;
-  // Way of Shadow grants Minor Illusion at L3 as data (#898).
+  // Warrior of Shadow grants Minor Illusion at L3 as data (#898).
   const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
   if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
   await prisma.subclassGrantedSpell.upsert({
@@ -180,7 +180,7 @@ async function createMulticlassWarlockFighter() {
   });
 }
 
-// Char D — Monk (Way of Shadow) 3 / Fighter 1 multiclass, no caster class in
+// Char D — Monk (Warrior of Shadow) 3 / Fighter 1 multiclass, no caster class in
 // the mix: buildMulticlassSpellcastingView's slotless granted-only branch
 // (multi.classes.length === 0, subclass-granted Minor Illusion surfaces).
 async function createMulticlassMonkFighter() {
@@ -359,7 +359,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     expect(c.classes).toHaveLength(2);
   });
 
-  // ── Char D: Monk (Way of Shadow) 3 / Fighter 1 — multiclass granted-only ────
+  // ── Char D: Monk (Warrior of Shadow) 3 / Fighter 1 — multiclass granted-only ────
   it("monk/fighter multiclass with no caster class: slotless granted-spell view", async () => {
     await createMulticlassMonkFighter();
     const d = (await getChar("serial-char-d")).body;
@@ -374,7 +374,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     expect(d.spellcasting.pact).toBeUndefined();
     expect(d.spellcasting.spells).toHaveLength(1);
     expect(d.spellcasting.spells[0]).toMatchObject({
-      id: "granted:way-of-shadow:minor-illusion",
+      id: "granted:warrior-of-shadow:minor-illusion",
       name: "Minor Illusion",
       source: "subclass",
     });

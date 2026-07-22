@@ -89,18 +89,16 @@ describe("actionResolvers", () => {
     expect(resolverFor("stunningStrike")).toBeUndefined();
   });
 
-  it("Shadow Step / Opportunist are economy-only simple-confirm reminders (#440)", () => {
+  it("Shadow Step is an economy-only simple-confirm reminder (2024 rewrite, #1246)", () => {
     const step = resolverFor("shadowStep");
     expect(step).toBeDefined();
     expect(step!.kind).toBe("simple-confirm");
     expect(step!.slot).toBe("bonusAction");
     expect(step!.serverEffect).toBe(false); // reminder only — no backend ACTION_EFFECT_FN
+  });
 
-    const opp = resolverFor("opportunist");
-    expect(opp).toBeDefined();
-    expect(opp!.kind).toBe("simple-confirm");
-    expect(opp!.slot).toBe("reaction");
-    expect(opp!.serverEffect).toBe(false);
+  it("has no opportunist resolver (2014 L17 feature retired — Cloak of Shadows is L17 now)", () => {
+    expect(resolverFor("opportunist")).toBeUndefined();
   });
 
   it("Patient Defense / Step of the Wind free variants are economy-only simple-confirm reminders (#1240)", () => {

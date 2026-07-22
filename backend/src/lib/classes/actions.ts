@@ -164,7 +164,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // vertical in stunning-strike.ts, exactly like Sneak Attack bypasses this
   // catalog entirely (#1242 supersedes the #392 bare-spend stub formerly here).
   // Deflect Attacks (#1241, SRD 5.2 L3, renamed from 2014 Deflect Missiles): the base
-  // reduction (1d10 + Dex + monk level) costs nothing, so — like the Way of Shadow
+  // reduction (1d10 + Dex + monk level) costs nothing, so — like the Warrior of Shadow
   // reminders below — it carries no resourceKey and the client rolls it directly (see
   // ACTION_EFFECT_FN comment). Deflect Energy (L13) just widens the damage-type clause
   // in the reminder text; it isn't a separate action key.
@@ -182,9 +182,26 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // not its own action-economy slot. Spends the persisted Focus resource, unlike
   // the free base reduction above.
   { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1 },
-  // Way of Shadow reminder actions (#440) — no resourceKey, no server effect; reminder is the deliverable.
-  { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
-  { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17, reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction." },
+  // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
+  // server effect; reminder is the deliverable. Improved Shadow Step (L11)
+  // upgrades the SAME bonus action (ignore the dim/dark destination requirement
+  // for 1 focus) rather than adding a competing catalog row — mirrors how
+  // Heightened Focus upgrades patientDefenseFocus/stepOfTheWindFocus in place.
+  // Opportunist (2014 L17 reaction) is retired — replaced by Cloak of Shadows
+  // (shadow-arts.ts activateCloakOfShadows), a real resourceKey-gated cast, not
+  // a catalog reminder.
+  {
+    key: "shadowStep",
+    name: "Shadow Step",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantSubclass: "Shadow",
+    grantLevel: 6,
+    reminder: (level) =>
+      level >= 11
+        ? "Teleport up to 60 ft between areas of dim light or darkness (or, for 1 focus, ignore the dim/dark destination requirement); advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting."
+        : "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
+  },
   // Warrior of the Open Hand (#1245): Open Hand Technique (Flurry-hit rider)
   // and Quivering Palm (set/trigger) are post-hit riders with their own
   // dedicated verticals (open-hand-technique.ts / quivering-palm.ts), exactly
@@ -501,9 +518,9 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
     return ops;
   },
   // deflectAttacks (the base reduction) has no entry here — it's a pure reminder
-  // action like shadowStep/opportunist: the client rolls 1d10 + Dex + monk level
-  // and never calls the transactions endpoint (nothing persisted). Only the
-  // redirect below is real, persisted state.
+  // action like shadowStep: the client rolls 1d10 + Dex + monk level and never
+  // calls the transactions endpoint (nothing persisted). Only the redirect
+  // below is real, persisted state.
   deflectAttacksRedirect: () => [{ type: "spendResource", key: "focus" }],
 
   // Paladin

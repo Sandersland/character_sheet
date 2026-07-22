@@ -91,9 +91,9 @@ export interface DerivedClassInfo {
   disciplineChoiceCount?: number;
   /** Way of the Four Elements only: focus save DC for discipline effects (8 + prof + Wis mod). */
   disciplineSaveDC?: number;
-  /** Way of Shadow only: whether the L3+ Shadow Arts focus-cast spells are available. */
+  /** Warrior of Shadow only: whether the L3+ 1-focus Darkness cast is available. */
   shadowArtsAvailable?: boolean;
-  /** Way of Shadow only: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
+  /** Warrior of Shadow only: whether the L17+ Cloak of Shadows self-invisible toggle is available (moved from L11 in the 2024 rewrite, #1246). */
   cloakOfShadowsAvailable?: boolean;
   /**
    * Generic subclass "choose N from a catalog" selections active at this level

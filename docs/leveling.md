@@ -33,7 +33,7 @@ Hand-rolled reconcilers remain only for features with extra mechanics (maneuvers
 
 ### Choice-less grants are pure-derived
 
-A level-gated grant with zero player choice (e.g. Way of Shadow's Minor Illusion at L3) is a pure function of `(subclass, level)` — derived at serialize time (`deriveGrantedSpells`) and **never persisted**. `reconcileGrantedSpells` is only a guard against leaked persisted grants, not the primary enforcement.
+A level-gated grant with zero player choice (e.g. Warrior of Shadow's Minor Illusion at L3) is a pure function of `(subclass, level)` — derived at serialize time (`deriveGrantedSpells`) and **never persisted**. `reconcileGrantedSpells` is only a guard against leaked persisted grants, not the primary enforcement.
 
 ## Checklist: adding a new level-gated feature
 

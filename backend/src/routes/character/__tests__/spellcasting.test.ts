@@ -675,7 +675,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
 });
 
 // ── Subclass-granted spells (derived, non-persisted) ──────────────────────────
-// A Way of Shadow monk gains Minor Illusion at level 3 as a pure-derived grant.
+// A Warrior of Shadow monk gains Minor Illusion at level 3 as a pure-derived grant.
 // The monk is a non-caster, so the whole spellcasting view exists only because
 // of the grant (slotless Wisdom view).
 
@@ -703,12 +703,12 @@ describe("subclass-granted spells", () => {
     });
     monkClassId = cls.id;
 
-    // Way of Shadow grants Minor Illusion at L3 as data (#898): a catalog Subclass
+    // Warrior of Shadow grants Minor Illusion at L3 as data (#898): a catalog Subclass
     // row under this test class + a SubclassGrantedSpell → the seeded Minor Illusion.
     // Warrior of the Open Hand exists as a catalog row but grants nothing.
     const shadow = await prisma.subclass.upsert({
-      where: { classId_name: { classId: monkClassId, name: "Way of Shadow" } },
-      create: { classId: monkClassId, name: "Way of Shadow", description: "Test subclass" },
+      where: { classId_name: { classId: monkClassId, name: "Warrior of Shadow" } },
+      create: { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
       update: {},
     });
     await prisma.subclass.upsert({
@@ -771,8 +771,8 @@ describe("subclass-granted spells", () => {
   const getSpells = (body: { spellcasting?: { spells?: Array<{ name: string; source?: string }> } }) =>
     body.spellcasting?.spells ?? [];
 
-  it("grants Minor Illusion to a Way of Shadow monk at level 3", async () => {
-    await createMonk({ xp: 900, subclass: "Way of Shadow" }); // L3
+  it("grants Minor Illusion to a Warrior of Shadow monk at level 3", async () => {
+    await createMonk({ xp: 900, subclass: "Warrior of Shadow" }); // L3
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(res.status).toBe(200);
     const minor = getSpells(res.body).find((s) => s.name === "Minor Illusion");
@@ -781,7 +781,7 @@ describe("subclass-granted spells", () => {
   });
 
   it("surfaces the granted view's casting ability + derived DC from that ability", async () => {
-    await createMonk({ xp: 900, subclass: "Way of Shadow" }); // L3, WIS 15 (+2), prof +2
+    await createMonk({ xp: 900, subclass: "Warrior of Shadow" }); // L3, WIS 15 (+2), prof +2
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.spellcasting.ability).toBe("wisdom");
@@ -790,7 +790,7 @@ describe("subclass-granted spells", () => {
   });
 
   it("does NOT grant Minor Illusion below level 3", async () => {
-    await createMonk({ xp: 300, subclass: "Way of Shadow" }); // L2
+    await createMonk({ xp: 300, subclass: "Warrior of Shadow" }); // L2
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(getSpells(res.body).find((s) => s.name === "Minor Illusion")).toBeUndefined();
   });
@@ -804,7 +804,7 @@ describe("subclass-granted spells", () => {
   it("does not duplicate Minor Illusion when the player also learned it (learned copy wins)", async () => {
     await createMonk({
       xp: 900,
-      subclass: "Way of Shadow",
+      subclass: "Warrior of Shadow",
       spells: [{
         id: "learned-minor-illusion", name: "Minor Illusion", level: 0, school: "illusion",
         prepared: true, castingTime: "1 action", range: "30 ft", duration: "1 minute",
@@ -818,18 +818,18 @@ describe("subclass-granted spells", () => {
   });
 
   it("400s when trying to forget a subclass-granted spell", async () => {
-    await createMonk({ xp: 900, subclass: "Way of Shadow" });
+    await createMonk({ xp: 900, subclass: "Warrior of Shadow" });
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${MONK_ID}/spellcasting/transactions`)
-      .send({ operations: [{ type: "forgetSpell", entryId: "granted:way-of-shadow:minor-illusion" }] });
+      .send({ operations: [{ type: "forgetSpell", entryId: "granted:warrior-of-shadow:minor-illusion" }] });
     expect(res.status).toBe(400);
   });
 
   it("casting a granted cantrip logs the cast but persists no granted entry", async () => {
-    await createMonk({ xp: 900, subclass: "Way of Shadow" });
+    await createMonk({ xp: 900, subclass: "Warrior of Shadow" });
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${MONK_ID}/spellcasting/transactions`)
-      .send({ operations: [{ type: "castSpell", entryId: "granted:way-of-shadow:minor-illusion", roll: 0 }] });
+      .send({ operations: [{ type: "castSpell", entryId: "granted:warrior-of-shadow:minor-illusion", roll: 0 }] });
     expect(res.status).toBe(200);
 
     // The response view still surfaces the re-derived grant.

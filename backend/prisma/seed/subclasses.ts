@@ -128,9 +128,9 @@ export const SUBCLASSES: SubclassSeed[] = [
   },
   {
     className: "Monk",
-    name: "Way of Shadow",
+    name: "Warrior of Shadow",
     description:
-      "You follow a tradition that values stealth and subtlety. You can cast certain spells by spending focus, teleport between areas of shadow, and silence a zone around yourself. At higher levels you become one with the darkness, striking from the unseen.",
+      "You follow a tradition that values stealth and subtlety. You know Minor Illusion, cast Darkness for 1 focus, and see in the dark. You teleport between areas of shadow, and at higher levels can spend focus to teleport freely and, ultimately, cloak yourself in invisibility.",
   },
   {
     className: "Monk",

@@ -772,7 +772,7 @@ describe("POST /api/characters/:id/experience — disciplines reconciled on leve
 // ── Subclass-granted spell reconciliation suite ───────────────────────────────
 // Defense-in-depth: subclass grants are derived and never persisted in the happy
 // path. This exercises reconcileGrantedSpells stripping a *leaked* persisted
-// source:"subclass" entry when a Way of Shadow monk drops below the grant level.
+// source:"subclass" entry when a Warrior of Shadow monk drops below the grant level.
 
 describe("POST /api/characters/:id/experience — granted spells reconciled on level-down", () => {
   let gsMonkClassId: string;
@@ -781,7 +781,7 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
   const leakedSpellcasting = () => ({
     slotsUsed: {},
     spells: [{
-      id: "granted:way-of-shadow:minor-illusion",
+      id: "granted:warrior-of-shadow:minor-illusion",
       name: "Minor Illusion",
       level: 0, school: "illusion", prepared: true, source: "subclass",
       castingTime: "1 action", range: "30 ft", duration: "1 minute",
@@ -821,7 +821,7 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
         hitDice: { total: 3, die: "d8", spent: 0 },
         spellcasting: leakedSpellcasting() as Prisma.InputJsonValue,
         classEntries: {
-          create: [{ name: GS_MONK_NAME, classId: gsMonkClassId, position: 0, level: 3, subclass: "Way of Shadow" }],
+          create: [{ name: GS_MONK_NAME, classId: gsMonkClassId, position: 0, level: 3, subclass: "Warrior of Shadow" }],
         },
       },
     });
@@ -860,10 +860,10 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
         hitDice: { total: 3, die: "d8", spent: 0 },
         spellcasting: {
           ...leakedSpellcasting(),
-          concentratingOn: { entryId: "granted:way-of-shadow:minor-illusion", spellName: "Minor Illusion" },
+          concentratingOn: { entryId: "granted:warrior-of-shadow:minor-illusion", spellName: "Minor Illusion" },
         } as Prisma.InputJsonValue,
         classEntries: {
-          create: [{ name: GS_MONK_NAME, classId: gsMonkClassId, position: 0, level: 3, subclass: "Way of Shadow" }],
+          create: [{ name: GS_MONK_NAME, classId: gsMonkClassId, position: 0, level: 3, subclass: "Warrior of Shadow" }],
         },
       },
     });

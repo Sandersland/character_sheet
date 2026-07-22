@@ -137,7 +137,7 @@ export function deriveResources(
   const result: DerivedClassInfo = { resources, features };
 
   // Subclass-specific extra derived fields (e.g. Battle Master maneuvers,
-  // Way of the Four Elements disciplines, Way of Shadow focus-cast unlocks).
+  // Way of the Four Elements disciplines, Warrior of Shadow focus-cast unlocks).
   if (sub.active && sub.def?.deriveExtras) {
     Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus));
   }
