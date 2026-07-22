@@ -273,7 +273,7 @@ describe("deriveResources — Way of the Four Elements", () => {
   });
 
   it("leaves other monks unaffected (no disciplineChoiceCount)", () => {
-    const openHand = deriveResources("monk", "way of the open hand", 6, ABILITY_SCORES, PROF_3);
+    const openHand = deriveResources("monk", "warrior of the open hand", 6, ABILITY_SCORES, PROF_3);
     expect(openHand!.disciplineChoiceCount).toBeUndefined();
     const noSub = deriveResources("monk", undefined, 6, ABILITY_SCORES, PROF_3);
     expect(noSub!.disciplineChoiceCount).toBeUndefined();
@@ -313,7 +313,7 @@ describe("deriveResources — Way of Shadow", () => {
   });
 
   it("leaves other monks unaffected (no cloakOfShadowsAvailable)", () => {
-    const openHand = deriveResources("monk", "way of the open hand", 11, ABILITY_SCORES, PROF_4);
+    const openHand = deriveResources("monk", "warrior of the open hand", 11, ABILITY_SCORES, PROF_4);
     expect(openHand!.cloakOfShadowsAvailable).toBeUndefined();
     const noSub = deriveResources("monk", undefined, 11, ABILITY_SCORES, PROF_4);
     expect(noSub!.cloakOfShadowsAvailable).toBeUndefined();

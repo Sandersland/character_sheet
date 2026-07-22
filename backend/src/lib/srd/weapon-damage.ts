@@ -101,14 +101,14 @@ export function deriveUnarmedDamageDie(advancements: AdvancementEntry[]): number
   return best;
 }
 
-// Monk Martial Arts die by monk class level (PHB p.78): d4 at L1, d6/d8/d10 at
-// L5/L11/L17. Returns 0 below monk level 1 (non-monk or no monk levels).
+// Monk Martial Arts die by monk class level (SRD 5.2): 1d6 at L1, 1d8/1d10/1d12
+// at L5/L11/L17. Returns 0 below monk level 1 (non-monk or no monk levels).
 export function deriveMartialArtsDie(monkLevel: number): number {
   if (monkLevel < 1) return 0;
-  if (monkLevel >= 17) return 10;
-  if (monkLevel >= 11) return 8;
-  if (monkLevel >= 5) return 6;
-  return 4;
+  if (monkLevel >= 17) return 12;
+  if (monkLevel >= 11) return 10;
+  if (monkLevel >= 5) return 8;
+  return 6;
 }
 
 /**
@@ -117,7 +117,7 @@ export function deriveMartialArtsDie(monkLevel: number): number {
  * `unarmedDamageDie` is 1 by default (flat 1 + STR mod) and is raised to 4
  * by Tavern Brawler. A Monk who is unarmored & unshielded uses max(Dex, Str)
  * for attack + damage and the larger of the feat die and the Martial Arts die.
- * Ki-Empowered Strikes (monk L6+) marks the strike `magical`, off monk level.
+ * Empowered Strikes (monk L6+) marks the strike `magical`, off monk level.
  */
 export function deriveUnarmedStrike(
   effectiveScores: Record<string, number>,
@@ -135,7 +135,7 @@ export function deriveUnarmedStrike(
   const martialArtsDie =
     monk && monk.isUnarmored && !monk.hasShield ? deriveMartialArtsDie(monk.level) : 0;
   const abilityMod = martialArtsDie > 0 ? Math.max(strMod, dexMod) : strMod;
-  // Ki-Empowered Strikes: monk unarmed strikes count as magical at level 6+.
+  // Empowered Strikes: monk unarmed strikes count as magical at level 6+.
   const magical = (monk?.level ?? 0) >= 6;
   return {
     attackBonus: abilityMod + proficiencyBonus,

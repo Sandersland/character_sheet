@@ -122,21 +122,21 @@ export const SUBCLASSES: SubclassSeed[] = [
   // ── Monk ─────────────────────────────────────────────────────────────────
   {
     className: "Monk",
-    name: "Way of the Open Hand",
+    name: "Warrior of the Open Hand",
     description:
-      "You master techniques to push and trip opponents, cover yourself in a shroud of ki, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reaction.",
+      "You master techniques to push and trip opponents, cover yourself in a shroud of focus, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions.",
   },
   {
     className: "Monk",
     name: "Way of Shadow",
     description:
-      "You follow a tradition that values stealth and subtlety. You can cast certain spells by spending ki points, teleport between areas of shadow, and silence a zone around yourself. At higher levels you become one with the darkness, striking from the unseen.",
+      "You follow a tradition that values stealth and subtlety. You can cast certain spells by spending focus, teleport between areas of shadow, and silence a zone around yourself. At higher levels you become one with the darkness, striking from the unseen.",
   },
   {
     className: "Monk",
     name: "Way of the Four Elements",
     description:
-      "You channel the elements through your ki, learning elemental disciplines that let you wield fire, water, air, and earth. Disciple of the Elements grants Elemental Attunement plus one discipline of your choice at level 3, with additional disciplines learned at levels 6, 11, and 17. Disciplines that mimic spells cost ki equal to the spell's level, using your ki save DC.",
+      "You channel the elements through your focus, learning elemental disciplines that let you wield fire, water, air, and earth. Disciple of the Elements grants Elemental Attunement plus one discipline of your choice at level 3, with additional disciplines learned at levels 6, 11, and 17. Disciplines that mimic spells cost focus equal to the spell's level, using your focus save DC.",
   },
   // ── Paladin ───────────────────────────────────────────────────────────────
   {

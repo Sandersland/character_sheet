@@ -13,7 +13,7 @@ const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
   cleric: [undefined, "life domain", "trickery domain"],
   druid: [undefined, "circle of the land", "circle of the moon"],
   fighter: [undefined, "battle master", "champion", "eldritch knight"],
-  monk: [undefined, "way of the open hand", "way of shadow", "way of the four elements"],
+  monk: [undefined, "warrior of the open hand", "way of shadow", "way of the four elements"],
   paladin: [undefined, "oath of devotion", "oath of the ancients", "oath of vengeance"],
   ranger: [undefined, "hunter", "beast master"],
   rogue: [undefined, "arcane trickster", "assassin", "thief"],

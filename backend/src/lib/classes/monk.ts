@@ -28,14 +28,14 @@ const MONK_FEATURES: DerivedFeature[] = [
     level: 1,
     source: "class",
     description:
-      "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d4 (L1–4), 1d6 (L5–10), 1d8 (L11–16), or 1d10 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+      "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
   },
   {
-    name: "Ki",
+    name: "Focus",
     level: 2,
     source: "class",
     description:
-      "You have a pool of ki points equal to your monk level. Spend them to fuel: Flurry of Blows (2 ki — two bonus unarmed strikes), Patient Defense (1 ki — Dodge as bonus action), Step of the Wind (1 ki — Disengage or Dash as bonus action, jump distance doubled). Ki save DC = 8 + proficiency + Wisdom modifier. Regain all ki on a short or long rest.",
+      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (2 focus — two bonus unarmed strikes), Patient Defense (1 focus — Dodge as bonus action), Step of the Wind (1 focus — Disengage or Dash as bonus action, jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
   },
   {
     name: "Unarmored Movement",
@@ -45,11 +45,18 @@ const MONK_FEATURES: DerivedFeature[] = [
       "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
   },
   {
-    name: "Deflect Missiles",
+    name: "Uncanny Metabolism",
+    level: 2,
+    source: "class",
+    description:
+      "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+  },
+  {
+    name: "Deflect Attacks",
     level: 3,
     source: "class",
     description:
-      "Use your reaction to deflect or catch a ranged weapon attack. Reduce damage by 1d10 + Dexterity modifier + monk level. If reduced to 0, you catch the missile and can throw it (1 ki) as part of the same reaction.",
+      "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
   },
   {
     name: "Slow Fall",
@@ -69,14 +76,14 @@ const MONK_FEATURES: DerivedFeature[] = [
     level: 5,
     source: "class",
     description:
-      "When you hit with a melee weapon attack, spend 1 ki to stun the target. It makes a Constitution save (ki save DC) or is stunned until the end of your next turn — incapacitated, can't move, and attacks against it have advantage.",
+      "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
   },
   {
-    name: "Ki-Empowered Strikes",
+    name: "Empowered Strikes",
     level: 6,
     source: "class",
     description:
-      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks.",
+      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
   },
   {
     name: "Evasion",
@@ -86,84 +93,84 @@ const MONK_FEATURES: DerivedFeature[] = [
       "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
   },
   {
-    name: "Stillness of Mind",
-    level: 7,
-    source: "class",
-    description:
-      "As an action, end one effect on yourself that causes you to be charmed or frightened.",
-  },
-  {
-    name: "Purity of Body",
+    name: "Heightened Focus",
     level: 10,
     source: "class",
     description:
-      "Your mastery of ki grants immunity to disease and poison.",
+      "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes for 1 focus (instead of two); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
   },
   {
-    name: "Tongue of the Sun and Moon",
+    name: "Self-Restoration",
+    level: 10,
+    source: "class",
+    description:
+      "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+  },
+  {
+    name: "Deflect Energy",
     level: 13,
     source: "class",
     description:
-      "You learn to touch the ki of other minds, allowing you to understand all spoken languages. Any creature that can understand a language can understand what you say.",
+      "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
   },
   {
-    name: "Diamond Soul",
+    name: "Disciplined Survivor",
     level: 14,
     source: "class",
     description:
-      "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 ki to reroll it and take the second result.",
+      "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
   },
   {
-    name: "Timeless Body",
+    name: "Perfect Focus",
     level: 15,
     source: "class",
     description:
-      "Your ki sustains you so that you suffer none of the frailty of old age, and you can't be aged magically. You still die of old age but are no longer affected by aging.",
+      "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
   },
   {
-    name: "Empty Body",
+    name: "Superior Defense",
     level: 18,
     source: "class",
     description:
-      "Spend 4 ki to become invisible for 1 minute. During that time, you also have resistance to all damage except force. Spend 8 ki to cast the Astral Projection spell without material components.",
+      "At the start of your turn, spend 3 focus to bolster yourself for 1 minute or until you're incapacitated: during that time you have resistance to all damage except force damage.",
   },
   {
-    name: "Perfect Self",
+    name: "Body and Mind",
     level: 20,
     source: "class",
     description:
-      "When you roll initiative and have no ki points remaining, you regain 4 ki points.",
+      "Your Dexterity and Wisdom scores each increase by 4, to a maximum of 25.",
   },
 ];
 
-const WAY_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
   {
     name: "Open Hand Technique",
     level: 3,
     source: "subclass",
     description:
-      "When you hit a creature with Flurry of Blows, you can impose one effect: the creature makes a Strength save or falls prone; the creature makes a Dexterity save or is pushed up to 15 ft away; or the creature can't take reactions until the start of your next turn.",
+      "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't take reactions until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
   },
   {
     name: "Wholeness of Body",
     level: 6,
     source: "subclass",
     description:
-      "As an action, regain HP equal to three times your monk level. Once used, regain on a long rest.",
+      "As a bonus action, roll your Martial Arts die and regain that many hit points plus your Wisdom modifier (minimum 1). Usable a number of times equal to your Wisdom modifier (minimum once); regain all expended uses on a long rest.",
   },
   {
-    name: "Tranquility",
+    name: "Fleet Step",
     level: 11,
     source: "subclass",
     description:
-      "At the end of a long rest, you gain the effect of a Sanctuary spell that lasts until your next long rest (Wisdom save DC 8 + proficiency + Wisdom modifier).",
+      "When you take a bonus action other than Step of the Wind, you can also take the Step of the Wind bonus action immediately afterward.",
   },
   {
     name: "Quivering Palm",
     level: 17,
     source: "subclass",
     description:
-      "When you hit with an unarmed strike, spend 3 ki to set up lethal vibrations in the creature. At any time thereafter, use your action to deal 10d10 necrotic damage (Con save, DC = ki save DC, for half) or end the vibrations harmlessly.",
+      "When you hit with an unarmed strike, spend 4 focus to set imperceptible vibrations in the creature that last for a number of days equal to your monk level. They are harmless unless you use your action to end them — the creature then makes a Constitution save, taking 10d12 force damage on a failure or half as much on a success. You can maintain vibrations in only one creature at a time and can end them harmlessly at any time without using an action.",
   },
 ];
 
@@ -173,7 +180,7 @@ const WAY_OF_SHADOW_FEATURES: DerivedFeature[] = [
     level: 3,
     source: "subclass",
     description:
-      "Spend 2 ki to cast Darkness, Darkvision, Pass without Trace, or Silence — without material components. You also know the Minor Illusion cantrip.",
+      "Spend 2 focus to cast Darkness, Darkvision, Pass without Trace, or Silence — without material components. You also know the Minor Illusion cantrip.",
   },
   {
     name: "Shadow Step",
@@ -204,7 +211,7 @@ const FOUR_ELEMENTS_FEATURES: DerivedFeature[] = [
     level: 3,
     source: "subclass",
     description:
-      "You learn magical elemental disciplines fueled by ki. You know the Elemental Attunement discipline plus one elemental discipline of your choice, and learn one additional discipline at levels 6, 11, and 17. Casting an elemental discipline that is a spell costs ki equal to the spell's level; the save DC equals your ki save DC.",
+      "You learn magical elemental disciplines fueled by focus. You know the Elemental Attunement discipline plus one elemental discipline of your choice, and learn one additional discipline at levels 6, 11, and 17. Casting an elemental discipline that is a spell costs focus equal to the spell's level; the save DC equals your focus save DC.",
   },
   {
     name: "Additional Elemental Discipline",
@@ -242,18 +249,22 @@ export const monk: ClassDefinition = {
     ];
   },
   subclasses: {
-    "way of the open hand": {
+    "warrior of the open hand": {
       grantLevel: 3,
-      features: WAY_OF_THE_OPEN_HAND_FEATURES,
-      resourceFn: (level) => {
+      features: WARRIOR_OF_THE_OPEN_HAND_FEATURES,
+      // Wholeness of Body (SRD 5.2): uses = Wisdom modifier (min 1), not the
+      // 2014 flat 1-use/long-rest shape — needs abilityScores, unlike the
+      // level-only 2014 formula.
+      resourceFn: (level, abilityScores) => {
         if (level < 6) return [];
+        const wisMod = Math.max(1, abilityModifier(abilityScores.wisdom ?? 10));
         return [
           {
             key: "wholenessOfBody",
             label: "Wholeness of Body",
-            total: 1,
+            total: wisMod,
             recharge: "longRest",
-            description: `Action: regain ${level * 3} HP (three times your monk level). Regain use on a long rest.`,
+            description: `Bonus action: roll your Martial Arts die and regain that many HP plus your Wisdom modifier (minimum 1). ${wisMod} use(s) per long rest.`,
           },
         ];
       },

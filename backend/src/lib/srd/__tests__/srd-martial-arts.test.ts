@@ -11,23 +11,23 @@ describe("deriveMartialArtsDie", () => {
   });
 
   it("scales by level band", () => {
-    expect(deriveMartialArtsDie(1)).toBe(4);
-    expect(deriveMartialArtsDie(4)).toBe(4);
-    expect(deriveMartialArtsDie(5)).toBe(6);
-    expect(deriveMartialArtsDie(10)).toBe(6);
-    expect(deriveMartialArtsDie(11)).toBe(8);
-    expect(deriveMartialArtsDie(16)).toBe(8);
-    expect(deriveMartialArtsDie(17)).toBe(10);
-    expect(deriveMartialArtsDie(20)).toBe(10);
+    expect(deriveMartialArtsDie(1)).toBe(6);
+    expect(deriveMartialArtsDie(4)).toBe(6);
+    expect(deriveMartialArtsDie(5)).toBe(8);
+    expect(deriveMartialArtsDie(10)).toBe(8);
+    expect(deriveMartialArtsDie(11)).toBe(10);
+    expect(deriveMartialArtsDie(16)).toBe(10);
+    expect(deriveMartialArtsDie(17)).toBe(12);
+    expect(deriveMartialArtsDie(20)).toBe(12);
   });
 
   it("crosses each threshold at the exact boundary", () => {
-    expect(deriveMartialArtsDie(4)).toBe(4);
-    expect(deriveMartialArtsDie(5)).toBe(6);
-    expect(deriveMartialArtsDie(10)).toBe(6);
-    expect(deriveMartialArtsDie(11)).toBe(8);
-    expect(deriveMartialArtsDie(16)).toBe(8);
-    expect(deriveMartialArtsDie(17)).toBe(10);
+    expect(deriveMartialArtsDie(4)).toBe(6);
+    expect(deriveMartialArtsDie(5)).toBe(8);
+    expect(deriveMartialArtsDie(10)).toBe(8);
+    expect(deriveMartialArtsDie(11)).toBe(10);
+    expect(deriveMartialArtsDie(16)).toBe(10);
+    expect(deriveMartialArtsDie(17)).toBe(12);
   });
 });
 
@@ -41,23 +41,23 @@ describe("deriveUnarmedStrike — Monk Martial Arts", () => {
   it("L1 monk, unarmored, Dex 16 / Str 10 uses Dex for attack + damage", () => {
     const s = deriveUnarmedStrike(scores(10, 16), 2, 1, monk(1));
     expect(s.attackBonus).toBe(3 + 2); // dexMod 3 + prof 2
-    expect(s.damage).toMatchObject({ count: 1, faces: 4, modifier: 3, damageType: "bludgeoning" });
+    expect(s.damage).toMatchObject({ count: 1, faces: 6, modifier: 3, damageType: "bludgeoning" });
   });
 
   it("scales the martial-arts die with monk level at each boundary", () => {
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(4)).damage.faces).toBe(4);
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(5)).damage.faces).toBe(6);
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(10)).damage.faces).toBe(6);
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(11)).damage.faces).toBe(8);
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(16)).damage.faces).toBe(8);
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(17)).damage.faces).toBe(10);
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(4)).damage.faces).toBe(6);
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(5)).damage.faces).toBe(8);
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(10)).damage.faces).toBe(8);
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(11)).damage.faces).toBe(10);
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(16)).damage.faces).toBe(10);
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(17)).damage.faces).toBe(12);
   });
 
   it("uses Str when Str exceeds Dex — never worse than STR-only", () => {
     const s = deriveUnarmedStrike(scores(16, 10), 2, 1, monk(1));
     expect(s.attackBonus).toBe(3 + 2); // strMod 3
     expect(s.damage.modifier).toBe(3);
-    expect(s.damage.faces).toBe(4);
+    expect(s.damage.faces).toBe(6);
   });
 
   it("falls back to STR + feat die when wearing armor", () => {
@@ -74,10 +74,11 @@ describe("deriveUnarmedStrike — Monk Martial Arts", () => {
   });
 
   it("Tavern Brawler: Monk die wins once it exceeds the feat die", () => {
-    // L1 monk with Tavern Brawler (feat die 4): max(4, 4) = 4
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(1)).damage.faces).toBe(4);
-    // L5 monk with Tavern Brawler: max(4, 6) = 6
-    expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(5)).damage.faces).toBe(6);
+    // L1 monk with Tavern Brawler (feat die 4): max(4, 6) = 6 — the 2024 martial-arts
+    // floor (1d6) already exceeds the feat die, unlike the 2014 1d4 floor.
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(1)).damage.faces).toBe(6);
+    // L5 monk with Tavern Brawler: max(4, 8) = 8
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(5)).damage.faces).toBe(8);
   });
 
   it("non-monk (no context) keeps STR-based flat-1 unarmed strike", () => {
@@ -99,7 +100,7 @@ describe("deriveUnarmedStrike — Monk Martial Arts", () => {
   });
 });
 
-describe("deriveUnarmedStrike — Ki-Empowered Strikes (magical at monk L6+)", () => {
+describe("deriveUnarmedStrike — Empowered Strikes (magical at monk L6+)", () => {
   const monk = (level: number, isUnarmored = true, hasShield = false) => ({
     level,
     isUnarmored,
