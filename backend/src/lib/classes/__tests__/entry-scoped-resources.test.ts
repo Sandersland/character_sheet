@@ -130,4 +130,63 @@ describe("deriveEntryScopedResources", () => {
 
     expect(derived?.resources).toEqual(bare?.resources);
   });
+
+  // #1206: `features` must scale per entry too (previously seeded from the
+  // primary entry at total level, so a secondary class's own features never
+  // appeared and the primary's appeared at the wrong — too high — level).
+  it("Monk 5 / Fighter (Battle Master) 3: features are scoped per entry — monk features up to L5, fighter features up to L3, no bleed", () => {
+    const totalLevel = 8; // monk 5 + fighter 3
+    const profBonus = proficiencyBonusForLevel(totalLevel);
+    const entries = [
+      { name: "monk", subclass: undefined, level: 5 },
+      { name: "fighter", subclass: "battle master", level: 3 },
+    ];
+
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+    const derivedNames = new Set(derived?.features?.map((f) => f.name));
+
+    const bareMonkAt5 = deriveResources("monk", undefined, 5, ABILITY_SCORES, profBonus);
+    const bareFighterAt3 = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, profBonus);
+    const bareMonkAt8 = deriveResources("monk", undefined, 8, ABILITY_SCORES, profBonus);
+    const monkAt5Names = new Set(bareMonkAt5?.features.map((f) => f.name));
+
+    // Every monk-L5 feature and every fighter-L3 feature is present...
+    expect(bareMonkAt5?.features.every((f) => derivedNames.has(f.name))).toBe(true);
+    expect(bareFighterAt3?.features.every((f) => derivedNames.has(f.name))).toBe(true);
+
+    // ...but nothing the monk gains ONLY between L6-L8 leaks in — that would
+    // only happen if features were still seeded from the primary at total
+    // level instead of the monk entry's own level (5).
+    const monkLevel6PlusNames = (bareMonkAt8?.features ?? [])
+      .map((f) => f.name)
+      .filter((name) => !monkAt5Names.has(name));
+    expect(monkLevel6PlusNames.length).toBeGreaterThan(0); // sanity: monk does gain something L6-8
+    expect(monkLevel6PlusNames.every((name) => !derivedNames.has(name))).toBe(true);
+  });
+
+  // #1206: gate booleans (shadowArtsAvailable/cloakOfShadowsAvailable, and any
+  // other deriveExtras scalar field) must key off the OWNING entry's own
+  // level, not the primary entry at total level — previously a secondary
+  // Warrior of Shadow monk got no gate at all (deriveExtras only ran on the
+  // primary). Deliberately does NOT assert against a hardcoded total level —
+  // only that the gate tracks the monk entry's own level, so this test stays
+  // valid across any future edition change to the gate's level.
+  it("Fighter 5 (primary) / Warrior of Shadow monk 3 (secondary): shadowArtsAvailable is set, keyed off the monk entry's own level", () => {
+    const totalLevel = 8; // fighter 5 + monk 3
+    const profBonus = proficiencyBonusForLevel(totalLevel);
+    const entries = [
+      { name: "fighter", subclass: undefined, level: 5 },
+      { name: "monk", subclass: "warrior of shadow", level: 3 },
+    ];
+
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+
+    const bareMonkAtEntryLevel = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, profBonus);
+    expect(derived?.shadowArtsAvailable).toBe(bareMonkAtEntryLevel?.shadowArtsAvailable);
+    expect(derived?.shadowArtsAvailable).toBe(true);
+    // The primary (fighter) never sets this field — proves the value came
+    // from overlaying the SECONDARY entry's own derivation, not the primary's.
+    const bareFighterPrimary = deriveResources("fighter", undefined, totalLevel, ABILITY_SCORES, profBonus);
+    expect(bareFighterPrimary?.shadowArtsAvailable).toBeUndefined();
+  });
 });
