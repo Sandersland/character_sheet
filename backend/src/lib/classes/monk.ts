@@ -1,6 +1,6 @@
 import { abilityModifier, deriveMartialArtsDie } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature, InitiativeRegen } from "./types.js";
+import type { ClassDefinition, DerivedFeature, DerivedResource, InitiativeRegen } from "./types.js";
 
 /** Elemental discipline count by Monk level (Way of the Four Elements). */
 function fourElementsDisciplineCount(level: number): number {
@@ -207,6 +207,61 @@ const WAY_OF_SHADOW_FEATURES: DerivedFeature[] = [
   },
 ];
 
+// Warrior of Mercy (PHB'24 p.92 — not in SRD 5.2, gap-fill content, #1248).
+// None of these features call for a saving throw: Hand of Harm/Hand of
+// Healing/Hand of Ultimate Mercy are touch effects that land automatically
+// (see hand-of-harm.ts / hand-of-ultimate-mercy.ts for the live-play
+// automation of the two that spend Focus mid-combat; Hand of Healing runs
+// through the generic actions.ts dispatch like Wholeness of Body). Implements
+// of Mercy grants fixed (non-choice) proficiencies — like Disciplined
+// Survivor's saving-throw proficiency above, it's feature text only; this
+// app has no mechanism for a subclass to auto-add to the persisted skill/tool
+// proficiency lists (those are chosen at creation).
+const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
+  {
+    name: "Implements of Mercy",
+    level: 3,
+    source: "subclass",
+    description:
+      "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+  },
+  {
+    name: "Hand of Harm",
+    level: 3,
+    source: "subclass",
+    description:
+      "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+  },
+  {
+    name: "Hand of Healing",
+    level: 3,
+    source: "subclass",
+    description:
+      "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+  },
+  {
+    name: "Physician's Touch",
+    level: 6,
+    source: "subclass",
+    description:
+      "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+  },
+  {
+    name: "Flurry of Healing and Harm",
+    level: 11,
+    source: "subclass",
+    description:
+      "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+  },
+  {
+    name: "Hand of Ultimate Mercy",
+    level: 17,
+    source: "subclass",
+    description:
+      "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+  },
+];
+
 const FOUR_ELEMENTS_FEATURES: DerivedFeature[] = [
   {
     name: "Disciple of the Elements",
@@ -310,6 +365,40 @@ export const monk: ClassDefinition = {
         disciplineChoiceCount: fourElementsDisciplineCount(level),
         disciplineSaveDC: focusSaveDC(abilityScores, profBonus),
       }),
+    },
+    "warrior of mercy": {
+      grantLevel: 3,
+      features: WARRIOR_OF_MERCY_FEATURES,
+      // Hand of Harm / Hand of Healing (L3) spend the base Focus pool directly
+      // — no dedicated pool (#1248). Flurry of Healing and Harm (L11) and Hand
+      // of Ultimate Mercy (L17) are their own long-rest pools, spent via the
+      // generic /resources/transactions endpoint like any other class pool;
+      // hand-of-harm.ts's `freeFromFlurry` flag is the only bespoke wiring
+      // that draws from flurryOfHealingAndHarm instead of focus.
+      resourceFn: (level, abilityScores) => {
+        const pools: DerivedResource[] = [];
+        if (level >= 11) {
+          const wisMod = Math.max(1, abilityModifier(abilityScores.wisdom ?? 10));
+          pools.push({
+            key: "flurryOfHealingAndHarm",
+            label: "Flurry of Healing and Harm",
+            total: wisMod,
+            recharge: "longRest",
+            description: `During Flurry of Blows, replace each unarmed strike with Hand of Healing and apply Hand of Harm without spending focus. ${wisMod} use(s) per long rest.`,
+          });
+        }
+        if (level >= 17) {
+          pools.push({
+            key: "handOfUltimateMercy",
+            label: "Hand of Ultimate Mercy",
+            total: 1,
+            recharge: "longRest",
+            description:
+              "Magic action, 5 focus: touch a creature dead no more than 24 hours to return it to life with 4d10 + Wisdom modifier hit points, ending Blinded, Deafened, Paralyzed, Poisoned, and Stunned. Once per long rest.",
+          });
+        }
+        return pools;
+      },
     },
   },
 };

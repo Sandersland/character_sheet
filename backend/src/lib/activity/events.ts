@@ -76,6 +76,8 @@ export type EventType =
   | "imposeOpenHandRider"
   | "setQuiveringPalm"
   | "triggerQuiveringPalm"
+  | "dealHandOfHarm"
+  | "useHandOfUltimateMercy"
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"

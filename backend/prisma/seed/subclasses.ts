@@ -138,6 +138,12 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You channel the elements through your focus, learning elemental disciplines that let you wield fire, water, air, and earth. Disciple of the Elements grants Elemental Attunement plus one discipline of your choice at level 3, with additional disciplines learned at levels 6, 11, and 17. Disciplines that mimic spells cost focus equal to the spell's level, using your focus save DC.",
   },
+  {
+    className: "Monk",
+    name: "Warrior of Mercy",
+    description:
+      "You wield your focus to wound or heal with a touch. Hand of Harm channels necrotic energy into your unarmed strikes, while Hand of Healing lets you mend a creature as a Magic action or in place of a Flurry of Blows strike. Physician's Touch adds lingering harm or cures grievous conditions, Flurry of Healing and Harm lets a flurry of blows do both at once, and Hand of Ultimate Mercy can restore the recently dead to life.",
+  },
   // ── Paladin ───────────────────────────────────────────────────────────────
   {
     className: "Paladin",

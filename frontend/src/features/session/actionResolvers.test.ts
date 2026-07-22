@@ -24,6 +24,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus",
   "deflectAttacksRedirect",
   "wholenessOfBody",
+  "handOfHealing", "handOfHealingFlurry",
   "divineSense", "layOnHands", "channelDivinityPaladin",
   "cunningAction",
   "metamagic",
