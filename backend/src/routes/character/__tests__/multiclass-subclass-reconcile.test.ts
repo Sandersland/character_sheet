@@ -134,7 +134,6 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
     return {
       used: {},
       maneuversKnown,
-      disciplinesKnown: [],
       toolProficienciesKnown: [],
       choicesKnown: {},
       advancements: [],

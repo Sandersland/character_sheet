@@ -16,6 +16,7 @@ import Card from "@/components/ui/Card";
 import { ChevronRight, ScrollText, Zap } from "@/components/ui/icons";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { useTurnActions } from "@/features/session/useTurnActions";
+import { useDeflectAttacksReaction } from "@/features/session/useDeflectAttacksReaction";
 import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
@@ -73,13 +74,35 @@ function TurnHubIdle({
 }) {
   const { inCombat, round, reactionUsed, consumeReaction } = turnState;
   const {
-    busy, error, reactionMessage,
-    showReactionMenu, setShowReactionMenu,
+    busy, error, reactionMessage, effectMessage,
+    showReactionMenu, setShowReactionMenu, setReactionMessage,
     dieLabel, dieBusy, superiorityRemaining, classReactions, reactionManeuvers,
     reactionSheetModel,
     handleActionClick, handleReactionManeuver,
     handleStartCombat, handleEndCombat, handleStartTurn,
   } = turn;
+
+  // Deflect Attacks (#1241) — a sibling hook (see its file header for why it
+  // isn't nested inside useTurnActions), composed here alongside turn.
+  const deflect = useDeflectAttacksReaction({
+    character,
+    onUpdate,
+    availableActions: character.availableActions ?? [],
+    reactionUsed,
+    consumeReaction,
+    setShowReactionMenu,
+    setReactionMessage,
+    attachBatchId: turnState.attachBatchId,
+  });
+  // Only the Reaction slot needs the Deflect Attacks interception — the
+  // Action/Bonus slots keep the plain handleActionClick from useTurnActions.
+  function handleReactionActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
+    if (key === "deflectAttacks") {
+      deflect.handleDeflectAttacks();
+      return;
+    }
+    handleActionClick(key, cost);
+  }
 
   // Not in combat — show only the Start Combat gate.
   if (!inCombat) {
@@ -120,6 +143,15 @@ function TurnHubIdle({
           </button>
         </div>
 
+        {/* Combat-start resource regen (#1239/#1243, e.g. Uncanny Metabolism/
+            Perfect Focus) — set once by handleStartCombat, so it's visible
+            immediately here rather than waiting for the active-turn TurnMessages. */}
+        {effectMessage && (
+          <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
+            {effectMessage}
+          </p>
+        )}
+
         <TurnDeathSaves character={character} onUpdate={onUpdate} />
 
         <TurnConcentrationBanner
@@ -139,12 +171,14 @@ function TurnHubIdle({
           superiorityRemaining={superiorityRemaining}
           dieLabel={dieLabel}
           dieBusy={dieBusy}
-          busy={busy}
+          busy={busy || deflect.busy}
           reactionMessage={reactionMessage}
-          error={error}
-          handleActionClick={handleActionClick}
+          error={error ?? deflect.error}
+          handleActionClick={handleReactionActionClick}
           handleReactionManeuver={handleReactionManeuver}
           consumeReaction={consumeReaction}
+          deflectRedirectAvailable={deflect.deflectRedirectAvailable}
+          handleDeflectAttacksRedirect={deflect.handleDeflectAttacksRedirect}
         />
 
         <button
@@ -362,6 +396,7 @@ function TurnMessages({
   );
 }
 
+// fallow-ignore-next-line complexity -- composing the #1241 useDeflectAttacksReaction sibling hook (same pattern as the pre-existing useTallyResolve below) pushed cognitive from 15 to 16; the added surface is one hook call + a 6-line dispatch wrapper, not new branchy logic
 export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies, overlaysActive = true, onOpenLog }: TurnHubProps) {
   const isBelowMd = useIsBelowMd();
   const {
@@ -389,7 +424,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
   const { busy, error, reactionMessage, effectMessage, send, handleUndo } = turn;
   const {
     showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
-    showReactionMenu, setShowReactionMenu, activeResolution, closeResolution,
+    showReactionMenu, setShowReactionMenu, setReactionMessage, activeResolution, closeResolution,
     loadoutSwap,
   } = turn;
   const {
@@ -399,9 +434,31 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     actionSheetModel, bonusSheetModel, reactionSheetModel,
   } = turn;
   const {
-    handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleActionSurge,
-    handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
+    handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleFlurryAction,
+    handleActionSurge, handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
+
+  // Deflect Attacks (#1241) — a sibling hook (see its file header for why it
+  // isn't nested inside useTurnActions), composed here alongside turn.
+  const deflect = useDeflectAttacksReaction({
+    character,
+    onUpdate,
+    availableActions: character.availableActions ?? [],
+    reactionUsed,
+    consumeReaction,
+    setShowReactionMenu,
+    setReactionMessage,
+    attachBatchId: turnState.attachBatchId,
+  });
+  // Only the Reaction slot needs the Deflect Attacks interception — the
+  // Action/Bonus slots keep the plain handleActionClick from useTurnActions.
+  function handleReactionActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
+    if (key === "deflectAttacks") {
+      deflect.handleDeflectAttacks();
+      return;
+    }
+    handleActionClick(key, cost);
+  }
 
   // Inline banner resolve (#811): verdict writes + on-line damage rolls for
   // skipped attacks, shared-shaped with the in-sheet strip's rule.
@@ -445,10 +502,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       handleActionClick={handleActionClick}
     />
   );
+  // The pending-swing counter is shared by TWF and Bonus Unarmed Strike
+  // (#1218, same bonusAttack state) — label it from whichever resolution is
+  // actually open rather than hardcoding "Off-hand attack".
+  const bonusAttackLabel =
+    activeResolution?.resolver.key === "bonusUnarmedStrike" ? "Bonus Unarmed Strike" : "Off-hand attack";
   const bonusSlot = (
     <BonusActionSlot
       bonusActionUsed={bonusActionUsed}
       bonusAttack={bonusAttack}
+      bonusAttackLabel={bonusAttackLabel}
       showBonusMenu={showBonusMenu}
       setShowBonusMenu={setShowBonusMenu}
       twfAvailable={twfAvailable}
@@ -456,6 +519,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       sheetModel={bonusSheetModel}
       busy={busy}
       handleTwfAction={handleTwfAction}
+      handleFlurryAction={handleFlurryAction}
       handleActionClick={handleActionClick}
       handleBonusSpellCast={handleBonusSpellCast}
       consumeBonusAction={consumeBonusAction}
@@ -472,12 +536,14 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       superiorityRemaining={superiorityRemaining}
       dieLabel={dieLabel}
       dieBusy={dieBusy}
-      busy={busy}
+      busy={busy || deflect.busy}
       reactionMessage={reactionMessage}
-      error={error}
-      handleActionClick={handleActionClick}
+      error={error ?? deflect.error}
+      handleActionClick={handleReactionActionClick}
       handleReactionManeuver={handleReactionManeuver}
       consumeReaction={consumeReaction}
+      deflectRedirectAvailable={deflect.deflectRedirectAvailable}
+      handleDeflectAttacksRedirect={deflect.handleDeflectAttacksRedirect}
     />
   );
   const actionSurge = (

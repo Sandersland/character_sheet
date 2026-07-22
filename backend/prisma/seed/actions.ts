@@ -202,26 +202,46 @@ export const ACTIONS: ActionSeed[] = [
 
   // ── Class: Monk ──────────────────────────────────────────────────────────
   {
+    key: "bonusUnarmedStrike",
+    name: "Bonus Unarmed Strike",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 1,
+    description:
+      "Martial Arts: make one Unarmed Strike as a bonus action. Requires no armor or Shield. No resource cost, no Attack-action prerequisite.",
+  },
+  {
     key: "flurryOfBlows",
     name: "Flurry of Blows",
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
-    resourceKey: "ki",
+    resourceKey: "focus",
     resourceAmount: 2,
     description:
-      "Immediately after taking the Attack action, spend 2 ki to make two unarmed strikes as a bonus action.",
+      "Immediately after taking the Attack action, spend 2 focus to make two unarmed strikes as a bonus action.",
   },
+  // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240): each has
+  // a free variant and a 1-Focus variant that does more — not the 2014 SRD's
+  // flat "always costs 1 ki" shape.
   {
     key: "patientDefense",
     name: "Patient Defense",
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
-    resourceKey: "ki",
+    description: "Take the Disengage action as a bonus action, for free.",
+  },
+  {
+    key: "patientDefenseFocus",
+    name: "Patient Defense (1 Focus)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "focus",
     resourceAmount: 1,
     description:
-      "Spend 1 ki point to take the Dodge action as a bonus action.",
+      "Spend 1 focus to take the Disengage action and the Dodge action as a bonus action.",
   },
   {
     key: "stepOfTheWind",
@@ -229,24 +249,27 @@ export const ACTIONS: ActionSeed[] = [
     cost: "bonusAction",
     grantClass: "monk",
     grantLevel: 2,
-    resourceKey: "ki",
-    resourceAmount: 1,
-    description:
-      "Spend 1 ki to take the Disengage or Dash action as a bonus action. Your jump distance doubles for the turn.",
+    description: "Take the Dash action as a bonus action, for free.",
   },
   {
-    key: "stunningStrike",
-    name: "Stunning Strike",
-    cost: "free",
+    key: "stepOfTheWindFocus",
+    name: "Step of the Wind (1 Focus)",
+    cost: "bonusAction",
     grantClass: "monk",
-    grantLevel: 5,
-    resourceKey: "ki",
+    grantLevel: 2,
+    resourceKey: "focus",
     resourceAmount: 1,
     description:
-      "After hitting with a melee weapon attack, spend 1 ki to force the target to make a Constitution save or be stunned until end of your next turn.",
+      "Spend 1 focus to take the Disengage action and the Dash action as a bonus action. Your jump distance doubles for the turn.",
   },
+  // Stunning Strike (L5) isn't seeded here — it's a post-hit rider (spend +
+  // Con save + fail/success outcome), not a selectable catalog action. See
+  // stunning-strike.ts (#1242 supersedes the #392 bare-spend stub formerly here).
 
-  // ── Subclass: Way of Shadow monk ─────────────────────────────────────────
+  // ── Subclass: Warrior of Shadow monk (2024 rewrite, #1246) ───────────────
+  // Opportunist (2014 L17 reaction) is retired — 2024 replaces it with Cloak
+  // of Shadows at L17 (a resourceKey-gated cast, see shadow-arts.ts), not a
+  // catalog reminder action.
   {
     key: "shadowStep",
     name: "Shadow Step",
@@ -255,17 +278,7 @@ export const ACTIONS: ActionSeed[] = [
     grantSubclass: "Shadow",
     grantLevel: 6,
     description:
-      "When in dim light or darkness, teleport up to 60 ft as a bonus action to an unoccupied space you can see that is also in dim light or darkness. You have advantage on the first melee attack you make before the end of this turn.",
-  },
-  {
-    key: "opportunist",
-    name: "Opportunist",
-    cost: "reaction",
-    grantClass: "monk",
-    grantSubclass: "Shadow",
-    grantLevel: 17,
-    description:
-      "When a creature within 5 ft of you is hit by an attack made by another creature, use your reaction to make a melee attack against that creature.",
+      "While in dim light or darkness, teleport up to 60 ft as a bonus action to an unoccupied space you can see that is also in dim light or darkness, then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of this turn.",
   },
 
   // ── Class: Paladin ──────────────────────────────────────────────────────

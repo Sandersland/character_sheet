@@ -2,12 +2,16 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+// Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
+// now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
+// would close an import cycle back through combat/hitpoints.ts.
 import {
   snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
+  clearInitiativeRegenMarkers,
   type ResourcesMutableState,
-} from "@/lib/classes/resources.js";
+} from "@/lib/classes/resources-state.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { deriveMulticlassSpellcasting } from "@/lib/srd/spellcasting-tables.js";
 import {
@@ -190,6 +194,9 @@ function resetRestResources(
       state.used[pool.key] = 0;
     }
   }
+  // A long rest resets the once-per-long-rest initiative-regen cap (#1239) so
+  // the next combat's regen (e.g. Uncanny Metabolism) can fire again.
+  if (rest === "long") clearInitiativeRegenMarkers(state);
   return { state, beforeResourceState, resourcesRestored };
 }
 

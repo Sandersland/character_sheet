@@ -1,4 +1,4 @@
-// Monk Unarmored Movement speed bonus by monk level (PHB p.78): +10 at L2, rising
+// Monk Unarmored Movement speed bonus by monk level (SRD 5.2): +10 at L2, rising
 // to +30 at L18. Lost while wearing armor or wielding a shield. Additive term —
 // composes with racial base speed and feat speed bonuses, never merged into them.
 export function deriveUnarmoredMovement(input: {

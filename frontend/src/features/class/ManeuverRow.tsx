@@ -2,7 +2,7 @@
  * ManeuverRow — renders a single known maneuver with an expandable description
  * and a "Forget" action. Purely presentational: no API calls, receives all
  * callbacks from the ClassFeaturesSection orchestrator. Renders through
- * AbilityRowShell (shared with DisciplineRow/ShadowArtRow).
+ * AbilityRowShell (shared with ShadowArtRow).
  */
 
 import AbilityRowShell from "@/features/class/AbilityRowShell";

@@ -79,6 +79,18 @@ export interface ClassActionOption {
   heal: boolean;
 }
 
+/**
+ * "Spend 1 Focus Points" caption for Flurry of Blows — its card otherwise
+ * shows only the pool's REMAINING total (the badge), never the per-use cost
+ * (#1217). Reads the pool's own `label` (never the raw resourceKey) so this
+ * never renders a bare camelCase key in the UI. Undefined when the pool isn't
+ * on the character (e.g. a non-monk somehow seeing this action).
+ */
+function flurrySpendLabel(pools: ResourcePool[] | undefined): string | undefined {
+  const pool = pools?.find((p) => p.key === "focus");
+  return pool ? `Spend 1 ${pool.label}` : undefined;
+}
+
 /** Enrich a backend AvailableAction with resolver-derived subtitle + pool badge. */
 export function classActionOption(
   action: AvailableAction,
@@ -87,12 +99,19 @@ export function classActionOption(
 ): ClassActionOption {
   const heal = resolver?.kind === "heal-roll" || resolver?.kind === "heal-input";
   const badge = poolBadgeFor(resolver?.resourceKey, character.resources?.pools);
-  // Heal-roll actions preview their heal; reminder-only actions (Shadow Step,
-  // Opportunist) surface their rule text as the caption instead.
+  // Heal-roll actions preview their heal; a resolver-level static subtitle
+  // (Bonus Unarmed Strike, #1218) wins next; Flurry surfaces its Focus cost
+  // (#1217, singled out rather than generalized to every resource-costing
+  // action — a broader "spend N" caption is a separate design call); every
+  // other reminder-only action (e.g. Shadow Step) shows its rule text.
   const subtitle =
     resolver?.kind === "heal-roll" && resolver.healRoll
       ? `Regain ${formatRollSpec(resolver.healRoll(character))} HP`
-      : action.reminder;
+      : resolver?.subtitle
+        ? resolver.subtitle
+        : action.key === "flurryOfBlows"
+          ? flurrySpendLabel(character.resources?.pools)
+          : action.reminder;
   return {
     key: action.key,
     title: action.name,

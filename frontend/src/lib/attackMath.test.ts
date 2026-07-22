@@ -6,8 +6,10 @@ import {
   buildAttackForms,
   buildEquippedWeaponEntries,
   buildOffHandEntry,
+  buildUnarmedOnlyForms,
   capabilitiesActive,
   critDamageSpec,
+  flurryStrikeCount,
   hasSuperiorityDice,
   unarmedDamageDisplay,
   weaponDamageRiders,
@@ -248,7 +250,7 @@ describe("buildAttackEntries", () => {
     expect(unarmed.magical).toBe(false);
   });
 
-  it("flags the unarmed row magical when the strike is magical (Ki-Empowered Strikes)", () => {
+  it("flags the unarmed row magical when the strike is magical (Empowered Strikes)", () => {
     const character = makeCharacter({
       unarmedStrike: {
         attackBonus: 5,
@@ -343,6 +345,35 @@ describe("buildAttackForms (#786)", () => {
       ] as unknown as Character["inventory"],
     });
     expect(buildAttackForms(character)[0].name).toBe("Longsword");
+  });
+});
+
+describe("buildUnarmedOnlyForms (#1217)", () => {
+  it("returns exactly one form — Unarmed Strike — even with weapons equipped", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 6, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing" }, "Shortsword", "inv-1"),
+      ] as unknown as Character["inventory"],
+    });
+    const forms = buildUnarmedOnlyForms(character);
+    expect(forms).toHaveLength(1);
+    expect(forms[0].id).toBe("unarmed");
+    expect(forms[0].name).toBe("Unarmed Strike");
+  });
+
+  it("never includes Improvised Weapon (2024 Flurry grants no weapon choice)", () => {
+    const forms = buildUnarmedOnlyForms(makeCharacter());
+    expect(forms.some((f) => f.id === "improvised")).toBe(false);
+  });
+});
+
+describe("flurryStrikeCount (#1217, Heightened Focus upgrade #1244)", () => {
+  it("is 2 below monk L10", () => {
+    expect(flurryStrikeCount(makeCharacter({ level: 9 }))).toBe(2);
+  });
+
+  it("is 3 at monk L10+ (Heightened Focus)", () => {
+    expect(flurryStrikeCount(makeCharacter({ level: 10 }))).toBe(3);
   });
 });
 

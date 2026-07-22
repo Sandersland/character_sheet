@@ -33,10 +33,15 @@ import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
 import { levelUpRouter } from "@/routes/character/level-up.js";
-import { disciplinesRouter } from "@/routes/character/disciplines.js";
+import { warriorOfElementsRouter } from "@/routes/character/warrior-of-elements.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
 import { sneakAttackRouter } from "@/routes/character/sneak-attack.js";
+import { stunningStrikeRouter } from "@/routes/character/stunning-strike.js";
+import { openHandTechniqueRouter } from "@/routes/character/open-hand-technique.js";
+import { quiveringPalmRouter } from "@/routes/character/quivering-palm.js";
+import { handOfHarmRouter } from "@/routes/character/hand-of-harm.js";
+import { handOfUltimateMercyRouter } from "@/routes/character/hand-of-ultimate-mercy.js";
 import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
@@ -118,7 +123,12 @@ export function createApp() {
   // transaction (POST /transactions), so they mount on both owned paths.
   app.use(["/api/maneuvers", "/api/characters/:id/maneuvers"], maneuversRouter);
   app.use("/api/characters/:id/sneak-attack", sneakAttackRouter);
-  app.use(["/api/disciplines", "/api/characters/:id/disciplines"], disciplinesRouter);
+  app.use("/api/characters/:id/stunning-strike", stunningStrikeRouter);
+  app.use("/api/characters/:id/open-hand-technique", openHandTechniqueRouter);
+  app.use("/api/characters/:id/quivering-palm", quiveringPalmRouter);
+  app.use("/api/characters/:id/hand-of-harm", handOfHarmRouter);
+  app.use("/api/characters/:id/hand-of-ultimate-mercy", handOfUltimateMercyRouter);
+  app.use("/api/characters/:id/elements", warriorOfElementsRouter);
   app.use(["/api/shadow-arts", "/api/characters/:id/shadow-arts"], shadowArtsRouter);
   app.use("/api/subclass-choices", subclassChoicesRouter);
 

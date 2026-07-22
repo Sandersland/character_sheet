@@ -1,6 +1,6 @@
 /**
  * Shared caster for activated abilities — one sequence behind castSpell and any
- * future castDiscipline: pay-cost → build summary → concentration → self-apply.
+ * future focus-cast abilities: pay-cost → build summary → concentration → self-apply.
  *
  * Concentration drop-on-cast and self-apply are lifted here as character-wide
  * helpers operating on the mutable state's `concentratingOn`, not on a

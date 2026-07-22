@@ -12,8 +12,8 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const shadowArtsRouter = Router({ mergeParams: true });
 
-// Feeds the Way of Shadow monk's Shadow Arts picker — mirrors GET /api/disciplines.
-// Each row carries its embedded ki cost (AbilityCost) and flat EffectSpec.
+// Feeds the Warrior of Shadow monk's Shadow Arts picker — mirrors GET /api/maneuvers.
+// Each row carries its embedded focus cost (AbilityCost) and flat EffectSpec.
 shadowArtsRouter.get("/", async (_req, res) => {
   const arts = await prisma.grantedAbility.findMany({
     where: { source: "shadowArts" },
@@ -37,7 +37,11 @@ const castShadowArtOpSchema = z.object({
   shadowArtId: z.string().min(1),
 });
 
-const operationSchema = z.discriminatedUnion("type", [castShadowArtOpSchema]);
+const activateCloakOfShadowsOpSchema = z.object({
+  type: z.literal("activateCloakOfShadows"),
+});
+
+const operationSchema = z.discriminatedUnion("type", [castShadowArtOpSchema, activateCloakOfShadowsOpSchema]);
 
 const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
@@ -45,9 +49,10 @@ const transactionsRequestSchema = z.object({
 
 /**
  * POST /api/characters/:id/shadow-arts/transactions
- * Intent-bearing batch mutation for Shadow Arts — mirrors the disciplines
- * endpoint. The one op today:
- *   castShadowArt — spend a flat 2 ki, apply concentration/buff, log the cast.
+ * Intent-bearing batch mutation for Warrior of Shadow's two focus-fuelled
+ * features (#1246):
+ *   castShadowArt          — spend 1 focus, cast Darkness (concentration).
+ *   activateCloakOfShadows — spend 3 focus, self-apply invisible (L17).
  */
 makeTransactionsEndpoint({
   router: shadowArtsRouter,

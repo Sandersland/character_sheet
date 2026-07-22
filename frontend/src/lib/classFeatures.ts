@@ -11,7 +11,7 @@ import type {
 export interface ClassFeatureFlags {
   hasPools: boolean;
   hasManeuvers: boolean;
-  hasDisciplines: boolean;
+  hasElementsWarrior: boolean;
   hasShadowArts: boolean;
   hasChannelDivinity: boolean;
   hasCloakOfShadows: boolean;
@@ -58,7 +58,7 @@ function deriveFlags(character: Character): ClassFeatureFlags {
     return {
       hasPools: false,
       hasManeuvers: false,
-      hasDisciplines: false,
+      hasElementsWarrior: false,
       hasShadowArts: false,
       hasChannelDivinity: false,
       hasCloakOfShadows: false,
@@ -70,7 +70,7 @@ function deriveFlags(character: Character): ClassFeatureFlags {
   return {
     hasPools: resources.pools.length > 0,
     hasManeuvers: resources.maneuverChoiceCount !== undefined,
-    hasDisciplines: resources.disciplineChoiceCount !== undefined,
+    hasElementsWarrior: resources.elementalAttunementAvailable === true,
     hasShadowArts: resources.shadowArtsAvailable === true,
     hasChannelDivinity: resources.pools.some((p) => p.key === "channelDivinity"),
     hasCloakOfShadows: resources.cloakOfShadowsAvailable === true,
@@ -88,7 +88,7 @@ function isFeatureViewEmpty(
   return (
     !flags.hasPools &&
     !flags.hasManeuvers &&
-    !flags.hasDisciplines &&
+    !flags.hasElementsWarrior &&
     !flags.hasShadowArts &&
     !flags.hasCloakOfShadows &&
     !flags.hasFeatures &&

@@ -46,7 +46,7 @@ const transactionsRequestSchema = z.object({
 
 /**
  * POST /api/characters/:id/maneuvers/transactions
- * Intent-bearing batch mutation for maneuvers — mirrors the disciplines endpoint.
+ * Intent-bearing batch mutation for maneuvers — mirrors the shadow-arts endpoint.
  * The one op today: castManeuver — spend one superiority die (server rolls it),
  * log the cast with the announced DC, apply Rally temp HP. Returns the updated
  * character plus per-op { roll, saveDc } so the client folds the die into the

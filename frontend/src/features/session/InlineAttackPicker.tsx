@@ -28,6 +28,8 @@ import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
 import SneakAttackSection from "@/features/session/SneakAttackSection";
+import StunningStrikeSection from "@/features/session/StunningStrikeSection";
+import QuiveringPalmSection from "@/features/session/QuiveringPalmSection";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -205,6 +207,26 @@ export default function InlineAttackPicker({
       onUpdate={onUpdate}
     />
   );
+  const stunningStrike = boundView && (
+    <StunningStrikeSection
+      character={character}
+      turnState={turnState}
+      currentRow={currentRow}
+      onUpdate={onUpdate}
+    />
+  );
+  // Unlike the hit-gated riders above, Quivering Palm's Trigger isn't tied to a
+  // hit this turn (it ends a prior Set, any time as a Magic action) — so this
+  // mounts unconditionally rather than gating on boundView; the section itself
+  // gates Set on currentRow and Trigger on the active flag (#1245).
+  const quiveringPalm = (
+    <QuiveringPalmSection
+      character={character}
+      turnState={turnState}
+      currentRow={currentRow}
+      onUpdate={onUpdate}
+    />
+  );
   const spellAttacks = (
     <InlineSpellAttackSection
       character={character}
@@ -256,6 +278,8 @@ export default function InlineAttackPicker({
         {stepCard}
         {maneuversDisclosure}
         {sneakAttack}
+        {stunningStrike}
+        {quiveringPalm}
         {spellAttacks}
         {footer}
       </div>
@@ -274,6 +298,8 @@ export default function InlineAttackPicker({
         {tallyStrip}
         {maneuversDisclosure}
         {sneakAttack}
+        {stunningStrike}
+        {quiveringPalm}
         {spellAttacks}
       </div>
     </div>

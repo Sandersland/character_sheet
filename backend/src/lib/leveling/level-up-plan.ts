@@ -19,7 +19,6 @@ export type LevelUpStepKind =
   | "subclass"
   | "maneuvers"
   | "fightingStyleFeat"
-  | "disciplines"
   | "toolProficiency"
   | "subclassChoice"
   | "newSpells"
@@ -81,11 +80,11 @@ function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
   return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 
-// Diff one bespoke choose-N count (maneuvers/disciplines/tools) across N vs N-1.
+// Diff one bespoke choose-N count (maneuvers/tools) across N vs N-1.
 function choiceCountStep(
   { now, prev }: PlanContext,
   kind: LevelUpStepKind,
-  field: "maneuverChoiceCount" | "disciplineChoiceCount" | "toolProfChoiceCount",
+  field: "maneuverChoiceCount" | "toolProfChoiceCount",
 ): LevelUpStep | null {
   const delta = (now?.[field] ?? 0) - (prev?.[field] ?? 0);
   return delta > 0 ? { kind, count: delta } : null;
@@ -154,7 +153,6 @@ export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: Target
     subclassStep(ctx),
     choiceCountStep(ctx, "maneuvers", "maneuverChoiceCount"),
     fightingStyleFeatStep(ctx),
-    choiceCountStep(ctx, "disciplines", "disciplineChoiceCount"),
     choiceCountStep(ctx, "toolProficiency", "toolProfChoiceCount"),
     ...subclassChoiceSteps(ctx),
     newSpellsStep(ctx),

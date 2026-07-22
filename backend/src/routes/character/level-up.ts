@@ -22,7 +22,6 @@ import { levelUpTargetSchema } from "@/routes/character/hitpoints.js";
 import { takeAsiOpSchema, takeFeatOpSchema } from "@/routes/character/advancement.js";
 import {
   learnManeuverOpSchema,
-  learnDisciplineOpSchema,
   learnToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
 } from "@/routes/character/resources.js";
@@ -133,7 +132,6 @@ const levelUpSubmissionSchema = z.object({
   subclassId: z.string().min(1).optional(),
   fightingStyleFeat: takeFeatOpSchema.optional(),
   maneuvers: z.array(learnManeuverOpSchema).optional(),
-  disciplines: z.array(learnDisciplineOpSchema).optional(),
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
   spellsLearned: z.array(learnSpellOpSchema).optional(),
@@ -145,7 +143,7 @@ const levelUpSubmissionSchema = z.object({
  * POST /api/characters/:id/level-up/transactions
  * One atomic level-up: validates the structured submission against the character's
  * derived plan, then applies hit points, advancement (ASI/feat), subclass choice,
- * subclass-derived choices (maneuvers / disciplines / tool proficiency / choose-N),
+ * subclass-derived choices (maneuvers / tool proficiency / choose-N),
  * and newly learned spells under a single batchId. Any invalid op rolls back the
  * whole ceremony. Returns the full updated character.
  */

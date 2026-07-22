@@ -8,13 +8,13 @@ import type {
   CampaignArc,
   CampaignPreferences,
   CatalogFeat,
-  CatalogDiscipline,
   CatalogManeuver,
   CatalogShadowArt,
   CatalogChannelDivinity,
   CatalogSpell,
   Character,
-  DisciplineOperation,
+  WarriorOfElementsOperation,
+  WarriorOfElementsResult,
   ShadowArtOperation,
   ChannelDivinityOperation,
   CharacterEvent,
@@ -43,8 +43,13 @@ import type {
   ManeuverOperation,
   ManeuverCastResult,
   SneakAttackRollResult,
+  StunningStrikeAttemptResult,
+  OpenHandRider,
+  OpenHandRiderResult,
+  QuiveringPalmResult,
   ReferenceData,
   ResourceOperation,
+  ResourceOpResult,
   Session,
   SessionDoorwayState,
   SpellcastingOperation,
@@ -225,27 +230,29 @@ export async function applySpellcastingTransactions(
   return postTransactions(characterId, "spellcasting", operations, "Failed to apply spellcasting operations");
 }
 
-// Feeds the Four Elements monk's discipline picker (min level + ki cost + ki-scaled effect).
-export async function fetchDisciplines(): Promise<CatalogDiscipline[]> {
-  return request<CatalogDiscipline[]>("/disciplines", undefined, "Failed to fetch discipline catalog");
-}
-
-// Applies a batch of discipline operations atomically: castDiscipline (spend ki,
-// roll the discipline's EffectSpec). Full updated Character returned on success.
-export async function applyDisciplineTransactions(
+// Applies a batch of Warrior of the Elements operations atomically (Elemental
+// Attunement toggle, Elemental Burst, Elemental Strikes). Returns the updated
+// Character plus a per-op results array (save DC / outcome / applied damage).
+export async function applyWarriorOfElementsTransactions(
   characterId: string,
-  operations: DisciplineOperation[]
-): Promise<Character> {
-  return postTransactions(characterId, "disciplines", operations, "Failed to apply discipline operations");
+  operations: WarriorOfElementsOperation[]
+): Promise<{ character: Character; results: WarriorOfElementsResult[] }> {
+  return request<{ character: Character; results: WarriorOfElementsResult[] }>(
+    `/characters/${characterId}/elements/transactions`,
+    jsonBody({ operations }),
+    "Failed to apply Warrior of the Elements operations",
+  );
 }
 
-// Feeds the Way of Shadow monk's Shadow Arts picker — 4 flat 2-ki ki-cast spells.
+// Feeds the Warrior of Shadow monk's Shadow Arts picker — the single flat
+// 1-focus Darkness cast (2024 rewrite, #1246).
 export async function fetchShadowArts(): Promise<CatalogShadowArt[]> {
   return request<CatalogShadowArt[]>("/shadow-arts", undefined, "Failed to fetch shadow arts catalog");
 }
 
-// Applies a batch of Shadow Arts operations atomically: castShadowArt (spend a
-// flat 2 ki, apply concentration/buff). Full updated Character returned on success.
+// Applies a batch of Warrior of Shadow operations atomically: castShadowArt
+// (spend 1 focus, concentration) or activateCloakOfShadows (L17: spend 3
+// focus, become invisible). Full updated Character returned on success.
 export async function applyShadowArtsTransactions(
   characterId: string,
   operations: ShadowArtOperation[]
@@ -435,6 +442,65 @@ export async function rollSneakAttackTransaction(
   );
 }
 
+// Spends 1 focus to attempt Stunning Strike server-side (enforcing the
+// once-per-turn guard), rolling the target's Con save against the monk's focus
+// DC. Returns the updated Character plus the DC/roll/fail-or-success outcome
+// so the caller surfaces the Stunned (fail) or half-speed+advantage (success)
+// rider inline (#1242).
+export async function attemptStunningStrikeTransaction(
+  characterId: string,
+  usedThisTurn: boolean,
+): Promise<{ character: Character; results: StunningStrikeAttemptResult[] }> {
+  return request<{ character: Character; results: StunningStrikeAttemptResult[] }>(
+    `/characters/${characterId}/stunning-strike/transactions`,
+    jsonBody({ operations: [{ type: "attemptStunningStrike", usedThisTurn }] }),
+    "Failed to attempt Stunning Strike",
+  );
+}
+
+// Imposes one Flurry-of-Blows rider (Addle/Push/Topple, #1245). Addle never
+// rolls (no save); Push/Topple roll a flat d20 vs the monk's focus save DC
+// server-side. Returns the updated Character plus the rider/DC/roll/outcome so
+// the caller surfaces it inline, mirroring attemptStunningStrikeTransaction.
+export async function imposeOpenHandRiderTransaction(
+  characterId: string,
+  rider: OpenHandRider,
+  usedThisTurn: boolean,
+): Promise<{ character: Character; results: OpenHandRiderResult[] }> {
+  return request<{ character: Character; results: OpenHandRiderResult[] }>(
+    `/characters/${characterId}/open-hand-technique/transactions`,
+    jsonBody({ operations: [{ type: "imposeOpenHandRider", rider, usedThisTurn }] }),
+    "Failed to impose Open Hand Technique rider",
+  );
+}
+
+// Spends 4 focus to set Quivering Palm's vibrations (#1245). Returns the
+// updated Character plus { active, daysRemaining, summary }.
+export async function setQuiveringPalmTransaction(
+  characterId: string,
+): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
+  return request<{ character: Character; results: QuiveringPalmResult[] }>(
+    `/characters/${characterId}/quivering-palm/transactions`,
+    jsonBody({ operations: [{ type: "setQuiveringPalm" }] }),
+    "Failed to set Quivering Palm",
+  );
+}
+
+// Ends Quivering Palm's vibrations as a Magic action (#1245): the server rolls
+// the target's Constitution save against the monk's focus save DC and halves
+// the client-rolled 10d12 total (`roll`) on a success. Returns the updated
+// Character plus { dc, saveRoll, outcome, rawDamage, appliedDamage, summary }.
+export async function triggerQuiveringPalmTransaction(
+  characterId: string,
+  roll: number,
+): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
+  return request<{ character: Character; results: QuiveringPalmResult[] }>(
+    `/characters/${characterId}/quivering-palm/transactions`,
+    jsonBody({ operations: [{ type: "triggerQuiveringPalm", roll }] }),
+    "Failed to trigger Quivering Palm",
+  );
+}
+
 // Applies a batch of resource operations atomically (spend/restore resource
 // pools, learn/forget maneuvers). Full updated Character returned on success.
 export async function applyResourceTransactions(
@@ -442,6 +508,23 @@ export async function applyResourceTransactions(
   operations: ResourceOperation[]
 ): Promise<Character> {
   return postTransactions(characterId, "resources", operations, "Failed to apply resource operations");
+}
+
+// Rolls Initiative / combat start (#1239/#1243): applies every onInitiative-
+// declaring pool's regen (Monk Uncanny Metabolism's Focus refill + HP heal,
+// Perfect Focus's top-up) server-side and returns the updated Character plus
+// the per-op result the caller reads for its combat-start toast. A dedicated
+// call (not the generic applyResourceTransactions) since existing callers of
+// that one expect a bare Character; results rides alongside here the same way
+// castManeuverTransaction's does.
+export async function rollInitiativeTransaction(
+  characterId: string,
+): Promise<Character & { results: ResourceOpResult[] }> {
+  return request<Character & { results: ResourceOpResult[] }>(
+    `/characters/${characterId}/resources/transactions`,
+    jsonBody({ operations: [{ type: "rollInitiative" }] }),
+    "Failed to roll initiative",
+  );
 }
 
 // Applies a batch of condition operations atomically (apply/remove a status

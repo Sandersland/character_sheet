@@ -948,17 +948,17 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     expect(undo.body.pendingLevelUps).toBe(1);
   });
 
-  it("a monk-secondary Way of the Four Elements ceremony (monk 2→3) records the discipline at the monk entry's own level (3), not total level", async () => {
+  it("a monk-secondary Warrior of the Elements ceremony (monk 2→3) grants the subclass with no choice step", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
     const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
-    const fourElements = await prisma.subclass.findFirstOrThrow({ where: { name: "Way of the Four Elements" } });
-    const CHAR_ID = "lvtx-mc-monk-disciplines";
+    const warriorOfElements = await prisma.subclass.findFirstOrThrow({ where: { name: "Warrior of the Elements" } });
+    const CHAR_ID = "lvtx-mc-monk-elements";
     await prisma.character.create({
       data: {
         ...BASE,
         ownerId: OWNER_ID,
         id: CHAR_ID,
-        name: "LevelUpTx MC Monk Disciplines",
+        name: "LevelUpTx MC Monk Elements",
         experiencePoints: 34000, // level 8 threshold; entries sum 7 (fighter 5 + monk 2) → 1 pending
         hitPoints: { current: 50, max: 50, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 7, die: "d8", spent: 0 },
@@ -976,28 +976,20 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
 
     const plan = await supertest(app)
       .get(`/api/characters/${CHAR_ID}/level-up/plan`)
-      .query({ classEntryId: secondary.id, subclassId: fourElements.id })
+      .query({ classEntryId: secondary.id, subclassId: warriorOfElements.id })
       .set("Cookie", COOKIE);
     expect(plan.status).toBe(200);
-    const disciplineStep = (plan.body.steps as Array<{ kind: string; count?: number }>).find((s) => s.kind === "disciplines");
-    expect(disciplineStep?.count).toBe(1); // Four Elements grants 1 discipline at monk L3
-
-    const discipline = await prisma.grantedAbility.findFirstOrThrow({
-      where: { source: "discipline", alwaysKnown: false, minLevel: { lte: 3 } },
-      select: { id: true },
-    });
+    // Warrior of the Elements has only fixed features — no choose-N step.
+    const kinds = (plan.body.steps as Array<{ kind: string }>).map((s) => s.kind);
+    expect(kinds).not.toContain("disciplines");
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: secondary.id },
       hp: { method: "average" },
-      subclassId: fourElements.id,
-      disciplines: [{ type: "learnDiscipline", disciplineId: discipline.id }],
+      subclassId: warriorOfElements.id,
     });
     expect(res.status).toBe(200);
-    expect(res.body.classes[1]).toMatchObject({ name: "monk", level: 3, subclass: "Way of the Four Elements" });
-    const known = res.body.resources.disciplinesKnown as Array<{ disciplineId?: string; learnedAtLevel: number }>;
-    const entry = known.find((d) => d.disciplineId === discipline.id);
-    expect(entry?.learnedAtLevel).toBe(3);
+    expect(res.body.classes[1]).toMatchObject({ name: "monk", level: 3, subclass: "Warrior of the Elements" });
   });
 
   it("atomicity: a bogus maneuverId 400s the whole ceremony — entry level unchanged, zero events", async () => {

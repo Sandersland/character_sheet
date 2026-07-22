@@ -173,13 +173,13 @@ describe("HP transaction event-stream characterization (#614)", () => {
       hitPoints: { current: 10, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
       hitDice: { total: 5, die: "d10", spent: 3 },
       spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
     });
     expect(ev.after).toEqual({
       hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
       hitDice: { total: 5, die: "d10", spent: 0 },
       spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
     });
   });
 
@@ -273,7 +273,6 @@ describe("rest/level-up branch pins (#684)", () => {
   const EMPTY_RESOURCES = {
     used: {},
     maneuversKnown: [],
-    disciplinesKnown: [],
     toolProficienciesKnown: [],
     choicesKnown: {},
     advancements: [],

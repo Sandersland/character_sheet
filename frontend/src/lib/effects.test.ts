@@ -3,7 +3,7 @@
  * (#685). This file mirrors the backend effects characterization suite
  * case-for-case (same fixture values) so the two hand-mirrored readers stay
  * diffably parallel, and adds the variants the backend suite pins elsewhere
- * or that were unpinned on this side entirely (buff, ki scaling, full-field
+ * or that were unpinned on this side entirely (buff, focus scaling, full-field
  * pass-through). Green before the #685 decomposition; stays unedited through it.
  */
 import { describe, expect, it } from "vitest";
@@ -146,13 +146,13 @@ describe("resolveEffectSpec — golden byte-parity with the backend", () => {
     expect(resolveEffectSpec(readEffectSpec(detectMagic), 0, { characterLevel: 1 })).toBeNull();
   });
 
-  it("ki scaling adds dicePerStep per ki above base (frontend-only entry point)", () => {
-    const kiSpec: EffectSpec = {
+  it("slot-upcast scaling adds dicePerStep per step above base", () => {
+    const upcastSpec: EffectSpec = {
       effectType: "damage",
       dice: { count: 1, faces: 10, modifier: 0 },
-      scaling: { mode: "ki", dicePerStep: 1 },
+      scaling: { mode: "slotUpcast", dicePerStep: 1 },
       addAbilityModToHeal: false,
     };
-    expect(resolveEffectSpec(kiSpec, 2, { characterLevel: 5 })).toEqual({ count: 3, faces: 10, modifier: 0 });
+    expect(resolveEffectSpec(upcastSpec, 2, { characterLevel: 5 })).toEqual({ count: 3, faces: 10, modifier: 0 });
   });
 });

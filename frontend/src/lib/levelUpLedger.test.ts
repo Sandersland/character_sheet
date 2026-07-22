@@ -6,7 +6,6 @@ import type { Character, LevelUpPlanResponse, LevelUpStep } from "@/types/charac
 
 const resolvers: LedgerResolvers = {
   maneuver: (id) => ({ m1: "Riposte", m2: "Trip Attack" })[id],
-  discipline: (id) => ({ d1: "Fangs of the Fire Snake" })[id],
   spell: (id) => ({ s1: "Fireball" })[id],
   feat: (id) => ({ f1: "Sentinel", "fs-archery": "Archery" })[id],
 };
@@ -141,13 +140,11 @@ describe("buildLevelUpLedger", () => {
         { type: "learnManeuver", maneuverId: "m1" },
         { type: "learnManeuver", custom: { name: "Homebrew Strike", description: "" } },
       ],
-      disciplines: [{ type: "learnDiscipline", disciplineId: "d1" }],
       spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
     };
     const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
 
     expect(rowFor(rows, "Maneuvers")?.items).toEqual(["Riposte", "Homebrew Strike"]);
-    expect(rowFor(rows, "Disciplines")?.items).toEqual(["Fangs of the Fire Snake"]);
     expect(rowFor(rows, "New Spells")?.items).toEqual(["Fireball"]);
   });
 

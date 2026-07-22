@@ -27,6 +27,12 @@ const restoreResourceOpSchema = z.object({
   amount: z.number().int().positive().optional(),
 });
 
+// Roll Initiative / combat start (#1239) — applies every pool's onInitiative
+// regen at once, so it carries no key.
+const rollInitiativeOpSchema = z.object({
+  type: z.literal("rollInitiative"),
+});
+
 export const learnManeuverOpSchema = z
   .object({
     type: z.literal("learnManeuver"),
@@ -43,38 +49,6 @@ const forgetManeuverOpSchema = z.object({
   type: z.literal("forgetManeuver"),
   entryId: z.string().min(1),
 });
-
-const customDisciplineSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1),
-  minLevel: z.number().int().positive().optional(),
-});
-
-export const learnDisciplineOpSchema = z
-  .object({
-    type: z.literal("learnDiscipline"),
-    disciplineId: z.string().optional(),
-    custom: customDisciplineSchema.optional(),
-  })
-  .refine((op) => Boolean(op.disciplineId) !== Boolean(op.custom), {
-    message: "Provide exactly one of disciplineId or custom",
-  });
-
-const forgetDisciplineOpSchema = z.object({
-  type: z.literal("forgetDiscipline"),
-  entryId: z.string().min(1),
-});
-
-const swapDisciplineOpSchema = z
-  .object({
-    type: z.literal("swapDiscipline"),
-    entryId: z.string().min(1),
-    disciplineId: z.string().optional(),
-    custom: customDisciplineSchema.optional(),
-  })
-  .refine((op) => Boolean(op.disciplineId) !== Boolean(op.custom), {
-    message: "Provide exactly one of disciplineId or custom",
-  });
 
 export const learnToolProficiencyOpSchema = z.object({
   type: z.literal("learnToolProficiency"),
@@ -105,11 +79,9 @@ const forgetSubclassChoiceOpSchema = z.object({
 const operationSchema = z.discriminatedUnion("type", [
   spendResourceOpSchema,
   restoreResourceOpSchema,
+  rollInitiativeOpSchema,
   learnManeuverOpSchema,
   forgetManeuverOpSchema,
-  learnDisciplineOpSchema,
-  forgetDisciplineOpSchema,
-  swapDisciplineOpSchema,
   learnToolProficiencyOpSchema,
   forgetToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
@@ -126,21 +98,23 @@ const transactionsRequestSchema = z.object({
  * POST /api/characters/:id/spellcasting/transactions. Operations:
  *   spendResource         — spend one or more units of a pool (e.g. superiority die)
  *   restoreResource       — restore spent units (undo mis-click or Relentless trigger)
+ *   rollInitiative        — regain resources on combat start (onInitiative pools, #1239)
  *   learnManeuver         — add a maneuver from catalog or custom payload
  *   forgetManeuver        — remove a known maneuver by entry id
- *   learnDiscipline       — add an elemental discipline (Four Elements monk)
- *   forgetDiscipline      — remove a known discipline by entry id
- *   swapDiscipline        — retrain one discipline for another (1 per monk level)
  *   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
  *   forgetToolProficiency — undo a tool proficiency choice by entry id
  *   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)
  *   forgetSubclassChoice  — undo a subclass-choice pick by entry id
  *
- * Returns the full updated character on success.
+ * Returns the full updated character on success, plus a top-level `results`
+ * array (one ResourceOpAudit per op) so a roll-driven op's outcome — today,
+ * rollInitiative's Focus-regen + Uncanny Metabolism heal summary (#1243) —
+ * reaches the client for its toast. Mirrors inventory.ts's `useResults`.
  */
 makeTransactionsEndpoint({
   router: resourcesRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyResourceOperations(characterId, data.operations),
   domainErrors: [InvalidResourceOperationError],
+  respond: (character, results) => ({ ...character, results }),
 });

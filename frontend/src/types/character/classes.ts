@@ -1,27 +1,15 @@
 /**
- * Class-feature wire types: resources, maneuvers, disciplines, fighting styles, and their operations.
+ * Class-feature wire types: resources, maneuvers, fighting styles, and their operations.
  */
 
 import type { EffectSpec } from "@/lib/effects";
 
-/** Ki (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
+/** Focus (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
 export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
   | { kind: "none" };
 
-/** A Way of the Four Elements discipline from GET /api/disciplines. */
-export interface CatalogDiscipline {
-  id: string;
-  name: string;
-  description: string;
-  minLevel: number;
-  alwaysKnown: boolean;
-  saveAbility?: string | null;
-  cost: AbilityCost;
-  effect: EffectSpec;
-}
-
-/** A Way of Shadow Shadow Art from GET /api/shadow-arts (flat 2-ki ki-cast spell). */
+/** The Warrior of Shadow Shadow Art (Darkness) from GET /api/shadow-arts (flat 1-focus focus-cast spell). */
 export interface CatalogShadowArt {
   id: string;
   name: string;
@@ -124,13 +112,44 @@ export interface SneakAttackRollResult {
   summary: string;
 }
 
-/** A known elemental discipline entry on a character (Way of the Four Elements). */
-export interface DisciplineEntry {
-  id: string;
-  disciplineId?: string;  // catalog Discipline.id provenance — undefined for custom
-  name: string;
-  description: string;
+/** Per-op result from POST …/stunning-strike/transactions — DC + roll + fail/success rider. */
+export interface StunningStrikeAttemptResult {
+  dc: number;
+  roll: number;
+  outcome: "fail" | "success";
+  summary: string;
 }
+
+/** Warrior of the Open Hand's Flurry-of-Blows rider choice (#1245). */
+export type OpenHandRider = "addle" | "push" | "topple";
+
+/** Per-op result from POST …/open-hand-technique/transactions — Addle has no roll. */
+export interface OpenHandRiderResult {
+  rider: OpenHandRider;
+  dc: number;
+  roll?: number;
+  outcome: "applied" | "resisted";
+  summary: string;
+}
+
+/** Per-op result from POST …/quivering-palm/transactions — setQuiveringPalm. */
+export interface SetQuiveringPalmResult {
+  active: true;
+  daysRemaining: number;
+  summary: string;
+}
+
+/** Per-op result from POST …/quivering-palm/transactions — triggerQuiveringPalm. */
+export interface TriggerQuiveringPalmResult {
+  dc: number;
+  saveRoll: number;
+  outcome: "fail" | "success";
+  rawDamage: number;
+  appliedDamage: number;
+  summary: string;
+}
+
+export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmResult;
 
 /**
  * One merged tool proficiency entry on the character wire type.
@@ -178,20 +197,18 @@ export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
   maneuverSaveDC?: number;
-  /** Way of the Four Elements: elemental disciplines known at this level. */
-  disciplineChoiceCount?: number;
-  /** Way of the Four Elements: ki save DC for discipline effects (8 + prof + Wis mod). */
-  disciplineSaveDC?: number;
-  /** Way of Shadow: whether the L3+ Shadow Arts ki-cast spells are available. */
+  /** Warrior of the Elements: whether the L3+ Elemental Attunement toggle is available. */
+  elementalAttunementAvailable?: boolean;
+  /** Warrior of the Elements: whether the L6+ Elemental Burst action is available. */
+  elementalBurstAvailable?: boolean;
+  /** Warrior of Shadow: whether the L3+ 1-focus Darkness cast is available. */
   shadowArtsAvailable?: boolean;
-  /** Way of Shadow: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
+  /** Warrior of Shadow: whether the L17+ Cloak of Shadows self-invisible toggle is available (moved from L11 in the 2024 rewrite). */
   cloakOfShadowsAvailable?: boolean;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];
   maneuversKnown: ManeuverEntry[];
-  /** Level-gated elemental disciplines learned (Way of the Four Elements). */
-  disciplinesKnown: DisciplineEntry[];
   /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
 }
@@ -229,18 +246,13 @@ export interface SpendResourceOperation { type: "spendResource"; key: string; am
 
 export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
 
+/** Roll Initiative / combat start (#1239/#1243): applies every onInitiative-declaring
+ *  pool's regen (e.g. Monk Uncanny Metabolism/Perfect Focus). Carries no key. */
+export interface RollInitiativeOperation { type: "rollInitiative" }
+
 export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
 
 export interface ForgetManeuverOperation { type: "forgetManeuver"; entryId: string }
-
-/** Learn an elemental discipline from catalog (Way of the Four Elements). */
-export interface LearnDisciplineOperation { type: "learnDiscipline"; disciplineId?: string; custom?: { name: string; description: string; minLevel?: number } }
-
-/** Forget a known elemental discipline by its per-character entry id. */
-export interface ForgetDisciplineOperation { type: "forgetDiscipline"; entryId: string }
-
-/** Retrain one known discipline for another within the cap. */
-export interface SwapDisciplineOperation { type: "swapDiscipline"; entryId: string; disciplineId?: string; custom?: { name: string; description: string; minLevel?: number } }
 
 /** Choose an artisan's-tool proficiency from the Student of War feature. */
 export interface LearnToolProficiencyOperation { type: "learnToolProficiency"; name: string }
@@ -260,42 +272,77 @@ export interface LearnSubclassChoiceOperation {
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
+  | RollInitiativeOperation
   | LearnManeuverOperation
   | ForgetManeuverOperation
-  | LearnDisciplineOperation
-  | ForgetDisciplineOperation
-  | SwapDisciplineOperation
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation
   | LearnSubclassChoiceOperation;
 
 /**
- * Discipline operation types — mirror of `applyDisciplineOperations`. Sent as
- * `{ operations: DisciplineOperation[] }` to POST /api/characters/:id/disciplines/transactions.
- *
- * Cast a known elemental discipline: spend ki, send the client-computed roll total (0 for utility).
+ * Per-op audit result from POST …/resources/transactions — mirrors the
+ * backend's generic ResourceOpAudit. Most ops' callers ignore it; rollInitiative
+ * (#1239/#1243) is read for its regen summary + eventData.regenerated (whether
+ * anything actually fired) to drive the combat-start toast.
  */
-export interface CastDisciplineOperation {
-  type: "castDiscipline";
-  disciplineId: string;
-  kiSpent: number;
-  roll: number;
+export interface ResourceOpResult {
+  eventType: string;
+  summary: string;
+  eventData: Record<string, unknown>;
 }
 
-export type DisciplineOperation = CastDisciplineOperation;
+/**
+ * Warrior of the Elements operation types — mirror of
+ * `applyWarriorOfElementsOperations`. Sent as
+ * `{ operations: WarriorOfElementsOperation[] }` to POST /api/characters/:id/elements/transactions.
+ */
+export type ElementalDamageType = "acid" | "cold" | "fire" | "lightning" | "thunder";
+
+/** Toggle Elemental Attunement on (spends 1 Focus) or off. */
+export interface ToggleElementalAttunementOperation { type: "toggleElementalAttunement"; active: boolean }
+
+/** Elemental Burst (L6): spend 2 Focus, roll 3× Martial Arts die, Dex save. */
+export interface CastElementalBurstOperation { type: "castElementalBurst"; damageType: ElementalDamageType; roll: number }
+
+/** Elemental Strikes rider (while attuned): swap damage type + force a Str-save move. */
+export interface ElementalStrikeOperation { type: "elementalStrike"; damageType: ElementalDamageType; roll?: number }
+
+export type WarriorOfElementsOperation =
+  | ToggleElementalAttunementOperation
+  | CastElementalBurstOperation
+  | ElementalStrikeOperation;
+
+/** Per-op result from POST …/elements/transactions (mirrors the backend union). */
+export interface WarriorOfElementsResult {
+  active?: boolean;
+  dc?: number;
+  saveRoll?: number;
+  outcome?: "fail" | "success";
+  damageType?: ElementalDamageType;
+  rawDamage?: number;
+  appliedDamage?: number;
+  moved?: boolean;
+  summary: string;
+}
 
 /**
- * Shadow Arts operation types — mirror of `applyShadowArtsOperations`. Sent as
- * `{ operations: ShadowArtOperation[] }` to POST /api/characters/:id/shadow-arts/transactions.
+ * Warrior of Shadow operation types — mirror of `applyShadowArtsOperations`.
+ * Sent as `{ operations: ShadowArtOperation[] }` to
+ * POST /api/characters/:id/shadow-arts/transactions.
  *
- * Cast a Shadow Art (Way of Shadow): spend a flat 2 ki, apply concentration/buff.
+ *   castShadowArt          — cast Shadow Arts' Darkness (1 focus, concentration).
+ *   activateCloakOfShadows — L17: spend 3 focus, become invisible.
  */
 export interface CastShadowArtOperation {
   type: "castShadowArt";
   shadowArtId: string;
 }
 
-export type ShadowArtOperation = CastShadowArtOperation;
+export interface ActivateCloakOfShadowsOperation {
+  type: "activateCloakOfShadows";
+}
+
+export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
 
 /**
  * Channel Divinity operation types — mirror of `applyChannelDivinityOperations`.

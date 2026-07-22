@@ -69,7 +69,6 @@ describe("deriveClassFeatureView", () => {
         {
           pools: [{ key: "channelDivinity" }] as unknown as CharacterResources["pools"],
           maneuverChoiceCount: 3,
-          disciplineChoiceCount: 2,
           shadowArtsAvailable: true,
           cloakOfShadowsAvailable: true,
           features: [{ source: "class", name: "F", description: "d" }] as unknown as CharacterResources["features"],
@@ -79,7 +78,6 @@ describe("deriveClassFeatureView", () => {
     );
     expect(view.hasPools).toBe(true);
     expect(view.hasManeuvers).toBe(true);
-    expect(view.hasDisciplines).toBe(true);
     expect(view.hasShadowArts).toBe(true);
     expect(view.hasChannelDivinity).toBe(true);
     expect(view.hasCloakOfShadows).toBe(true);

@@ -53,10 +53,6 @@ function buildResourcesPayload(
     derivedRes.toolProfChoiceCount !== undefined
       ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
       : stored.toolProficienciesKnown;
-  const clampedDisciplinesKnown =
-    derivedRes.disciplineChoiceCount !== undefined
-      ? stored.disciplinesKnown.slice(0, derivedRes.disciplineChoiceCount)
-      : stored.disciplinesKnown;
   // Generic subclass "choose N" clamp-on-read (#899): keep only keys the derived
   // subclassChoices still grant, each capped to its count — defense-in-depth
   // mirroring reconcileSubclassChoices for characters not yet reconciled.
@@ -68,8 +64,8 @@ function buildResourcesPayload(
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
     maneuverSaveDC: derivedRes.maneuverSaveDC,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
-    disciplineChoiceCount: derivedRes.disciplineChoiceCount,
-    disciplineSaveDC: derivedRes.disciplineSaveDC,
+    elementalAttunementAvailable: derivedRes.elementalAttunementAvailable,
+    elementalBurstAvailable: derivedRes.elementalBurstAvailable,
     shadowArtsAvailable: derivedRes.shadowArtsAvailable,
     cloakOfShadowsAvailable: derivedRes.cloakOfShadowsAvailable,
     pools: derivedRes.resources.map((pool) => ({
@@ -83,7 +79,6 @@ function buildResourcesPayload(
       remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
     })),
     maneuversKnown: clampedManeuversKnown,
-    disciplinesKnown: clampedDisciplinesKnown,
     toolProficienciesKnown: clampedToolProfsKnown,
     // Generic subclass "choose N" surface (#899): the derived choices (key/label/
     // count/catalogSource) tell the level-up Choose-N step which pickers to render;
@@ -174,6 +169,9 @@ export function buildAvailableActionsView(
   primaryClass: PrimaryClass,
   level: number,
   resources: object | undefined,
+  // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218) —
+  // gates the Monk's Bonus Unarmed Strike (requiresUnarmored in DERIVED_ACTIONS).
+  unarmoredUnshielded: boolean,
 ): AvailableAction[] {
   const pools =
     resources && "pools" in resources
@@ -184,6 +182,7 @@ export function buildAvailableActionsView(
     primaryClass?.subclass ?? undefined,
     level,
     pools,
+    unarmoredUnshielded,
   );
 }
 

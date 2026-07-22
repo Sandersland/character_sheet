@@ -50,15 +50,22 @@ describe("deriveActions — class gates", () => {
     expect(l2).toContain("recklessAttack");
   });
 
-  it("Monk L2 gets flurryOfBlows/patientDefense/stepOfTheWind; L5 adds stunningStrike", () => {
+  it("Monk L2 gets flurryOfBlows/patientDefense(+Focus)/stepOfTheWind(+Focus); stunningStrike is not a catalog action (#1242)", () => {
     const l2 = keys(deriveActions("monk", undefined, 2, []));
     expect(l2).toContain("flurryOfBlows");
     expect(l2).toContain("patientDefense");
+    expect(l2).toContain("patientDefenseFocus");
     expect(l2).toContain("stepOfTheWind");
+    expect(l2).toContain("stepOfTheWindFocus");
+    // Stunning Strike (L5) is a post-hit rider, not a catalog action — see
+    // stunning-strike.test.ts (#1242).
     expect(l2).not.toContain("stunningStrike");
-
     const l5 = keys(deriveActions("monk", undefined, 5, []));
-    expect(l5).toContain("stunningStrike");
+    expect(l5).not.toContain("stunningStrike");
+  });
+
+  it("Monk L1 gets bonusUnarmedStrike (Martial Arts, #1218)", () => {
+    expect(keys(deriveActions("monk", undefined, 1, []))).toContain("bonusUnarmedStrike");
   });
 
   it("Paladin L1 gets divineSense/layOnHands; L3 adds channelDivinityPaladin", () => {
@@ -125,15 +132,15 @@ describe("deriveActions — resource gating", () => {
     expect(rage?.disabledReason).toBe("No rage remaining");
   });
 
-  it("flurryOfBlows needs ki×2: disabled with 'Need 2 ki, have 1' when ki=1", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("ki", 1)]);
+  it("flurryOfBlows needs 1 focus: disabled with 'No focus remaining' at 0 (#1217)", () => {
+    const actions = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(false);
-    expect(flurry?.disabledReason).toBe("Need 2 ki, have 1");
+    expect(flurry?.disabledReason).toBe("No focus remaining");
   });
 
-  it("flurryOfBlows is enabled when ki >= 2", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("ki", 3)]);
+  it("flurryOfBlows is enabled when focus >= 1 (still usable without the Attack action)", () => {
+    const actions = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(true);
   });
@@ -151,6 +158,37 @@ describe("deriveActions — resource gating", () => {
     const secondWind = actions.find((a) => a.key === "secondWind");
     expect(secondWind?.enabled).toBe(false);
     expect(secondWind?.disabledReason).toBe("No secondWind remaining");
+  });
+});
+
+describe("deriveActions — requiresUnarmored gate (Bonus Unarmed Strike, #1218)", () => {
+  it("is enabled when unarmoredUnshielded is true (default)", () => {
+    const actions = deriveActions("monk", undefined, 1, []);
+    const bonusUnarmedStrike = actions.find((a) => a.key === "bonusUnarmedStrike");
+    expect(bonusUnarmedStrike?.enabled).toBe(true);
+    expect(bonusUnarmedStrike?.disabledReason).toBeUndefined();
+  });
+
+  it("is disabled with 'Requires no armor or Shield' when unarmoredUnshielded is false", () => {
+    const actions = deriveActions("monk", undefined, 1, [], false);
+    const bonusUnarmedStrike = actions.find((a) => a.key === "bonusUnarmedStrike");
+    expect(bonusUnarmedStrike?.enabled).toBe(false);
+    expect(bonusUnarmedStrike?.disabledReason).toBe("Requires no armor or Shield");
+  });
+
+  it("has no resourceKey — spends no resource", () => {
+    const bonusUnarmedStrike = deriveActions("monk", undefined, 1, []).find(
+      (a) => a.key === "bonusUnarmedStrike",
+    );
+    expect(bonusUnarmedStrike?.cost).toBe("bonusAction");
+    expect(ACTION_EFFECT_FN.bonusUnarmedStrike({})).toEqual([]);
+  });
+
+  it("actions with no requiresUnarmored flag ignore the unarmoredUnshielded param", () => {
+    // Rage carries no requiresUnarmored — armored/shielded is irrelevant to it.
+    const actions = deriveActions("barbarian", undefined, 1, [pool("rage", 1)], false);
+    const rage = actions.find((a) => a.key === "rage");
+    expect(rage?.enabled).toBe(true);
   });
 });
 
@@ -236,54 +274,139 @@ describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
   });
 });
 
-describe("ACTION_EFFECT_FN — monk ki actions", () => {
-  it("flurryOfBlows → spendResource ki amount:2", () => {
+describe("ACTION_EFFECT_FN — monk focus actions", () => {
+  it("flurryOfBlows → spendResource focus (1, no amount override) (#1217)", () => {
     expect(ACTION_EFFECT_FN.flurryOfBlows({})).toEqual([
-      { type: "spendResource", key: "ki", amount: 2 },
-    ]);
-  });
-
-  it("patientDefense → spendResource ki (no amount)", () => {
-    expect(ACTION_EFFECT_FN.patientDefense({})).toEqual([
-      { type: "spendResource", key: "ki" },
-    ]);
-  });
-
-  it("stepOfTheWind → spendResource ki", () => {
-    expect(ACTION_EFFECT_FN.stepOfTheWind({})).toEqual([
-      { type: "spendResource", key: "ki" },
-    ]);
-  });
-
-  it("stunningStrike → spendResource ki", () => {
-    expect(ACTION_EFFECT_FN.stunningStrike({})).toEqual([
-      { type: "spendResource", key: "ki" },
+      { type: "spendResource", key: "focus" },
     ]);
   });
 });
 
-describe("Monk Stunning Strike — combat feature wiring (#392)", () => {
-  it("is granted at monk L5 via deriveActions", () => {
-    expect(keys(deriveActions("monk", undefined, 5, []))).toContain("stunningStrike");
+describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (#1240)", () => {
+  it("both are granted at monk L2, in both the free and Focus-spend forms", () => {
+    const l2 = keys(deriveActions("monk", undefined, 2, []));
+    expect(l2).toEqual(
+      expect.arrayContaining(["patientDefense", "patientDefenseFocus", "stepOfTheWind", "stepOfTheWindFocus"]),
+    );
   });
 
-  it("is absent at monk L4 (level 5 gate)", () => {
+  it("free variants are always enabled — no resourceKey gate — regardless of remaining focus", () => {
+    const noFocus = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
+    const patientFree = noFocus.find((a) => a.key === "patientDefense");
+    const stepFree = noFocus.find((a) => a.key === "stepOfTheWind");
+    expect(patientFree?.enabled).toBe(true);
+    expect(stepFree?.enabled).toBe(true);
+  });
+
+  it("Focus variants are gated on 1 remaining focus, like any other resource-gated action", () => {
+    const noFocus = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "patientDefenseFocus")?.enabled).toBe(false);
+    expect(noFocus.find((a) => a.key === "stepOfTheWindFocus")?.enabled).toBe(false);
+
+    const withFocus = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    expect(withFocus.find((a) => a.key === "patientDefenseFocus")?.enabled).toBe(true);
+    expect(withFocus.find((a) => a.key === "stepOfTheWindFocus")?.enabled).toBe(true);
+  });
+
+  it("Patient Defense reminders name Disengage-only free vs Disengage+Dodge paid", () => {
+    const l2 = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const patientFree = l2.find((a) => a.key === "patientDefense");
+    const patientFocus = l2.find((a) => a.key === "patientDefenseFocus");
+    expect(patientFree).toBeDefined();
+    expect(patientFocus).toBeDefined();
+    expect(patientFree!.reminder).toMatch(/disengage/i);
+    expect(patientFree!.reminder).not.toMatch(/dodge/i);
+    expect(patientFocus!.reminder).toMatch(/disengage/i);
+    expect(patientFocus!.reminder).toMatch(/dodge/i);
+  });
+
+  it("Step of the Wind reminders name Dash-only free vs Disengage+Dash+doubled-jump paid", () => {
+    const l2 = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const stepFree = l2.find((a) => a.key === "stepOfTheWind");
+    const stepFocus = l2.find((a) => a.key === "stepOfTheWindFocus");
+    expect(stepFree).toBeDefined();
+    expect(stepFocus).toBeDefined();
+    expect(stepFree!.reminder).toMatch(/dash/i);
+    expect(stepFree!.reminder).not.toMatch(/disengage/i);
+    expect(stepFocus!.reminder).toMatch(/disengage/i);
+    expect(stepFocus!.reminder).toMatch(/dash/i);
+    expect(stepFocus!.reminder).toMatch(/jump/i);
+  });
+
+  it("free variants are pure reminder actions — no server effect fn (like Shadow Step/Opportunist)", () => {
+    expect(ACTION_EFFECT_FN.patientDefense).toBeUndefined();
+    expect(ACTION_CAST_FN.patientDefense).toBeUndefined();
+    expect(ACTION_EFFECT_FN.stepOfTheWind).toBeUndefined();
+    expect(ACTION_CAST_FN.stepOfTheWind).toBeUndefined();
+  });
+
+  it("patientDefenseFocus spends exactly 1 focus", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseFocus({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("stepOfTheWindFocus spends exactly 1 focus", () => {
+    expect(ACTION_EFFECT_FN.stepOfTheWindFocus({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+});
+
+describe("Heightened Focus (monk L10, #1244) — Patient Defense temp HP + reminder upgrades", () => {
+  it("patientDefenseFocus adds a tempHp op when ctx carries a pre-rolled heightenedFocusTempHp amount", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseFocus({ heightenedFocusTempHp: 11 })).toEqual([
+      { type: "spendResource", key: "focus" },
+      { type: "tempHp", amount: 11 },
+    ]);
+  });
+
+  it("patientDefenseFocus adds no tempHp op when ctx omits heightenedFocusTempHp (below L10)", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseFocus({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("stepOfTheWindFocus has no server effect change — the move-ally rider is narrated only", () => {
+    expect(ACTION_EFFECT_FN.stepOfTheWindFocus({ heightenedFocusTempHp: 11 })).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("patientDefenseFocus reminder names the temp-HP rider only at monk L10+", () => {
+    const l9 = deriveActions("monk", undefined, 9, [pool("focus", 1)]);
+    const l10 = deriveActions("monk", undefined, 10, [pool("focus", 1)]);
+    expect(l9.find((a) => a.key === "patientDefenseFocus")?.reminder).not.toMatch(/temporary hit points/i);
+    expect(l10.find((a) => a.key === "patientDefenseFocus")?.reminder).toMatch(/temporary hit points/i);
+    expect(l10.find((a) => a.key === "patientDefenseFocus")?.reminder).toMatch(/martial arts die/i);
+  });
+
+  it("stepOfTheWindFocus reminder names the move-a-willing-creature rider only at monk L10+", () => {
+    const l9 = deriveActions("monk", undefined, 9, [pool("focus", 1)]);
+    const l10 = deriveActions("monk", undefined, 10, [pool("focus", 1)]);
+    expect(l9.find((a) => a.key === "stepOfTheWindFocus")?.reminder).not.toMatch(/creature/i);
+    expect(l10.find((a) => a.key === "stepOfTheWindFocus")?.reminder).toMatch(/creature/i);
+    expect(l10.find((a) => a.key === "stepOfTheWindFocus")?.reminder).toMatch(/opportunity attack/i);
+  });
+});
+
+// Stunning Strike (#392's bare-spend stub) is superseded by the dedicated
+// stunning-strike.ts vertical (#1242) — see stunning-strike.test.ts for its
+// once-per-turn guard, DC math, and fail/success outcome coverage.
+describe("Monk Stunning Strike — not a catalog action (#1242)", () => {
+  it("has no DERIVED_ACTIONS entry at any level", () => {
     expect(keys(deriveActions("monk", undefined, 4, []))).not.toContain("stunningStrike");
+    expect(keys(deriveActions("monk", undefined, 5, []))).not.toContain("stunningStrike");
+    expect(keys(deriveActions("monk", undefined, 20, []))).not.toContain("stunningStrike");
   });
 
-  it("spends 1 ki when invoked", () => {
-    const ops = ACTION_EFFECT_FN.stunningStrike({});
-    expect(ops).toHaveLength(1);
-    const [op] = ops as Array<{ type: string; key: string; amount?: number }>;
-    expect(op.type).toBe("spendResource");
-    expect(op.key).toBe("ki");
-    // amount omitted defaults to 1 in the spendResource handler.
-    expect(op.amount ?? 1).toBe(1);
+  it("has no ACTION_EFFECT_FN entry (post-hit rider, not a selectable action)", () => {
+    expect(ACTION_EFFECT_FN.stunningStrike).toBeUndefined();
   });
 });
 
-describe("Way of Shadow — Shadow Step / Opportunist (#440)", () => {
-  const SHADOW = "Way of Shadow";
+describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
+  const SHADOW = "Warrior of Shadow";
 
   it("Shadow monk gets shadowStep as a bonus action at L6, not at L5", () => {
     expect(keys(deriveActions("monk", SHADOW, 5, []))).not.toContain("shadowStep");
@@ -293,51 +416,49 @@ describe("Way of Shadow — Shadow Step / Opportunist (#440)", () => {
     expect(shadowStep?.cost).toBe("bonusAction");
   });
 
-  it("Shadow monk gets opportunist as a reaction at L17, not at L16", () => {
-    expect(keys(deriveActions("monk", SHADOW, 16, []))).not.toContain("opportunist");
-    const l17 = deriveActions("monk", SHADOW, 17, []);
-    const opportunist = l17.find((a) => a.key === "opportunist");
-    expect(opportunist).toBeDefined();
-    expect(opportunist?.cost).toBe("reaction");
-  });
-
-  it("both are always enabled (no resourceKey gate)", () => {
+  it("is always enabled (no resourceKey gate)", () => {
     const l17 = deriveActions("monk", SHADOW, 17, []);
     const shadowStep = l17.find((a) => a.key === "shadowStep");
-    const opportunist = l17.find((a) => a.key === "opportunist");
     expect(shadowStep?.enabled).toBe(true);
     expect(shadowStep?.disabledReason).toBeUndefined();
-    expect(opportunist?.enabled).toBe(true);
-    expect(opportunist?.disabledReason).toBeUndefined();
   });
 
-  it("subclass gate: a non-Shadow monk gets neither at L17", () => {
-    const openHand = keys(deriveActions("monk", "Way of the Open Hand", 17, []));
+  it("has no opportunist entry at any level (2014 L17 feature retired)", () => {
+    for (const level of [17, 20]) {
+      expect(keys(deriveActions("monk", SHADOW, level, []))).not.toContain("opportunist");
+    }
+  });
+
+  it("subclass gate: a non-Shadow monk doesn't get shadowStep at L17", () => {
+    const openHand = keys(deriveActions("monk", "Warrior of the Open Hand", 17, []));
     expect(openHand).not.toContain("shadowStep");
-    expect(openHand).not.toContain("opportunist");
     const noSub = keys(deriveActions("monk", undefined, 17, []));
     expect(noSub).not.toContain("shadowStep");
-    expect(noSub).not.toContain("opportunist");
   });
 
-  it("class gate: a non-monk gets neither even with a Shadow-like subclass", () => {
+  it("class gate: a non-monk doesn't get shadowStep even with a Shadow-like subclass", () => {
     const rogue = keys(deriveActions("rogue", SHADOW, 20, []));
     expect(rogue).not.toContain("shadowStep");
-    expect(rogue).not.toContain("opportunist");
   });
 
   it("matches the subclass substring case-insensitively", () => {
-    expect(keys(deriveActions("Monk", "way of shadow", 6, []))).toContain("shadowStep");
+    expect(keys(deriveActions("Monk", "warrior of shadow", 6, []))).toContain("shadowStep");
   });
 
-  it("carry their rule text as a reminder for in-session surfacing", () => {
-    const l17 = deriveActions("monk", SHADOW, 17, []);
-    const shadowStep = l17.find((a) => a.key === "shadowStep");
-    const opportunist = l17.find((a) => a.key === "opportunist");
+  it("carries its rule text as a reminder for in-session surfacing", () => {
+    const l6 = deriveActions("monk", SHADOW, 6, []);
+    const shadowStep = l6.find((a) => a.key === "shadowStep");
     expect(shadowStep?.reminder).toMatch(/teleport/i);
     expect(shadowStep?.reminder).toMatch(/dim light|darkness/i);
-    expect(opportunist?.reminder).toMatch(/reaction/i);
-    expect(opportunist?.reminder).toMatch(/5 ft/i);
+    expect(shadowStep?.reminder).toMatch(/unarmed strike/i);
+  });
+
+  it("Improved Shadow Step (L11) upgrades the reminder in place — no separate catalog row", () => {
+    const l10 = deriveActions("monk", SHADOW, 10, []).find((a) => a.key === "shadowStep");
+    const l11 = deriveActions("monk", SHADOW, 11, []).find((a) => a.key === "shadowStep");
+    expect(l10?.reminder).not.toMatch(/1 focus/i);
+    expect(l11?.reminder).toMatch(/1 focus/i);
+    expect(keys(deriveActions("monk", SHADOW, 11, []))).not.toContain("improvedShadowStep");
   });
 
   it("resource-gated class actions carry no reminder (reminder is Shadow-only)", () => {
@@ -345,11 +466,64 @@ describe("Way of Shadow — Shadow Step / Opportunist (#440)", () => {
     expect(flurry?.reminder).toBeUndefined();
   });
 
-  it("are pure reminder actions — no server effect fn (no ACTION_EFFECT_FN/ACTION_CAST_FN)", () => {
+  it("is a pure reminder action — no server effect fn (no ACTION_EFFECT_FN/ACTION_CAST_FN)", () => {
     expect(ACTION_EFFECT_FN.shadowStep).toBeUndefined();
     expect(ACTION_CAST_FN.shadowStep).toBeUndefined();
-    expect(ACTION_EFFECT_FN.opportunist).toBeUndefined();
-    expect(ACTION_CAST_FN.opportunist).toBeUndefined();
+  });
+});
+
+describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
+  it("is granted at monk L3 as a reaction with no resourceKey (free reminder, base reduction costs nothing)", () => {
+    expect(keys(deriveActions("monk", undefined, 2, []))).not.toContain("deflectAttacks");
+    const l3 = deriveActions("monk", undefined, 3, []);
+    const deflect = l3.find((a) => a.key === "deflectAttacks");
+    expect(deflect).toBeDefined();
+    expect(deflect?.cost).toBe("reaction");
+    expect(deflect?.enabled).toBe(true);
+    expect(deflect?.disabledReason).toBeUndefined();
+  });
+
+  it("carries its rule text as a reminder for in-session surfacing", () => {
+    const deflect = deriveActions("monk", undefined, 3, []).find((a) => a.key === "deflectAttacks");
+    expect(deflect?.reminder).toMatch(/bludgeoning, piercing, or slashing/i);
+    expect(deflect?.reminder).toMatch(/reaction/i);
+  });
+
+  it("is a pure reminder action — no server effect fn for the base reduction", () => {
+    // Mirrors Warrior of Shadow's shadowStep (#1246): the client rolls
+    // 1d10 + Dex + monk level and never calls the transactions endpoint for the
+    // base reduction (nothing persisted). Only the redirect spends Focus.
+    expect(ACTION_EFFECT_FN.deflectAttacks).toBeUndefined();
+    expect(ACTION_CAST_FN.deflectAttacks).toBeUndefined();
+  });
+
+  it("deflectAttacksRedirect is granted at monk L3 as a free-cost Focus spend", () => {
+    expect(keys(deriveActions("monk", undefined, 2, []))).not.toContain("deflectAttacksRedirect");
+    const l3 = deriveActions("monk", undefined, 3, [pool("focus", 3)]);
+    const redirect = l3.find((a) => a.key === "deflectAttacksRedirect");
+    expect(redirect).toBeDefined();
+    expect(redirect?.cost).toBe("free");
+    expect(redirect?.enabled).toBe(true);
+  });
+
+  it("deflectAttacksRedirect is disabled with no Focus remaining", () => {
+    const redirect = deriveActions("monk", undefined, 3, [pool("focus", 0)]).find(
+      (a) => a.key === "deflectAttacksRedirect",
+    );
+    expect(redirect?.enabled).toBe(false);
+    expect(redirect?.disabledReason).toBe("No focus remaining");
+  });
+
+  it("deflectAttacksRedirect spends 1 focus", () => {
+    expect(ACTION_EFFECT_FN.deflectAttacksRedirect({})).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("class gate: a non-monk gets neither key", () => {
+    const fighter = keys(deriveActions("fighter", undefined, 20, []));
+    expect(fighter).not.toContain("deflectAttacks");
+    expect(fighter).not.toContain("deflectAttacksRedirect");
   });
 });
 
@@ -417,6 +591,132 @@ describe("ACTION_EFFECT_FN — metamagic", () => {
     expect(ACTION_EFFECT_FN.metamagic({})).toEqual([
       { type: "spendResource", key: "sorceryPoints", amount: 1 },
     ]);
+  });
+});
+
+describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", () => {
+  const OPEN_HAND = "Warrior of the Open Hand";
+
+  it("Open Hand monk gets wholenessOfBody as a bonus action at L6, not at L5", () => {
+    expect(keys(deriveActions("monk", OPEN_HAND, 5, []))).not.toContain("wholenessOfBody");
+    const l6 = deriveActions("monk", OPEN_HAND, 6, []);
+    const wholeness = l6.find((a) => a.key === "wholenessOfBody");
+    expect(wholeness).toBeDefined();
+    expect(wholeness?.cost).toBe("bonusAction");
+  });
+
+  it("wholenessOfBody is gated on the wholenessOfBody pool like any other resource-gated action", () => {
+    const noUses = deriveActions("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 0)]);
+    expect(noUses.find((a) => a.key === "wholenessOfBody")?.enabled).toBe(false);
+    const withUses = deriveActions("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 1)]);
+    expect(withUses.find((a) => a.key === "wholenessOfBody")?.enabled).toBe(true);
+  });
+
+  it("wholenessOfBody: with roll=8, spends 1 use and heals 8", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBody({ roll: 8 })).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+      { type: "heal", amount: 8 },
+    ]);
+  });
+
+  it("wholenessOfBody: without a roll, spends the use but heals nothing", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBody({})).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+    ]);
+  });
+
+  it("Open Hand monk gets fleetStep as a free-cost reminder at L11, not at L10", () => {
+    expect(keys(deriveActions("monk", OPEN_HAND, 10, []))).not.toContain("fleetStep");
+    const l11 = deriveActions("monk", OPEN_HAND, 11, []);
+    const fleetStep = l11.find((a) => a.key === "fleetStep");
+    expect(fleetStep).toBeDefined();
+    expect(fleetStep?.cost).toBe("free");
+    expect(fleetStep?.enabled).toBe(true);
+    expect(fleetStep?.reminder).toMatch(/step of the wind/i);
+  });
+
+  it("fleetStep is a pure reminder — no server effect fn (like recklessAttack/metamagic's free cost siblings)", () => {
+    expect(ACTION_EFFECT_FN.fleetStep).toBeUndefined();
+    expect(ACTION_CAST_FN.fleetStep).toBeUndefined();
+  });
+
+  it("subclass gate: a non-Open-Hand monk gets neither at L11+", () => {
+    const shadow = keys(deriveActions("monk", "Warrior of Shadow", 17, []));
+    expect(shadow).not.toContain("wholenessOfBody");
+    expect(shadow).not.toContain("fleetStep");
+    const noSub = keys(deriveActions("monk", undefined, 17, []));
+    expect(noSub).not.toContain("wholenessOfBody");
+    expect(noSub).not.toContain("fleetStep");
+  });
+
+  it("Open Hand Technique and Quivering Palm are post-hit riders, not catalog actions", () => {
+    const l20 = keys(deriveActions("monk", OPEN_HAND, 20, []));
+    expect(l20).not.toContain("openHandTechnique");
+    expect(l20).not.toContain("quiveringPalm");
+    expect(ACTION_EFFECT_FN.openHandTechnique).toBeUndefined();
+    expect(ACTION_EFFECT_FN.quiveringPalm).toBeUndefined();
+  });
+});
+
+describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
+  const MERCY = "Warrior of Mercy";
+
+  it("Warrior of Mercy monk gets handOfHealing (action) and handOfHealingFlurry (bonus action) at L3", () => {
+    const l3 = deriveActions("monk", MERCY, 3, []);
+    const healing = l3.find((a) => a.key === "handOfHealing");
+    expect(healing).toBeDefined();
+    expect(healing?.cost).toBe("action");
+    const flurry = l3.find((a) => a.key === "handOfHealingFlurry");
+    expect(flurry).toBeDefined();
+    expect(flurry?.cost).toBe("bonusAction");
+  });
+
+  it("handOfHealing is gated on the focus pool like any other resource-gated action", () => {
+    const noFocus = deriveActions("monk", MERCY, 3, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "handOfHealing")?.enabled).toBe(false);
+    const withFocus = deriveActions("monk", MERCY, 3, [pool("focus", 1)]);
+    expect(withFocus.find((a) => a.key === "handOfHealing")?.enabled).toBe(true);
+  });
+
+  it("handOfHealingFlurry has no resource gate — it's always enabled once granted", () => {
+    const noFocus = deriveActions("monk", MERCY, 3, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "handOfHealingFlurry")?.enabled).toBe(true);
+  });
+
+  it("handOfHealing: with roll=8, spends 1 focus and heals 8", () => {
+    expect(ACTION_EFFECT_FN.handOfHealing({ roll: 8 })).toEqual([
+      { type: "spendResource", key: "focus" },
+      { type: "heal", amount: 8 },
+    ]);
+  });
+
+  it("handOfHealing: without a roll, spends focus but heals nothing", () => {
+    expect(ACTION_EFFECT_FN.handOfHealing({})).toEqual([{ type: "spendResource", key: "focus" }]);
+  });
+
+  it("handOfHealingFlurry: with roll=8, heals 8 and spends no focus", () => {
+    expect(ACTION_EFFECT_FN.handOfHealingFlurry({ roll: 8 })).toEqual([{ type: "heal", amount: 8 }]);
+  });
+
+  it("handOfHealingFlurry: without a roll, does nothing", () => {
+    expect(ACTION_EFFECT_FN.handOfHealingFlurry({})).toEqual([]);
+  });
+
+  it("subclass gate: a non-Warrior-of-Mercy monk gets neither at L3+", () => {
+    const shadow = keys(deriveActions("monk", "Way of Shadow", 20, []));
+    expect(shadow).not.toContain("handOfHealing");
+    expect(shadow).not.toContain("handOfHealingFlurry");
+    const noSub = keys(deriveActions("monk", undefined, 20, []));
+    expect(noSub).not.toContain("handOfHealing");
+    expect(noSub).not.toContain("handOfHealingFlurry");
+  });
+
+  it("Hand of Harm and Hand of Ultimate Mercy are dedicated verticals, not catalog actions", () => {
+    const l20 = keys(deriveActions("monk", MERCY, 20, []));
+    expect(l20).not.toContain("handOfHarm");
+    expect(l20).not.toContain("handOfUltimateMercy");
+    expect(ACTION_EFFECT_FN.handOfHarm).toBeUndefined();
+    expect(ACTION_EFFECT_FN.handOfUltimateMercy).toBeUndefined();
   });
 });
 

@@ -1,8 +1,8 @@
 /**
- * ShadowArtRow — a single Way of Shadow Shadow Art with an expandable
- * description and a flat 2-ki cast affordance. Renders through AbilityRowShell
- * (shared with ManeuverRow/DisciplineRow); Shadow Arts are flat-cost,
- * roll-less utility/buff spells, so there is no ki scaling here.
+ * ShadowArtRow — the Warrior of Shadow Shadow Art (Darkness) with an expandable
+ * description and a flat 1-focus cast affordance (#1246). Renders through
+ * AbilityRowShell (shared with ManeuverRow); the buff-chip path stays generic
+ * (shared with Channel Divinity) even though no current Shadow Art uses it.
  */
 
 import AbilityRowShell, { CastAbilityButton } from "@/features/class/AbilityRowShell";
@@ -14,7 +14,7 @@ import type {
 
 interface Props {
   art: CatalogShadowArt;
-  kiAvailable: number;
+  focusAvailable: number;
   busy: boolean;
   /** True when this Shadow Art is the character's active concentration. */
   isConcentrating: boolean;
@@ -25,13 +25,13 @@ interface Props {
 
 export default function ShadowArtRow({
   art,
-  kiAvailable,
+  focusAvailable,
   busy,
   isConcentrating,
   concentratingOnName,
   onCast,
 }: Props) {
-  const view = shadowArtView(art, kiAvailable, isConcentrating, concentratingOnName);
+  const view = shadowArtView(art, focusAvailable, isConcentrating, concentratingOnName);
 
   function handleCast() {
     if (busy || !view.canAfford) return;
@@ -44,7 +44,7 @@ export default function ShadowArtRow({
       chips={
         <>
           <span className="text-[10px] text-gold-700" aria-hidden="true">
-            {view.kiCost} ki
+            {view.focusCost} focus
           </span>
           {view.concentrates &&
             (isConcentrating ? (
@@ -69,8 +69,8 @@ export default function ShadowArtRow({
           onClick={handleCast}
           title={
             !view.canAfford
-              ? `Not enough ki (needs ${view.kiCost})`
-              : `Cast ${view.displayName} (${view.kiCost} ki)`
+              ? `Not enough focus (needs ${view.focusCost})`
+              : `Cast ${view.displayName} (${view.focusCost} focus)`
           }
         />
       }

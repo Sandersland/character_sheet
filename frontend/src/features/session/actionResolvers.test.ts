@@ -20,7 +20,11 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "channelDivinityCleric",
   "wildShape",
   "secondWind", "actionSurge",
-  "flurryOfBlows", "patientDefense", "stepOfTheWind", "stunningStrike",
+  "bonusUnarmedStrike",
+  "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus",
+  "deflectAttacksRedirect",
+  "wholenessOfBody",
+  "handOfHealing", "handOfHealingFlurry",
   "divineSense", "layOnHands", "channelDivinityPaladin",
   "cunningAction",
   "metamagic",
@@ -39,12 +43,21 @@ describe("actionResolvers", () => {
 
   it("all resolvers have a valid kind", () => {
     const VALID_KINDS = new Set([
-      "attack-picker", "twf-picker", "spell-picker", "item-picker",
+      "attack-picker", "twf-picker", "flurry-picker", "spell-picker", "item-picker",
       "heal-roll", "heal-input", "simple-confirm", "loadout-picker",
     ]);
     for (const r of Object.values(ACTION_RESOLVERS)) {
       expect(VALID_KINDS.has(r.kind), `${r.key} has invalid kind: ${r.kind}`).toBe(true);
     }
+  });
+
+  it("Flurry of Blows resolves Unarmed Strikes only for 1 Focus, not the weapon attack-picker (#1217)", () => {
+    const r = resolverFor("flurryOfBlows");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("flurry-picker");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.resourceKey).toBe("focus");
+    expect(r!.resourceAmount).toBe(1);
   });
 
   it("the twf off-hand resolver is an economy-only bonus-action picker (#732)", () => {
@@ -55,6 +68,16 @@ describe("actionResolvers", () => {
     expect(r!.serverEffect).toBe(false); // local roll, like `attack` — not in backend ACTION_EFFECT_FN
   });
 
+  it("bonusUnarmedStrike reuses the twf-picker economy path, locked-in subtitle (#1218)", () => {
+    const r = resolverFor("bonusUnarmedStrike");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("twf-picker");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.serverEffect).toBe(false); // gated at derive time (requiresUnarmored), not spent server-side
+    expect(r!.resourceKey).toBeUndefined();
+    expect(r!.subtitle).toBe("One Unarmed Strike as a Bonus Action (Dex + Martial Arts die).");
+  });
+
   it("the changeWeapons resolver is a local loadout-picker (no backend effect, #815)", () => {
     const r = resolverFor("changeWeapons");
     expect(r).toBeDefined();
@@ -62,18 +85,86 @@ describe("actionResolvers", () => {
     expect(r!.serverEffect).toBe(false); // the swap posts inventory transactions, not applyActionTransactions
   });
 
-  it("Shadow Step / Opportunist are economy-only simple-confirm reminders (#440)", () => {
+  it("Stunning Strike has no resolver — it's a post-hit rider, not a selectable action (#1242)", () => {
+    expect(resolverFor("stunningStrike")).toBeUndefined();
+  });
+
+  it("Shadow Step is an economy-only simple-confirm reminder (2024 rewrite, #1246)", () => {
     const step = resolverFor("shadowStep");
     expect(step).toBeDefined();
     expect(step!.kind).toBe("simple-confirm");
     expect(step!.slot).toBe("bonusAction");
     expect(step!.serverEffect).toBe(false); // reminder only — no backend ACTION_EFFECT_FN
+  });
 
-    const opp = resolverFor("opportunist");
-    expect(opp).toBeDefined();
-    expect(opp!.kind).toBe("simple-confirm");
-    expect(opp!.slot).toBe("reaction");
-    expect(opp!.serverEffect).toBe(false);
+  it("has no opportunist resolver (2014 L17 feature retired — Cloak of Shadows is L17 now)", () => {
+    expect(resolverFor("opportunist")).toBeUndefined();
+  });
+
+  it("Patient Defense / Step of the Wind free variants are economy-only simple-confirm reminders (#1240)", () => {
+    const patient = resolverFor("patientDefense");
+    expect(patient).toBeDefined();
+    expect(patient!.kind).toBe("simple-confirm");
+    expect(patient!.slot).toBe("bonusAction");
+    expect(patient!.serverEffect).toBe(false); // free variant — no backend ACTION_EFFECT_FN
+    expect(patient!.resourceKey).toBeUndefined();
+
+    const step = resolverFor("stepOfTheWind");
+    expect(step).toBeDefined();
+    expect(step!.kind).toBe("simple-confirm");
+    expect(step!.slot).toBe("bonusAction");
+    expect(step!.serverEffect).toBe(false);
+    expect(step!.resourceKey).toBeUndefined();
+  });
+
+  it("Patient Defense / Step of the Wind 1-Focus variants spend the focus pool (#1240)", () => {
+    const patientFocus = resolverFor("patientDefenseFocus");
+    expect(patientFocus).toBeDefined();
+    expect(patientFocus!.serverEffect).toBe(true);
+    expect(patientFocus!.resourceKey).toBe("focus");
+
+    const stepFocus = resolverFor("stepOfTheWindFocus");
+    expect(stepFocus).toBeDefined();
+    expect(stepFocus!.serverEffect).toBe(true);
+    expect(stepFocus!.resourceKey).toBe("focus");
+  });
+
+  it("Deflect Attacks base reduction is a reaction reminder; the redirect is a real Focus spend (#1241)", () => {
+    const deflect = resolverFor("deflectAttacks");
+    expect(deflect).toBeDefined();
+    expect(deflect!.kind).toBe("simple-confirm");
+    expect(deflect!.slot).toBe("reaction");
+    expect(deflect!.serverEffect).toBe(false); // reminder only — the dynamic roll is bespoke in useTurnActions
+
+    const redirect = resolverFor("deflectAttacksRedirect");
+    expect(redirect).toBeDefined();
+    expect(redirect!.kind).toBe("simple-confirm");
+    expect(redirect!.slot).toBe("free"); // decided within the same reaction, not its own slot
+    expect(redirect!.serverEffect).toBe(true);
+    expect(redirect!.resourceKey).toBe("focus");
+  });
+
+  it("Warrior of the Open Hand: Wholeness of Body is a heal-roll bonus action (#1245)", () => {
+    const r = resolverFor("wholenessOfBody");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("heal-roll");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.serverEffect).toBe(true);
+    expect(r!.resourceKey).toBe("wholenessOfBody");
+    expect(r!.healRoll).toBeDefined();
+  });
+
+  it("Warrior of the Open Hand: Fleet Step is a pure free-cost reminder (#1245)", () => {
+    const r = resolverFor("fleetStep");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("simple-confirm");
+    expect(r!.slot).toBe("free");
+    expect(r!.serverEffect).toBe(false);
+  });
+
+  it("Open Hand Technique / Quivering Palm have no resolver — post-hit riders with their own sections (#1245)", () => {
+    expect(resolverFor("openHandTechnique")).toBeUndefined();
+    expect(resolverFor("quiveringPalm")).toBeUndefined();
   });
 
   it("all resolvers have a valid slot", () => {
@@ -97,6 +188,17 @@ describe("actionResolvers", () => {
     const healRoll = resolver!.healRoll!;
     const spec = healRoll({ level: 5 } as Parameters<typeof healRoll>[0]);
     expect(spec).toEqual({ count: 1, faces: 10, modifier: 5 });
+  });
+
+  it("wholenessOfBody healRoll produces Martial Arts die + Wis modifier (#1245)", () => {
+    const resolver = resolverFor("wholenessOfBody");
+    expect(resolver).toBeDefined();
+    const healRoll = resolver!.healRoll!;
+    const mock = {
+      unarmedStrike: { damage: { faces: 8 } },
+      abilityScores: { wisdom: 14 },
+    } as Parameters<typeof healRoll>[0];
+    expect(healRoll(mock)).toEqual({ count: 1, faces: 8, modifier: 2 });
   });
 
   it("resolverFor returns undefined for unknown keys", () => {

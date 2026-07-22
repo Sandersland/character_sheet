@@ -1,15 +1,13 @@
 /**
  * Entry-scoped resource-op caps for multiclass characters (#1177). Before the
- * fix, applyResourceOpInTx derived every choice cap (maneuverChoiceCount,
- * disciplineChoiceCount, the discipline min-level gate) from classEntries[0]
- * (the PRIMARY entry) at TOTAL level — so a non-primary Battle Master's
- * maneuver cap or a non-primary Way of the Four Elements monk's discipline
- * gate were silently derived from the wrong class at the wrong level. A
- * spellcaster primary (no maneuverChoiceCount/disciplineChoiceCount of its
- * own) made the cap check `undefined` → skipped entirely → unbounded learns.
+ * fix, applyResourceOpInTx derived every choice cap (e.g. maneuverChoiceCount)
+ * from classEntries[0] (the PRIMARY entry) at TOTAL level — so a non-primary
+ * Battle Master's maneuver cap was silently derived from the wrong class at the
+ * wrong level. A spellcaster primary (no maneuverChoiceCount of its own) made
+ * the cap check `undefined` → skipped entirely → unbounded learns.
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "@/app.js";
@@ -132,7 +130,7 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
     });
 
     // Closes a coverage gap (not a red-first case: the write-side cap check
-    // already goes through the same deriveEntryScopedResources/overlayCapFields
+    // already goes through the same deriveEntryScopedResources/overlayExtrasFields
     // path the maneuver test above exercises, so this passes on the current fix).
     it("caps learnToolProficiency at the SECONDARY fighter entry's Student of War count (1)", async () => {
       const first = await agent()
@@ -147,78 +145,6 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
 
       const final = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(final.body.resources.toolProficienciesKnown).toHaveLength(1);
-    });
-  });
-
-  describe("fighter 7 (primary) / Way of the Four Elements monk 3 (secondary) — discipline level gate", () => {
-    const CHAR_ID = "test-1177-mc-disciplines";
-    const resourcesUrl = `/api/characters/${CHAR_ID}/resources/transactions`;
-    const NAME_LOW = "Res Caps MC Disc Low"; // minLevel 3 — legal at monk entry level 3
-    const NAME_HIGH = "Res Caps MC Disc High"; // minLevel 6 — illegal at monk entry level 3
-
-    let lowId: string;
-    let highId: string;
-
-    beforeEach(async () => {
-      const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-      const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
-      const [low, high] = await Promise.all([
-        prisma.grantedAbility.upsert({
-          where: { name: NAME_LOW },
-          create: { name: NAME_LOW, description: "Low test discipline.", minLevel: 3 },
-          update: { minLevel: 3, alwaysKnown: false },
-        }),
-        prisma.grantedAbility.upsert({
-          where: { name: NAME_HIGH },
-          create: { name: NAME_HIGH, description: "High test discipline.", minLevel: 6 },
-          update: { minLevel: 6, alwaysKnown: false },
-        }),
-      ]);
-      lowId = low.id;
-      highId = high.id;
-
-      await prisma.character.create({
-        data: {
-          ...BASE,
-          id: CHAR_ID,
-          name: "Res Caps MC Disciplines",
-          ownerId: OWNER_ID,
-          experiencePoints: 64000, // total level 10 (fighter 7 + monk 3), no pending level-up
-          hitDice: { total: 10, die: "d10", spent: 0 },
-          abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 15, charisma: 10 },
-          spellcasting: Prisma.JsonNull,
-          resources: Prisma.JsonNull,
-          classEntries: {
-            create: [
-              { name: "fighter", subclass: null, classId: fighter.id, position: 0, level: 7 },
-              { name: "monk", subclass: "Way of the Four Elements", classId: monk.id, position: 1, level: 3 },
-            ],
-          },
-        },
-      });
-    });
-
-    afterEach(async () => {
-      await prisma.character.deleteMany({ where: { id: CHAR_ID } });
-    });
-    afterAll(async () => {
-      await prisma.grantedAbility.deleteMany({ where: { name: { in: [NAME_LOW, NAME_HIGH] } } });
-    });
-
-    it("rejects a discipline gated above the SECONDARY monk entry's own level-3, even though total level (10) would clear it", async () => {
-      // Before the fix: the gate read total level (10) off the primary fighter
-      // entry's derivation context, so a minLevel-6 discipline wrongly passed.
-      const res = await agent().post(resourcesUrl).send({ operations: [{ type: "learnDiscipline", disciplineId: highId }] });
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/requires monk level 6/);
-    });
-
-    it("a legal discipline learn records learnedAtLevel at the monk entry's own level (3), not total level (10)", async () => {
-      const res = await agent().post(resourcesUrl).send({ operations: [{ type: "learnDiscipline", disciplineId: lowId }] });
-      expect(res.status).toBe(200);
-      const known = res.body.resources.disciplinesKnown as Array<{ disciplineId?: string; learnedAtLevel: number }>;
-      const entry = known.find((d) => d.disciplineId === lowId);
-      expect(entry?.learnedAtLevel).toBe(3);
     });
   });
 });

@@ -55,7 +55,7 @@ export interface GrantedSpellSource {
   grantedSpells: GrantedSpellRow[];
 }
 
-// "Way of Shadow" -> "way-of-shadow": the stable derived-id key.
+// "Warrior of Shadow" -> "warrior-of-shadow": the stable derived-id key.
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }

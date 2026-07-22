@@ -165,8 +165,8 @@ describe("poolBadgeFor", () => {
 
   it("undefined when the key or pool is missing", () => {
     expect(poolBadgeFor(undefined, [pool({})])).toBeUndefined();
-    expect(poolBadgeFor("ki", [pool({})])).toBeUndefined();
-    expect(poolBadgeFor("ki", undefined)).toBeUndefined();
+    expect(poolBadgeFor("focus", [pool({})])).toBeUndefined();
+    expect(poolBadgeFor("focus", undefined)).toBeUndefined();
   });
 });
 
@@ -229,6 +229,52 @@ describe("classActionOption", () => {
     );
     expect(option.enabled).toBe(false);
     expect(option.disabledReason).toBe("No uses remaining");
+  });
+
+  it("uses the resolver's static subtitle for Bonus Unarmed Strike, not the backend reminder (#1218)", () => {
+    const option = classActionOption(
+      available({ key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike" }),
+      resolverFor("bonusUnarmedStrike"),
+      makeCharacter(),
+    );
+    expect(option).toEqual({
+      key: "bonusUnarmedStrike",
+      title: "Bonus Unarmed Strike",
+      enabled: true,
+      subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die).",
+      heal: false,
+    });
+  });
+
+  it("passes through the armor/Shield disabledReason for Bonus Unarmed Strike (#1218)", () => {
+    const option = classActionOption(
+      available({
+        key: "bonusUnarmedStrike",
+        name: "Bonus Unarmed Strike",
+        enabled: false,
+        disabledReason: "Requires no armor or Shield",
+      }),
+      resolverFor("bonusUnarmedStrike"),
+      makeCharacter(),
+    );
+    expect(option.enabled).toBe(false);
+    expect(option.disabledReason).toBe("Requires no armor or Shield");
+  });
+  it("surfaces Flurry of Blows' 1-Focus spend as the subtitle, not just the remaining-pool badge (#1217)", () => {
+    const c = makeCharacter({
+      resources: {
+        pools: [{ key: "focus", label: "Focus Points", total: 3, used: 0, remaining: 3, recharge: "short-or-long" }],
+      },
+    } as Partial<Character>);
+    const option = classActionOption(
+      available({ key: "flurryOfBlows", name: "Flurry of Blows" }),
+      resolverFor("flurryOfBlows"),
+      c,
+    );
+    expect(option).toMatchObject({
+      subtitle: "Spend 1 Focus Points",
+      badge: "3 / rest",
+    });
   });
 });
 

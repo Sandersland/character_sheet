@@ -4,10 +4,10 @@ import { login } from "./helpers/auth";
 import { enterLiveCombat } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
-// Uses the Monk L6 roster persona: at monk level 6 Ki-Empowered Strikes marks
+// Uses the Monk L6 roster persona: at monk level 6 Empowered Strikes marks
 // unarmed strikes magical, surfaced as a "Magical" badge on the attack card's
 // summary when Unarmed Strike is picked in the "Attacking with" selector (#786).
-test("unarmed: Monk L6 shows the Ki-Empowered Strikes magical badge", async ({ page }) => {
+test("unarmed: Monk L6 shows the Empowered Strikes magical badge", async ({ page }) => {
   await login(page);
 
   const errors = collectConsoleErrors(page);
@@ -22,7 +22,7 @@ test("unarmed: Monk L6 shows the Ki-Empowered Strikes magical badge", async ({ p
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
   // Unarmed Strike is a form segment now — select it, then the card summary
-  // carries the Ki-Empowered "Magical" badge.
+  // carries the Empowered Strikes "Magical" badge.
   await page.getByRole("radio", { name: "Unarmed Strike" }).click();
   await expect(page.getByText("Magical")).toBeVisible();
 

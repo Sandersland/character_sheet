@@ -2,8 +2,10 @@ import { experienceProgress, levelForExperience } from "@/lib/leveling/experienc
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { deriveAttacksPerAction, deriveRangedAttackRollBonus } from "@/lib/srd/srd.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
+import { focusSaveDC } from "@/lib/classes/monk.js";
+import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
-import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
+import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
@@ -39,6 +41,60 @@ function serializeSneakAttack(
 ): { dice: number; faces: number } | null {
   const spec = sneakAttackSpec(classEntries.find((c) => c.name.toLowerCase() === "rogue")?.level ?? 0);
   return spec ? { dice: spec.count, faces: spec.faces } : null;
+}
+
+// Stunning Strike wire shape: the focus save DC, or null below monk L5. Mirrors
+// serializeSneakAttack's gate-by-class-level shape; scales with the monk class
+// entry's own level, matching monkLevel() in stunning-strike.ts.
+function serializeStunningStrike(
+  classEntries: { name: string; level: number }[],
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): { dc: number } | null {
+  const monkLevel = classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
+  return monkLevel >= 5 ? { dc: focusSaveDC(abilityScores, profBonus) } : null;
+}
+
+// Warrior of the Open Hand's monk class entry, or undefined off-subclass —
+// shared by serializeOpenHandTechnique/serializeQuiveringPalm so both gate on
+// the same (freeform, substring-matched) subclass string, mirroring
+// DERIVED_ACTIONS' grantSubclass convention in lib/classes/actions.ts.
+function openHandMonkEntry(
+  classEntries: { name: string; level: number; subclass?: string | null }[],
+): { name: string; level: number; subclass?: string | null } | undefined {
+  const monk = classEntries.find((c) => c.name.toLowerCase() === "monk");
+  return monk && (monk.subclass ?? "").toLowerCase().includes("open hand") ? monk : undefined;
+}
+
+// Open Hand Technique wire shape (Warrior of the Open Hand L3, #1245): the
+// focus save DC for the Push/Topple riders, or null below monk L3 off-subclass.
+// Addle carries no save, but the shape stays uniform (dc is always present once
+// unlocked) — live-play automation lives in open-hand-technique.ts.
+function serializeOpenHandTechnique(
+  classEntries: { name: string; level: number; subclass?: string | null }[],
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): { dc: number } | null {
+  const monk = openHandMonkEntry(classEntries);
+  return monk && monk.level >= 3 ? { dc: focusSaveDC(abilityScores, profBonus) } : null;
+}
+
+// Quivering Palm wire shape (Warrior of the Open Hand L17, #1245): the focus
+// save DC for the Con-save trigger, plus whether vibrations are currently set
+// (the activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
+// quivering-palm.ts's header for why a buff, not new persisted state).
+function serializeQuiveringPalm(
+  classEntries: { name: string; level: number; subclass?: string | null }[],
+  abilityScores: Record<string, number>,
+  profBonus: number,
+  activeEffects: ActiveEffectsMutableState,
+): { dc: number; active: boolean } | null {
+  const monk = openHandMonkEntry(classEntries);
+  if (!monk || monk.level < 17) return null;
+  return {
+    dc: focusSaveDC(abilityScores, profBonus),
+    active: activeEffects.buffs.some((b) => b.key === QUIVERING_PALM_BUFF_KEY),
+  };
 }
 
 export function serializeCharacterSummary(row: {
@@ -178,6 +234,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
   // 5. Equipped-armor selection feeds AC, speed (Unarmored/Fast Movement), and
   //    the Monk unarmed strike — all derived, never persisted.
   const { bestArmor, hasShield } = selectEquippedBodyArmor(row, effectiveScores);
+  // Martial Arts blanket condition (Monk Bonus Unarmed Strike, #1218): no armor
+  // or Shield. Computed once here — `deriveActions` is the first consumer, but
+  // the flag is generic (`requiresUnarmored`) so future gated features share it.
+  const unarmoredUnshielded = bestArmor == null && !hasShield;
   const { armorClass, armorClassBreakdown } = buildArmorClassView(
     row,
     effectiveScores,
@@ -304,7 +364,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
 
     // Class-specific available actions for the turn tracker (universal ones
     // render client-side from UNIVERSAL_ACTIONS).
-    availableActions: buildAvailableActionsView(primaryClass, progress.level, resources),
+    availableActions: buildAvailableActionsView(primaryClass, progress.level, resources, unarmoredUnshielded),
 
     // Combat attack rows — derived at read time; the frontend renders these
     // directly in AttacksPanel rather than recomputing attack math on the client.
@@ -315,6 +375,14 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Rogue Sneak Attack Nd6 (derived from rogue class levels); null otherwise.
     // The count drives the session card's toggle + the roll shown in results.
     sneakAttack: serializeSneakAttack(row.classEntries),
+    // Monk Stunning Strike focus save DC (derived from monk class level + Wis);
+    // null below monk L5. Drives the session card's DC display (#1242).
+    stunningStrike: serializeStunningStrike(row.classEntries, effectiveScores, progress.proficiencyBonus),
+    // Warrior of the Open Hand riders (#1245): focus save DC once unlocked, or
+    // null off-subclass/below the gate level. See open-hand-technique.ts /
+    // quivering-palm.ts for the live-play automation.
+    openHandTechnique: serializeOpenHandTechnique(row.classEntries, effectiveScores, progress.proficiencyBonus),
+    quiveringPalm: serializeQuiveringPalm(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects),
 
     journal: buildJournalView(row),
 

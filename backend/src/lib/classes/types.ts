@@ -3,12 +3,67 @@
 
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
 
+/**
+ * A bonus HP heal tied to an `InitiativeRegen` descriptor firing (Uncanny
+ * Metabolism, SRD 5.2, #1243): roll a `dieFaces` die and heal `flatBonus` +
+ * the roll. Rolled server-side with no client input (mirrors the automatic
+ * concentration-save roll, `lib/core/dice.ts`) since this is an automatic
+ * combat-start effect, not a player-initiated roll.
+ */
+export interface InitiativeBonusHeal {
+  /** Attribution surfaced on the HP-heal audit event / toast (e.g. "Uncanny Metabolism"). */
+  sourceName: string;
+  dieFaces: number;
+  flatBonus: number;
+}
+
+/**
+ * Regain-on-rolling-Initiative descriptor (SRD 5.2). Declared on a pool that
+ * refills at combat start, applied by the `rollInitiative` resource op — e.g.
+ * Uncanny Metabolism ({ amount: "all", oncePerLongRest: true, bonusHeal }) or
+ * Perfect Focus ({ amount: 4 }). Orthogonal to `recharge` and independent of
+ * any future short-rest-regain field (#1221) — resources may declare both.
+ */
+export interface InitiativeRegen {
+  /**
+   * "all" fully refills the pool. A number tops the pool up to *at least* that
+   * many available (never spends) — e.g. Perfect Focus regains until you have 4
+   * (only when you have 3 or fewer; a pool already at/above the target is a
+   * no-op, so the "3 or fewer" trigger needs no separate check).
+   */
+  amount: "all" | number;
+  /**
+   * When true the regen fires at most once between long rests (Uncanny
+   * Metabolism's 1/long-rest cap). Tracked by a marker in `used`, cleared on a
+   * long rest by clearInitiativeRegenMarkers. Absent ⇒ fires every combat.
+   */
+  oncePerLongRest?: boolean;
+  /**
+   * Discriminator for the once-per-long-rest marker when a pool declares
+   * MULTIPLE onInitiative descriptors (#1243 — e.g. Monk Focus at L15+ combines
+   * Uncanny Metabolism's once/long-rest full refill with Perfect Focus's
+   * every-combat top-up on the same pool). Defaults to the descriptor's
+   * position in the array when omitted; only needs to be unique within one
+   * pool's onInitiative list.
+   */
+  id?: string;
+  /** A bonus HP heal this descriptor grants whenever it fires. Absent for a plain regen (Perfect Focus has none). */
+  bonusHeal?: InitiativeBonusHeal;
+}
+
 export interface DerivedResource {
   key: string;          // stable machine key, e.g. "superiorityDice"
   label: string;        // display label, e.g. "Superiority Dice"
   total: number;        // maximum count at this level
   die?: string;         // die size string, e.g. "d8" — absent for simple counters
   recharge: RechargeOn; // when the pool fully recharges
+  /**
+   * Regain on rolling Initiative / combat start (#1239). A pool may declare
+   * several descriptors (#1243) that fire independently — e.g. Monk Focus at
+   * L15+ combines Uncanny Metabolism (once/long rest, full refill + heal) with
+   * Perfect Focus (every combat, top-up to 4). Inert when absent.
+   */
+  onInitiative?: InitiativeRegen | InitiativeRegen[];
   description?: string;
 }
 
@@ -32,13 +87,13 @@ export interface DerivedClassInfo {
    * Undefined when no subclass feature grants a tool choice.
    */
   toolProfChoiceCount?: number;
-  /** Way of the Four Elements only: number of elemental disciplines known at this level. */
-  disciplineChoiceCount?: number;
-  /** Way of the Four Elements only: ki save DC for discipline effects (8 + prof + Wis mod). */
-  disciplineSaveDC?: number;
-  /** Way of Shadow only: whether the L3+ Shadow Arts ki-cast spells are available. */
+  /** Warrior of the Elements only: whether the L3+ Elemental Attunement toggle is available. */
+  elementalAttunementAvailable?: boolean;
+  /** Warrior of the Elements only: whether the L6+ Elemental Burst action is available. */
+  elementalBurstAvailable?: boolean;
+  /** Warrior of Shadow only: whether the L3+ 1-focus Darkness cast is available. */
   shadowArtsAvailable?: boolean;
-  /** Way of Shadow only: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
+  /** Warrior of Shadow only: whether the L17+ Cloak of Shadows self-invisible toggle is available (moved from L11 in the 2024 rewrite, #1246). */
   cloakOfShadowsAvailable?: boolean;
   /**
    * Generic subclass "choose N from a catalog" selections active at this level
@@ -55,7 +110,7 @@ export interface DerivedClassInfo {
  * (issue #899) — e.g. Ranger's Hunter's Prey, Barbarian totems. Its only
  * persisted state is the selection (ResourcesMutableState.choicesKnown[key]);
  * the option catalog lives as GrantedAbility rows keyed by `catalogSource`.
- * Distinct from the bespoke maneuvers/disciplines/tool-prof lists, which carry
+ * Distinct from the bespoke maneuvers/tool-prof lists, which carry
  * extra mechanics (save DCs, cast/swap ops) and stay hand-rolled.
  */
 export interface SubclassChoice {

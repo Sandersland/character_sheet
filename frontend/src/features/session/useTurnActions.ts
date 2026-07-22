@@ -9,9 +9,10 @@
 
 import { useState } from "react";
 
-import { applyActionTransactions, revertBatch, startCombat, endCombat, advanceCombatRound } from "@/api/client";
+import { applyActionTransactions, revertBatch, startCombat, endCombat, advanceCombatRound, rollInitiativeTransaction } from "@/api/client";
+import { flurryStrikeCount } from "@/lib/attackMath";
 import { rollSpec } from "@/lib/dice";
-import { planActionClick } from "@/lib/turnActionPlan";
+import { planActionClick, type ActionClickPlan } from "@/lib/turnActionPlan";
 import {
   bonusSpellOptions,
   classActionOption,
@@ -24,7 +25,7 @@ import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
 import { equippedLoadoutLabel } from "@/lib/paperDoll";
 import { interactionBudgetRemaining } from "@/lib/loadoutPicker";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
-import { resolverFor } from "@/features/session/actionResolvers";
+import { resolverFor, type ResolutionKind } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
 import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -56,6 +57,7 @@ export function useTurnActions({
     enterAttackMode,
     consumeBonusAction,
     enterTwfMode,
+    enterFlurryMode,
     consumeReaction,
     grantExtraAction,
     history,
@@ -190,30 +192,44 @@ export function useTurnActions({
     else setShowReactionMenu(false);
   }
 
-  // Consume the economy slot for the clicked cost.
-  function consumeSlotFor(cost: "action" | "bonusAction" | "reaction") {
-    if (cost === "action") consumeAction();
+  // Consume the economy slot for the clicked cost. twf-picker kind actions
+  // reaching the generic dispatch (Bonus Unarmed Strike, #1218 — the `twf` key
+  // itself never arrives here, see handleTwfAction below) open the
+  // single-swing bonusAttack counter instead of a flat consume, so
+  // InlineOffHandPicker's pre/post-roll state tracks correctly.
+  function consumeSlotFor(cost: "action" | "bonusAction" | "reaction", resolverKind: ResolutionKind | undefined) {
+    if (resolverKind === "twf-picker") enterTwfMode();
+    else if (cost === "action") consumeAction();
     else if (cost === "bonusAction") consumeBonusAction();
     else consumeReaction();
+  }
+
+  // Fire applyActionTransactions per the plan's send mode (none/plain/healRoll).
+  function sendForPlan(plan: ActionClickPlan, key: string) {
+    if (plan.send === "plain") void send(key);
+    else if (plan.send === "healRoll" && plan.healRoll) {
+      void send(key, { roll: rollSpec(plan.healRoll).total });
+    }
+  }
+
+  // No-server-effect reminder actions (e.g. Shadow Step): the rule text is the
+  // whole deliverable, so surface it on use.
+  function surfaceReminder(key: string, cost: "action" | "bonusAction" | "reaction") {
+    const reminder = availableActions.find((a) => a.key === key)?.reminder;
+    if (!reminder) return;
+    if (cost === "reaction") setReactionMessage(reminder);
+    else setEffectMessage(reminder);
   }
 
   // Action button click handler — plans via planActionClick, then applies effects.
   function handleActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
     closeMenuFor(cost);
-    const plan = planActionClick(resolverFor(key), character);
-    if (plan.consumeSlot) consumeSlotFor(cost);
-    if (plan.send === "plain") void send(key);
-    else if (plan.send === "healRoll" && plan.healRoll) {
-      void send(key, { roll: rollSpec(plan.healRoll).total });
-    }
+    const resolver = resolverFor(key);
+    const plan = planActionClick(resolver, character);
+    if (plan.consumeSlot) consumeSlotFor(cost, resolver?.kind);
+    sendForPlan(plan, key);
     if (plan.openResolution) openResolution(key);
-    // No-server-effect reminder actions (Shadow Step, Opportunist): the rule
-    // text is the whole deliverable, so surface it on use.
-    const reminder = availableActions.find((a) => a.key === key)?.reminder;
-    if (reminder) {
-      if (cost === "reaction") setReactionMessage(reminder);
-      else setEffectMessage(reminder);
-    }
+    surfaceReminder(key, cost);
   }
 
   // Special path for Attack action — must use enterAttackMode, not consumeAction.
@@ -235,6 +251,22 @@ export function useTurnActions({
   function handleTwfAction() {
     enterTwfMode();
     openResolution("twf");
+    setShowBonusMenu(false);
+  }
+
+  // Special path for Flurry of Blows (#1217) — bypasses the generic
+  // handleActionClick/planActionClick path (like handleTwfAction) because it
+  // needs to arm the strike counter via enterFlurryMode. The bonus action is
+  // consumed here (reversibly — cancelFlurry refunds it pre-roll, like TWF),
+  // but the 1 Focus is deliberately NOT spent here: InlineFlurryPicker fires it
+  // exactly once, on the first strike roll, so a cancel-before-rolling loses
+  // nothing (a cancel-time "refund" that couldn't return an already-spent
+  // Focus Point would lie to the player). Always resolves as Unarmed Strikes
+  // only via InlineFlurryPicker, never the weapon attack-picker.
+  function handleFlurryAction() {
+    consumeBonusAction();
+    enterFlurryMode(flurryStrikeCount(character));
+    openResolution("flurryOfBlows");
     setShowBonusMenu(false);
   }
 
@@ -267,6 +299,23 @@ export function useTurnActions({
   // Combat lifecycle — local state first, best-effort audit log after.
   async function handleStartCombat() {
     startCombatState();
+    setReactionMessage(null);
+    setEffectMessage(null);
+    setError(null);
+    // Automatic combat-start resource regen (#1239/#1243): fires every pool's
+    // onInitiative descriptor (today, Monk Uncanny Metabolism/Perfect Focus) —
+    // harmless no-op for every other class/level. Separate try/catch from the
+    // audit-log call below so one failing best-effort call doesn't block the other.
+    try {
+      const updated = await rollInitiativeTransaction(character.id);
+      onUpdate(updated);
+      // eventData.regenerated is only non-empty when a descriptor actually
+      // fired (#1243) — a plain "no resources to regain" roll stays silent.
+      const regenerated = updated.results[0]?.eventData.regenerated as unknown[] | undefined;
+      if (regenerated && regenerated.length > 0) setEffectMessage(updated.results[0].summary);
+    } catch (e) {
+      console.error("initiative regen failed (startCombat)", e);
+    }
     try {
       await startCombat(character.id, sessionId);
       onLogChanged();
@@ -382,6 +431,10 @@ export function useTurnActions({
     busy,
     error,
     reactionMessage,
+    // Exposed alongside the value (#1241) so TurnHub can compose the sibling
+    // useDeflectAttacksReaction hook (see that file's header for why it's a
+    // sibling rather than nested in here) and write into the same result strip.
+    setReactionMessage,
     effectMessage,
     showActionMenu,
     setShowActionMenu,
@@ -412,6 +465,7 @@ export function useTurnActions({
     handleAttackAction,
     handleResumeAttack,
     handleTwfAction,
+    handleFlurryAction,
     handleBonusSpellCast,
     handleActionSurge,
     handleStartCombat,

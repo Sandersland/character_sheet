@@ -20,11 +20,11 @@ export interface AvailableAction {
   key: string;
   name: string;
   cost: ActionCost;
-  /** False when the character can't currently use this action (e.g. no ki). */
+  /** False when the character can't currently use this action (e.g. no focus). */
   enabled: boolean;
   /** Human-readable reason why `enabled` is false; absent when enabled. */
   disabledReason?: string;
-  /** In-play rule text for no-server-effect reminder actions (Shadow Step, Opportunist). */
+  /** In-play rule text for no-server-effect reminder actions (e.g. Shadow Step). */
   reminder?: string;
 }
 

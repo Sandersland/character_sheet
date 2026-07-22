@@ -11,9 +11,10 @@
  *    CLASS_RESOURCE_FN / deriveResources pattern from class-features.ts.
  *
  * 2. `ACTION_EFFECT_FN` — hardcoded TS dispatch table keyed by action `key`.
- *    Returns existing op types (spendResource, adjustQuantity, heal) for the
- *    Phase-C orchestrator endpoint (POST /actions/transactions). This is the
- *    `CLASS_RESOURCE_FN` analog — no interpreted JSON engine.
+ *    Returns existing op types (spendResource, adjustQuantity, heal, tempHp,
+ *    applyBuff, clearBuff) for the Phase-C orchestrator endpoint (POST
+ *    /actions/transactions). This is the `CLASS_RESOURCE_FN` analog — no
+ *    interpreted JSON engine.
  *
  * Adding a new mechanical action:
  *   • Append a row to ACTIONS in `prisma/seed.ts` (display + gating data for
@@ -58,7 +59,14 @@ interface DerivedActionRecord {
   grantLevel?: number;   // min level for this action
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
-  reminder?: string;     // in-play rule text for no-server-effect reminder actions
+  // In-play rule text for no-server-effect reminder actions. A function form
+  // (Heightened Focus, monk L10, #1244) lets patientDefenseFocus/
+  // stepOfTheWindFocus swap in their L10 rider text without a second row.
+  reminder?: string | ((level: number) => string);
+  // Martial Arts' blanket condition (Bonus Unarmed Strike, #1218): gates on
+  // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
+  // future Martial-Arts-conditioned action can reuse the same gate.
+  requiresUnarmored?: boolean;
 }
 
 /** Available action shape serialized onto the character. */
@@ -106,13 +114,148 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "actionSurge", name: "Action Surge", cost: "special", grantClass: "fighter", grantLevel: 2, resourceKey: "actionSurge", resourceAmount: 1 },
 
   // Monk
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 2 },
-  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
-  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
-  { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "ki", resourceAmount: 1 },
-  // Way of Shadow reminder actions (#440) — no resourceKey, no server effect; reminder is the deliverable.
-  { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
-  { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17, reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction." },
+  // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no
+  // resource cost, gated only on the Martial Arts blanket condition (no armor
+  // or Shield), not on the Attack action. Distinct from Flurry of Blows (#1217,
+  // the two-strike Focus version).
+  { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
+  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
+  // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
+  // TWO menu entries — a free variant and a 1-Focus variant — rather than the
+  // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
+  // action, so both are cost:"bonusAction"; the free entry has no resourceKey
+  // (always enabled, like Dodge/Dash themselves) while the Focus entry gates
+  // on the focus pool like any other spend. Heightened Focus (monk L10,
+  // #1244) upgrades both *Focus entries without touching the free ones:
+  // patientDefenseFocus's reminder + ACTION_EFFECT_FN entry gain a level-gated
+  // temp-HP roll; stepOfTheWindFocus's reminder gains a narrated move-a-
+  // willing-creature rider (no server state — this app has no ally/NPC
+  // combatant model to move).
+  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Disengage (free bonus action)." },
+  {
+    key: "patientDefenseFocus",
+    name: "Patient Defense (1 Focus)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: (level) =>
+      level >= 10
+        ? "Disengage + Dodge (spend 1 Focus). Heightened Focus (L10): also gain temporary hit points equal to two Martial Arts die rolls."
+        : "Disengage + Dodge (spend 1 Focus).",
+  },
+  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Dash (free bonus action)." },
+  {
+    key: "stepOfTheWindFocus",
+    name: "Step of the Wind (1 Focus)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: (level) =>
+      level >= 10
+        ? "Disengage + Dash, jump distance doubled this turn (spend 1 Focus). Heightened Focus (L10): also bring one willing creature within 5 ft along with you, moving it up to your Speed — it doesn't provoke opportunity attacks."
+        : "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
+  },
+  // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
+  // (spend + Con save + fail/success outcome), built as its own dedicated
+  // vertical in stunning-strike.ts, exactly like Sneak Attack bypasses this
+  // catalog entirely (#1242 supersedes the #392 bare-spend stub formerly here).
+  // Deflect Attacks (#1241, SRD 5.2 L3, renamed from 2014 Deflect Missiles): the base
+  // reduction (1d10 + Dex + monk level) costs nothing, so — like the Warrior of Shadow
+  // reminders below — it carries no resourceKey and the client rolls it directly (see
+  // ACTION_EFFECT_FN comment). Deflect Energy (L13) just widens the damage-type clause
+  // in the reminder text; it isn't a separate action key.
+  {
+    key: "deflectAttacks",
+    name: "Deflect Attacks",
+    cost: "reaction",
+    grantClass: "monk",
+    grantLevel: 3,
+    reminder:
+      "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+  },
+  // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a "free"
+  // follow-up decision within the same reaction (mirrors Stunning Strike's shape),
+  // not its own action-economy slot. Spends the persisted Focus resource, unlike
+  // the free base reduction above.
+  { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1 },
+  // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
+  // server effect; reminder is the deliverable. Improved Shadow Step (L11)
+  // upgrades the SAME bonus action (ignore the dim/dark destination requirement
+  // for 1 focus) rather than adding a competing catalog row — mirrors how
+  // Heightened Focus upgrades patientDefenseFocus/stepOfTheWindFocus in place.
+  // Opportunist (2014 L17 reaction) is retired — replaced by Cloak of Shadows
+  // (shadow-arts.ts activateCloakOfShadows), a real resourceKey-gated cast, not
+  // a catalog reminder.
+  {
+    key: "shadowStep",
+    name: "Shadow Step",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantSubclass: "Shadow",
+    grantLevel: 6,
+    reminder: (level) =>
+      level >= 11
+        ? "Teleport up to 60 ft between areas of dim light or darkness (or, for 1 focus, ignore the dim/dark destination requirement); advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting."
+        : "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
+  },
+  // Warrior of the Open Hand (#1245): Open Hand Technique (Flurry-hit rider)
+  // and Quivering Palm (set/trigger) are post-hit riders with their own
+  // dedicated verticals (open-hand-technique.ts / quivering-palm.ts), exactly
+  // like Stunning Strike bypasses this catalog — neither is a selectable action.
+  // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
+  // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
+  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclass: "Open Hand", grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
+  // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
+  // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
+  // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
+  // with Wholeness of Body/Flurry/Bonus Unarmed Strike for the same bonus
+  // action. Full automation of "which bonus action did you just take" is heavy
+  // for a one-line rider — the reminder is the deliverable (ticket #1245).
+  {
+    key: "fleetStep",
+    name: "Fleet Step",
+    cost: "free",
+    grantClass: "monk",
+    grantSubclass: "Open Hand",
+    grantLevel: 11,
+    reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
+  },
+  // Warrior of Mercy (#1248): Hand of Healing is a Magic-action heal spending
+  // 1 Focus (mirrors Wholeness of Body's shape) plus a free Flurry-strike
+  // replacement variant. Hand of Harm and Hand of Ultimate Mercy are their
+  // own dedicated verticals (hand-of-harm.ts / hand-of-ultimate-mercy.ts) —
+  // like Stunning Strike / Quivering Palm — since they carry once-per-turn /
+  // once-per-long-rest mechanics this catalog doesn't model.
+  {
+    key: "handOfHealing",
+    name: "Hand of Healing",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclass: "Mercy",
+    grantLevel: 3,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: (level) =>
+      level >= 6
+        ? "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod). Physician's Touch (L6): also ends one of Blinded/Deafened/Paralyzed/Poisoned/Stunned."
+        : "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod).",
+  },
+  // The Flurry-replacement variant swaps in for one of Flurry of Blows' own
+  // unarmed strikes, so it costs no Focus of its own (Flurry already spent
+  // its 1 Focus via the separate flurryOfBlows action) — hence no resourceKey.
+  {
+    key: "handOfHealingFlurry",
+    name: "Hand of Healing (Flurry replacement)",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantSubclass: "Mercy",
+    grantLevel: 3,
+    reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
+  },
 
   // Paladin
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
@@ -141,6 +284,9 @@ export function deriveActions(
   subclass: string | undefined,
   level: number,
   pools: ResourcePool[],
+  // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218).
+  // Defaults to true (permissive) since only requiresUnarmored actions read it.
+  unarmoredUnshielded = true,
 ): AvailableAction[] {
   const cls = (className ?? "").toLowerCase();
   const sub = (subclass ?? "").toLowerCase();
@@ -164,29 +310,44 @@ export function deriveActions(
       return true;
     })
     .map((a): AvailableAction => {
-      let enabled = true;
-      let disabledReason: string | undefined;
-
-      if (a.resourceKey && a.resourceAmount) {
-        const remaining = poolMap.get(a.resourceKey) ?? 0;
-        if (remaining < a.resourceAmount) {
-          enabled = false;
-          disabledReason =
-            remaining === 0
-              ? `No ${a.resourceKey} remaining`
-              : `Need ${a.resourceAmount} ${a.resourceKey}, have ${remaining}`;
-        }
-      }
-
+      const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
+      const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
       return {
         key: a.key,
         name: a.name,
         cost: a.cost,
         enabled,
         ...(disabledReason ? { disabledReason } : {}),
-        ...(a.reminder ? { reminder: a.reminder } : {}),
+        ...(reminder ? { reminder } : {}),
       };
     });
+}
+
+// One action row's enabled/disabledReason — pulled out of the `.map()` above to
+// keep that callback's complexity low. Resource-pool gate first, then the
+// Martial Arts unarmored/unshielded gate (mutually exclusive today, but a
+// future action could carry both — resource wins the reason if so).
+function resolveEnablement(
+  a: DerivedActionRecord,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): { enabled: boolean; disabledReason?: string } {
+  if (a.resourceKey && a.resourceAmount) {
+    const remaining = poolMap.get(a.resourceKey) ?? 0;
+    if (remaining < a.resourceAmount) {
+      return {
+        enabled: false,
+        disabledReason:
+          remaining === 0
+            ? `No ${a.resourceKey} remaining`
+            : `Need ${a.resourceAmount} ${a.resourceKey}, have ${remaining}`,
+      };
+    }
+  }
+  if (a.requiresUnarmored && !unarmoredUnshielded) {
+    return { enabled: false, disabledReason: "Requires no armor or Shield" };
+  }
+  return { enabled: true };
 }
 
 // Keyed by action `key`. Each function receives an execution context and returns
@@ -197,7 +358,11 @@ export function deriveActions(
 //  - Return op arrays, never side-effect directly.
 //  - If a roll was performed client-side, receive it via `ctx.roll`; validate
 //    range server-side rather than recomputing (same pattern as castSpell.roll).
-//  - Use ONLY existing op types (spendResource, adjustQuantity, heal).
+//  - A roll made server-side with no client input (e.g. Heightened Focus's
+//    temp-HP roll) is precomputed by the route before dispatch and passed in
+//    via its own ctx field, same shape as `rageDamageBonus` below.
+//  - Use ONLY existing op types (spendResource, adjustQuantity, heal, tempHp,
+//    applyBuff, clearBuff).
 
 interface ActionContext {
   /** Arbitrary dice roll total supplied by the client (e.g. potion healing). */
@@ -206,14 +371,22 @@ interface ActionContext {
   inventoryItemId?: string;
   /** Level-derived Rage melee-damage bonus, computed by the route from barbarian level. */
   rageDamageBonus?: number;
+  /**
+   * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): temp HP for
+   * Patient Defense's Focus variant, rolled server-side (two Martial Arts die
+   * rolls, no client input) by the route before dispatch. Undefined/0 below
+   * L10, so patientDefenseFocus simply omits the tempHp op.
+   */
+  heightenedFocusTempHp?: number;
 }
 
 type SpendResourceOp = { type: "spendResource"; key: string; amount?: number };
 type AdjustQuantityOp = { type: "adjustQuantity"; inventoryItemId: string; delta: number };
 type HealOp = { type: "heal"; amount: number };
+type TempHpOp = { type: "tempHp"; amount: number };
 type ApplyBuffOp = { type: "applyBuff"; buff: Omit<ActiveBuff, "id"> };
 type ClearBuffOp = { type: "clearBuff"; key: string; reason: string };
-type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | ApplyBuffOp | ClearBuffOp;
+type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
@@ -284,10 +457,71 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   actionSurge: () => [{ type: "spendResource", key: "actionSurge" }],
 
   // Monk
-  flurryOfBlows: () => [{ type: "spendResource", key: "ki", amount: 2 }],
-  patientDefense: () => [{ type: "spendResource", key: "ki" }],
-  stepOfTheWind: () => [{ type: "spendResource", key: "ki" }],
-  stunningStrike: () => [{ type: "spendResource", key: "ki" }],
+  // bonusUnarmedStrike is economy-only, like `attack`/`twf` — no server state
+  // to spend, the gate is already applied at derive time (requiresUnarmored).
+  bonusUnarmedStrike: () => [],
+  // SRD 5.2 Focus: Flurry expends 1 Focus Point to make two Unarmed Strikes
+  // (#1217 — was miscoded at 2 Focus, a 2014-rules holdover).
+  flurryOfBlows: () => [{ type: "spendResource", key: "focus" }],
+  // patientDefense / stepOfTheWind (the FREE variants) have no ACTION_EFFECT_FN
+  // entry — like Shadow Step/Opportunist, they're economy-only (consume the
+  // bonus action, spend nothing); planActionClick never calls send() for a
+  // serverEffect:false resolver, so no dispatch entry is needed here.
+  patientDefenseFocus: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "focus" }];
+    // Heightened Focus (monk L10, #1244): the route pre-rolls two Martial Arts
+    // die rolls into ctx.heightenedFocusTempHp (0/undefined below L10), so the
+    // tempHp op is simply omitted rather than pushed at amount 0.
+    if (ctx.heightenedFocusTempHp) {
+      ops.push({ type: "tempHp", amount: ctx.heightenedFocusTempHp });
+    }
+    return ops;
+  },
+  // stepOfTheWindFocus's Heightened Focus rider (move a willing creature) has
+  // no server state to apply — this app has no NPC/ally combatant model — so
+  // it's surfaced only via the level-gated reminder text above, not here.
+  stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
+  // stunningStrike is not here — it's a post-hit rider in stunning-strike.ts (#1242).
+  // Warrior of the Open Hand (#1245): Wholeness of Body mirrors layOnHands'
+  // shape (spend the pool, heal the client-rolled amount) but spends a flat 1
+  // use rather than a variable HP-pool draw. Open Hand Technique / Quivering
+  // Palm have no entry here — see the DERIVED_ACTIONS comment above.
+  wholenessOfBody: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "wholenessOfBody" }];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
+  // fleetStep has no entry here — it's a pure reminder (cost:"free") like
+  // recklessAttack/metamagic: no server state to spend.
+  // Warrior of Mercy (#1248): Hand of Healing's rule text is "touch a
+  // creature", but — like layOnHands/wholenessOfBody above — this app has no
+  // cross-character heal path via the actions endpoint, so it applies to the
+  // acting character only; the client-rolled amount already includes the
+  // Martial Arts die + Wis mod. Physician's Touch's condition-cure (L6+) is
+  // narrated via the reminder text only (no persisted target condition).
+  handOfHealing: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "focus" }];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
+  // Flurry-replacement variant: no Focus spend (Flurry's own flurryOfBlows
+  // action already paid it) — just the same client-rolled heal.
+  handOfHealingFlurry: (ctx) => {
+    const ops: ActionOp[] = [];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
+  // deflectAttacks (the base reduction) has no entry here — it's a pure reminder
+  // action like shadowStep: the client rolls 1d10 + Dex + monk level and never
+  // calls the transactions endpoint (nothing persisted). Only the redirect
+  // below is real, persisted state.
+  deflectAttacksRedirect: () => [{ type: "spendResource", key: "focus" }],
 
   // Paladin
   divineSense: () => [{ type: "spendResource", key: "divineSense" }],

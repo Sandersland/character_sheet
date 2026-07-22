@@ -75,6 +75,66 @@ function ManeuverReactionCard({
   );
 }
 
+/**
+ * Deflect Attacks redirect (#1241): a ranged hit reduced to 0 can spend 1 Focus
+ * to redirect it, as part of the same reaction — self-adjudicated by the player
+ * (the app doesn't track incoming attacks), same trust model as "ranged" and
+ * "free hand" in the reaction's reminder text.
+ */
+function DeflectRedirectButton({
+  available,
+  busy,
+  onRedirect,
+}: {
+  available: boolean;
+  busy: boolean;
+  onRedirect: () => void;
+}) {
+  if (!available) return null;
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onRedirect}
+      className="mt-2 w-full rounded-control border border-gold-300 bg-gold-100 px-3 py-1.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      Redirect · spend 1 Focus
+    </button>
+  );
+}
+
+/**
+ * The result strip inside the Reaction slot card: the die-spend error (before
+ * use), or the spent-reaction message plus the Deflect Attacks redirect
+ * follow-up (after use). Split out of ReactionSlot to keep its own branching
+ * budget for the menu/sheet wiring below.
+ */
+function ReactionSlotResult({
+  reactionUsed,
+  error,
+  reactionMessage,
+  deflectRedirectAvailable,
+  busy,
+  onDeflectRedirect,
+}: {
+  reactionUsed: boolean;
+  error: string | null;
+  reactionMessage: string | null;
+  deflectRedirectAvailable: boolean;
+  busy: boolean;
+  onDeflectRedirect: () => void;
+}) {
+  if (!reactionUsed) {
+    return error ? <ReactionResult message={error} tone="garnet" /> : null;
+  }
+  return (
+    <>
+      <ReactionResult message={reactionMessage} />
+      <DeflectRedirectButton available={deflectRedirectAvailable} busy={busy} onRedirect={onDeflectRedirect} />
+    </>
+  );
+}
+
 /** Universal reactions the class doesn't already provide + the slot's preview line. */
 function deriveReactionOptions(
   classReactions: AvailableAction[],
@@ -181,6 +241,8 @@ export default function ReactionSlot({
   handleActionClick,
   handleReactionManeuver,
   consumeReaction,
+  deflectRedirectAvailable,
+  handleDeflectAttacksRedirect,
 }: {
   reactionUsed: boolean;
   showReactionMenu: boolean;
@@ -198,6 +260,9 @@ export default function ReactionSlot({
   handleReactionManeuver: (entryId: string, name: string) => Promise<void>;
   /** "Other reaction" catch-all — consume the slot without a specific action. */
   consumeReaction: () => void;
+  /** Deflect Attacks (#1241): true once the base roll fired and 1+ Focus remains. */
+  deflectRedirectAvailable: boolean;
+  handleDeflectAttacksRedirect: () => Promise<void>;
 }) {
   const { universalReactions, preview } = deriveReactionOptions(classReactions, reactionManeuvers);
 
@@ -212,10 +277,14 @@ export default function ReactionSlot({
         onUse={!reactionUsed ? () => setShowReactionMenu(true) : undefined}
         useLabel="Use Reaction"
       >
-        {/* Error: die spend failed before the reaction was consumed. */}
-        {!reactionUsed && error && <ReactionResult message={error} tone="garnet" />}
-        {/* Result: shown after the reaction is spent. */}
-        {reactionUsed && <ReactionResult message={reactionMessage} />}
+        <ReactionSlotResult
+          reactionUsed={reactionUsed}
+          error={error}
+          reactionMessage={reactionMessage}
+          deflectRedirectAvailable={deflectRedirectAvailable}
+          busy={busy}
+          onDeflectRedirect={() => void handleDeflectAttacksRedirect()}
+        />
       </TurnSlotCard>
 
       {showReactionMenu && !reactionUsed && (

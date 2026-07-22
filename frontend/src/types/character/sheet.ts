@@ -161,6 +161,16 @@ export interface Character {
   /** Rogue Sneak Attack Nd6 (dice count + faces), or null for a non-rogue. */
   sneakAttack: { dice: number; faces: number } | null;
 
+  /** Monk Stunning Strike focus save DC, or null below monk L5 (#1242). */
+  stunningStrike: { dc: number } | null;
+
+  /** Warrior of the Open Hand Open Hand Technique focus save DC (Push/Topple),
+   *  or null below monk L3 off-subclass (#1245). Addle carries no save. */
+  openHandTechnique: { dc: number } | null;
+  /** Warrior of the Open Hand Quivering Palm — focus save DC + whether
+   *  vibrations are currently set, or null below monk L17 off-subclass (#1245). */
+  quiveringPalm: { dc: number; active: boolean } | null;
+
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];
   /** How many advancement slots this character has earned at their level. */

@@ -5,7 +5,9 @@
 // resolver kind; TurnResolutionSheets itself is only the kind → sheet dispatch.
 
 import BottomSheet from "@/components/ui/BottomSheet";
+import { flurryStrikeCount } from "@/lib/attackMath";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
+import InlineFlurryPicker from "@/features/session/InlineFlurryPicker";
 import InlineLoadoutPicker from "@/features/session/InlineLoadoutPicker";
 import InlineOffHandPicker from "@/features/session/InlineOffHandPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
@@ -61,6 +63,8 @@ export default function TurnResolutionSheets(props: TurnResolutionSheetsProps) {
       return <AttackResolutionSheet {...props} />;
     case "twf-picker":
       return <TwfResolutionSheet {...props} />;
+    case "flurry-picker":
+      return <FlurryResolutionSheet {...props} />;
     case "item-picker":
       return <ItemResolutionSheet {...props} />;
     case "heal-input":
@@ -139,6 +143,7 @@ function TwfResolutionSheet({
   character,
   sessionId,
   turnState,
+  activeResolution,
   closeResolution,
   setShowBonusMenu,
   onUpdate,
@@ -148,15 +153,20 @@ function TwfResolutionSheet({
   | "character"
   | "sessionId"
   | "turnState"
+  | "activeResolution"
   | "closeResolution"
   | "setShowBonusMenu"
   | "onUpdate"
   | "onLogChanged"
 >) {
+  // Martial Arts Bonus Unarmed Strike (#1218) shares this sheet + the TWF
+  // single-swing bonusAttack path — only the entry built (buildUnarmedEntry vs
+  // buildOffHandEntry) and this title/subtitle differ.
+  const isUnarmed = activeResolution?.resolver.key === "bonusUnarmedStrike";
   return (
     <BottomSheet
-      title="Off-hand attack"
-      subtitle="Two-Weapon Fighting · bonus action"
+      title={isUnarmed ? "Bonus Unarmed Strike" : "Off-hand attack"}
+      subtitle={isUnarmed ? "Martial Arts · bonus action" : "Two-Weapon Fighting · bonus action"}
       wide
       onClose={() => {
         turnState.cancelTwf();
@@ -167,6 +177,7 @@ function TwfResolutionSheet({
         character={character}
         turnState={turnState}
         sessionId={sessionId}
+        variant={isUnarmed ? "unarmed" : "twf"}
         onClose={closeResolution}
         onCancel={() => {
           turnState.cancelTwf();
@@ -175,6 +186,71 @@ function TwfResolutionSheet({
         }}
         onUpdate={onUpdate}
         onLogChanged={onLogChanged}
+      />
+    </BottomSheet>
+  );
+}
+
+// Flurry of Blows (#1217): strikes remaining → finalize (like the Attack
+// sheet's Resume pattern); no strikes rolled yet → refund. Unlike TWF's always-
+// exactly-1 swing, Flurry's 2 strikes mean a mid-way close is reachable — it
+// just leaves the counter live with no explicit resume affordance (cosmetic
+// only: the bonus action stays correctly spent either way).
+//
+// The 1 Focus spend is deliberately deferred to the FIRST strike roll, not
+// opened here — `send` fires the same executeAction("flurryOfBlows") the
+// generic click path uses elsewhere, just wired as InlineFlurryPicker's
+// onCommitFocusSpend so a pre-roll cancel truly costs nothing.
+function FlurryResolutionSheet({
+  character,
+  sessionId,
+  turnState,
+  closeResolution,
+  setShowBonusMenu,
+  onUpdate,
+  onLogChanged,
+  send,
+}: Pick<
+  TurnResolutionSheetsProps,
+  | "character"
+  | "sessionId"
+  | "turnState"
+  | "closeResolution"
+  | "setShowBonusMenu"
+  | "onUpdate"
+  | "onLogChanged"
+  | "send"
+>) {
+  const attack = turnState.bonusAttack;
+  const exhausted = attack !== null && attack.used >= attack.total;
+  const closeFlurrySheet = () => {
+    if (exhausted) turnState.finishFlurry();
+    else turnState.cancelFlurry();
+    closeResolution();
+  };
+  const strikeCount = attack?.total ?? flurryStrikeCount(character);
+  return (
+    <BottomSheet
+      title="Flurry of Blows"
+      subtitle={`${strikeCount} Unarmed Strike${strikeCount === 1 ? "" : "s"} · bonus action`}
+      wide
+      onClose={closeFlurrySheet}
+    >
+      <InlineFlurryPicker
+        character={character}
+        turnState={turnState}
+        sessionId={sessionId}
+        onClose={closeFlurrySheet}
+        onCancel={() => {
+          turnState.cancelFlurry();
+          closeResolution();
+          setShowBonusMenu(true);
+        }}
+        onUpdate={onUpdate}
+        onLogChanged={onLogChanged}
+        onCommitFocusSpend={() => {
+          void send("flurryOfBlows");
+        }}
       />
     </BottomSheet>
   );

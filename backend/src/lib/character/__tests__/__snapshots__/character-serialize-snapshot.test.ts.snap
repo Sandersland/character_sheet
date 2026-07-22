@@ -381,18 +381,19 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "level": 6,
   "name": "Snapshot Multiclass Caster",
   "nextLevelThreshold": 23000,
+  "openHandTechnique": null,
   "ownerId": "owner-serialize-snapshot",
   "pendingLevelUps": 1,
   "portraitUrl": undefined,
   "proficiencyBonus": 3,
+  "quiveringPalm": null,
   "race": "Elf",
   "resistances": [],
   "resources": {
     "choicesKnown": {},
     "cloakOfShadowsAvailable": undefined,
-    "disciplineChoiceCount": undefined,
-    "disciplineSaveDC": undefined,
-    "disciplinesKnown": [],
+    "elementalAttunementAvailable": undefined,
+    "elementalBurstAvailable": undefined,
     "features": [
       {
         "description": "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
@@ -567,6 +568,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       },
     ],
   },
+  "stunningStrike": null,
   "subclass": undefined,
   "subclassId": undefined,
   "toolProficiencies": [
@@ -712,18 +714,19 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "level": 5,
   "name": "Snapshot Simple Fighter",
   "nextLevelThreshold": 14000,
+  "openHandTechnique": null,
   "ownerId": "owner-serialize-snapshot",
   "pendingLevelUps": 0,
   "portraitUrl": undefined,
   "proficiencyBonus": 3,
+  "quiveringPalm": null,
   "race": "",
   "resistances": [],
   "resources": {
     "choicesKnown": {},
     "cloakOfShadowsAvailable": undefined,
-    "disciplineChoiceCount": undefined,
-    "disciplineSaveDC": undefined,
-    "disciplinesKnown": [],
+    "elementalAttunementAvailable": undefined,
+    "elementalBurstAvailable": undefined,
     "features": [
       {
         "description": "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
@@ -843,6 +846,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "sneakAttack": null,
   "speed": 30,
   "spellcasting": undefined,
+  "stunningStrike": null,
   "subclass": "battle master",
   "subclassId": undefined,
   "toolProficiencies": [

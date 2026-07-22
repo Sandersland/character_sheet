@@ -902,17 +902,17 @@ enum ActionCost {
   special
 }
 
-// Generic granted-ability catalog — source discriminates ("discipline" for Four
-// Elements, "shadowArts" for Way of Shadow, "maneuver" for Battle Master).
-// Embeds min level, save ability, EffectSpec + AbilityCost. Provenance pointer in
-// DisciplineEntry.disciplineId / ManeuverEntry.maneuverId.
+// Generic granted-ability catalog — source discriminates ("maneuver" for Battle
+// Master, "shadowArts" for Way of Shadow, "channelDivinity", plus subclass
+// choose-N option sources). Embeds min level, save ability, EffectSpec +
+// AbilityCost. Provenance pointer in ManeuverEntry.maneuverId.
 model GrantedAbility {
   id          String  @id @default(uuid())
   name        String  @unique
-  source      String  @default("discipline")
+  source      String  @default("maneuver")
   description String
-  minLevel    Int     @default(3) // minimum monk level to learn
-  alwaysKnown Boolean @default(false) // Elemental Attunement — free, uncapped
+  minLevel    Int     @default(3) // minimum level to learn/use
+  alwaysKnown Boolean @default(false) // always known (bypasses the choice cap)
 
   // Battle Master maneuver placement/action metadata (source "maneuver" only).
   // placement routes the session UI: attackRoll | damageRoll | reaction | effect
@@ -922,14 +922,14 @@ model GrantedAbility {
   actionSlot  String?
   selfTempHp  Boolean @default(false)
 
-  // Embedded AbilityCost (F2) — ki-pool spend. kind "none" = free.
+  // Embedded AbilityCost (F2) — focus/superiority-die pool spend. kind "none" = free.
   costKind    String? // "none" | "pool"
-  costPoolKey String? // e.g. "ki"
-  costBase    Int?    // base ki cost
-  costPerStep Int?    // additional ki per scaling step
+  costPoolKey String? // e.g. "focus"
+  costBase    Int?    // base pool cost
+  costPerStep Int?    // additional units per scaling step
 
   // Embedded EffectSpec (F1) — same flat columns as Spell. saveAbility doubles
-  // as the discipline's DC save ability.
+  // as the ability's DC save ability.
   effectKind         String?
   effectDiceCount    Int?
   effectDiceFaces    Int?
@@ -1423,17 +1423,22 @@ enum CharacterEventType {
   // resources
   spendResource
   restoreResource
+  initiativeRegen
   learnManeuver
   forgetManeuver
   maneuversReconciled
-  learnDiscipline
-  forgetDiscipline
-  swapDiscipline
-  disciplinesReconciled
-  castDiscipline
   castManeuver
   castShadowArt
   castChannelDivinity
+  castStunningStrike
+  imposeOpenHandRider
+  setQuiveringPalm
+  triggerQuiveringPalm
+  dealHandOfHarm
+  useHandOfUltimateMercy
+  toggleElementalAttunement
+  castElementalBurst
+  elementalStrike
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled

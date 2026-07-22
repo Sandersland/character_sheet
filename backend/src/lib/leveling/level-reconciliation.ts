@@ -41,7 +41,6 @@ import {
   serializeResourcesState,
   snapshotResources,
   splitAdvancementsBySlotCap,
-  type DisciplineEntry,
   type ManeuverEntry,
   type ResourcesMutableState,
   type ToolProfEntry,
@@ -281,8 +280,8 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
 }
 
 // Shared flow for trimming a level-gated "known" list in Character.resources
-// (maneuvers, elemental disciplines, tool proficiency choices) when the level-
-// derived choice count has decreased. Each runs AFTER reconcileSubclass so an
+// (maneuvers, tool proficiency choices) when the level-derived choice count has
+// decreased. Each runs AFTER reconcileSubclass so an
 // already-cleared subclass produces allowed=0 (deriveResources returns null →
 // choice count undefined → allowed 0 → all entries removed).
 //
@@ -292,8 +291,8 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
 // Uses `resources`-category events so the existing undo branch in activity.ts
 // restores the full before.resources JSON with no new undo code.
 
-type KnownListKey = "maneuversKnown" | "disciplinesKnown" | "toolProficienciesKnown";
-type KnownEntry = ManeuverEntry | DisciplineEntry | ToolProfEntry;
+type KnownListKey = "maneuversKnown" | "toolProficienciesKnown";
+type KnownEntry = ManeuverEntry | ToolProfEntry;
 
 interface KnownListConfig {
   /** Which ResourcesMutableState array this reconciler trims. */
@@ -402,22 +401,6 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
       allowed === 0
         ? `All ${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
-    snapshot: (state) => ({ resources: snapshotResources(state) }),
-  });
-}
-
-// Trims persisted disciplinesKnown (Way of the Four Elements) when the level-
-// derived choice count decreases. See reconcileKnownList for the shared flow.
-
-async function reconcileDisciplines(ctx: ReconcileContext): Promise<void> {
-  return reconcileKnownList(ctx, {
-    listKey: "disciplinesKnown",
-    allowed: (derived) => derived?.disciplineChoiceCount ?? 0,
-    eventType: "disciplinesReconciled",
-    summary: (removedCount, allowed) =>
-      allowed === 0
-        ? `All ${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
-        : `${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
     snapshot: (state) => ({ resources: snapshotResources(state) }),
   });
 }
@@ -717,7 +700,6 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileGrantedSpells,
   reconcilePreparedSpells,
   reconcileManeuvers,
-  reconcileDisciplines,
   reconcileToolProficiencies,
   reconcileSubclassChoices,
   reconcileAdvancements,

@@ -2,7 +2,10 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { characterAdvancementSlots, deriveFeatBonuses } from "@/lib/srd/srd.js";
-import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources.js";
+// Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
+// now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
+// would close an import cycle back through this one.
+import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources-state.js";
 import {
   InvalidHitPointOperationError,
   normalizeHitPoints,

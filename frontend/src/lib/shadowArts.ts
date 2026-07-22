@@ -1,4 +1,4 @@
-// Pure Way of Shadow row derivations — extracted from ShadowArtRow (#688). No JSX.
+// Pure Warrior of Shadow row derivations — extracted from ShadowArtRow (#688). No JSX.
 
 import { skillLabel } from "@/lib/abilities";
 import type { CatalogShadowArt, SkillName } from "@/types/character";
@@ -7,7 +7,7 @@ import type { CatalogShadowArt, SkillName } from "@/types/character";
 export interface ShadowArtView {
   /** Catalog name with the "Shadow Arts: " prefix stripped. */
   displayName: string;
-  kiCost: number;
+  focusCost: number;
   canAfford: boolean;
   concentrates: boolean;
   /** "+10 Stealth" chip for a passive buff art, resolved through skillLabel. */
@@ -18,11 +18,11 @@ export interface ShadowArtView {
 
 export function shadowArtView(
   art: CatalogShadowArt,
-  kiAvailable: number,
+  focusAvailable: number,
   isConcentrating: boolean,
   concentratingOnName: string | null,
 ): ShadowArtView {
-  const kiCost = art.cost.kind === "pool" ? art.cost.base : 0;
+  const focusCost = art.cost.kind === "pool" ? art.cost.base : 0;
   const concentrates = art.effect.concentration ?? false;
   const buffLabel =
     art.effect.effectType === "buff" && art.effect.buffTarget
@@ -30,8 +30,8 @@ export function shadowArtView(
       : null;
   return {
     displayName: art.name.replace(/^Shadow Arts:\s*/, ""),
-    kiCost,
-    canAfford: kiAvailable >= kiCost,
+    focusCost,
+    canAfford: focusAvailable >= focusCost,
     concentrates,
     buffLabel,
     willReplace: concentrates && !isConcentrating && Boolean(concentratingOnName),

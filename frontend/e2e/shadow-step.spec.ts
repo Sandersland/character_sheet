@@ -4,11 +4,11 @@ import { login } from "./helpers/auth";
 import { enterLiveCombat } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
-// The Shadow Monk persona (seeded in global-setup) is Monk L6 / Way of Shadow,
+// The Shadow Monk persona (seeded in global-setup) is Monk L6 / Warrior of Shadow,
 // so Shadow Step (L6) is a bonus-action card in the session Bonus Action sheet.
-// Opportunist (L17) is gated above any seeded persona and is covered by the
-// backend deriveActions unit tests instead.
-test("session: a Way of Shadow monk uses Shadow Step as a bonus action", async ({ page }) => {
+// Improved Shadow Step (L11) and Cloak of Shadows (L17, 2024 rewrite, #1246)
+// are gated above any seeded persona and are covered by backend unit tests instead.
+test("session: a Warrior of Shadow monk uses Shadow Step as a bonus action", async ({ page }) => {
   await login(page);
 
   const errors = collectConsoleErrors(page);

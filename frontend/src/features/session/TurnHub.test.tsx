@@ -15,6 +15,7 @@ import {
   advanceCombatRound,
   applyInventoryTransactions,
   logRoll,
+  rollInitiativeTransaction,
 } from "@/api/client";
 import { axe } from "@/test/axe";
 import type { Character } from "@/types/character";
@@ -29,6 +30,7 @@ vi.mock("@/api/client", () => ({
   advanceCombatRound: vi.fn(),
   applyInventoryTransactions: vi.fn(),
   logRoll: vi.fn(),
+  rollInitiativeTransaction: vi.fn(),
 }));
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
@@ -130,6 +132,9 @@ beforeEach(() => {
   vi.mocked(endCombat).mockResolvedValue(undefined);
   vi.mocked(advanceCombatRound).mockResolvedValue(undefined);
   vi.mocked(logRoll).mockResolvedValue(undefined);
+  // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
+  // call would report an empty regen, same as this default (#1239/#1243).
+  vi.mocked(rollInitiativeTransaction).mockResolvedValue({ ...updated, results: [] });
 });
 
 describe("TurnHub — combat lifecycle", () => {
@@ -928,11 +933,11 @@ describe("TurnHub — mid-turn weapon change (#815, interaction-budget model #11
   });
 });
 
-describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
+describe("TurnHub — Warrior of Shadow reminder actions (2024 rewrite, #1246)", () => {
   function shadowMonk(): Character {
     return makeCharacter({
       class: "Monk",
-      subclass: "Way of Shadow",
+      subclass: "Warrior of Shadow",
       level: 17,
       availableActions: [
         {
@@ -940,14 +945,7 @@ describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
           name: "Shadow Step",
           cost: "bonusAction",
           enabled: true,
-          reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn.",
-        },
-        {
-          key: "opportunist",
-          name: "Opportunist",
-          cost: "reaction",
-          enabled: true,
-          reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction.",
+          reminder: "Teleport up to 60 ft between areas of dim light or darkness (or, for 1 focus, ignore the dim/dark destination requirement); advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
         },
       ],
     } as unknown as Partial<Character>);
@@ -968,18 +966,178 @@ describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
     expect(screen.getByText(/Teleport up to 60 ft/i)).toBeInTheDocument();
     expect(applyActionTransactions).not.toHaveBeenCalled();
   });
+});
 
-  it("Opportunist shows its reminder in the Reaction sheet and after use", async () => {
+describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
+  function monkWithBonusUnarmedStrike(
+    actionOverrides: Partial<NonNullable<Character["availableActions"]>[number]> = {},
+  ): Character {
+    return makeCharacter({
+      class: "Monk",
+      level: 1,
+      availableActions: [
+        {
+          key: "bonusUnarmedStrike",
+          name: "Bonus Unarmed Strike",
+          cost: "bonusAction",
+          enabled: true,
+          ...actionOverrides,
+        },
+      ],
+    } as unknown as Partial<Character>);
+  }
+
+  it("offers the card with its rule-text subtitle, no resource badge", async () => {
     const user = userEvent.setup();
-    renderHub(shadowMonk());
+    renderHub(monkWithBonusUnarmedStrike());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    expect(
+      screen.getByText("One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)."),
+    ).toBeInTheDocument();
+  });
+
+  it("resolves one Unarmed Strike (no weapon toggle), marks the bonus action used, and fires no server effect", async () => {
+    const user = userEvent.setup();
+    renderHub(monkWithBonusUnarmedStrike());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    await user.click(screen.getByRole("button", { name: "Bonus Unarmed Strike" }));
+
+    // The resolution sheet opened for the unarmed profile — single form, no toggle.
+    expect(screen.getByText("Martial Arts · bonus action")).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    // Bonus action is spent; exclusivity blocks re-opening the menu.
+    expect(screen.queryByRole("button", { name: "Use Bonus" })).not.toBeInTheDocument();
+  });
+
+  it("is disabled with 'Requires no armor or Shield' when the backend gate fails", async () => {
+    const user = userEvent.setup();
+    renderHub(
+      monkWithBonusUnarmedStrike({ enabled: false, disabledReason: "Requires no armor or Shield" }),
+    );
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    const card = screen.getByRole("button", { name: /Bonus Unarmed Strike/ });
+    expect(card).toBeDisabled();
+    expect(card).toHaveAttribute("title", "Requires no armor or Shield");
+  });
+});
+
+describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
+  function deflectMonk(overrides: Partial<Character> = {}): Character {
+    return makeCharacter({
+      class: "Monk",
+      subclass: undefined,
+      level: 5,
+      abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10 },
+      unarmedStrike: {
+        attackBonus: 6,
+        damage: { count: 1, faces: 8, modifier: 3, damageType: "bludgeoning" },
+      },
+      availableActions: [
+        {
+          key: "deflectAttacks",
+          name: "Deflect Attacks",
+          cost: "reaction",
+          enabled: true,
+          reminder:
+            "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+        },
+        { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+      ],
+      resources: {
+        features: [],
+        pools: [{ key: "focus", label: "Focus Points", total: 5, recharge: "short-or-long", used: 0, remaining: 5 }],
+        maneuversKnown: [],
+        toolProficienciesKnown: [],
+      },
+      ...overrides,
+    } as unknown as Partial<Character>);
+  }
+
+  it("rolls the reduction on click, shows the toast, and consumes the reaction (no server call)", async () => {
+    const user = userEvent.setup();
+    renderHub(deflectMonk());
     await startTurn(user);
 
     await user.click(screen.getByRole("button", { name: "Use Reaction" }));
-    expect(screen.getByText(/within 5 ft of you is hit/i)).toBeInTheDocument();
+    expect(screen.getByText(/1d10 \+ Dex modifier \+ monk level/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Opportunist" }));
-    expect(screen.getByText("Reaction used")).toBeInTheDocument();
-    expect(screen.getByText(/within 5 ft of you is hit/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    expect(screen.queryByRole("button", { name: "Use Reaction" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Deflect Attacks — reduce bludgeoning, piercing, or slashing damage/)).toBeInTheDocument();
     expect(applyActionTransactions).not.toHaveBeenCalled();
+  });
+
+  it("offers the redirect option after the base roll, and spends 1 Focus on click", async () => {
+    const user = userEvent.setup();
+    renderHub(deflectMonk());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    const redirectButton = await screen.findByRole("button", { name: /Redirect/ });
+    await user.click(redirectButton);
+
+    await waitFor(() =>
+      expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
+        { type: "executeAction", actionKey: "deflectAttacksRedirect" },
+      ]),
+    );
+    expect(await screen.findByText(/Dexterity sav/i)).toBeInTheDocument();
+    // The redirect is one-shot per reaction — the button doesn't linger.
+    expect(screen.queryByRole("button", { name: /Redirect/ })).not.toBeInTheDocument();
+  });
+
+  it("does not offer the redirect option when no Focus remains", async () => {
+    const user = userEvent.setup();
+    renderHub(
+      deflectMonk({
+        availableActions: [
+          {
+            key: "deflectAttacks",
+            name: "Deflect Attacks",
+            cost: "reaction",
+            enabled: true,
+          },
+          { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: false, disabledReason: "No focus remaining" },
+        ],
+        resources: {
+          features: [],
+          pools: [{ key: "focus", label: "Focus Points", total: 5, recharge: "short-or-long", used: 5, remaining: 0 }],
+          maneuversKnown: [],
+          toolProficienciesKnown: [],
+        },
+      } as unknown as Partial<Character>),
+    );
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    expect(screen.queryByRole("button", { name: /Redirect/ })).not.toBeInTheDocument();
+  });
+
+  it("names 'any damage type' at monk L13 (Deflect Energy)", async () => {
+    const user = userEvent.setup();
+    renderHub(deflectMonk({ level: 13 }));
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
+
+    expect(screen.getByText(/Deflect Attacks — reduce any damage type/)).toBeInTheDocument();
   });
 });

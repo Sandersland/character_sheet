@@ -31,12 +31,21 @@ export interface SubclassGrantedSpellSeed {
 }
 
 export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
-  // Way of Shadow (Monk) — Minor Illusion, migrated from the former in-code
+  // Warrior of Shadow (Monk) — Minor Illusion, migrated from the former in-code
   // MINOR_ILLUSION snapshot in lib/spellcasting/granted-spells.ts (#898).
   {
     className: "Monk",
-    subclassName: "Way of Shadow",
+    subclassName: "Warrior of Shadow",
     spellName: "Minor Illusion",
+    gateLevel: 3,
+    castingAbility: "wisdom",
+  },
+  // Warrior of the Elements (Monk) — Manipulate Elements (L3) grants the
+  // Elementalism cantrip (#1247, SRD 5.2 / PHB'24).
+  {
+    className: "Monk",
+    subclassName: "Warrior of the Elements",
+    spellName: "Elementalism",
     gateLevel: 3,
     castingAbility: "wisdom",
   },

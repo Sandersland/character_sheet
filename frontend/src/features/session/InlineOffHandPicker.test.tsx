@@ -77,7 +77,7 @@ function twoWeaponCharacter(overrides: Partial<Character> = {}): Character {
 function renderPicker(
   character: Character,
   turnState: TurnState & TurnStateActions,
-  handlers: Partial<{ onClose: () => void; onCancel: () => void }> = {},
+  handlers: Partial<{ onClose: () => void; onCancel: () => void; variant: "twf" | "unarmed" }> = {},
 ) {
   return render(
     <RollProvider>
@@ -85,6 +85,7 @@ function renderPicker(
         character={character}
         turnState={turnState}
         sessionId="sess-1"
+        variant={handlers.variant}
         onClose={handlers.onClose ?? vi.fn()}
         onCancel={handlers.onCancel ?? vi.fn()}
         onUpdate={vi.fn()}
@@ -162,6 +163,51 @@ describe("InlineOffHandPicker (#813 redesign)", () => {
     } as unknown as Partial<Character>);
     renderPicker(bm, makeTurnState({ total: 1, used: 0 }));
     expect(screen.getByRole("button", { name: /Battle Master maneuvers/ })).toBeInTheDocument();
+  });
+
+  it("variant=unarmed renders the Unarmed Strike form, no weapon toggle (#1218)", () => {
+    renderPicker(twoWeaponCharacter(), makeTurnState({ total: 1, used: 0 }), { variant: "unarmed" });
+    expect(screen.getByText("Unarmed Strike")).toBeInTheDocument();
+    expect(screen.queryByText("Dagger (off-hand)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+  });
+
+  it("variant=unarmed ignores equipped weapons entirely, even with no off-hand weapon", () => {
+    // Would hit the "No off-hand weapon equipped" branch under variant=twf —
+    // buildUnarmedEntry never returns null, so the swing is always offered.
+    const solo = twoWeaponCharacter({
+      inventory: [
+        {
+          id: "main",
+          name: "Shortsword",
+          category: "weapon",
+          quantity: 1,
+          equipped: true,
+          equippedSlot: "MAIN_HAND",
+          weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing", light: true, attackBonus: 5 },
+        },
+      ] as unknown as Character["inventory"],
+    });
+    renderPicker(solo, makeTurnState({ total: 1, used: 0 }), { variant: "unarmed" });
+    expect(screen.getByText("Unarmed Strike")).toBeInTheDocument();
+    expect(screen.queryByText(/No off-hand weapon equipped/i)).not.toBeInTheDocument();
+  });
+
+  it("variant=unarmed spends the bonus action and records the swing as Unarmed Strike", async () => {
+    const turnState = makeTurnState({ total: 1, used: 0 });
+    renderPicker(twoWeaponCharacter(), turnState, { variant: "unarmed" });
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+
+    expect(turnState.recordTwfAttack).toHaveBeenCalledOnce();
+    expect(turnState.recordTwfAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "bonusAction", formName: "Unarmed Strike" }),
+    );
+    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
+      "char-1",
+      "sess-1",
+      expect.objectContaining({ kind: "attack", source: "Unarmed Strike" }),
+    );
   });
 
   it("falls back to a helpful message when no off-hand weapon is equipped", () => {

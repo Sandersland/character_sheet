@@ -33,7 +33,7 @@ describe("rest recharge reads all class entries, not just primary (#1072)", () =
     await prisma.character.deleteMany({ where: { id: { in: [MONK_FIGHTER_ID, SORCERER_WARLOCK_ID] } } });
   });
 
-  it("Monk 5 / Fighter (Battle Master) 3 short-rests: ki refills to 5 AND superiority dice refill to 4", async () => {
+  it("Monk 5 / Fighter (Battle Master) 3 short-rests: focus refills to 5 AND superiority dice refill to 4", async () => {
     await ensureTestOwner(OWNER_ID);
     await prisma.character.create({
       data: {
@@ -47,7 +47,7 @@ describe("rest recharge reads all class entries, not just primary (#1072)", () =
         abilityScores: { strength: 14, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 13, charisma: 10 },
         spellcasting: Prisma.JsonNull,
         // Both pools fully spent going in.
-        resources: { used: { ki: 5, superiorityDice: 4 } } as Prisma.InputJsonValue,
+        resources: { used: { focus: 5, superiorityDice: 4 } } as Prisma.InputJsonValue,
         classEntries: {
           create: [
             { name: "monk", position: 0, level: 5 },
@@ -61,7 +61,7 @@ describe("rest recharge reads all class entries, not just primary (#1072)", () =
 
     const row = await readRow(MONK_FIGHTER_ID);
     const used = (row.resources as { used: Record<string, number> }).used;
-    expect(used.ki ?? 0).toBe(0);
+    expect(used.focus ?? 0).toBe(0);
     expect(used.superiorityDice ?? 0).toBe(0);
   });
 

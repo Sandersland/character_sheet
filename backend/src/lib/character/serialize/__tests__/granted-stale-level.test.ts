@@ -32,8 +32,8 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
     });
     monkClassId = cls.id;
     const shadow = await prisma.subclass.upsert({
-      where: { classId_name: { classId: monkClassId, name: "Way of Shadow" } },
-      create: { classId: monkClassId, name: "Way of Shadow", description: "Test subclass" },
+      where: { classId_name: { classId: monkClassId, name: "Warrior of Shadow" } },
+      create: { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
       update: {},
     });
     shadowId = shadow.id;
@@ -70,7 +70,7 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
         classEntries: {
           // Stale-low per-class level (2) below the XP-derived total (3). The
           // granted-only path must gate on the XP-derived level, not entry.level.
-          create: [{ name: "monk", classId: monkClassId, position: 0, level: 2, subclass: "Way of Shadow", subclassId: shadowId }],
+          create: [{ name: "monk", classId: monkClassId, position: 0, level: 2, subclass: "Warrior of Shadow", subclassId: shadowId }],
         },
       },
     });

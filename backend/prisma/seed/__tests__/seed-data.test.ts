@@ -25,7 +25,6 @@ import { CLASSES, ITEMS } from "../catalog-data.js";
 import { ACTIONS } from "../actions.js";
 import { SUBCLASSES } from "../subclasses.js";
 import { MANEUVERS } from "../maneuvers.js";
-import { DISCIPLINES } from "../disciplines.js";
 import { SHADOW_ARTS } from "../shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "../channel-divinity.js";
 import { FEATS } from "../feats.js";
@@ -39,6 +38,32 @@ import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
 const duplicates = <T>(values: T[]): T[] =>
   [...new Set(values.filter((v, i) => values.indexOf(v) !== i))];
 
+describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
+  // A feature that says "you know the X cantrip" must have a matching grant row,
+  // or the cantrip never reaches the sheet (the #1247 Elementalism bug: seeded
+  // spell, no link). Guard that every grant points at seeded content.
+  it("every grant references a seeded spell and a seeded subclass", () => {
+    const spellNames = new Set(SPELLS.map((s) => s.name));
+    const subclassKeys = new Set(SUBCLASSES.map((s) => `${s.className}::${s.name}`));
+    for (const g of SUBCLASS_GRANTED_SPELLS) {
+      expect(spellNames.has(g.spellName), `unseeded spell: ${g.spellName}`).toBe(true);
+      expect(
+        subclassKeys.has(`${g.className}::${g.subclassName}`),
+        `unseeded subclass: ${g.className}::${g.subclassName}`,
+      ).toBe(true);
+    }
+  });
+
+  it("Warrior of the Elements grants Elementalism at L3 (Manipulate Elements, #1247)", () => {
+    const grant = SUBCLASS_GRANTED_SPELLS.find(
+      (g) => g.className === "Monk" && g.subclassName === "Warrior of the Elements" && g.spellName === "Elementalism",
+    );
+    expect(grant).toBeDefined();
+    expect(grant!.gateLevel).toBe(3);
+    expect(grant!.castingAbility).toBe("wisdom");
+  });
+});
+
 describe("per-domain business-key uniqueness", () => {
   it("ACTIONS have unique keys", () => {
     expect(duplicates(ACTIONS.map((a) => a.key))).toEqual([]);
@@ -50,10 +75,6 @@ describe("per-domain business-key uniqueness", () => {
 
   it("MANEUVERS have unique names", () => {
     expect(duplicates(MANEUVERS.map((m) => m.name))).toEqual([]);
-  });
-
-  it("DISCIPLINES have unique names", () => {
-    expect(duplicates(DISCIPLINES.map((d) => d.name))).toEqual([]);
   });
 
   it("SHADOW_ARTS have unique names", () => {
@@ -382,19 +403,18 @@ describe("SRD 5.2 catalog values — CHUNK 4 additions (#1132)", () => {
 });
 
 describe("global GrantedAbility name-uniqueness", () => {
-  // All four sources upsert into GrantedAbility, whose `name` is globally
+  // All these sources upsert into GrantedAbility, whose `name` is globally
   // unique — a cross-source collision would make one row silently overwrite
   // another. This is the same invariant the seed.ts guard throws on.
-  it("no name collides across maneuvers/disciplines/shadow-arts/channel-divinity", () => {
+  it("no name collides across maneuvers/shadow-arts/channel-divinity", () => {
     const names = [
       ...MANEUVERS.map((m) => m.name),
-      ...DISCIPLINES.map((d) => d.name),
       ...SHADOW_ARTS.map((s) => s.name),
       ...CHANNEL_DIVINITIES.map((c) => c.name),
     ];
     expect(
       duplicates(names),
-      "GrantedAbility name collision across the four seed sources",
+      "GrantedAbility name collision across the seed sources",
     ).toEqual([]);
   });
 });

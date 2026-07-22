@@ -14,7 +14,15 @@
 //   Session Fighter — Fighter L1, attached to its own solo campaign so
 //                     session.spec can start/resume a live session in-spec.
 //   Monk L6         — Monk, 14000 XP (L6), own campaign; unarmed.spec asserts
-//                     the Ki-Empowered Strikes "Magical" badge in a live session.
+//                     the Empowered Strikes "Magical" badge in a live session.
+//   Elements Monk   — Monk, L6, Warrior of the Elements, own campaign;
+//                     Elemental Attunement/Burst live-play automation.
+//   Shadow Monk     — Monk, L6, Warrior of Shadow, own campaign; shadow-arts.spec
+//                     and shadow-step.spec exercise Shadow Arts/Shadow Step.
+//   Open Hand Monk L11 — Monk, 85000 XP (L11), Warrior of the Open Hand, own
+//                     campaign; #1250's e2e drives Deflect Attacks, Stunning
+//                     Strike, 3-strike Flurry (Heightened Focus, L10), Patient
+//                     Defense/Step of the Wind, and the Open Hand Technique rider.
 //
 // Personas that need a live session each get a DEDICATED campaign: a campaign
 // allows only one active session at a time, so sharing one would make the
@@ -38,8 +46,11 @@ const ABILITY_SCORES = {
 // L5 threshold from the XP curve (backend/src/lib/leveling/experience.ts). The curve is
 // class-independent, so this is L5 for both the Wizard and the Battle Master.
 const LEVEL_5_XP = 6500;
-// L6 threshold — gates Monk Ki-Empowered Strikes (magical unarmed strikes).
+// L6 threshold — gates Monk Empowered Strikes (magical unarmed strikes).
 const LEVEL_6_XP = 14000;
+// L11 threshold — gates Monk Heightened Focus's 3-strike Flurry (granted at L10,
+// so any L11+ classLevel exercises it) plus subclass L11 features.
+const LEVEL_11_XP = 85000;
 
 interface Persona {
   name: string;
@@ -54,8 +65,6 @@ interface Persona {
   subclassName?: string;
   // Battle Master maneuver to learn (by catalog name).
   maneuverName?: string;
-  // Four Elements discipline to learn (by catalog name).
-  disciplineName?: string;
   // A dedicated solo campaign to attach to (name); enables live sessions.
   campaignName?: string;
   // #1131: a caster's level-1 creation picks, by spell name. Counts must match the
@@ -120,15 +129,14 @@ const ROSTER: Persona[] = [
     campaignName: "E2E Solo — Monk L6",
   },
   {
-    name: "Four Elements Monk",
+    name: "Elements Monk",
     race: "Human",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
     classLevel: 6,
-    subclassName: "Way of the Four Elements",
-    disciplineName: "Fangs of the Fire Snake",
-    campaignName: "E2E Solo — Four Elements Monk",
+    subclassName: "Warrior of the Elements",
+    campaignName: "E2E Solo — Elements Monk",
   },
   {
     name: "Shadow Monk",
@@ -137,8 +145,22 @@ const ROSTER: Persona[] = [
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
     classLevel: 6,
-    subclassName: "Way of Shadow",
+    subclassName: "Warrior of Shadow",
     campaignName: "E2E Solo — Shadow Monk",
+  },
+  {
+    // #1249/#1250: L11+ so Heightened Focus (L10, 3-strike Flurry) and Open Hand
+    // Technique (subclass, L3+) are both live, exercising Deflect Attacks (L3),
+    // Stunning Strike (L5), Flurry/Patient Defense/Step of the Wind, and the
+    // Open Hand Technique rider (Addle/Push/Topple) in one persona.
+    name: "Open Hand Monk L11",
+    race: "Human",
+    background: "Soldier",
+    className: "Monk",
+    experiencePoints: LEVEL_11_XP,
+    classLevel: 11,
+    subclassName: "Warrior of the Open Hand",
+    campaignName: "E2E Solo — Open Hand Monk",
   },
 ];
 
@@ -269,7 +291,7 @@ async function seedExperience(cookie: string, id: string, persona: Persona): Pro
 }
 
 // Class-entry level tracks applied HP level-ups, not XP-derived level. Drive
-// (classLevel - 1) average level-ups so level-gated features (Ki-Empowered
+// (classLevel - 1) average level-ups so level-gated features (Empowered
 // Strikes) derive correctly.
 async function seedLevelUps(cookie: string, id: string, persona: Persona): Promise<void> {
   if (!persona.classLevel || persona.classLevel <= 1) return;
@@ -304,21 +326,6 @@ async function seedManeuver(cookie: string, id: string, persona: Persona): Promi
   if (!res.ok) throw new Error(`Failed to learn maneuver for ${persona.name}: ${res.status}`);
 }
 
-// Elemental disciplines are learned via the resource transactions endpoint.
-async function seedDiscipline(cookie: string, id: string, persona: Persona): Promise<void> {
-  if (!persona.disciplineName) return;
-  const dResponse = await api(cookie, "/api/disciplines");
-  if (!dResponse.ok) throw new Error(`Failed to load disciplines: ${dResponse.status}`);
-  const catalog = (await dResponse.json()) as { id: string; name: string }[];
-  const match = catalog.find((d) => d.name === persona.disciplineName);
-  if (!match) throw new Error(`Discipline not found: ${persona.disciplineName}`);
-  const res = await api(cookie, `/api/characters/${id}/resources/transactions`, {
-    method: "POST",
-    body: JSON.stringify({ operations: [{ type: "learnDiscipline", disciplineId: match.id }] }),
-  });
-  if (!res.ok) throw new Error(`Failed to learn discipline for ${persona.name}: ${res.status}`);
-}
-
 // Attach to a dedicated campaign so the persona can start a live session.
 async function attachToCampaign(cookie: string, id: string, persona: Persona): Promise<void> {
   if (!persona.campaignName) return;
@@ -339,7 +346,6 @@ async function createPersona(cookie: string, persona: Persona): Promise<void> {
   await seedLevelUps(cookie, id, persona);
   await seedSubclass(cookie, id, persona);
   await seedManeuver(cookie, id, persona);
-  await seedDiscipline(cookie, id, persona);
   await attachToCampaign(cookie, id, persona);
 }
 

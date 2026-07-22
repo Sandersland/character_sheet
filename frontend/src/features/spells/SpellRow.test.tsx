@@ -168,7 +168,7 @@ describe("SpellRow", () => {
   describe("subclass-granted spell", () => {
     const grantedCantrip: Spell = {
       ...mockCantrip,
-      id: "granted:way-of-shadow:minor-illusion",
+      id: "granted:warrior-of-shadow:minor-illusion",
       name: "Minor Illusion",
       source: "subclass",
     };

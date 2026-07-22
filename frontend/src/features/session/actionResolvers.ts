@@ -15,12 +15,14 @@
  * ⚑ Keep in sync with the backend ACTION_EFFECT_FN table.
  */
 
+import { abilityModifier } from "@/lib/abilities";
 import type { Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
 
 /**
  * What inline tool the TurnHub renders when this action is selected.
  *  attack-picker  — equipped weapons + Unarmed + Improvised, with Attack/Damage rolls.
+ *  flurry-picker  — Unarmed Strike only, no weapon choice (2024 Flurry of Blows, #1217).
  *  spell-picker   — prepared/known spells, slot-gated cast surface.
  *  item-picker    — consumable inventory items with heal rolls.
  *  heal-roll      — single self-heal dice roll (Second Wind: 1d10+level).
@@ -31,6 +33,7 @@ import type { RollSpec } from "@/lib/dice";
 export type ResolutionKind =
   | "attack-picker"
   | "twf-picker"
+  | "flurry-picker"
   | "spell-picker"
   | "item-picker"
   | "heal-roll"
@@ -54,6 +57,14 @@ export interface ActionResolver {
    * e.g. Second Wind → { count: 1, faces: 10, modifier: character.level }
    */
   healRoll?: (character: Character) => RollSpec;
+  /**
+   * Static option-card subtitle for economy-only actions with fixed rule text
+   * (Bonus Unarmed Strike). Takes priority over the backend AvailableAction's
+   * `reminder` in classActionOption — unlike Shadow Step/Opportunist, this
+   * action opens a picker, so its rule text belongs on the card, not an
+   * on-click toast (which `reminder` would also trigger).
+   */
+  subtitle?: string;
   /**
    * Whether this resolver fires applyActionTransactions after resolution.
    * false = ephemeral only (attack economy bookkeeping, Dodge, Reckless Attack).
@@ -105,13 +116,73 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   },
   actionSurge:       { key: "actionSurge",       kind: "simple-confirm", slot: "special",     serverEffect: true,  resourceKey: "actionSurge" },
 
-  flurryOfBlows:     { key: "flurryOfBlows",     kind: "attack-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "ki", resourceAmount: 2 },
-  patientDefense:    { key: "patientDefense",    kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
-  stepOfTheWind:     { key: "stepOfTheWind",     kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
-  stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "ki" },
-  // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
+  // Martial Arts Bonus Unarmed Strike (#1218) — reuses the twf-picker economy
+  // path (single bonusAction-source swing), locked to the Unarmed Strike
+  // profile. Gated server-side by requiresUnarmored, not a resource pool.
+  bonusUnarmedStrike: { key: "bonusUnarmedStrike", kind: "twf-picker", slot: "bonusAction", serverEffect: false, subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)." },
+  // Dispatched via its own handleFlurryAction (like twf), not planActionClick —
+  // 2024 Flurry is Unarmed Strikes only (#1217), so it never opens the weapon picker.
+  flurryOfBlows:     { key: "flurryOfBlows",     kind: "flurry-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 1 },
+  // Patient Defense / Step of the Wind (#1240) — free vs 1-Focus variants, each
+  // its own menu entry (mirrors rage/endRage). The free entries are
+  // economy-only, like Shadow Step: no backend ACTION_EFFECT_FN, so
+  // serverEffect:false and no resourceKey.
+  patientDefense:      { key: "patientDefense",      kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+  patientDefenseFocus: { key: "patientDefenseFocus", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  stepOfTheWind:       { key: "stepOfTheWind",       kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+  stepOfTheWindFocus:  { key: "stepOfTheWindFocus",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  // Stunning Strike (L5) has no resolver here — it's a post-hit rider rendered
+  // by StunningStrikeSection (mirrors SneakAttackSection), not a selectable
+  // action (#1242 supersedes the #392 bare-spend stub formerly here).
+  // Deflect Attacks (#1241, SRD 5.2 L3) — reminder-only reaction like shadowStep
+  // below; the dynamic 1d10+Dex+level roll is computed by useTurnActions'
+  // bespoke handleDeflectAttacks, not this generic dispatch.
+  deflectAttacks:    { key: "deflectAttacks",    kind: "simple-confirm", slot: "reaction",    serverEffect: false },
+  // Redirect rider — a "free" decision within the same reaction (not its own
+  // slot), spending 1 Focus server-side once a ranged hit is reduced to 0.
+  deflectAttacksRedirect: { key: "deflectAttacksRedirect", kind: "simple-confirm", slot: "free", serverEffect: true, resourceKey: "focus" },
+  // Warrior of Shadow reminder action (2024 rewrite, #1246) — economy-only, like
+  // twf; no backend effect fn. Opportunist (2014 L17) is retired — Cloak of
+  // Shadows (L17) is a real cast now, wired through ClassResourceBlocks'
+  // shadow-arts transactions, not this reaction-slot registry.
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
-  opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },
+  // Warrior of the Open Hand (#1245): Open Hand Technique / Quivering Palm have
+  // no resolver here — they're post-hit riders rendered by their own sections
+  // (OpenHandTechniqueSection / QuiveringPalmSection), mirroring how Stunning
+  // Strike bypasses this registry (#1242). Wholeness of Body reuses the
+  // heal-roll kind (Second Wind's shape): Martial Arts die + Wis modifier.
+  wholenessOfBody: {
+    key: "wholenessOfBody",
+    kind: "heal-roll",
+    slot: "bonusAction",
+    serverEffect: true,
+    resourceKey: "wholenessOfBody",
+    healRoll: (c) => ({ count: 1, faces: c.unarmedStrike.damage.faces, modifier: abilityModifier(c.abilityScores.wisdom) }),
+  },
+  // Fleet Step (L11) is a pure reminder (cost:"free", no server effect), like
+  // Reckless Attack/Metamagic — see the DERIVED_ACTIONS comment in actions.ts.
+  fleetStep: { key: "fleetStep", kind: "simple-confirm", slot: "free", serverEffect: false },
+  // Warrior of Mercy (#1248): Hand of Harm / Hand of Ultimate Mercy have no
+  // resolver here — they're their own dedicated verticals (mirrors Stunning
+  // Strike / Quivering Palm's bypass above). Hand of Healing reuses Wholeness
+  // of Body's heal-roll shape (Martial Arts die + Wis mod); the Flurry-
+  // replacement variant heals the same but spends no Focus of its own
+  // (Flurry's own flurryOfBlows action already paid it).
+  handOfHealing: {
+    key: "handOfHealing",
+    kind: "heal-roll",
+    slot: "action",
+    serverEffect: true,
+    resourceKey: "focus",
+    healRoll: (c) => ({ count: 1, faces: c.unarmedStrike.damage.faces, modifier: abilityModifier(c.abilityScores.wisdom) }),
+  },
+  handOfHealingFlurry: {
+    key: "handOfHealingFlurry",
+    kind: "heal-roll",
+    slot: "bonusAction",
+    serverEffect: true,
+    healRoll: (c) => ({ count: 1, faces: c.unarmedStrike.damage.faces, modifier: abilityModifier(c.abilityScores.wisdom) }),
+  },
 
   divineSense:       { key: "divineSense",       kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "divineSense" },
   layOnHands:        { key: "layOnHands",        kind: "heal-input",     slot: "action",      serverEffect: true,  resourceKey: "layOnHands" },

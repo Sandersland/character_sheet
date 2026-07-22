@@ -122,21 +122,27 @@ export const SUBCLASSES: SubclassSeed[] = [
   // ── Monk ─────────────────────────────────────────────────────────────────
   {
     className: "Monk",
-    name: "Way of the Open Hand",
+    name: "Warrior of the Open Hand",
     description:
-      "You master techniques to push and trip opponents, cover yourself in a shroud of ki, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reaction.",
+      "You master techniques to push and trip opponents, cover yourself in a shroud of focus, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions.",
   },
   {
     className: "Monk",
-    name: "Way of Shadow",
+    name: "Warrior of Shadow",
     description:
-      "You follow a tradition that values stealth and subtlety. You can cast certain spells by spending ki points, teleport between areas of shadow, and silence a zone around yourself. At higher levels you become one with the darkness, striking from the unseen.",
+      "You follow a tradition that values stealth and subtlety. You know Minor Illusion, cast Darkness for 1 focus, and see in the dark. You teleport between areas of shadow, and at higher levels can spend focus to teleport freely and, ultimately, cloak yourself in invisibility.",
   },
   {
     className: "Monk",
-    name: "Way of the Four Elements",
+    name: "Warrior of the Elements",
     description:
-      "You channel the elements through your ki, learning elemental disciplines that let you wield fire, water, air, and earth. Disciple of the Elements grants Elemental Attunement plus one discipline of your choice at level 3, with additional disciplines learned at levels 6, 11, and 17. Disciplines that mimic spells cost ki equal to the spell's level, using your ki save DC.",
+      "You wield the elements of air, earth, fire, and water. Manipulate Elements grants the Elementalism cantrip, and Elemental Attunement lets you spend 1 Focus Point to imbue yourself for 10 minutes — extending your Unarmed Strike reach and letting your strikes deal elemental damage that shoves foes. Elemental Burst (level 6) unleashes a 20-ft sphere for three Martial Arts dice, Stride of the Elements (level 11) grants flight and swimming while attuned, and Elemental Epitome (level 17) adds elemental resistance, a destructive stride, and empowered strikes.",
+  },
+  {
+    className: "Monk",
+    name: "Warrior of Mercy",
+    description:
+      "You wield your focus to wound or heal with a touch. Hand of Harm channels necrotic energy into your unarmed strikes, while Hand of Healing lets you mend a creature as a Magic action or in place of a Flurry of Blows strike. Physician's Touch adds lingering harm or cures grievous conditions, Flurry of Healing and Harm lets a flurry of blows do both at once, and Hand of Ultimate Mercy can restore the recently dead to life.",
   },
   // ── Paladin ───────────────────────────────────────────────────────────────
   {

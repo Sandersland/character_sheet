@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchDisciplines, fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
 import ReviewStep from "@/features/level-up/ReviewStep";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -10,7 +10,6 @@ import type { Character, LevelUpPlanResponse } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchManeuvers: vi.fn(),
-  fetchDisciplines: vi.fn(),
   fetchSpells: vi.fn(),
   fetchFeats: vi.fn(),
 }));
@@ -21,7 +20,6 @@ beforeEach(() => {
     { id: "m1", name: "Riposte", description: "" },
     { id: "m2", name: "Trip Attack", description: "" },
   ]);
-  vi.mocked(fetchDisciplines).mockResolvedValue([]);
   vi.mocked(fetchSpells).mockResolvedValue([{ id: "s1", name: "Fireball" }] as unknown as Awaited<
     ReturnType<typeof fetchSpells>
   >);
@@ -141,7 +139,6 @@ describe("ReviewStep", () => {
       advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
     });
     expect(fetchManeuvers).not.toHaveBeenCalled();
-    expect(fetchDisciplines).not.toHaveBeenCalled();
     expect(fetchSpells).not.toHaveBeenCalled();
     expect(fetchFeats).not.toHaveBeenCalled();
   });

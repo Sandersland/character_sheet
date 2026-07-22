@@ -28,13 +28,18 @@ export function planActionClick(
   }
 
   switch (resolver.kind) {
-    // twf-picker is never reached at runtime — the off-hand attack dispatches
-    // through handleTwfAction, not the generic handleActionClick → planActionClick
-    // path. It appears here only to keep this switch exhaustive over
-    // ResolutionKind (so adding a future kind is a compile error), and shares the
-    // attack-picker plan shape.
+    // flurry-picker and the `twf` key dispatch via handleFlurryAction /
+    // handleTwfAction, not this generic handleActionClick → planActionClick path
+    // (both need extra wiring: enterFlurryMode / enterTwfMode). But
+    // bonusUnarmedStrike (#1218) — a real DERIVED_ACTIONS entry with a
+    // twf-picker resolver — DOES reach here; its consumeSlot:true is
+    // special-cased in handleActionClick to open the bonusAttack counter
+    // (enterTwfMode) rather than a flat consumeBonusAction. All share the
+    // attack-picker plan shape, and the twf-picker/flurry-picker cases keep this
+    // switch exhaustive over ResolutionKind (adding a future kind is a compile error).
     case "attack-picker":
     case "twf-picker":
+    case "flurry-picker":
       return {
         consumeSlot: true,
         openResolution: true,

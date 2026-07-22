@@ -29,8 +29,10 @@ import type { PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import type { SpendResourceOperation } from "@/lib/classes/resources.js";
 import type { AdjustQuantityOperation } from "@/lib/inventory/inventory.js";
 import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
-import { applyHealInTx } from "@/lib/combat/hitpoints.js";
+import { applyHealInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import { applySpendResourceInTx } from "@/lib/classes/resources.js";
+import { deriveMartialArtsDie } from "@/lib/srd/srd.js";
+import { rollDie } from "@/lib/core/dice.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
@@ -58,8 +60,9 @@ type ExecuteActionOp = z.infer<typeof executeActionSchema>;
  * Apply a single action op inside the shared transaction. A cast-core action
  * (`ACTION_CAST_FN`) pays its pool cost + self-applies through the shared caster;
  * otherwise `ACTION_EFFECT_FN` yields a list of primitive ops (spend / adjust /
- * heal / buff) applied in order. Split out of the /transactions handler so the
- * route stays a thin parse → validate → transaction → serialize shell.
+ * heal / tempHp / buff) applied in order. Split out of the /transactions
+ * handler so the route stays a thin parse → validate → transaction →
+ * serialize shell.
  */
 async function applyActionOpInTx(
   tx: Prisma.TransactionClient,
@@ -68,8 +71,9 @@ async function applyActionOpInTx(
   batchId: string,
   sessionId: string | null,
   rageDamageBonus: number,
+  heightenedFocusTempHp: number,
 ): Promise<void> {
-  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus };
+  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus, heightenedFocusTempHp };
 
   // Cast-core actions (Second Wind #420): pay the pool cost + self-apply the
   // heal through the shared caster. The OpOutcome is intentionally not logged —
@@ -108,7 +112,7 @@ async function applyActionOpInTx(
 /** The primitive op types `ACTION_EFFECT_FN` yields for a non-cast action. */
 type ActionEffect = ReturnType<(typeof ACTION_EFFECT_FN)[string]>[number];
 
-/** Apply one primitive action effect (spend / adjust / heal / buff) in the tx. */
+/** Apply one primitive action effect (spend / adjust / heal / tempHp / buff) in the tx. */
 async function applyActionEffectInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -137,6 +141,10 @@ async function applyActionEffectInTx(
       await applyHealInTx(tx, characterId, effect.amount, batchId, sessionId);
       break;
 
+    case "tempHp":
+      await applyTempHpInTx(tx, characterId, effect.amount, batchId, sessionId);
+      break;
+
     case "applyBuff":
       await appendActiveBuffInTx(tx, characterId, effect.buff, batchId, sessionId);
       break;
@@ -146,7 +154,7 @@ async function applyActionEffectInTx(
       break;
 
     default: {
-      // Exhaustive — ACTION_EFFECT_FN returns the five op types above.
+      // Exhaustive — ACTION_EFFECT_FN returns the six op types above.
       const _never: never = effect;
       throw new Error(`Unexpected op type in action effect: ${JSON.stringify(_never)}`);
     }
@@ -176,6 +184,26 @@ async function computeRageDamageBonus(operations: ExecuteActionOp[], characterId
   return rageMeleeDamageBonus(barbarianLevel);
 }
 
+/**
+ * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): Patient Defense's
+ * Focus variant additionally grants temp HP = two Martial Arts die rolls,
+ * rolled server-side (no client input) — mirrors computeRageDamageBonus:
+ * only hits the DB when a patientDefenseFocus op is present, and only rolls
+ * when the monk is actually L10+ (0 below that, so the effect fn omits the
+ * tempHp op entirely rather than granting a zero amount).
+ */
+async function computeHeightenedFocusTempHp(operations: ExecuteActionOp[], characterId: string): Promise<number> {
+  if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
+  const classRow = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: { classEntries: { select: { name: true, level: true } } },
+  });
+  const monkLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
+  if (monkLevel < 10) return 0;
+  const dieFaces = deriveMartialArtsDie(monkLevel);
+  return rollDie(dieFaces) + rollDie(dieFaces);
+}
+
 actionsRouter.post<{ id: string }>(
   "/transactions",
   async (req, res) => {
@@ -200,15 +228,16 @@ actionsRouter.post<{ id: string }>(
     assertKnownActionKeys(operations);
 
     const rageDamageBonus = await computeRageDamageBonus(operations, characterId);
+    const heightenedFocusTempHp = await computeHeightenedFocusTempHp(operations, characterId);
     const batchId = randomUUID();
     const sessionId = await getActiveSessionId(characterId);
 
     // Cross-domain atomic transaction — every op (cast-core, spendResource,
-    // adjustQuantity, heal) shares the same batchId so they appear as one
-    // batch on the activity timeline and a single revertBatch undoes them all.
+    // adjustQuantity, heal, tempHp) shares the same batchId so they appear as
+    // one batch on the activity timeline and a single revertBatch undoes them all.
     await prisma.$transaction(async (tx) => {
       for (const op of operations) {
-        await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus);
+        await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus, heightenedFocusTempHp);
       }
     });
 

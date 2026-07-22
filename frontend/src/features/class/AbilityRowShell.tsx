@@ -1,6 +1,6 @@
 /**
  * AbilityRowShell — the shared <li> anatomy of the class-ability rows
- * (ManeuverRow / DisciplineRow / ShadowArtRow, #688): an expandable
+ * (ManeuverRow / ShadowArtRow, #688): an expandable
  * name-toggle with inline chips, a right-aligned action cluster, an optional
  * warning line, and the expandable body. Owns the expanded state; the rows
  * keep their own cast/forget semantics.
@@ -10,9 +10,9 @@ import { useState, type ReactNode } from "react";
 
 interface AbilityRowShellProps {
   name: string;
-  /** Inline chips rendered after the name (ki cost, concentration, buff). */
+  /** Inline chips rendered after the name (focus cost, concentration, buff). */
   chips?: ReactNode;
-  /** Right-aligned action cluster (ki select, Cast, Swap, Forget). */
+  /** Right-aligned action cluster (focus select, Cast, Swap, Forget). */
   actions: ReactNode;
   /** Optional line between the header and the expandable body. */
   warning?: ReactNode;

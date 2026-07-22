@@ -224,6 +224,16 @@ export function buildEquippedWeaponEntries(character: Character): AttackEntry[] 
   return entries;
 }
 
+/**
+ * The single-swing entry for InlineOffHandPicker's bonus-action picker: the
+ * off-hand weapon (TWF) or the locked Unarmed Strike profile (Bonus Unarmed
+ * Strike, #1218). Kept out of the component body to keep its complexity
+ * budget clear of this branch.
+ */
+export function buildBonusSwingEntry(character: Character, variant: "twf" | "unarmed"): AttackEntry | null {
+  return variant === "unarmed" ? buildUnarmedEntry(character) : buildOffHandEntry(character);
+}
+
 // The Unarmed Strike attack row — flat display when faces === 1 (baseline).
 function buildUnarmedEntry(character: Character): AttackEntry {
   const { unarmedStrike } = character;
@@ -279,6 +289,19 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
     buildUnarmedEntry(character),
     buildImprovisedEntry(character),
   ];
+}
+
+// Flurry of Blows' single form — 2024 rules grant no weapon choice, so unlike
+// buildAttackForms this never includes equipped weapons or Improvised (#1217).
+export function buildUnarmedOnlyForms(character: Character): AttackEntry[] {
+  return [buildUnarmedEntry(character)];
+}
+
+// Flurry of Blows strike count (SRD 5.2 "Focus"): expend 1 Focus Point to make
+// two Unarmed Strikes as a bonus action — three at Heightened Focus (monk L10,
+// #1244).
+export function flurryStrikeCount(character: Character): number {
+  return character.level >= 10 ? 3 : 2;
 }
 
 // The "Attacking with" form options for the single attack card (#786): deduped
