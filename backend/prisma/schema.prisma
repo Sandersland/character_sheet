@@ -1434,6 +1434,7 @@ enum CharacterEventType {
   castManeuver
   castShadowArt
   castChannelDivinity
+  castStunningStrike
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled

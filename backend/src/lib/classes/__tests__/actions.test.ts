@@ -50,17 +50,18 @@ describe("deriveActions — class gates", () => {
     expect(l2).toContain("recklessAttack");
   });
 
-  it("Monk L2 gets flurryOfBlows/patientDefense(+Focus)/stepOfTheWind(+Focus); L5 adds stunningStrike", () => {
+  it("Monk L2 gets flurryOfBlows/patientDefense(+Focus)/stepOfTheWind(+Focus); stunningStrike is not a catalog action (#1242)", () => {
     const l2 = keys(deriveActions("monk", undefined, 2, []));
     expect(l2).toContain("flurryOfBlows");
     expect(l2).toContain("patientDefense");
     expect(l2).toContain("patientDefenseFocus");
     expect(l2).toContain("stepOfTheWind");
     expect(l2).toContain("stepOfTheWindFocus");
+    // Stunning Strike (L5) is a post-hit rider, not a catalog action — see
+    // stunning-strike.test.ts (#1242).
     expect(l2).not.toContain("stunningStrike");
-
     const l5 = keys(deriveActions("monk", undefined, 5, []));
-    expect(l5).toContain("stunningStrike");
+    expect(l5).not.toContain("stunningStrike");
   });
 
   it("Monk L1 gets bonusUnarmedStrike (Martial Arts, #1218)", () => {
@@ -279,12 +280,6 @@ describe("ACTION_EFFECT_FN — monk focus actions", () => {
       { type: "spendResource", key: "focus" },
     ]);
   });
-
-  it("stunningStrike → spendResource focus", () => {
-    expect(ACTION_EFFECT_FN.stunningStrike({})).toEqual([
-      { type: "spendResource", key: "focus" },
-    ]);
-  });
 });
 
 describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (#1240)", () => {
@@ -358,23 +353,18 @@ describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (
   });
 });
 
-describe("Monk Stunning Strike — combat feature wiring (#392)", () => {
-  it("is granted at monk L5 via deriveActions", () => {
-    expect(keys(deriveActions("monk", undefined, 5, []))).toContain("stunningStrike");
-  });
-
-  it("is absent at monk L4 (level 5 gate)", () => {
+// Stunning Strike (#392's bare-spend stub) is superseded by the dedicated
+// stunning-strike.ts vertical (#1242) — see stunning-strike.test.ts for its
+// once-per-turn guard, DC math, and fail/success outcome coverage.
+describe("Monk Stunning Strike — not a catalog action (#1242)", () => {
+  it("has no DERIVED_ACTIONS entry at any level", () => {
     expect(keys(deriveActions("monk", undefined, 4, []))).not.toContain("stunningStrike");
+    expect(keys(deriveActions("monk", undefined, 5, []))).not.toContain("stunningStrike");
+    expect(keys(deriveActions("monk", undefined, 20, []))).not.toContain("stunningStrike");
   });
 
-  it("spends 1 focus when invoked", () => {
-    const ops = ACTION_EFFECT_FN.stunningStrike({});
-    expect(ops).toHaveLength(1);
-    const [op] = ops as Array<{ type: string; key: string; amount?: number }>;
-    expect(op.type).toBe("spendResource");
-    expect(op.key).toBe("focus");
-    // amount omitted defaults to 1 in the spendResource handler.
-    expect(op.amount ?? 1).toBe(1);
+  it("has no ACTION_EFFECT_FN entry (post-hit rider, not a selectable action)", () => {
+    expect(ACTION_EFFECT_FN.stunningStrike).toBeUndefined();
   });
 });
 

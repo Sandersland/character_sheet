@@ -124,6 +124,14 @@ export interface SneakAttackRollResult {
   summary: string;
 }
 
+/** Per-op result from POST …/stunning-strike/transactions — DC + roll + fail/success rider. */
+export interface StunningStrikeAttemptResult {
+  dc: number;
+  roll: number;
+  outcome: "fail" | "success";
+  summary: string;
+}
+
 /** A known elemental discipline entry on a character (Way of the Four Elements). */
 export interface DisciplineEntry {
   id: string;

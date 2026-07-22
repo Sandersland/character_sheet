@@ -134,6 +134,8 @@ export interface TurnState {
   tookDamageThisTurn: boolean;
   /** Sneak Attack applied this turn — enforces the rogue once-per-turn guard (#902). */
   sneakAttackUsedThisTurn: boolean;
+  /** Stunning Strike attempted this turn — enforces the monk once-per-turn guard (#1242). */
+  stunningStrikeUsedThisTurn: boolean;
   /**
    * Equip/unequip credits earned this turn — one per attack made with the
    * Attack action (PHB'24: "you can equip or unequip one weapon when you make
@@ -321,6 +323,8 @@ export interface TurnStateActions {
   undo: () => void;
   /** Mark Sneak Attack applied this turn — enforces the once-per-turn guard (#902). */
   markSneakAttackUsed: () => void;
+  /** Mark Stunning Strike attempted this turn — enforces the once-per-turn guard (#1242). */
+  markStunningStrikeUsed: () => void;
 }
 
 /**
@@ -351,6 +355,7 @@ function initialState(): TurnState {
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    stunningStrikeUsedThisTurn: false,
     attackEquipCredits: 0,
     freeInteractionUsed: false,
     history: [],
@@ -695,6 +700,7 @@ function endTurnState(s: TurnState): TurnState {
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    stunningStrikeUsedThisTurn: false,
     attackEquipCredits: 0,
     freeInteractionUsed: false,
     history: [],
@@ -718,6 +724,7 @@ function startCombatState(): TurnState {
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
+    stunningStrikeUsedThisTurn: false,
     attackEquipCredits: 0,
     freeInteractionUsed: false,
     history: [],
@@ -741,6 +748,7 @@ function startTurnState(s: TurnState): TurnState {
     castTally: [],
     spellCastThisTurn: {},
     sneakAttackUsedThisTurn: false, // once per turn — resets each of your turns
+    stunningStrikeUsedThisTurn: false, // once per turn — resets each of your turns
     attackEquipCredits: 0, // interaction-budget credits reset each of your turns (#1165)
     freeInteractionUsed: false,
     history: [], // undo never reaches across turns
@@ -817,6 +825,7 @@ type TurnAction =
   | { type: "undo" }
   | { type: "markDamageTaken" }
   | { type: "markSneakAttackUsed" }
+  | { type: "markStunningStrikeUsed" }
   | { type: "hydrate"; state: TurnState };
 
 // The action types whose transition pushes an undo snapshot (the former `mutate`
@@ -888,6 +897,8 @@ const HANDLERS: TurnActionHandlers = {
   markDamageTaken: (s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }),
   markSneakAttackUsed: (s) =>
     s.sneakAttackUsedThisTurn ? s : { ...s, sneakAttackUsedThisTurn: true },
+  markStunningStrikeUsed: (s) =>
+    s.stunningStrikeUsedThisTurn ? s : { ...s, stunningStrikeUsedThisTurn: true },
   hydrate: (_s, a) => a.state,
 };
 
@@ -1011,6 +1022,7 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       attachBatchId: (batchId) => dispatch({ type: "attachBatchId", batchId }),
       undo: () => dispatch({ type: "undo" }),
       markSneakAttackUsed: () => dispatch({ type: "markSneakAttackUsed" }),
+      markStunningStrikeUsed: () => dispatch({ type: "markStunningStrikeUsed" }),
     }),
     [],
   );

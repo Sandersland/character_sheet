@@ -2,6 +2,7 @@ import { experienceProgress, levelForExperience } from "@/lib/leveling/experienc
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { deriveAttacksPerAction, deriveRangedAttackRollBonus } from "@/lib/srd/srd.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
+import { focusSaveDC } from "@/lib/classes/monk.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import type { CharacterWithRelations } from "./character-include.js";
@@ -39,6 +40,18 @@ function serializeSneakAttack(
 ): { dice: number; faces: number } | null {
   const spec = sneakAttackSpec(classEntries.find((c) => c.name.toLowerCase() === "rogue")?.level ?? 0);
   return spec ? { dice: spec.count, faces: spec.faces } : null;
+}
+
+// Stunning Strike wire shape: the focus save DC, or null below monk L5. Mirrors
+// serializeSneakAttack's gate-by-class-level shape; scales with the monk class
+// entry's own level, matching monkLevel() in stunning-strike.ts.
+function serializeStunningStrike(
+  classEntries: { name: string; level: number }[],
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): { dc: number } | null {
+  const monkLevel = classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
+  return monkLevel >= 5 ? { dc: focusSaveDC(abilityScores, profBonus) } : null;
 }
 
 export function serializeCharacterSummary(row: {
@@ -319,6 +332,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Rogue Sneak Attack Nd6 (derived from rogue class levels); null otherwise.
     // The count drives the session card's toggle + the roll shown in results.
     sneakAttack: serializeSneakAttack(row.classEntries),
+    // Monk Stunning Strike focus save DC (derived from monk class level + Wis);
+    // null below monk L5. Drives the session card's DC display (#1242).
+    stunningStrike: serializeStunningStrike(row.classEntries, effectiveScores, progress.proficiencyBonus),
 
     journal: buildJournalView(row),
 

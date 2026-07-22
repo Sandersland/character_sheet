@@ -10,8 +10,10 @@ function fourElementsDisciplineCount(level: number): number {
   return 1;
 }
 
-/** Focus save DC (Monk) — used by Stunning Strike, focus features, and elemental disciplines. */
-function focusSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
+// Focus save DC (Monk) — used by Stunning Strike (live-play automation lives in
+// stunning-strike.ts, which imports this), focus features, and elemental
+// disciplines. Exported so it's the single copy of the formula (SRD 5.2).
+export function focusSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
   return 8 + profBonus + abilityModifier(abilityScores.wisdom ?? 10);
 }
 

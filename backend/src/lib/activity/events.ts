@@ -72,6 +72,7 @@ export type EventType =
   | "castManeuver"
   | "castShadowArt"
   | "castChannelDivinity"
+  | "castStunningStrike"
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"

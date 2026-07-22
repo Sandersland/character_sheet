@@ -567,6 +567,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       },
     ],
   },
+  "stunningStrike": null,
   "subclass": undefined,
   "subclassId": undefined,
   "toolProficiencies": [
@@ -843,6 +844,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "sneakAttack": null,
   "speed": 30,
   "spellcasting": undefined,
+  "stunningStrike": null,
   "subclass": "battle master",
   "subclassId": undefined,
   "toolProficiencies": [

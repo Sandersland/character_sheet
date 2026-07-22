@@ -262,17 +262,9 @@ export const ACTIONS: ActionSeed[] = [
     description:
       "Spend 1 focus to take the Disengage action and the Dash action as a bonus action. Your jump distance doubles for the turn.",
   },
-  {
-    key: "stunningStrike",
-    name: "Stunning Strike",
-    cost: "free",
-    grantClass: "monk",
-    grantLevel: 5,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    description:
-      "After hitting with a melee weapon attack, spend 1 focus to force the target to make a Constitution save or be stunned until end of your next turn.",
-  },
+  // Stunning Strike (L5) isn't seeded here — it's a post-hit rider (spend +
+  // Con save + fail/success outcome), not a selectable catalog action. See
+  // stunning-strike.ts (#1242 supersedes the #392 bare-spend stub formerly here).
 
   // ── Subclass: Way of Shadow monk ─────────────────────────────────────────
   {
