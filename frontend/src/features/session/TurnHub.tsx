@@ -74,7 +74,7 @@ function TurnHubIdle({
 }) {
   const { inCombat, round, reactionUsed, consumeReaction } = turnState;
   const {
-    busy, error, reactionMessage,
+    busy, error, reactionMessage, effectMessage,
     showReactionMenu, setShowReactionMenu, setReactionMessage,
     dieLabel, dieBusy, superiorityRemaining, classReactions, reactionManeuvers,
     reactionSheetModel,
@@ -142,6 +142,15 @@ function TurnHubIdle({
             End combat
           </button>
         </div>
+
+        {/* Combat-start resource regen (#1239/#1243, e.g. Uncanny Metabolism/
+            Perfect Focus) — set once by handleStartCombat, so it's visible
+            immediately here rather than waiting for the active-turn TurnMessages. */}
+        {effectMessage && (
+          <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
+            {effectMessage}
+          </p>
+        )}
 
         <TurnDeathSaves character={character} onUpdate={onUpdate} />
 

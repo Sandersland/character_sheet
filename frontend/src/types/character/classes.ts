@@ -237,6 +237,10 @@ export interface SpendResourceOperation { type: "spendResource"; key: string; am
 
 export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
 
+/** Roll Initiative / combat start (#1239/#1243): applies every onInitiative-declaring
+ *  pool's regen (e.g. Monk Uncanny Metabolism/Perfect Focus). Carries no key. */
+export interface RollInitiativeOperation { type: "rollInitiative" }
+
 export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
 
 export interface ForgetManeuverOperation { type: "forgetManeuver"; entryId: string }
@@ -268,6 +272,7 @@ export interface LearnSubclassChoiceOperation {
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
+  | RollInitiativeOperation
   | LearnManeuverOperation
   | ForgetManeuverOperation
   | LearnDisciplineOperation
@@ -276,6 +281,18 @@ export type ResourceOperation =
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation
   | LearnSubclassChoiceOperation;
+
+/**
+ * Per-op audit result from POST …/resources/transactions — mirrors the
+ * backend's generic ResourceOpAudit. Most ops' callers ignore it; rollInitiative
+ * (#1239/#1243) is read for its regen summary + eventData.regenerated (whether
+ * anything actually fired) to drive the combat-start toast.
+ */
+export interface ResourceOpResult {
+  eventType: string;
+  summary: string;
+  eventData: Record<string, unknown>;
+}
 
 /**
  * Discipline operation types — mirror of `applyDisciplineOperations`. Sent as

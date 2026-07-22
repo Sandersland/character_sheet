@@ -17,275 +17,56 @@ import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/exp
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "./class-features.js";
 import { toolsByCategory } from "@/lib/srd/srd.js";
+import { rollDie } from "@/lib/core/dice.js";
+// Cross-domain HP heal for Uncanny Metabolism's bonusHeal (#1243) — precedented
+// by lib/spellcasting/ability-cast.ts, which also composes applyHealInTx from a
+// sibling domain's lib file. hp-in-tx.ts needs the mutable-state normalizer for
+// its own feat max-HP bonus lookup, so that shape lives in the leaf module
+// resources-state.ts (no back-imports) rather than here — importing
+// combat/hitpoints.ts from THIS file would otherwise close a cycle through it.
+import { applyHealInTx } from "@/lib/combat/hitpoints.js";
+import type { DerivedResource, InitiativeBonusHeal, InitiativeRegen } from "./types.js";
+import {
+  clampChoicesToCaps,
+  clearInitiativeRegenMarkers,
+  INITIATIVE_REGEN_MARKER_PREFIX,
+  normalizeResourcesMutable,
+  serializeResourcesState,
+  snapshotResources,
+  splitAdvancementsBySlotCap,
+  type AdvancementEntry,
+  type ChoiceEntry,
+  type DisciplineEntry,
+  type FeatImprovement,
+  type ManeuverEntry,
+  type ResourcesMutableState,
+  type ToolProfEntry,
+} from "./resources-state.js";
+
+// Re-exported so existing consumers (character-serialize/classes.ts, hp-core.ts,
+// route/test files, …) keep resolving the mutable-state shape + its helpers from
+// this module — the definitions now live in resources-state.ts (#1243).
+export {
+  clampChoicesToCaps,
+  clearInitiativeRegenMarkers,
+  normalizeResourcesMutable,
+  serializeResourcesState,
+  snapshotResources,
+  splitAdvancementsBySlotCap,
+};
+export type {
+  AdvancementEntry,
+  ChoiceEntry,
+  DisciplineEntry,
+  FeatImprovement,
+  ManeuverEntry,
+  ResourcesMutableState,
+  ToolProfEntry,
+};
 
 // status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidResourceOperationError extends Error {
   status = 400;
-}
-
-// Canonical mutable state shape. Stored in Character.resources JSON column.
-// `used`: resource key (string) → number of units currently spent.
-// `maneuversKnown`: snapshot array of learned maneuvers; each entry has a
-//   locally-generated `id` (the operation target), optional `maneuverId`
-//   (catalog Maneuver.id provenance — null for custom maneuvers), and a
-//   snapshot of name + description at learn time.
-
-export interface ManeuverEntry {
-  id: string;           // per-character entry UUID (operation target)
-  maneuverId?: string;  // catalog GrantedAbility.id provenance — undefined for custom
-  name: string;
-  description: string;
-  // Session-UI routing snapshot from the catalog at learn time (undefined for
-  // custom maneuvers → frontend defaults to "damageRoll").
-  placement?: string;
-  actionSlot?: string | null;
-}
-
-/**
- * A known elemental discipline (Way of the Four Elements). Mirrors ManeuverEntry.
- * learnedAtLevel/lastSwapLevel are recorded to support #397's one-swap-per-level
- * rule (2026-07-03 decision); lastSwapLevel is null until the entry is first swapped.
- */
-export interface DisciplineEntry {
-  id: string;              // per-character entry UUID (operation target)
-  disciplineId?: string;   // catalog provenance — undefined for custom disciplines
-  name: string;
-  description: string;
-  learnedAtLevel: number;
-  lastSwapLevel: number | null;
-}
-
-/** A tool proficiency granted by a level-gated subclass feature (Student of War). */
-export interface ToolProfEntry {
-  id: string;   // per-character entry UUID (operation target)
-  name: string; // matches a TOOLS entry name
-}
-
-/**
- * One picked option of a generic subclass "choose N" feature (#899) —
- * e.g. a Ranger's Hunter's Prey selection. Mirrors ManeuverEntry but carries
- * no mechanics: the option catalog is GrantedAbility rows, the selection is
- * just this snapshot. Stored under choicesKnown[choiceKey].
- */
-export interface ChoiceEntry {
-  id: string;         // per-character entry UUID (operation target)
-  optionId?: string;  // catalog GrantedAbility.id provenance — undefined for custom
-  name: string;
-  description: string;
-}
-
-/**
- * A structured mechanical effect defined on a catalog or custom feat.
- * Snapshot into AdvancementEntry.improvements at take-time so removal/derivation
- * never depend on the catalog row being present.
- *
- * Supported targets (enforced in advancement route, applied in serializeCharacter):
- *
- * Numeric (summed by deriveFeatBonuses, applied as additive bonuses):
- *   "initiative" | "speed" | "armorClass" | "maxHp"
- *
- * Keyed proficiency (collected by deriveFeatProficiencies, OR'd with stored proficiencies):
- *   "skillProficiency"       — imp.key = camelCase skill key e.g. "athletics" / "animalHandling"
- *   "savingThrowProficiency" — imp.key = ability name e.g. "strength"
- *
- * `perLevel`: when true, the effective bonus = amount × character's applied level
- * (hitDice.total). Only meaningful for numeric targets. Used by Tough (+2 HP per level).
- */
-export interface FeatImprovement {
-  target: string;
-  amount: number;
-  perLevel?: boolean;
-  /** Required for keyed targets (skillProficiency, savingThrowProficiency). */
-  key?: string;
-  /** PHB'24: "proficiencyBonus" multiplies amount by PB at read time (e.g. Alert). */
-  scaling?: "proficiencyBonus";
-}
-
-/**
- * One taken Ability Score Improvement or feat.
- * Stores the deltas applied so reversal subtracts exactly what was added —
- * never recomputes from ability scores, which may have changed since.
- */
-// fallow-ignore-next-line code-duplication -- FeatImprovement/AdvancementEntry intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
-export interface AdvancementEntry {
-  id: string;                            // per-character entry UUID (operation target)
-  level: number;                         // character level when taken (informational)
-  kind: "asi" | "feat";
-  /** PHB'24 Origin feat granted by a background (#1130): exempt from the ASI
-   *  slot cap and never reversed on level-down; can't be removed via the route. */
-  origin?: true;
-  /** Fighting Style feat (#1137): consumes a `fightingStyle` slot, not an ASI
-   *  slot. Absent ⇒ ASI-slot feat/ASI. Both partitions live in this one array. */
-  slot?: "fightingStyle";
-  /** The raw score increases applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
-  abilityDeltas: Record<string, number>;
-  /** HP added to hitPoints.max/current (CON-mod change × hitDice.total). */
-  hpDelta: number;
-  /** Addend applied to initiativeBonus (DEX-mod change). */
-  initDelta: number;
-  /** Catalog Feat.id provenance — undefined for ASI or custom feat. */
-  featId?: string;
-  /** Display name snapshot taken at time of choice (for feats). */
-  featName?: string;
-  /** Description snapshot taken at time of choice (for feats). */
-  featDescription?: string;
-  /**
-   * Snapshot of the feat's structured mechanical effects at take-time.
-   * Applied as a derived modifier layer in serializeCharacter / effective-max
-   * computations — never persisted into separate columns.
-   * Empty for ASI entries.
-   */
-  improvements?: FeatImprovement[];
-}
-
-export interface ResourcesMutableState {
-  used: Record<string, number>;
-  maneuversKnown: ManeuverEntry[];
-  /** Level-gated elemental disciplines (Way of the Four Elements). */
-  disciplinesKnown: DisciplineEntry[];
-  /** Level-gated tool proficiency choices (currently: Student of War). */
-  toolProficienciesKnown: ToolProfEntry[];
-  /**
-   * Generic subclass "choose N" selections (#899), keyed by SubclassChoice.key
-   * (e.g. "huntersPrey"). Each list is capped at the level-derived count and
-   * trimmed by reconcileSubclassChoices on level-down. A new choose-N feature
-   * adds a subclass declaration + seed rows — no new state key here.
-   */
-  choicesKnown: Record<string, ChoiceEntry[]>;
-  /** Ability Score Improvements and feats taken, in the order chosen. Fighting
-   *  Style feats (#1137) live here tagged slot:"fightingStyle" — no separate key. */
-  advancements: AdvancementEntry[];
-}
-
-// Subclass "choose N" cap policy: single-sourced level-gating for choicesKnown, shared by reconcile-on-write
-// (trimChoicesToCaps) and clamp-on-read (buildResourcesPayload). Caps each key's
-// list to its derived count (LIFO: keep the oldest picks); keys absent from
-// `caps` (subclass/tier no longer grants them) get cap 0 and are dropped from
-// `clamped`. `removedCount` is the total entries over cap.
-export function clampChoicesToCaps(
-  choicesKnown: Record<string, ChoiceEntry[]>,
-  caps: Map<string, number>,
-): { clamped: Record<string, ChoiceEntry[]>; removedCount: number } {
-  const clamped: Record<string, ChoiceEntry[]> = {};
-  let removedCount = 0;
-  for (const [key, entries] of Object.entries(choicesKnown)) {
-    const cap = caps.get(key) ?? 0;
-    if (entries.length > cap) removedCount += entries.length - cap;
-    if (cap > 0) clamped[key] = entries.slice(0, cap);
-  }
-  return { clamped, removedCount };
-}
-
-// Single source of the ASI-slot cap policy (#1130/#1137), shared by every
-// clamp-on-read and reconcile-on-write site. Three partitions in one array:
-// Origin feats (background grants) are always kept and consume no slot; Fighting
-// Style feats (slot "fightingStyle", #1137) keep the earliest `fightingStyleSlotTotal`
-// against their OWN cap; every other ASI/feat keeps the earliest `slotTotal`. Each
-// partition trims LIFO (the tail beyond its cap becomes `excess`). `kept` preserves
-// the original order; `usedSlots`/`usedFightingStyleSlots` count the kept
-// slot-consuming entries of each partition. fightingStyleSlotTotal defaults to
-// Infinity so non-reconcile callers (HP/concentration feat-bonus reads) keep every
-// fs feat without trimming — only the serialize clamp + reconciler pass the real cap.
-export function splitAdvancementsBySlotCap(
-  advancements: AdvancementEntry[],
-  slotTotal: number,
-  fightingStyleSlotTotal = Number.POSITIVE_INFINITY,
-): { kept: AdvancementEntry[]; excess: AdvancementEntry[]; usedSlots: number; usedFightingStyleSlots: number } {
-  const kept: AdvancementEntry[] = [];
-  const excess: AdvancementEntry[] = [];
-  let usedSlots = 0;
-  let usedFightingStyleSlots = 0;
-  for (const entry of advancements) {
-    if (entry.origin) {
-      kept.push(entry);
-    } else if (entry.slot === "fightingStyle") {
-      if (usedFightingStyleSlots < fightingStyleSlotTotal) {
-        kept.push(entry);
-        usedFightingStyleSlots++;
-      } else {
-        excess.push(entry);
-      }
-    } else if (usedSlots < slotTotal) {
-      kept.push(entry);
-      usedSlots++;
-    } else {
-      excess.push(entry);
-    }
-  }
-  return { kept, excess, usedSlots, usedFightingStyleSlots };
-}
-
-// Normalizer: tolerant of null (character has never used any resources) and future schema
-// additions. Mirror of normalizeSpellcastingMutable.
-
-export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMutableState {
-  if (!json || typeof json !== "object" || Array.isArray(json)) {
-    return {
-      used: {},
-      maneuversKnown: [],
-      disciplinesKnown: [],
-      toolProficienciesKnown: [],
-      choicesKnown: {},
-      advancements: [],
-    };
-  }
-  const obj = json as Record<string, unknown>;
-  const rawChoices = obj.choicesKnown;
-  const choicesKnown: Record<string, ChoiceEntry[]> =
-    rawChoices && typeof rawChoices === "object" && !Array.isArray(rawChoices)
-      ? (rawChoices as Record<string, ChoiceEntry[]>)
-      : {};
-  return {
-    used: (obj.used as Record<string, number>) ?? {},
-    maneuversKnown: (obj.maneuversKnown as ManeuverEntry[]) ?? [],
-    disciplinesKnown: (obj.disciplinesKnown as DisciplineEntry[]) ?? [],
-    toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
-    choicesKnown,
-    advancements: (obj.advancements as AdvancementEntry[]) ?? [],
-  };
-}
-
-/**
- * Serializes the full mutable resource state to the shape written to
- * Character.resources. Route every update through this helper so all keys
- * round-trip — required now that multiple level-gated lists share one column.
- */
-export function serializeResourcesState(state: ResourcesMutableState): Prisma.InputJsonValue {
-  return {
-    used: state.used,
-    maneuversKnown: state.maneuversKnown,
-    disciplinesKnown: state.disciplinesKnown,
-    toolProficienciesKnown: state.toolProficienciesKnown,
-    choicesKnown: state.choicesKnown,
-    advancements: state.advancements,
-  } as unknown as Prisma.InputJsonValue;
-}
-
-/**
- * Canonical deep-clone of the COMPLETE resources audit-snapshot shape — the one
- * source of truth for every before/after event snapshot, so no field can be
- * omitted per-site (the undo handlers restore before.resources wholesale, so an
- * omitted key silently wipes on revert). Copies every entry, so mutating `state`
- * after capture can't retroactively alter the snapshot.
- */
-export function snapshotResources(state: ResourcesMutableState): ResourcesMutableState {
-  return {
-    used: { ...state.used },
-    maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
-    disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-    toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
-    choicesKnown: Object.fromEntries(
-      Object.entries(state.choicesKnown).map(([key, entries]) => [key, entries.map((e) => ({ ...e }))]),
-    ),
-    advancements: state.advancements.map((a) => ({
-      ...a,
-      abilityDeltas: { ...a.abilityDeltas },
-      // Shallow-copy the improvements array so a later mutation of state can't
-      // retroactively alter this snapshot; its FeatImprovement elements are
-      // treated as immutable snapshots.
-      improvements: a.improvements ? [...a.improvements] : undefined,
-    })),
-  };
 }
 
 /** Spend one or more units of a trackable resource (e.g. a superiority die). */
@@ -400,10 +181,12 @@ export type ResourceOperation =
   | ForgetSubclassChoiceOperation;
 
 // Per-op appliers: each validates + mutates `state` in place (throwing on any illegal op) and
-// returns the audit payload the dispatcher writes to the event log. Kept
-// module-private so the public API (applyResourceOperations) stays byte-stable.
+// returns the audit payload the dispatcher writes to the event log.
 
-interface ResourceOpAudit {
+// Exported (#1243) so routes/character/resources.ts can type its `respond`
+// override that surfaces per-op results (e.g. rollInitiative's regen summary)
+// to the client, mirroring ManeuverCastResult.
+export interface ResourceOpAudit {
   eventType: string;
   summary: string;
   eventData: Record<string, unknown>;
@@ -472,26 +255,12 @@ function applyRestoreResourceOp(
   };
 }
 
-// Marker in `used` recording that a oncePerLongRest initiative-regen has fired
-// for a pool since the last long rest (#1239). The `__` prefix + `:` separator
-// can't collide with a real camelCase pool key, so it stays out of the wire
-// `pools` view (which reads only derived pool keys) and out of rest/reconcile
-// pool math. Single-sourced here so rest.ts clears the same keys on long rest.
-const INITIATIVE_REGEN_MARKER_PREFIX = "__onInitiativeUsed:";
-
-function initiativeRegenMarkerKey(poolKey: string): string {
-  return `${INITIATIVE_REGEN_MARKER_PREFIX}${poolKey}`;
-}
-
-/**
- * Clear every once-per-long-rest initiative-regen marker (#1239) so the next
- * combat's regen fires again. Called from the long-rest path only — the cap is
- * per LONG rest, so a short rest must leave the markers in place.
- */
-export function clearInitiativeRegenMarkers(state: ResourcesMutableState): void {
-  for (const key of Object.keys(state.used)) {
-    if (key.startsWith(INITIATIVE_REGEN_MARKER_PREFIX)) delete state.used[key];
-  }
+// Discriminator defaults to the descriptor's position in its pool's
+// onInitiative array (#1243) so two oncePerLongRest descriptors on the same
+// pool (not used today, but supported) don't collide; a lone descriptor keeps
+// a stable key across calls since resourceFn returns array order deterministically.
+function initiativeRegenMarkerKey(poolKey: string, discriminator: string | number): string {
+  return `${INITIATIVE_REGEN_MARKER_PREFIX}${poolKey}:${discriminator}`;
 }
 
 /** One pool's regain from an onInitiative application, for the audit payload. */
@@ -500,50 +269,127 @@ export interface InitiativeRegenResult {
   label: string;
   restored: number;
   remaining: number;
+  /**
+   * Present when the firing descriptor grants a bonus HP heal (Uncanny
+   * Metabolism, #1243) — the impure rollInitiative op rolls the die and
+   * applies the heal; this pure function only surfaces the descriptor.
+   */
+  bonusHeal?: InitiativeBonusHeal;
 }
 
 /**
- * Apply every derived pool's `onInitiative` regen (#1239) to `state.used`,
- * returning what was regained. "all" fully refills; a numeric amount tops the
- * pool up to at least that many available (never spends). oncePerLongRest
- * descriptors fire at most once per long-rest cycle — tracked by a marker in
- * `used` (set whenever the descriptor fires, even if nothing was expended to
- * regain) that clearInitiativeRegenMarkers resets on a long rest. Generic: any
- * class pool can declare onInitiative (Focus, superiority dice, Bardic
- * Inspiration); inert for pools without it. Pure + exported so it's unit-testable
- * and a future combat-start hook can reuse it. Mirrors applyRestoreResourceOp.
+ * Apply every derived pool's `onInitiative` regen(s) (#1239/#1243) to
+ * `state.used`, returning what was regained. A pool's `onInitiative` may be a
+ * single descriptor or an array of them (#1243 — e.g. Monk Focus at L15+
+ * combines Uncanny Metabolism with Perfect Focus); each fires independently.
+ * "all" fully refills; a numeric amount tops the pool up to at least that many
+ * available (never spends). oncePerLongRest descriptors fire at most once per
+ * long-rest cycle — tracked by a marker in `used` (set whenever the descriptor
+ * fires, even if nothing was expended to regain) that clearInitiativeRegenMarkers
+ * resets on a long rest. A oncePerLongRest descriptor carrying a `bonusHeal`
+ * always reports once it fires (even restoring nothing) so the impure caller
+ * still rolls the heal; a plain top-up descriptor reports only when it actually
+ * restores something. Generic: any class pool can declare onInitiative (Focus,
+ * superiority dice, Bardic Inspiration); inert for pools without it. Pure +
+ * exported so it's unit-testable and a future combat-start hook can reuse it.
+ * Mirrors applyRestoreResourceOp.
  */
+// One onInitiative descriptor's regen against its pool: fires (respecting the
+// once-per-long-rest marker), tops up state.used, and returns the result — or
+// null when there's nothing to report (already fired this rest, or nothing
+// restored and no bonusHeal to signal). Split into three single-purpose
+// helpers (marker gate / target math / orchestration) so a pool's multiple
+// descriptors (#1243) stay under the complexity gate — one combined function
+// tripped it (CRAP 43).
+
+// Whether `regen` may fire right now, consuming its once-per-long-rest marker
+// as a side effect when it does. Always true for a descriptor with no rest cap.
+function markerAllowsFiring(
+  state: ResourcesMutableState,
+  pool: DerivedResource,
+  regen: InitiativeRegen,
+  discriminator: string | number,
+): boolean {
+  if (!regen.oncePerLongRest) return true;
+  const markerKey = initiativeRegenMarkerKey(pool.key, regen.id ?? discriminator);
+  if (state.used[markerKey]) return false; // already fired since the last long rest
+  state.used[markerKey] = 1;
+  return true;
+}
+
+// "all" clears all spend; a numeric target N tops up to N available, i.e.
+// used = total − N, never raising `used` (never spends) and never below 0.
+function regenTargetUsed(pool: DerivedResource, regen: InitiativeRegen, used: number): number {
+  return regen.amount === "all" ? 0 : Math.max(0, Math.min(used, pool.total - regen.amount));
+}
+
+function applyOneInitiativeDescriptor(
+  state: ResourcesMutableState,
+  pool: DerivedResource,
+  regen: InitiativeRegen,
+  discriminator: string | number,
+): InitiativeRegenResult | null {
+  if (!markerAllowsFiring(state, pool, regen, discriminator)) return null;
+  const used = state.used[pool.key] ?? 0;
+  const targetUsed = regenTargetUsed(pool, regen, used);
+  const restored = targetUsed < used ? used - targetUsed : 0;
+  if (restored > 0) state.used[pool.key] = targetUsed;
+  if (restored === 0 && !regen.bonusHeal) return null;
+  return {
+    key: pool.key,
+    label: pool.label,
+    restored,
+    remaining: pool.total - (state.used[pool.key] ?? 0),
+    ...(regen.bonusHeal ? { bonusHeal: regen.bonusHeal } : {}),
+  };
+}
+
 export function applyInitiativeRegen(
   state: ResourcesMutableState,
   derivedInfo: DerivedClassInfo | null,
 ): InitiativeRegenResult[] {
   const regenerated: InitiativeRegenResult[] = [];
   for (const pool of derivedInfo?.resources ?? []) {
-    const regen = pool.onInitiative;
-    if (!regen) continue;
-    if (regen.oncePerLongRest) {
-      const markerKey = initiativeRegenMarkerKey(pool.key);
-      if (state.used[markerKey]) continue; // already fired since the last long rest
-      state.used[markerKey] = 1;
+    if (!pool.onInitiative) continue;
+    const descriptors = Array.isArray(pool.onInitiative) ? pool.onInitiative : [pool.onInitiative];
+    for (const [index, regen] of descriptors.entries()) {
+      const result = applyOneInitiativeDescriptor(state, pool, regen, index);
+      if (result) regenerated.push(result);
     }
-    const used = state.used[pool.key] ?? 0;
-    // "all" clears all spend; a numeric target N tops up to N available, i.e.
-    // used = total − N, never raising `used` (never spends) and never below 0.
-    const targetUsed = regen.amount === "all" ? 0 : Math.max(0, Math.min(used, pool.total - regen.amount));
-    if (targetUsed >= used) continue; // already at/above target — nothing to regain
-    state.used[pool.key] = targetUsed;
-    regenerated.push({ key: pool.key, label: pool.label, restored: used - targetUsed, remaining: pool.total - targetUsed });
   }
   return regenerated;
 }
 
-function applyRollInitiativeOp(
+/**
+ * Roll Initiative op core: applies every pool's onInitiative regen(s), then
+ * resolves any bonusHeal that fired (Uncanny Metabolism, #1243) — rolling its
+ * die server-side (no client input; automatic combat-start effect) and
+ * applying the heal via the shared HP path, atomic with the resources write in
+ * this same transaction/batch.
+ */
+async function applyRollInitiativeOp(
+  tx: Prisma.TransactionClient,
+  characterId: string,
   state: ResourcesMutableState,
   derivedInfo: DerivedClassInfo | null,
-): ResourceOpAudit {
+  batchId: string,
+  sessionId: string | null,
+): Promise<ResourceOpAudit> {
   const regenerated = applyInitiativeRegen(state, derivedInfo);
-  const summary = regenerated.length
-    ? `Rolled Initiative — regained ${regenerated.map((r) => `${r.restored} ${r.label}`).join(", ")}`
+
+  const parts: string[] = [];
+  for (const r of regenerated) {
+    if (r.restored > 0) parts.push(`${r.restored} ${r.label}`);
+    if (r.bonusHeal) {
+      const roll = rollDie(r.bonusHeal.dieFaces);
+      const amount = r.bonusHeal.flatBonus + roll;
+      await applyHealInTx(tx, characterId, amount, batchId, sessionId, { source: r.bonusHeal.sourceName });
+      parts.push(`${amount} HP (${r.bonusHeal.sourceName}: d${r.bonusHeal.dieFaces} roll ${roll} + ${r.bonusHeal.flatBonus})`);
+    }
+  }
+
+  const summary = parts.length
+    ? `Rolled Initiative — regained ${parts.join(", ")}`
     : "Rolled Initiative — no resources to regain";
   return {
     eventType: "initiativeRegen",
@@ -939,6 +785,11 @@ interface ResourceOpContext {
   /** The discipline-granting entry's own effective level (#1177) — only the
    *  learnDiscipline/swapDiscipline handlers read this. */
   disciplineLevel: number;
+  /** Only rollInitiative reads these — its bonusHeal composes applyHealInTx
+   *  in the same tx/batch (#1243). */
+  characterId: string;
+  batchId: string;
+  sessionId: string | null;
 }
 
 type ResourceOpResult = ResourceOpAudit | Promise<ResourceOpAudit>;
@@ -951,7 +802,8 @@ const RESOURCE_OP_HANDLERS: {
 } = {
   spendResource: (ctx, op) => applySpendResourceOp(ctx.state, op, ctx.derivedInfo),
   restoreResource: (ctx, op) => applyRestoreResourceOp(ctx.state, op, ctx.derivedInfo),
-  rollInitiative: (ctx) => applyRollInitiativeOp(ctx.state, ctx.derivedInfo),
+  rollInitiative: (ctx) =>
+    applyRollInitiativeOp(ctx.tx, ctx.characterId, ctx.state, ctx.derivedInfo, ctx.batchId, ctx.sessionId),
   learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
   forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
   learnDiscipline: (ctx, op) => applyLearnDisciplineOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.disciplineLevel),
@@ -1030,7 +882,7 @@ export async function applyResourceOpInTx(
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = await dispatchResourceOp({ tx, state, derivedInfo, disciplineLevel }, op);
+  const audit = await dispatchResourceOp({ tx, state, derivedInfo, disciplineLevel, characterId, batchId, sessionId }, op);
 
   // Write the updated state back — always via serializeResourcesState so
   // all keys round-trip (prevents clobbering toolProficienciesKnown when
@@ -1068,18 +920,26 @@ export async function applyResourceOpInTx(
  *
  * The scaffold's per-op row is only the existence check: applyResourceOpInTx
  * re-reads its own state via RESOURCES_SELECT so it composes under a caller tx.
+ *
+ * Returns one ResourceOpAudit per op (mirrors applyManeuverOperations) so the
+ * route can surface roll/regen outcomes (e.g. rollInitiative's Focus-regen +
+ * Uncanny Metabolism heal summary, #1243) for the client toast — most callers
+ * (spendResource, learnManeuver, …) ignore it, same as before this return
+ * type existed.
  */
 export async function applyResourceOperations(
   characterId: string,
   operations: ResourceOperation[]
-): Promise<void> {
+): Promise<ResourceOpAudit[]> {
+  const results: ResourceOpAudit[] = [];
   await runCharacterTransaction(characterId, operations, {
     select: { id: true },
     notFound: (id) => new InvalidResourceOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
-      await applyResourceOpInTx(tx, id, op, batchId, sessionId);
+      results.push(await applyResourceOpInTx(tx, id, op, batchId, sessionId));
     },
   });
+  return results;
 }
 
 /**

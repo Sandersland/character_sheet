@@ -2,13 +2,16 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+// Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
+// now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
+// would close an import cycle back through combat/hitpoints.ts.
 import {
   snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
   clearInitiativeRegenMarkers,
   type ResourcesMutableState,
-} from "@/lib/classes/resources.js";
+} from "@/lib/classes/resources-state.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { deriveMulticlassSpellcasting } from "@/lib/srd/spellcasting-tables.js";
 import {
