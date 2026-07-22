@@ -1,6 +1,6 @@
 /**
  * AbilityRowShell — the shared <li> anatomy of the class-ability rows
- * (ManeuverRow / DisciplineRow / ShadowArtRow, #688): an expandable
+ * (ManeuverRow / ShadowArtRow, #688): an expandable
  * name-toggle with inline chips, a right-aligned action cluster, an optional
  * warning line, and the expandable body. Owns the expanded state; the rows
  * keep their own cast/forget semantics.

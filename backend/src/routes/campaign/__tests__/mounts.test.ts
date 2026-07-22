@@ -2,7 +2,7 @@
  * Router mount map (#501). Pins the owned-path + mergeParams refactor: external
  * URLs are unchanged, so every documented route must still resolve to its
  * handler. Two invariants:
- *   1. Hybrid routers (maneuvers/disciplines/shadow-arts) still serve their
+ *   1. Hybrid routers (maneuvers/shadow-arts) still serve their
  *      catalog GET at the top level (/api/<name>), not under /characters/:id.
  *   2. Every character-scoped route reaches its handler with `:id` merged in —
  *      proven by a bogus id yielding the domain 404 ("Character not found",
@@ -28,7 +28,7 @@ function agent() {
 }
 
 describe("hybrid catalog routers stay top-level", () => {
-  it.each(["/api/maneuvers", "/api/disciplines", "/api/shadow-arts"])(
+  it.each(["/api/maneuvers", "/api/shadow-arts"])(
     "GET %s returns a catalog array",
     async (url) => {
       const res = await agent().get(url);
@@ -53,7 +53,7 @@ describe("character-scoped routes resolve to their handler with :id merged", () 
     ["POST /experience", () => post("/experience")],
     ["POST /actions/transactions", () => post("/actions/transactions")],
     ["POST /maneuvers/transactions", () => post("/maneuvers/transactions")],
-    ["POST /disciplines/transactions", () => post("/disciplines/transactions")],
+    ["POST /elements/transactions", () => post("/elements/transactions")],
     ["POST /shadow-arts/transactions", () => post("/shadow-arts/transactions")],
     ["POST /channel-divinity/transactions", () => post("/channel-divinity/transactions")],
     ["GET /channel-divinity", () => get("/channel-divinity")],

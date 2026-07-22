@@ -267,7 +267,6 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
       { id: "m3", name: "Menacing Attack", description: "Frighten." },
     ]);
     expect(a.resources.toolProficienciesKnown).toEqual([{ id: "tp1", name: "Smith's Tools" }]);
-    expect(a.resources.disciplinesKnown).toEqual([]);
 
     expect(a.conditions).toEqual({ active: [], exhaustion: 1 });
     expect(a.advancementSlots).toEqual({ total: 1, used: 0 });

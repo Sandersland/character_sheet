@@ -36,7 +36,6 @@ import {
   splitAdvancementsBySlotCap,
   type AdvancementEntry,
   type ChoiceEntry,
-  type DisciplineEntry,
   type FeatImprovement,
   type ManeuverEntry,
   type ResourcesMutableState,
@@ -57,7 +56,6 @@ export {
 export type {
   AdvancementEntry,
   ChoiceEntry,
-  DisciplineEntry,
   FeatImprovement,
   ManeuverEntry,
   ResourcesMutableState,
@@ -107,30 +105,6 @@ export interface ForgetManeuverOperation {
   entryId: string;
 }
 
-/** Learn an elemental discipline from catalog (disciplineId) or add a custom one. */
-export interface LearnDisciplineOperation {
-  type: "learnDiscipline";
-  disciplineId?: string; // catalog Discipline.id
-  custom?: { name: string; description: string; minLevel?: number };
-}
-
-/** Remove a known elemental discipline by its per-character entry id. */
-export interface ForgetDisciplineOperation {
-  type: "forgetDiscipline";
-  entryId: string;
-}
-
-/**
- * Swap (retrain) one known discipline for another within the cap. Gated to one
- * swap per monk level via the lastSwapLevel marker. Replaces the entry in place.
- */
-export interface SwapDisciplineOperation {
-  type: "swapDiscipline";
-  entryId: string;       // the known discipline to replace
-  disciplineId?: string; // catalog Discipline.id of the replacement
-  custom?: { name: string; description: string; minLevel?: number };
-}
-
 /**
  * Learn an artisan's-tool proficiency from the Student of War feature.
  * `name` must match a TOOLS entry with category "artisan".
@@ -172,9 +146,6 @@ export type ResourceOperation =
   | RollInitiativeOperation
   | LearnManeuverOperation
   | ForgetManeuverOperation
-  | LearnDisciplineOperation
-  | ForgetDisciplineOperation
-  | SwapDisciplineOperation
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation
   | LearnSubclassChoiceOperation
@@ -482,150 +453,6 @@ function applyForgetManeuverOp(
   };
 }
 
-// Resolve a discipline op's target (catalog or custom) to a snapshot, enforcing
-// catalog/custom exclusivity, catalog existence, always-known status, and the
-// per-discipline min monk level. Shared by learn + swap.
-async function resolveDiscipline(
-  tx: Prisma.TransactionClient,
-  op: { disciplineId?: string; custom?: { name: string; description: string; minLevel?: number } },
-  level: number,
-): Promise<{ disciplineId?: string; name: string; description: string }> {
-  if (Boolean(op.disciplineId) === Boolean(op.custom)) {
-    throw new InvalidResourceOperationError(
-      "discipline op: provide exactly one of disciplineId or custom"
-    );
-  }
-  if (op.disciplineId) {
-    const catalog = await tx.grantedAbility.findUnique({ where: { id: op.disciplineId } });
-    if (!catalog || catalog.source !== "discipline") {
-      throw new InvalidResourceOperationError(`Discipline not found in catalog: ${op.disciplineId}`);
-    }
-    if (catalog.alwaysKnown) {
-      throw new InvalidResourceOperationError(
-        `${catalog.name} is always known and cannot be learned or swapped`
-      );
-    }
-    if (level < catalog.minLevel) {
-      throw new InvalidResourceOperationError(
-        `Cannot learn ${catalog.name}: requires monk level ${catalog.minLevel} (currently ${level})`
-      );
-    }
-    return { disciplineId: catalog.id, name: catalog.name, description: catalog.description };
-  }
-  const custom = op.custom!;
-  const minLevel = custom.minLevel ?? 3;
-  if (level < minLevel) {
-    throw new InvalidResourceOperationError(
-      `Cannot learn ${custom.name}: requires monk level ${minLevel} (currently ${level})`
-    );
-  }
-  return { name: custom.name, description: custom.description };
-}
-
-async function applyLearnDisciplineOp(
-  tx: Prisma.TransactionClient,
-  state: ResourcesMutableState,
-  op: LearnDisciplineOperation,
-  derivedInfo: DerivedClassInfo | null,
-  level: number,
-): Promise<ResourceOpAudit> {
-  const choiceCount = derivedInfo?.disciplineChoiceCount;
-  if (choiceCount !== undefined && state.disciplinesKnown.length >= choiceCount) {
-    throw new InvalidResourceOperationError(
-      `Cannot learn more disciplines: already know ${state.disciplinesKnown.length}/${choiceCount}`
-    );
-  }
-  const resolved = await resolveDiscipline(tx, op, level);
-  if (resolved.disciplineId && state.disciplinesKnown.some((d) => d.disciplineId === resolved.disciplineId)) {
-    throw new InvalidResourceOperationError(
-      `Discipline already known (disciplineId: ${resolved.disciplineId})`
-    );
-  }
-  const newEntry: DisciplineEntry = {
-    id: randomUUID(),
-    disciplineId: resolved.disciplineId,
-    name: resolved.name,
-    description: resolved.description,
-    learnedAtLevel: level,
-    lastSwapLevel: null,
-  };
-  state.disciplinesKnown.push(newEntry);
-  return {
-    eventType: "learnDiscipline",
-    summary: `Learned discipline: ${newEntry.name}`,
-    eventData: {
-      entryId: newEntry.id,
-      disciplineName: newEntry.name,
-      disciplineId: newEntry.disciplineId ?? null,
-    },
-  };
-}
-
-function applyForgetDisciplineOp(
-  state: ResourcesMutableState,
-  op: ForgetDisciplineOperation,
-): ResourceOpAudit {
-  const idx = state.disciplinesKnown.findIndex((d) => d.id === op.entryId);
-  if (idx === -1) {
-    throw new InvalidResourceOperationError(`Discipline entry not found: ${op.entryId}`);
-  }
-  const forgotten = state.disciplinesKnown[idx];
-  state.disciplinesKnown.splice(idx, 1);
-  return {
-    eventType: "forgetDiscipline",
-    summary: `Forgot discipline: ${forgotten.name}`,
-    eventData: { entryId: op.entryId, disciplineName: forgotten.name },
-  };
-}
-
-async function applySwapDisciplineOp(
-  tx: Prisma.TransactionClient,
-  state: ResourcesMutableState,
-  op: SwapDisciplineOperation,
-  level: number,
-): Promise<ResourceOpAudit> {
-  const idx = state.disciplinesKnown.findIndex((d) => d.id === op.entryId);
-  if (idx === -1) {
-    throw new InvalidResourceOperationError(`Discipline entry not found: ${op.entryId}`);
-  }
-  // One retraining swap per monk level.
-  if (state.disciplinesKnown.some((d) => d.lastSwapLevel === level)) {
-    throw new InvalidResourceOperationError(
-      `Already swapped a discipline at monk level ${level} — swap again after leveling up`
-    );
-  }
-  const resolved = await resolveDiscipline(tx, op, level);
-  if (
-    resolved.disciplineId &&
-    state.disciplinesKnown.some((d, i) => i !== idx && d.disciplineId === resolved.disciplineId)
-  ) {
-    throw new InvalidResourceOperationError(
-      `Discipline already known (disciplineId: ${resolved.disciplineId})`
-    );
-  }
-  const previous = state.disciplinesKnown[idx];
-  const replacement: DisciplineEntry = {
-    id: randomUUID(),
-    disciplineId: resolved.disciplineId,
-    name: resolved.name,
-    description: resolved.description,
-    learnedAtLevel: previous.learnedAtLevel,
-    lastSwapLevel: level,
-  };
-  state.disciplinesKnown[idx] = replacement;
-  return {
-    eventType: "swapDiscipline",
-    summary: `Swapped discipline: ${previous.name} → ${replacement.name}`,
-    eventData: {
-      entryId: replacement.id,
-      replacedEntryId: op.entryId,
-      fromName: previous.name,
-      toName: replacement.name,
-      disciplineId: replacement.disciplineId ?? null,
-    },
-  };
-}
-
 function applyLearnToolProficiencyOp(
   state: ResourcesMutableState,
   op: LearnToolProficiencyOperation,
@@ -687,8 +514,8 @@ function applyForgetToolProficiencyOp(
 // choice's catalog source, and the pick must stay within the derived count.
 
 // Resolve a subclass-choice op's target (catalog optionId or custom) to a new
-// ChoiceEntry, enforcing catalog membership + dedup. Shared shape with
-// resolveDiscipline; keeps applyLearnSubclassChoiceOp under the complexity bar.
+// ChoiceEntry, enforcing catalog membership + dedup; keeps
+// applyLearnSubclassChoiceOp under the complexity bar.
 async function resolveChoiceOption(
   tx: Prisma.TransactionClient,
   op: LearnSubclassChoiceOperation,
@@ -782,9 +609,6 @@ interface ResourceOpContext {
   tx: Prisma.TransactionClient;
   state: ResourcesMutableState;
   derivedInfo: DerivedClassInfo | null;
-  /** The discipline-granting entry's own effective level (#1177) — only the
-   *  learnDiscipline/swapDiscipline handlers read this. */
-  disciplineLevel: number;
   /** Only rollInitiative reads these — its bonusHeal composes applyHealInTx
    *  in the same tx/batch (#1243). */
   characterId: string;
@@ -806,9 +630,6 @@ const RESOURCE_OP_HANDLERS: {
     applyRollInitiativeOp(ctx.tx, ctx.characterId, ctx.state, ctx.derivedInfo, ctx.batchId, ctx.sessionId),
   learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
   forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
-  learnDiscipline: (ctx, op) => applyLearnDisciplineOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.disciplineLevel),
-  forgetDiscipline: (ctx, op) => applyForgetDisciplineOp(ctx.state, op),
-  swapDiscipline: (ctx, op) => applySwapDisciplineOp(ctx.tx, ctx.state, op, ctx.disciplineLevel),
   learnToolProficiency: (ctx, op) => applyLearnToolProficiencyOp(ctx.state, op, ctx.derivedInfo),
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
   learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
@@ -869,10 +690,9 @@ export async function applyResourceOpInTx(
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  // Entry-scoped caps (#1177): a secondary Battle Master's maneuver cap and a
-  // secondary Four Elements monk's discipline gate must come from THAT entry's
-  // own effective level, not the primary entry's.
-  const { derived: derivedInfo, disciplineLevel } = deriveEntryScopedResources(
+  // Entry-scoped caps (#1177): a secondary Battle Master's maneuver cap must
+  // come from THAT entry's own effective level, not the primary entry's.
+  const { derived: derivedInfo } = deriveEntryScopedResources(
     row.classEntries,
     level,
     abilityScores,
@@ -882,7 +702,7 @@ export async function applyResourceOpInTx(
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = await dispatchResourceOp({ tx, state, derivedInfo, disciplineLevel, characterId, batchId, sessionId }, op);
+  const audit = await dispatchResourceOp({ tx, state, derivedInfo, characterId, batchId, sessionId }, op);
 
   // Write the updated state back — always via serializeResourcesState so
   // all keys round-trip (prevents clobbering toolProficienciesKnown when

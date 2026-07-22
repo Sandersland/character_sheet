@@ -33,7 +33,7 @@ import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
 import { levelUpRouter } from "@/routes/character/level-up.js";
-import { disciplinesRouter } from "@/routes/character/disciplines.js";
+import { warriorOfElementsRouter } from "@/routes/character/warrior-of-elements.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
 import { sneakAttackRouter } from "@/routes/character/sneak-attack.js";
@@ -128,7 +128,7 @@ export function createApp() {
   app.use("/api/characters/:id/quivering-palm", quiveringPalmRouter);
   app.use("/api/characters/:id/hand-of-harm", handOfHarmRouter);
   app.use("/api/characters/:id/hand-of-ultimate-mercy", handOfUltimateMercyRouter);
-  app.use(["/api/disciplines", "/api/characters/:id/disciplines"], disciplinesRouter);
+  app.use("/api/characters/:id/elements", warriorOfElementsRouter);
   app.use(["/api/shadow-arts", "/api/characters/:id/shadow-arts"], shadowArtsRouter);
   app.use("/api/subclass-choices", subclassChoicesRouter);
 

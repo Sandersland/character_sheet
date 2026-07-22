@@ -31,7 +31,6 @@ const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: L
   maneuvers: ChoiceStep,
   fightingStyleFeat: ChoiceStep,
   toolProficiency: ChoiceStep,
-  disciplines: ChoiceStep,
   subclass: SubclassStep,
   newSpells: NewSpellsStep,
   review: ReviewStep,

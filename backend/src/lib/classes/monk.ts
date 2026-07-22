@@ -2,17 +2,10 @@ import { abilityModifier, deriveMartialArtsDie } from "@/lib/srd/srd.js";
 
 import type { ClassDefinition, DerivedFeature, DerivedResource, InitiativeRegen } from "./types.js";
 
-/** Elemental discipline count by Monk level (Way of the Four Elements). */
-function fourElementsDisciplineCount(level: number): number {
-  if (level >= 17) return 4;
-  if (level >= 11) return 3;
-  if (level >= 6) return 2;
-  return 1;
-}
-
 // Focus save DC (Monk) — used by Stunning Strike (live-play automation lives in
-// stunning-strike.ts, which imports this), focus features, and elemental
-// disciplines. Exported so it's the single copy of the formula (SRD 5.2).
+// stunning-strike.ts, which imports this), focus features, and Warrior of the
+// Elements (Elemental Burst / Elemental Strikes force this DC). Exported so it's
+// the single copy of the formula (SRD 5.2).
 export function focusSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
   return 8 + profBonus + abilityModifier(abilityScores.wisdom ?? 10);
 }
@@ -266,31 +259,47 @@ const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const FOUR_ELEMENTS_FEATURES: DerivedFeature[] = [
+// Warrior of the Elements (2024, PHB'24 p.90 / SRD 5.2) — the 2024 rebuild of
+// the retired Way of the Four Elements. Four fixed features (no chosen
+// abilities): Manipulate Elements + Elemental Attunement at L3, Elemental
+// Burst at L6, Stride of the Elements at L11, and the Elemental Epitome capstone
+// at L17. Elemental Attunement is modeled as a while-active buff + two Focus-
+// spending session actions (toggle + Elemental Burst) — see warrior-of-elements.ts.
+const WARRIOR_OF_THE_ELEMENTS_FEATURES: DerivedFeature[] = [
   {
-    name: "Disciple of the Elements",
+    name: "Manipulate Elements",
     level: 3,
     source: "subclass",
     description:
-      "You learn magical elemental disciplines fueled by focus. You know the Elemental Attunement discipline plus one elemental discipline of your choice, and learn one additional discipline at levels 6, 11, and 17. Casting an elemental discipline that is a spell costs focus equal to the spell's level; the save DC equals your focus save DC.",
+      "You know the Elementalism cantrip. Wisdom is your spellcasting ability for it.",
   },
   {
-    name: "Additional Elemental Discipline",
+    name: "Elemental Attunement",
+    level: 3,
+    source: "subclass",
+    description:
+      "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure.",
+  },
+  {
+    name: "Elemental Burst",
     level: 6,
     source: "subclass",
-    description: "You learn one additional elemental discipline of your choice.",
+    description:
+      "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success.",
   },
   {
-    name: "Additional Elemental Discipline",
+    name: "Stride of the Elements",
     level: 11,
     source: "subclass",
-    description: "You learn one additional elemental discipline of your choice.",
+    description:
+      "While your Elemental Attunement is active, you have a Fly Speed and a Swim Speed each equal to your Speed.",
   },
   {
-    name: "Additional Elemental Discipline",
+    name: "Elemental Epitome",
     level: 17,
     source: "subclass",
-    description: "You learn one additional elemental discipline of your choice.",
+    description:
+      "While your Elemental Attunement is active you gain: Resistance to Acid, Cold, Fire, Lightning, or Thunder damage (choose one at the start of each of your turns); Destructive Stride (when you use Step of the Wind, your Speed increases by 20 ft that turn, and the first creature you move within 5 ft of takes one roll of your Martial Arts die of your chosen resistance type); and Empowered Strikes (once per turn, one Unarmed Strike deals an extra Martial Arts die of your chosen resistance type on a hit).",
   },
 ];
 
@@ -365,13 +374,19 @@ export const monk: ClassDefinition = {
         return extras;
       },
     },
-    "way of the four elements": {
+    "warrior of the elements": {
       grantLevel: 3,
-      features: FOUR_ELEMENTS_FEATURES,
-      deriveExtras: (level, abilityScores, profBonus) => ({
-        disciplineChoiceCount: fourElementsDisciplineCount(level),
-        disciplineSaveDC: focusSaveDC(abilityScores, profBonus),
-      }),
+      features: WARRIOR_OF_THE_ELEMENTS_FEATURES,
+      // Gate flags for the two Focus-spending session actions (Elemental
+      // Attunement toggle at L3, Elemental Burst at L6). The save DC for both is
+      // the monk's focus save DC (surfaced via the Focus pool), so no separate
+      // DC field is derived here.
+      deriveExtras: (level) => {
+        const extras: { elementalAttunementAvailable?: boolean; elementalBurstAvailable?: boolean } = {};
+        if (level >= 3) extras.elementalAttunementAvailable = true;
+        if (level >= 6) extras.elementalBurstAvailable = true;
+        return extras;
+      },
     },
     "warrior of mercy": {
       grantLevel: 3,

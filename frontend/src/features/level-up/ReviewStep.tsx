@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 
-import { fetchDisciplines, fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { buildLevelUpLedger, type LedgerResolvers, type LedgerRow } from "@/lib/levelUpLedger";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -35,10 +35,9 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
   return { lookup: (id) => map?.[id], pending: !!fetcher && map === null };
 }
 
-// fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/disciplines/spells/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
+// fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/spells/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
 function useLedgerResolvers(draft: LevelUpDraft): { resolvers: LedgerResolvers; resolving: boolean } {
   const maneuvers = useCatalogNames(draft.maneuvers?.length ? fetchManeuvers : undefined);
-  const disciplines = useCatalogNames(draft.disciplines?.length ? fetchDisciplines : undefined);
   // Cantrips share the spell catalog, so either list gates the same fetch (#1157).
   const spells = useCatalogNames(draft.spellsLearned?.length || draft.cantripsLearned?.length ? fetchSpells : undefined);
   // Any taken feat fetches the catalog — a custom feat resolves by its own name,
@@ -48,8 +47,8 @@ function useLedgerResolvers(draft: LevelUpDraft): { resolvers: LedgerResolvers; 
     draft.advancement?.type === "takeFeat" || draft.fightingStyleFeat ? fetchFeats : undefined,
   );
   return {
-    resolvers: { maneuver: maneuvers.lookup, discipline: disciplines.lookup, spell: spells.lookup, feat: feats.lookup },
-    resolving: [maneuvers, disciplines, spells, feats].some((c) => c.pending),
+    resolvers: { maneuver: maneuvers.lookup, spell: spells.lookup, feat: feats.lookup },
+    resolving: [maneuvers, spells, feats].some((c) => c.pending),
   };
 }
 

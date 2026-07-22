@@ -146,13 +146,13 @@ describe("resolveEffectSpec — golden byte-parity with the backend", () => {
     expect(resolveEffectSpec(readEffectSpec(detectMagic), 0, { characterLevel: 1 })).toBeNull();
   });
 
-  it("focus scaling adds dicePerStep per focus above base (frontend-only entry point)", () => {
-    const focusSpec: EffectSpec = {
+  it("slot-upcast scaling adds dicePerStep per step above base", () => {
+    const upcastSpec: EffectSpec = {
       effectType: "damage",
       dice: { count: 1, faces: 10, modifier: 0 },
-      scaling: { mode: "focus", dicePerStep: 1 },
+      scaling: { mode: "slotUpcast", dicePerStep: 1 },
       addAbilityModToHeal: false,
     };
-    expect(resolveEffectSpec(focusSpec, 2, { characterLevel: 5 })).toEqual({ count: 3, faces: 10, modifier: 0 });
+    expect(resolveEffectSpec(upcastSpec, 2, { characterLevel: 5 })).toEqual({ count: 3, faces: 10, modifier: 0 });
   });
 });

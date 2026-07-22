@@ -69,7 +69,7 @@ describe("buildLevelUpPlan — subclass", () => {
   });
 });
 
-describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/disciplines/toolProficiency)", () => {
+describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/toolProficiency)", () => {
   it("Battle Master 6→7 grants 2 maneuvers", () => {
     const plan = buildLevelUpPlan(char("fighter", 6, "battle master"), target("fighter", 7, "battle master"));
     expect(kinds(plan)).toEqual(["hitPoints", "maneuvers", "review"]);
@@ -107,13 +107,12 @@ describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/dis
     expect(kinds(plan)).not.toContain("maneuvers");
   });
 
-  it("Way of the Four Elements 5→6 grants a discipline", () => {
+  it("Warrior of the Elements 5→6 has no choice step (all features are fixed)", () => {
     const plan = buildLevelUpPlan(
-      char("monk", 5, "way of the four elements"),
-      target("monk", 6, "way of the four elements"),
+      char("monk", 5, "warrior of the elements"),
+      target("monk", 6, "warrior of the elements"),
     );
-    expect(kinds(plan)).toEqual(["hitPoints", "disciplines", "review"]);
-    expect(plan.find((s) => s.kind === "disciplines")?.count).toBe(1);
+    expect(kinds(plan)).toEqual(["hitPoints", "review"]);
   });
 });
 

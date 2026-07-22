@@ -392,9 +392,8 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "resources": {
     "choicesKnown": {},
     "cloakOfShadowsAvailable": undefined,
-    "disciplineChoiceCount": undefined,
-    "disciplineSaveDC": undefined,
-    "disciplinesKnown": [],
+    "elementalAttunementAvailable": undefined,
+    "elementalBurstAvailable": undefined,
     "features": [
       {
         "description": "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
@@ -726,9 +725,8 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "resources": {
     "choicesKnown": {},
     "cloakOfShadowsAvailable": undefined,
-    "disciplineChoiceCount": undefined,
-    "disciplineSaveDC": undefined,
-    "disciplinesKnown": [],
+    "elementalAttunementAvailable": undefined,
+    "elementalBurstAvailable": undefined,
     "features": [
       {
         "description": "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage).",

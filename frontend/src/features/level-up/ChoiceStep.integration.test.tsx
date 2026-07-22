@@ -15,7 +15,6 @@ vi.mock("@/api/client", () => ({
     { id: "m2", name: "Trip Attack", description: "trip" },
     { id: "m3", name: "Menacing Attack", description: "menace" },
   ]),
-  fetchDisciplines: vi.fn(async () => []),
   fetchReference: vi.fn(async () => ({ artisanTools: [] })),
   fetchFeats: vi.fn(async () => [
     { id: "archery", name: "Archery", description: "arch", category: "fighting_style" },

@@ -1,5 +1,5 @@
 // Pure (no DB) tests for deriveEntryScopedResources (#1177): the shared rule
-// function that re-derives the choice-cap fields (maneuvers/disciplines/tool
+// function that re-derives the choice-cap fields (maneuvers/tool
 // profs/subclassChoices) per class entry at that entry's OWN effective level,
 // instead of always reading the primary entry at total level. Consumed by
 // applyResourceOpInTx (write-side), loadResourcesReconcileState (reconcile-on-
@@ -25,23 +25,21 @@ describe("deriveEntryScopedResources", () => {
     const profBonus = proficiencyBonusForLevel(level);
     const entries = [{ name: "fighter", subclass: "battle master", level }];
 
-    const { derived, disciplineLevel } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus);
     const bare = deriveResources("fighter", "battle master", level, ABILITY_SCORES, profBonus);
 
     expect(derived).toEqual(bare);
-    expect(disciplineLevel).toBe(level); // fallback: no discipline-granting entry
   });
 
-  it("single-class Way of the Four Elements monk: output is identical to a bare deriveResources call", () => {
+  it("single-class Warrior of the Elements monk: output is identical to a bare deriveResources call", () => {
     const level = 6;
     const profBonus = proficiencyBonusForLevel(level);
-    const entries = [{ name: "monk", subclass: "way of the four elements", level }];
+    const entries = [{ name: "monk", subclass: "warrior of the elements", level }];
 
-    const { derived, disciplineLevel } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus);
-    const bare = deriveResources("monk", "way of the four elements", level, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus);
+    const bare = deriveResources("monk", "warrior of the elements", level, ABILITY_SCORES, profBonus);
 
     expect(derived).toEqual(bare);
-    expect(disciplineLevel).toBe(level);
   });
 
   it("wizard primary / Battle Master fighter SECONDARY: maneuverChoiceCount comes from the fighter entry's own level (7), not total level", () => {
@@ -78,21 +76,6 @@ describe("deriveEntryScopedResources", () => {
     const wrongTotalLevelCount = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus);
     expect(wrongTotalLevelCount?.maneuverChoiceCount).toBe(7);
     expect(derived?.maneuverChoiceCount).not.toBe(wrongTotalLevelCount?.maneuverChoiceCount);
-  });
-
-  it("Way of the Four Elements monk SECONDARY: disciplineLevel is the monk entry's own effective level", () => {
-    const totalLevel = 9; // fighter 3 + monk 6
-    const profBonus = proficiencyBonusForLevel(totalLevel);
-    const entries = [
-      { name: "fighter", subclass: "champion", level: 3 },
-      { name: "monk", subclass: "way of the four elements", level: 6 },
-    ];
-
-    const { derived, disciplineLevel } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
-
-    expect(disciplineLevel).toBe(6);
-    // fourElementsDisciplineCount(6) === 2, not the level-9 value.
-    expect(derived?.disciplineChoiceCount).toBe(2);
   });
 
   it("Hunter Ranger SECONDARY: subclassChoices (Hunter's Prey) are present, scoped to the ranger entry's own level", () => {

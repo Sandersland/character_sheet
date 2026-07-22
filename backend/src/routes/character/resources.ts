@@ -50,38 +50,6 @@ const forgetManeuverOpSchema = z.object({
   entryId: z.string().min(1),
 });
 
-const customDisciplineSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1),
-  minLevel: z.number().int().positive().optional(),
-});
-
-export const learnDisciplineOpSchema = z
-  .object({
-    type: z.literal("learnDiscipline"),
-    disciplineId: z.string().optional(),
-    custom: customDisciplineSchema.optional(),
-  })
-  .refine((op) => Boolean(op.disciplineId) !== Boolean(op.custom), {
-    message: "Provide exactly one of disciplineId or custom",
-  });
-
-const forgetDisciplineOpSchema = z.object({
-  type: z.literal("forgetDiscipline"),
-  entryId: z.string().min(1),
-});
-
-const swapDisciplineOpSchema = z
-  .object({
-    type: z.literal("swapDiscipline"),
-    entryId: z.string().min(1),
-    disciplineId: z.string().optional(),
-    custom: customDisciplineSchema.optional(),
-  })
-  .refine((op) => Boolean(op.disciplineId) !== Boolean(op.custom), {
-    message: "Provide exactly one of disciplineId or custom",
-  });
-
 export const learnToolProficiencyOpSchema = z.object({
   type: z.literal("learnToolProficiency"),
   name: z.string().min(1),
@@ -114,9 +82,6 @@ const operationSchema = z.discriminatedUnion("type", [
   rollInitiativeOpSchema,
   learnManeuverOpSchema,
   forgetManeuverOpSchema,
-  learnDisciplineOpSchema,
-  forgetDisciplineOpSchema,
-  swapDisciplineOpSchema,
   learnToolProficiencyOpSchema,
   forgetToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
@@ -136,9 +101,6 @@ const transactionsRequestSchema = z.object({
  *   rollInitiative        — regain resources on combat start (onInitiative pools, #1239)
  *   learnManeuver         — add a maneuver from catalog or custom payload
  *   forgetManeuver        — remove a known maneuver by entry id
- *   learnDiscipline       — add an elemental discipline (Four Elements monk)
- *   forgetDiscipline      — remove a known discipline by entry id
- *   swapDiscipline        — retrain one discipline for another (1 per monk level)
  *   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
  *   forgetToolProficiency — undo a tool proficiency choice by entry id
  *   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)

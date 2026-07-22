@@ -108,7 +108,6 @@ async function createBattleMaster() {
       resources: {
         used: {},
         maneuversKnown: fiveManeuvers(),
-        disciplinesKnown: [],
         toolProficienciesKnown: [],
         advancements: twoAdvancements(),
       } as unknown as Prisma.InputJsonValue,

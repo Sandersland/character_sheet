@@ -27,7 +27,6 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
       features: [],
       pools: [],
       maneuversKnown: [],
-      disciplinesKnown: [],
       toolProficienciesKnown: [{ id: "tp1", name: "Woodcarver's Tools" }],
       toolProfChoiceCount: 1,
     },

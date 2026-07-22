@@ -158,7 +158,6 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
   // #1137: force the fs slot so the pick lands in the fightingStyle partition.
   fightingStyleFeat: (s) => [{ domain: "advancement", op: { ...s.fightingStyleFeat!, slot: "fightingStyle" } }],
   maneuvers: (s) => (s.maneuvers ?? []).map((op) => ({ domain: "resources", op })),
-  disciplines: (s) => (s.disciplines ?? []).map((op) => ({ domain: "resources", op })),
   toolProficiency: (s) => (s.toolProficiencies ?? []).map((op) => ({ domain: "resources", op })),
   subclassChoice: (s, step) =>
     (s.subclassChoices ?? [])

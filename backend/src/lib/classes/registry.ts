@@ -137,7 +137,7 @@ export function deriveResources(
   const result: DerivedClassInfo = { resources, features };
 
   // Subclass-specific extra derived fields (e.g. Battle Master maneuvers,
-  // Way of the Four Elements disciplines, Warrior of Shadow focus-cast unlocks).
+  // Warrior of the Elements gate flags, Warrior of Shadow focus-cast unlocks).
   if (sub.active && sub.def?.deriveExtras) {
     Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus));
   }
@@ -158,7 +158,7 @@ export function deriveResources(
  * Row-shaped convenience wrapper over {@link deriveResources}: derives level and
  * proficiency bonus from a character row's XP + primary class entry, then returns
  * that class's non-slot resource derivation plus the computed `level` — consumers
- * that also need level-scaled cost math (e.g. a future `disciplines.ts` migration)
+ * that also need level-scaled cost math (e.g. a future focus-cast subclass migration)
  * can destructure `level` directly. Shared by the die-fueled activated-ability
  * handlers (maneuvers, shadow arts), which each re-read the same
  * {name, subclass} + XP + abilityScores select shape per op.
@@ -185,21 +185,21 @@ export function deriveResourcesForCharacterRow(row: {
 /**
  * Row-shaped wrapper over {@link deriveEntryScopedResources}: derives level +
  * proficiency bonus from XP, then returns the entry-scoped derivation (every
- * class entry's own caps/pools merged) plus disciplineLevel. Selects need
- * `classEntries: {name, subclass, level}[]` for EVERY entry (not just the
- * primary) — used by the focus-cast/maneuver action seams so a secondary Monk's
- * or Battle Master's own level drives its gate/DC/per-cast cap (#1072).
+ * class entry's own caps/pools merged). Selects need `classEntries: {name,
+ * subclass, level}[]` for EVERY entry (not just the primary) — used by the
+ * focus-cast/maneuver action seams so a secondary Monk's or Battle Master's own
+ * level drives its gate/DC/per-cast cap (#1072).
  */
 export function deriveEntryScopedResourcesForCharacterRow(row: {
   experiencePoints: number;
   abilityScores: unknown;
   classEntries: { name: string; subclass?: string | null; level: number }[];
-}): { derived: DerivedClassInfo | null; level: number; disciplineLevel: number } {
+}): { derived: DerivedClassInfo | null; level: number } {
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  const { derived, disciplineLevel } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus);
-  return { derived, level, disciplineLevel };
+  const { derived } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus);
+  return { derived, level };
 }
 
 // The five choice-cap fields overlaid per class entry by deriveEntryScopedResources.
@@ -210,8 +210,6 @@ export function deriveEntryScopedResourcesForCharacterRow(row: {
 const CAP_FIELDS = [
   "maneuverChoiceCount",
   "maneuverSaveDC",
-  "disciplineChoiceCount",
-  "disciplineSaveDC",
   "toolProfChoiceCount",
 ] as const satisfies readonly (keyof DerivedClassInfo)[];
 
@@ -268,7 +266,7 @@ function collectEntryScopedPools(
 /**
  * Entry-scoped resource caps + pools for multiclass level-up (#1177 caps, #1071
  * pools): both the CHOICE-CAP fields (maneuverChoiceCount/SaveDC,
- * disciplineChoiceCount/SaveDC, toolProfChoiceCount, subclassChoices) and the
+ * toolProfChoiceCount, subclassChoices) and the
  * `resources` pool layer (focus, superiority dice, rage, sorcery points, …) are
  * re-derived per class entry at that entry's OWN effective level and merged —
  * so a secondary Battle Master's maneuver cap AND its superiority-dice pool
@@ -280,18 +278,13 @@ function collectEntryScopedPools(
  * `effectiveEntryLevel` collapses to the XP-derived total for single-class
  * characters, so single-class output is byte-identical to a bare
  * deriveResources() call (see the parity tests).
- *
- * disciplineLevel is the effective level of whichever entry contributed
- * disciplineChoiceCount (fallback: totalLevel) — the level the discipline
- * learn/swap ops must gate against, since it may differ from totalLevel for a
- * secondary Way of the Four Elements monk.
  */
 export function deriveEntryScopedResources(
   classEntries: { name: string; subclass?: string | null; level: number }[],
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
-): { derived: DerivedClassInfo | null; disciplineLevel: number } {
+): { derived: DerivedClassInfo | null } {
   const primary = classEntries[0];
   const base = deriveResources(primary?.name ?? "", primary?.subclass ?? undefined, totalLevel, abilityScores, profBonus);
 
@@ -306,8 +299,6 @@ export function deriveEntryScopedResources(
   let derived: DerivedClassInfo | null = base
     ? { ...base, resources: [], features: [...base.features], subclassChoices: undefined }
     : null;
-  // Fallback for characters with no discipline-granting entry; discipline ops on them have no monk level to key off.
-  let disciplineLevel = totalLevel;
 
   for (const entry of classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
@@ -315,7 +306,6 @@ export function deriveEntryScopedResources(
     if (!info || !entryContributesCapFields(info)) continue;
 
     derived = overlayCapFields(derived, info);
-    if (info.disciplineChoiceCount !== undefined) disciplineLevel = effLevel;
   }
 
   const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus);
@@ -325,5 +315,5 @@ export function deriveEntryScopedResources(
     derived = { resources: pools, features: [] };
   }
 
-  return { derived, disciplineLevel };
+  return { derived };
 }

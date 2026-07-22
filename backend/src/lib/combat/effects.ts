@@ -7,9 +7,9 @@
 export type EffectType = "damage" | "heal" | "utility" | "buff";
 
 // How the dice count grows: cantrips scale by character level, leveled spells by
-// slot upcast steps, focus-fuelled abilities by focus spent above the base cost.
+// slot upcast steps.
 export interface EffectScaling {
-  mode: "none" | "slotUpcast" | "cantripLevel" | "focus";
+  mode: "none" | "slotUpcast" | "cantripLevel";
   dicePerStep?: number;
 }
 
@@ -114,9 +114,9 @@ export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): E
   };
 }
 
-// Catalog columns a focus-fuelled ability (discipline, Shadow Art) maps to an
-// EffectSpec. The row carries the dice/damage/save fields OR the buff fields; the
-// caller supplies the two genuine per-subclass differences via CatalogEffectConfig.
+// Catalog columns a focus-fuelled ability (Shadow Art) maps to an EffectSpec.
+// The row carries the dice/damage/save fields OR the buff fields; the caller
+// supplies the two genuine per-subclass differences via CatalogEffectConfig.
 export interface CatalogEffectRow {
   name: string;
   effectKind?: string | null;
@@ -132,16 +132,15 @@ export interface CatalogEffectRow {
 }
 
 // The genuine differences between focus-cast subclasses: how the effect scales
-// (focus vs flat) and which ability names concentrate (a per-name set membership test).
+// and which ability names concentrate (a per-name set membership test).
 export interface CatalogEffectConfig {
   scaling: EffectScaling;
   concentrates: (name: string) => boolean;
 }
 
-// Build a focus-fuelled ability's EffectSpec from its catalog row. Disciplines pass
-// { mode: "focus", dicePerStep } + their concentration set; Shadow Arts pass
-// { mode: "none" } + theirs. Kept deliberately thin — the declarative subclass
-// engine (#416) will subsume this row→spec mapping.
+// Build a focus-fuelled ability's EffectSpec from its catalog row. Shadow Arts
+// pass { mode: "none" } + their concentration set. Kept deliberately thin — the
+// declarative subclass engine (#416) will subsume this row→spec mapping.
 export function catalogEffectSpec(row: CatalogEffectRow, config: CatalogEffectConfig): EffectSpec {
   const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
   const dice = hasDice
@@ -191,7 +190,7 @@ export function resolveEffectSpec(
     if (ctx.characterLevel >= 17) count *= 4;
     else if (ctx.characterLevel >= 11) count *= 3;
     else if (ctx.characterLevel >= 5) count *= 2;
-  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "focus") {
+  } else if (spec.scaling.mode === "slotUpcast") {
     count += effectiveStep * (spec.scaling.dicePerStep ?? 0);
   }
 

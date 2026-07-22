@@ -9,7 +9,6 @@ import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/cat
 import { ACTIONS } from "./seed/actions.js";
 import { SUBCLASSES } from "./seed/subclasses.js";
 import { MANEUVERS } from "./seed/maneuvers.js";
-import { DISCIPLINES } from "./seed/disciplines.js";
 import { SHADOW_ARTS } from "./seed/shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
@@ -162,35 +161,6 @@ async function seedManeuvers(prisma: PrismaClient) {
   }
 }
 
-// Seed elemental discipline catalog — upsert by unique name.
-async function seedDisciplines(prisma: PrismaClient) {
-  for (const discipline of DISCIPLINES) {
-    const data = {
-      name: discipline.name,
-      source: "discipline",
-      description: discipline.description,
-      minLevel: discipline.minLevel,
-      alwaysKnown: orElse(discipline.alwaysKnown, false),
-      saveAbility: orNull(discipline.saveAbility),
-      costKind: orNull(discipline.costKind),
-      costPoolKey: orNull(discipline.costPoolKey),
-      costBase: orNull(discipline.costBase),
-      costPerStep: orNull(discipline.costPerStep),
-      effectKind: orNull(discipline.effectKind),
-      effectDiceCount: orNull(discipline.effectDiceCount),
-      effectDiceFaces: orNull(discipline.effectDiceFaces),
-      damageType: orNull(discipline.damageType),
-      attackType: orNull(discipline.attackType),
-      saveEffect: orNull(discipline.saveEffect),
-    };
-    await prisma.grantedAbility.upsert({
-      where: { name: discipline.name },
-      create: data,
-      update: data,
-    });
-  }
-}
-
 // Seed the Shadow Arts catalog — upsert by unique name. Flat 1-focus, no scaling
 // (2024 rewrite, #1246: was flat 2-focus across a 4-spell menu; now a single
 // always-concentrating Darkness cast, so effectKind/buffTarget/buffModifier are
@@ -219,7 +189,7 @@ async function seedShadowArts(prisma: PrismaClient) {
   }
   // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — mirrors
   // seedFeats' stale-row cleanup. Scoped to source "shadowArts" so this never
-  // touches maneuvers/disciplines/channelDivinity rows sharing the same table.
+  // touches maneuvers/channelDivinity rows sharing the same table.
   const staleNames = SHADOW_ARTS.map((a) => a.name);
   const stale = await prisma.grantedAbility.findMany({
     where: { source: "shadowArts", name: { notIn: staleNames } },
@@ -411,7 +381,6 @@ async function seedPacks(prisma: PrismaClient, itemIdsByName: Map<string, string
 async function main() {
   assertUniqueGrantedAbilityNames([
     ...MANEUVERS,
-    ...DISCIPLINES,
     ...SHADOW_ARTS,
     ...CHANNEL_DIVINITIES,
     ...SUBCLASS_CHOICE_OPTIONS,
@@ -421,7 +390,6 @@ async function main() {
   await seedSubclasses(prisma, classIds);
   await seedActions(prisma);
   await seedManeuvers(prisma);
-  await seedDisciplines(prisma);
   await seedShadowArts(prisma);
   await seedChannelDivinities(prisma);
   await seedSubclassChoiceOptions(prisma);

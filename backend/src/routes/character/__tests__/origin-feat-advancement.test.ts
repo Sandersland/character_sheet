@@ -21,7 +21,6 @@ let classId: string;
 const EMPTY_RESOURCES = {
   used: {},
   maneuversKnown: [],
-  disciplinesKnown: [],
   toolProficienciesKnown: [],
   choicesKnown: {},
   advancements: [] as unknown[],

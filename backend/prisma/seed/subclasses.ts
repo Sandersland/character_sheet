@@ -134,9 +134,9 @@ export const SUBCLASSES: SubclassSeed[] = [
   },
   {
     className: "Monk",
-    name: "Way of the Four Elements",
+    name: "Warrior of the Elements",
     description:
-      "You channel the elements through your focus, learning elemental disciplines that let you wield fire, water, air, and earth. Disciple of the Elements grants Elemental Attunement plus one discipline of your choice at level 3, with additional disciplines learned at levels 6, 11, and 17. Disciplines that mimic spells cost focus equal to the spell's level, using your focus save DC.",
+      "You wield the elements of air, earth, fire, and water. Manipulate Elements grants the Elementalism cantrip, and Elemental Attunement lets you spend 1 Focus Point to imbue yourself for 10 minutes — extending your Unarmed Strike reach and letting your strikes deal elemental damage that shoves foes. Elemental Burst (level 6) unleashes a 20-ft sphere for three Martial Arts dice, Stride of the Elements (level 11) grants flight and swimming while attuned, and Elemental Epitome (level 17) adds elemental resistance, a destructive stride, and empowered strikes.",
   },
   {
     className: "Monk",

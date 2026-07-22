@@ -8,13 +8,13 @@ import type {
   CampaignArc,
   CampaignPreferences,
   CatalogFeat,
-  CatalogDiscipline,
   CatalogManeuver,
   CatalogShadowArt,
   CatalogChannelDivinity,
   CatalogSpell,
   Character,
-  DisciplineOperation,
+  WarriorOfElementsOperation,
+  WarriorOfElementsResult,
   ShadowArtOperation,
   ChannelDivinityOperation,
   CharacterEvent,
@@ -230,18 +230,18 @@ export async function applySpellcastingTransactions(
   return postTransactions(characterId, "spellcasting", operations, "Failed to apply spellcasting operations");
 }
 
-// Feeds the Four Elements monk's discipline picker (min level + focus cost + focus-scaled effect).
-export async function fetchDisciplines(): Promise<CatalogDiscipline[]> {
-  return request<CatalogDiscipline[]>("/disciplines", undefined, "Failed to fetch discipline catalog");
-}
-
-// Applies a batch of discipline operations atomically: castDiscipline (spend focus,
-// roll the discipline's EffectSpec). Full updated Character returned on success.
-export async function applyDisciplineTransactions(
+// Applies a batch of Warrior of the Elements operations atomically (Elemental
+// Attunement toggle, Elemental Burst, Elemental Strikes). Returns the updated
+// Character plus a per-op results array (save DC / outcome / applied damage).
+export async function applyWarriorOfElementsTransactions(
   characterId: string,
-  operations: DisciplineOperation[]
-): Promise<Character> {
-  return postTransactions(characterId, "disciplines", operations, "Failed to apply discipline operations");
+  operations: WarriorOfElementsOperation[]
+): Promise<{ character: Character; results: WarriorOfElementsResult[] }> {
+  return request<{ character: Character; results: WarriorOfElementsResult[] }>(
+    `/characters/${characterId}/elements/transactions`,
+    jsonBody({ operations }),
+    "Failed to apply Warrior of the Elements operations",
+  );
 }
 
 // Feeds the Warrior of Shadow monk's Shadow Arts picker — the single flat

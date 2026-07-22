@@ -246,37 +246,48 @@ describe("deriveResources — Monk Focus", () => {
   });
 });
 
-// ── Monk — Way of the Four Elements ───────────────────────────────────────────
+// ── Monk — Warrior of the Elements (2024) ─────────────────────────────────────
 
-describe("deriveResources — Way of the Four Elements", () => {
-  it("does not set disciplineChoiceCount below grant level 3", () => {
-    const result = deriveResources("monk", "way of the four elements", 2, ABILITY_SCORES, PROF_2);
-    expect(result!.disciplineChoiceCount).toBeUndefined();
+describe("deriveResources — Warrior of the Elements", () => {
+  it("does not set the elemental gate flags below grant level 3", () => {
+    const result = deriveResources("monk", "warrior of the elements", 2, ABILITY_SCORES, PROF_2);
+    expect(result!.elementalAttunementAvailable).toBeUndefined();
+    expect(result!.elementalBurstAvailable).toBeUndefined();
   });
 
-  it("disciplineChoiceCount is 1/2/3/4 at levels 3/6/11/17", () => {
-    const expected: [number, number][] = [[3, 1], [6, 2], [11, 3], [17, 4]];
-    for (const [level, count] of expected) {
-      const result = deriveResources("monk", "way of the four elements", level, ABILITY_SCORES, PROF_2);
-      expect(result!.disciplineChoiceCount).toBe(count);
+  it("gates Elemental Attunement at L3 and Elemental Burst at L6", () => {
+    const l3 = deriveResources("monk", "warrior of the elements", 3, ABILITY_SCORES, PROF_2);
+    expect(l3!.elementalAttunementAvailable).toBe(true);
+    expect(l3!.elementalBurstAvailable).toBeUndefined();
+    const l6 = deriveResources("monk", "warrior of the elements", 6, ABILITY_SCORES, PROF_3);
+    expect(l6!.elementalAttunementAvailable).toBe(true);
+    expect(l6!.elementalBurstAvailable).toBe(true);
+  });
+
+  it("surfaces all four fixed features by level 17", () => {
+    const result = deriveResources("monk", "warrior of the elements", 17, ABILITY_SCORES, PROF_2);
+    const names = result!.features.filter((f) => f.source === "subclass").map((f) => f.name);
+    for (const feature of [
+      "Manipulate Elements",
+      "Elemental Attunement",
+      "Elemental Burst",
+      "Stride of the Elements",
+      "Elemental Epitome",
+    ]) {
+      expect(names).toContain(feature);
     }
   });
 
-  it("surfaces Disciple of the Elements at level 3", () => {
-    const result = deriveResources("monk", "way of the four elements", 3, ABILITY_SCORES, PROF_2);
-    expect(result!.features.some((f) => f.name === "Disciple of the Elements")).toBe(true);
-  });
-
   it("does not surface subclass features below grant level 3", () => {
-    const result = deriveResources("monk", "way of the four elements", 2, ABILITY_SCORES, PROF_2);
+    const result = deriveResources("monk", "warrior of the elements", 2, ABILITY_SCORES, PROF_2);
     expect(result!.features.some((f) => f.source === "subclass")).toBe(false);
   });
 
-  it("leaves other monks unaffected (no disciplineChoiceCount)", () => {
+  it("leaves other monks unaffected (no elemental gate flags)", () => {
     const openHand = deriveResources("monk", "warrior of the open hand", 6, ABILITY_SCORES, PROF_3);
-    expect(openHand!.disciplineChoiceCount).toBeUndefined();
+    expect(openHand!.elementalAttunementAvailable).toBeUndefined();
     const noSub = deriveResources("monk", undefined, 6, ABILITY_SCORES, PROF_3);
-    expect(noSub!.disciplineChoiceCount).toBeUndefined();
+    expect(noSub!.elementalAttunementAvailable).toBeUndefined();
   });
 });
 

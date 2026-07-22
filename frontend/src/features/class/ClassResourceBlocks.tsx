@@ -1,29 +1,25 @@
 import {
   applyChannelDivinityTransactions,
-  applyDisciplineTransactions,
   applyResourceTransactions,
   applyShadowArtsTransactions,
+  applyWarriorOfElementsTransactions,
 } from "@/api/client";
 import type {
   CastChannelDivinityOperation,
-  CastDisciplineOperation,
   CastShadowArtOperation,
   Character,
-  ForgetDisciplineOperation,
-  LearnDisciplineOperation,
   LearnManeuverOperation,
   ResourceOperation,
   ShadowArtOperation,
-  SwapDisciplineOperation,
+  WarriorOfElementsOperation,
 } from "@/types/character";
 import type { ClassFeatureView } from "@/lib/classFeatures";
-import { focusRemaining } from "@/lib/disciplines";
 import ChannelDivinitySection from "@/features/class/ChannelDivinitySection";
 import CloakOfShadowsSection from "@/features/class/CloakOfShadowsSection";
-import DisciplinesSection from "@/features/class/DisciplinesSection";
 import ManeuversSection from "@/features/class/ManeuversSection";
 import ResourcePoolsSection from "@/features/class/ResourcePoolsSection";
 import ShadowArtsSection from "@/features/class/ShadowArtsSection";
+import WarriorOfElementsSection from "@/features/class/WarriorOfElementsSection";
 
 interface Props {
   character: Character;
@@ -32,14 +28,18 @@ interface Props {
   run: (send: () => Promise<Character>) => void;
 }
 
+// Remaining Focus from the character's derived resource pools — mirrors the
+// identical local helper in ShadowArtsSection/WarriorOfElementsSection.
+function focusRemaining(character: Character): number {
+  return character.resources?.pools.find((p) => p.key === "focus")?.remaining ?? 0;
+}
+
 // The entitlement-gated resource/subclass feature blocks, split out of the
 // orchestrator to keep each render function under the complexity budget.
 export default function ClassResourceBlocks({ character, view, busy, run }: Props) {
   const resources = character.resources;
 
-  const resourceOp = (
-    op: LearnManeuverOperation | LearnDisciplineOperation | ForgetDisciplineOperation | SwapDisciplineOperation,
-  ) => run(() => applyResourceTransactions(character.id, [op]));
+  const resourceOp = (op: LearnManeuverOperation) => run(() => applyResourceTransactions(character.id, [op]));
 
   return (
     <>
@@ -63,17 +63,13 @@ export default function ClassResourceBlocks({ character, view, busy, run }: Prop
         />
       )}
 
-      {view.hasDisciplines && (
-        <DisciplinesSection
+      {view.hasElementsWarrior && (
+        <WarriorOfElementsSection
           character={character}
-          choiceCount={resources!.disciplineChoiceCount!}
-          saveDC={resources!.disciplineSaveDC}
-          disciplinesKnown={resources!.disciplinesKnown ?? []}
           busy={busy}
-          onCast={(op: CastDisciplineOperation) => run(() => applyDisciplineTransactions(character.id, [op]))}
-          onLearn={(op) => resourceOp(op)}
-          onForget={(op) => resourceOp(op)}
-          onSwap={(op) => resourceOp(op)}
+          onOperations={(ops: WarriorOfElementsOperation[]) =>
+            run(() => applyWarriorOfElementsTransactions(character.id, ops).then((r) => r.character))
+          }
         />
       )}
 
@@ -96,7 +92,7 @@ export default function ClassResourceBlocks({ character, view, busy, run }: Prop
       {view.hasCloakOfShadows && (
         <CloakOfShadowsSection
           character={character}
-          focusAvailable={focusRemaining(resources)}
+          focusAvailable={focusRemaining(character)}
           busy={busy}
           onActivate={() =>
             run(() =>

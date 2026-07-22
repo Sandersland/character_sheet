@@ -25,7 +25,6 @@ import { CLASSES, ITEMS } from "../catalog-data.js";
 import { ACTIONS } from "../actions.js";
 import { SUBCLASSES } from "../subclasses.js";
 import { MANEUVERS } from "../maneuvers.js";
-import { DISCIPLINES } from "../disciplines.js";
 import { SHADOW_ARTS } from "../shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "../channel-divinity.js";
 import { FEATS } from "../feats.js";
@@ -50,10 +49,6 @@ describe("per-domain business-key uniqueness", () => {
 
   it("MANEUVERS have unique names", () => {
     expect(duplicates(MANEUVERS.map((m) => m.name))).toEqual([]);
-  });
-
-  it("DISCIPLINES have unique names", () => {
-    expect(duplicates(DISCIPLINES.map((d) => d.name))).toEqual([]);
   });
 
   it("SHADOW_ARTS have unique names", () => {
@@ -382,19 +377,18 @@ describe("SRD 5.2 catalog values — CHUNK 4 additions (#1132)", () => {
 });
 
 describe("global GrantedAbility name-uniqueness", () => {
-  // All four sources upsert into GrantedAbility, whose `name` is globally
+  // All these sources upsert into GrantedAbility, whose `name` is globally
   // unique — a cross-source collision would make one row silently overwrite
   // another. This is the same invariant the seed.ts guard throws on.
-  it("no name collides across maneuvers/disciplines/shadow-arts/channel-divinity", () => {
+  it("no name collides across maneuvers/shadow-arts/channel-divinity", () => {
     const names = [
       ...MANEUVERS.map((m) => m.name),
-      ...DISCIPLINES.map((d) => d.name),
       ...SHADOW_ARTS.map((s) => s.name),
       ...CHANNEL_DIVINITIES.map((c) => c.name),
     ];
     expect(
       duplicates(names),
-      "GrantedAbility name collision across the four seed sources",
+      "GrantedAbility name collision across the seed sources",
     ).toEqual([]);
   });
 });
