@@ -60,6 +60,7 @@ export type EventType =
   // resources
   | "spendResource"
   | "restoreResource"
+  | "initiativeRegen"
   | "learnManeuver"
   | "forgetManeuver"
   | "maneuversReconciled"

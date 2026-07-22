@@ -304,6 +304,15 @@ export interface RestoreResourceOperation {
   amount?: number; // default 1
 }
 
+/**
+ * Roll Initiative / combat start (#1239). Applies EVERY derived pool's
+ * `onInitiative` regen at once — a single combat-start event, so it carries no
+ * key. Inert for characters whose pools declare no onInitiative descriptor.
+ */
+export interface RollInitiativeOperation {
+  type: "rollInitiative";
+}
+
 /** Learn a maneuver from catalog (maneuverId) or add a custom one. */
 export interface LearnManeuverOperation {
   type: "learnManeuver";
@@ -379,6 +388,7 @@ export interface ForgetSubclassChoiceOperation {
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
+  | RollInitiativeOperation
   | LearnManeuverOperation
   | ForgetManeuverOperation
   | LearnDisciplineOperation
@@ -459,6 +469,86 @@ function applyRestoreResourceOp(
     eventType: "restoreResource",
     summary: `Restored ${amount} ${pool.label} — ${pool.total - newUsed}/${pool.total} remaining`,
     eventData: { key: op.key, amount },
+  };
+}
+
+// Marker in `used` recording that a oncePerLongRest initiative-regen has fired
+// for a pool since the last long rest (#1239). The `__` prefix + `:` separator
+// can't collide with a real camelCase pool key, so it stays out of the wire
+// `pools` view (which reads only derived pool keys) and out of rest/reconcile
+// pool math. Single-sourced here so rest.ts clears the same keys on long rest.
+const INITIATIVE_REGEN_MARKER_PREFIX = "__onInitiativeUsed:";
+
+function initiativeRegenMarkerKey(poolKey: string): string {
+  return `${INITIATIVE_REGEN_MARKER_PREFIX}${poolKey}`;
+}
+
+/**
+ * Clear every once-per-long-rest initiative-regen marker (#1239) so the next
+ * combat's regen fires again. Called from the long-rest path only — the cap is
+ * per LONG rest, so a short rest must leave the markers in place.
+ */
+export function clearInitiativeRegenMarkers(state: ResourcesMutableState): void {
+  for (const key of Object.keys(state.used)) {
+    if (key.startsWith(INITIATIVE_REGEN_MARKER_PREFIX)) delete state.used[key];
+  }
+}
+
+/** One pool's regain from an onInitiative application, for the audit payload. */
+export interface InitiativeRegenResult {
+  key: string;
+  label: string;
+  restored: number;
+  remaining: number;
+}
+
+/**
+ * Apply every derived pool's `onInitiative` regen (#1239) to `state.used`,
+ * returning what was regained. "all" fully refills; a numeric amount tops the
+ * pool up to at least that many available (never spends). oncePerLongRest
+ * descriptors fire at most once per long-rest cycle — tracked by a marker in
+ * `used` (set whenever the descriptor fires, even if nothing was expended to
+ * regain) that clearInitiativeRegenMarkers resets on a long rest. Generic: any
+ * class pool can declare onInitiative (Focus, superiority dice, Bardic
+ * Inspiration); inert for pools without it. Pure + exported so it's unit-testable
+ * and a future combat-start hook can reuse it. Mirrors applyRestoreResourceOp.
+ */
+export function applyInitiativeRegen(
+  state: ResourcesMutableState,
+  derivedInfo: DerivedClassInfo | null,
+): InitiativeRegenResult[] {
+  const regenerated: InitiativeRegenResult[] = [];
+  for (const pool of derivedInfo?.resources ?? []) {
+    const regen = pool.onInitiative;
+    if (!regen) continue;
+    if (regen.oncePerLongRest) {
+      const markerKey = initiativeRegenMarkerKey(pool.key);
+      if (state.used[markerKey]) continue; // already fired since the last long rest
+      state.used[markerKey] = 1;
+    }
+    const used = state.used[pool.key] ?? 0;
+    // "all" clears all spend; a numeric target N tops up to N available, i.e.
+    // used = total − N, never raising `used` (never spends) and never below 0.
+    const targetUsed = regen.amount === "all" ? 0 : Math.max(0, Math.min(used, pool.total - regen.amount));
+    if (targetUsed >= used) continue; // already at/above target — nothing to regain
+    state.used[pool.key] = targetUsed;
+    regenerated.push({ key: pool.key, label: pool.label, restored: used - targetUsed, remaining: pool.total - targetUsed });
+  }
+  return regenerated;
+}
+
+function applyRollInitiativeOp(
+  state: ResourcesMutableState,
+  derivedInfo: DerivedClassInfo | null,
+): ResourceOpAudit {
+  const regenerated = applyInitiativeRegen(state, derivedInfo);
+  const summary = regenerated.length
+    ? `Rolled Initiative — regained ${regenerated.map((r) => `${r.restored} ${r.label}`).join(", ")}`
+    : "Rolled Initiative — no resources to regain";
+  return {
+    eventType: "initiativeRegen",
+    summary,
+    eventData: { regenerated },
   };
 }
 
@@ -861,6 +951,7 @@ const RESOURCE_OP_HANDLERS: {
 } = {
   spendResource: (ctx, op) => applySpendResourceOp(ctx.state, op, ctx.derivedInfo),
   restoreResource: (ctx, op) => applyRestoreResourceOp(ctx.state, op, ctx.derivedInfo),
+  rollInitiative: (ctx) => applyRollInitiativeOp(ctx.state, ctx.derivedInfo),
   learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
   forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
   learnDiscipline: (ctx, op) => applyLearnDisciplineOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.disciplineLevel),

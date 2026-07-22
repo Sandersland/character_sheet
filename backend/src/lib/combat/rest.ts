@@ -6,6 +6,7 @@ import {
   snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
+  clearInitiativeRegenMarkers,
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
@@ -190,6 +191,9 @@ function resetRestResources(
       state.used[pool.key] = 0;
     }
   }
+  // A long rest resets the once-per-long-rest initiative-regen cap (#1239) so
+  // the next combat's regen (e.g. Uncanny Metabolism) can fire again.
+  if (rest === "long") clearInitiativeRegenMarkers(state);
   return { state, beforeResourceState, resourcesRestored };
 }
 

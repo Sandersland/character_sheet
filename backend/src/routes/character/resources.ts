@@ -27,6 +27,12 @@ const restoreResourceOpSchema = z.object({
   amount: z.number().int().positive().optional(),
 });
 
+// Roll Initiative / combat start (#1239) — applies every pool's onInitiative
+// regen at once, so it carries no key.
+const rollInitiativeOpSchema = z.object({
+  type: z.literal("rollInitiative"),
+});
+
 export const learnManeuverOpSchema = z
   .object({
     type: z.literal("learnManeuver"),
@@ -105,6 +111,7 @@ const forgetSubclassChoiceOpSchema = z.object({
 const operationSchema = z.discriminatedUnion("type", [
   spendResourceOpSchema,
   restoreResourceOpSchema,
+  rollInitiativeOpSchema,
   learnManeuverOpSchema,
   forgetManeuverOpSchema,
   learnDisciplineOpSchema,
@@ -126,6 +133,7 @@ const transactionsRequestSchema = z.object({
  * POST /api/characters/:id/spellcasting/transactions. Operations:
  *   spendResource         — spend one or more units of a pool (e.g. superiority die)
  *   restoreResource       — restore spent units (undo mis-click or Relentless trigger)
+ *   rollInitiative        — regain resources on combat start (onInitiative pools, #1239)
  *   learnManeuver         — add a maneuver from catalog or custom payload
  *   forgetManeuver        — remove a known maneuver by entry id
  *   learnDiscipline       — add an elemental discipline (Four Elements monk)
