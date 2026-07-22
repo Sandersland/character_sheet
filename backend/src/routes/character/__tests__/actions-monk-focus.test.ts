@@ -205,6 +205,70 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
   });
 });
 
+// Deflect Attacks — Redirect (#1241): the reaction's base 1d10+Dex+level
+// reduction is a pure client-side roll (no server call — see
+// useDeflectAttacksReaction's header comment), but the optional Redirect once
+// a ranged hit is reduced to 0 is a real 1-Focus spend through this same
+// route. actions.test.ts (lib) already pins ACTION_EFFECT_FN.deflectAttacksRedirect's
+// pure output and TurnHub.test.tsx pins the UI wiring; this closes the gap
+// pattern-matched from patientDefenseFocus/stepOfTheWindFocus above — an actual
+// HTTP round trip through the real focus pool, never previously exercised.
+describe("POST /:id/actions/transactions — Deflect Attacks Redirect (#1241)", () => {
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: MONK_CATALOG_NAME },
+      create: {
+        name: MONK_CATALOG_NAME,
+        hitDie: "d8",
+        savingThrows: ["strength", "dexterity"],
+        skillChoiceCount: 2,
+        skillChoices: ["acrobatics", "stealth"],
+        isSpellcaster: false,
+        subclassLevel: 3,
+      },
+      update: {},
+    });
+    monkClassId = cls.id;
+    await createMonk();
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MONK_ID } });
+  });
+
+  it("deflectAttacksRedirect spends exactly 1 focus (level-2 monk has a 2-focus pool)", async () => {
+    const res = await executeAction("deflectAttacksRedirect");
+    expect(res.status).toBe(200);
+    expect(pool(res.body, "focus")).toMatchObject({ used: 1, remaining: 1 });
+  });
+
+  it("the deflectAttacksRedirect spend is logged as a session/activity spendResource event", async () => {
+    await executeAction("deflectAttacksRedirect");
+    const events = await activity();
+    const spend = events.find((e) => e.type === "spendResource" && e.data?.key === "focus");
+    expect(spend).toBeDefined();
+  });
+
+  it("rejects a second deflectAttacksRedirect once the shared focus pool is exhausted", async () => {
+    const first = await executeAction("deflectAttacksRedirect");
+    expect(first.status).toBe(200);
+    expect(pool(first.body, "focus")).toMatchObject({ used: 1, remaining: 1 });
+
+    const second = await executeAction("deflectAttacksRedirect");
+    expect(second.status).toBe(200);
+    expect(pool(second.body, "focus")).toMatchObject({ used: 2, remaining: 0 });
+
+    const third = await executeAction("deflectAttacksRedirect");
+    expect(third.status).toBe(400); // pool exhausted
+  });
+});
+
 describe("POST /:id/actions/transactions — Heightened Focus temp HP (monk L10, #1244)", () => {
   afterAll(async () => {
     await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
