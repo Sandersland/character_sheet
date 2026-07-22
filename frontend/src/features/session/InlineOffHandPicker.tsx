@@ -10,13 +10,20 @@
 //
 // Off-hand damage omits the ability modifier unless the character has the
 // Two-Weapon Fighting style — that adjustment lives in buildOffHandEntry.
+//
+// Martial Arts Bonus Unarmed Strike (#1218) reuses this exact shell via
+// `variant="unarmed"`: same single-swing tally/counter path, just locked to
+// the Unarmed Strike profile (buildBonusSwingEntry, attackMath.ts) instead of
+// the off-hand weapon — no weapon/improvised toggle, matching the rule
+// (Flurry of Blows, #1217, is the two-strike Focus version and stays on the
+// separate attack-picker path).
 
 import { useState } from "react";
 
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
 import { useRoll } from "@/features/dice/RollContext";
-import { buildOffHandEntry, hasSuperiorityDice } from "@/lib/attackMath";
+import { buildBonusSwingEntry, hasSuperiorityDice } from "@/lib/attackMath";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
@@ -38,6 +45,10 @@ interface InlineOffHandPickerProps {
   onCancel: () => void;
   onUpdate: (c: Character) => void;
   onLogChanged: () => void;
+  /** "twf" (default): the off-hand weapon swing. "unarmed": Martial Arts'
+   *  Bonus Unarmed Strike (#1218) — same shell, locked to the Unarmed Strike
+   *  profile via buildBonusSwingEntry. */
+  variant?: "twf" | "unarmed";
 }
 
 export default function InlineOffHandPicker({
@@ -48,13 +59,14 @@ export default function InlineOffHandPicker({
   onCancel,
   onUpdate,
   onLogChanged,
+  variant = "twf",
 }: InlineOffHandPickerProps) {
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const die = useManeuverDie(character, onUpdate);
   const [rolledId, setRolledId] = useState<string | null>(null);
 
-  const entry = buildOffHandEntry(character);
+  const entry = buildBonusSwingEntry(character, variant);
 
   // Bind steps 2–3 to the last bonusAction row — the tally also holds the Attack
   // action's rows, so "last row overall" would misattribute (#813).

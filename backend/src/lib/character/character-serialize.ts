@@ -178,6 +178,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
   // 5. Equipped-armor selection feeds AC, speed (Unarmored/Fast Movement), and
   //    the Monk unarmed strike — all derived, never persisted.
   const { bestArmor, hasShield } = selectEquippedBodyArmor(row, effectiveScores);
+  // Martial Arts blanket condition (Monk Bonus Unarmed Strike, #1218): no armor
+  // or Shield. Computed once here — `deriveActions` is the first consumer, but
+  // the flag is generic (`requiresUnarmored`) so future gated features share it.
+  const unarmoredUnshielded = bestArmor == null && !hasShield;
   const { armorClass, armorClassBreakdown } = buildArmorClassView(
     row,
     effectiveScores,
@@ -304,7 +308,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
 
     // Class-specific available actions for the turn tracker (universal ones
     // render client-side from UNIVERSAL_ACTIONS).
-    availableActions: buildAvailableActionsView(primaryClass, progress.level, resources),
+    availableActions: buildAvailableActionsView(primaryClass, progress.level, resources, unarmoredUnshielded),
 
     // Combat attack rows — derived at read time; the frontend renders these
     // directly in AttacksPanel rather than recomputing attack math on the client.

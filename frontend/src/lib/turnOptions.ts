@@ -87,12 +87,13 @@ export function classActionOption(
 ): ClassActionOption {
   const heal = resolver?.kind === "heal-roll" || resolver?.kind === "heal-input";
   const badge = poolBadgeFor(resolver?.resourceKey, character.resources?.pools);
-  // Heal-roll actions preview their heal; reminder-only actions (Shadow Step,
-  // Opportunist) surface their rule text as the caption instead.
+  // Heal-roll actions preview their heal; a resolver-level static subtitle
+  // (Bonus Unarmed Strike) wins next; reminder-only actions (Shadow Step,
+  // Opportunist) surface their rule text as the caption otherwise.
   const subtitle =
     resolver?.kind === "heal-roll" && resolver.healRoll
       ? `Regain ${formatRollSpec(resolver.healRoll(character))} HP`
-      : action.reminder;
+      : (resolver?.subtitle ?? action.reminder);
   return {
     key: action.key,
     title: action.name,

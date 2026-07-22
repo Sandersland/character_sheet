@@ -174,6 +174,9 @@ export function buildAvailableActionsView(
   primaryClass: PrimaryClass,
   level: number,
   resources: object | undefined,
+  // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218) —
+  // gates the Monk's Bonus Unarmed Strike (requiresUnarmored in DERIVED_ACTIONS).
+  unarmoredUnshielded: boolean,
 ): AvailableAction[] {
   const pools =
     resources && "pools" in resources
@@ -184,6 +187,7 @@ export function buildAvailableActionsView(
     primaryClass?.subclass ?? undefined,
     level,
     pools,
+    unarmoredUnshielded,
   );
 }
 

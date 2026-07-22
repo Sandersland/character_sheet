@@ -63,6 +63,10 @@ describe("deriveActions — class gates", () => {
     expect(l5).toContain("stunningStrike");
   });
 
+  it("Monk L1 gets bonusUnarmedStrike (Martial Arts, #1218)", () => {
+    expect(keys(deriveActions("monk", undefined, 1, []))).toContain("bonusUnarmedStrike");
+  });
+
   it("Paladin L1 gets divineSense/layOnHands; L3 adds channelDivinityPaladin", () => {
     const l1 = keys(deriveActions("paladin", undefined, 1, []));
     expect(l1).toContain("divineSense");
@@ -153,6 +157,37 @@ describe("deriveActions — resource gating", () => {
     const secondWind = actions.find((a) => a.key === "secondWind");
     expect(secondWind?.enabled).toBe(false);
     expect(secondWind?.disabledReason).toBe("No secondWind remaining");
+  });
+});
+
+describe("deriveActions — requiresUnarmored gate (Bonus Unarmed Strike, #1218)", () => {
+  it("is enabled when unarmoredUnshielded is true (default)", () => {
+    const actions = deriveActions("monk", undefined, 1, []);
+    const bonusUnarmedStrike = actions.find((a) => a.key === "bonusUnarmedStrike");
+    expect(bonusUnarmedStrike?.enabled).toBe(true);
+    expect(bonusUnarmedStrike?.disabledReason).toBeUndefined();
+  });
+
+  it("is disabled with 'Requires no armor or Shield' when unarmoredUnshielded is false", () => {
+    const actions = deriveActions("monk", undefined, 1, [], false);
+    const bonusUnarmedStrike = actions.find((a) => a.key === "bonusUnarmedStrike");
+    expect(bonusUnarmedStrike?.enabled).toBe(false);
+    expect(bonusUnarmedStrike?.disabledReason).toBe("Requires no armor or Shield");
+  });
+
+  it("has no resourceKey — spends no resource", () => {
+    const bonusUnarmedStrike = deriveActions("monk", undefined, 1, []).find(
+      (a) => a.key === "bonusUnarmedStrike",
+    );
+    expect(bonusUnarmedStrike?.cost).toBe("bonusAction");
+    expect(ACTION_EFFECT_FN.bonusUnarmedStrike({})).toEqual([]);
+  });
+
+  it("actions with no requiresUnarmored flag ignore the unarmoredUnshielded param", () => {
+    // Rage carries no requiresUnarmored — armored/shielded is irrelevant to it.
+    const actions = deriveActions("barbarian", undefined, 1, [pool("rage", 1)], false);
+    const rage = actions.find((a) => a.key === "rage");
+    expect(rage?.enabled).toBe(true);
   });
 });
 

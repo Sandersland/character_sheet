@@ -224,6 +224,16 @@ export function buildEquippedWeaponEntries(character: Character): AttackEntry[] 
   return entries;
 }
 
+/**
+ * The single-swing entry for InlineOffHandPicker's bonus-action picker: the
+ * off-hand weapon (TWF) or the locked Unarmed Strike profile (Bonus Unarmed
+ * Strike, #1218). Kept out of the component body to keep its complexity
+ * budget clear of this branch.
+ */
+export function buildBonusSwingEntry(character: Character, variant: "twf" | "unarmed"): AttackEntry | null {
+  return variant === "unarmed" ? buildUnarmedEntry(character) : buildOffHandEntry(character);
+}
+
 // The Unarmed Strike attack row — flat display when faces === 1 (baseline).
 function buildUnarmedEntry(character: Character): AttackEntry {
   const { unarmedStrike } = character;

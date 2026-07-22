@@ -10,6 +10,7 @@ import type { AvailableAction } from "@/types/character";
 export default function BonusActionSlot({
   bonusActionUsed,
   bonusAttack,
+  bonusAttackLabel,
   showBonusMenu,
   setShowBonusMenu,
   twfAvailable,
@@ -23,6 +24,9 @@ export default function BonusActionSlot({
 }: {
   bonusActionUsed: boolean;
   bonusAttack: AttackState | null;
+  /** Label for the pending-swing counter — "Off-hand attack" or "Bonus Unarmed
+   *  Strike" (#1218), both of which share the same bonusAttack state. */
+  bonusAttackLabel: string;
   showBonusMenu: boolean;
   setShowBonusMenu: React.Dispatch<React.SetStateAction<boolean>>;
   twfAvailable: boolean;
@@ -57,7 +61,7 @@ export default function BonusActionSlot({
         useLabel="Use Bonus"
       >
         {bonusAttack !== null && (
-          <AttackCounter total={bonusAttack.total} used={bonusAttack.used} label="Off-hand attack" />
+          <AttackCounter total={bonusAttack.total} used={bonusAttack.used} label={bonusAttackLabel} />
         )}
       </TurnSlotCard>
 

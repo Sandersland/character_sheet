@@ -59,6 +59,10 @@ interface DerivedActionRecord {
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
   reminder?: string;     // in-play rule text for no-server-effect reminder actions
+  // Martial Arts' blanket condition (Bonus Unarmed Strike, #1218): gates on
+  // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
+  // future Martial-Arts-conditioned action can reuse the same gate.
+  requiresUnarmored?: boolean;
 }
 
 /** Available action shape serialized onto the character. */
@@ -106,6 +110,11 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "actionSurge", name: "Action Surge", cost: "special", grantClass: "fighter", grantLevel: 2, resourceKey: "actionSurge", resourceAmount: 1 },
 
   // Monk
+  // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no
+  // resource cost, gated only on the Martial Arts blanket condition (no armor
+  // or Shield), not on the Attack action. Distinct from Flurry of Blows (#1217,
+  // the two-strike Focus version).
+  { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
   { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 2 },
   // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
   // TWO menu entries — a free variant and a 1-Focus variant — rather than the
@@ -151,6 +160,9 @@ export function deriveActions(
   subclass: string | undefined,
   level: number,
   pools: ResourcePool[],
+  // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218).
+  // Defaults to true (permissive) since only requiresUnarmored actions read it.
+  unarmoredUnshielded = true,
 ): AvailableAction[] {
   const cls = (className ?? "").toLowerCase();
   const sub = (subclass ?? "").toLowerCase();
@@ -174,20 +186,7 @@ export function deriveActions(
       return true;
     })
     .map((a): AvailableAction => {
-      let enabled = true;
-      let disabledReason: string | undefined;
-
-      if (a.resourceKey && a.resourceAmount) {
-        const remaining = poolMap.get(a.resourceKey) ?? 0;
-        if (remaining < a.resourceAmount) {
-          enabled = false;
-          disabledReason =
-            remaining === 0
-              ? `No ${a.resourceKey} remaining`
-              : `Need ${a.resourceAmount} ${a.resourceKey}, have ${remaining}`;
-        }
-      }
-
+      const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       return {
         key: a.key,
         name: a.name,
@@ -197,6 +196,33 @@ export function deriveActions(
         ...(a.reminder ? { reminder: a.reminder } : {}),
       };
     });
+}
+
+// One action row's enabled/disabledReason — pulled out of the `.map()` above to
+// keep that callback's complexity low. Resource-pool gate first, then the
+// Martial Arts unarmored/unshielded gate (mutually exclusive today, but a
+// future action could carry both — resource wins the reason if so).
+function resolveEnablement(
+  a: DerivedActionRecord,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): { enabled: boolean; disabledReason?: string } {
+  if (a.resourceKey && a.resourceAmount) {
+    const remaining = poolMap.get(a.resourceKey) ?? 0;
+    if (remaining < a.resourceAmount) {
+      return {
+        enabled: false,
+        disabledReason:
+          remaining === 0
+            ? `No ${a.resourceKey} remaining`
+            : `Need ${a.resourceAmount} ${a.resourceKey}, have ${remaining}`,
+      };
+    }
+  }
+  if (a.requiresUnarmored && !unarmoredUnshielded) {
+    return { enabled: false, disabledReason: "Requires no armor or Shield" };
+  }
+  return { enabled: true };
 }
 
 // Keyed by action `key`. Each function receives an execution context and returns
@@ -294,6 +320,9 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   actionSurge: () => [{ type: "spendResource", key: "actionSurge" }],
 
   // Monk
+  // bonusUnarmedStrike is economy-only, like `attack`/`twf` — no server state
+  // to spend, the gate is already applied at derive time (requiresUnarmored).
+  bonusUnarmedStrike: () => [],
   flurryOfBlows: () => [{ type: "spendResource", key: "focus", amount: 2 }],
   // patientDefense / stepOfTheWind (the FREE variants) have no ACTION_EFFECT_FN
   // entry — like Shadow Step/Opportunist, they're economy-only (consume the
