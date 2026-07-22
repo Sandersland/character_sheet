@@ -40,6 +40,15 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
     gateLevel: 3,
     castingAbility: "wisdom",
   },
+  // Warrior of the Elements (Monk) — Manipulate Elements (L3) grants the
+  // Elementalism cantrip (#1247, SRD 5.2 / PHB'24).
+  {
+    className: "Monk",
+    subclassName: "Warrior of the Elements",
+    spellName: "Elementalism",
+    gateLevel: 3,
+    castingAbility: "wisdom",
+  },
 
   // Oath of Devotion (Paladin) — CHA, gated 3/5/9/13/17.
   { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Protection from Evil and Good", gateLevel: 3, castingAbility: "charisma" },

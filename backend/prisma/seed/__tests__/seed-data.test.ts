@@ -38,6 +38,32 @@ import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
 const duplicates = <T>(values: T[]): T[] =>
   [...new Set(values.filter((v, i) => values.indexOf(v) !== i))];
 
+describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
+  // A feature that says "you know the X cantrip" must have a matching grant row,
+  // or the cantrip never reaches the sheet (the #1247 Elementalism bug: seeded
+  // spell, no link). Guard that every grant points at seeded content.
+  it("every grant references a seeded spell and a seeded subclass", () => {
+    const spellNames = new Set(SPELLS.map((s) => s.name));
+    const subclassKeys = new Set(SUBCLASSES.map((s) => `${s.className}::${s.name}`));
+    for (const g of SUBCLASS_GRANTED_SPELLS) {
+      expect(spellNames.has(g.spellName), `unseeded spell: ${g.spellName}`).toBe(true);
+      expect(
+        subclassKeys.has(`${g.className}::${g.subclassName}`),
+        `unseeded subclass: ${g.className}::${g.subclassName}`,
+      ).toBe(true);
+    }
+  });
+
+  it("Warrior of the Elements grants Elementalism at L3 (Manipulate Elements, #1247)", () => {
+    const grant = SUBCLASS_GRANTED_SPELLS.find(
+      (g) => g.className === "Monk" && g.subclassName === "Warrior of the Elements" && g.spellName === "Elementalism",
+    );
+    expect(grant).toBeDefined();
+    expect(grant!.gateLevel).toBe(3);
+    expect(grant!.castingAbility).toBe("wisdom");
+  });
+});
+
 describe("per-domain business-key uniqueness", () => {
   it("ACTIONS have unique keys", () => {
     expect(duplicates(ACTIONS.map((a) => a.key))).toEqual([]);

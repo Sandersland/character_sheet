@@ -253,6 +253,10 @@ async function castElementalBurst(
   return { dc, saveRoll, outcome, damageType: op.damageType, rawDamage: op.roll, appliedDamage, summary };
 }
 
+// The elemental-strike rider (damage-type swap + Str-save 10-ft move while
+// attuned) is fully wired server-side and covered by tests, but has no
+// dedicated live-play button yet — the Attunement toggle + Elemental Burst are
+// the surfaced actions. Frontend surfacing is a follow-up (#1247 deferral).
 async function elementalStrike(
   tx: Prisma.TransactionClient,
   row: WarriorOfElementsRow,
