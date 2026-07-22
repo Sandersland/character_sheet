@@ -161,6 +161,9 @@ export interface Character {
   /** Rogue Sneak Attack Nd6 (dice count + faces), or null for a non-rogue. */
   sneakAttack: { dice: number; faces: number } | null;
 
+  /** Monk Stunning Strike focus save DC, or null below monk L5 (#1242). */
+  stunningStrike: { dc: number } | null;
+
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];
   /** How many advancement slots this character has earned at their level. */

@@ -128,7 +128,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "patientDefenseFocus", name: "Patient Defense (1 Focus)", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, reminder: "Disengage + Dodge (spend 1 Focus)." },
   { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Dash (free bonus action)." },
   { key: "stepOfTheWindFocus", name: "Step of the Wind (1 Focus)", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, reminder: "Disengage + Dash, jump distance doubled this turn (spend 1 Focus)." },
-  { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "focus", resourceAmount: 1 },
+  // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
+  // (spend + Con save + fail/success outcome), built as its own dedicated
+  // vertical in stunning-strike.ts, exactly like Sneak Attack bypasses this
+  // catalog entirely (#1242 supersedes the #392 bare-spend stub formerly here).
   // Deflect Attacks (#1241, SRD 5.2 L3, renamed from 2014 Deflect Missiles): the base
   // reduction (1d10 + Dex + monk level) costs nothing, so — like the Way of Shadow
   // reminders below — it carries no resourceKey and the client rolls it directly (see
@@ -351,7 +354,7 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // serverEffect:false resolver, so no dispatch entry is needed here.
   patientDefenseFocus: () => [{ type: "spendResource", key: "focus" }],
   stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
-  stunningStrike: () => [{ type: "spendResource", key: "focus" }],
+  // stunningStrike is not here — it's a post-hit rider in stunning-strike.ts (#1242).
   // deflectAttacks (the base reduction) has no entry here — it's a pure reminder
   // action like shadowStep/opportunist: the client rolls 1d10 + Dex + monk level
   // and never calls the transactions endpoint (nothing persisted). Only the

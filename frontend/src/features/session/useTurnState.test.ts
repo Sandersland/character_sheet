@@ -1566,3 +1566,38 @@ describe("Sneak Attack once-per-turn guard (#902)", () => {
     expect(result.current.sneakAttackUsedThisTurn).toBe(false);
   });
 });
+
+describe("Stunning Strike once-per-turn guard (#1242)", () => {
+  it("markStunningStrikeUsed sets the flag; idempotent within a turn", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.stunningStrikeUsedThisTurn).toBe(false);
+
+    act(() => { result.current.markStunningStrikeUsed(); });
+    expect(result.current.stunningStrikeUsedThisTurn).toBe(true);
+    act(() => { result.current.markStunningStrikeUsed(); });
+    expect(result.current.stunningStrikeUsedThisTurn).toBe(true);
+  });
+
+  it("resets on endTurn, the next startTurn, and endCombat (create/cleanup symmetry)", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+
+    act(() => { result.current.markStunningStrikeUsed(); });
+    act(() => { result.current.endTurn(); });
+    expect(result.current.stunningStrikeUsedThisTurn).toBe(false);
+
+    // A fresh turn, set again, then cleared by the next startTurn.
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.markStunningStrikeUsed(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.stunningStrikeUsedThisTurn).toBe(false);
+
+    // endCombat wipes it too.
+    act(() => { result.current.markStunningStrikeUsed(); });
+    act(() => { result.current.endCombat(); });
+    expect(result.current.stunningStrikeUsedThisTurn).toBe(false);
+  });
+});

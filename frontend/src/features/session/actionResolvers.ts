@@ -130,7 +130,9 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   patientDefenseFocus: { key: "patientDefenseFocus", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
   stepOfTheWind:       { key: "stepOfTheWind",       kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   stepOfTheWindFocus:  { key: "stepOfTheWindFocus",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
-  stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "focus" },
+  // Stunning Strike (L5) has no resolver here — it's a post-hit rider rendered
+  // by StunningStrikeSection (mirrors SneakAttackSection), not a selectable
+  // action (#1242 supersedes the #392 bare-spend stub formerly here).
   // Deflect Attacks (#1241, SRD 5.2 L3) — reminder-only reaction like shadowStep/
   // opportunist below; the dynamic 1d10+Dex+level roll is computed by
   // useTurnActions' bespoke handleDeflectAttacks, not this generic dispatch.

@@ -43,6 +43,7 @@ import type {
   ManeuverOperation,
   ManeuverCastResult,
   SneakAttackRollResult,
+  StunningStrikeAttemptResult,
   ReferenceData,
   ResourceOperation,
   Session,
@@ -432,6 +433,22 @@ export async function rollSneakAttackTransaction(
     `/characters/${characterId}/sneak-attack/transactions`,
     jsonBody({ operations: [{ type: "rollSneakAttack", eligible, usedThisTurn }] }),
     "Failed to roll Sneak Attack",
+  );
+}
+
+// Spends 1 focus to attempt Stunning Strike server-side (enforcing the
+// once-per-turn guard), rolling the target's Con save against the monk's focus
+// DC. Returns the updated Character plus the DC/roll/fail-or-success outcome
+// so the caller surfaces the Stunned (fail) or half-speed+advantage (success)
+// rider inline (#1242).
+export async function attemptStunningStrikeTransaction(
+  characterId: string,
+  usedThisTurn: boolean,
+): Promise<{ character: Character; results: StunningStrikeAttemptResult[] }> {
+  return request<{ character: Character; results: StunningStrikeAttemptResult[] }>(
+    `/characters/${characterId}/stunning-strike/transactions`,
+    jsonBody({ operations: [{ type: "attemptStunningStrike", usedThisTurn }] }),
+    "Failed to attempt Stunning Strike",
   );
 }
 

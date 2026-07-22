@@ -21,7 +21,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "wildShape",
   "secondWind", "actionSurge",
   "bonusUnarmedStrike",
-  "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus", "stunningStrike",
+  "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus",
   "deflectAttacksRedirect",
   "divineSense", "layOnHands", "channelDivinityPaladin",
   "cunningAction",
@@ -81,6 +81,10 @@ describe("actionResolvers", () => {
     expect(r).toBeDefined();
     expect(r!.kind).toBe("loadout-picker");
     expect(r!.serverEffect).toBe(false); // the swap posts inventory transactions, not applyActionTransactions
+  });
+
+  it("Stunning Strike has no resolver — it's a post-hit rider, not a selectable action (#1242)", () => {
+    expect(resolverFor("stunningStrike")).toBeUndefined();
   });
 
   it("Shadow Step / Opportunist are economy-only simple-confirm reminders (#440)", () => {
