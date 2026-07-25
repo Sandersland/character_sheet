@@ -158,9 +158,13 @@ export function useLoadoutSwap(
 
   // Clear the committed-swap affordance — called at end of turn so the Refund
   // is bounded to the turn of the swap (no cross-turn action-economy leak).
+  // All three error sources must clear together: the exposed `error` folds
+  // budgetError over both mutations, so clearing one still shows a stale one.
   function reset() {
     setLastSwap(null);
     setBudgetError(null);
+    swapMutation.reset();
+    refundMutation.reset();
   }
 
   async function refund() {
