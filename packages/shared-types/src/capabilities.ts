@@ -69,8 +69,9 @@ export type GrantValueKind =
 export type ProficiencyKind = "skill" | "save" | "weapon" | "tool" | "language";
 
 // Dice-valued bonus (e.g. +2d6 fire) — round-trips now; consumed in the damage
-// roll at #526C. damageType is non-nullable here because the serializers drop
-// nulls; the backend's column-read form keeps its own nullable variant.
+// roll at #526C. damageType excludes null (never undefined-vs-absent) because the
+// serializers drop nulls; it is still optional, absent when there is no damage
+// type. The backend's column-read form keeps its own nullable variant.
 export interface CapabilityDice {
   count: number;
   faces: number;

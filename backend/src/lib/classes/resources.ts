@@ -548,6 +548,9 @@ interface ResourceOpContext {
   sessionId: string | null;
 }
 
+// The handler-map return type — async ops return a Promise. Unrelated to the
+// frontend's ResourceOpResult, which is an alias for ResourceOpAudit that #1275
+// collapses once it rewrites the client.
 type ResourceOpResult = ResourceOpAudit | Promise<ResourceOpAudit>;
 
 const RESOURCE_OP_HANDLERS: {
