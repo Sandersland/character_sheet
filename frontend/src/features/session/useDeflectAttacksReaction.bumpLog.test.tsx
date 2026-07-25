@@ -1,12 +1,12 @@
 /**
- * GENUINE RED (plan #1283 §3/§9.2): once a mutation writes the character
- * cache directly, calling `onUpdate` from inside the mutation is no longer
- * NEEDED for the sheet to update — but `useCombatLifecycle.handleCharacterUpdate`
- * piggybacks a session-log bump on that same call. If a migrated hook stopped
- * calling `onUpdate` (relying purely on the cache write), the bump would
- * silently stop firing with no other test catching it. This composes the real
- * useCombatLifecycle with the real useDeflectAttacksReaction — the actual
- * production wiring, not a mock of either — to pin that the bump still fires.
+ * Historically (#1283) this pinned that `useCombatLifecycle.handleCharacterUpdate`
+ * bumped the session log itself. #1284 moved that responsibility to
+ * `useSessionLogBumpOnCharacterWrite` (mounted once in CharacterSheetWorkspace,
+ * covered by its own test) so the bump fires for every character-cache write,
+ * not only ones that happened to flow through this hook. This composed test
+ * now pins the part that's still this hook's job: `handleCharacterUpdate`
+ * forwards the updated character through the real useDeflectAttacksReaction ->
+ * useCombatLifecycle wiring.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -41,13 +41,13 @@ const availableActions: AvailableAction[] = [
 ] as unknown as AvailableAction[];
 
 function makeLive() {
-  return { refresh: vi.fn().mockResolvedValue(undefined), setEndedSession: vi.fn(), bumpLog: vi.fn() };
+  return { refresh: vi.fn().mockResolvedValue(undefined), setEndedSession: vi.fn() };
 }
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("useDeflectAttacksReaction + useCombatLifecycle (session-log bump, #1283)", () => {
-  it("still bumps the session log after a successful redirect mutation", async () => {
+describe("useDeflectAttacksReaction + useCombatLifecycle (character forwarding, #1284)", () => {
+  it("still forwards the updated character after a successful redirect mutation", async () => {
     const character = makeCharacter();
     mockApply.mockResolvedValue({ ...character, batchId: "batch-1" });
     const live = makeLive();
@@ -76,6 +76,5 @@ describe("useDeflectAttacksReaction + useCombatLifecycle (session-log bump, #128
     });
 
     await waitFor(() => expect(setCharacter).toHaveBeenCalled());
-    expect(live.bumpLog).toHaveBeenCalledTimes(1);
   });
 });

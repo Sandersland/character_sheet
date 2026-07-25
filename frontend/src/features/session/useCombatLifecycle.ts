@@ -5,6 +5,11 @@
  * underneath with no navigation, and the recap survives the panel unmounting
  * because `endedSession` lives in the provider, not here (#960 decision 5 /
  * addendum D). Built from the shared `sessionLifecycleHelpers` primitives.
+ *
+ * `handleCharacterUpdate` no longer bumps the session log itself (#1284) — that
+ * moved to `useSessionLogBumpOnCharacterWrite`, mounted once in
+ * CharacterSheetWorkspace, which fires for every character-cache write instead
+ * of only ones that happened to flow through this hook.
  */
 
 import {
@@ -27,7 +32,7 @@ export function useCombatLifecycle({
   // handlers below never fire with a null session.
   session: Session | null;
   onUpdate: (c: Character) => void;
-  live: Pick<LiveSessionValue, "refresh" | "setEndedSession" | "bumpLog">;
+  live: Pick<LiveSessionValue, "refresh" | "setEndedSession">;
 }) {
   const end = usePendingAction();
   const leave = usePendingAction();
@@ -35,7 +40,6 @@ export function useCombatLifecycle({
 
   function handleCharacterUpdate(updated: Character) {
     onUpdate(updated);
-    live.bumpLog();
   }
 
   const handleConfirmEnd = (xpAmount: number) =>

@@ -18,9 +18,10 @@ import { useLiveRound } from "@/features/session/useLiveRound";
 import SessionDoorway from "@/features/session/SessionDoorway";
 import CombatLivePanel from "@/features/session/CombatLivePanel";
 import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
+import { useSessionLogBumpOnCharacterWrite } from "@/features/session/useSessionLogBumpOnCharacterWrite";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
-import type { SheetTabId } from "@/features/character-meta/sheetTabs";
+import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { Character, ReferenceData, Session } from "@/types/character";
 
 interface CharacterSheetContentProps {
@@ -64,14 +65,14 @@ function CharacterSheetWorkspace({
   // Session-log invalidation is shared with RollProvider so a logged roll and
   // the log view use one counter (#959).
   const live = useLiveSession();
+  // Bumps the log for EVERY character-cache write (#1284) — a strict superset
+  // of the old combat-only bump (see useCombatLifecycle's docblock).
+  useSessionLogBumpOnCharacterWrite(live.bumpLog);
   const turnState = useTurnStateContext();
   const liveRound = useLiveRound();
   // Start/Join from the doorway jumps to the Combat tab in-workspace (#963).
   const session = useSessionDoorway(id, () => onTabChange("combat"));
-  // Mobile: horizontal swipe on the panel region walks the tabs (clamped).
-  const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
-  // Mobile: collapse the compact header to a single bar once the panels scroll.
-  const collapse = useScrollCollapse();
+  const { swipe, collapse } = useMobileSheetGestures(tabs, activeTab, onTabChange);
   const goToCombat = () => onTabChange("combat");
 
   // #1085: while live + joined the header cluster is the sole live indicator —
@@ -302,6 +303,15 @@ function SessionCue({
       onAction={session.onAction}
     />
   );
+}
+
+/** The panel region's two mobile-only scroll affordances — horizontal swipe
+ *  walks the tabs, vertical scroll collapses the header — grouped into one
+ *  hook so the workspace calls it once instead of two. */
+function useMobileSheetGestures(tabs: SheetTab[], activeTab: SheetTabId, onTabChange: (id: SheetTabId) => void) {
+  const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
+  const collapse = useScrollCollapse();
+  return { swipe, collapse };
 }
 
 /** The sheet's modal open-state + toggles (delete / activity / sessions /
