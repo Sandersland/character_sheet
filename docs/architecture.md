@@ -52,7 +52,7 @@ Every mutable domain follows the same shape:
 
 1. **Zod discriminated union** per op type.
 2. **`apply*Operations(characterId, ops)`** in `lib/` — one `prisma.$transaction`, ops applied in order, `logEvent` per meaningful op with the shared `batchId`. Most domains delegate the shared preamble (batchId + active-session lookup + transaction + per-op re-read) to `runCharacterTransaction` (`lib/character/character-transaction.ts`).
-3. **Route** — the uniform scaffold (assert `edit` → parse → apply → domain-error → 400 → re-fetch → serialize) is owned by `makeTransactionsEndpoint` (`lib/http/transactions-endpoint.ts`). Non-uniform endpoints (e.g. `/hp`) keep hand-written handlers.
+3. **Route** — the uniform scaffold (assert `edit` → parse → apply → domain-error → 400 → re-fetch → serialize) is owned by `runTransaction`, exposed either as one router-owned endpoint via `makeTransactionsEndpoint` (`lib/http/transactions-endpoint.ts`) or, for class/subclass abilities, via the single `POST /characters/:id/abilities/:abilityKey/transactions` endpoint dispatching on `ABILITY_REGISTRY` (#1275). Non-uniform endpoints (e.g. `/hp`) keep hand-written handlers.
 
 `lib/inventory/inventory.ts` is the reference implementation for the lib layer. Do not add new mutable domains via `PATCH /characters/:id`. The campaign-side counterpart is DM award/revoke (`lib/campaign/campaign-item-award.ts`), which writes undoable events on the **target** character.
 

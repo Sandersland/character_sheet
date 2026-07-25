@@ -13,6 +13,7 @@ import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-maneuvers";
@@ -40,7 +41,7 @@ function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
 const resourcesUrl = `/api/characters/${FIXTURE_ID}/resources/transactions`;
-const maneuversUrl = `/api/characters/${FIXTURE_ID}/maneuvers/transactions`;
+const maneuversUrl = `/api/characters/${FIXTURE_ID}/abilities/maneuvers/transactions`;
 
 async function learn(op: unknown): Promise<{ id: string; name: string; maneuverId?: string }> {
   const res = await agent().post(resourcesUrl).send({ operations: [op] });
@@ -48,7 +49,7 @@ async function learn(op: unknown): Promise<{ id: string; name: string; maneuverI
   return list[list.length - 1];
 }
 
-describe("POST /api/characters/:id/maneuvers/transactions", () => {
+describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
   let tripId: string;
   let rallyId: string;
 
@@ -93,6 +94,46 @@ describe("POST /api/characters/:id/maneuvers/transactions", () => {
 
     const pool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "superiorityDice");
     expect(pool.remaining).toBe(3);
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one Trip Attack cast", async () => {
+    const entry = await learn({ type: "learnManeuver", maneuverId: tripId });
+    const res = await agent().post(maneuversUrl).send({ operations: [{ type: "castManeuver", entryId: entry.id }] });
+    expect(res.status).toBe(200);
+    const { roll } = res.body.results[0];
+
+    const known = [{
+      id: entry.id, maneuverId: tripId, name: "Trip Attack", placement: "damageRoll", actionSlot: null,
+      description:
+        "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. " +
+        "If the target is Large or smaller, it must make a Strength saving throw or be knocked prone.",
+    }];
+    const base = { maneuversKnown: known, toolProficienciesKnown: [], choicesKnown: {}, advancements: [] };
+
+    expect(await readPinnedEvents(FIXTURE_ID, ["castManeuver", "spendResource"])).toEqual([
+      {
+        category: "resources",
+        type: "castManeuver",
+        summary: `Used Trip Attack — d8:${roll}, DC 13 Str save`,
+        before: null,
+        after: null,
+        data: {
+          entryId: entry.id, maneuverId: tripId, maneuverName: "Trip Attack",
+          die: "d8", roll, saveDc: 13, saveAbility: "strength",
+        },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 1 Superiority Dice — 3/4 remaining",
+        before: { resources: { ...base, used: {} } },
+        after: { resources: { ...base, used: { superiorityDice: 1 } } },
+        data: { key: "superiorityDice", amount: 1, remaining: 3, roll: null },
+      },
+    ]);
   });
 
   it("Rally applies self temp HP (die + Cha mod) via the core self-apply path", async () => {

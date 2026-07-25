@@ -1,14 +1,6 @@
 import { Router } from "express";
-import { z } from "zod";
 
-import {
-  applyManeuverOperations,
-  InvalidManeuverOperationError,
-} from "@/lib/classes/maneuvers.js";
-import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
-import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const maneuversRouter = Router({ mergeParams: true });
 
@@ -31,35 +23,4 @@ maneuversRouter.get("/", async (_req, res) => {
       saveAbility: row.saveAbility,
     }))
   );
-});
-
-const castManeuverOpSchema = z.object({
-  type: z.literal("castManeuver"),
-  entryId: z.string().min(1),
-});
-
-const operationSchema = z.discriminatedUnion("type", [castManeuverOpSchema]);
-
-const transactionsRequestSchema = z.object({
-  operations: z.array(operationSchema).min(1),
-});
-
-/**
- * POST /api/characters/:id/maneuvers/transactions
- * Intent-bearing batch mutation for maneuvers — mirrors the shadow-arts endpoint.
- * The one op today: castManeuver — spend one superiority die (server rolls it),
- * log the cast with the announced DC, apply Rally temp HP. Returns the updated
- * character plus per-op { roll, saveDc } so the client folds the die into the
- * attack/damage total.
- */
-makeTransactionsEndpoint({
-  router: maneuversRouter,
-  schema: transactionsRequestSchema,
-  apply: (characterId, data) => applyManeuverOperations(characterId, data.operations),
-  domainErrors: [
-    InvalidManeuverOperationError,
-    InvalidResourceOperationError,
-    InvalidSpellcastingOperationError,
-  ],
-  respond: (character, results) => ({ character, results }),
 });

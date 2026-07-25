@@ -11,6 +11,7 @@ import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-sneak-attack";
@@ -37,7 +38,7 @@ const FIXTURE_BASE = {
 function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
-const url = `/api/characters/${FIXTURE_ID}/sneak-attack/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/sneak-attack/transactions`;
 
 async function createRogue(level: number) {
   const cls = await prisma.characterClass.upsert({
@@ -55,7 +56,7 @@ async function createRogue(level: number) {
   });
 }
 
-describe("POST /api/characters/:id/sneak-attack/transactions", () => {
+describe("POST /api/characters/:id/abilities/sneak-attack/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
@@ -80,6 +81,28 @@ describe("POST /api/characters/:id/sneak-attack/transactions", () => {
     expect(result.roll).toBeGreaterThanOrEqual(4);
     expect(result.roll).toBeLessThanOrEqual(24);
     expect(result.summary).toBe(`Sneak Attack — 4d6: ${result.roll}`);
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged. Only the RNG roll is read back from the response.
+  it("pins the audit trail of one Sneak Attack roll", async () => {
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "rollSneakAttack", eligible: true, usedThisTurn: false }] });
+    expect(res.status).toBe(200);
+    const { roll } = res.body.results[0];
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "roll",
+        type: "damageRoll",
+        summary: `Sneak Attack — 4d6: ${roll}`,
+        before: null,
+        after: null,
+        data: { source: "Sneak Attack", dice: 4, faces: 6, roll },
+      },
+    ]);
   });
 
   it("the once-per-turn guard rejects a second application in the same turn", async () => {
@@ -129,7 +152,7 @@ describe("Sneak Attack for a non-rogue", () => {
 
   it("rejects a non-rogue with no Sneak Attack", async () => {
     const res = await agent()
-      .post(`/api/characters/${FIGHTER_ID}/sneak-attack/transactions`)
+      .post(`/api/characters/${FIGHTER_ID}/abilities/sneak-attack/transactions`)
       .send({ operations: [{ type: "rollSneakAttack", eligible: true, usedThisTurn: false }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/rogue/i);

@@ -1,14 +1,8 @@
 import { Router } from "express";
-import { z } from "zod";
 
 import { readAbilityCost } from "@/lib/spellcasting/ability-cost.js";
-import {
-  applyShadowArtsOperations,
-  shadowArtEffectSpec,
-  InvalidShadowArtOperationError,
-} from "@/lib/classes/shadow-arts.js";
+import { shadowArtEffectSpec } from "@/lib/classes/shadow-arts.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const shadowArtsRouter = Router({ mergeParams: true });
 
@@ -30,33 +24,4 @@ shadowArtsRouter.get("/", async (_req, res) => {
       effect: shadowArtEffectSpec(row),
     })),
   );
-});
-
-const castShadowArtOpSchema = z.object({
-  type: z.literal("castShadowArt"),
-  shadowArtId: z.string().min(1),
-});
-
-const activateCloakOfShadowsOpSchema = z.object({
-  type: z.literal("activateCloakOfShadows"),
-});
-
-const operationSchema = z.discriminatedUnion("type", [castShadowArtOpSchema, activateCloakOfShadowsOpSchema]);
-
-const transactionsRequestSchema = z.object({
-  operations: z.array(operationSchema).min(1),
-});
-
-/**
- * POST /api/characters/:id/shadow-arts/transactions
- * Intent-bearing batch mutation for Warrior of Shadow's two focus-fuelled
- * features (#1246):
- *   castShadowArt          — spend 1 focus, cast Darkness (concentration).
- *   activateCloakOfShadows — spend 3 focus, self-apply invisible (L17).
- */
-makeTransactionsEndpoint({
-  router: shadowArtsRouter,
-  schema: transactionsRequestSchema,
-  apply: (characterId, data) => applyShadowArtsOperations(characterId, data.operations),
-  domainErrors: [InvalidShadowArtOperationError],
 });

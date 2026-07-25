@@ -40,7 +40,7 @@ function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
 const resourcesUrl = `/api/characters/${FIXTURE_ID}/resources/transactions`;
-const maneuversUrl = `/api/characters/${FIXTURE_ID}/maneuvers/transactions`;
+const maneuversUrl = `/api/characters/${FIXTURE_ID}/abilities/maneuvers/transactions`;
 
 describe("castManeuver — Battle Master as a SECONDARY class entry (#1072)", () => {
   let tripId: string;

@@ -11,6 +11,7 @@ import supertest from "supertest";
 import { createApp } from "@/app.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-open-hand-technique";
@@ -37,7 +38,7 @@ const FIXTURE_BASE = {
 function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
-const url = `/api/characters/${FIXTURE_ID}/open-hand-technique/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/open-hand-technique/transactions`;
 
 async function createMonk(level: number, subclass?: string) {
   const cls = await prisma.characterClass.upsert({
@@ -54,7 +55,7 @@ async function createMonk(level: number, subclass?: string) {
   });
 }
 
-describe("POST /api/characters/:id/open-hand-technique/transactions", () => {
+describe("POST /api/characters/:id/abilities/open-hand-technique/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
@@ -78,6 +79,28 @@ describe("POST /api/characters/:id/open-hand-technique/transactions", () => {
     expect(result.roll).toBeUndefined();
     expect(result.outcome).toBe("applied");
     expect(result.summary).toMatch(/no save/i);
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one Addle rider (the roll-free branch)", async () => {
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
+    expect(res.status).toBe(200);
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "resources",
+        type: "imposeOpenHandRider",
+        summary:
+          "Open Hand Technique — Addle (no save): the target can't take reactions until the start of your next turn.",
+        before: null,
+        after: null,
+        data: { rider: "addle", dc: 13, roll: null, outcome: "applied" },
+      },
+    ]);
   });
 
   it("push rolls a flat d20 vs DC 13 (Wis 16, prof +2) and is internally consistent", async () => {

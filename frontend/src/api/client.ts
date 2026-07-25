@@ -112,7 +112,9 @@ const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
 // Operations and applyExperienceOperations deliberately don't use this: HP unwraps
 // { character, concentrationChecks } and XP threads an optional sessionId.
 // submitLevelUp doesn't either: its body is the structured LevelUpSubmission
-// itself, not an { operations } batch.)
+// itself, not an { operations } batch. Class/subclass abilities go through
+// applyAbilityTransactions instead (#1275): extra abilityKey URL segment,
+// heterogeneous response type.)
 async function postTransactions<TOp>(
   characterId: string,
   domain: string,
@@ -121,6 +123,24 @@ async function postTransactions<TOp>(
 ): Promise<Character> {
   return request<Character>(
     `/characters/${characterId}/${domain}/transactions`,
+    jsonBody({ operations }),
+    errorLabel,
+  );
+}
+
+// The single seam onto the shared ability endpoint (#1275): every automated
+// class/subclass feature POSTs the same { operations } batch, choosing the
+// feature by URL key rather than by its own route. Generic in the response
+// because some abilities return the bare Character and others { character,
+// results }; the named wrappers below fix that per feature.
+export async function applyAbilityTransactions<TOp, TResponse = Character>(
+  characterId: string,
+  abilityKey: string,
+  operations: TOp[],
+  errorLabel: string,
+): Promise<TResponse> {
+  return request<TResponse>(
+    `/characters/${characterId}/abilities/${abilityKey}/transactions`,
     jsonBody({ operations }),
     errorLabel,
   );
@@ -237,9 +257,10 @@ export async function applyWarriorOfElementsTransactions(
   characterId: string,
   operations: WarriorOfElementsOperation[]
 ): Promise<{ character: Character; results: WarriorOfElementsResult[] }> {
-  return request<{ character: Character; results: WarriorOfElementsResult[] }>(
-    `/characters/${characterId}/elements/transactions`,
-    jsonBody({ operations }),
+  return applyAbilityTransactions<WarriorOfElementsOperation, { character: Character; results: WarriorOfElementsResult[] }>(
+    characterId,
+    "warrior-of-elements",
+    operations,
     "Failed to apply Warrior of the Elements operations",
   );
 }
@@ -257,7 +278,7 @@ export async function applyShadowArtsTransactions(
   characterId: string,
   operations: ShadowArtOperation[]
 ): Promise<Character> {
-  return postTransactions(characterId, "shadow-arts", operations, "Failed to apply shadow arts operations");
+  return applyAbilityTransactions(characterId, "shadow-arts", operations, "Failed to apply shadow arts operations");
 }
 
 // Feeds the Cleric/Paladin Channel Divinity picker — the entitled options for
@@ -276,7 +297,12 @@ export async function applyChannelDivinityTransactions(
   characterId: string,
   operations: ChannelDivinityOperation[]
 ): Promise<Character> {
-  return postTransactions(characterId, "channel-divinity", operations, "Failed to apply Channel Divinity operations");
+  return applyAbilityTransactions(
+    characterId,
+    "channel-divinity",
+    operations,
+    "Failed to apply Channel Divinity operations",
+  );
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
@@ -420,9 +446,10 @@ export async function castManeuverTransaction(
   characterId: string,
   operations: ManeuverOperation[],
 ): Promise<{ character: Character; results: ManeuverCastResult[] }> {
-  return request<{ character: Character; results: ManeuverCastResult[] }>(
-    `/characters/${characterId}/maneuvers/transactions`,
-    jsonBody({ operations }),
+  return applyAbilityTransactions<ManeuverOperation, { character: Character; results: ManeuverCastResult[] }>(
+    characterId,
+    "maneuvers",
+    operations,
     "Failed to cast maneuver",
   );
 }
@@ -435,9 +462,10 @@ export async function rollSneakAttackTransaction(
   eligible: boolean,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: SneakAttackRollResult[] }> {
-  return request<{ character: Character; results: SneakAttackRollResult[] }>(
-    `/characters/${characterId}/sneak-attack/transactions`,
-    jsonBody({ operations: [{ type: "rollSneakAttack", eligible, usedThisTurn }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: SneakAttackRollResult[] }>(
+    characterId,
+    "sneak-attack",
+    [{ type: "rollSneakAttack", eligible, usedThisTurn }],
     "Failed to roll Sneak Attack",
   );
 }
@@ -451,9 +479,10 @@ export async function attemptStunningStrikeTransaction(
   characterId: string,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: StunningStrikeAttemptResult[] }> {
-  return request<{ character: Character; results: StunningStrikeAttemptResult[] }>(
-    `/characters/${characterId}/stunning-strike/transactions`,
-    jsonBody({ operations: [{ type: "attemptStunningStrike", usedThisTurn }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: StunningStrikeAttemptResult[] }>(
+    characterId,
+    "stunning-strike",
+    [{ type: "attemptStunningStrike", usedThisTurn }],
     "Failed to attempt Stunning Strike",
   );
 }
@@ -467,9 +496,10 @@ export async function imposeOpenHandRiderTransaction(
   rider: OpenHandRider,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: OpenHandRiderResult[] }> {
-  return request<{ character: Character; results: OpenHandRiderResult[] }>(
-    `/characters/${characterId}/open-hand-technique/transactions`,
-    jsonBody({ operations: [{ type: "imposeOpenHandRider", rider, usedThisTurn }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: OpenHandRiderResult[] }>(
+    characterId,
+    "open-hand-technique",
+    [{ type: "imposeOpenHandRider", rider, usedThisTurn }],
     "Failed to impose Open Hand Technique rider",
   );
 }
@@ -479,9 +509,10 @@ export async function imposeOpenHandRiderTransaction(
 export async function setQuiveringPalmTransaction(
   characterId: string,
 ): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
-  return request<{ character: Character; results: QuiveringPalmResult[] }>(
-    `/characters/${characterId}/quivering-palm/transactions`,
-    jsonBody({ operations: [{ type: "setQuiveringPalm" }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: QuiveringPalmResult[] }>(
+    characterId,
+    "quivering-palm",
+    [{ type: "setQuiveringPalm" }],
     "Failed to set Quivering Palm",
   );
 }
@@ -494,9 +525,10 @@ export async function triggerQuiveringPalmTransaction(
   characterId: string,
   roll: number,
 ): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
-  return request<{ character: Character; results: QuiveringPalmResult[] }>(
-    `/characters/${characterId}/quivering-palm/transactions`,
-    jsonBody({ operations: [{ type: "triggerQuiveringPalm", roll }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: QuiveringPalmResult[] }>(
+    characterId,
+    "quivering-palm",
+    [{ type: "triggerQuiveringPalm", roll }],
     "Failed to trigger Quivering Palm",
   );
 }

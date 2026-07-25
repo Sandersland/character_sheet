@@ -13,6 +13,7 @@ import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-hand-of-ultimate-mercy";
@@ -41,7 +42,7 @@ function fixtureBase(experiencePoints: number) {
 function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
-const url = `/api/characters/${FIXTURE_ID}/hand-of-ultimate-mercy/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/hand-of-ultimate-mercy/transactions`;
 
 async function createMonk(experiencePoints: number, level: number, subclass?: string, resources?: Prisma.InputJsonValue) {
   const cls = await prisma.characterClass.upsert({
@@ -59,7 +60,7 @@ async function createMonk(experiencePoints: number, level: number, subclass?: st
   });
 }
 
-describe("POST /api/characters/:id/hand-of-ultimate-mercy/transactions", () => {
+describe("POST /api/characters/:id/abilities/hand-of-ultimate-mercy/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
@@ -88,6 +89,46 @@ describe("POST /api/characters/:id/hand-of-ultimate-mercy/transactions", () => {
     expect(focusPool.remaining).toBe(focusPool.total - 5);
     expect(ultimateMercyPool.remaining).toBe(0);
     expect(ultimateMercyPool.total).toBe(1);
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one Hand of Ultimate Mercy use", async () => {
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "useHandOfUltimateMercy", roll: 27 }] });
+    expect(res.status).toBe(200);
+
+    const base = { maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] };
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 1 Hand of Ultimate Mercy — 0/1 remaining",
+        before: { resources: { ...base, used: {} } },
+        after: { resources: { ...base, used: { handOfUltimateMercy: 1 } } },
+        data: { key: "handOfUltimateMercy", amount: 1, remaining: 0, roll: null },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 5 Focus Points — 12/17 remaining",
+        before: { resources: { ...base, used: { handOfUltimateMercy: 1 } } },
+        after: { resources: { ...base, used: { focus: 5, handOfUltimateMercy: 1 } } },
+        data: { key: "focus", amount: 5, remaining: 12, roll: null },
+      },
+      {
+        category: "resources",
+        type: "useHandOfUltimateMercy",
+        summary:
+          "Hand of Ultimate Mercy — returns the creature to life with 27 hit points, ending Blinded, Deafened, Paralyzed, Poisoned, and Stunned.",
+        before: null,
+        after: null,
+        data: { hpRestored: 27 },
+      },
+    ]);
   });
 
   it("rejects a non-positive roll", async () => {
