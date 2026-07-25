@@ -20,7 +20,7 @@ describe("CurrencyEditor", () => {
   // Was GENUINE RED pre-#1284 C2 (plan §0/§2/§9.3): CurrencyEditor used to call
   // updateCharacter() directly and only forward the result via a since-deleted
   // update callback prop — nothing wrote the character query cache. Now routed
-  // through useCharacterMutation + useCurrentCharacter().setCharacter.
+  // through useCharacterMutation, which writes the cache itself.
   it("reaches the character cache after a purse edit", async () => {
     const updated = makeCharacter({ currency: makeCurrency({ gp: 42 }) });
     vi.mocked(updateCharacter).mockResolvedValue(updated);

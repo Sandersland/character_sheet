@@ -59,7 +59,7 @@ function makeCharacterWithNote(): Character {
 // CapturePalette reads useCurrentCharacter(), so every render mounts
 // CurrentCharacterProvider via renderWithCharacter. Every character fixture in
 // this file shares id "char-1", so any of them seeds the same cache entry —
-// setCharacter only depends on the provider's id, not this exact reference.
+// the cache write keys off the provider's id, not this exact reference.
 function render(ui: ReactElement) {
   return renderWithCharacter(ui, makeCharacter());
 }
@@ -134,8 +134,8 @@ describe("CapturePalette (#247)", () => {
     const [charId, entry] = vi.mocked(client.createJournalEntry).mock.calls[0];
     expect(charId).toBe("char-1");
     expect(entry).toEqual({ kind: "NOTE", body: "The bridge collapsed", sessionId: "sess-1" });
-    // The returned character reaches the cache (the write useJournalMutations
-    // wires through useCurrentCharacter().setCharacter).
+    // The returned character reaches the cache — useJournalMutations writes it
+    // through useCharacterMutation, with no callback in between.
     expect(cachedCharacter("char-1")).toEqual(makeCharacter());
   });
 

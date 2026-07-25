@@ -20,7 +20,7 @@ describe("CampaignPreferencesFields", () => {
   // Was GENUINE RED pre-#1284 C2 (plan §0/§2/§9.4): this used to call
   // updateCampaignPreferences() directly and only forward the result via a
   // since-deleted update callback prop — nothing wrote the character query
-  // cache. Now routed through useCharacterMutation + useCurrentCharacter().setCharacter.
+  // cache. Now routed through useCharacterMutation, which writes the cache itself.
   it("reaches the character cache after a preference toggle", async () => {
     const updated = makeCharacter({
       campaignPreferences: { shareWithDm: true, autoFriendlyHealing: false },
