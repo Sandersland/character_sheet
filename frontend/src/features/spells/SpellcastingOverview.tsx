@@ -2,11 +2,12 @@
 // boxed stat readouts, slot pips, a read-only prepared roster, the single Cast
 // door (#1162), the inline cast-result/error banners, and a Manage-spellbook
 // opener (caster-spellbook.html §1).
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { abilityLabel } from "@/lib/abilities";
 import { derivePreparedSummary } from "@/lib/preparedSummary";
 import type { CastResult } from "@/lib/spellCast";
 import type { SpellListDerivation } from "@/lib/spellList";
-import type { Character, Spell } from "@/types/character";
+import type { Spell } from "@/types/character";
 import Card from "@/components/ui/Card";
 import CastResultBanner from "@/features/spells/CastResultBanner";
 import CastSpellDoor from "@/features/spells/CastSpellDoor";
@@ -16,7 +17,6 @@ import SpellSlotMeters from "@/features/spells/SpellSlotMeters";
 import SpellcastingStatBar from "@/features/spells/SpellcastingStatBar";
 
 interface SpellcastingOverviewProps {
-  character: Character;
   derived: SpellListDerivation;
   busy: boolean;
   error: string | null;
@@ -82,10 +82,11 @@ function OverviewFooter({
 }
 
 export default function SpellcastingOverview({
-  character, derived, busy, error, castResult, isLive,
+  derived, busy, error, castResult, isLive,
   onExpend, onRestore, onCast, onGoToCombat, onManageSpellbook,
   onDropConcentration, onDismissBuff, onDismissResult,
 }: SpellcastingOverviewProps) {
+  const { character } = useCurrentCharacter();
   const sc = character.spellcasting!;
 
   return (
@@ -118,7 +119,6 @@ export default function SpellcastingOverview({
           onRestore={onRestore}
         />
         <CastSpellDoor
-          character={character}
           derived={derived}
           busy={busy}
           isLive={isLive}

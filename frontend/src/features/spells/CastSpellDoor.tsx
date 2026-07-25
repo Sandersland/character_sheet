@@ -14,15 +14,15 @@
  */
 import { useState } from "react";
 
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { deriveCastableSpells } from "@/lib/preparedSpells";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
 import { slotOrdinal } from "@/lib/spellMeta";
 import SpellDetailCard from "@/features/spells/SpellDetailCard";
 import SlotLevelSelector from "@/features/session/SlotLevelSelector";
-import type { Character, Spell } from "@/types/character";
+import type { Spell } from "@/types/character";
 
 interface CastSpellDoorProps {
-  character: Character;
   derived: { availableSlotLevels: number[]; availableArcanaLevels: number[] };
   busy: boolean;
   /** A live session is active — casting defers to the Combat tab instead of opening the picker. */
@@ -76,7 +76,8 @@ function LiveNotice() {
   );
 }
 
-export default function CastSpellDoor({ character, derived, busy, isLive, onCast, onGoToCombat }: CastSpellDoorProps) {
+export default function CastSpellDoor({ derived, busy, isLive, onCast, onGoToCombat }: CastSpellDoorProps) {
+  const { character } = useCurrentCharacter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [detailSpellId, setDetailSpellId] = useState<string | null>(null);
   const [slotLevel, setSlotLevel] = useState<number | undefined>(undefined);
