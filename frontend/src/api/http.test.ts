@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch, jsonBody, postTransactions, rawFetch, request, send, setUnauthorizedHandler } from "@/api/http";
+import { createCampaign, fetchCampaigns } from "@/api/campaign";
 
 // New direct coverage for the shared plumbing (#1270) — previously only
 // exercised indirectly through domain callers in client.test.ts.
@@ -99,6 +100,45 @@ describe("request<T> / send direct coverage", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
 
     await expect(send("/x", undefined, "Failed to send x")).resolves.toBeUndefined();
+  });
+});
+
+// Verbatim regression pin from client.test.ts (#1270) — assertions unchanged,
+// only the import specifier retargeted (now exercises the plumbing through
+// api/campaign.ts's fetchCampaigns/createCampaign as representative callers).
+describe("request<T> (json flow, via fetchCampaigns / createCampaign)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the parsed body on a plain GET success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => [{ id: "c1", name: "Curse of Strahd" }] })
+    );
+
+    await expect(fetchCampaigns()).resolves.toMatchObject([{ name: "Curse of Strahd" }]);
+  });
+
+  it("falls back to the labeled message when a plain GET fails with no JSON error body", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => null }));
+
+    await expect(fetchCampaigns()).rejects.toThrow("Failed to fetch campaigns (500)");
+  });
+
+  it("surfaces the server's { error } message on a non-ok write", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: "Name already taken" }) })
+    );
+
+    await expect(createCampaign("Dupe")).rejects.toThrow("Name already taken");
+  });
+
+  it("falls back to the labeled message on a non-ok write with no { error }", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }));
+
+    await expect(createCampaign("Boom")).rejects.toThrow("Failed to create campaign (500)");
   });
 });
 
