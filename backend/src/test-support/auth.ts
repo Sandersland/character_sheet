@@ -6,9 +6,8 @@ import { SESSION_COOKIE } from "@/lib/auth/session.js";
 // deterministic, long-lived AuthSession for it, then returns the Cookie header
 // value (`cs_session=<token>`) tests attach to their requests.
 //
-// Deterministic token id per owner + upsert = idempotent across reruns (no
-// session-row accumulation) and safe under parallel test files (distinct owner
-// ids per file, same rule as ensureTestOwner).
+// Deterministic token id per owner + upsert = idempotent across reruns, so a
+// file's repeated beforeEach doesn't accumulate session rows.
 export async function authCookie(ownerId: string): Promise<string> {
   await prisma.user.upsert({ where: { id: ownerId }, create: { id: ownerId }, update: {} });
 

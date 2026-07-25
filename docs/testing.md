@@ -15,19 +15,20 @@ npm run test:coverage -w backend # Istanbul coverage → feeds the fallow CRAP g
 cd frontend && npx vitest run    # frontend (no DB)
 ```
 
-Local setup: `backend/.env` must contain `DATABASE_URL` (`cp .env.example backend/.env` on a fresh clone); `backend/vitest.config.ts` reads it automatically via `loadEnv`.
+Local setup: `backend/.env` must contain `DATABASE_URL` (`cp .env.example backend/.env` on a fresh clone); `backend/vitest.config.ts` reads it automatically via `loadEnv`. Tests derive their own databases from it on the same server and never read or write the one it names, so a test run can't disturb your dev data.
 
 ## Backend route tests (`backend/src/routes/__tests__/`)
 
 `supertest` against `createApp()`, real Postgres via Prisma — no mocks.
 
-**Fixture rules (parallel files, one shared DB):**
+**Fixture rules (parallel files, one database per worker):**
+
+Each vitest worker runs against its own database, cloned in `globalSetup` from a migrated+seeded template. A worker still runs many files in sequence, so files sharing a worker still see each other's leftovers.
 
 - Upsert catalog fixtures in `beforeEach`; delete only what the test created (`afterEach`/`afterAll`).
-- **Never `deleteMany` a seeded catalog row** — use uniquely-named fixture rows (e.g. `"Spellcasting Route Test Wizard"`, with the class-entry *snapshot* `name` set to `"wizard"` so rule lookups still match). If you nuke a seeded row: `cd backend && npx prisma db seed`.
-- **Unique, file-prefixed fixture IDs + a per-file owner** (`ensureTestOwner("owner-<domain>")`, `backend/src/test-support/owner.ts`) so parallel suites never collide.
-- **Never assert on an unscoped/global list** — tables hold the union of every running suite's fixtures. Find your own row (`findInList`, `test-support/list.js`) and assert on it; an eslint `no-restricted-syntax` rule backstops this for `GET /api/characters`.
-- Don't add a `fileParallelism` override — the speed matters. Connection teardown is handled by `backend/vitest.setup.ts` (`$disconnect()` + `pool.end()`).
+- **Never `deleteMany` a seeded catalog row** — use uniquely-named fixture rows (e.g. `"Spellcasting Route Test Wizard"`, with the class-entry *snapshot* `name` set to `"wizard"` so rule lookups still match). A wiped catalog row stays wiped for every later file on that worker; the next run rebuilds from the template.
+- Use `ensureTestOwner("owner-<domain>")` for the `ownerId` every character needs.
+- Don't add a `fileParallelism` override, and don't reach for `--fileParallelism=false` to make a flaky suite pass — cross-file interference is a leaking fixture, not a scheduling problem. Connection teardown is handled by `backend/vitest.setup.ts` (`$disconnect()` + `pool.end()`).
 
 **Every transaction endpoint gets:** a 404 test (unknown character), a 400 test (malformed op), one test per domain error, and a multi-op **atomicity** test (a failing second op rolls back the first).
 
@@ -51,7 +52,7 @@ Real-browser verification hits `requireAuth` and OAuth can't complete headless. 
 
 Specs live in `frontend/e2e/`; run via `npm run e2e` (→ `docker compose --profile e2e run --rm e2e`, a pinned Playwright image on host networking that derives its base URL from `FRONTEND_PORT`, so it works against the main stack or any worktree slot).
 
-- `global-setup.ts` signs in via dev-login and idempotently recreates the shared personas (Smoke Fighter, Wizard L5, Battle Master, Session Fighter) — safe after a backend vitest pass wipes the dev user.
+- `global-setup.ts` signs in via dev-login and idempotently recreates the shared personas (Smoke Fighter, Wizard L5, Battle Master, Session Fighter).
 - Per-spec state is created **inside each spec** via `e2e/helpers/api.ts`, never in globalSetup — every spec is independently runnable and personas stay unmutated.
 - Session-driving personas get their own campaigns (one active session per campaign); `workers: 1` runs serially.
 - The stack sets `RATE_LIMIT_DISABLED=true` (compose + CI) so repeated runs never trip the limiter.

@@ -141,10 +141,9 @@ describe("characters routes", () => {
     await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
   });
 
-  // The catalog rows are upserted (not deleted) between tests so reruns
-  // don't churn ids — but they shouldn't linger in a shared dev database
-  // as selectable "Test Race"/"Test Class"/"Test Background"/"Test Club"
-  // options once the whole suite is done.
+  // The catalog rows are upserted (not deleted) between tests so reruns don't
+  // churn ids — but a later file on this worker inherits the same database, so
+  // they must not linger as selectable catalog options once the suite is done.
   afterAll(async () => {
     await prisma.race.deleteMany({ where: { name: TEST_RACE.name } });
     await prisma.characterClass.deleteMany({ where: { name: TEST_CLASS.name } });
