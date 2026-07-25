@@ -8,9 +8,9 @@
  */
 
 import { Minus, Plus, X } from "lucide-react";
-import { useState } from "react";
 
 import { applyConditionTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiHealthNormal } from "@/components/ui/icons";
 import {
@@ -31,22 +31,24 @@ interface Props {
 }
 
 export default function ConditionsSheetBody({ character, onUpdate, defaultAddOpen }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: ConditionOperation[]) => applyConditionTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Something went wrong.",
+    onCharacterWritten: onUpdate,
+  });
+  const busy = mutation.isPending;
+  const error = mutation.error;
 
   const { active, exhaustion } = character.conditions;
   const activeKeys = active.map((c) => c.key);
 
   async function send(ops: ConditionOperation[]) {
-    setBusy(true);
-    setError(null);
     try {
-      const updated = await applyConditionTransactions(character.id, ops);
-      onUpdate(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
+      await mutation.mutateAsync(ops);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 
