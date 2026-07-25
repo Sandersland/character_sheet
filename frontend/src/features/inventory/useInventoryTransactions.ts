@@ -1,6 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 
 import { applyInventoryTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character, InventoryOperation } from "@/types/character";
 
 export interface InventoryTransactions {
@@ -20,25 +21,25 @@ export function useInventoryTransactions(
   character: Character,
   onUpdate: (character: Character) => void
 ): InventoryTransactions {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (operations: InventoryOperation[]) => applyInventoryTransactions(character.id, operations),
+    toCharacter: (c) => c,
+    fallbackMessage: "Couldn't save — try again.",
+    onCharacterWritten: onUpdate,
+  });
+
   async function applyOps(operations: InventoryOperation[]): Promise<boolean> {
-    setPending(true);
-    setError(null);
     try {
-      const updated = await applyInventoryTransactions(character.id, operations);
-      onUpdate(updated);
+      await mutation.mutateAsync(operations);
       setAddOpen(false);
       setEditingId(null);
       return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save — try again.");
+    } catch {
       return false;
-    } finally {
-      setPending(false);
     }
   }
 
@@ -46,5 +47,14 @@ export function useInventoryTransactions(
     await applyOps(operations);
   }
 
-  return { pending, error, addOpen, editingId, setAddOpen, setEditingId, applyOps, submitOperations };
+  return {
+    pending: mutation.isPending,
+    error: mutation.error,
+    addOpen,
+    editingId,
+    setAddOpen,
+    setEditingId,
+    applyOps,
+    submitOperations,
+  };
 }
