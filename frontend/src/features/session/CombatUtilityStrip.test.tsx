@@ -85,11 +85,10 @@ describe("CombatUtilityStrip (#982)", () => {
 
   it("opens the add-condition picker as an overlay and applies a condition", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
     const mockApply = vi.mocked(client.applyConditionTransactions);
     mockApply.mockResolvedValue(makeCharacter({ active: [], exhaustion: 0 }));
 
-    renderStrip(makeCharacter({ active: [], exhaustion: 0 }), onUpdate);
+    renderStrip(makeCharacter({ active: [], exhaustion: 0 }));
 
     // "+ Add" opens the picker already expanded (no extra inline expand click).
     // Accessible name is the standalone "Add condition" (#986 review), not the
@@ -99,7 +98,6 @@ describe("CombatUtilityStrip (#982)", () => {
     await user.click(within(proneRow).getByRole("button", { name: "Apply" }));
 
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "applyCondition", key: "prone" }]);
-    expect(onUpdate).toHaveBeenCalled();
   });
 
   it("removes a condition through the transaction endpoint", async () => {
