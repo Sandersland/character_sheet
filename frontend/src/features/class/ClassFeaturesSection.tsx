@@ -3,6 +3,7 @@
 // and composes per-feature subcomponents. Mirrors SpellsSection's orchestrator/row split.
 
 import { applyAdvancementTransactions, applyClassTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character, ClassOption } from "@/types/character";
 import { deriveClassFeatureView } from "@/lib/classFeatures";
 import { useClassTransactions } from "@/features/class/useClassTransactions";
@@ -15,11 +16,11 @@ import SubclassSection from "@/features/class/SubclassSection";
 interface Props {
   character: Character;
   referenceClasses: ClassOption[];
-  onUpdate: (updated: Character) => void;
 }
 
-export default function ClassFeaturesSection({ character, referenceClasses, onUpdate }: Props) {
-  const { busy, error, run } = useClassTransactions(character.id, onUpdate);
+export default function ClassFeaturesSection({ character, referenceClasses }: Props) {
+  const { setCharacter } = useCurrentCharacter();
+  const { busy, error, run } = useClassTransactions(character.id, setCharacter);
   const view = deriveClassFeatureView(character, referenceClasses);
 
   return (

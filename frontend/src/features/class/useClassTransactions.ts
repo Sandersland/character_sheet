@@ -8,13 +8,13 @@ import type { Character } from "@/types/character";
 // response to a bare Character before returning — mutationFn just invokes
 // whichever thunk a call site passes, so every existing call site (`run(() =>
 // applyX(...))`) keeps working unchanged.
-export function useClassTransactions(characterId: string, onUpdate: (updated: Character) => void) {
+export function useClassTransactions(characterId: string, setCharacter: (updated: Character) => void) {
   const mutation = useCharacterMutation<() => Promise<Character>, Character>({
     characterId,
     mutationFn: (send) => send(),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   return {
