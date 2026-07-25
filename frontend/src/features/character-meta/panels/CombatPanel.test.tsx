@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render as rtlRender, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CombatPanel from "@/features/character-meta/panels/CombatPanel";
 import { RollProvider } from "@/features/dice/RollContext";
 import { fetchSessions } from "@/api/client";
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { SessionDoorwaySummary } from "@/features/session/sessionDoorwaySummary";
 import type { RollResult } from "@/lib/dice";
 import type { Character, Session } from "@/types/character";
@@ -89,10 +90,11 @@ function endedSession(overrides: Partial<Session> = {}): Session {
 }
 
 function renderPanel(character: Character) {
-  return rtlRender(
+  return renderWithCharacter(
     <RollProvider characterId="char-1">
       <CombatPanel character={character} reference={null} onUpdate={() => {}} />
     </RollProvider>,
+    character,
   );
 }
 

@@ -306,7 +306,6 @@ function CollapsedBar({ character, onUpdate, pill, menuItems, onOpenSwitcher }: 
       {onUpdate ? (
         <ManageHpButton
           character={character}
-          onUpdate={onUpdate}
           className="flex flex-none items-center gap-1.5 rounded-control px-1 py-0.5 transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
         >
           {hp}
@@ -377,7 +376,6 @@ function ExpandedSheetHeader({ character, onUpdate, pill, menuItems, onOpenSwitc
         {onUpdate ? (
           <ManageHpButton
             character={character}
-            onUpdate={onUpdate}
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
           >
             <HpNumbers current={current} max={max} temp={temp} />

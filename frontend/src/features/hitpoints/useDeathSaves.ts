@@ -10,7 +10,7 @@ import type { Character, HitPointOperation } from "@/types/character";
  * ops instead of duplicating the handlers. Death-save ops deal no damage, so
  * they carry no concentration check — the minimal post here is sufficient.
  */
-export function useDeathSaves(character: Character, onUpdate: (c: Character) => void) {
+export function useDeathSaves(character: Character, setCharacter: (c: Character) => void) {
   const isDying = character.hitPoints.current === 0;
 
   // Surface transaction failures to the caller so each consumer can render them
@@ -21,7 +21,7 @@ export function useDeathSaves(character: Character, onUpdate: (c: Character) => 
     mutationFn: (ops: HitPointOperation[]) => applyHitPointOperations(character.id, ops),
     toCharacter: (r) => r.character,
     fallbackMessage: "Something went wrong — try again",
-    onCharacterWritten: (r) => onUpdate(r.character),
+    onCharacterWritten: (r) => setCharacter(r.character),
   });
 
   async function post(ops: HitPointOperation[]) {

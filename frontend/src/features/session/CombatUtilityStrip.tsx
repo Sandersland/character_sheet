@@ -43,7 +43,6 @@ const STEP_DISC =
 // orchestrator so the client calls stay single-sourced.
 interface UtilityViewProps {
   character: Character;
-  onUpdate: (character: Character) => void;
   active: ConditionsState["active"];
   exhaustion: number;
   exhaustionBusy: boolean;
@@ -90,7 +89,6 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
 
   const viewProps: UtilityViewProps = {
     character,
-    onUpdate,
     active,
     exhaustion,
     exhaustionBusy,
@@ -123,7 +121,6 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
 // chips beside a big-hit exhaustion stepper, then a Rest row with hit dice.
 function MobileUtilityRows({
   character,
-  onUpdate,
   active,
   exhaustion,
   exhaustionBusy,
@@ -204,7 +201,7 @@ function MobileUtilityRows({
         </div>
       </div>
 
-      <RestButton character={character} onUpdate={onUpdate} variant="row" />
+      <RestButton character={character} variant="row" />
     </div>
   );
 }
@@ -212,7 +209,6 @@ function MobileUtilityRows({
 // Desktop (#982): the one-line summary — conditions + Add + exhaustion + Rest.
 function DesktopUtilityLine({
   character,
-  onUpdate,
   active,
   exhaustion,
   exhaustionBusy,
@@ -294,7 +290,7 @@ function DesktopUtilityLine({
 
       {/* Rest — reuses the session rest control + its short/long-rest handlers. */}
       <div className="ml-auto shrink-0">
-        <RestButton character={character} onUpdate={onUpdate} />
+        <RestButton character={character} />
       </div>
     </div>
   );

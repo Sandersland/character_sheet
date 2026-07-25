@@ -76,7 +76,7 @@ export default function CombatLivePanel({ character, session, onUpdate, active }
         }
         // Mobile keeps HP in the sheet header (#1085); desktop's canonical HP
         // affordance is this compact card (the DesktopUtilityLine stopgap is gone).
-        hpSlot={isBelowMd ? null : <LiveHpCard character={character} onUpdate={onUpdate} />}
+        hpSlot={isBelowMd ? null : <LiveHpCard character={character} />}
         conditionsSlot={<CombatUtilityStrip character={character} onUpdate={onUpdate} />}
         logRow={
           <CombatLogRow
@@ -109,12 +109,11 @@ export default function CombatLivePanel({ character, session, onUpdate, active }
 // dynamic accessible name carries the HP numbers. One canonical HP affordance for
 // desktop live play — the header dropped HP (#1085) and DesktopUtilityLine no
 // longer carries it.
-function LiveHpCard({ character, onUpdate }: { character: Character; onUpdate: (c: Character) => void }) {
+function LiveHpCard({ character }: { character: Character }) {
   const { hitPoints, hitDice } = character;
   return (
     <ManageHpButton
       character={character}
-      onUpdate={onUpdate}
       className="flex w-full items-center gap-4 rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 text-left shadow-card transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
     >
       <span className="min-w-0 flex-1">

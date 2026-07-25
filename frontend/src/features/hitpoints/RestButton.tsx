@@ -6,11 +6,11 @@ import { ChevronRight } from "@/components/ui/icons";
 import RestControls from "@/features/hitpoints/RestControls";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
 import { useRestActions } from "@/features/hitpoints/useRestActions";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 interface RestButtonProps {
   character: Character;
-  onUpdate: (character: Character) => void;
   /** "compact" (default) — the campfire chip. "row" — a full-bleed mobile
    *  utility row with the hit-dice count inline (#1028). */
   variant?: "compact" | "row";
@@ -22,9 +22,10 @@ interface RestButtonProps {
  * chip (ManageHpButton), opening a "Rest" sheet with the short/long rest controls
  * and hit-dice readout — the session home for rests now the Rest & HP tab is gone.
  */
-export default function RestButton({ character, onUpdate, variant = "compact" }: RestButtonProps) {
+export default function RestButton({ character, variant = "compact" }: RestButtonProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const hp = useHitPointApply(character, onUpdate);
+  const { setCharacter } = useCurrentCharacter();
+  const hp = useHitPointApply(character, setCharacter);
   const rest = useRestActions(character, hp.submit);
   const { total, die } = character.hitDice;
 
