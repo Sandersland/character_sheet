@@ -137,6 +137,9 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
   const spellcasting = character.spellcasting!;
   const { slots = [], arcana = [], spells = [], spellSaveDC, spellAttackBonus } = spellcasting;
 
+  // castMutation.error is deliberately never read: a picker casts one of many
+  // rows, so a failure has to land on the row that caused it (via patchRow),
+  // not on a hook-wide field that would blame whichever spell rendered last.
   const castMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: Parameters<typeof applySpellcastingTransactions>[1]) =>

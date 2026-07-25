@@ -25,17 +25,21 @@ import type { Session } from "@/types/character";
 export function usePendingAction() {
   const [error, setError] = useState<string | null>(null);
   const mutation = useMutation({ mutationFn: (fn: () => Promise<void>) => fn() });
+  // Depend on mutateAsync, not the mutation object: the object is rebuilt on
+  // every idle→pending→settled transition, so depending on it would hand out a
+  // new `run` after each call and defeat the memo entirely.
+  const { mutateAsync } = mutation;
 
   const run = useCallback(
     async (fn: () => Promise<void>, fallbackMsg: string) => {
       setError(null);
       try {
-        await mutation.mutateAsync(fn);
+        await mutateAsync(fn);
       } catch (err) {
         setError(errorMessage(err, fallbackMsg));
       }
     },
-    [mutation],
+    [mutateAsync],
   );
   return { pending: mutation.isPending, error, setError, run };
 }

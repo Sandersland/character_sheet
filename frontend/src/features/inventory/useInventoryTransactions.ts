@@ -15,8 +15,8 @@ export interface InventoryTransactions {
   submitOperations: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-// Owns the async write path: POST .../inventory/transactions, swap in the returned
-// character, and close the add/edit panels on success.
+// Owns the async write path: POST .../inventory/transactions, write the returned
+// character straight into the query cache, and close the add/edit panels on success.
 export function useInventoryTransactions(
   character: Character,
   onUpdate: (character: Character) => void
