@@ -112,7 +112,9 @@ const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
 // Operations and applyExperienceOperations deliberately don't use this: HP unwraps
 // { character, concentrationChecks } and XP threads an optional sessionId.
 // submitLevelUp doesn't either: its body is the structured LevelUpSubmission
-// itself, not an { operations } batch.)
+// itself, not an { operations } batch. Class/subclass abilities go through
+// applyAbilityTransactions instead (#1275): extra abilityKey URL segment,
+// heterogeneous response type.)
 async function postTransactions<TOp>(
   characterId: string,
   domain: string,
