@@ -9,12 +9,12 @@ import { toHaveNoViolations } from "jest-axe";
 
 import { createQueryClient, getQueryClient, __setQueryClientForTests } from "@/api/queryClient";
 
-// Every test file gets a live QueryClient with no explicit provider — see
-// [RULING 2] in #1282. `vi.mock` on a setupFiles module reaches every test
-// file's `import { render } from "@testing-library/react"` because vitest
-// resolves that import against the same mocked module registry the setup
-// file ran in. A test's own `wrapper` still nests INSIDE ours since we
-// compose rather than replace it.
+// Every test file gets a live QueryClient without declaring a provider, so the
+// ~200 existing `render(...)` call sites did not have to change (#1282).
+// `vi.mock` here reaches every test file's `import { render } from
+// "@testing-library/react"` because vitest resolves that import against the
+// same mocked module registry the setup file ran in. A test's own `wrapper`
+// still nests INSIDE ours — we compose rather than replace it.
 vi.mock("@testing-library/react", async () => {
   const actual = await vi.importActual<typeof RTL>("@testing-library/react");
   function withQueryClient(ui: React.ReactElement) {
