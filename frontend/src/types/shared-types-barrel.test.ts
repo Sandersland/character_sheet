@@ -37,6 +37,7 @@ import type {
   AdvantageOn,
   ArmorCategory,
   ArmorDetailInput,
+  ActivationType,
   AttunementPrereqKind,
   CampaignRecap,
   CapabilityDice,
@@ -78,6 +79,7 @@ describe("@/types/character barrel", () => {
   });
 
   it("re-exports the shared item + capability wire types", () => {
+    expectTypeOf<ActivationType>().toEqualTypeOf<Shared.ActivationType>();
     expectTypeOf<AdvantageOn>().toEqualTypeOf<Shared.AdvantageOn>();
     expectTypeOf<ArmorCategory>().toEqualTypeOf<Shared.ArmorCategory>();
     expectTypeOf<ArmorDetailInput>().toEqualTypeOf<Shared.ArmorDetailInput>();
