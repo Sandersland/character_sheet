@@ -85,9 +85,12 @@ beforeAll(async () => {
   subclassId = sub.id;
 });
 
+// Cleanup filters on the uniquely-prefixed fixture NAMES, never on `classId` —
+// if beforeAll threw, classId is undefined and Prisma reads that as "no filter",
+// which would delete every seeded Subclass row.
 afterAll(async () => {
   await prisma.character.deleteMany({ where: { name: { startsWith: "SeamEdition" } } });
-  await prisma.subclass.deleteMany({ where: { classId } });
+  await prisma.subclass.deleteMany({ where: { name: SUBCLASS_NAME } });
   await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
 });
 

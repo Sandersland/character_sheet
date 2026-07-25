@@ -3,7 +3,7 @@
 Read this when you need the cross-cutting data patterns (catalog+snapshot, JSON columns, audit log, transaction pattern) or the auth/ownership model. For inventories of what exists, read the code — it is the source of truth:
 
 - **Routers:** `backend/src/app.ts` mounts. Catalog/plain-REST routers mount at `/api`; character-scoped mutation routers mount on their owned sub-path under `/api/characters/:id` via `Router({ mergeParams: true })`.
-- **Domain logic:** `ls backend/src/lib/` — domain folders (`auth`, `activity`, `srd`, `classes`, `leveling`, `spellcasting`, `combat`, `inventory`, `character`, `session`, `campaign`, `core`, `http`).
+- **Domain logic:** `ls backend/src/lib/` — domain folders (`auth`, `activity`, `srd`, `rules`, `classes`, `leveling`, `spellcasting`, `combat`, `inventory`, `character`, `session`, `campaign`, `core`, `http`).
 - **Frontend routes:** `frontend/src/App.tsx`.
 - **Schema:** `backend/prisma/schema.prisma` — model comments carry the per-model reasoning.
 
@@ -30,6 +30,12 @@ Item mechanics live in category detail tables (`Item*Detail` + their `Inventory*
 ### Derive, don't persist
 
 `serializeCharacter` (`lib/character/character-serialize.ts`) is the full read model: level/proficiency from XP, spell slots/DC, AC (+ ordered `armorClassBreakdown` — the frontend renders the labels verbatim and never does AC math; new bonus parts are appended, never prepended), speed, attacks per action, resources, granted spells, roll modifiers. Every mutation router re-fetches with `characterInclude` and returns `serializeCharacter(updated)`. See the CLAUDE.md non-negotiable and `docs/leveling.md` for the clamp/reconcile pattern.
+
+### Rules edition
+
+`Character.rulesEdition` is authoritative for a sheet; `Campaign.rulesEdition` is only the default a new character is created with (a character may link to several campaigns, and a solo session #1080 has none). It is **write-once** — set by the create transaction, excluded from `PATCH /characters/:id` and from every transaction op — so no reconciler ever has to handle an edition change (#1281, 2026-07-25).
+
+Rules code obtains it exactly one way: `editionOf` (`lib/rules/edition.ts`). The parameter is required, so a `select` that omits `rulesEdition` is a compile error rather than a silent 2024 default. A rule that varies by edition takes `edition` as its last parameter and stays one function per rule; a rule that is edition-invariant — the majority (XP/PB, every spell-slot table, death saves, ASI levels, multiclass prerequisites, Unarmored Defense) — takes no `edition`. `subclassGateLevel` is the pattern-setter, and shows the required discipline: its reconcile-on-write, clamp-on-read and write-side-validation callers all resolve through it, so the three can never disagree.
 
 ### JSON columns on Character
 
