@@ -2,6 +2,8 @@
  * Shared-campaign wire types: campaigns, entity registry, campaign items, and identity merges.
  */
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { ArmorDetail, ArmorDetailInput, AttunementPrereqKind, ConsumableDetail, EquipSlot, ItemCapability, ItemCategory, ItemRarity, WeaponDetail, WeaponDetailInput } from "./inventory";
 import type { JournalEntryKind } from "./journal";
 import type { Currency } from "./primitives";
@@ -32,6 +34,9 @@ export interface Campaign {
   id: string;
   name: string;
   ownerId: string;
+  /** The DM's default edition for characters created into this campaign (#1285).
+   *  Never authoritative for a sheet — Character.rulesEdition is. */
+  rulesEdition: RulesEdition;
   inviteCode: string;
   createdAt: string;
   members: CampaignMember[];

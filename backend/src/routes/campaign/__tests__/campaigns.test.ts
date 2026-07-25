@@ -71,6 +71,25 @@ describe("campaigns (#246)", () => {
     expect(owner?.role).toBe("OWNER");
   });
 
+  // #1285: the campaign wire returns raw Prisma rows, so the column surfaces
+  // without a mapper — pinned here so a future mapper can't silently drop it.
+  it("exposes rulesEdition on create and on GET, defaulting to EDITION_2024", async () => {
+    const created = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "Edition Default" });
+
+    expect(created.status).toBe(201);
+    expect(created.body.rulesEdition).toBe("EDITION_2024");
+
+    const fetched = await supertest(createApp())
+      .get(`/api/campaigns/${created.body.id as string}`)
+      .set("Cookie", cookieA);
+
+    expect(fetched.status).toBe(200);
+    expect(fetched.body.rulesEdition).toBe("EDITION_2024");
+  });
+
   it("lets a second user join via invite code as PLAYER", async () => {
     const created = await supertest(createApp())
       .post("/api/campaigns")

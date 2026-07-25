@@ -4,3 +4,4 @@
 // here reaches either runtime bundle. Add one file per mirror family and re-export
 // it here.
 export type * from "./spellcasting.js";
+export type * from "./edition.js";

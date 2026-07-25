@@ -275,6 +275,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     portraitUrl: row.portraitUrl ?? undefined,
     // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
+    rulesEdition: row.rulesEdition,
     // Campaign-scoped play prefs (#537), or undefined when unattached.
     campaignPreferences: buildCampaignPreferencesView(row),
 
