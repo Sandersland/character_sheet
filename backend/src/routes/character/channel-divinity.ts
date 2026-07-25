@@ -1,20 +1,14 @@
 import { Router } from "express";
-import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
-import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
 import {
-  applyChannelDivinityOperations,
   describeChannelDivinity,
   CHANNEL_DIVINITY_OPTIONS,
   isEntitled,
-  InvalidChannelDivinityOperationError,
   type GateEntry,
 } from "@/lib/classes/channel-divinity.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const channelDivinityRouter = Router({ mergeParams: true });
 
@@ -53,32 +47,4 @@ channelDivinityRouter.get<{ id: string }>("/", async (req, res) => {
     .map(({ row, gate }) => describeChannelDivinity(row, gate, { abilityScores, profBonus, classLevel: level }));
 
   res.json(options);
-});
-
-const castChannelDivinityOpSchema = z.object({
-  type: z.literal("castChannelDivinity"),
-  abilityId: z.string().min(1),
-});
-
-const operationSchema = z.discriminatedUnion("type", [castChannelDivinityOpSchema]);
-
-const transactionsRequestSchema = z.object({
-  operations: z.array(operationSchema).min(1),
-});
-
-/**
- * POST /api/characters/:id/channel-divinity/transactions
- * Intent-bearing batch mutation — mirrors the shadow-arts endpoint. The one op:
- *   castChannelDivinity — spend 1 CD charge; apply the option's real side effect
- *   (Sacred Weapon attack buff, Cloak of Shadows invisibility) or reminder/DC.
- */
-makeTransactionsEndpoint({
-  router: channelDivinityRouter,
-  schema: transactionsRequestSchema,
-  apply: (characterId, data) => applyChannelDivinityOperations(characterId, data.operations),
-  domainErrors: [
-    InvalidChannelDivinityOperationError,
-    InvalidResourceOperationError,
-    InvalidSpellcastingOperationError,
-  ],
 });

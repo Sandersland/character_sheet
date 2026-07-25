@@ -6,7 +6,6 @@ import supertest from "supertest";
 import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { findInList } from "@/test-support/list.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
@@ -142,10 +141,9 @@ describe("characters routes", () => {
     await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
   });
 
-  // The catalog rows are upserted (not deleted) between tests so reruns
-  // don't churn ids — but they shouldn't linger in a shared dev database
-  // as selectable "Test Race"/"Test Class"/"Test Background"/"Test Club"
-  // options once the whole suite is done.
+  // The catalog rows are upserted (not deleted) between tests so reruns don't
+  // churn ids — but a later file on this worker inherits the same database, so
+  // they must not linger as selectable catalog options once the suite is done.
   afterAll(async () => {
     await prisma.race.deleteMany({ where: { name: TEST_RACE.name } });
     await prisma.characterClass.deleteMany({ where: { name: TEST_CLASS.name } });
@@ -154,17 +152,38 @@ describe("characters routes", () => {
     await prisma.user.deleteMany({ where: { id: TEST_USER.id } });
   });
 
-  it("GET /api/characters returns summaries with derived level", async () => {
-    // eslint-disable-next-line no-restricted-syntax -- lists every character, but asserts only on this suite's own fixture via findInList (see docs/testing.md)
+  it("GET /api/characters returns exactly this suite's fixtures, name-ordered", async () => {
+    const secondId = "test-character-2";
+    createdCharacterIds.push(secondId);
+    await prisma.character.create({
+      data: {
+        ...FIXTURE,
+        id: secondId,
+        name: "Aardvark Fixture",
+        owner: { connect: { id: TEST_USER.id } },
+        spellcasting: Prisma.JsonNull,
+        raceSelection: { create: { name: TEST_RACE.name } },
+        backgroundSelection: { create: { name: TEST_BACKGROUND.name } },
+        classEntries: { create: [{ name: TEST_CLASS.name, position: 0 }] },
+      },
+    });
+
     const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/characters");
 
     expect(response.status).toBe(200);
-    const fixture = findInList<{ id: string; name: string; level: number; ownerId: string }>(
-      response.body,
-      FIXTURE.id
-    );
-    expect(fixture).toBeDefined();
-    expect(fixture).toMatchObject({ name: "Test Fixture", level: 3, ownerId: TEST_USER.id });
+    expect(response.body).toEqual([
+      expect.objectContaining({ id: secondId, name: "Aardvark Fixture" }),
+      expect.objectContaining({
+        id: FIXTURE.id,
+        name: "Test Fixture",
+        level: 3,
+        ownerId: TEST_USER.id,
+      }),
+    ]);
+    // Deliberately unscoped — the whole Character table, which only a
+    // per-worker database makes assertable (#1269). It doubles as a leak
+    // detector for any earlier file sharing this worker.
+    expect(await prisma.character.count()).toBe(2);
   });
 
   it("GET /api/characters/:id returns full character with derived fields", async () => {
@@ -996,8 +1015,7 @@ describe("characters routes", () => {
       );
 
       expect(filtered.status).toBe(200);
-      const filteredIds = filtered.body.map((c: { id: string }) => c.id);
-      expect(filteredIds).toContain(FIXTURE.id);
+      expect(filtered.body.map((c: { id: string }) => c.id)).toEqual([FIXTURE.id]);
     });
   });
 

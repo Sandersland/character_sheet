@@ -3,7 +3,7 @@
 Read this when you need the cross-cutting data patterns (catalog+snapshot, JSON columns, audit log, transaction pattern) or the auth/ownership model. For inventories of what exists, read the code — it is the source of truth:
 
 - **Routers:** `backend/src/app.ts` mounts. Catalog/plain-REST routers mount at `/api`; character-scoped mutation routers mount on their owned sub-path under `/api/characters/:id` via `Router({ mergeParams: true })`.
-- **Domain logic:** `ls backend/src/lib/` — domain folders (`auth`, `activity`, `srd`, `classes`, `leveling`, `spellcasting`, `combat`, `inventory`, `character`, `session`, `campaign`, `core`, `http`).
+- **Domain logic:** `ls backend/src/lib/` — domain folders (`auth`, `activity`, `srd`, `rules`, `classes`, `leveling`, `spellcasting`, `combat`, `inventory`, `character`, `session`, `campaign`, `core`, `http`).
 - **Frontend routes:** `frontend/src/App.tsx`.
 - **Schema:** `backend/prisma/schema.prisma` — model comments carry the per-model reasoning.
 
@@ -31,6 +31,12 @@ Item mechanics live in category detail tables (`Item*Detail` + their `Inventory*
 
 `serializeCharacter` (`lib/character/character-serialize.ts`) is the full read model: level/proficiency from XP, spell slots/DC, AC (+ ordered `armorClassBreakdown` — the frontend renders the labels verbatim and never does AC math; new bonus parts are appended, never prepended), speed, attacks per action, resources, granted spells, roll modifiers. Every mutation router re-fetches with `characterInclude` and returns `serializeCharacter(updated)`. See the CLAUDE.md non-negotiable and `docs/leveling.md` for the clamp/reconcile pattern.
 
+### Rules edition
+
+`Character.rulesEdition` is authoritative for a sheet; `Campaign.rulesEdition` is only the default a new character is created with (a character may link to several campaigns, and a solo session #1080 has none). It is **write-once** — set by the create transaction, excluded from `PATCH /characters/:id` and from every transaction op — so no reconciler ever has to handle an edition change (#1281, 2026-07-25).
+
+Rules code obtains it exactly one way: `editionOf` (`lib/rules/edition.ts`). The parameter is required, so a `select` that omits `rulesEdition` is a compile error rather than a silent 2024 default. A rule that varies by edition takes `edition` as its last parameter and stays one function per rule; a rule that is edition-invariant — the majority (XP/PB, every spell-slot table, death saves, ASI levels, multiclass prerequisites, Unarmored Defense) — takes no `edition`. `subclassGateLevel` is the pattern-setter, and shows the required discipline: its reconcile-on-write, clamp-on-read and write-side-validation callers all resolve through it, so the three can never disagree.
+
 ### JSON columns on Character
 
 `hitPoints`, `hitDice`, `abilityScores`, `skills`, `toolProficiencies`, `currency`, `spellcasting?`, `resources?`, `conditions?`, `activeEffects?`. They hold **mutable state only** — all totals/caps are derived at read time and clamped-on-read. `currency` is the only JSON column still patchable via `PATCH /characters/:id`; every other one mutates exclusively through its domain's transactions endpoint. Journal is a separate `JournalEntry` table, not a JSON column.
@@ -52,7 +58,7 @@ Every mutable domain follows the same shape:
 
 1. **Zod discriminated union** per op type.
 2. **`apply*Operations(characterId, ops)`** in `lib/` — one `prisma.$transaction`, ops applied in order, `logEvent` per meaningful op with the shared `batchId`. Most domains delegate the shared preamble (batchId + active-session lookup + transaction + per-op re-read) to `runCharacterTransaction` (`lib/character/character-transaction.ts`).
-3. **Route** — the uniform scaffold (assert `edit` → parse → apply → domain-error → 400 → re-fetch → serialize) is owned by `makeTransactionsEndpoint` (`lib/http/transactions-endpoint.ts`). Non-uniform endpoints (e.g. `/hp`) keep hand-written handlers.
+3. **Route** — the uniform scaffold (assert `edit` → parse → apply → domain-error → 400 → re-fetch → serialize) is owned by `runTransaction`, exposed either as one router-owned endpoint via `makeTransactionsEndpoint` (`lib/http/transactions-endpoint.ts`) or, for class/subclass abilities, via the single `POST /characters/:id/abilities/:abilityKey/transactions` endpoint dispatching on `ABILITY_REGISTRY` (#1275). Non-uniform endpoints (e.g. `/hp`) keep hand-written handlers.
 
 `lib/inventory/inventory.ts` is the reference implementation for the lib layer. Do not add new mutable domains via `PATCH /characters/:id`. The campaign-side counterpart is DM award/revoke (`lib/campaign/campaign-item-award.ts`), which writes undoable events on the **target** character.
 
@@ -60,7 +66,12 @@ The level-up ceremony endpoint (`/level-up/transactions`) is the **composition v
 
 ### Cross-tier shared types
 
-Wire types shared by both tiers (backend transaction-op inputs the frontend must construct) have a single source of truth in the `@character-sheet/shared-types` workspace (`packages/shared-types/`), consumed via `import type` only — so nothing reaches either runtime bundle and tsc catches drift that hand-mirrors used to hide (#820). Each tier re-exports the names it uses from its existing public module (backend `lib/spellcasting/spellcasting.ts`, frontend `types/character/spells.ts`) so downstream imports are unchanged. Add a mirror family as one file under `src/`, export only names consumed by name (union-only members stay module-private for the zero-dead-export gate), and re-export per tier. The spellcasting-op family is the migrated pattern-setter; remaining families (`#820`) still hand-mirror until moved.
+Wire types shared by both tiers (backend transaction-op inputs the frontend must construct, and the shapes the serializers return) are declared **once** in the `@character-sheet/shared-types` workspace (`packages/shared-types/`) and never hand-mirrored. Consume via `import type` only — nothing reaches either runtime bundle, and tsc catches the drift a mirror used to hide (#820). Add a family as one file under `src/`, re-export it from `index.ts`, then re-export the names each tier uses from that tier's existing public module (backend `lib/…`, frontend `types/character/*.ts`) so downstream imports never change. Put only the *consumed* names in those per-tier re-export blocks — a name that was previously used inside its declaring module becomes a dead export the moment it is only forwarded, and the zero-dead-export gate is repo-wide.
+
+Two rules the package can't enforce for you:
+
+- **A runtime value that used to define its type is now a separate declaration.** Where an `as const` tuple fed both a zod schema and `type X = (typeof TUPLE)[number]`, the tuple stays backend-side and the union moves — so add a `expectTypeOf<(typeof TUPLE)[number]>().toEqualTypeOf<X>()` latch, or the schema and the wire type will drift silently. Same for any Prisma enum a shared type spells out as a literal union (the package has no Prisma dependency).
+- **Not every look-alike pair is one type.** If a serializer remaps fields on the way out, the internal and wire shapes are genuinely different types that a token-based clone detector cannot tell apart — leave the internal one private.
 
 ## Docker Compose
 

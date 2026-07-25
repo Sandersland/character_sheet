@@ -1,6 +1,6 @@
 import { Prisma, type EquipSlot } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
-import type { ItemCategoryName } from "./item-detail-inputs.js";
+import type { ItemCategory } from "./item-detail-inputs.js";
 import {
   type Currency,
   InvalidInventoryOperationError,
@@ -36,7 +36,7 @@ import {
 interface AcquireSource {
   itemId: string | null;
   name: string;
-  category: ItemCategoryName;
+  category: ItemCategory;
   weight: number | undefined;
   cost: Currency | undefined;
   description: string | undefined;

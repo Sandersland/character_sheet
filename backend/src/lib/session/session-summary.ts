@@ -7,81 +7,17 @@
  * existing `CharacterEvent` rows. No new per-event bookkeeping is introduced.
  */
 
-/** One acquired-item line: catalog/custom name + net quantity gained. */
-export interface SummaryItem {
-  name: string;
-  qty: number;
-}
+import type {
+  CampaignRecap,
+  ParticipantSummary,
+  SessionSummary,
+  SessionSummaryAdvancement,
+  SessionSummaryItem,
+} from "@character-sheet/shared-types";
 
-/** A level-up, ASI, or feat taken during the session — surfaced as a headline. */
-export interface SummaryAdvancement {
-  /** "levelUp" | "abilityScoreImprovement" | "featTaken" */
-  type: string;
-  /** Human-readable description, copied from the event's stored summary. */
-  label: string;
-}
-
-export interface SessionSummary {
-  startedAt: string; // ISO 8601
-  endedAt: string; // ISO 8601
-  durationMs: number;
-  /** Net XP gained across all xpAward / xpSet events (can be negative). */
-  xpGained: number;
-  /** Number of levelUp events logged this session. */
-  levelsGained: number;
-  /** Net quantity acquired per item, alphabetical, zero-net items omitted. */
-  itemsAcquired: SummaryItem[];
-  /** Quantity sold per item (positive counts), alphabetical. Kept separate from
-   * acquired so a sale never shows as a negative "acquired" line. */
-  itemsSold: SummaryItem[];
-  /** DM-awarded loot this session (awarded net of revoked), alphabetical. Kept
-   * separate from itemsAcquired so campaign grants read as their own line. */
-  loot: SummaryItem[];
-  /** Spell slots spent this session, keyed by slot level → count (net of restores). */
-  slotsSpent: Record<string, number>;
-  /** Number of castSpell events (includes cantrips). */
-  spellsCast: number;
-  /** Highest combat round reached across all combatRoundAdvanced events. */
-  combatRounds: number;
-  /** Count of attackRoll events. */
-  attackRolls: number;
-  /** Count of damageRoll events. */
-  damageRolls: number;
-  /** ASIs + feats taken (level-ups excluded; counted separately). */
-  featsOrAsis: SummaryAdvancement[];
-}
-
-/** One participant's session summary, plus their presence window (#245). */
-export interface ParticipantSummary extends SessionSummary {
-  characterId: string;
-  characterName: string;
-  joinedAt: string; // ISO 8601
-  leftAt: string | null; // ISO 8601, null if still present at session end
-  presentMs: number;
-}
-
-/** Campaign-level recap: aggregate of every participant's summary (#245). */
-export interface CampaignRecap {
-  startedAt: string | null; // ISO 8601 — earliest join, null when no participants
-  endedAt: string | null; // ISO 8601 — latest leave/end, null when no participants
-  durationMs: number;
-  participantCount: number;
-  xpGained: number;
-  levelsGained: number;
-  spellsCast: number;
-  combatRounds: number;
-  attackRolls: number;
-  damageRolls: number;
-  itemsAcquired: SummaryItem[];
-  itemsSold: SummaryItem[];
-  /** DM-awarded loot across participants (awarded net of revoked). */
-  loot: SummaryItem[];
-  /** Spell slots spent, keyed by slot level → count, summed across participants. */
-  slotsSpent: Record<string, number>;
-  /** ASIs + feats taken across all participants (level-ups counted separately). */
-  featsOrAsis: SummaryAdvancement[];
-  totalPresentMs: number;
-}
+// The summary shapes are the wire contract and live in shared-types (#1273);
+// re-exported so importers of this module keep resolving them here unchanged.
+export type { CampaignRecap, ParticipantSummary, SessionSummary };
 
 /**
  * The minimal subset of a `CharacterEvent` the aggregation reads. Matches the
@@ -174,7 +110,7 @@ interface SummaryAccumulator {
   soldNet: Map<string, number>;
   lootNet: Map<string, number>;
   slotsSpent: Record<string, number>;
-  featsOrAsis: SummaryAdvancement[];
+  featsOrAsis: SessionSummaryAdvancement[];
 }
 
 function createAccumulator(): SummaryAccumulator {
@@ -349,14 +285,14 @@ export function computeSessionSummary(
 }
 
 /** Merge a list of already-summed items into a name→qty map. */
-function mergeItems(map: Map<string, number>, items: SummaryItem[]): void {
+function mergeItems(map: Map<string, number>, items: SessionSummaryItem[]): void {
   for (const item of items) {
     map.set(item.name, (map.get(item.name) ?? 0) + item.qty);
   }
 }
 
-/** Net a name→qty map into a sorted SummaryItem[], dropping zero-net entries. */
-function itemsFromMap(map: Map<string, number>): SummaryItem[] {
+/** Net a name→qty map into a sorted SessionSummaryItem[], dropping zero-net entries. */
+function itemsFromMap(map: Map<string, number>): SessionSummaryItem[] {
   return [...map.entries()]
     .filter(([, qty]) => qty !== 0)
     .map(([name, qty]) => ({ name, qty }))
@@ -374,7 +310,7 @@ export function computeCampaignRecap(participants: ParticipantSummary[]): Campai
   const soldNet = new Map<string, number>();
   const lootNet = new Map<string, number>();
   const slotsSpent: Record<string, number> = {};
-  const featsOrAsis: SummaryAdvancement[] = [];
+  const featsOrAsis: SessionSummaryAdvancement[] = [];
   let xpGained = 0;
   let levelsGained = 0;
   let spellsCast = 0;

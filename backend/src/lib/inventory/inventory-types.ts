@@ -1,6 +1,6 @@
 import { Prisma, type EquipSlot } from "@/generated/prisma/client.js";
 import type {
-  ItemCategoryName,
+  ItemCategory,
   WeaponDetailInput,
   ArmorDetailInput,
   ConsumableDetailInput,
@@ -9,7 +9,7 @@ import { type Currency, InvalidInventoryOperationError } from "./inventory-curre
 
 export interface CustomItemInput {
   name: string;
-  category: ItemCategoryName;
+  category: ItemCategory;
   weight?: number;
   cost?: Currency;
   description?: string;

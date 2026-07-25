@@ -1,46 +1,23 @@
 // Single source for the weapon/armor/consumable detail-input shapes shared
 // by the runtime lib (lib/inventory/inventory.ts) and the catalog seed
-// (prisma/seed/catalog-data.ts). Types-only leaf, zero imports, so the seed's
-// tsx context resolves it via a plain relative path. Each object is used
-// directly as an Item's nested detail create, so a *Detail table's stats are
-// typed in exactly one place.
+// (prisma/seed/catalog-data.ts). Each object is used directly as an Item's
+// nested detail create, so a *Detail table's stats are typed in exactly one
+// place. Type-only: the seed resolves this module through a plain relative path
+// under tsx, and every statement below is erased before that resolution happens.
 
-// Match the Prisma schema's ItemCategory/ArmorCategory enums.
-export type ItemCategoryName = "weapon" | "armor" | "consumable" | "gear";
-export type ArmorCategoryName = "light" | "medium" | "heavy" | "shield";
+import type {
+  ArmorCategory,
+  ArmorDetailInput,
+  ItemCategory,
+  WeaponDetailInput,
+} from "@character-sheet/shared-types";
 
-// Mirrors ItemWeaponDetail's own fields (minus id/itemId). Dice are
-// count/faces/modifier (matching frontend dice RollSpec), not a "1d6" string —
-// see schema.prisma's comment on ItemWeaponDetail for why.
-export interface WeaponDetailInput {
-  damageDiceCount: number;
-  damageDiceFaces: number;
-  damageModifier?: number;
-  damageType: string;
-  versatileDiceCount?: number;
-  versatileDiceFaces?: number;
-  finesse?: boolean;
-  light?: boolean;
-  heavy?: boolean;
-  twoHanded?: boolean;
-  reach?: boolean;
-  thrown?: boolean;
-  ammunition?: boolean;
-  rangeNormal?: number;
-  rangeLong?: number;
-  weaponClass?: "simple" | "martial";
-  weaponRange?: "melee" | "ranged";
-}
+// The category enums and the weapon/armor inputs are the wire contract and live
+// in shared-types (#1273); re-exported so importers keep resolving them here.
+export type { ArmorCategory, ArmorDetailInput, ItemCategory, WeaponDetailInput };
 
-export interface ArmorDetailInput {
-  armorCategory: ArmorCategoryName;
-  baseArmorClass: number;
-  dexModifierApplies?: boolean;
-  dexModifierMax?: number;
-  stealthDisadvantage?: boolean;
-  strengthRequirement?: number;
-}
-
+// No frontend twin (the client sends ConsumableDetail, which the API also
+// returns), so this one stays backend-local.
 export interface ConsumableDetailInput {
   effectDiceCount?: number;
   effectDiceFaces?: number;

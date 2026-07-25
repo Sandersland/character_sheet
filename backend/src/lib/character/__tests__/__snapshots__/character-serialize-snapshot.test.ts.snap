@@ -470,6 +470,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "source": "Heroic Chant",
     },
   ],
+  "rulesEdition": "EDITION_2024",
   "savingThrowProficiencies": [
     "intelligence",
     "wisdom",
@@ -827,6 +828,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     ],
   },
   "rollModifiers": [],
+  "rulesEdition": "EDITION_2024",
   "savingThrowProficiencies": [
     "strength",
     "constitution",

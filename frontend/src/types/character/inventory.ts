@@ -2,15 +2,56 @@
  * Inventory + item catalog wire types: items, weapon/armor/consumable detail, capabilities, and inventory operations.
  */
 
+import type {
+  ActivationType,
+  ArmorCategory,
+  ArmorDetailInput,
+  AttunementPrereqKind,
+  CastResource,
+  CastStatMode,
+  ItemCategory,
+  ProficiencyKind,
+  SerializedCapability,
+  WeaponClass,
+  WeaponDetailInput,
+  WeaponRange,
+} from "@character-sheet/shared-types";
+
 import type { Currency } from "./primitives";
 
-export type ItemCategory = "weapon" | "armor" | "consumable" | "gear";
-
-export type ArmorCategory = "light" | "medium" | "heavy" | "shield";
-
-export type WeaponClass = "simple" | "martial";
-
-export type WeaponRange = "melee" | "ranged";
+// The item/capability wire vocabulary is the single cross-tier source of truth in
+// shared-types (#1273); re-exported here so this module stays the frontend's
+// inventory-types entry point (flowing through the @/types/character barrel).
+// The names imported above are also used locally by the shapes below.
+export type {
+  ActivationType,
+  ArmorCategory,
+  AttunementPrereqKind,
+  CastResource,
+  CastStatMode,
+  ItemCategory,
+  ProficiencyKind,
+  WeaponClass,
+  WeaponRange,
+};
+export type { ArmorDetailInput, WeaponDetailInput };
+export type {
+  AdvantageOn,
+  CapabilityDice,
+  CapabilityKind,
+  CapabilityOp,
+  CapabilityTarget,
+  ChargeTrigger,
+  GrantType,
+  GrantValueKind,
+  ItemAdvantageGrant,
+  ItemProficiencyGrant,
+} from "@character-sheet/shared-types";
+// The wire capability keeps its frontend name: the shared declaration is called
+// SerializedCapability to distinguish it from the backend's kind-discriminated
+// internal Capability union, a distinction the client doesn't have. Aliasing
+// beats renaming 80+ call sites — it is still one declaration (#1273).
+export type { SerializedCapability as ItemCapability };
 
 /**
  * Weapon-specific mechanics, present (as `weapon`) only on a row whose
@@ -115,99 +156,6 @@ export interface Item {
   consumable?: ConsumableDetail;
 }
 
-/**
- * Item capabilities & attunement (#546). Mirrors the backend `CapabilityKind`.
- * Only passiveBonus is authorable/rendered this slice; the reserved kinds
- * round-trip as opaque.
- */
-export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
-
-export type CapabilityTarget =
-  | "ac"
-  | "attack"
-  | "damage"
-  | "save"
-  | "skill"
-  | "abilityScore"
-  | "spellAttack"
-  | "spellDc"
-  | "initiative"
-  | "speed"
-  | "maxHp";
-
-export type CapabilityOp = "add" | "setTo";
-
-export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
-
-/** grant kind (#529). Mirrors the backend `GrantType`. */
-export type GrantType = "resistance" | "immunity" | "conditionImmunity" | "advantage" | "proficiency";
-
-export type AdvantageOn = "save" | "check" | "initiative" | "attack";
-
-export type GrantValueKind = "damageType" | "condition" | "skill" | "ability" | "save" | "weapon" | "tool" | "language";
-
-export type ProficiencyKind = "skill" | "save" | "weapon" | "tool" | "language";
-
-/** Dice-valued bonus (e.g. +2d6 fire); consumed in the damage roll at #526C. */
-export interface CapabilityDice {
-  count: number;
-  faces: number;
-  damageType?: string;
-}
-
-/** One capability as served on a campaign item or an inventory-item snapshot. */
-/** castSpell resource recharge (#528). atWill is unlimited; perDay ≈ long rest.
- * charges (#555) spends the item's shared pool (chargeCost per cast). */
-export type CastResource = "perRestShort" | "perRestLong" | "perDayDawn" | "perDayDusk" | "atWill" | "charges";
-
-/** Charges-pool recharge trigger (#555); dawn/dusk ≈ long rest. */
-export type ChargeTrigger = "short" | "long" | "dawn" | "dusk";
-
-/** Whether a castSpell DC/attack is a fixed item value or the wielder's own (#528). */
-export type CastStatMode = "fixed" | "wielder";
-
-export interface ItemCapability {
-  kind: CapabilityKind;
-  target?: CapabilityTarget;
-  op?: CapabilityOp;
-  value?: number;
-  /** Specific skill/ability/save key when target is skill|abilityScore|save. */
-  targetKey?: string;
-  condition?: string;
-  description?: string;
-  dice?: CapabilityDice;
-  // castSpell fields (#528).
-  spellId?: string;
-  spellName?: string;
-  spellLevel?: number;
-  castLevel?: number;
-  resource?: CastResource;
-  uses?: number;
-  concentration?: boolean;
-  dcMode?: CastStatMode;
-  dcValue?: number;
-  attackMode?: CastStatMode;
-  attackValue?: number;
-  /** activatedEffect (#543) — reuses target/op/value for the inline self-buff. */
-  activation?: ActivationType;
-  activatedDuration?: "whileActive" | "untilRest";
-  resourceKind?: "perRest" | "perDay" | "atWill" | "charges";
-  resourcePeriod?: "short" | "long" | "dawn" | "dusk";
-  resourceCharges?: number;
-  durationText?: string;
-  /** grant kind (#529): the trait/proficiency the item confers while active. */
-  grantType?: GrantType;
-  grantOn?: AdvantageOn;
-  grantValueKind?: GrantValueKind;
-  grantValue?: string;
-  cantBeSurprised?: boolean;
-  /** charges pool (#555): the item's shared charge reservoir. */
-  maxCharges?: number;
-  recharge?: { trigger: ChargeTrigger; dice?: { count: number; faces: number }; bonus?: number };
-  /** Pool charges a castSpell/activatedEffect spends when its resource is "charges" (default 1). */
-  chargeCost?: number;
-}
-
 /** Item-granted-spell metadata on a Spell whose source is "item" (#528). */
 export interface ItemSpellMeta {
   inventoryItemId: string;
@@ -233,32 +181,17 @@ export interface ItemChargesState {
   recharge: string;
 }
 
-/** An item-granted damage resistance/immunity, tagged with its item source (#529). */
+// The two trait grants below have no shared declaration (unlike their advantage
+// and proficiency siblings) because deriveItemGrants produces a generic
+// {value, source} internally and serializeCharacter remaps `value` to
+// `damageType` / `condition` on the way out — these ARE the wire shapes (#529).
 export interface ItemDamageTrait {
   damageType: string;
   source: string;
 }
 
-/** An item-granted condition immunity, tagged with its item source (#529). */
 export interface ItemConditionImmunity {
   condition: string;
-  source: string;
-}
-
-/** An item-granted advantage (rendered as reminder text on its surface) (#529). */
-export interface ItemAdvantageGrant {
-  on: AdvantageOn;
-  valueKind?: GrantValueKind;
-  value?: string;
-  cantBeSurprised: boolean;
-  source: string;
-  description?: string;
-}
-
-/** An item-granted proficiency, for the item-source display marker (#529). */
-export interface ItemProficiencyGrant {
-  profType: ProficiencyKind;
-  value: string;
   source: string;
 }
 
@@ -312,7 +245,7 @@ export interface InventoryItem {
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
-  capabilities?: ItemCapability[];
+  capabilities?: SerializedCapability[];
   /** Activate/deactivate control state for an item's activatedEffect capability (#543). */
   activated?: ActivatedEffectState;
   /** Shared charge-pool state for an item with a charges capability (#555). */
@@ -328,43 +261,6 @@ export interface ActivatedEffectState {
   remainingUses: number | null;
   active: boolean;
   available: boolean;
-}
-
-export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
-
-// Looser than WeaponDetail/ArmorDetail above (which describe what the API
-// always returns, every flag included) — these describe what a client only
-// has to *send*: just the fields the matching *Detail table's columns are
-// NOT NULL for, matching the backend `WeaponDetailInput`/`ArmorDetailInput`
-// exactly. Everything else defaults server-side and is refinable later via an
-// `update` operation.
-export interface WeaponDetailInput {
-  damageDiceCount: number;
-  damageDiceFaces: number;
-  damageModifier?: number;
-  damageType: string;
-  versatileDiceCount?: number;
-  versatileDiceFaces?: number;
-  finesse?: boolean;
-  light?: boolean;
-  heavy?: boolean;
-  twoHanded?: boolean;
-  reach?: boolean;
-  thrown?: boolean;
-  ammunition?: boolean;
-  rangeNormal?: number;
-  rangeLong?: number;
-  weaponClass?: WeaponClass;
-  weaponRange?: WeaponRange;
-}
-
-export interface ArmorDetailInput {
-  armorCategory: ArmorCategory;
-  baseArmorClass: number;
-  dexModifierApplies?: boolean;
-  dexModifierMax?: number;
-  stealthDisadvantage?: boolean;
-  strengthRequirement?: number;
 }
 
 /**

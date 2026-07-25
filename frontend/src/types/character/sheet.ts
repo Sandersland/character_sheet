@@ -2,6 +2,8 @@
  * The aggregate serialized Character shape and its lean summary view.
  */
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { AvailableAction } from "./actions";
 import type { CampaignPreferences } from "./campaign";
 import type { ArmorProficiency, CharacterResources, ClassEntry, ToolProficiency, WeaponProficiency } from "./classes";
@@ -186,6 +188,8 @@ export interface Character {
   campaignId?: string;
   /** Per-campaign play preferences (#537); absent when not in a campaign. */
   campaignPreferences?: CampaignPreferences;
+  /** Authoritative rules edition for this sheet (#1285); write-once at creation. */
+  rulesEdition: RulesEdition;
 }
 
 export interface CharacterSummary {

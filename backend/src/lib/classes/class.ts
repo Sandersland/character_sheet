@@ -12,7 +12,8 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
-import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+import { effectiveEntryLevel, subclassGateLevel } from "@/lib/leveling/effective-levels.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -64,6 +65,7 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     where: { id: characterId },
     select: {
       experiencePoints: true,
+      rulesEdition: true,
       classEntries: {
         orderBy: { position: "asc" as const },
         select: { id: true, name: true, subclass: true, subclassId: true, classId: true, level: true },
@@ -100,7 +102,9 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     character.classEntries.length,
     levelForExperience(character.experiencePoints),
   );
-  const required = subclass.class.subclassLevel;
+  // Same gate the reconciler and the clamp-on-read use — without this the write
+  // path would accept a subclass the sheet then refuses to show (#1285).
+  const required = subclassGateLevel(subclass.class.subclassLevel, editionOf(character));
   if (level < required) {
     throw new InvalidClassOperationError(
       `Character is ${subclass.class.name} level ${level} but the subclass is not granted until level ${required}`

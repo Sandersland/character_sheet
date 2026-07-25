@@ -1,45 +1,14 @@
-import type { CampaignRole } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSession } from "./sessions.js";
+import type { SessionDoorwayRole, SessionDoorwayState } from "@character-sheet/shared-types";
 
 // The doorway is the sheet's one always-visible, state-aware session affordance
 // (#942). This module is the read model behind GET
 // /api/characters/:id/sessions/doorway — a small settle-on-read serializer, no
-// schema change. The union below is the FROZEN contract: scheduling (#951)
-// extends server behavior only (starts emitting the `scheduled*`/`earlyJoin`
-// kinds + `scheduled` sessions, flips `canStart` owner-only). This issue never
-// returns the scheduled kinds, but the shape already carries their fields so the
-// client can be written against all five kinds today.
-
-export type SessionDoorwayKind =
-  | "none"
-  | "liveJoined"
-  | "liveNotJoined"
-  | "scheduledUpcoming"
-  | "earlyJoin";
-
-export interface SessionDoorwaySessionState {
-  id: string;
-  status: "active" | "scheduled";
-  startedAt: string | null;
-  /** null until #951 (no scheduled sittings exist yet). */
-  scheduledAt: string | null;
-  title: string | null;
-  /** This character is a present participant (joined, !leftAt). */
-  joined: boolean;
-  /** DERIVED from the latest combatRoundAdvanced event — never persisted. */
-  round: number | null;
-}
-
-export interface SessionDoorwayState {
-  /** null → character-scoped solo session; the client's signal for solo play (#1080). */
-  campaignId: string | null;
-  role: CampaignRole;
-  /** THIS ISSUE: true for every campaign member and every solo character. #951 flips it owner-only. */
-  canStart: boolean;
-  kind: SessionDoorwayKind;
-  session: SessionDoorwaySessionState | null;
-}
+// schema change. The shapes are the wire contract and live in shared-types
+// (#1273), where the FROZEN-contract note on the kind union now lives too;
+// SessionDoorwayState is re-exported so importers keep resolving it here.
+export type { SessionDoorwayState };
 
 /** Latest combat round for a session, or null when combat never advanced a round. */
 async function latestCombatRound(sessionId: string): Promise<number | null> {
@@ -72,7 +41,7 @@ export async function getSessionDoorway(
   const campaignId = character?.campaignId ?? null;
 
   // Solo characters have no campaign membership; every solo character may start.
-  const role: CampaignRole = campaignId
+  const role: SessionDoorwayRole = campaignId
     ? (await prisma.campaignMembership.findUnique({
         where: { campaignId_userId: { campaignId, userId } },
         select: { role: true },

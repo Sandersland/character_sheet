@@ -7,8 +7,8 @@ import {
   weaponDetailFields,
 } from "./detail-snapshot.js";
 import type {
-  ItemCategoryName,
-  ArmorCategoryName,
+  ItemCategory,
+  ArmorCategory,
   WeaponDetailInput,
   ArmorDetailInput,
   ConsumableDetailInput,
@@ -121,7 +121,7 @@ export interface DeletedInventoryItemSnapshot {
   itemId: string | null;
   campaignItemId: string | null;
   name: string;
-  category: ItemCategoryName;
+  category: ItemCategory;
   weight: number | null;
   cost: Currency | null;
   description: string | null;
@@ -245,10 +245,10 @@ export function buildInventoryCreateFromCatalog(
 // that function's exact return type) so the rule stays unit-testable from a
 // hand-written literal with no DB.
 export interface AutoEquipCandidate {
-  category: ItemCategoryName;
+  category: ItemCategory;
   position: number;
   weaponDetail?: { create: { twoHanded?: boolean | null } } | undefined;
-  armorDetail?: { create: { armorCategory: ArmorCategoryName } } | undefined;
+  armorDetail?: { create: { armorCategory: ArmorCategory } } | undefined;
 }
 
 // 5e starting-equipment auto-equip rule, kept here in lib/ so it stays out of

@@ -288,12 +288,16 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
 
   // ── subclassLevel = 1 class preserves its subclass at level 1 ─────────────
 
+  // A subclassLevel=1 class is a PHB'14 shape (Cleric/Sorcerer/Warlock); SRD 5.2
+  // gates every class at 3. So this fixture is stamped EDITION_2014 — under 2024
+  // the catalog column is ignored and the subclass is correctly cleared (#1285).
   it("preserves a subclassLevel=1 subclass (Cleric) when XP drops to level 1", async () => {
     await ensureTestOwner(OWNER_ID);
     const cleric = await prisma.character.create({
       data: {
         ...BASE_CHARACTER,
         ownerId: OWNER_ID,
+        rulesEdition: "EDITION_2014",
         id: "test-xp-cleric-1",
         name: "Cleric test-xp-cleric-1",
         experiencePoints: XP_LVL_3,

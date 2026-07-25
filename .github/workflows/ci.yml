@@ -238,12 +238,13 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
 
-      - name: Prisma generate / migrate / seed
+      # No migrate/seed here: vitest's global setup migrates and seeds its own
+      # template database and clones one per worker (#1269), so the job-level
+      # DATABASE_URL only donates the host, credentials and base name. The e2e
+      # job still prepares the main database — it runs a real stack.
+      - name: Prisma generate
         working-directory: backend
-        run: |
-          npx prisma generate
-          npx prisma migrate deploy
-          npx prisma db seed
+        run: npx prisma generate
 
       # Backend runs WITH coverage so the fallow job can gate real CRAP (#717);
       # test:coverage IS the backend `vitest run` plus Istanbul instrumentation
