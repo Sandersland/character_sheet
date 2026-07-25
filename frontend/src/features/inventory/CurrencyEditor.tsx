@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 
 import { updateCharacter } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import type { Character, Currency } from "@/types/character";
+import type { Currency } from "@/types/character";
 import CurrencyEditForm from "@/features/inventory/CurrencyEditForm";
 import { formatCurrency } from "@/lib/currency";
 
-interface CurrencyEditorProps {
-  character: Character;
-}
-
 // Display-first purse: shows the formatted currency with an "Edit purse" toggle revealing the denomination inputs. Reuses PATCH /api/characters/:id (a bare currency edit has no item and isn't ledgered).
-export default function CurrencyEditor({ character }: CurrencyEditorProps) {
+export default function CurrencyEditor() {
+  const { character } = useCurrentCharacter();
   const [editing, setEditing] = useState(false);
   const [currency, setCurrency] = useState<Currency>(character.currency);
 

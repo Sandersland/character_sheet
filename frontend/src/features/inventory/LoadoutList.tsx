@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 
-import type { Character, EquipSlot, InventoryItem, InventoryOperation } from "@/types/character";
+import type { EquipSlot, InventoryItem, InventoryOperation } from "@/types/character";
 import { EQUIP_SLOT_ICONS, Lock, MoreHorizontal, TriangleAlert } from "@/components/ui/icons";
 import Badge from "@/components/ui/Badge";
 import Popover from "@/components/ui/Popover";
 import SlotPickerPanel from "@/features/inventory/SlotPickerPanel";
 import AttuneToggle from "@/features/inventory/AttuneToggle";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { bagItemsForSlot } from "@/lib/paperDoll";
 import { attunementSummary, buildLoadoutGroups, type FilledLoadoutRow } from "@/lib/loadout";
 import { rarityLabel, rarityTone } from "@/lib/rarity";
 
 interface LoadoutListProps {
-  character: Character;
   pending: boolean;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
@@ -81,7 +81,8 @@ function FilledRowActions({ row, candidates, pending, onUnequip, onReplace }: Fi
 // The interactive "Worn" loadout list (#925): grouped Weapons / Armor /
 // Accessories rows replacing the rejected tile grid. Reuses the paper-doll slot
 // model + equip/unequip ops; swaps batch an unequip + equip atomically.
-export default function LoadoutList({ character, pending, onSubmit }: LoadoutListProps) {
+export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
+  const { character } = useCurrentCharacter();
   const inventory = character.inventory;
   const groups = buildLoadoutGroups(character);
   const attunement = attunementSummary(inventory);

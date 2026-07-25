@@ -1,4 +1,4 @@
-import type { Character, Currency, InventoryItem, InventoryOperation } from "@/types/character";
+import type { Currency, InventoryItem, InventoryOperation } from "@/types/character";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiKnapsack } from "@/components/ui/icons";
 import InventoryContent from "@/features/inventory/InventoryContent";
@@ -7,7 +7,6 @@ import { type SellLine } from "@/lib/bulkSell";
 import { type InventorySection } from "@/lib/inventorySections";
 
 interface InventoryBodyProps {
-  character: Character;
   configuringSell: boolean;
   selectedItems: InventoryItem[];
   pending: boolean;

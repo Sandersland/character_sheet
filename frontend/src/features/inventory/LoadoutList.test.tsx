@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import LoadoutList from "@/features/inventory/LoadoutList";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, InventoryItem } from "@/types/character";
 
 function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
@@ -68,12 +69,15 @@ function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character
   } as unknown as Character;
 }
 
+// LoadoutList reads useCurrentCharacter(), so every render seeds the cache and
+// mounts CurrentCharacterProvider via renderWithCharacter.
 function renderList(
   inventory: InventoryItem[],
   onSubmit = vi.fn().mockResolvedValue(undefined),
   profs: Profs = {},
 ) {
-  render(<LoadoutList character={makeCharacter(inventory, profs)} pending={false} onSubmit={onSubmit} />);
+  const character = makeCharacter(inventory, profs);
+  renderWithCharacter(<LoadoutList pending={false} onSubmit={onSubmit} />, character);
   return { onSubmit };
 }
 
@@ -110,8 +114,9 @@ describe("LoadoutList groups & rows", () => {
       equippedSlot: "MAIN_HAND",
       weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
     });
-    const { unmount } = render(
-      <LoadoutList character={makeCharacter([martial])} pending={false} onSubmit={vi.fn()} />,
+    const { unmount } = renderWithCharacter(
+      <LoadoutList pending={false} onSubmit={vi.fn()} />,
+      makeCharacter([martial]),
     );
     expect(screen.getByText("Not proficient")).toBeInTheDocument();
     unmount();
@@ -184,15 +189,12 @@ const attunableRing = (o: Partial<InventoryItem> = {}) =>
 
 describe("LoadoutList attunement", () => {
   it("shows the Attuned N/3 header reflecting the real count", () => {
-    const { unmount } = render(
-      <LoadoutList
-        character={makeCharacter([
-          attunableRing({ id: "a", name: "Ring A", attuned: true }),
-          attunableRing({ id: "b", name: "Ring B", attuned: true }),
-        ])}
-        pending={false}
-        onSubmit={vi.fn()}
-      />,
+    const { unmount } = renderWithCharacter(
+      <LoadoutList pending={false} onSubmit={vi.fn()} />,
+      makeCharacter([
+        attunableRing({ id: "a", name: "Ring A", attuned: true }),
+        attunableRing({ id: "b", name: "Ring B", attuned: true }),
+      ]),
     );
     expect(screen.getByText("Attuned 2/3")).toBeInTheDocument();
     unmount();
@@ -215,8 +217,9 @@ describe("LoadoutList attunement", () => {
 
   it("disables Attune at the 3-item cap and enables it below", () => {
     const belowCap = [attunableRing({ id: "a", name: "Ring A" })];
-    const { unmount } = render(
-      <LoadoutList character={makeCharacter(belowCap)} pending={false} onSubmit={vi.fn()} />,
+    const { unmount } = renderWithCharacter(
+      <LoadoutList pending={false} onSubmit={vi.fn()} />,
+      makeCharacter(belowCap),
     );
     expect(screen.getByRole("button", { name: "Attune" })).toBeEnabled();
     unmount();
