@@ -29,6 +29,8 @@ describe("query harness", () => {
     expect(screen.getByText("loading")).toBeInTheDocument();
   });
 
+  // This test and the next are a pair: one writes, the next proves the fresh
+  // per-test client dropped it. Splitting or reordering them defeats both.
   it("the cache does not bleed between tests", () => {
     getQueryClient().setQueryData(["bleed"], "leftover");
     expect(getQueryClient().getQueryData(["bleed"])).toBe("leftover");

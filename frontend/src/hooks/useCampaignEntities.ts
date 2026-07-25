@@ -15,9 +15,9 @@ export function primeCampaignEntities(campaignId: string, entities: CampaignEnti
   getQueryClient().setQueryData(campaignKeys.entities(campaignId), entities);
 }
 
-// Test-only: clear the whole cache so one test's entries can't leak into the
-// next (the source of MentionAutocomplete.test.tsx flakiness, #282). Not used
-// in any production path.
+// Test-only, and now redundant: the per-test fresh QueryClient in the vitest
+// setup file is what prevents cross-test leakage (#282), so callers already run
+// against an empty cache. Kept until #1283 retires its four call sites.
 export function __resetCampaignEntitiesCacheForTests(): void {
   getQueryClient().clear();
 }

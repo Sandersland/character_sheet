@@ -12,6 +12,8 @@ export function primeCampaignMerges(campaignId: string, merges: CampaignEntityMe
   getQueryClient().setQueryData(campaignKeys.merges(campaignId), merges);
 }
 
+// Test-only, and now redundant for the same reason as its entities twin: the
+// vitest setup file's per-test fresh QueryClient already prevents leakage.
 export function __resetCampaignMergesCacheForTests(): void {
   getQueryClient().clear();
 }

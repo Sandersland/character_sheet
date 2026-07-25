@@ -44,9 +44,9 @@ function LegacySessionRedirect() {
 
 export default function App() {
   return (
-    // Outermost: server state is orthogonal to routing/theme/auth, and the
-    // module-level client (@/api/queryClient) needs to be in scope before
-    // anything below it can read or write the cache.
+    // Outermost: injects the module-level client (@/api/queryClient) into React
+    // context so useQuery/useQueryClient resolve anywhere in the tree. Server
+    // state is orthogonal to routing/theme/auth, so it wraps rather than nests.
     <QueryClientProvider client={getQueryClient()}>
       <BrowserRouter>
         {/* Catches any render-time crash in a route so one bad screen can't
