@@ -52,4 +52,57 @@ describe("rulesEdition on the character wire (#1285)", () => {
     expect(res.status).toBe(200);
     expect(res.body.rulesEdition).toBe("EDITION_2024");
   });
+
+  it("POST /api/characters honours rulesEdition: EDITION_2014", async () => {
+    const res = await create({ ...BASE, name: "RulesEdition Fourteen", rulesEdition: "EDITION_2014" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.rulesEdition).toBe("EDITION_2014");
+  });
+});
+
+// Write-once (#1281, 2026-07-25). These are regression pins, not red-first
+// tests: .strict() on updateCharacterSchema already rejects an unknown key, so
+// they pass before the change. Their value is failing the day someone adds
+// rulesEdition to a mutable schema.
+describe("rulesEdition is write-once (#1285)", () => {
+  async function make2014() {
+    const res = await create({ ...BASE, name: "RulesEdition Immutable", rulesEdition: "EDITION_2014" });
+    return res.body.id as string;
+  }
+
+  it("PATCH /api/characters/:id rejects rulesEdition and leaves the sheet on 2014", async () => {
+    const id = await make2014();
+
+    const patch = await supertest(app)
+      .patch(`/api/characters/${id}`)
+      .set("Cookie", COOKIE)
+      .send({ rulesEdition: "EDITION_2024" });
+
+    expect(patch.status).toBe(400);
+    expect((await get(id)).body.rulesEdition).toBe("EDITION_2014");
+  });
+
+  it("PATCH rejects an unknown edition value", async () => {
+    const id = await make2014();
+
+    const patch = await supertest(app)
+      .patch(`/api/characters/${id}`)
+      .set("Cookie", COOKIE)
+      .send({ rulesEdition: "EDITION_2000" });
+
+    expect(patch.status).toBe(400);
+  });
+
+  it("an XP transaction does not change rulesEdition", async () => {
+    const id = await make2014();
+
+    const xp = await supertest(app)
+      .post(`/api/characters/${id}/experience`)
+      .set("Cookie", COOKIE)
+      .send({ operations: [{ type: "set", value: 900 }] });
+
+    expect(xp.status).toBe(200);
+    expect(xp.body.rulesEdition).toBe("EDITION_2014");
+  });
 });

@@ -66,6 +66,10 @@ export const createCharacterSchema = z
     spells: z
       .object({ cantripIds: z.array(z.string()), spellIds: z.array(z.string()) })
       .optional(),
+    // #1285: the only endpoint that may set a character's edition (write-once).
+    // Optional — omitting it takes the Character.rulesEdition column default,
+    // which stays the single source of that default. The picker is #1286.
+    rulesEdition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
   })
   .strict();
 
@@ -85,6 +89,12 @@ export type CreateCharacterBody = z.infer<typeof createCharacterSchema>;
 // experiencePoints is also absent here — XP changes must go through
 // POST /api/characters/:id/experience so they are
 // logged to the activity timeline and auto-reverse HP on level-down.
+//
+// rulesEdition is absent because a character's edition is irreversible after
+// creation (#1281, 2026-07-25) — set by the create transaction and never again,
+// which is what lets every LEVEL_GATED_RECONCILERS entry treat it as a constant.
+// .strict() therefore 400s an attempt rather than silently ignoring it, exactly
+// as for level/experiencePoints.
 //
 // currency IS still patchable here (a bare DM-handed-over amount isn't
 // economically categorised as a buy/sell/etc.); the handler writes a
