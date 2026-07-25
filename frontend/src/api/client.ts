@@ -33,7 +33,6 @@ import type {
   ExperienceOperation,
   HitPointOperation,
   JournalEntryKind,
-  InventoryOperation,
   LevelUpPlanResponse,
   LevelUpSubmission,
   LevelUpTarget,
@@ -48,13 +47,14 @@ import type {
   ResourceOpResult,
   Session,
   SessionDoorwayState,
-  SpellcastingOperation,
 } from "@/types/character";
 export { setUnauthorizedHandler } from "@/api/http";
 import { apiFetch, jsonBody, postTransactions, request, send } from "@/api/http";
 
 export * from "@/api/auth";
 export * from "@/api/catalog";
+export * from "@/api/spells";
+export * from "@/api/inventory";
 
 // The single seam onto the shared ability endpoint (#1275): every automated
 // class/subclass feature POSTs the same { operations } batch, choosing the
@@ -113,16 +113,6 @@ export async function updateCampaignPreferences(
   );
 }
 
-// Applies a batch of spellcasting operations atomically: cast, expend/restore
-// slots, learn/forget spells, prepare/unprepare. Mirrors applyInventoryTransactions
-// — same intent-bearing batch pattern, full updated Character returned on success.
-export async function applySpellcastingTransactions(
-  characterId: string,
-  operations: SpellcastingOperation[]
-): Promise<Character> {
-  return postTransactions(characterId, "spellcasting", operations, "Failed to apply spellcasting operations");
-}
-
 // Applies a batch of Warrior of the Elements operations atomically (Elemental
 // Attunement toggle, Elemental Burst, Elemental Strikes). Returns the updated
 // Character plus a per-op results array (save DC / outcome / applied damage).
@@ -176,16 +166,6 @@ export async function applyChannelDivinityTransactions(
     operations,
     "Failed to apply Channel Divinity operations",
   );
-}
-
-// One inline edit is a batch of one operation; a bulk action (e.g. selling
-// several stacks at once) is a batch of several — see backend
-// applyInventoryOperations for the atomicity/ledger semantics.
-export async function applyInventoryTransactions(
-  characterId: string,
-  operations: InventoryOperation[]
-): Promise<Character> {
-  return postTransactions(characterId, "inventory", operations, "Failed to apply inventory transactions");
 }
 
 // Applies a batch of HP operations atomically (damage, heal, rest, level-up,
