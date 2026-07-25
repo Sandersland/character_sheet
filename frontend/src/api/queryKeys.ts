@@ -7,4 +7,10 @@
 // Namespaces are added incrementally, one per commit, alongside their first
 // consumer — an export with no importer yet fails fallow's unused-exports gate.
 
+export const characterKeys = {
+  all: ["characters"] as const,
+  list: () => [...characterKeys.all, "list"] as const,
+  detail: (id: string | null | undefined) => [...characterKeys.all, "detail", id] as const,
+};
+
 export const referenceKeys = { all: ["reference"] as const };
