@@ -43,7 +43,6 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
               <ProficienciesCard
                 character={character}
                 artisanTools={reference?.artisanTools ?? []}
-                onUpdate={onUpdate}
               />
             </Card>
           )}

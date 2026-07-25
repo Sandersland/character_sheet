@@ -15,6 +15,7 @@
 
 import { applyResourceTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import {
   ARMOR_CATEGORY_LABELS,
   ARMOR_CATEGORY_ORDER,
@@ -33,7 +34,6 @@ import type {
 interface Props {
   character: Character;
   artisanTools: ToolOption[];
-  onUpdate: (updated: Character) => void;
 }
 
 // Tool grouping helpers — identical to the ones that were in ToolProficienciesCard.
@@ -173,20 +173,20 @@ function ProficiencySection({
 // mutation) can never race each other. Split out of ProficienciesCard so its
 // own hook-composition + try/catch branches don't count against that
 // component's complexity budget.
-function useToolProficiencyMutations(character: Character, onUpdate: (c: Character) => void) {
+function useToolProficiencyMutations(character: Character, setCharacter: (c: Character) => void) {
   const learnMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (name: string) => applyResourceTransactions(character.id, [{ type: "learnToolProficiency", name }]),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to save tool proficiency. Please try again.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
   const forgetMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (entryId: string) => applyResourceTransactions(character.id, [{ type: "forgetToolProficiency", entryId }]),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to remove tool proficiency. Please try again.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   async function learn(name: string) {
@@ -216,10 +216,10 @@ function useToolProficiencyMutations(character: Character, onUpdate: (c: Charact
 export default function ProficienciesCard({
   character,
   artisanTools,
-  onUpdate,
 }: Props) {
+  const { setCharacter } = useCurrentCharacter();
   const { busy, error, learn: handleLearnToolProf, forget: handleForgetToolProf } =
-    useToolProficiencyMutations(character, onUpdate);
+    useToolProficiencyMutations(character, setCharacter);
 
   const weapons: WeaponProficiency[] = character.weaponProficiencies ?? [];
   const armor = sortedArmor(character.armorProficiencies ?? []);
