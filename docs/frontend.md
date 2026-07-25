@@ -43,7 +43,7 @@ WCAG AA rules that have shipped broken before (full rationale in `design_system.
 
 ## API calls
 
-All `fetch` goes through `frontend/src/api/client.ts` (`apiFetch`: credentials + a single registered 401 handler). New endpoints delegate to `request<T>`/`send`; intent-bearing transactions go through `postTransactions`. Never call `fetch` from a component.
+All `fetch` goes through `frontend/src/api/http.ts` (`apiFetch`: credentials + a single registered 401 handler), imported by the domain modules under `frontend/src/api/` (`characters.ts`, `campaign.ts`, `session.ts`, …). `frontend/src/api/client.ts` is the barrel every component imports from — never a domain module directly. New endpoints delegate to `request<T>`/`send`; intent-bearing transactions go through `postTransactions`. Never call `fetch` from a component.
 
 ## Dice engine
 
