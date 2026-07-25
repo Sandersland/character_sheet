@@ -1,7 +1,7 @@
 import type { Character } from "@/types/character";
 
-// Not exported: apiFetch/rawFetch take a path and prefix it internally, so no
-// sibling module needs to build a full URL itself.
+// Deliberately module-private: apiFetch/rawFetch prefix it internally, so a
+// sibling module never needs to build a full URL — and can't drift from this one.
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 
 // Centralized handling for an expired/absent session. AuthProvider registers a
