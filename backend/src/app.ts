@@ -116,10 +116,9 @@ export function createApp() {
   // mounts on the character root rather than a single leaf.
   app.use("/api/characters/:id", activityRouter);
 
-  // Hybrid routers serve a top-level catalog (GET /) plus a character-scoped
-  // transaction (POST /transactions), so they mount on both owned paths.
-  app.use(["/api/maneuvers", "/api/characters/:id/maneuvers"], maneuversRouter);
-  app.use(["/api/shadow-arts", "/api/characters/:id/shadow-arts"], shadowArtsRouter);
+  // Catalog pickers for abilities whose transactions live on abilitiesRouter (#1275).
+  app.use("/api/maneuvers", maneuversRouter);
+  app.use("/api/shadow-arts", shadowArtsRouter);
   app.use("/api/subclass-choices", subclassChoicesRouter);
 
   app.use("/api", sessionsRouter);

@@ -41,7 +41,7 @@ function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
 const resourcesUrl = `/api/characters/${FIXTURE_ID}/resources/transactions`;
-const maneuversUrl = `/api/characters/${FIXTURE_ID}/maneuvers/transactions`;
+const maneuversUrl = `/api/characters/${FIXTURE_ID}/abilities/maneuvers/transactions`;
 
 async function learn(op: unknown): Promise<{ id: string; name: string; maneuverId?: string }> {
   const res = await agent().post(resourcesUrl).send({ operations: [op] });
@@ -49,7 +49,7 @@ async function learn(op: unknown): Promise<{ id: string; name: string; maneuverI
   return list[list.length - 1];
 }
 
-describe("POST /api/characters/:id/maneuvers/transactions", () => {
+describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
   let tripId: string;
   let rallyId: string;
 

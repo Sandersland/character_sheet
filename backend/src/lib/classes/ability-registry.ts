@@ -1,17 +1,24 @@
 import { z } from "zod";
 
 import type { TransactionHandler } from "@/lib/http/transactions-endpoint.js";
+import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
+import {
+  applyChannelDivinityOperations,
+  InvalidChannelDivinityOperationError,
+} from "./channel-divinity.js";
 import { applyHandOfHarmOperations, InvalidHandOfHarmOperationError } from "./hand-of-harm.js";
 import {
   applyHandOfUltimateMercyOperations,
   InvalidHandOfUltimateMercyOperationError,
 } from "./hand-of-ultimate-mercy.js";
+import { applyManeuverOperations, InvalidManeuverOperationError } from "./maneuvers.js";
 import {
   applyOpenHandTechniqueOperations,
   InvalidOpenHandTechniqueOperationError,
 } from "./open-hand-technique.js";
 import { applyQuiveringPalmOperations, InvalidQuiveringPalmOperationError } from "./quivering-palm.js";
 import { InvalidResourceOperationError } from "./resources.js";
+import { applyShadowArtsOperations, InvalidShadowArtOperationError } from "./shadow-arts.js";
 import { applySneakAttackOperations, InvalidSneakAttackOperationError } from "./sneak-attack.js";
 import { applyStunningStrikeOperations, InvalidStunningStrikeOperationError } from "./stunning-strike.js";
 import {
@@ -50,6 +57,22 @@ function defineAbility<Schema extends z.ZodTypeAny, Result>(
  * module, which dispatch class/subclass *derivation*, not HTTP transactions.
  */
 export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
+  // castChannelDivinity — spend 1 CD charge; apply the option's real side effect
+  // (Sacred Weapon attack buff, Cloak of Shadows invisibility) or reminder/DC.
+  // The entitled-options picker stays a GET on channelDivinityRouter.
+  "channel-divinity": defineAbility({
+    schema: opBatch(z.object({
+      type: z.literal("castChannelDivinity"),
+      abilityId: z.string().min(1),
+    })),
+    apply: (characterId, data) => applyChannelDivinityOperations(characterId, data.operations),
+    domainErrors: [
+      InvalidChannelDivinityOperationError,
+      InvalidResourceOperationError,
+      InvalidSpellcastingOperationError,
+    ],
+  }),
+
   // Once per turn, spends 1 Focus (or a Flurry of Healing and Harm free use at
   // L11+, via `freeFromFlurry`) to narrate the client-rolled necrotic bonus on
   // an Unarmed Strike hit; Physician's Touch (L6+) adds the Poisoned rider.
@@ -79,6 +102,24 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
     respond: (character, results) => ({ character, results }),
   }),
 
+  // castManeuver — spend one superiority die (server rolls it), log the cast with
+  // the announced DC, apply Rally temp HP. Returns the updated character plus
+  // per-op { roll, saveDc } so the client folds the die into the attack/damage
+  // total. The learn-a-maneuver catalog stays a GET on maneuversRouter.
+  maneuvers: defineAbility({
+    schema: opBatch(z.object({
+      type: z.literal("castManeuver"),
+      entryId: z.string().min(1),
+    })),
+    apply: (characterId, data) => applyManeuverOperations(characterId, data.operations),
+    domainErrors: [
+      InvalidManeuverOperationError,
+      InvalidResourceOperationError,
+      InvalidSpellcastingOperationError,
+    ],
+    respond: (character, results) => ({ character, results }),
+  }),
+
   // Imposes one Flurry-of-Blows rider (Addle/Push/Topple). Addle never rolls
   // (no save); Push/Topple roll a flat d20 vs the monk's focus save DC. Returns
   // the updated character plus per-op { rider, dc, roll?, outcome, summary }.
@@ -105,6 +146,19 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
     apply: (characterId, data) => applyQuiveringPalmOperations(characterId, data.operations),
     domainErrors: [InvalidQuiveringPalmOperationError, InvalidResourceOperationError],
     respond: (character, results) => ({ character, results }),
+  }),
+
+  // Warrior of Shadow's two focus-fuelled features (#1246):
+  //   castShadowArt          — spend 1 focus, cast Darkness (concentration).
+  //   activateCloakOfShadows — spend 3 focus, self-apply invisible (L17).
+  // The Shadow Arts picker stays a GET on shadowArtsRouter.
+  "shadow-arts": defineAbility({
+    schema: opBatch(
+      z.object({ type: z.literal("castShadowArt"), shadowArtId: z.string().min(1) }),
+      z.object({ type: z.literal("activateCloakOfShadows") }),
+    ),
+    apply: (characterId, data) => applyShadowArtsOperations(characterId, data.operations),
+    domainErrors: [InvalidShadowArtOperationError],
   }),
 
   // Rolls the rogue's level-derived Nd6 Sneak Attack server-side, enforcing the

@@ -1,6 +1,6 @@
 /**
  * Warrior of Shadow cast endpoint (2024 rewrite, #1246 — formerly #441):
- * POST /shadow-arts/transactions. Real Postgres + supertest. Fixture is a
+ * POST /abilities/shadow-arts/transactions. Real Postgres + supertest. Fixture is a
  * Warrior of Shadow monk whose XP sets the level. The single Shadow Arts
  * Darkness cast and the Cloak of Shadows activation are both exercised here.
  */
@@ -27,7 +27,7 @@ const XP_L2 = 300;
 const XP_L3 = 900;
 const XP_L17 = 225000;
 
-const url = `/api/characters/${FIXTURE_ID}/shadow-arts/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/shadow-arts/transactions`;
 const activityUrl = `/api/characters/${FIXTURE_ID}/activity?category=resources`;
 
 const FIXTURE_BASE = {
@@ -464,7 +464,7 @@ describe("Shadow Arts source guard", () => {
       },
     });
     const res = await agent()
-      .post(`/api/characters/${FIXTURE_ID_2}/shadow-arts/transactions`)
+      .post(`/api/characters/${FIXTURE_ID_2}/abilities/shadow-arts/transactions`)
       .send({ operations: [{ type: "castShadowArt", shadowArtId: nonShadowId }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not found in catalog/);

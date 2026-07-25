@@ -1,5 +1,5 @@
 /**
- * Channel Divinity cast endpoint (#419): POST /channel-divinity/transactions and
+ * Channel Divinity cast endpoint (#419): POST /abilities/channel-divinity/transactions and
  * GET /characters/:id/channel-divinity. Real Postgres + supertest. Fixtures are
  * single-class clerics/paladins whose XP sets the level; CD options are read from
  * the seeded catalog by name.
@@ -26,7 +26,7 @@ const XP_L2 = 300;
 const XP_L3 = 900;
 const XP_L6 = 14000;
 
-const url = `/api/characters/${FIXTURE_ID}/channel-divinity/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/channel-divinity/transactions`;
 const activityUrl = `/api/characters/${FIXTURE_ID}/activity?category=resources`;
 
 const FIXTURE_BASE = {

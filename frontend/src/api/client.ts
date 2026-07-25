@@ -276,7 +276,7 @@ export async function applyShadowArtsTransactions(
   characterId: string,
   operations: ShadowArtOperation[]
 ): Promise<Character> {
-  return postTransactions(characterId, "shadow-arts", operations, "Failed to apply shadow arts operations");
+  return applyAbilityTransactions(characterId, "shadow-arts", operations, "Failed to apply shadow arts operations");
 }
 
 // Feeds the Cleric/Paladin Channel Divinity picker — the entitled options for
@@ -295,7 +295,12 @@ export async function applyChannelDivinityTransactions(
   characterId: string,
   operations: ChannelDivinityOperation[]
 ): Promise<Character> {
-  return postTransactions(characterId, "channel-divinity", operations, "Failed to apply Channel Divinity operations");
+  return applyAbilityTransactions(
+    characterId,
+    "channel-divinity",
+    operations,
+    "Failed to apply Channel Divinity operations",
+  );
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
@@ -439,9 +444,10 @@ export async function castManeuverTransaction(
   characterId: string,
   operations: ManeuverOperation[],
 ): Promise<{ character: Character; results: ManeuverCastResult[] }> {
-  return request<{ character: Character; results: ManeuverCastResult[] }>(
-    `/characters/${characterId}/maneuvers/transactions`,
-    jsonBody({ operations }),
+  return applyAbilityTransactions<ManeuverOperation, { character: Character; results: ManeuverCastResult[] }>(
+    characterId,
+    "maneuvers",
+    operations,
     "Failed to cast maneuver",
   );
 }
