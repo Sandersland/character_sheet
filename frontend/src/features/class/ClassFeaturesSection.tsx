@@ -19,7 +19,7 @@ interface Props {
 }
 
 export default function ClassFeaturesSection({ character, referenceClasses, onUpdate }: Props) {
-  const { busy, error, run } = useClassTransactions(onUpdate);
+  const { busy, error, run } = useClassTransactions(character.id, onUpdate);
   const view = deriveClassFeatureView(character, referenceClasses);
 
   return (
