@@ -1,6 +1,18 @@
 import { afterAll } from "vitest";
 
-import { prisma, pool } from "./src/lib/core/prisma.js";
+import { baseDatabaseUrl, workerDatabaseUrl } from "./vitest.db.js";
+
+// `prisma` and `pool` snapshot DATABASE_URL into a pg.Pool when their module is
+// first evaluated, so this assignment has to land before that happens — hence
+// the dynamic import. A static import is hoisted above the assignment and would
+// silently bind every worker to the ambient shared database instead of its own
+// clone, with the whole suite still passing (#1269). The current_database()
+// assertion in the per-worker-database suite is the guard against that.
+process.env.DATABASE_URL = workerDatabaseUrl(
+  baseDatabaseUrl(),
+  Number(process.env.VITEST_POOL_ID)
+);
+const { prisma, pool } = await import("./src/lib/core/prisma.js");
 
 // Per-file teardown. Vitest runs each test file in its own isolated module
 // context (default `isolate: true`), so this file's `lib/prisma` — and its
