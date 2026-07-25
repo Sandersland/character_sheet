@@ -45,7 +45,14 @@ gh pr create --base main --head staging \
 gh pr merge <pr-url> --merge --auto
 ```
 
-Main's protection is strict (up-to-date required), but a staging→main PR is up to date by construction. Once lint/test/build pass (claude-review reports `skipped`), it lands itself.
+Once lint/test/build pass (claude-review reports `skipped`), it lands itself — **unless the PR is `BEHIND`**, which is the normal case, not an anomaly. Each promote lands a merge commit that exists only on `main`, so main is always ≥1 commit ahead of staging by the next promote; main's `strict: true` plus repo `allow_update_branch: false` means auto-merge cannot advance the branch itself.
+
+```bash
+gh pr view <pr> --json mergeStateStatus -q .mergeStateStatus   # BEHIND → back-merge main into staging
+gh pr update-branch <pr>
+```
+
+That adds a "Merge branch 'main' into staging" commit to staging (clean in practice) and moves the PR `BEHIND` → `BLOCKED`, i.e. just waiting on the checks to re-run. The armed auto-merge then lands it.
 
 ### 5. Report
 
