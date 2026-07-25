@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { updateCharacter } from "@/api/client";
 import CurrencyEditor from "@/features/inventory/CurrencyEditor";
-import { cachedCharacter } from "@/test/renderWithCharacter";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Currency } from "@/types/character";
 
 vi.mock("@/api/client", () => ({ updateCharacter: vi.fn() }));
@@ -17,15 +17,15 @@ function makeCharacter(over: Partial<Character> = {}): Character {
 }
 
 describe("CurrencyEditor", () => {
-  // GENUINE RED (plan §0/§2/§9.3): today CurrencyEditor calls updateCharacter()
-  // directly and only forwards the result via `onUpdate` — nothing writes the
-  // character query cache, so any sibling reading useCurrentCharacter() would
-  // never see the new purse until a full reload.
+  // Was GENUINE RED pre-#1284 C2 (plan §0/§2/§9.3): CurrencyEditor used to call
+  // updateCharacter() directly and only forward the result via a since-deleted
+  // `onUpdate` prop — nothing wrote the character query cache. Now routed
+  // through useCharacterMutation + useCurrentCharacter().setCharacter.
   it("reaches the character cache after a purse edit", async () => {
     const updated = makeCharacter({ currency: makeCurrency({ gp: 42 }) });
     vi.mocked(updateCharacter).mockResolvedValue(updated);
 
-    render(<CurrencyEditor character={makeCharacter()} onUpdate={vi.fn()} />);
+    renderWithCharacter(<CurrencyEditor character={makeCharacter()} />, makeCharacter());
 
     fireEvent.click(screen.getByRole("button", { name: /edit purse/i }));
     fireEvent.click(screen.getByRole("button", { name: /save/i }));

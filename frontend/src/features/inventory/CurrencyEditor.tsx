@@ -2,17 +2,18 @@ import { useEffect, useState } from "react";
 
 import { updateCharacter } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character, Currency } from "@/types/character";
 import CurrencyEditForm from "@/features/inventory/CurrencyEditForm";
 import { formatCurrency } from "@/lib/currency";
 
 interface CurrencyEditorProps {
   character: Character;
-  onUpdate: (character: Character) => void;
 }
 
 // Display-first purse: shows the formatted currency with an "Edit purse" toggle revealing the denomination inputs. Reuses PATCH /api/characters/:id (a bare currency edit has no item and isn't ledgered).
-export default function CurrencyEditor({ character, onUpdate }: CurrencyEditorProps) {
+export default function CurrencyEditor({ character }: CurrencyEditorProps) {
+  const { setCharacter } = useCurrentCharacter();
   const [editing, setEditing] = useState(false);
   const [currency, setCurrency] = useState<Currency>(character.currency);
 
@@ -25,7 +26,7 @@ export default function CurrencyEditor({ character, onUpdate }: CurrencyEditorPr
     mutationFn: (next: Currency) => updateCharacter(character.id, { currency: next }),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to update purse.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   async function save() {

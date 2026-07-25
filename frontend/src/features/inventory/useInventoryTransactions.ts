@@ -19,7 +19,7 @@ export interface InventoryTransactions {
 // character straight into the query cache, and close the add/edit panels on success.
 export function useInventoryTransactions(
   character: Character,
-  onUpdate: (character: Character) => void
+  setCharacter: (character: Character) => void
 ): InventoryTransactions {
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function useInventoryTransactions(
     mutationFn: (operations: InventoryOperation[]) => applyInventoryTransactions(character.id, operations),
     toCharacter: (c) => c,
     fallbackMessage: "Couldn't save — try again.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   async function applyOps(operations: InventoryOperation[]): Promise<boolean> {
