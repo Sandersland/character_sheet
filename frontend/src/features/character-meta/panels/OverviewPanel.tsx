@@ -49,7 +49,7 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
         </div>
 
         <div className="flex flex-col gap-6">
-          <ExperienceTracker character={character} onUpdate={onUpdate} />
+          <ExperienceTracker character={character} />
 
           {character.spellcasting && (
             <Card title="Spell Slots" className="p-4">

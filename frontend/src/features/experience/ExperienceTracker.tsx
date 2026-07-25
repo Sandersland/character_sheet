@@ -3,13 +3,13 @@ import { Plus } from "lucide-react";
 
 import { applyExperienceOperations } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character, ExperienceOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
 import MeterBar from "@/components/ui/MeterBar";
 
 interface ExperienceTrackerProps {
   character: Character;
-  onUpdate: (character: Character) => void;
 }
 
 type ApplyXp = (op: ExperienceOperation) => Promise<Character | null>;
@@ -18,13 +18,13 @@ type ApplyXp = (op: ExperienceOperation) => Promise<Character | null>;
 // character (or null on failure) so callers can resync their input fields.
 // `error` stays a boolean here (not the mutation's message) — deliberate,
 // matching this hook's pre-#1283 contract; don't widen it to a string.
-function useExperienceActions(character: Character, onUpdate: (c: Character) => void) {
+function useExperienceActions(character: Character, setCharacter: (c: Character) => void) {
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (op: ExperienceOperation) => applyExperienceOperations(character.id, [op]),
     toCharacter: (c) => c,
     fallbackMessage: "Couldn't save — try again.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   const apply: ApplyXp = async (op) => {
@@ -38,8 +38,9 @@ function useExperienceActions(character: Character, onUpdate: (c: Character) => 
   return { pending: mutation.isPending, error: Boolean(mutation.error), apply };
 }
 
-export default function ExperienceTracker({ character, onUpdate }: ExperienceTrackerProps) {
-  const { pending, error, apply } = useExperienceActions(character, onUpdate);
+export default function ExperienceTracker({ character }: ExperienceTrackerProps) {
+  const { setCharacter } = useCurrentCharacter();
+  const { pending, error, apply } = useExperienceActions(character, setCharacter);
 
   return (
     <Card
