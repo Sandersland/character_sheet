@@ -48,13 +48,14 @@ function defineAbility<Schema extends z.ZodTypeAny, Result>(
  * Every class/subclass ability the sheet automates, keyed by URL segment for the
  * shared `POST /api/characters/:id/abilities/:abilityKey/transactions` endpoint
  * (#1275). Adding an automated feature is a rules module plus one entry here —
- * no route file, no app.ts mount, no new client export.
+ * no route file, no mount, no new client export.
  *
  * Invariant: `abilityKey` is the basename of the ability's rules module in this
  * directory, so the URL names the file that implements it.
  *
- * Unrelated to `SUBCLASS_REGISTRY` and friends in this directory's `registry`
- * module, which dispatch class/subclass *derivation*, not HTTP transactions.
+ * Despite the name, unrelated to `deriveResources`/`deriveEntryScopedResources`
+ * and their dispatch tables, which derive class/subclass state rather than
+ * serving HTTP transactions.
  */
 export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // castChannelDivinity — spend 1 CD charge; apply the option's real side effect
