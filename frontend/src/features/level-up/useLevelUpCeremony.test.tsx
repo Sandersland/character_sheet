@@ -164,7 +164,11 @@ describe("useLevelUpCeremony", () => {
 
     act(() => result.current.setDraft((d) => ({ ...d, hp: { method: "average" } })));
     await act(() => result.current.confirm());
-    expect(result.current.submitError).toBe("expected 1 advancement for this level-up, got 0");
+    // A mutation's error dispatch is notified via TanStack Query's internal
+    // batching (a microtask hop beyond confirm()'s own await), so this needs a tick.
+    await waitFor(() =>
+      expect(result.current.submitError).toBe("expected 1 advancement for this level-up, got 0"),
+    );
   });
 });
 

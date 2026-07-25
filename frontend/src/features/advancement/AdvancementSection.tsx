@@ -10,9 +10,8 @@
  * Mirrors ClassFeaturesSection / SpellsSection in structure.
  */
 
-import { useState } from "react";
-
 import { applyAdvancementTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { abilityAbbr } from "@/lib/abilities";
 import { entryDetail } from "@/lib/advancement";
 import type { AdvancementEntry, AdvancementOperation, Character } from "@/types/character";
@@ -35,8 +34,15 @@ function entryLabel(entry: AdvancementEntry): string {
 }
 
 export default function AdvancementSection({ character, onUpdate }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: AdvancementOperation[]) => applyAdvancementTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Something went wrong.",
+    onCharacterWritten: onUpdate,
+  });
+  const busy = mutation.isPending;
+  const error = mutation.error;
 
   const { advancementSlots } = character;
   // Fighting Style feats (#1137) occupy their own slot partition and render in the
@@ -45,15 +51,10 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
   const slotsRemaining = advancementSlots.total - advancementSlots.used;
 
   async function send(ops: AdvancementOperation[]) {
-    setBusy(true);
-    setError(null);
     try {
-      const updated = await applyAdvancementTransactions(character.id, ops);
-      onUpdate(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
+      await mutation.mutateAsync(ops);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 
