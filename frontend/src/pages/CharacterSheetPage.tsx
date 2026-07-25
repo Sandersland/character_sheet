@@ -6,12 +6,13 @@ import Spinner from "@/components/ui/Spinner";
 import { CurrentCharacterProvider } from "@/hooks/CurrentCharacterProvider";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
-import { useReferenceData } from "@/hooks/useReferenceData";
 
+// Loads the character, decides load/error/not-found, then mounts
+// CurrentCharacterProvider — everything below (including reference data) is
+// read via hooks, not props (#1284 C17).
 export default function CharacterSheetPage() {
   const { id } = useParams();
   const { character, error } = useCharacter(id);
-  const { reference } = useReferenceData();
   const showSpinner = useDelayedFlag(character === undefined && !error);
 
   if (error) return <CharacterLoadError variant="error" />;
@@ -24,11 +25,7 @@ export default function CharacterSheetPage() {
 
   return (
     <CurrentCharacterProvider id={character.id}>
-      <CharacterSheetContent
-        id={id}
-        character={character}
-        reference={reference}
-      />
+      <CharacterSheetContent />
     </CurrentCharacterProvider>
   );
 }

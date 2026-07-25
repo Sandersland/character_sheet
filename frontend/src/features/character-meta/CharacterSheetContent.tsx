@@ -11,6 +11,8 @@ import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
 import { useScrollCollapse } from "@/features/character-meta/useScrollCollapse";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useReferenceData } from "@/hooks/useReferenceData";
 import { LiveSessionProvider, useLiveSession } from "@/features/session/LiveSessionProvider";
 import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
@@ -24,23 +26,23 @@ import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { Character, ReferenceData, Session } from "@/types/character";
 
-interface CharacterSheetContentProps {
-  id: string | undefined;
-  character: Character;
-  reference: ReferenceData | null;
-}
-
 /**
- * The loaded-sheet view. Wraps the workspace in the shared session providers
- * (#959) — `LiveSessionProvider` (is a session live + am I in it) above
- * `TurnStateProvider` (the single turn-state instance) — so the Combat tab, the
- * live strip, the nav pip, and the doorway all read one server-derived source.
+ * The loaded-sheet view. Takes NO props (#1284 C17) — reads the character via
+ * useCurrentCharacter() (the page's CurrentCharacterProvider is already
+ * mounted above this) and the catalog via useReferenceData(), instead of
+ * receiving either threaded down from CharacterSheetPage. Wraps the workspace
+ * in the shared session providers (#959) — `LiveSessionProvider` (is a
+ * session live + am I in it) above `TurnStateProvider` (the single turn-state
+ * instance) — so the Combat tab, the live strip, the nav pip, and the doorway
+ * all read one server-derived source.
  */
-export default function CharacterSheetContent(props: CharacterSheetContentProps) {
+export default function CharacterSheetContent() {
+  const { character } = useCurrentCharacter();
+  const { reference } = useReferenceData();
   return (
-    <LiveSessionProvider characterId={props.character.id}>
+    <LiveSessionProvider characterId={character.id}>
       <TurnStateProvider>
-        <CharacterSheetWorkspace {...props} />
+        <CharacterSheetWorkspace character={character} reference={reference} />
       </TurnStateProvider>
     </LiveSessionProvider>
   );
@@ -48,14 +50,16 @@ export default function CharacterSheetContent(props: CharacterSheetContentProps)
 
 /**
  * The sheet body: banner + tab panels + the roll/modal chrome. Split from
- * CharacterSheetPage so the page holds only load/error/guard states and this
- * owns the per-character interaction state (tabs, modals, capture dock, doorway).
+ * CharacterSheetContent so the providers above stay uncluttered and this owns
+ * the per-character interaction state (tabs, modals, capture dock, doorway).
  */
 function CharacterSheetWorkspace({
-  id,
   character,
   reference,
-}: CharacterSheetContentProps) {
+}: {
+  character: Character;
+  reference: ReferenceData | null;
+}) {
   const { tabs, activeTab, onTabChange } = useSheetTabs(character);
   const modals = useSheetModals();
   // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
@@ -69,7 +73,7 @@ function CharacterSheetWorkspace({
   const turnState = useTurnStateContext();
   const liveRound = useLiveRound();
   // Start/Join from the doorway jumps to the Combat tab in-workspace (#963).
-  const session = useSessionDoorway(id, () => onTabChange("combat"));
+  const session = useSessionDoorway(character.id, () => onTabChange("combat"));
   const { swipe, collapse } = useMobileSheetGestures(tabs, activeTab, onTabChange);
   const goToCombat = () => onTabChange("combat");
 
