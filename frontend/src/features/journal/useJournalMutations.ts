@@ -12,14 +12,14 @@ import type { Character } from "@/types/character";
 // update/remove all share one scoped mutation instead of three.
 export function useJournalMutations(
   characterId: string,
-  onUpdate: (character: Character) => void,
+  setCharacter: (character: Character) => void,
 ) {
   const mutation = useCharacterMutation<() => Promise<Character>, Character>({
     characterId,
     mutationFn: (action) => action(),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   async function run(action: () => Promise<Character>): Promise<boolean> {

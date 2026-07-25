@@ -80,7 +80,6 @@ export default function CharacterSheetModals({
           sessionId={captureSessionId}
           session={captureSession}
           onClose={onCloseCapture}
-          onUpdate={onUpdate}
         />
       )}
     </>

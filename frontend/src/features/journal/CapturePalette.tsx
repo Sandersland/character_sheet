@@ -12,6 +12,7 @@ import MobileCaptureSheet from "@/features/journal/MobileCaptureSheet";
 import { DockFeed, MobileFeed } from "@/features/journal/NoteFeed";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import type { Character, EntryVisibility, Session } from "@/types/character";
 
@@ -22,7 +23,6 @@ interface CapturePaletteProps {
   /** Live session, when known: the dock header shows its title + elapsed time. */
   session?: Session | null;
   onClose: () => void;
-  onUpdate: (character: Character) => void;
 }
 
 export default function CapturePalette({
@@ -30,12 +30,12 @@ export default function CapturePalette({
   sessionId,
   session,
   onClose,
-  onUpdate,
 }: CapturePaletteProps) {
+  const { setCharacter } = useCurrentCharacter();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useIsBelowMd();
   const { byId } = useCampaignEntities(character.campaignId);
-  const { busy, error, create, update, remove } = useJournalMutations(character.id, onUpdate);
+  const { busy, error, create, update, remove } = useJournalMutations(character.id, setCharacter);
 
   // The NOTE feed: newest-first, scoped to the active session when one is given.
   const notes = character.journal

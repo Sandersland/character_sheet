@@ -14,6 +14,7 @@ import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
 import MentionText from "@/features/journal/MentionText";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import type { ChronicleChapter } from "@/features/journal/chronicle";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatJournalDate, formatJournalTime } from "@/lib/formatJournalDate";
 import type { CampaignEntity, Character, EntryVisibility, JournalEntry } from "@/types/character";
 
@@ -21,7 +22,6 @@ interface ManuscriptPageProps {
   character: Character;
   chapter: ChronicleChapter;
   entities: Map<string, CampaignEntity>;
-  onUpdate: (character: Character) => void;
   /** True when this character participates in the session (may rename the chapter). */
   canRename: boolean;
   /** Persist a new chapter title (PATCH session); resolves true on success. */
@@ -52,11 +52,11 @@ export default function ManuscriptPage({
   character,
   chapter,
   entities,
-  onUpdate,
   canRename,
   onRename,
 }: ManuscriptPageProps) {
-  const { busy, error, create, update, remove } = useJournalMutations(character.id, onUpdate);
+  const { setCharacter } = useCurrentCharacter();
+  const { busy, error, create, update, remove } = useJournalMutations(character.id, setCharacter);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [entryPanelOpen, setEntryPanelOpen] = useState(false);
