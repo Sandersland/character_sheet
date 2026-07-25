@@ -16,7 +16,7 @@ vi.mock("@/lib/character/character-serialize.js", () => ({
 }));
 vi.mock("@/lib/character/character-include.js", () => ({ characterInclude: { marker: true } }));
 
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint, runTransaction } from "@/lib/http/transactions-endpoint.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 
@@ -171,5 +171,47 @@ describe("makeTransactionsEndpoint", () => {
     await expect(handler(req({ operations: [] }), res)).rejects.toThrow("Character not found");
     expect(apply).not.toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+// runTransaction is the same body without the router closure — the shared ability
+// endpoint calls it per request after resolving a handler out of ABILITY_REGISTRY
+// (#1275). The suite above proves makeTransactionsEndpoint still delegates here.
+describe("runTransaction", () => {
+  const call = (
+    handler: Parameters<typeof runTransaction>[0],
+    body: unknown,
+    res: ReturnType<typeof makeRes>,
+  ) =>
+    runTransaction(
+      handler,
+      req(body) as unknown as Parameters<typeof runTransaction>[1],
+      res as unknown as Parameters<typeof runTransaction>[2],
+    );
+
+  it("runs the full flow without a router (access, apply, re-fetch, respond)", async () => {
+    const apply = vi.fn().mockResolvedValue([{ roll: 5 }]);
+    const res = makeRes();
+
+    await call(
+      { schema, apply, domainErrors: [], respond: (character, result) => ({ character, results: result }) },
+      { operations: [{ type: "go" }] },
+      res,
+    );
+
+    expect(access).toHaveBeenCalledWith(prisma, "u1", "c1", "edit");
+    expect(apply).toHaveBeenCalledWith("c1", { operations: [{ type: "go" }] }, "u1");
+    expect(res.body).toEqual({ character: { id: "c1", serialized: true }, results: [{ roll: 5 }] });
+  });
+
+  it("maps a listed domain error to 400 { error: message }", async () => {
+    const apply = vi.fn().mockRejectedValue(new DomainErrorA("bad op"));
+    const res = makeRes();
+
+    await call({ schema, apply, domainErrors: [DomainErrorA] }, { operations: [{ type: "go" }] }, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.body).toEqual({ error: "bad op" });
+    expect(findUnique).not.toHaveBeenCalled();
   });
 });
