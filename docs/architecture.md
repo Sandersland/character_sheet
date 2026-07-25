@@ -66,7 +66,12 @@ The level-up ceremony endpoint (`/level-up/transactions`) is the **composition v
 
 ### Cross-tier shared types
 
-Wire types shared by both tiers (backend transaction-op inputs the frontend must construct) have a single source of truth in the `@character-sheet/shared-types` workspace (`packages/shared-types/`), consumed via `import type` only — so nothing reaches either runtime bundle and tsc catches drift that hand-mirrors used to hide (#820). Each tier re-exports the names it uses from its existing public module (backend `lib/spellcasting/spellcasting.ts`, frontend `types/character/spells.ts`) so downstream imports are unchanged. Add a mirror family as one file under `src/`, export only names consumed by name (union-only members stay module-private for the zero-dead-export gate), and re-export per tier. The spellcasting-op family is the migrated pattern-setter; remaining families (`#820`) still hand-mirror until moved.
+Wire types shared by both tiers (backend transaction-op inputs the frontend must construct, and the shapes the serializers return) are declared **once** in the `@character-sheet/shared-types` workspace (`packages/shared-types/`) and never hand-mirrored. Consume via `import type` only — nothing reaches either runtime bundle, and tsc catches the drift a mirror used to hide (#820). Add a family as one file under `src/`, re-export it from `index.ts`, then re-export the names each tier uses from that tier's existing public module (backend `lib/…`, frontend `types/character/*.ts`) so downstream imports never change. Put only the *consumed* names in those per-tier re-export blocks — a name that was previously used inside its declaring module becomes a dead export the moment it is only forwarded, and the zero-dead-export gate is repo-wide.
+
+Two rules the package can't enforce for you:
+
+- **A runtime value that used to define its type is now a separate declaration.** Where an `as const` tuple fed both a zod schema and `type X = (typeof TUPLE)[number]`, the tuple stays backend-side and the union moves — so add a `expectTypeOf<(typeof TUPLE)[number]>().toEqualTypeOf<X>()` latch, or the schema and the wire type will drift silently. Same for any Prisma enum a shared type spells out as a literal union (the package has no Prisma dependency).
+- **Not every look-alike pair is one type.** If a serializer remaps fields on the way out, the internal and wire shapes are genuinely different types that a token-based clone detector cannot tell apart — leave the internal one private.
 
 ## Docker Compose
 

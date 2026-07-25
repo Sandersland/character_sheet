@@ -1,64 +1,11 @@
-// Starting equipment — per-class packages (2014 Basic Rules).
-//
-// This nested choice-group / open-pick structure stays in TS as an intermediate
-// step: pack contents already migrated to the DB (Pack / PackContent tables) but
-// the choice-group schema isn't worth designing yet. The frontend receives it
-// via GET /api/reference (each class row's entry); pack expansion runs
-// server-side at character creation from the DB-backed packs.
+// Starting equipment — per-class packages (2014 Basic Rules). Content still in
+// TS rather than seed rows: pack contents already migrated to the Pack /
+// PackContent tables, but the choice-group schema isn't worth designing yet.
 
-export type WeaponClassName = "simple" | "martial";
-export type WeaponRangeName = "melee" | "ranged";
-
-/** Filter used for open picks — omitting a field means "any". */
-export interface WeaponPoolFilter {
-  weaponClass?: WeaponClassName;
-  range?: WeaponRangeName;
-}
-
-/** Reference to a concrete catalog Item by its unique name, with a quantity. */
-export interface FixedItemRef {
-  catalogName: string;
-  quantity?: number; // default 1
-}
-
-/** An open pick from the weapon pool, e.g. "any martial weapon". */
-export interface OpenWeaponPick {
-  label: string;
-  filter: WeaponPoolFilter;
-  quantity?: number; // default 1
-}
-
-/**
- * One selectable bundle within a choice group — a set of fixed items plus
- * zero or more open picks the player fills in from the filtered catalog.
- */
-export interface EquipmentBundle {
-  label: string;
-  items?: FixedItemRef[];
-  openPicks?: OpenWeaponPick[];
-}
-
-/**
- * A choice group within a class's starting equipment.
- * options.length === 1 → auto-granted (no player choice needed).
- * options.length > 1  → player picks exactly one bundle.
- */
-export interface EquipmentChoiceGroup {
-  label: string;
-  options: EquipmentBundle[];
-}
-
-/** Dice expression for starting gold: roll diceCount×dFaces, multiply. */
-export interface StartingGold {
-  diceCount: number;
-  diceFaces: number;
-  multiplier: number;
-}
-
-export interface ClassStartingEquipment {
-  groups: EquipmentChoiceGroup[];
-  gold: StartingGold;
-}
+// The package shapes are the wire contract (the frontend reads them off
+// GET /api/reference) and live in shared-types (#1273), so the literal below is
+// now checked against the very type the client renders.
+import type { ClassStartingEquipment } from "@character-sheet/shared-types";
 
 export const STARTING_EQUIPMENT: Record<string, ClassStartingEquipment> = {
   Fighter: {

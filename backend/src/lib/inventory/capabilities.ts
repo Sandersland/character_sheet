@@ -4,11 +4,55 @@
 // castSpell (#528), grant (#529), activatedEffect (#543), charges (#555).
 
 import { casterFractionFor } from "@/lib/srd/srd.js";
+import type {
+  ActivatedDurationKind,
+  ActivationType,
+  AdvantageOn,
+  AttunementPrereqKind,
+  CapabilityKind,
+  CapabilityOp,
+  CapabilityTarget,
+  CastResource,
+  CastStatMode,
+  ChargeTrigger,
+  GrantType,
+  GrantValueKind,
+  ItemAdvantageGrant,
+  ItemProficiencyGrant,
+  ItemResourceKind,
+  ItemResourcePeriod,
+  ProficiencyKind,
+  SerializedCapability,
+} from "@character-sheet/shared-types";
 
-export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
+// The capability vocabulary is the wire contract and lives in shared-types
+// (#1273); re-exported so the ~8 backend modules importing it from here keep
+// resolving it unchanged. The as-const tuples below stay backend-side because
+// they feed the route zod schemas — capability-wire-contract.test.ts latches each
+// tuple to its shared union, which is what the deleted `(typeof X)[number]`
+// definitions used to guarantee for free.
+export type {
+  ActivatedDurationKind,
+  ActivationType,
+  AdvantageOn,
+  AttunementPrereqKind,
+  CapabilityKind,
+  CapabilityOp,
+  CapabilityTarget,
+  CastResource,
+  CastStatMode,
+  ChargeTrigger,
+  GrantType,
+  GrantValueKind,
+  ItemAdvantageGrant,
+  ItemProficiencyGrant,
+  ItemResourceKind,
+  ItemResourcePeriod,
+  SerializedCapability,
+};
 
 // The passiveBonus target enum, as a value tuple so the route's zod schema and
-// the frontend option list share one source of truth with the type below.
+// the frontend option list share one source of truth with the shared union.
 export const CAPABILITY_TARGETS = [
   "ac",
   "attack",
@@ -23,53 +67,38 @@ export const CAPABILITY_TARGETS = [
   "maxHp",
 ] as const;
 
-export type CapabilityTarget = (typeof CAPABILITY_TARGETS)[number];
-
 export const CAPABILITY_OPS = ["add", "setTo"] as const;
-export type CapabilityOp = (typeof CAPABILITY_OPS)[number];
 
 export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
-export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
 
 // castSpell resource + stat-mode enums (#528), value tuples so the route schema
-// and the frontend option lists share one source of truth with the types below.
+// and the frontend option lists share one source of truth with the shared unions.
 export const CAST_RESOURCES = ["perRestShort", "perRestLong", "perDayDawn", "perDayDusk", "atWill", "charges"] as const;
-export type CastResource = (typeof CAST_RESOURCES)[number];
 
 export const CAST_STAT_MODES = ["fixed", "wielder"] as const;
-export type CastStatMode = (typeof CAST_STAT_MODES)[number];
-
-// activatedEffect axes (#543) — mirror the ActivationType / ActivatedDuration /
-// ItemResourceKind / ItemResourcePeriod schema enums.
-export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
-export type ActivatedDurationKind = "whileActive" | "untilRest";
-export type ItemResourceKind = "perRest" | "perDay" | "atWill" | "charges";
-export type ItemResourcePeriod = "short" | "long" | "dawn" | "dusk";
 
 // Recharge triggers for a charges pool (#555) — the ItemResourcePeriod values,
 // as a tuple so the route schema and frontend option list share one source.
 export const CHARGE_TRIGGERS = ["short", "long", "dawn", "dusk"] as const;
-export type ChargeTrigger = (typeof CHARGE_TRIGGERS)[number];
 
 // grant kind (#529). "sense"/"movement" are reserved: valid enum values the DM
 // can't yet author and no derivation consumes them.
 export const GRANT_TYPES = ["resistance", "immunity", "conditionImmunity", "advantage", "proficiency"] as const;
-export type GrantType = (typeof GRANT_TYPES)[number];
 
 export const ADVANTAGE_ON = ["save", "check", "initiative", "attack"] as const;
-export type AdvantageOn = (typeof ADVANTAGE_ON)[number];
 
 // What grantValue names: a damage type, a condition, a skill/ability/save key,
 // or a weapon/tool/language name. Disambiguates the flat grantValue column.
 export const GRANT_VALUE_KINDS = ["damageType", "condition", "skill", "ability", "save", "weapon", "tool", "language"] as const;
-export type GrantValueKind = (typeof GRANT_VALUE_KINDS)[number];
 
-// Proficiency grants name one of these categories via grantValueKind.
-const PROFICIENCY_KINDS = ["skill", "save", "weapon", "tool", "language"] as const;
-export type ProficiencyKind = (typeof PROFICIENCY_KINDS)[number];
+// Proficiency grants name one of these categories via grantValueKind; exported
+// so capability-wire-contract.test.ts can latch it to the shared ProficiencyKind.
+export const PROFICIENCY_KINDS = ["skill", "save", "weapon", "tool", "language"] as const;
 
-// Dice-valued bonus payload — round-trips now; consumed in the damage roll at #526C.
-export interface CapabilityDice {
+// The column-read form of a dice-valued bonus: valueDamageType is a nullable
+// column, so this stays nullable where the wire CapabilityDice is not —
+// serializePassiveBonus drops the null on the way out.
+interface CapabilityDiceColumns {
   count: number;
   faces: number;
   damageType?: string | null;
@@ -83,7 +112,7 @@ export interface PassiveBonusCapability {
   targetKey?: string | null;
   condition?: string | null;
   description?: string | null;
-  dice?: CapabilityDice | null;
+  dice?: CapabilityDiceColumns | null;
 }
 
 // A castSpell capability (#528): the item casts a referenced Spell from its own
@@ -436,51 +465,6 @@ export function describeActivatedReminder(cap: ActivatedEffectCapability): strin
   return parts.join(" · ");
 }
 
-// The flat wire shape a capability serializes to — the same fields the DM authors
-// and the sheet renders. Dice is nested; opaque kinds carry only kind+description.
-export interface SerializedCapability {
-  kind: CapabilityKind;
-  target?: CapabilityTarget;
-  op?: CapabilityOp;
-  value?: number;
-  targetKey?: string;
-  condition?: string;
-  description?: string;
-  dice?: CapabilityDice;
-  // castSpell fields (#528).
-  spellId?: string;
-  spellName?: string;
-  spellLevel?: number;
-  castLevel?: number;
-  resource?: CastResource;
-  uses?: number;
-  concentration?: boolean;
-  dcMode?: CastStatMode;
-  dcValue?: number;
-  attackMode?: CastStatMode;
-  attackValue?: number;
-  // activatedEffect (#543) — round-tripped so the DM editor can re-populate.
-  // activatedDuration matches the authoring input field name (the internal
-  // Capability shape calls it `duration`).
-  activation?: ActivationType;
-  activatedDuration?: ActivatedDurationKind;
-  resourceKind?: ItemResourceKind;
-  resourcePeriod?: ItemResourcePeriod;
-  resourceCharges?: number;
-  durationText?: string;
-  // grant fields (#529).
-  grantType?: GrantType;
-  grantOn?: AdvantageOn;
-  grantValueKind?: GrantValueKind;
-  grantValue?: string;
-  cantBeSurprised?: boolean;
-  // charges pool (#555) — nested recharge mirrors the DM input shape.
-  maxCharges?: number;
-  recharge?: { trigger: ChargeTrigger; dice?: { count: number; faces: number }; bonus?: number };
-  // Pool cost on a spending castSpell/activatedEffect capability (omitted = 1).
-  chargeCost?: number;
-}
-
 // Per-kind serializers. Each drops nulls so the wire shape matches the optional-
 // field DM input; nested dice/recharge mirror the authoring shape.
 function serializeCastSpell(cap: CastSpellCapability): SerializedCapability {
@@ -671,25 +655,12 @@ export function isItemActive(item: { equipped: boolean; attuned: boolean; requir
   return item.requiresAttunement ? item.attuned : item.equipped;
 }
 
-/** One item-sourced damage resistance/immunity or condition immunity. */
+// One item-sourced damage resistance/immunity or condition immunity. Stays
+// backend-private (unlike its advantage/proficiency siblings, which are shared
+// wire types) because serializeCharacter remaps it: `value` becomes `damageType`
+// on a resistance/immunity and `condition` on a condition immunity, so the wire
+// shape is a different type that merely looks alike.
 export interface ItemTraitGrant {
-  value: string;
-  source: string;
-}
-
-/** One item-sourced advantage grant (rendered as reminder text on its surface). */
-export interface ItemAdvantageGrant {
-  on: AdvantageOn;
-  valueKind?: GrantValueKind;
-  value?: string;
-  cantBeSurprised: boolean;
-  source: string;
-  description?: string;
-}
-
-/** One item-sourced proficiency grant, merged into the derived proficiency lists. */
-export interface ItemProficiencyGrant {
-  profType: ProficiencyKind;
   value: string;
   source: string;
 }

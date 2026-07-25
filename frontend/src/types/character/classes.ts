@@ -4,6 +4,33 @@
 
 import type { EffectSpec } from "@/lib/effects";
 
+// The resource + Warrior-of-the-Elements op shapes are the single cross-tier
+// source of truth in shared-types (#1273); re-exported here so this module stays
+// the frontend's class-types entry point (flowing through the @/types/character
+// barrel).
+export type {
+  CastElementalBurstOperation,
+  ElementalDamageType,
+  ElementalStrikeOperation,
+  ForgetManeuverOperation,
+  ForgetSubclassChoiceOperation,
+  ForgetToolProficiencyOperation,
+  LearnManeuverOperation,
+  LearnSubclassChoiceOperation,
+  LearnToolProficiencyOperation,
+  ResourceOperation,
+  RestoreResourceOperation,
+  RollInitiativeOperation,
+  SpendResourceOperation,
+  ToggleElementalAttunementOperation,
+  WarriorOfElementsOperation,
+  WarriorOfElementsResult,
+} from "@character-sheet/shared-types";
+// The per-op audit payload keeps its frontend name: the shared declaration is
+// called ResourceOpAudit (what the server logs) where the client sees a result.
+// Aliasing keeps api/client.ts out of this diff — #1275 is rewriting that file.
+export type { ResourceOpAudit as ResourceOpResult } from "@character-sheet/shared-types";
+
 /** Focus (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
 export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
@@ -237,93 +264,6 @@ export interface SetSubclassOperation { type: "setSubclass"; subclassId: string 
 // #1137: setFightingStyle is gone — Fighting Style is now a feat taken via the
 // advancement endpoint (fightingStyle slot), not a class-scalar op.
 export type ClassOperation = SetSubclassOperation;
-
-/**
- * Resource operation types — mirror of `applyResourceOperations`. Sent as
- * `{ operations: ResourceOperation[] }` to POST /api/characters/:id/resources/transactions.
- */
-export interface SpendResourceOperation { type: "spendResource"; key: string; amount?: number; roll?: number }
-
-export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
-
-/** Roll Initiative / combat start (#1239/#1243): applies every onInitiative-declaring
- *  pool's regen (e.g. Monk Uncanny Metabolism/Perfect Focus). Carries no key. */
-export interface RollInitiativeOperation { type: "rollInitiative" }
-
-export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
-
-export interface ForgetManeuverOperation { type: "forgetManeuver"; entryId: string }
-
-/** Choose an artisan's-tool proficiency from the Student of War feature. */
-export interface LearnToolProficiencyOperation { type: "learnToolProficiency"; name: string }
-
-/** Undo a subclass-granted tool proficiency choice. */
-export interface ForgetToolProficiencyOperation { type: "forgetToolProficiency"; entryId: string }
-
-/** Pick one option for a generic subclass "choose N" (e.g. Hunter's Prey). */
-export interface LearnSubclassChoiceOperation {
-  type: "learnSubclassChoice";
-  choiceKey: string;
-  /** Catalog GrantedAbility id; omit for a custom (homebrew) option. */
-  optionId?: string;
-  custom?: { name: string; description: string };
-}
-
-export type ResourceOperation =
-  | SpendResourceOperation
-  | RestoreResourceOperation
-  | RollInitiativeOperation
-  | LearnManeuverOperation
-  | ForgetManeuverOperation
-  | LearnToolProficiencyOperation
-  | ForgetToolProficiencyOperation
-  | LearnSubclassChoiceOperation;
-
-/**
- * Per-op audit result from POST …/resources/transactions — mirrors the
- * backend's generic ResourceOpAudit. Most ops' callers ignore it; rollInitiative
- * (#1239/#1243) is read for its regen summary + eventData.regenerated (whether
- * anything actually fired) to drive the combat-start toast.
- */
-export interface ResourceOpResult {
-  eventType: string;
-  summary: string;
-  eventData: Record<string, unknown>;
-}
-
-/**
- * Warrior of the Elements operation types — mirror of
- * `applyWarriorOfElementsOperations`. Sent as
- * `{ operations: WarriorOfElementsOperation[] }` to POST /api/characters/:id/elements/transactions.
- */
-export type ElementalDamageType = "acid" | "cold" | "fire" | "lightning" | "thunder";
-
-/** Toggle Elemental Attunement on (spends 1 Focus) or off. */
-export interface ToggleElementalAttunementOperation { type: "toggleElementalAttunement"; active: boolean }
-
-/** Elemental Burst (L6): spend 2 Focus, roll 3× Martial Arts die, Dex save. */
-export interface CastElementalBurstOperation { type: "castElementalBurst"; damageType: ElementalDamageType; roll: number }
-
-/** Elemental Strikes rider (while attuned): swap damage type + force a Str-save move. */
-export interface ElementalStrikeOperation { type: "elementalStrike"; damageType: ElementalDamageType; roll?: number }
-
-export type WarriorOfElementsOperation =
-  | ToggleElementalAttunementOperation
-  | CastElementalBurstOperation
-  | ElementalStrikeOperation;
-
-/** Per-op result from POST …/elements/transactions (mirrors the backend union). */
-export interface WarriorOfElementsResult {
-  active?: boolean;
-  dc?: number;
-  saveRoll?: number;
-  outcome?: "fail" | "success";
-  damageType?: ElementalDamageType;
-  rawDamage?: number;
-  appliedDamage?: number;
-  moved?: boolean;
-  summary: string;
-}
 
 /**
  * Warrior of Shadow operation types — mirror of `applyShadowArtsOperations`.

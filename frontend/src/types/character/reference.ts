@@ -2,8 +2,16 @@
  * Character-creation reference data (GET /api/reference) and the create-character body.
  */
 
-import type { WeaponClass, WeaponRange } from "./inventory";
+import type { ClassStartingEquipment } from "@character-sheet/shared-types";
+
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
+
+// The starting-equipment shapes are the single cross-tier source of truth in
+// shared-types (#1273); re-exported here so this module stays the frontend's
+// reference-types entry point (flowing through the @/types/character barrel).
+// ClassStartingEquipment is also used locally by ClassOption below.
+export type { ClassStartingEquipment };
+export type { EquipmentBundle, OpenWeaponPick } from "@character-sheet/shared-types";
 
 /** Subclass option (from GET /api/reference). */
 export interface SubclassOption {
@@ -23,49 +31,6 @@ export interface RaceOption {
   name: string;
   speed: number;
   toolProficiencies: string[];
-}
-
-/**
- * Starting equipment types — mirror of the backend `ClassStartingEquipment` /
- * `STARTING_EQUIPMENT`. The frontend receives these from GET /api/reference
- * (attached to each ClassOption) and never needs to hardcode them itself.
- */
-export interface WeaponPoolFilter {
-  weaponClass?: WeaponClass;
-  range?: WeaponRange;
-}
-
-export interface FixedItemRef {
-  catalogName: string;
-  quantity?: number;
-}
-
-export interface OpenWeaponPick {
-  label: string;
-  filter: WeaponPoolFilter;
-  quantity?: number;
-}
-
-export interface EquipmentBundle {
-  label: string;
-  items?: FixedItemRef[];
-  openPicks?: OpenWeaponPick[];
-}
-
-export interface EquipmentChoiceGroup {
-  label: string;
-  options: EquipmentBundle[];
-}
-
-export interface StartingGold {
-  diceCount: number;
-  diceFaces: number;
-  multiplier: number;
-}
-
-export interface ClassStartingEquipment {
-  groups: EquipmentChoiceGroup[];
-  gold: StartingGold;
 }
 
 /** Reference types (GET /api/reference) that populate the character-creation form. */

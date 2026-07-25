@@ -12,7 +12,7 @@
 // Detail-input shapes are single-sourced in src/lib/inventory (shared with the
 // runtime lib). Relative, not @/, since the seed's tsx context doesn't alias.
 import type {
-  ItemCategoryName,
+  ItemCategory,
   WeaponDetailInput,
   ArmorDetailInput,
   ConsumableDetailInput,
@@ -258,7 +258,7 @@ function coins(gp: number, sp = 0, cp = 0) {
 
 export interface CatalogItem {
   name: string;
-  category: ItemCategoryName;
+  category: ItemCategory;
   weight?: number;
   cost?: ReturnType<typeof coins>;
   description?: string;

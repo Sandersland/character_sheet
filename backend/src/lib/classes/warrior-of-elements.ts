@@ -23,6 +23,17 @@ import { runCharacterTransaction, type CharacterTxContext } from "@/lib/characte
 import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { focusSaveDC } from "./monk.js";
+import type {
+  CastElementalBurstOperation,
+  ElementalBurstResult,
+  ElementalSaveOutcome,
+  ElementalStrikeOperation,
+  ElementalStrikeResult,
+  ToggleAttunementResult,
+  ToggleElementalAttunementOperation,
+  WarriorOfElementsOperation,
+  WarriorOfElementsResult,
+} from "@character-sheet/shared-types";
 
 export class InvalidWarriorOfElementsOperationError extends Error {}
 
@@ -30,65 +41,10 @@ export const ELEMENTAL_ATTUNEMENT_BUFF_KEY = "elementalAttunement";
 const ELEMENTAL_BURST_FOCUS_COST = 2;
 const ELEMENTAL_ATTUNEMENT_FOCUS_COST = 1;
 
-/** The five elemental damage types a Warrior of the Elements can deal (SRD 5.2). */
+// The five elemental damage types a Warrior of the Elements can deal (SRD 5.2).
+// The tuple stays here because the route's z.enum consumes it; the union it used
+// to define lives in shared-types (#1273), latched by resource-wire-contract.test.ts.
 export const ELEMENTAL_DAMAGE_TYPES = ["acid", "cold", "fire", "lightning", "thunder"] as const;
-export type ElementalDamageType = (typeof ELEMENTAL_DAMAGE_TYPES)[number];
-
-/** Toggle Elemental Attunement on (spends 1 Focus) or off (no refund). */
-export interface ToggleElementalAttunementOperation {
-  type: "toggleElementalAttunement";
-  active: boolean;
-}
-
-/** Elemental Burst (L6): Magic action, 2 Focus, 3× Martial Arts die, Dex save. */
-export interface CastElementalBurstOperation {
-  type: "castElementalBurst";
-  damageType: ElementalDamageType;
-  /** Client-rolled three-Martial-Arts-die total (server halves it on a made save). */
-  roll: number;
-}
-
-/** Elemental Strikes rider (part of Elemental Attunement): swap the Unarmed
- *  Strike's damage type and force a Strength save to move the target 10 ft. */
-export interface ElementalStrikeOperation {
-  type: "elementalStrike";
-  damageType: ElementalDamageType;
-  /** Client-rolled Unarmed Strike damage of the chosen type (logged for the toast). */
-  roll?: number;
-}
-
-export type WarriorOfElementsOperation =
-  | ToggleElementalAttunementOperation
-  | CastElementalBurstOperation
-  | ElementalStrikeOperation;
-
-export type ElementalSaveOutcome = "fail" | "success";
-
-export interface ToggleAttunementResult {
-  active: boolean;
-  summary: string;
-}
-
-export interface ElementalBurstResult {
-  dc: number;
-  saveRoll: number;
-  outcome: ElementalSaveOutcome;
-  damageType: ElementalDamageType;
-  rawDamage: number;
-  appliedDamage: number;
-  summary: string;
-}
-
-export interface ElementalStrikeResult {
-  dc: number;
-  saveRoll: number;
-  outcome: ElementalSaveOutcome;
-  damageType: ElementalDamageType;
-  moved: boolean;
-  summary: string;
-}
-
-export type WarriorOfElementsResult = ToggleAttunementResult | ElementalBurstResult | ElementalStrikeResult;
 
 /** Fail (roll < DC) takes full damage; success halves it, rounded down (SRD 5.2 "half as much"). */
 export function resolveElementalBurstDamage(
