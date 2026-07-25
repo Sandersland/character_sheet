@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { SheetTab } from "@/features/character-meta/sheetTabs";
 import type { Character } from "@/types/character";
 
@@ -38,12 +39,16 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
+// CampaignIndicator (rendered inside the header) reads useCurrentCharacter(),
+// so every render seeds the cache and mounts CurrentCharacterProvider via
+// renderWithCharacter — keyed on the same character passed as the prop.
 function renderHeader(props: Partial<Parameters<typeof CharacterSheetHeader>[0]> = {}) {
-  return render(
+  const character = props.character ?? makeCharacter();
+  return renderWithCharacter(
     <MemoryRouter>
       <RollProvider>
         <CharacterSheetHeader
-          character={makeCharacter()}
+          character={character}
           tabs={TABS}
           activeTab="combat"
           onTabChange={vi.fn()}
@@ -55,6 +60,7 @@ function renderHeader(props: Partial<Parameters<typeof CharacterSheetHeader>[0]>
         />
       </RollProvider>
     </MemoryRouter>,
+    character,
   );
 }
 

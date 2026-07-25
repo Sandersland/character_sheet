@@ -1,10 +1,7 @@
 import { updateCampaignPreferences } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import type { CampaignPreferences, Character } from "@/types/character";
-
-interface CampaignPreferencesFieldsProps {
-  character: Character;
-}
+import type { CampaignPreferences } from "@/types/character";
 
 // One labeled toggle row. Container + read/write wiring only — the underlying
 // behaviors (DM sharing #116; party-target healing consent #462) live elsewhere.
@@ -39,9 +36,8 @@ function ToggleRow({ label, hint, checked, disabled, onChange }: ToggleRowProps)
 // (#537). Extracted from the Story tab into a standalone field block so the
 // header Campaign-settings sheet (#1087) owns the surface. Reads the serialized
 // prefs and writes each flag through the API client helper.
-export default function CampaignPreferencesFields({
-  character,
-}: CampaignPreferencesFieldsProps) {
+export default function CampaignPreferencesFields() {
+  const { character } = useCurrentCharacter();
   const prefs: CampaignPreferences = character.campaignPreferences ?? {
     shareWithDm: false,
     autoFriendlyHealing: false,

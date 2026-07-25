@@ -224,7 +224,7 @@ function DesktopBanner({
                 <span>
                   {character.background} · {character.alignment}
                 </span>
-                <CampaignIndicator character={character} />
+                <CampaignIndicator />
               </p>
             </div>
           </div>
