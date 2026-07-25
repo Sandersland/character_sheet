@@ -10,16 +10,12 @@ import type { Character } from "@/types/character";
 // Generic thunk runner — mirrors useClassTransactions' run(send) shape: the
 // mutationFn just invokes whichever thunk a call site passes, so create/
 // update/remove all share one scoped mutation instead of three.
-export function useJournalMutations(
-  characterId: string,
-  setCharacter: (character: Character) => void,
-) {
+export function useJournalMutations(characterId: string) {
   const mutation = useCharacterMutation<() => Promise<Character>, Character>({
     characterId,
     mutationFn: (action) => action(),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: setCharacter,
   });
 
   async function run(action: () => Promise<Character>): Promise<boolean> {

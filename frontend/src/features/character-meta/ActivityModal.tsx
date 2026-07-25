@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { fetchActivity, fetchSessions, revertBatch } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import {
   categoryLabel,
   categoryTone,
@@ -380,7 +379,6 @@ function useActivityEvents(filters: ActivityFilterState) {
 }
 
 export default function ActivityModal({ characterId, onClose, entityId }: ActivityModalProps) {
-  const { setCharacter } = useCurrentCharacter();
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
   // Bulk-sale summary collapse (issue #104). Keyed by batch.key, kept INDEPENDENT
   // of expandedFields (keyed by event.id) so the summary line and the per-row
@@ -391,7 +389,6 @@ export default function ActivityModal({ characterId, onClose, entityId }: Activi
     mutationFn: (batchId: string) => revertBatch(characterId, batchId),
     toCharacter: (c) => c,
     fallbackMessage: "Undo failed — try again.",
-    onCharacterWritten: setCharacter,
   });
 
   // Filter state. "all" category disables the category predicate; an empty

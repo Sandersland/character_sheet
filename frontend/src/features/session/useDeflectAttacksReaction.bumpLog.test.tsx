@@ -3,9 +3,9 @@
  * bumped the session log itself. #1284 moved that responsibility to
  * `useSessionLogBumpOnCharacterWrite` (mounted once in CharacterSheetWorkspace,
  * covered by its own test) so the bump fires for every character-cache write,
- * not only ones that happened to flow through this hook — and dissolved the
- * useCombatLifecycle coupling entirely: useDeflectAttacksReaction now writes
- * straight to the cache via useCurrentCharacter(). This pins that write.
+ * not only ones that happened to flow through this hook. useCharacterMutation's
+ * onSuccess is now the only write (redundant-write cleanup, follow-up to #1284);
+ * this pins that the cache still ends up correct (batchId stripped).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, waitFor } from "@testing-library/react";

@@ -202,7 +202,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
   it("handleSwap batches unprepare-one + prepare-another in a single client call", async () => {
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
     mockApply.mockResolvedValue(makeWizard());
-    const { result } = renderHook(() => useSpellcasting(makeWizard(), vi.fn()));
+    const { result } = renderHook(() => useSpellcasting(makeWizard()));
 
     result.current.handleSwap("entry-drop", "entry-add");
 

@@ -6,7 +6,6 @@ import { ChevronRight } from "@/components/ui/icons";
 import RestControls from "@/features/hitpoints/RestControls";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
 import { useRestActions } from "@/features/hitpoints/useRestActions";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 interface RestButtonProps {
@@ -24,8 +23,7 @@ interface RestButtonProps {
  */
 export default function RestButton({ character, variant = "compact" }: RestButtonProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { setCharacter } = useCurrentCharacter();
-  const hp = useHitPointApply(character, setCharacter);
+  const hp = useHitPointApply(character);
   const rest = useRestActions(character, hp.submit);
   const { total, die } = character.hitDice;
 

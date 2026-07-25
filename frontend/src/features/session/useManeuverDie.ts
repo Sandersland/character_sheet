@@ -20,7 +20,6 @@
 
 import { castManeuverTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 export interface UseManeuverDieReturn {
@@ -32,7 +31,6 @@ export interface UseManeuverDieReturn {
 }
 
 export function useManeuverDie(character: Character): UseManeuverDieReturn {
-  const { setCharacter } = useCurrentCharacter();
   const pool = character.resources?.pools?.find((p) => p.key === "superiorityDice");
   const diceFaces = pool?.die ? parseInt(pool.die.replace("d", ""), 10) : 8;
   const dieLabel = pool?.die ?? "d8";
@@ -42,7 +40,6 @@ export function useManeuverDie(character: Character): UseManeuverDieReturn {
     mutationFn: (entryId: string) => castManeuverTransaction(character.id, [{ type: "castManeuver", entryId }]),
     toCharacter: (r) => r.character,
     fallbackMessage: "Failed to cast maneuver",
-    onCharacterWritten: (r) => setCharacter(r.character),
   });
 
   // No try/catch here (unchanged from pre-#1283): a spend failure propagates to

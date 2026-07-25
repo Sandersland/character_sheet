@@ -15,7 +15,6 @@
 
 import { applyResourceTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import {
   ARMOR_CATEGORY_LABELS,
   ARMOR_CATEGORY_ORDER,
@@ -173,20 +172,18 @@ function ProficiencySection({
 // mutation) can never race each other. Split out of ProficienciesCard so its
 // own hook-composition + try/catch branches don't count against that
 // component's complexity budget.
-function useToolProficiencyMutations(character: Character, setCharacter: (c: Character) => void) {
+function useToolProficiencyMutations(character: Character) {
   const learnMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (name: string) => applyResourceTransactions(character.id, [{ type: "learnToolProficiency", name }]),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to save tool proficiency. Please try again.",
-    onCharacterWritten: setCharacter,
   });
   const forgetMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (entryId: string) => applyResourceTransactions(character.id, [{ type: "forgetToolProficiency", entryId }]),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to remove tool proficiency. Please try again.",
-    onCharacterWritten: setCharacter,
   });
 
   async function learn(name: string) {
@@ -217,9 +214,8 @@ export default function ProficienciesCard({
   character,
   artisanTools,
 }: Props) {
-  const { setCharacter } = useCurrentCharacter();
   const { busy, error, learn: handleLearnToolProf, forget: handleForgetToolProf } =
-    useToolProficiencyMutations(character, setCharacter);
+    useToolProficiencyMutations(character);
 
   const weapons: WeaponProficiency[] = character.weaponProficiencies ?? [];
   const armor = sortedArmor(character.armorProficiencies ?? []);

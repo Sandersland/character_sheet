@@ -3,9 +3,9 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { fetchCharacter } from "@/api/client";
 import { characterKeys } from "@/api/queryKeys";
 
-// No `setCharacter` here (#1284 C18 — the last consumer, useCurrentCharacter,
-// now writes the cache itself): a page reads this hook directly only to
-// render the load/error/not-found guard, never to mutate.
+// No `setCharacter` here (#1284): every write goes through useCharacterMutation's
+// onSuccess instead. A page reads this hook directly only to render the
+// load/error/not-found guard, never to mutate.
 export function useCharacter(id: string | undefined) {
   const { data, isError } = useQuery({
     queryKey: characterKeys.detail(id),

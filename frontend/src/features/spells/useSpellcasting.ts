@@ -14,7 +14,7 @@ import type {
   SpellcastingOperation,
 } from "@/types/character";
 
-export function useSpellcasting(character: Character, setCharacter: (c: Character) => void) {
+export function useSpellcasting(character: Character) {
   const [castResult, setCastResult] = useState<CastResult | null>(null);
   const [addPanelOpen, setAddPanelOpen] = useState(false);
   // The prepared-cap pre-block fires before any request is sent, so it needs
@@ -26,7 +26,6 @@ export function useSpellcasting(character: Character, setCharacter: (c: Characte
     mutationFn: (ops: SpellcastingOperation[]) => applySpellcastingTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: setCharacter,
   });
 
   async function send(ops: SpellcastingOperation[]) {

@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { applyExperienceOperations, fetchSession } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Session } from "@/types/character";
 
 // "Add XP to this session" — awards XP tagged to this (already-ended) session
@@ -17,7 +16,6 @@ export default function SessionAddXpForm({
   sessionId: string;
   onAwarded: (session: Session) => void;
 }) {
-  const { setCharacter } = useCurrentCharacter();
   const [open, setOpen] = useState(false);
   const [xp, setXp] = useState("");
   // Session-refresh failures (fetchSession, after a successful award) keep
@@ -29,7 +27,6 @@ export default function SessionAddXpForm({
     mutationFn: (amount: number) => applyExperienceOperations(characterId, [{ type: "award", amount }], sessionId),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to award XP.",
-    onCharacterWritten: setCharacter,
   });
 
   const parsed = Number(xp);

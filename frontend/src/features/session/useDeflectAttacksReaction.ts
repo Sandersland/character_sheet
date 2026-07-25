@@ -20,7 +20,6 @@ import { useEffect, useState } from "react";
 
 import { applyActionTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { rollSpec } from "@/lib/dice";
 import {
   deflectAttacksReductionRoll,
@@ -59,7 +58,6 @@ export function useDeflectAttacksReaction({
   setReactionMessage,
   attachBatchId,
 }: UseDeflectAttacksReactionArgs): UseDeflectAttacksReactionReturn {
-  const { setCharacter } = useCurrentCharacter();
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -75,13 +73,6 @@ export function useDeflectAttacksReaction({
       return c;
     },
     fallbackMessage: "Redirect failed.",
-    // Re-strips batchId — onCharacterWritten gets the RAW result, not
-    // toCharacter's output, so a bare `setCharacter` here would re-pollute
-    // the cache with batchId right after the correct write.
-    onCharacterWritten: ({ batchId, ...c }) => {
-      void batchId;
-      setCharacter(c);
-    },
   });
 
   // Reuses deriveActions' own resourceKey gating (focus remaining >= 1) rather

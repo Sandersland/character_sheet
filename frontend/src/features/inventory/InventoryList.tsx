@@ -9,7 +9,6 @@ import InventoryListMobile from "@/features/inventory/InventoryListMobile";
 import InventoryMeters from "@/features/inventory/InventoryMeters";
 import InventoryToolbar from "@/features/inventory/InventoryToolbar";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useInventoryTransactions } from "@/features/inventory/useInventoryTransactions";
 import { useItemCatalog } from "@/features/inventory/useItemCatalog";
 import { useSellSelection } from "@/features/inventory/useSellSelection";
@@ -24,11 +23,10 @@ interface InventoryListProps {
 
 // The sheet's inventory editor: category-sectioned rows + add/sell panels, all funneling through one submitOperations that calls POST .../inventory/transactions and swaps in the returned character.
 export default function InventoryList({ character }: InventoryListProps) {
-  const { setCharacter } = useCurrentCharacter();
   const catalog = useItemCatalog();
   const isMobile = useIsBelowMd();
   const { pending, error, addOpen, editingId, setAddOpen, setEditingId, applyOps, submitOperations } =
-    useInventoryTransactions(character, setCharacter);
+    useInventoryTransactions(character);
   const sell = useSellSelection();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");

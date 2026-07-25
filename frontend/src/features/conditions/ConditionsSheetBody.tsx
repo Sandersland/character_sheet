@@ -11,7 +11,6 @@ import { Minus, Plus, X } from "lucide-react";
 
 import { applyConditionTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiHealthNormal } from "@/components/ui/icons";
 import {
@@ -31,13 +30,11 @@ interface Props {
 }
 
 export default function ConditionsSheetBody({ character, defaultAddOpen }: Props) {
-  const { setCharacter } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: ConditionOperation[]) => applyConditionTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: setCharacter,
   });
   const busy = mutation.isPending;
   const error = mutation.error;

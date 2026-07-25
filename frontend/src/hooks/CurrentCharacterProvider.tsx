@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
 /**
  * Workspace-scoped access to "the character this route is for" (#1284), so a
- * deeply nested component can read/write the character without a prop threaded
+ * deeply nested component can read the character without a prop threaded
  * through every layer between it and the page.
  *
  * Holds only the id, never the Character itself — a second copy of the
@@ -16,11 +16,9 @@
  * cache once a character has loaded).
  */
 
-import { createContext, useCallback, useContext, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, type ReactNode } from "react";
 
 import { useCharacter } from "@/hooks/useCharacter";
-import { characterKeys } from "@/api/queryKeys";
 import type { Character } from "@/types/character";
 
 const CurrentCharacterIdContext = createContext<string | null>(null);
@@ -36,30 +34,21 @@ export function CurrentCharacterProvider({ id, children }: Props) {
 
 export interface CurrentCharacterValue {
   character: Character;
-  setCharacter: (next: Character) => void;
 }
 
+// No `setCharacter` (#1284 follow-up): every mutation writes the cache itself
+// through useCharacterMutation's onSuccess — a second setter here was the
+// redundant-write footgun that let raw shape B/C results re-pollute the cache.
 export function useCurrentCharacter(): CurrentCharacterValue {
   const id = useContext(CurrentCharacterIdContext);
   if (id === null) {
     throw new Error("useCurrentCharacter must be used inside <CurrentCharacterProvider>");
   }
-  const queryClient = useQueryClient();
   const { character } = useCharacter(id);
   if (character == null) {
     throw new Error(
       "useCurrentCharacter: character is absent — CurrentCharacterProvider must mount only below a loaded guard",
     );
   }
-  // The ONE cache write every mutation's onCharacterWritten funnels through
-  // (#1284 C18 — moved out of useCharacter, which had no other consumer left).
-  // Memoised: threaded into effect deps deep in the sheet, where a new
-  // identity per render would re-fire them.
-  const setCharacter = useCallback(
-    (next: Character) => {
-      queryClient.setQueryData(characterKeys.detail(id), next);
-    },
-    [queryClient, id],
-  );
-  return { character, setCharacter };
+  return { character };
 }

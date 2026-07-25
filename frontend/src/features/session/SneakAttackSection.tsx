@@ -7,7 +7,6 @@ import { useState } from "react";
 
 import { rollSneakAttackTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
@@ -32,7 +31,6 @@ function useSneakAttackRoll(
   currentRow: AttackTallyRow | null,
   eligible: boolean,
 ) {
-  const { setCharacter } = useCurrentCharacter();
   const [rolled, setRolled] = useState<number | null>(null);
   const used = turnState.sneakAttackUsedThisTurn;
 
@@ -41,7 +39,6 @@ function useSneakAttackRoll(
     mutationFn: () => rollSneakAttackTransaction(character.id, eligible, used),
     toCharacter: (r) => r.character,
     fallbackMessage: "Failed to roll Sneak Attack",
-    onCharacterWritten: (r) => setCharacter(r.character),
   });
   const canRoll = eligible && !used && !mutation.isPending && currentRow !== null;
 

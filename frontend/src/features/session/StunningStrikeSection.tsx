@@ -12,7 +12,6 @@ import { useState } from "react";
 
 import { attemptStunningStrikeTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character, StunningStrikeAttemptResult } from "@/types/character";
@@ -31,7 +30,6 @@ function useStunningStrikeAttempt(
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
 ) {
-  const { setCharacter } = useCurrentCharacter();
   const [result, setResult] = useState<StunningStrikeAttemptResult | null>(null);
   const used = turnState.stunningStrikeUsedThisTurn;
 
@@ -40,7 +38,6 @@ function useStunningStrikeAttempt(
     mutationFn: (usedThisTurn: boolean) => attemptStunningStrikeTransaction(character.id, usedThisTurn),
     toCharacter: (r) => r.character,
     fallbackMessage: "Failed to attempt Stunning Strike",
-    onCharacterWritten: (r) => setCharacter(r.character),
   });
   const canAttempt = !used && !mutation.isPending && currentRow !== null;
 

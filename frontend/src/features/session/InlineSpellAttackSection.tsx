@@ -16,7 +16,6 @@ import { useState } from "react";
 import { useRoll } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatRollSpec, isNaturalTwenty } from "@/lib/dice";
 import { computeCastSpec } from "@/lib/spellCast";
 import { isAttackCantrip } from "@/lib/spellMeta";
@@ -46,7 +45,6 @@ export default function InlineSpellAttackSection({
   turnState,
   onLogChanged,
 }: InlineSpellAttackSectionProps) {
-  const { setCharacter } = useCurrentCharacter();
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
 
@@ -61,7 +59,6 @@ export default function InlineSpellAttackSection({
       applySpellcastingTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Cast failed — try again.",
-    onCharacterWritten: setCharacter,
   });
 
   const cantrips = (character.spellcasting?.spells ?? []).filter(isAttackCantrip);

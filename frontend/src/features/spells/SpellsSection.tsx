@@ -13,7 +13,6 @@ import { useState } from "react";
 
 import { deriveSpellList, preparedBudget } from "@/lib/spellList";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character, Spell } from "@/types/character";
 import AddSpellPanel from "@/features/spells/AddSpellPanel";
 import CastResultBanner from "@/features/spells/CastResultBanner";
@@ -33,7 +32,6 @@ export default function SpellsSection({
   isLive = false,
   onGoToCombat = () => {},
 }: SpellsSectionProps) {
-  const { setCharacter } = useCurrentCharacter();
   const spellcasting = character.spellcasting!;
   const { slots = [], spells = [] } = spellcasting;
   const concentratingOn = spellcasting.concentratingOn ?? null;
@@ -45,7 +43,7 @@ export default function SpellsSection({
     busy, error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
     handleCast, handlePrepare, handleForget, handleLearn, handleSwap,
-  } = useSpellcasting(character, setCharacter);
+  } = useSpellcasting(character);
 
   // The grimoire (prepare/swap/learn) is a distinct view reached from the record's
   // "Manage spellbook →" — not rendered alongside the record block.

@@ -7,9 +7,10 @@
  * addendum D). Built from the shared `sessionLifecycleHelpers` primitives.
  *
  * No longer forwards character updates (#1284) — every session component now
- * reads/writes the character via useCurrentCharacter() directly, and the
- * session-log bump moved to useSessionLogBumpOnCharacterWrite (mounted once in
- * CharacterSheetWorkspace), which fires for every character-cache write.
+ * reads the character via useCurrentCharacter() directly and writes it through
+ * useCharacterMutation's own cache write, and the session-log bump moved to
+ * useSessionLogBumpOnCharacterWrite (mounted once in CharacterSheetWorkspace),
+ * which fires for every character-cache write.
  */
 
 import {

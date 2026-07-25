@@ -14,7 +14,6 @@ import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
 import MentionText from "@/features/journal/MentionText";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import type { ChronicleChapter } from "@/features/journal/chronicle";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatJournalDate, formatJournalTime } from "@/lib/formatJournalDate";
 import type { CampaignEntity, Character, EntryVisibility, JournalEntry } from "@/types/character";
 
@@ -55,8 +54,7 @@ export default function ManuscriptPage({
   canRename,
   onRename,
 }: ManuscriptPageProps) {
-  const { setCharacter } = useCurrentCharacter();
-  const { busy, error, create, update, remove } = useJournalMutations(character.id, setCharacter);
+  const { busy, error, create, update, remove } = useJournalMutations(character.id);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [entryPanelOpen, setEntryPanelOpen] = useState(false);

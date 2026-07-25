@@ -6,15 +6,11 @@
 
 import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
 import { useDeathSaves } from "@/features/hitpoints/useDeathSaves";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 export default function TurnDeathSaves({ character }: { character: Character }) {
-  const { setCharacter } = useCurrentCharacter();
-  const { isDying, deathSaves, pending, error, onRollDeathSave, onStabilize } = useDeathSaves(
-    character,
-    setCharacter,
-  );
+  const { isDying, deathSaves, pending, error, onRollDeathSave, onStabilize } =
+    useDeathSaves(character);
   if (!isDying) return null;
 
   // DeathSaveTracker supplies its own garnet card + heading, so render it

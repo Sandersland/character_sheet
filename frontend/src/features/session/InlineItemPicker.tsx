@@ -7,7 +7,6 @@
 
 import { applyActionTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { rollSpec } from "@/lib/dice";
 import type { Character } from "@/types/character";
 
@@ -23,7 +22,6 @@ export default function InlineItemPicker({
   onCommit,
   onClose,
 }: InlineItemPickerProps) {
-  const { setCharacter } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: Parameters<typeof applyActionTransactions>[1]) => applyActionTransactions(character.id, ops),
@@ -32,13 +30,6 @@ export default function InlineItemPicker({
       return c;
     },
     fallbackMessage: "Failed to use item.",
-    // Re-strips batchId — onCharacterWritten gets the RAW result, not
-    // toCharacter's output, so a bare `setCharacter` here would re-pollute
-    // the cache with batchId right after the correct write.
-    onCharacterWritten: ({ batchId, ...c }) => {
-      void batchId;
-      setCharacter(c);
-    },
   });
 
   const consumables = character.inventory.filter((i) => i.category === "consumable");

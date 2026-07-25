@@ -1,5 +1,4 @@
 import { activeResistedDamageTypes } from "@/lib/damageTypes";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
 import AutoRollConcentrationToggle from "@/features/hitpoints/AutoRollConcentrationToggle";
@@ -17,8 +16,7 @@ interface HpSheetBodyProps {
  * heal, temp HP, and concentration checks behave identically to the Rest tab.
  */
 export default function HpSheetBody({ character }: HpSheetBodyProps) {
-  const { setCharacter } = useCurrentCharacter();
-  const hp = useHitPointApply(character, setCharacter);
+  const hp = useHitPointApply(character);
   const resistedTypes = [...activeResistedDamageTypes(character.activeEffects?.buffs ?? [])];
 
   return (

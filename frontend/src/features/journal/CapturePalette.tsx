@@ -12,7 +12,6 @@ import MobileCaptureSheet from "@/features/journal/MobileCaptureSheet";
 import { DockFeed, MobileFeed } from "@/features/journal/NoteFeed";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import type { Character, EntryVisibility, Session } from "@/types/character";
 
@@ -31,11 +30,10 @@ export default function CapturePalette({
   session,
   onClose,
 }: CapturePaletteProps) {
-  const { setCharacter } = useCurrentCharacter();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useIsBelowMd();
   const { byId } = useCampaignEntities(character.campaignId);
-  const { busy, error, create, update, remove } = useJournalMutations(character.id, setCharacter);
+  const { busy, error, create, update, remove } = useJournalMutations(character.id);
 
   // The NOTE feed: newest-first, scoped to the active session when one is given.
   const notes = character.journal

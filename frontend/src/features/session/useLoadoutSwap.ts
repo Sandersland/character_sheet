@@ -18,7 +18,6 @@ import { useState } from "react";
 
 import { applyInventoryTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { equippedLoadoutLabel, itemsInSlot } from "@/lib/paperDoll";
 import { NO_BUDGET_REASON, planInteractionSpend, type InteractionSpend } from "@/lib/loadoutPicker";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -71,7 +70,6 @@ function buildSwapOps(
 export type LoadoutSwapControls = ReturnType<typeof useLoadoutSwap>;
 
 export function useLoadoutSwap(character: Character, turnState: TurnState & TurnStateActions) {
-  const { setCharacter } = useCurrentCharacter();
   const [lastSwap, setLastSwap] = useState<CommittedSwap | null>(null);
   // The "nothing can pay for this" guard fires before either mutation starts,
   // so it needs its own slot — a mutation's own error clears the moment its
@@ -86,14 +84,12 @@ export function useLoadoutSwap(character: Character, turnState: TurnState & Turn
     mutationFn: (ops: InventoryOperation[]) => applyInventoryTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Swap failed — try again.",
-    onCharacterWritten: setCharacter,
   });
   const refundMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: InventoryOperation[]) => applyInventoryTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Refund failed — try again.",
-    onCharacterWritten: setCharacter,
   });
   const busy = swapMutation.isPending || refundMutation.isPending;
   const error = budgetError ?? swapMutation.error ?? refundMutation.error;

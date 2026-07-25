@@ -37,7 +37,7 @@ describe("useCurrentCharacter", () => {
     const { result } = renderHook(() => useCurrentCharacter(), { wrapper });
     await waitFor(() => expect(result.current.character.name).toBe("Aldric"));
 
-    result.current.setCharacter(makeCharacter({ name: "Aldric the Bold" }));
+    getQueryClient().setQueryData(characterKeys.detail("c1"), makeCharacter({ name: "Aldric the Bold" }));
 
     await waitFor(() => expect(result.current.character.name).toBe("Aldric the Bold"));
   });
@@ -52,7 +52,7 @@ describe("useCurrentCharacter", () => {
     await waitFor(() => expect(result.current.character).toBeDefined());
     const before = result.current.character;
 
-    result.current.setCharacter(makeCharacter());
+    getQueryClient().setQueryData(characterKeys.detail("c1"), makeCharacter());
 
     await waitFor(() => expect(result.current.character).toBe(before));
   });
@@ -66,11 +66,10 @@ describe("useCurrentCharacter", () => {
     );
   });
 
-  // Pin (moved from useCharacter.test.ts at #1284 C18, which lost setCharacter
-  // once useCurrentCharacter became its only consumer): setCharacter must
-  // reach every consumer of the same id, not just the caller — the property
-  // every onCharacterWritten mutation across the sheet is built on.
-  it("setCharacter is visible to a second consumer of the same id", async () => {
+  // Pin: a cache write (the path every useCharacterMutation's onSuccess uses)
+  // must reach every consumer of the same id, not just whichever component
+  // triggered the mutation.
+  it("a cache write is visible to a second consumer of the same id", async () => {
     getQueryClient().setQueryData(characterKeys.detail("c1"), makeCharacter());
     const first = renderHook(() => useCurrentCharacter(), { wrapper });
     const second = renderHook(() => useCurrentCharacter(), { wrapper });
@@ -78,20 +77,8 @@ describe("useCurrentCharacter", () => {
     await waitFor(() => expect(second.result.current.character.name).toBe("Aldric"));
 
     const updated = makeCharacter({ name: "Aldric the Bold" });
-    first.result.current.setCharacter(updated);
+    getQueryClient().setQueryData(characterKeys.detail("c1"), updated);
 
     await waitFor(() => expect(second.result.current.character).toEqual(updated));
-  });
-
-  // Pin (moved from useCharacter.test.ts at #1284 C18): a naive un-memoised
-  // closure would silently re-fire any effect that threads setCharacter into
-  // its deps (e.g. the old useCombatLifecycle onUpdate wiring).
-  it("setCharacter identity is stable across re-renders", async () => {
-    getQueryClient().setQueryData(characterKeys.detail("c1"), makeCharacter());
-    const { result, rerender } = renderHook(() => useCurrentCharacter(), { wrapper });
-    await waitFor(() => expect(result.current.character).toBeDefined());
-    const before = result.current.setCharacter;
-    rerender();
-    expect(result.current.setCharacter).toBe(before);
   });
 });
