@@ -40,7 +40,7 @@ const FIXTURE_BASE = {
 function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
-const url = `/api/characters/${FIXTURE_ID}/elements/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/warrior-of-elements/transactions`;
 
 async function createMonk(level: number, subclass?: string) {
   const cls = await prisma.characterClass.upsert({
@@ -71,7 +71,7 @@ async function activeBuffs(): Promise<{ key: string; duration?: string }[]> {
   return (row!.activeEffects as { buffs: { key: string; duration?: string }[] }).buffs;
 }
 
-describe("POST /api/characters/:id/elements/transactions", () => {
+describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);

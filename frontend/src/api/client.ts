@@ -255,9 +255,10 @@ export async function applyWarriorOfElementsTransactions(
   characterId: string,
   operations: WarriorOfElementsOperation[]
 ): Promise<{ character: Character; results: WarriorOfElementsResult[] }> {
-  return request<{ character: Character; results: WarriorOfElementsResult[] }>(
-    `/characters/${characterId}/elements/transactions`,
-    jsonBody({ operations }),
+  return applyAbilityTransactions<WarriorOfElementsOperation, { character: Character; results: WarriorOfElementsResult[] }>(
+    characterId,
+    "warrior-of-elements",
+    operations,
     "Failed to apply Warrior of the Elements operations",
   );
 }
@@ -470,9 +471,10 @@ export async function attemptStunningStrikeTransaction(
   characterId: string,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: StunningStrikeAttemptResult[] }> {
-  return request<{ character: Character; results: StunningStrikeAttemptResult[] }>(
-    `/characters/${characterId}/stunning-strike/transactions`,
-    jsonBody({ operations: [{ type: "attemptStunningStrike", usedThisTurn }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: StunningStrikeAttemptResult[] }>(
+    characterId,
+    "stunning-strike",
+    [{ type: "attemptStunningStrike", usedThisTurn }],
     "Failed to attempt Stunning Strike",
   );
 }
@@ -486,9 +488,10 @@ export async function imposeOpenHandRiderTransaction(
   rider: OpenHandRider,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: OpenHandRiderResult[] }> {
-  return request<{ character: Character; results: OpenHandRiderResult[] }>(
-    `/characters/${characterId}/open-hand-technique/transactions`,
-    jsonBody({ operations: [{ type: "imposeOpenHandRider", rider, usedThisTurn }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: OpenHandRiderResult[] }>(
+    characterId,
+    "open-hand-technique",
+    [{ type: "imposeOpenHandRider", rider, usedThisTurn }],
     "Failed to impose Open Hand Technique rider",
   );
 }
@@ -498,9 +501,10 @@ export async function imposeOpenHandRiderTransaction(
 export async function setQuiveringPalmTransaction(
   characterId: string,
 ): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
-  return request<{ character: Character; results: QuiveringPalmResult[] }>(
-    `/characters/${characterId}/quivering-palm/transactions`,
-    jsonBody({ operations: [{ type: "setQuiveringPalm" }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: QuiveringPalmResult[] }>(
+    characterId,
+    "quivering-palm",
+    [{ type: "setQuiveringPalm" }],
     "Failed to set Quivering Palm",
   );
 }
@@ -513,9 +517,10 @@ export async function triggerQuiveringPalmTransaction(
   characterId: string,
   roll: number,
 ): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
-  return request<{ character: Character; results: QuiveringPalmResult[] }>(
-    `/characters/${characterId}/quivering-palm/transactions`,
-    jsonBody({ operations: [{ type: "triggerQuiveringPalm", roll }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: QuiveringPalmResult[] }>(
+    characterId,
+    "quivering-palm",
+    [{ type: "triggerQuiveringPalm", roll }],
     "Failed to trigger Quivering Palm",
   );
 }

@@ -1,7 +1,26 @@
 import { z } from "zod";
 
 import type { TransactionHandler } from "@/lib/http/transactions-endpoint.js";
+import { applyHandOfHarmOperations, InvalidHandOfHarmOperationError } from "./hand-of-harm.js";
+import {
+  applyHandOfUltimateMercyOperations,
+  InvalidHandOfUltimateMercyOperationError,
+} from "./hand-of-ultimate-mercy.js";
+import {
+  applyOpenHandTechniqueOperations,
+  InvalidOpenHandTechniqueOperationError,
+} from "./open-hand-technique.js";
+import { applyQuiveringPalmOperations, InvalidQuiveringPalmOperationError } from "./quivering-palm.js";
+import { InvalidResourceOperationError } from "./resources.js";
 import { applySneakAttackOperations, InvalidSneakAttackOperationError } from "./sneak-attack.js";
+import { applyStunningStrikeOperations, InvalidStunningStrikeOperationError } from "./stunning-strike.js";
+import {
+  applyWarriorOfElementsOperations,
+  ELEMENTAL_DAMAGE_TYPES,
+  InvalidWarriorOfElementsOperationError,
+} from "./warrior-of-elements.js";
+
+const elementalDamageTypeSchema = z.enum(ELEMENTAL_DAMAGE_TYPES);
 
 // Every ability takes the same envelope — a non-empty batch of ops discriminated
 // on `type` — so the entries below differ only in their op shapes.
@@ -31,6 +50,67 @@ function defineAbility<Schema extends z.ZodTypeAny, Result>(
  * module, which dispatch class/subclass *derivation*, not HTTP transactions.
  */
 export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
+  // Once per turn, spends 1 Focus (or a Flurry of Healing and Harm free use at
+  // L11+, via `freeFromFlurry`) to narrate the client-rolled necrotic bonus on
+  // an Unarmed Strike hit; Physician's Touch (L6+) adds the Poisoned rider.
+  // Returns the updated character plus per-op { necroticDamage, poisoned, summary }.
+  "hand-of-harm": defineAbility({
+    schema: opBatch(z.object({
+      type: z.literal("dealHandOfHarm"),
+      usedThisTurn: z.boolean(),
+      roll: z.number().positive(),
+      freeFromFlurry: z.boolean().optional(),
+    })),
+    apply: (characterId, data) => applyHandOfHarmOperations(characterId, data.operations),
+    domainErrors: [InvalidHandOfHarmOperationError, InvalidResourceOperationError],
+    respond: (character, results) => ({ character, results }),
+  }),
+
+  // Spends 5 Focus + 1 use of the once-per-long-rest handOfUltimateMercy pool
+  // to narrate reviving a creature with the client-rolled 4d10 + Wis mod hit
+  // points. Returns the updated character plus per-op { hpRestored, summary }.
+  "hand-of-ultimate-mercy": defineAbility({
+    schema: opBatch(z.object({
+      type: z.literal("useHandOfUltimateMercy"),
+      roll: z.number().positive(),
+    })),
+    apply: (characterId, data) => applyHandOfUltimateMercyOperations(characterId, data.operations),
+    domainErrors: [InvalidHandOfUltimateMercyOperationError, InvalidResourceOperationError],
+    respond: (character, results) => ({ character, results }),
+  }),
+
+  // Imposes one Flurry-of-Blows rider (Addle/Push/Topple). Addle never rolls
+  // (no save); Push/Topple roll a flat d20 vs the monk's focus save DC. Returns
+  // the updated character plus per-op { rider, dc, roll?, outcome, summary }.
+  "open-hand-technique": defineAbility({
+    schema: opBatch(z.object({
+      type: z.literal("imposeOpenHandRider"),
+      rider: z.enum(["addle", "push", "topple"]),
+      usedThisTurn: z.boolean(),
+    })),
+    apply: (characterId, data) => applyOpenHandTechniqueOperations(characterId, data.operations),
+    domainErrors: [InvalidOpenHandTechniqueOperationError],
+    respond: (character, results) => ({ character, results }),
+  }),
+
+  // setQuiveringPalm: spends 4 focus and marks vibrations active (lasts monk
+  // level days, narrated). triggerQuiveringPalm: rolls a flat d20 Con save vs
+  // the monk's focus save DC and halves the client-rolled 10d12 on a success,
+  // clearing the active flag. Returns the updated character plus per-op result.
+  "quivering-palm": defineAbility({
+    schema: opBatch(
+      z.object({ type: z.literal("setQuiveringPalm") }),
+      z.object({ type: z.literal("triggerQuiveringPalm"), roll: z.number().positive() }),
+    ),
+    apply: (characterId, data) => applyQuiveringPalmOperations(characterId, data.operations),
+    domainErrors: [InvalidQuiveringPalmOperationError, InvalidResourceOperationError],
+    respond: (character, results) => ({ character, results }),
+  }),
+
+  // Rolls the rogue's level-derived Nd6 Sneak Attack server-side, enforcing the
+  // once-per-turn + eligibility guard, and logs the roll. Returns the updated
+  // character plus per-op { roll, dice, faces } so the client folds the roll into
+  // the attack's damage tally.
   "sneak-attack": defineAbility({
     schema: opBatch(z.object({
       type: z.literal("rollSneakAttack"),
@@ -39,6 +119,45 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
     })),
     apply: (characterId, data) => applySneakAttackOperations(characterId, data.operations),
     domainErrors: [InvalidSneakAttackOperationError],
+    respond: (character, results) => ({ character, results }),
+  }),
+
+  // Spends 1 focus and rolls the target's Constitution save (flat d20) against
+  // the monk's focus save DC, enforcing the once-per-turn guard. Returns the
+  // updated character plus per-op { dc, roll, outcome, summary } so the client
+  // surfaces the fail(Stunned)/success(half-speed+advantage) rider inline.
+  "stunning-strike": defineAbility({
+    schema: opBatch(z.object({
+      type: z.literal("attemptStunningStrike"),
+      usedThisTurn: z.boolean(),
+    })),
+    apply: (characterId, data) => applyStunningStrikeOperations(characterId, data.operations),
+    domainErrors: [InvalidStunningStrikeOperationError, InvalidResourceOperationError],
+    respond: (character, results) => ({ character, results }),
+  }),
+
+  // Warrior of the Elements (2024) session actions:
+  //   toggleElementalAttunement — spend 1 Focus to imbue for 10 min (or clear it)
+  //   castElementalBurst        — spend 2 Focus, roll 3× Martial Arts die vs a Dex save
+  //   elementalStrike           — while attuned, swap the strike's damage type and
+  //                               force a Str save to move the target 10 ft
+  // Returns the updated character plus a per-op `results` array for the toast.
+  "warrior-of-elements": defineAbility({
+    schema: opBatch(
+      z.object({ type: z.literal("toggleElementalAttunement"), active: z.boolean() }),
+      z.object({
+        type: z.literal("castElementalBurst"),
+        damageType: elementalDamageTypeSchema,
+        roll: z.number().positive(),
+      }),
+      z.object({
+        type: z.literal("elementalStrike"),
+        damageType: elementalDamageTypeSchema,
+        roll: z.number().positive().optional(),
+      }),
+    ),
+    apply: (characterId, data) => applyWarriorOfElementsOperations(characterId, data.operations),
+    domainErrors: [InvalidWarriorOfElementsOperationError, InvalidResourceOperationError],
     respond: (character, results) => ({ character, results }),
   }),
 };

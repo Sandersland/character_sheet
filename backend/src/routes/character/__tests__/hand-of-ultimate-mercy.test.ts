@@ -42,7 +42,7 @@ function fixtureBase(experiencePoints: number) {
 function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
-const url = `/api/characters/${FIXTURE_ID}/hand-of-ultimate-mercy/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/hand-of-ultimate-mercy/transactions`;
 
 async function createMonk(experiencePoints: number, level: number, subclass?: string, resources?: Prisma.InputJsonValue) {
   const cls = await prisma.characterClass.upsert({
@@ -60,7 +60,7 @@ async function createMonk(experiencePoints: number, level: number, subclass?: st
   });
 }
 
-describe("POST /api/characters/:id/hand-of-ultimate-mercy/transactions", () => {
+describe("POST /api/characters/:id/abilities/hand-of-ultimate-mercy/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);

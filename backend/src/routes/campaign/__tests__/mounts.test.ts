@@ -53,7 +53,9 @@ describe("character-scoped routes resolve to their handler with :id merged", () 
     ["POST /experience", () => post("/experience")],
     ["POST /actions/transactions", () => post("/actions/transactions")],
     ["POST /maneuvers/transactions", () => post("/maneuvers/transactions")],
-    ["POST /elements/transactions", () => post("/elements/transactions")],
+    // One representative ability key; the full per-key matrix is registry-driven
+    // in the abilities route tests.
+    ["POST /abilities/:key/transactions", () => post("/abilities/sneak-attack/transactions")],
     ["POST /shadow-arts/transactions", () => post("/shadow-arts/transactions")],
     ["POST /channel-divinity/transactions", () => post("/channel-divinity/transactions")],
     ["GET /channel-divinity", () => get("/channel-divinity")],

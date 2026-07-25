@@ -38,7 +38,7 @@ const FIXTURE_BASE = {
 function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
-const url = `/api/characters/${FIXTURE_ID}/stunning-strike/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/stunning-strike/transactions`;
 
 async function createMonk(level: number, resources?: Prisma.InputJsonValue) {
   const cls = await prisma.characterClass.upsert({
@@ -56,7 +56,7 @@ async function createMonk(level: number, resources?: Prisma.InputJsonValue) {
   });
 }
 
-describe("POST /api/characters/:id/stunning-strike/transactions", () => {
+describe("POST /api/characters/:id/abilities/stunning-strike/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
@@ -193,7 +193,7 @@ describe("Stunning Strike for a non-monk", () => {
 
   it("rejects a non-monk with no Stunning Strike", async () => {
     const res = await agent()
-      .post(`/api/characters/${FIGHTER_ID}/stunning-strike/transactions`)
+      .post(`/api/characters/${FIGHTER_ID}/abilities/stunning-strike/transactions`)
       .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/monk/i);

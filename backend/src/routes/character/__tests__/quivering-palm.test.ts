@@ -38,7 +38,7 @@ const FIXTURE_BASE = {
 function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
-const url = `/api/characters/${FIXTURE_ID}/quivering-palm/transactions`;
+const url = `/api/characters/${FIXTURE_ID}/abilities/quivering-palm/transactions`;
 
 async function createMonk(level: number, subclass?: string) {
   const cls = await prisma.characterClass.upsert({
@@ -55,7 +55,7 @@ async function createMonk(level: number, subclass?: string) {
   });
 }
 
-describe("POST /api/characters/:id/quivering-palm/transactions", () => {
+describe("POST /api/characters/:id/abilities/quivering-palm/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
