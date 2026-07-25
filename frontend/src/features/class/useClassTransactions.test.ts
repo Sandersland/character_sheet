@@ -14,8 +14,8 @@ describe("useClassTransactions", () => {
   });
 
   it("toggles busy and propagates the result on success", async () => {
-    const onUpdate = vi.fn();
-    const { result } = renderHook(() => useClassTransactions("char-1", onUpdate));
+    const setCharacter = vi.fn();
+    const { result } = renderHook(() => useClassTransactions("char-1", setCharacter));
 
     let resolve!: (c: Character) => void;
     const pending = new Promise<Character>((r) => { resolve = r; });
@@ -28,19 +28,19 @@ describe("useClassTransactions", () => {
     // A mutation's success dispatch is notified via TanStack Query's internal
     // batching (a microtask hop beyond `run`'s own await), so these need a tick.
     await waitFor(() => expect(result.current.busy).toBe(false));
-    expect(onUpdate).toHaveBeenCalledWith(updated);
+    expect(setCharacter).toHaveBeenCalledWith(updated);
     expect(result.current.error).toBeNull();
   });
 
   it("captures the error message and clears busy on failure", async () => {
-    const onUpdate = vi.fn();
-    const { result } = renderHook(() => useClassTransactions("char-1", onUpdate));
+    const setCharacter = vi.fn();
+    const { result } = renderHook(() => useClassTransactions("char-1", setCharacter));
 
     await act(async () => {
       await result.current.run(() => Promise.reject(new Error("boom")));
     });
 
-    expect(onUpdate).not.toHaveBeenCalled();
+    expect(setCharacter).not.toHaveBeenCalled();
     await waitFor(() => expect(result.current.error).toBe("boom"));
     expect(result.current.busy).toBe(false);
   });

@@ -2,7 +2,7 @@
  * AdvancementSection — orchestrator for Ability Score Improvements and Feats.
  *
  * Owns busy + error state, fires API calls through the client module, and
- * propagates the updated Character via onUpdate. Renders:
+ * writes the updated Character into the character query cache. Renders:
  *   - Summary header showing slots used/total
  *   - List of taken advancements (each with a Remove button)
  *   - AdvancementPanel inline picker when slots remain

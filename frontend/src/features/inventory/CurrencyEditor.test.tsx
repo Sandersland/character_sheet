@@ -19,7 +19,7 @@ function makeCharacter(over: Partial<Character> = {}): Character {
 describe("CurrencyEditor", () => {
   // Was GENUINE RED pre-#1284 C2 (plan §0/§2/§9.3): CurrencyEditor used to call
   // updateCharacter() directly and only forward the result via a since-deleted
-  // `onUpdate` prop — nothing wrote the character query cache. Now routed
+  // update callback prop — nothing wrote the character query cache. Now routed
   // through useCharacterMutation + useCurrentCharacter().setCharacter.
   it("reaches the character cache after a purse edit", async () => {
     const updated = makeCharacter({ currency: makeCurrency({ gp: 42 }) });
