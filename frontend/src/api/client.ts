@@ -126,6 +126,24 @@ async function postTransactions<TOp>(
   );
 }
 
+// The single seam onto the shared ability endpoint (#1275): every automated
+// class/subclass feature POSTs the same { operations } batch, choosing the
+// feature by URL key rather than by its own route. Generic in the response
+// because some abilities return the bare Character and others { character,
+// results }; the named wrappers below fix that per feature.
+export async function applyAbilityTransactions<TOp, TResponse = Character>(
+  characterId: string,
+  abilityKey: string,
+  operations: TOp[],
+  errorLabel: string,
+): Promise<TResponse> {
+  return request<TResponse>(
+    `/characters/${characterId}/abilities/${abilityKey}/transactions`,
+    jsonBody({ operations }),
+    errorLabel,
+  );
+}
+
 // The enabled sign-in providers — drives the login screen's buttons (data-driven
 // so adding a provider server-side needs no frontend change). Public endpoint.
 export async function fetchAuthProviders(): Promise<AuthProviderInfo[]> {
@@ -435,9 +453,10 @@ export async function rollSneakAttackTransaction(
   eligible: boolean,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: SneakAttackRollResult[] }> {
-  return request<{ character: Character; results: SneakAttackRollResult[] }>(
-    `/characters/${characterId}/sneak-attack/transactions`,
-    jsonBody({ operations: [{ type: "rollSneakAttack", eligible, usedThisTurn }] }),
+  return applyAbilityTransactions<unknown, { character: Character; results: SneakAttackRollResult[] }>(
+    characterId,
+    "sneak-attack",
+    [{ type: "rollSneakAttack", eligible, usedThisTurn }],
     "Failed to roll Sneak Attack",
   );
 }
