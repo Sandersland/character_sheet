@@ -13,9 +13,8 @@
  * server-side at read time (class + race + feats) and are read-only.
  */
 
-import { useState } from "react";
-
 import { applyResourceTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import {
   ARMOR_CATEGORY_LABELS,
   ARMOR_CATEGORY_ORDER,
@@ -169,13 +168,58 @@ function ProficiencySection({
   );
 }
 
+// Two mutations (not one) — learn/forget keep distinct fallback copy; both
+// share one `character-${id}` scope so they (and every other character
+// mutation) can never race each other. Split out of ProficienciesCard so its
+// own hook-composition + try/catch branches don't count against that
+// component's complexity budget.
+function useToolProficiencyMutations(character: Character, onUpdate: (c: Character) => void) {
+  const learnMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (name: string) => applyResourceTransactions(character.id, [{ type: "learnToolProficiency", name }]),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to save tool proficiency. Please try again.",
+    onCharacterWritten: onUpdate,
+  });
+  const forgetMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (entryId: string) => applyResourceTransactions(character.id, [{ type: "forgetToolProficiency", entryId }]),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to remove tool proficiency. Please try again.",
+    onCharacterWritten: onUpdate,
+  });
+
+  async function learn(name: string) {
+    try {
+      await learnMutation.mutateAsync(name);
+    } catch {
+      // learnMutation.error already carries the message.
+    }
+  }
+
+  async function forget(entryId: string) {
+    try {
+      await forgetMutation.mutateAsync(entryId);
+    } catch {
+      // forgetMutation.error already carries the message.
+    }
+  }
+
+  return {
+    busy: learnMutation.isPending || forgetMutation.isPending,
+    error: learnMutation.error ?? forgetMutation.error,
+    learn,
+    forget,
+  };
+}
+
 export default function ProficienciesCard({
   character,
   artisanTools,
   onUpdate,
 }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, learn: handleLearnToolProf, forget: handleForgetToolProf } =
+    useToolProficiencyMutations(character, onUpdate);
 
   const weapons: WeaponProficiency[] = character.weaponProficiencies ?? [];
   const armor = sortedArmor(character.armorProficiencies ?? []);
@@ -192,36 +236,6 @@ export default function ProficienciesCard({
   const alreadyChosenSubclassNames = new Set(
     (resources?.toolProficienciesKnown ?? []).map((t) => t.name)
   );
-
-  async function handleLearnToolProf(name: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await applyResourceTransactions(character.id, [
-        { type: "learnToolProficiency", name },
-      ]);
-      onUpdate(updated);
-    } catch {
-      setError("Failed to save tool proficiency. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleForgetToolProf(entryId: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await applyResourceTransactions(character.id, [
-        { type: "forgetToolProficiency", entryId },
-      ]);
-      onUpdate(updated);
-    } catch {
-      setError("Failed to remove tool proficiency. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   const hasAnything =
     weapons.length > 0 ||
