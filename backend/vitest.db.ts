@@ -85,8 +85,9 @@ export async function buildTemplate(base: string): Promise<void> {
       // Prisma writes migration names and seeded-row counts to stdout, so a
       // stderr-only message loses the context that identifies which step failed.
       const { stdout, stderr } = cause as { stdout?: string; stderr?: string };
+      const output = [stdout, stderr].filter(Boolean).join("");
       throw new Error(
-        `Building the test template failed: npx ${args.join(" ")}\n${stdout ?? ""}${stderr ?? ""}`,
+        `Building the test template failed: npx ${args.join(" ")}\n${output}`,
         { cause }
       );
     }
