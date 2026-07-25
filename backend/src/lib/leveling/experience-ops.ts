@@ -7,6 +7,7 @@ import {
   runCharacterTransaction,
 } from "@/lib/character/character-transaction.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { abilityModifier, hitDieFace } from "@/lib/srd/srd.js";
 import { recomputeSummaries } from "@/lib/session/sessions.js";
@@ -178,7 +179,7 @@ export function xpEventSummary(
 }
 
 type XpTxContext = CharacterTxContext<
-  Prisma.CharacterGetPayload<{ select: { experiencePoints: true; hitDice: true } }>,
+  Prisma.CharacterGetPayload<{ select: { experiencePoints: true; hitDice: true; rulesEdition: true } }>,
   ExperienceOperation
 >;
 
@@ -223,7 +224,7 @@ async function applyExperienceOp(ctx: XpTxContext): Promise<void> {
   // registered order. Runs unconditionally so it catches characters who gained a
   // subclass via XP alone (no HP level-ups applied yet) and self-heals those
   // already in an invalid state on their next XP op.
-  await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
+  await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, edition: editionOf(row), batchId });
 }
 
 /**
@@ -259,11 +260,11 @@ export async function applyExperienceOperations(
     }
   }
 
-  await runCharacterTransaction<{ experiencePoints: true; hitDice: true }, ExperienceOperation>(
+  await runCharacterTransaction<{ experiencePoints: true; hitDice: true; rulesEdition: true }, ExperienceOperation>(
     characterId,
     operations,
     {
-      select: { experiencePoints: true, hitDice: true },
+      select: { experiencePoints: true, hitDice: true, rulesEdition: true },
       notFound: (id) => new InvalidExperienceOperationError(`Character not found: ${id}`),
       // undefined → scaffold falls back to the active session; string → tag verbatim.
       sessionId: explicitSessionId,

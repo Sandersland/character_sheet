@@ -31,6 +31,8 @@
  * Feats and Ability Score Improvements ship via `reconcileAdvancements`.
  */
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
 import { effectiveEntryLevel, subclassActiveAt, subclassGateLevel } from "./effective-levels.js";
@@ -57,6 +59,9 @@ export interface ReconcileContext {
   characterId: string;
   /** XP-derived level after the current operation — the new authority. */
   newDerivedLevel: number;
+  /** The character's edition. Write-once (#1285), so it is constant for the
+   *  whole reconcile pass — no reconciler ever has to handle it changing. */
+  edition: RulesEdition;
   batchId: string;
 }
 
@@ -72,7 +77,7 @@ type Reconciler = (ctx: ReconcileContext) => Promise<void>;
 
 // fallow-ignore-next-line complexity -- pre-existing per-entry subclass-clear logic; unchanged by #1137, CRAP re-estimated after the fightingStyle-scalar export removal
 async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+  const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
 
   const entries = await tx.characterClassEntry.findMany({
     where: { characterId },
@@ -90,8 +95,8 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
     if (entry.subclass === null && entry.subclassId === null) continue;
 
     const effectiveLevel = effectiveEntryLevel(entry.level, entries.length, newDerivedLevel);
-    if (subclassActiveAt(effectiveLevel, entry.class?.subclassLevel)) continue;
-    const subclassLevel = subclassGateLevel(entry.class?.subclassLevel);
+    if (subclassActiveAt(effectiveLevel, entry.class?.subclassLevel, edition)) continue;
+    const subclassLevel = subclassGateLevel(entry.class?.subclassLevel, edition);
 
     // Level has fallen below the grant level — clear this entry's subclass.
     await tx.characterClassEntry.update({

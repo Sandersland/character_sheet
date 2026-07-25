@@ -15,29 +15,45 @@ describe("effectiveEntryLevel", () => {
 });
 
 describe("subclassGateLevel", () => {
-  it("returns the declared gate", () => {
-    expect(subclassGateLevel(1)).toBe(1);
-    expect(subclassGateLevel(6)).toBe(6);
+  it("returns the declared gate under 2014 rules", () => {
+    expect(subclassGateLevel(1, "EDITION_2014")).toBe(1);
+    expect(subclassGateLevel(6, "EDITION_2014")).toBe(6);
   });
 
-  it("defaults to 3 when undeclared", () => {
-    expect(subclassGateLevel(null)).toBe(3);
-    expect(subclassGateLevel(undefined)).toBe(3);
+  // SRD 5.2: every class gains its subclass at level 3, so the catalog column
+  // is ignored under 2024 rules (#1128).
+  it("is always 3 under 2024 rules, whatever the catalog says", () => {
+    expect(subclassGateLevel(1, "EDITION_2024")).toBe(3);
+    expect(subclassGateLevel(2, "EDITION_2024")).toBe(3);
+    expect(subclassGateLevel(6, "EDITION_2024")).toBe(3);
+  });
+
+  it("defaults to 3 when undeclared, in both editions", () => {
+    expect(subclassGateLevel(null, "EDITION_2014")).toBe(3);
+    expect(subclassGateLevel(undefined, "EDITION_2014")).toBe(3);
+    expect(subclassGateLevel(null, "EDITION_2024")).toBe(3);
+    expect(subclassGateLevel(undefined, "EDITION_2024")).toBe(3);
   });
 });
 
 describe("subclassActiveAt", () => {
   it("is active at or above the gate", () => {
-    expect(subclassActiveAt(3, 3)).toBe(true);
-    expect(subclassActiveAt(4, 3)).toBe(true);
+    expect(subclassActiveAt(3, 3, "EDITION_2024")).toBe(true);
+    expect(subclassActiveAt(4, 3, "EDITION_2024")).toBe(true);
   });
 
   it("is inactive below the gate", () => {
-    expect(subclassActiveAt(2, 3)).toBe(false);
+    expect(subclassActiveAt(2, 3, "EDITION_2024")).toBe(false);
+  });
+
+  // A PHB'14 Wizard has its subclass at 2; the same sheet under 2024 does not.
+  it("splits on edition for a class whose 2014 gate is below 3", () => {
+    expect(subclassActiveAt(2, 2, "EDITION_2014")).toBe(true);
+    expect(subclassActiveAt(2, 2, "EDITION_2024")).toBe(false);
   });
 
   it("applies the default-3 gate for an undeclared subclass level", () => {
-    expect(subclassActiveAt(3, null)).toBe(true);
-    expect(subclassActiveAt(2, undefined)).toBe(false);
+    expect(subclassActiveAt(3, null, "EDITION_2024")).toBe(true);
+    expect(subclassActiveAt(2, undefined, "EDITION_2024")).toBe(false);
   });
 });

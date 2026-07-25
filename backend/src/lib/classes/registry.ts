@@ -76,6 +76,13 @@ interface SubclassLayer extends ClassLayer {
 }
 
 // A subclass contributes only once the character has reached its grant level (defaults to 3).
+//
+// This code-side grantLevel table stays edition-blind for now (#1285): the
+// edition-aware gate is subclassGateLevel, and the drift test in the seed-data
+// suite keeps the two aligned. Bounded consequence on a 2014 sheet below the
+// 2024 gate — the subclass *name* is visible while its derived *features* are
+// not. Unreachable on shipped data (every seeded subclassLevel is 3); the
+// content-tagging sub-issue resolves it.
 function isSubclassActive(def: SubclassDefinition | undefined, level: number): def is SubclassDefinition {
   if (!def) return false;
   return level >= (def.grantLevel ?? 3);
