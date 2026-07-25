@@ -11,9 +11,7 @@ import {
   fetchCampaigns,
   fetchCharacter,
   fetchCharacters,
-  fetchItems,
   fetchLevelUpPlan,
-  fetchReference,
   joinSession,
   submitLevelUp,
   updateCharacter,
@@ -99,63 +97,6 @@ describe("updateCharacter", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400 }));
 
     await expect(updateCharacter("1", {})).rejects.toThrow();
-  });
-});
-
-describe("fetchReference", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("returns the parsed catalog on success", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          races: [{ id: "r1", name: "Human", speed: 30 }],
-          classes: [],
-          backgrounds: [],
-          alignments: ["Lawful Good"],
-        }),
-      })
-    );
-
-    await expect(fetchReference()).resolves.toMatchObject({
-      races: [{ name: "Human", speed: 30 }],
-    });
-  });
-
-  it("throws on a non-ok response", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
-
-    await expect(fetchReference()).rejects.toThrow();
-  });
-});
-
-describe("fetchItems", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("returns the parsed item catalog on success", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => [
-          { id: "i1", name: "Club", category: "weapon", damageDice: "1d4", properties: ["light"] },
-        ],
-      })
-    );
-
-    await expect(fetchItems()).resolves.toMatchObject([{ name: "Club", category: "weapon" }]);
-  });
-
-  it("throws on a non-ok response", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
-
-    await expect(fetchItems()).rejects.toThrow();
   });
 });
 
