@@ -7,9 +7,7 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 // spellcasting so a stray ?tab=magic on a non-caster renders nothing. Forwards
 // isLive/onGoToCombat so the record view's Cast door can defer to Combat during
 // a live session (#1162).
-export default function MagicPanel({ character, onUpdate, isLive, onGoToCombat }: SheetPanelProps) {
+export default function MagicPanel({ character, isLive, onGoToCombat }: SheetPanelProps) {
   if (!character.spellcasting) return null;
-  return (
-    <SpellsSection character={character} onUpdate={onUpdate} isLive={isLive} onGoToCombat={onGoToCombat} />
-  );
+  return <SpellsSection character={character} isLive={isLive} onGoToCombat={onGoToCombat} />;
 }
