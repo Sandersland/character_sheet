@@ -6,6 +6,7 @@ import {
   connectAsAdmin,
   dropTestDatabases,
   lockTemplate,
+  quoteIdent,
   templateDatabaseName,
 } from "./vitest.db.js";
 
@@ -21,7 +22,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   let admin = await connectAsAdmin(base);
   try {
     await dropTestDatabases(admin, base);
-    await admin.query(`CREATE DATABASE "${templateDatabaseName(base)}"`);
+    await admin.query(`CREATE DATABASE ${quoteIdent(templateDatabaseName(base))}`);
   } finally {
     await admin.end();
   }

@@ -28,7 +28,7 @@ function withDatabase(base: string, name: string): string {
   return url.toString();
 }
 
-function quoteIdent(name: string): string {
+export function quoteIdent(name: string): string {
   if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`Unsafe database name: ${name}`);
   return `"${name}"`;
 }
@@ -82,10 +82,13 @@ export async function buildTemplate(base: string): Promise<void> {
         maxBuffer: 32 * 1024 * 1024,
       });
     } catch (cause) {
-      const { stderr } = cause as { stderr?: string };
-      throw new Error(`Building the test template failed: npx ${args.join(" ")}\n${stderr ?? ""}`, {
-        cause,
-      });
+      // Prisma writes migration names and seeded-row counts to stdout, so a
+      // stderr-only message loses the context that identifies which step failed.
+      const { stdout, stderr } = cause as { stdout?: string; stderr?: string };
+      throw new Error(
+        `Building the test template failed: npx ${args.join(" ")}\n${stdout ?? ""}${stderr ?? ""}`,
+        { cause }
+      );
     }
   }
 }
