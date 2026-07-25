@@ -12,6 +12,7 @@ import { useRoll } from "@/features/dice/RollContext";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { applySpellcastingTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import {
   buildCastSettle,
   castAnnounceLine,
@@ -89,7 +90,6 @@ export type { CastSettleView } from "@/lib/spellCast";
 export interface UseSpellPickerOptions {
   character: Character;
   sessionId: string;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   slot: EconomySlot;
   slotAvailable: boolean;
@@ -121,7 +121,6 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
   const {
     character,
     sessionId,
-    onUpdate,
     onLogChanged,
     slot,
     slotAvailable,
@@ -132,6 +131,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     onCastSettled,
   } = opts;
 
+  const { setCharacter } = useCurrentCharacter();
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const spellcasting = character.spellcasting!;
@@ -146,7 +146,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
       applySpellcastingTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   const [rowStates, setRowStates] = useState<Record<string, SpellRowState>>({});

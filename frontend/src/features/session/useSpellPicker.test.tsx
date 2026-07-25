@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 import { useSpellPicker, type UseSpellPickerOptions } from "@/features/session/useSpellPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions, logRoll } from "@/api/client";
 import { saveDcLabel } from "@/lib/spellMeta";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
+import { CurrentCharacterProvider } from "@/hooks/CurrentCharacterProvider";
 import type { Character, Spell } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -57,7 +60,6 @@ function makeOpts(spells: Spell[], overrides: Partial<UseSpellPickerOptions> = {
   return {
     character: makeCharacter(spells),
     sessionId: "sess-1",
-    onUpdate: vi.fn(),
     onLogChanged: vi.fn(),
     slot: "action",
     slotAvailable: true,
@@ -69,10 +71,20 @@ function makeOpts(spells: Spell[], overrides: Partial<UseSpellPickerOptions> = {
   };
 }
 
-const wrapper = ({ children }: { children: ReactNode }) => <RollProvider>{children}</RollProvider>;
+// useSpellPicker needs both RollProvider (useRoll) and CurrentCharacterProvider
+// (useCurrentCharacter, #1284) — renderHookWithCharacter's wrapper option can't
+// compose with an extra provider, so this seeds the cache and nests both by hand.
+function makeWrapper(character: Character) {
+  getQueryClient().setQueryData(characterKeys.detail(character.id), character);
+  return ({ children }: { children: ReactNode }) => (
+    <CurrentCharacterProvider id={character.id}>
+      <RollProvider>{children}</RollProvider>
+    </CurrentCharacterProvider>
+  );
+}
 
 function render(opts: UseSpellPickerOptions) {
-  return renderHook(() => useSpellPicker(opts), { wrapper });
+  return renderHook(() => useSpellPicker(opts), { wrapper: makeWrapper(opts.character) });
 }
 
 beforeEach(() => {
@@ -180,7 +192,9 @@ describe("useSpellPicker", () => {
       expect.objectContaining({ type: "castSpell", entryId: "sp-cantrip" }),
     ]);
     expect(opts.onCommitSlot).toHaveBeenCalledWith(0);
-    await waitFor(() => expect(opts.onUpdate).toHaveBeenCalledWith(updatedChar));
+    await waitFor(() =>
+      expect(getQueryClient().getQueryData(characterKeys.detail("char-1"))).toEqual(updatedChar),
+    );
   });
 
   it("guards a leveled cast when all matching slots are exhausted", async () => {

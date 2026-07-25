@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { setQuiveringPalmTransaction, triggerQuiveringPalmTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { rollSpec } from "@/lib/dice";
 import { quiveringPalmDamageRoll } from "@/lib/quiveringPalm";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -19,8 +20,8 @@ export function useQuiveringPalmActions(
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
   active: boolean,
-  onUpdate: (c: Character) => void,
 ) {
+  const { setCharacter } = useCurrentCharacter();
   const [message, setMessage] = useState<string | null>(null);
 
   // Two mutations (not one) — set/trigger keep distinct fallback copy; both
@@ -31,14 +32,14 @@ export function useQuiveringPalmActions(
     mutationFn: () => setQuiveringPalmTransaction(character.id),
     toCharacter: (r) => r.character,
     fallbackMessage: "Set failed.",
-    onCharacterWritten: (r) => onUpdate(r.character),
+    onCharacterWritten: (r) => setCharacter(r.character),
   });
   const triggerMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (roll: number) => triggerQuiveringPalmTransaction(character.id, roll),
     toCharacter: (r) => r.character,
     fallbackMessage: "Trigger failed.",
-    onCharacterWritten: (r) => onUpdate(r.character),
+    onCharacterWritten: (r) => setCharacter(r.character),
   });
   const busy = setMutation.isPending || triggerMutation.isPending;
   const error = setMutation.error ?? triggerMutation.error;

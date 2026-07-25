@@ -7,23 +7,23 @@
 import SpellStatusBanners from "@/features/spells/SpellStatusBanners";
 import { applySpellcastingTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 export default function TurnConcentrationBanner({
   character,
-  onUpdate,
   onLogChanged,
 }: {
   character: Character;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
 }) {
+  const { setCharacter } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: () => applySpellcastingTransactions(character.id, [{ type: "dropConcentration" }]),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to drop concentration.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
   const concentratingOn = character.spellcasting?.concentratingOn ?? null;
   if (!concentratingOn) return null;

@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { imposeOpenHandRiderTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character, OpenHandRider, OpenHandRiderResult } from "@/types/character";
@@ -30,15 +31,14 @@ interface OpenHandTechniqueSectionProps {
   turnState: TurnState & TurnStateActions;
   /** The bound Flurry hit row this rider rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function OpenHandTechniqueSection({
   character,
   turnState,
   currentRow,
-  onUpdate,
 }: OpenHandTechniqueSectionProps) {
+  const { setCharacter } = useCurrentCharacter();
   const { openHandTechnique } = character;
   const [result, setResult] = useState<OpenHandRiderResult | null>(null);
   const used = turnState.openHandRiderUsedThisTurn;
@@ -47,7 +47,7 @@ export default function OpenHandTechniqueSection({
     mutationFn: (rider: OpenHandRider) => imposeOpenHandRiderTransaction(character.id, rider, used),
     toCharacter: (r) => r.character,
     fallbackMessage: "Failed to impose Open Hand Technique rider",
-    onCharacterWritten: (r) => onUpdate(r.character),
+    onCharacterWritten: (r) => setCharacter(r.character),
   });
   const canImpose = !used && !mutation.isPending && currentRow !== null;
 

@@ -1,8 +1,9 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { applyInventoryTransactions } from "@/api/client";
 import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
+import { renderHookWithCharacter } from "@/test/renderWithCharacter";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
@@ -36,7 +37,8 @@ describe("useLoadoutSwap", () => {
   // into the next turn. Pre-migration there was one error slot and one clear.
   it("reset() clears a failed swap's error, not just the budget error", async () => {
     vi.mocked(applyInventoryTransactions).mockRejectedValue(new Error("server said no"));
-    const { result } = renderHook(() => useLoadoutSwap(character(), turnState(), vi.fn()));
+    const c = character();
+    const { result } = renderHookWithCharacter(() => useLoadoutSwap(c, turnState()), c);
 
     await act(async () => {
       await result.current.stow("MAIN_HAND");

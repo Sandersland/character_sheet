@@ -35,7 +35,6 @@ interface ManeuverPromptProps {
    * Pass null for a total that wasn't changed.
    */
   onRollsUpdated: (newAttackTotal: number | null, newDamageTotal: number | null) => void;
-  onUpdate: (c: Character) => void;
 }
 
 export default function ManeuverPrompt({
@@ -44,10 +43,9 @@ export default function ManeuverPrompt({
   lastAttackRoll,
   lastDamageRoll,
   onRollsUpdated,
-  onUpdate,
 }: ManeuverPromptProps) {
   // All hooks at the top — no hooks after the early returns below.
-  const { pool, dieLabel, busy, spend } = useManeuverDie(character, onUpdate);
+  const { pool, dieLabel, busy, spend } = useManeuverDie(character);
   const [spentFor, setSpentFor] = useState<string | null>(null);
   const [selectedDamageManeuver, setSelectedDamageManeuver] = useState("");
 

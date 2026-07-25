@@ -27,10 +27,15 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// RestButton (rendered inside) reads useCurrentCharacter(), so every render
-// seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
-function renderStrip(character: Character, onUpdate: (c: Character) => void = vi.fn()) {
-  return renderWithCharacter(<CombatUtilityStrip character={character} onUpdate={onUpdate} />, character);
+// CombatUtilityStrip (and RestButton/ConditionsSheetBody nested inside) reads
+// useCurrentCharacter(), so every render seeds the cache and mounts
+// CurrentCharacterProvider via renderWithCharacter.
+function renderStrip(character: Character) {
+  const result = renderWithCharacter(<CombatUtilityStrip character={character} />, character);
+  return {
+    ...result,
+    rerender: (next: Character) => result.rerender(<CombatUtilityStrip character={next} />),
+  };
 }
 
 describe("CombatUtilityStrip (#982)", () => {
@@ -145,7 +150,7 @@ describe("CombatUtilityStrip (#982)", () => {
     const { rerender } = renderStrip(makeCharacter({ active: [], exhaustion: 0 }));
     expect(screen.getByRole("button", { name: "Decrease exhaustion" })).toBeDisabled();
 
-    rerender(<CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 6 })} onUpdate={vi.fn()} />);
+    rerender(makeCharacter({ active: [], exhaustion: 6 }));
     expect(screen.getByRole("button", { name: "Increase exhaustion" })).toBeDisabled();
   });
 

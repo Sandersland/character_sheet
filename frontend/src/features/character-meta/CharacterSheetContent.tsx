@@ -28,7 +28,6 @@ interface CharacterSheetContentProps {
   id: string | undefined;
   character: Character;
   reference: ReferenceData | null;
-  onUpdate: (c: Character) => void;
 }
 
 /**
@@ -56,7 +55,6 @@ function CharacterSheetWorkspace({
   id,
   character,
   reference,
-  onUpdate,
 }: CharacterSheetContentProps) {
   const { tabs, activeTab, onTabChange } = useSheetTabs(character);
   const modals = useSheetModals();
@@ -90,14 +88,8 @@ function CharacterSheetWorkspace({
   // The End/Leave-session lifecycle lifts here (#979) so the persistent sheet
   // header — a sibling of the panel region — can drive it (there is no separate
   // in-panel controls strip anymore). Handlers no-op until a session is joined.
-  const life = useCombatLifecycle({ character, session: live.session, onUpdate, live });
-  const livePanel = renderLivePanel(
-    character,
-    live.session,
-    Boolean(turnState),
-    activeTab === "combat",
-    life.handleCharacterUpdate,
-  );
+  const life = useCombatLifecycle({ character, session: live.session, live });
+  const livePanel = renderLivePanel(character, live.session, Boolean(turnState), activeTab === "combat");
 
   return (
     <RollProvider
@@ -182,7 +174,7 @@ function CharacterSheetWorkspace({
             onGoToCombat={goToCombat}
           />
         </div>
-        <WorkspaceSessionModals characterId={character.id} live={live} life={life} onUpdate={onUpdate} />
+        <WorkspaceSessionModals characterId={character.id} live={live} life={life} />
         <RollResultSeal />
         {/* Mobile: the session cue (live-strip / doorway), between the panels
             and the bottom nav; absent on the Combat tab (#961). */}
@@ -208,12 +200,10 @@ function WorkspaceSessionModals({
   characterId,
   live,
   life,
-  onUpdate,
 }: {
   characterId: string;
   live: ReturnType<typeof useLiveSession>;
   life: ReturnType<typeof useCombatLifecycle>;
-  onUpdate: (c: Character) => void;
 }) {
   return (
     <>
@@ -222,7 +212,6 @@ function WorkspaceSessionModals({
           characterId={characterId}
           session={live.endedSession}
           onClose={() => live.setEndedSession(null)}
-          onCharacterUpdate={onUpdate}
         />
       )}
       {life.endPromptOpen && (
@@ -265,10 +254,9 @@ function renderLivePanel(
   session: Session | null,
   hasTurnState: boolean,
   combatActive: boolean,
-  onUpdate: (c: Character) => void,
 ): ReactNode {
   if (!hasTurnState || !session) return null;
-  return <CombatLivePanel character={character} session={session} onUpdate={onUpdate} active={combatActive} />;
+  return <CombatLivePanel character={character} session={session} active={combatActive} />;
 }
 
 /**

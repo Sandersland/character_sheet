@@ -31,14 +31,12 @@ interface QuiveringPalmSectionProps {
   turnState: TurnState & TurnStateActions;
   /** The bound hit row Set rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function QuiveringPalmSection({
   character,
   turnState,
   currentRow,
-  onUpdate,
 }: QuiveringPalmSectionProps) {
   const { quiveringPalm } = character;
   const { setDisabled, triggerDisabled, message, error, handleSet, handleTrigger } = useQuiveringPalmActions(
@@ -46,7 +44,6 @@ export default function QuiveringPalmSection({
     turnState,
     currentRow,
     quiveringPalm?.active ?? false,
-    onUpdate,
   );
 
   // Only a L17+ Warrior of the Open Hand has Quivering Palm.

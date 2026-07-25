@@ -3,17 +3,16 @@
  * bumped the session log itself. #1284 moved that responsibility to
  * `useSessionLogBumpOnCharacterWrite` (mounted once in CharacterSheetWorkspace,
  * covered by its own test) so the bump fires for every character-cache write,
- * not only ones that happened to flow through this hook. This composed test
- * now pins the part that's still this hook's job: `handleCharacterUpdate`
- * forwards the updated character through the real useDeflectAttacksReaction ->
- * useCombatLifecycle wiring.
+ * not only ones that happened to flow through this hook — and dissolved the
+ * useCombatLifecycle coupling entirely: useDeflectAttacksReaction now writes
+ * straight to the cache via useCurrentCharacter(). This pins that write.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 
-import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
 import { useDeflectAttacksReaction } from "@/features/session/useDeflectAttacksReaction";
 import { applyActionTransactions } from "@/api/client";
+import { cachedCharacter, renderHookWithCharacter } from "@/test/renderWithCharacter";
 import type { AvailableAction, Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -40,34 +39,25 @@ const availableActions: AvailableAction[] = [
   { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
 ] as unknown as AvailableAction[];
 
-function makeLive() {
-  return { refresh: vi.fn().mockResolvedValue(undefined), setEndedSession: vi.fn() };
-}
-
 beforeEach(() => vi.clearAllMocks());
 
-describe("useDeflectAttacksReaction + useCombatLifecycle (character forwarding, #1284)", () => {
-  it("still forwards the updated character after a successful redirect mutation", async () => {
+describe("useDeflectAttacksReaction (character forwarding, #1284)", () => {
+  it("still writes the updated character to the cache after a successful redirect mutation", async () => {
     const character = makeCharacter();
     mockApply.mockResolvedValue({ ...character, batchId: "batch-1" });
-    const live = makeLive();
-    const setCharacter = vi.fn();
 
-    const lifecycle = renderHook(() =>
-      useCombatLifecycle({ character, session: null, onUpdate: setCharacter, live }),
-    );
-
-    const { result } = renderHook(() =>
-      useDeflectAttacksReaction({
-        character,
-        onUpdate: lifecycle.result.current.handleCharacterUpdate,
-        availableActions,
-        reactionUsed: true,
-        consumeReaction: vi.fn(),
-        setShowReactionMenu: vi.fn(),
-        setReactionMessage: vi.fn(),
-        attachBatchId: vi.fn(),
-      }),
+    const { result } = renderHookWithCharacter(
+      () =>
+        useDeflectAttacksReaction({
+          character,
+          availableActions,
+          reactionUsed: true,
+          consumeReaction: vi.fn(),
+          setShowReactionMenu: vi.fn(),
+          setReactionMessage: vi.fn(),
+          attachBatchId: vi.fn(),
+        }),
+      character,
     );
 
     act(() => result.current.handleDeflectAttacks());
@@ -75,6 +65,6 @@ describe("useDeflectAttacksReaction + useCombatLifecycle (character forwarding, 
       await result.current.handleDeflectAttacksRedirect();
     });
 
-    await waitFor(() => expect(setCharacter).toHaveBeenCalled());
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(character));
   });
 });

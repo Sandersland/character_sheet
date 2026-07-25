@@ -13,9 +13,11 @@
 
 import { applyActionTransactions, revertBatch, rollInitiativeTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { ActionOperation, Character, ResourceOpResult } from "@/types/character";
 
-export function useTurnActionMutations(characterId: string, onUpdate: (c: Character) => void) {
+export function useTurnActionMutations(characterId: string) {
+  const { setCharacter } = useCurrentCharacter();
   const actionMutation = useCharacterMutation({
     characterId,
     mutationFn: (ops: ActionOperation[]) => applyActionTransactions(characterId, ops),
@@ -24,7 +26,14 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
       return character;
     },
     fallbackMessage: "Action failed.",
-    onCharacterWritten: onUpdate,
+    // Re-strips batchId — onCharacterWritten gets the RAW result, not
+    // toCharacter's output, so a bare `setCharacter` here would re-pollute
+    // the cache with batchId right after the correct write (regression pin
+    // in useDeflectAttacksReaction.bumpLog.test.tsx's sibling hooks).
+    onCharacterWritten: ({ batchId, ...character }) => {
+      void batchId;
+      setCharacter(character);
+    },
   });
 
   const undoMutation = useCharacterMutation({
@@ -32,7 +41,7 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
     mutationFn: (batchId: string) => revertBatch(characterId, batchId),
     toCharacter: (c) => c,
     fallbackMessage: "Undo failed.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   const actionSurgeMutation = useCharacterMutation({
@@ -43,7 +52,10 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
       return character;
     },
     fallbackMessage: "Action Surge failed.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: ({ batchId, ...character }) => {
+      void batchId;
+      setCharacter(character);
+    },
   });
 
   // Best-effort (no UI error surface, mirrors pre-#1283 console.error-only
@@ -56,7 +68,10 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
       return character;
     },
     fallbackMessage: "Failed to roll initiative.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: ({ results, ...character }) => {
+      void results;
+      setCharacter(character);
+    },
   });
 
   async function sendAction(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {

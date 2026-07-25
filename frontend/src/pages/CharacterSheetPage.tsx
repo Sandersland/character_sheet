@@ -10,7 +10,7 @@ import { useReferenceData } from "@/hooks/useReferenceData";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
-  const { character, error, setCharacter } = useCharacter(id);
+  const { character, error } = useCharacter(id);
   const { reference } = useReferenceData();
   const showSpinner = useDelayedFlag(character === undefined && !error);
 
@@ -28,7 +28,6 @@ export default function CharacterSheetPage() {
         id={id}
         character={character}
         reference={reference}
-        onUpdate={setCharacter}
       />
     </CurrentCharacterProvider>
   );

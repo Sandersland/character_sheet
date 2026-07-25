@@ -1,11 +1,12 @@
-import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineLoadoutPicker from "@/features/session/InlineLoadoutPicker";
 import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
 import { applyInventoryTransactions } from "@/api/client";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character, InventoryItem } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { InteractionSpend } from "@/lib/loadoutPicker";
@@ -66,19 +67,17 @@ const EXHAUSTED_BUDGET = { attackEquipCredits: 0, freeInteractionUsed: true };
 function Harness({
   character,
   turnState,
-  onUpdate,
 }: {
   character: Character;
   turnState: TurnState & TurnStateActions;
-  onUpdate: (c: Character) => void;
 }) {
-  const loadout = useLoadoutSwap(character, turnState, onUpdate);
+  const loadout = useLoadoutSwap(character, turnState);
   return <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadout} />;
 }
 
-function renderPicker(character: Character, turnState: TurnState & TurnStateActions, onUpdate = vi.fn()) {
+function renderPicker(character: Character, turnState: TurnState & TurnStateActions) {
   mockApply.mockResolvedValue(character); // returned char isn't asserted here
-  return render(<Harness character={character} turnState={turnState} onUpdate={onUpdate} />);
+  return renderWithCharacter(<Harness character={character} turnState={turnState} />, character);
 }
 
 // A turnState whose spend/consume mocks actually mutate the object (mirroring
@@ -111,17 +110,12 @@ function makeLiveTurnState(
   return state;
 }
 
-// Re-renders on each swap's onUpdate — needed so a second interaction in the
-// same test sees the hand-occupancy change from the first.
-function LiveHarness({
-  initialCharacter,
-  turnState,
-}: {
-  initialCharacter: Character;
-  turnState: TurnState & TurnStateActions;
-}) {
-  const [character, setCharacter] = useState(initialCharacter);
-  const loadout = useLoadoutSwap(character, turnState, setCharacter);
+// Reads the character live from the cache — needed so a second interaction in
+// the same test sees the hand-occupancy change useLoadoutSwap's first cache
+// write produced (#1284: no more local onUpdate/setState re-render seam).
+function LiveHarness({ turnState }: { turnState: TurnState & TurnStateActions }) {
+  const { character } = useCurrentCharacter();
+  const loadout = useLoadoutSwap(character, turnState);
   return <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadout} />;
 }
 
@@ -153,8 +147,7 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
   it("swapping into the occupied main hand costs the Action when the budget can't cover 2 units", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(1); // fresh budget: only 1 unit (the free interaction)
-    const onUpdate = vi.fn();
-    renderPicker(makeChar([longsword, dagger]), turnState, onUpdate);
+    renderPicker(makeChar([longsword, dagger]), turnState);
 
     const main = handCard("Main hand");
     await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
@@ -167,7 +160,6 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
     ]);
     expect(turnState.consumeAction).toHaveBeenCalledOnce();
     expect(turnState.spendInteractionBudget).not.toHaveBeenCalled();
-    expect(onUpdate).toHaveBeenCalled();
     await waitFor(() => expect(screen.getByRole("button", { name: /Refund/ })).toBeInTheDocument());
   });
 
@@ -336,7 +328,7 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
     mockApply.mockResolvedValue(afterStow);
 
     const turnState = makeLiveTurnState(1); // fresh: 1 action, the free interaction unspent, no attack credits
-    render(<LiveHarness initialCharacter={makeChar([ls, dg])} turnState={turnState} />);
+    renderWithCharacter(<LiveHarness turnState={turnState} />, makeChar([ls, dg]));
 
     // First: Stow the main hand (1 unit) — paid from the free interaction.
     await user.click(handCard("Main hand").getByRole("button", { name: "Change" }));

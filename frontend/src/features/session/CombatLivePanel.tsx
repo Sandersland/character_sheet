@@ -40,14 +40,11 @@ interface CombatLivePanelProps {
   character: Character;
   /** The live joined session (participants included) — parent-guaranteed non-null. */
   session: Session;
-  /** Character update handler — already bumps the session-log counter (the lifted
-   *  `useCombatLifecycle.handleCharacterUpdate`, #979). */
-  onUpdate: (c: Character) => void;
   /** The Combat tab is the visible tab — gates the log overlay render. */
   active: boolean;
 }
 
-export default function CombatLivePanel({ character, session, onUpdate, active }: CombatLivePanelProps) {
+export default function CombatLivePanel({ character, session, active }: CombatLivePanelProps) {
   const turnState = useTurnStateContext();
   const live = useLiveSession();
   const [showLog, setShowLog] = useState(false);
@@ -68,7 +65,6 @@ export default function CombatLivePanel({ character, session, onUpdate, active }
             character={character}
             session={session}
             turnState={turnState}
-            onUpdate={onUpdate}
             onLogChanged={live.bumpLog}
             overlaysActive={active}
             onOpenLog={openLog}
@@ -77,7 +73,7 @@ export default function CombatLivePanel({ character, session, onUpdate, active }
         // Mobile keeps HP in the sheet header (#1085); desktop's canonical HP
         // affordance is this compact card (the DesktopUtilityLine stopgap is gone).
         hpSlot={isBelowMd ? null : <LiveHpCard character={character} />}
-        conditionsSlot={<CombatUtilityStrip character={character} onUpdate={onUpdate} />}
+        conditionsSlot={<CombatUtilityStrip character={character} />}
         logRow={
           <CombatLogRow
             mode="live"

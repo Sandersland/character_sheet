@@ -92,7 +92,7 @@ afterEach(() => {
 function renderPanel(active = true) {
   const character = makeCharacter();
   return renderWithCharacter(
-    <CombatLivePanel character={character} session={session} onUpdate={vi.fn()} active={active} />,
+    <CombatLivePanel character={character} session={session} active={active} />,
     character,
   );
 }

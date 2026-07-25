@@ -37,7 +37,6 @@ interface TurnHubProps {
   character: Character;
   sessionId: string;
   turnState: TurnStateView;
-  onUpdate: (c: Character) => void;
   /** Called after a combat log event so the Log tab refreshes. */
   onLogChanged: () => void;
   /** Opted-in party members a healing cast can target on their sheet (#462). */
@@ -61,13 +60,11 @@ interface TurnHubProps {
 // hook bags rather than ~18 loose props; TurnHub stays the orchestrator.
 function TurnHubIdle({
   character,
-  onUpdate,
   onLogChanged,
   turnState,
   turn,
 }: {
   character: Character;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   turnState: TurnStateView;
   turn: ReturnType<typeof useTurnActions>;
@@ -86,7 +83,6 @@ function TurnHubIdle({
   // isn't nested inside useTurnActions), composed here alongside turn.
   const deflect = useDeflectAttacksReaction({
     character,
-    onUpdate,
     availableActions: character.availableActions ?? [],
     reactionUsed,
     consumeReaction,
@@ -152,13 +148,9 @@ function TurnHubIdle({
           </p>
         )}
 
-        <TurnDeathSaves character={character} onUpdate={onUpdate} />
+        <TurnDeathSaves character={character} />
 
-        <TurnConcentrationBanner
-          character={character}
-          onUpdate={onUpdate}
-          onLogChanged={onLogChanged}
-        />
+        <TurnConcentrationBanner character={character} onLogChanged={onLogChanged} />
 
         {/* Reaction is available between turns — render it in idle mode. */}
         <ReactionSlot
@@ -397,7 +389,7 @@ function TurnMessages({
 }
 
 // fallow-ignore-next-line complexity -- composing the #1241 useDeflectAttacksReaction sibling hook (same pattern as the pre-existing useTallyResolve below) pushed cognitive from 15 to 16; the added surface is one hook call + a 6-line dispatch wrapper, not new branchy logic
-export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies, overlaysActive = true, onOpenLog }: TurnHubProps) {
+export default function TurnHub({ character, sessionId, turnState, onLogChanged, allies, overlaysActive = true, onOpenLog }: TurnHubProps) {
   const isBelowMd = useIsBelowMd();
   const {
     inCombat,
@@ -418,7 +410,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     history,
   } = turnState;
 
-  const turn = useTurnActions({ character, sessionId, turnState, onUpdate, onLogChanged });
+  const turn = useTurnActions({ character, sessionId, turnState, onLogChanged });
   // Grouped for readability; also keeps this destructure from cloning
   // useTurnActions' flat return block (a benign hook-bag mirror).
   const { busy, error, reactionMessage, effectMessage, send, handleUndo } = turn;
@@ -442,7 +434,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
   // isn't nested inside useTurnActions), composed here alongside turn.
   const deflect = useDeflectAttacksReaction({
     character,
-    onUpdate,
     availableActions: character.availableActions ?? [],
     reactionUsed,
     consumeReaction,
@@ -474,7 +465,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     return (
       <TurnHubIdle
         character={character}
-        onUpdate={onUpdate}
         onLogChanged={onLogChanged}
         turnState={turnState}
         turn={turn}
@@ -484,10 +474,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
 
   // Shared surfaces — identical on both breakpoints; only the slot rows and the
   // wrapper/header differ (TurnSlotCard self-adapts to a full-bleed mobile row).
-  const deathSaves = <TurnDeathSaves character={character} onUpdate={onUpdate} />;
-  const concentration = (
-    <TurnConcentrationBanner character={character} onUpdate={onUpdate} onLogChanged={onLogChanged} />
-  );
+  const deathSaves = <TurnDeathSaves character={character} />;
+  const concentration = <TurnConcentrationBanner character={character} onLogChanged={onLogChanged} />;
   const actionSlot = (
     <ActionSlot
       actionsRemaining={actionsRemaining}
@@ -566,7 +554,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       closeResolution={closeResolution}
       setShowActionMenu={setShowActionMenu}
       setShowBonusMenu={setShowBonusMenu}
-      onUpdate={onUpdate}
       onLogChanged={onLogChanged}
       allies={allies}
       send={send}

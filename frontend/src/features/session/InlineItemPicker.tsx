@@ -2,17 +2,17 @@
  * InlineItemPicker — inline consumable-item list for the TurnHub's item resolution.
  *
  * Lists consumable inventory items. On Use: rolls heal dice if present, sends
- * applyActionTransactions with the roll total, and calls onUpdate + onClose.
+ * applyActionTransactions with the roll total, and calls onCommit + onClose.
  */
 
 import { applyActionTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { rollSpec } from "@/lib/dice";
 import type { Character } from "@/types/character";
 
 interface InlineItemPickerProps {
   character: Character;
-  onUpdate: (c: Character) => void;
   /** Commit the action slot once an item is used (#765) — tag the batch for undo. */
   onCommit: (batchId?: string) => void;
   onClose: () => void;
@@ -20,10 +20,10 @@ interface InlineItemPickerProps {
 
 export default function InlineItemPicker({
   character,
-  onUpdate,
   onCommit,
   onClose,
 }: InlineItemPickerProps) {
+  const { setCharacter } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: Parameters<typeof applyActionTransactions>[1]) => applyActionTransactions(character.id, ops),
@@ -32,7 +32,13 @@ export default function InlineItemPicker({
       return c;
     },
     fallbackMessage: "Failed to use item.",
-    onCharacterWritten: onUpdate,
+    // Re-strips batchId — onCharacterWritten gets the RAW result, not
+    // toCharacter's output, so a bare `setCharacter` here would re-pollute
+    // the cache with batchId right after the correct write.
+    onCharacterWritten: ({ batchId, ...c }) => {
+      void batchId;
+      setCharacter(c);
+    },
   });
 
   const consumables = character.inventory.filter((i) => i.category === "consumable");

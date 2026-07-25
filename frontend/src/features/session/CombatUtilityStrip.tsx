@@ -19,6 +19,7 @@ import { Minus, Plus } from "lucide-react";
 
 import { applyConditionTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import BottomSheet from "@/components/ui/BottomSheet";
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";
 import RestButton from "@/features/hitpoints/RestButton";
@@ -28,7 +29,6 @@ import type { Character, ConditionsState } from "@/types/character";
 
 interface Props {
   character: Character;
-  onUpdate: (character: Character) => void;
 }
 
 const STEP =
@@ -52,7 +52,8 @@ interface UtilityViewProps {
   onStep: (next: number) => void;
 }
 
-export default function CombatUtilityStrip({ character, onUpdate }: Props) {
+export default function CombatUtilityStrip({ character }: Props) {
+  const { setCharacter } = useCurrentCharacter();
   // null = closed; "manage" opens the sheet as-is; "add" opens it with the
   // condition picker already expanded (the "+ Add" affordance).
   const [sheet, setSheet] = useState<null | "manage" | "add">(null);
@@ -73,7 +74,7 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
     mutationFn: (level: number) => applyConditionTransactions(character.id, [{ type: "setExhaustion", level }]),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to update exhaustion.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
   const exhaustionBusy = exhaustionMutation.isPending;
 
