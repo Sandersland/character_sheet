@@ -4,7 +4,9 @@
 // here reaches either runtime bundle. Add one file per mirror family and re-export
 // it here.
 export type * from "./capabilities.js";
+export type * from "./class-resources.js";
+export type * from "./edition.js";
 export type * from "./item-detail-inputs.js";
 export type * from "./session.js";
 export type * from "./spellcasting.js";
-export type * from "./edition.js";
+export type * from "./warrior-of-elements.js";

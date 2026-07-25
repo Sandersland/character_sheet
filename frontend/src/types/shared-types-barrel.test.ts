@@ -10,6 +10,25 @@ import { describe, expectTypeOf, it } from "vitest";
 
 import type * as Shared from "@character-sheet/shared-types";
 import type {
+  CastElementalBurstOperation,
+  ElementalDamageType,
+  ElementalStrikeOperation,
+  ForgetManeuverOperation,
+  ForgetSubclassChoiceOperation,
+  ForgetToolProficiencyOperation,
+  LearnManeuverOperation,
+  LearnSubclassChoiceOperation,
+  LearnToolProficiencyOperation,
+  ResourceOperation,
+  ResourceOpResult,
+  RestoreResourceOperation,
+  RollInitiativeOperation,
+  SpendResourceOperation,
+  ToggleElementalAttunementOperation,
+  WarriorOfElementsOperation,
+  WarriorOfElementsResult,
+} from "@/types/character";
+import type {
   AdvantageOn,
   ArmorCategory,
   ArmorDetailInput,
@@ -76,5 +95,26 @@ describe("@/types/character barrel", () => {
     expectTypeOf<WeaponClass>().toEqualTypeOf<Shared.WeaponClass>();
     expectTypeOf<WeaponDetailInput>().toEqualTypeOf<Shared.WeaponDetailInput>();
     expectTypeOf<WeaponRange>().toEqualTypeOf<Shared.WeaponRange>();
+  });
+
+  it("re-exports the shared class-resource + elements wire types", () => {
+    expectTypeOf<CastElementalBurstOperation>().toEqualTypeOf<Shared.CastElementalBurstOperation>();
+    expectTypeOf<ElementalDamageType>().toEqualTypeOf<Shared.ElementalDamageType>();
+    expectTypeOf<ElementalStrikeOperation>().toEqualTypeOf<Shared.ElementalStrikeOperation>();
+    expectTypeOf<ForgetManeuverOperation>().toEqualTypeOf<Shared.ForgetManeuverOperation>();
+    expectTypeOf<ForgetSubclassChoiceOperation>().toEqualTypeOf<Shared.ForgetSubclassChoiceOperation>();
+    expectTypeOf<ForgetToolProficiencyOperation>().toEqualTypeOf<Shared.ForgetToolProficiencyOperation>();
+    expectTypeOf<LearnManeuverOperation>().toEqualTypeOf<Shared.LearnManeuverOperation>();
+    expectTypeOf<LearnSubclassChoiceOperation>().toEqualTypeOf<Shared.LearnSubclassChoiceOperation>();
+    expectTypeOf<LearnToolProficiencyOperation>().toEqualTypeOf<Shared.LearnToolProficiencyOperation>();
+    expectTypeOf<ResourceOperation>().toEqualTypeOf<Shared.ResourceOperation>();
+    // The frontend's ResourceOpResult is the shared ResourceOpAudit aliased.
+    expectTypeOf<ResourceOpResult>().toEqualTypeOf<Shared.ResourceOpAudit>();
+    expectTypeOf<RestoreResourceOperation>().toEqualTypeOf<Shared.RestoreResourceOperation>();
+    expectTypeOf<RollInitiativeOperation>().toEqualTypeOf<Shared.RollInitiativeOperation>();
+    expectTypeOf<SpendResourceOperation>().toEqualTypeOf<Shared.SpendResourceOperation>();
+    expectTypeOf<ToggleElementalAttunementOperation>().toEqualTypeOf<Shared.ToggleElementalAttunementOperation>();
+    expectTypeOf<WarriorOfElementsOperation>().toEqualTypeOf<Shared.WarriorOfElementsOperation>();
+    expectTypeOf<WarriorOfElementsResult>().toEqualTypeOf<Shared.WarriorOfElementsResult>();
   });
 });
