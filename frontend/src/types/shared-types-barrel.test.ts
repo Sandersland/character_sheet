@@ -10,6 +10,11 @@ import { describe, expectTypeOf, it } from "vitest";
 
 import type * as Shared from "@character-sheet/shared-types";
 import type {
+  ClassStartingEquipment,
+  EquipmentBundle,
+  OpenWeaponPick,
+} from "@/types/character";
+import type {
   CastElementalBurstOperation,
   ElementalDamageType,
   ElementalStrikeOperation,
@@ -116,5 +121,11 @@ describe("@/types/character barrel", () => {
     expectTypeOf<ToggleElementalAttunementOperation>().toEqualTypeOf<Shared.ToggleElementalAttunementOperation>();
     expectTypeOf<WarriorOfElementsOperation>().toEqualTypeOf<Shared.WarriorOfElementsOperation>();
     expectTypeOf<WarriorOfElementsResult>().toEqualTypeOf<Shared.WarriorOfElementsResult>();
+  });
+
+  it("re-exports the shared starting-equipment wire types", () => {
+    expectTypeOf<ClassStartingEquipment>().toEqualTypeOf<Shared.ClassStartingEquipment>();
+    expectTypeOf<EquipmentBundle>().toEqualTypeOf<Shared.EquipmentBundle>();
+    expectTypeOf<OpenWeaponPick>().toEqualTypeOf<Shared.OpenWeaponPick>();
   });
 });

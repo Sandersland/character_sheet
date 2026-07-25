@@ -51,7 +51,6 @@ import type {
   ResourceOpAudit,
   ResourceOperation,
   RestoreResourceOperation,
-  RollInitiativeOperation,
   SpendResourceOperation,
 } from "@character-sheet/shared-types";
 

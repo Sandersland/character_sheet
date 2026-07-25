@@ -9,4 +9,5 @@ export type * from "./edition.js";
 export type * from "./item-detail-inputs.js";
 export type * from "./session.js";
 export type * from "./spellcasting.js";
+export type * from "./starting-equipment.js";
 export type * from "./warrior-of-elements.js";
