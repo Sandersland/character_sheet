@@ -41,10 +41,12 @@ export interface CurrentCharacterValue {
 // redundant-write footgun that let raw shape B/C results re-pollute the cache.
 export function useCurrentCharacter(): CurrentCharacterValue {
   const id = useContext(CurrentCharacterIdContext);
+  // Both hooks run before either guard: throwing between them would make the
+  // hook count differ by path. useCharacter already no-ops on undefined.
+  const { character } = useCharacter(id ?? undefined);
   if (id === null) {
     throw new Error("useCurrentCharacter must be used inside <CurrentCharacterProvider>");
   }
-  const { character } = useCharacter(id);
   if (character == null) {
     throw new Error(
       "useCurrentCharacter: character is absent — CurrentCharacterProvider must mount only below a loaded guard",
