@@ -42,7 +42,7 @@ gh pr create --base main --head staging \
 ### 4. Arm auto-merge — merge commit, not squash
 
 ```bash
-gh pr merge <pr-url> --merge --auto
+gh pr merge <pr> --merge --auto
 ```
 
 Once lint/test/build pass (claude-review reports `skipped`), it lands itself — **unless the PR is `BEHIND`**, which is the normal case, not an anomaly. Each promote lands a merge commit that exists only on `main`, so main is always ≥1 commit ahead of staging by the next promote; main's `strict: true` plus repo `allow_update_branch: false` means auto-merge cannot advance the branch itself.
