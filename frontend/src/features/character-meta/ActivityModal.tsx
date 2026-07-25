@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchActivity, fetchSessions, revertBatch } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import {
   categoryLabel,
   categoryTone,
@@ -385,8 +386,13 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   // of expandedFields (keyed by event.id) so the summary line and the per-row
   // field-diff toggles can't collide.
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
-  const [undoing, setUndoing] = useState(false);
-  const [undoError, setUndoError] = useState<string | null>(null);
+  const undoMutation = useCharacterMutation({
+    characterId,
+    mutationFn: (batchId: string) => revertBatch(characterId, batchId),
+    toCharacter: (c) => c,
+    fallbackMessage: "Undo failed — try again.",
+    onCharacterWritten: onUpdate,
+  });
 
   // Filter state. "all" category disables the category predicate; an empty
   // typeFilter/sessionFilter disables those. Type chips are inventory-only.
@@ -431,16 +437,11 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   }
 
   async function handleUndo(batchId: string) {
-    setUndoing(true);
-    setUndoError(null);
     try {
-      const updated = await revertBatch(characterId, batchId);
-      onUpdate(updated);
+      await undoMutation.mutateAsync(batchId);
       reload(); // Refresh the timeline so reverted events are dimmed.
-    } catch (err) {
-      setUndoError(err instanceof Error ? err.message : "Undo failed — try again.");
-    } finally {
-      setUndoing(false);
+    } catch {
+      // undoMutation.error already carries the message.
     }
   }
 
@@ -472,7 +473,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
           error={error}
           showSpinner={showSpinner}
           filtersActive={filtersActive}
-          undoError={undoError}
+          undoError={undoMutation.error}
         />
 
         <ul className="flex flex-col gap-4">
@@ -487,7 +488,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                     key={batch.key}
                     batch={batch}
                     isUndoable={batch.key === undoableBatchId}
-                    undoing={undoing}
+                    undoing={undoMutation.isPending}
                     onUndo={handleUndo}
                     expandedFields={expandedFields}
                     onToggleFields={toggleFields}

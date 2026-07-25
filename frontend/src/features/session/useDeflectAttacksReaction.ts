@@ -19,6 +19,7 @@
 import { useEffect, useState } from "react";
 
 import { applyActionTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { rollSpec } from "@/lib/dice";
 import {
   deflectAttacksReductionRoll,
@@ -60,12 +61,22 @@ export function useDeflectAttacksReaction({
   attachBatchId,
 }: UseDeflectAttacksReactionArgs): UseDeflectAttacksReactionReturn {
   const [pending, setPending] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!reactionUsed) setPending(false);
   }, [reactionUsed]);
+
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: () =>
+      applyActionTransactions(character.id, [{ type: "executeAction", actionKey: "deflectAttacksRedirect" }]),
+    toCharacter: ({ batchId, ...c }) => {
+      void batchId;
+      return c;
+    },
+    fallbackMessage: "Redirect failed.",
+    onCharacterWritten: onUpdate,
+  });
 
   // Reuses deriveActions' own resourceKey gating (focus remaining >= 1) rather
   // than re-checking the pool here, same as every other resource-gated action.
@@ -73,8 +84,7 @@ export function useDeflectAttacksReaction({
   const deflectRedirectAvailable = pending && (redirectAction?.enabled ?? false);
 
   function handleDeflectAttacks() {
-    if (busy) return;
-    setError(null);
+    if (mutation.isPending) return;
     consumeReaction();
     setShowReactionMenu(false);
     const roll = rollSpec(deflectAttacksReductionRoll(character));
@@ -82,26 +92,24 @@ export function useDeflectAttacksReaction({
     setPending(true);
   }
 
-  // fallow-ignore-next-line complexity -- CRAP is estimated from export references (no coverage data in the pre-commit static pass); this function is exercised end-to-end by TurnHub.test.tsx's redirect test and mirrors the same guard+try/catch/finally shape as the pre-existing handleActionSurge/send in useTurnActions.ts, which aren't flagged only because they predate this changeset
   async function handleDeflectAttacksRedirect() {
-    if (!deflectRedirectAvailable || busy) return;
-    setBusy(true);
-    setError(null);
+    if (!deflectRedirectAvailable || mutation.isPending) return;
     try {
-      const updated = await applyActionTransactions(character.id, [
-        { type: "executeAction", actionKey: "deflectAttacksRedirect" },
-      ]);
-      onUpdate(updated);
+      const updated = await mutation.mutateAsync(undefined);
       if (updated.batchId) attachBatchId(updated.batchId);
       const redirectRoll = rollSpec(deflectAttacksRedirectRoll(character));
       setReactionMessage((prev) => `${prev ?? ""} ${formatDeflectAttacksRedirectMessage(redirectRoll)}`.trim());
       setPending(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Redirect failed.");
-    } finally {
-      setBusy(false);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 
-  return { deflectRedirectAvailable, busy, error, handleDeflectAttacks, handleDeflectAttacksRedirect };
+  return {
+    deflectRedirectAvailable,
+    busy: mutation.isPending,
+    error: mutation.error,
+    handleDeflectAttacks,
+    handleDeflectAttacksRedirect,
+  };
 }

@@ -2,14 +2,15 @@
  * useTurnActions — the TurnHub dispatch hub.
  *
  * Owns the transient UI state (busy/error/messages + the three menu booleans),
- * composes useActiveResolution() and useManeuverDie(), derives the class-action
- * partitions, and exposes every handler the TurnHub render needs. Keeps TurnHub
- * a thin orchestrator over turnState + this hook.
+ * composes useActiveResolution(), useTurnActionMutations(), and
+ * useManeuverActions(), derives the class-action partitions, and exposes every
+ * handler the TurnHub render needs. Keeps TurnHub a thin orchestrator over
+ * turnState + this hook.
  */
 
 import { useState } from "react";
 
-import { applyActionTransactions, revertBatch, startCombat, endCombat, advanceCombatRound, rollInitiativeTransaction } from "@/api/client";
+import { startCombat, endCombat, advanceCombatRound } from "@/api/client";
 import { flurryStrikeCount } from "@/lib/attackMath";
 import { rollSpec } from "@/lib/dice";
 import { planActionClick, type ActionClickPlan } from "@/lib/turnActionPlan";
@@ -24,7 +25,8 @@ import {
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
 import { equippedLoadoutLabel } from "@/lib/paperDoll";
 import { interactionBudgetRemaining } from "@/lib/loadoutPicker";
-import { useManeuverDie } from "@/features/session/useManeuverDie";
+import { useManeuverActions } from "@/features/session/useManeuverActions";
+import { useTurnActionMutations } from "@/features/session/useTurnActionMutations";
 import { resolverFor, type ResolutionKind } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
 import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
@@ -76,8 +78,15 @@ export function useTurnActions({
   // and the persistent under-slot Refund strip read one committed-swap state.
   const loadoutSwap = useLoadoutSwap(character, turnState, onUpdate);
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    busy,
+    error: mutationError,
+    resetErrors,
+    sendAction,
+    undoBatch,
+    spendActionSurge,
+    rollInitiative,
+  } = useTurnActionMutations(character.id, onUpdate);
   // reactionMessage: last reaction result; effectMessage: effect-maneuver result.
   const [reactionMessage, setReactionMessage] = useState<string | null>(null);
   const [effectMessage, setEffectMessage] = useState<string | null>(null);
@@ -86,9 +95,24 @@ export function useTurnActions({
   const [showBonusMenu, setShowBonusMenu] = useState(false);
   const [showReactionMenu, setShowReactionMenu] = useState(false);
 
-  // Superiority die spend helper — used by reaction and effect maneuvers.
-  const { pool: superiorityPool, dieLabel, busy: dieBusy, spend: spendDie } =
-    useManeuverDie(character, onUpdate);
+  // Superiority die spend + its handlers — used by the reaction and effect
+  // maneuver slots. A maneuver spend surfaces into the same error slot the
+  // mutations above use.
+  const {
+    dieLabel,
+    dieBusy,
+    superiorityRemaining,
+    maneuverError,
+    resetManeuverError,
+    handleReactionManeuver,
+    handleEffectManeuver,
+  } = useManeuverActions(character, onUpdate, {
+    consumeReaction,
+    closeReactionMenu: () => setShowReactionMenu(false),
+    setReactionMessage,
+    setEffectMessage,
+  });
+  const error = mutationError ?? maneuverError;
 
   // Derive available class actions from character data.
   const availableActions: AvailableAction[] = character.availableActions ?? [];
@@ -139,24 +163,16 @@ export function useTurnActions({
   const effectManeuvers = maneuversKnown.filter(
     (m) => (m.placement ?? "damageRoll") === "effect",
   );
-  const superiorityRemaining = superiorityPool?.remaining ?? 0;
 
-  // send() — fires applyActionTransactions then calls onUpdate. The returned
+  // send() — fires applyActionTransactions via the mutation. The returned
   // batchId is tagged onto the just-pushed history entry so undo can revert this
   // server effect (#758).
   async function send(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {
-    setBusy(true);
-    setError(null);
     try {
-      const updated = await applyActionTransactions(character.id, [
-        { type: "executeAction", actionKey, ...opts },
-      ]);
-      onUpdate(updated);
+      const updated = await sendAction(actionKey, opts);
       if (updated.batchId) attachBatchId(updated.batchId);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed.");
-    } finally {
-      setBusy(false);
+    } catch {
+      // error already carries the message via useTurnActionMutations.
     }
   }
 
@@ -172,16 +188,11 @@ export function useTurnActions({
       undo();
       return;
     }
-    setBusy(true);
-    setError(null);
     try {
-      const reverted = await revertBatch(character.id, top.batchId);
-      onUpdate(reverted);
+      await undoBatch(top.batchId);
       undo();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Undo failed.");
-    } finally {
-      setBusy(false);
+    } catch {
+      // error already carries the message via useTurnActionMutations.
     }
   }
 
@@ -281,18 +292,11 @@ export function useTurnActions({
   // Action Surge — server-confirms first, then grants the extra action slot.
   async function handleActionSurge() {
     if (!actionSurgeAvailable || busy) return;
-    setBusy(true);
-    setError(null);
     try {
-      const updated = await applyActionTransactions(character.id, [
-        { type: "executeAction", actionKey: "actionSurge" },
-      ]);
-      onUpdate(updated);
+      await spendActionSurge();
       grantExtraAction();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Action Surge failed.");
-    } finally {
-      setBusy(false);
+    } catch {
+      // error already carries the message via useTurnActionMutations.
     }
   }
 
@@ -301,14 +305,14 @@ export function useTurnActions({
     startCombatState();
     setReactionMessage(null);
     setEffectMessage(null);
-    setError(null);
+    resetManeuverError();
+    resetErrors();
     // Automatic combat-start resource regen (#1239/#1243): fires every pool's
     // onInitiative descriptor (today, Monk Uncanny Metabolism/Perfect Focus) —
     // harmless no-op for every other class/level. Separate try/catch from the
     // audit-log call below so one failing best-effort call doesn't block the other.
     try {
-      const updated = await rollInitiativeTransaction(character.id);
-      onUpdate(updated);
+      const updated = await rollInitiative();
       // eventData.regenerated is only non-empty when a descriptor actually
       // fired (#1243) — a plain "no resources to regain" roll stays silent.
       const regenerated = updated.results[0]?.eventData.regenerated as unknown[] | undefined;
@@ -330,7 +334,8 @@ export function useTurnActions({
     loadoutSwap.reset();
     setReactionMessage(null);
     setEffectMessage(null);
-    setError(null);
+    resetManeuverError();
+    resetErrors();
     try {
       await endCombat(character.id, sessionId);
       onLogChanged();
@@ -343,7 +348,8 @@ export function useTurnActions({
   function handleStartTurn() {
     setReactionMessage(null);
     setEffectMessage(null);
-    setError(null);
+    resetManeuverError();
+    resetErrors();
     startTurn();
   }
 
@@ -351,7 +357,8 @@ export function useTurnActions({
   async function handleEndTurn() {
     setReactionMessage(null);
     setEffectMessage(null);
-    setError(null);
+    resetManeuverError();
+    resetErrors();
     // Evaluate durable-buff end-conditions against this turn's window BEFORE
     // endTurn() resets it. Each expiring buff clears server-side (auto-end).
     const expiring = buffsToAutoEnd(activeDurableBuffKeys, {
@@ -376,54 +383,6 @@ export function useTurnActions({
       } catch (e) {
         console.error("combat log failed (advanceCombatRound)", e);
       }
-    }
-  }
-
-  async function handleReactionManeuver(entryId: string, maneuverName: string) {
-    if (dieBusy || superiorityRemaining === 0) return;
-    setError(null);
-    try {
-      const dieResult = await spendDie(entryId);
-      consumeReaction();
-      setShowReactionMenu(false);
-      if (maneuverName === "Parry") {
-        setReactionMessage(
-          `Parry — reduce incoming damage by ${dieResult} + DEX modifier (${dieLabel} rolled ${dieResult}).`,
-        );
-      } else if (maneuverName === "Riposte") {
-        setReactionMessage(
-          `Riposte — make one melee attack against the creature; add +${dieResult} to the damage roll (${dieLabel} rolled ${dieResult}).`,
-        );
-      } else {
-        setReactionMessage(
-          `${maneuverName} — tell your DM: rolled ${dieResult} on ${dieLabel}.`,
-        );
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : `${maneuverName} failed.`);
-    }
-  }
-
-  async function handleEffectManeuver(entryId: string, maneuverName: string) {
-    if (dieBusy || superiorityRemaining === 0) return;
-    setError(null);
-    try {
-      const dieResult = await spendDie(entryId);
-      if (maneuverName === "Evasive Footwork") {
-        setEffectMessage(
-          `Evasive Footwork — add +${dieResult} to your AC until the end of your turn (${dieLabel} rolled ${dieResult}).`,
-        );
-      } else if (maneuverName === "Rally") {
-        setEffectMessage(
-          `Rally — gained temporary HP (${dieLabel} rolled ${dieResult} + your CHA modifier).`,
-        );
-      } else {
-        setEffectMessage(
-          `${maneuverName} — tell your DM: rolled ${dieResult} on ${dieLabel}.`,
-        );
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : `${maneuverName} failed.`);
     }
   }
 
