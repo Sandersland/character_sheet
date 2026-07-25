@@ -39,7 +39,7 @@ function databasePrefix(base: string): string {
 
 // Maintenance database, so the setup can create and drop the others without
 // being connected to any of them.
-export function adminUrl(base: string): string {
+function adminUrl(base: string): string {
   return withDatabase(base, "postgres");
 }
 

@@ -1,3 +1,4 @@
+// fallow-ignore-file unused-file -- an entry point vitest loads from the `globalSetup` path string, which import analysis can't follow
 import {
   baseDatabaseUrl,
   buildTemplate,
