@@ -45,6 +45,10 @@ WCAG AA rules that have shipped broken before (full rationale in `design_system.
 
 All `fetch` goes through `frontend/src/api/http.ts` (`apiFetch`: credentials + a single registered 401 handler), imported by the domain modules under `frontend/src/api/` (`characters.ts`, `campaign.ts`, `session.ts`, …). `frontend/src/api/client.ts` is the barrel every component imports from — never a domain module directly. New endpoints delegate to `request<T>`/`send`; intent-bearing transactions go through `postTransactions`. Never call `fetch` from a component.
 
+## Server state
+
+Fetched data goes through TanStack Query (`@/api/queryClient`), never ad-hoc `useEffect`/`useState`. Keys come from the factories in `@/api/queryKeys` — no call site ever string-literals one.
+
 ## Dice engine
 
 - `lib/dice.ts` is the **only** place `Math.random` is called for dice.
