@@ -148,6 +148,52 @@ describe("campaigns (#246)", () => {
     expect(res.body.campaignId).toBe(id);
   });
 
+  // Regression pin, not red-first (#1285/#1286): passes today because the
+  // attach handler's updateMany only ever sets campaignId. Its job is to fail
+  // the day a future picker/mapper starts touching rulesEdition on attach.
+  it("does not convert a character's rulesEdition when it joins a campaign", async () => {
+    const createdChar = await supertest(createApp())
+      .post("/api/characters")
+      .set("Cookie", cookieA)
+      .send({
+        name: "test-campaigns-char-edition-pin",
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: "Fighter" }],
+        abilityScores: {
+          strength: 15,
+          dexterity: 14,
+          constitution: 14,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 8,
+        },
+        rulesEdition: "EDITION_2014",
+      });
+    expect(createdChar.status).toBe(201);
+    expect(createdChar.body.rulesEdition).toBe("EDITION_2014");
+    const charId = createdChar.body.id as string;
+
+    try {
+      const campaign = await supertest(createApp())
+        .post("/api/campaigns")
+        .set("Cookie", cookieA)
+        .send({ name: "Edition Pin Campaign" });
+      expect(campaign.body.rulesEdition).toBe("EDITION_2024");
+
+      const attach = await supertest(createApp())
+        .post(`/api/campaigns/${campaign.body.id as string}/characters`)
+        .set("Cookie", cookieA)
+        .send({ characterId: charId });
+
+      expect(attach.status).toBe(200);
+      expect(attach.body.rulesEdition).toBe("EDITION_2014");
+    } finally {
+      await prisma.character.deleteMany({ where: { id: charId } });
+    }
+  });
+
   it("403s attaching a character the caller does not own", async () => {
     const created = await supertest(createApp())
       .post("/api/campaigns")

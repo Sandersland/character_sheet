@@ -746,7 +746,7 @@ async function persistCreatedCharacter(
       portraitUrl: input.portraitUrl ?? null,
       // Omitted when absent so the column default stays the single source of
       // the default edition (#1285). This is the only write of rulesEdition.
-      ...(input.rulesEdition ? { rulesEdition: input.rulesEdition } : {}),
+      ...(input.rulesEdition !== undefined ? { rulesEdition: input.rulesEdition } : {}),
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: effectiveScores,
       ...derived,

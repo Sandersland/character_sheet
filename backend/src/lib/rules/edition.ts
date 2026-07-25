@@ -18,6 +18,10 @@ import type { RulesEdition } from "@character-sheet/shared-types";
  * helpers) — `subclassGateLevel` is the pattern-setter. A reconciler and its
  * clamp-on-read must always resolve to the same one. A rule that is
  * edition-invariant — the majority — takes no `edition` and changes nothing.
+ *
+ * Pure, zero-project-import modules (`effectiveEntryLevel`, `subclassGateLevel`)
+ * import `RulesEdition` straight from `@character-sheet/shared-types` to stay
+ * cycle-safe; everything else goes through `editionOf` here.
  */
 export function editionOf(row: { rulesEdition: RulesEdition }): RulesEdition {
   return row.rulesEdition;
