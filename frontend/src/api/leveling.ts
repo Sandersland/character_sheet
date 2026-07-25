@@ -44,8 +44,9 @@ export async function fetchLevelUpPlan(
   );
 }
 
-// Commits one whole level-up ceremony atomically. The submission is the body
-// verbatim (see the postTransactions note above); returns the leveled Character.
+// Commits one whole level-up ceremony atomically. Bypasses postTransactions
+// because the body is the LevelUpSubmission verbatim, not an { operations }
+// batch; returns the leveled Character.
 export async function submitLevelUp(
   characterId: string,
   submission: LevelUpSubmission,

@@ -113,7 +113,8 @@ describe("api barrel surface", () => {
     expect(actual).toEqual(EXPECTED_EXPORTS);
   });
 
-  // RED today: client.ts is 1,137 lines. Green once the split lands.
+  // Keeps the domain cut from collapsing back toward one file — the ceiling is
+  // what makes a growing module split instead of absorb.
   it("every module in frontend/src/api/ is <= 250 lines", () => {
     const oversized = apiSourceFiles()
       .map((f) => ({ f, lines: readFileSync(join(API_DIR, f), "utf8").split("\n").length }))
@@ -122,16 +123,16 @@ describe("api barrel surface", () => {
     expect(oversized).toEqual([]);
   });
 
-  // RED today: client.ts still declares every function body. Green once C11
-  // reduces it to re-export statements only.
+  // A function body here means a call site could start importing behaviour from
+  // the barrel, which is what re-creates the convergence point #1270 removed.
   it("client.ts is a pure barrel — declares no functions", () => {
     const source = readFileSync(join(API_DIR, "client.ts"), "utf8");
     expect(source).not.toMatch(/\bfunction\b/);
   });
 
-  // RED today: apiFetch's call plus fetchMe's raw un-hooked probe both live in
-  // client.ts. Green once both move behind http.ts's apiFetch/rawFetch — makes
-  // CLAUDE.md's "fetch only touches api/" invariant machine-checkable.
+  // Makes CLAUDE.md's "fetch only touches the API layer" invariant machine-
+  // checkable: one chokepoint means the 401 handler and credentials mode can
+  // never be bypassed by a domain module reaching for fetch directly.
   it("only api/http.ts calls fetch(...)", () => {
     const offenders = apiSourceFiles()
       .filter((f) => f !== "http.ts")
