@@ -4,9 +4,9 @@
 // prompt stays owned by HitPointTracker (epic #728, Decision #6) — this banner
 // only mirrors state + ends concentration; it never prompts a save.
 
-import { useState } from "react";
 import SpellStatusBanners from "@/features/spells/SpellStatusBanners";
 import { applySpellcastingTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character } from "@/types/character";
 
 export default function TurnConcentrationBanner({
@@ -18,20 +18,22 @@ export default function TurnConcentrationBanner({
   onUpdate: (c: Character) => void;
   onLogChanged: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: () => applySpellcastingTransactions(character.id, [{ type: "dropConcentration" }]),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to drop concentration.",
+    onCharacterWritten: onUpdate,
+  });
   const concentratingOn = character.spellcasting?.concentratingOn ?? null;
   if (!concentratingOn) return null;
 
   async function drop() {
-    setBusy(true);
     try {
-      const updated = await applySpellcastingTransactions(character.id, [
-        { type: "dropConcentration" },
-      ]);
-      onUpdate(updated);
+      await mutation.mutateAsync(undefined);
       onLogChanged();
-    } finally {
-      setBusy(false);
+    } catch {
+      // mutation.error already carries the message; no UI surface here (mirrors pre-#1283).
     }
   }
 
@@ -39,7 +41,7 @@ export default function TurnConcentrationBanner({
     <SpellStatusBanners
       concentratingOn={concentratingOn}
       dismissibleSpellBuffs={[]}
-      busy={busy}
+      busy={mutation.isPending}
       onDropConcentration={drop}
       onDismissBuff={() => {}}
     />
