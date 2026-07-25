@@ -38,7 +38,7 @@ See `docs/development.md` for per-workspace commands, running outside Docker, an
 
 **State changes go through intent-bearing transaction endpoints.** `PATCH /api/characters/:id` is a thin field-patch for cosmetic fields only. Every meaningful mutable domain is mutated only through a `POST …/transactions` endpoint that **validates its ops, applies them atomically, writes audit events, and returns the updated character**. Those four properties are the invariant — *not* one URL per domain: a shared endpoint dispatching to registered per-ability handlers satisfies it equally (see #1275), and is the preferred shape as feature count grows. `lib/inventory/inventory.ts` is the reference implementation; do not add new mutable domains to PATCH. From the campaign side, a player's sheet is mutated only through DM award/revoke (`lib/campaign/campaign-item-award.ts`), never by writing `InventoryItem` rows directly.
 
-**Never call `fetch` from a component.** Every backend call goes through the API layer in `frontend/src/api/` (today a single `client.ts`), which stays the only place in the frontend that touches `fetch`.
+**Never call `fetch` from a component.** Every backend call goes through the API layer in `frontend/src/api/` — components import only the `client.ts` barrel; `fetch` itself is called from `http.ts` alone, underneath the per-domain modules (`characters.ts`, `campaign.ts`, `session.ts`, …).
 
 **Frontend code is organized by domain.** Primitives in `components/ui/`, domain components in `features/<domain>/`, shared hooks in `hooks/`, pure logic (no JSX) in `lib/`. Use the `@/` alias for all cross-file imports — never `../`. See `docs/frontend.md` for the decision rule.
 
