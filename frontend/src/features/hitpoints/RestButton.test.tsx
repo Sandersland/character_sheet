@@ -37,7 +37,7 @@ beforeEach(() => {
 // RestButton reads useCurrentCharacter(), so every render seeds the cache and
 // mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
-  return renderWithCharacter(<RestButton character={character} />, character);
+  return renderWithCharacter(<RestButton />, character);
 }
 
 describe("RestButton (#814)", () => {

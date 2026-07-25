@@ -6,10 +6,9 @@ import { ChevronRight } from "@/components/ui/icons";
 import RestControls from "@/features/hitpoints/RestControls";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
 import { useRestActions } from "@/features/hitpoints/useRestActions";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface RestButtonProps {
-  character: Character;
   /** "compact" (default) — the campfire chip. "row" — a full-bleed mobile
    *  utility row with the hit-dice count inline (#1028). */
   variant?: "compact" | "row";
@@ -21,7 +20,8 @@ interface RestButtonProps {
  * chip (ManageHpButton), opening a "Rest" sheet with the short/long rest controls
  * and hit-dice readout — the session home for rests now the Rest & HP tab is gone.
  */
-export default function RestButton({ character, variant = "compact" }: RestButtonProps) {
+export default function RestButton({ variant = "compact" }: RestButtonProps) {
+  const { character } = useCurrentCharacter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const hp = useHitPointApply(character);
   const rest = useRestActions(character, hp.submit);

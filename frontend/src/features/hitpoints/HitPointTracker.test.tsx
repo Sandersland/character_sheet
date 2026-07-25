@@ -26,7 +26,7 @@ vi.mock("@/api/client", () => ({
 function render(character: Character) {
   return renderWithCharacter(
     <RollProvider>
-      <HitPointTracker character={character} />
+      <HitPointTracker />
     </RollProvider>,
     character,
   );

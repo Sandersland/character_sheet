@@ -41,7 +41,6 @@ const STEP_DISC =
 // Shared props both breakpoint layouts consume — state + handlers live in the
 // orchestrator so the client calls stay single-sourced.
 interface UtilityViewProps {
-  character: Character;
   active: ConditionsState["active"];
   exhaustion: number;
   exhaustionBusy: boolean;
@@ -86,7 +85,6 @@ export default function CombatUtilityStrip({ character }: Props) {
   }
 
   const viewProps: UtilityViewProps = {
-    character,
     active,
     exhaustion,
     exhaustionBusy,
@@ -113,7 +111,6 @@ export default function CombatUtilityStrip({ character }: Props) {
 // Mobile (#1028): full-bleed utility rows — Conditions header + Add, wrapping
 // chips beside a big-hit exhaustion stepper, then a Rest row with hit dice.
 function MobileUtilityRows({
-  character,
   active,
   exhaustion,
   exhaustionBusy,
@@ -194,14 +191,13 @@ function MobileUtilityRows({
         </div>
       </div>
 
-      <RestButton character={character} variant="row" />
+      <RestButton variant="row" />
     </div>
   );
 }
 
 // Desktop (#982): the one-line summary — conditions + Add + exhaustion + Rest.
 function DesktopUtilityLine({
-  character,
   active,
   exhaustion,
   exhaustionBusy,
@@ -283,7 +279,7 @@ function DesktopUtilityLine({
 
       {/* Rest — reuses the session rest control + its short/long-rest handlers. */}
       <div className="ml-auto shrink-0">
-        <RestButton character={character} />
+        <RestButton />
       </div>
     </div>
   );

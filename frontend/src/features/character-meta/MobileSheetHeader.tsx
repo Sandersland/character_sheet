@@ -300,7 +300,6 @@ function CollapsedBar({ character, pill, menuItems, onOpenSwitcher }: SubHeaderP
 
       {/* HP — its own tap target (#982): opens the shared "Hit Points" sheet. */}
       <ManageHpButton
-        character={character}
         className="flex flex-none items-center gap-1.5 rounded-control px-1 py-0.5 transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
       >
         {hp}
@@ -366,7 +365,6 @@ function ExpandedSheetHeader({ character, pill, menuItems, onOpenSwitcher }: Sub
           shared "Hit Points" sheet (#982). */}
       <div className="mt-2 flex items-center gap-2.5">
         <ManageHpButton
-          character={character}
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
         >
           <HpNumbers current={current} max={max} temp={temp} />

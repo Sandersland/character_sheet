@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 // The switcher sheet fetches the character list on open; keep it inert here.
@@ -34,12 +35,16 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
+// ManageHpButton (rendered inside the header) reads useCurrentCharacter(), so
+// every render seeds the cache and mounts CurrentCharacterProvider via
+// renderWithCharacter — keyed on the same character passed as the prop.
 function renderHeader(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = {}) {
-  return render(
+  const character = props.character ?? makeCharacter();
+  return renderWithCharacter(
     <MemoryRouter>
       <RollProvider>
         <MobileSheetHeader
-          character={props.character ?? makeCharacter()}
+          character={character}
           onOpenCapture={vi.fn()}
           onOpenSessions={vi.fn()}
           onOpenActivity={vi.fn()}
@@ -48,6 +53,7 @@ function renderHeader(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = 
         />
       </RollProvider>
     </MemoryRouter>,
+    character,
   );
 }
 
@@ -295,7 +301,7 @@ describe("MobileSheetHeader animated collapse (#1083)", () => {
         </RollProvider>
       </MemoryRouter>
     );
-    const utils = render(tree(scrolled));
+    const utils = renderWithCharacter(tree(scrolled), makeCharacter());
     return { ...utils, toggle: (s: boolean) => act(() => utils.rerender(tree(s))) };
   }
 

@@ -108,10 +108,7 @@ export default function CombatLivePanel({ character, session, active }: CombatLi
 function LiveHpCard({ character }: { character: Character }) {
   const { hitPoints, hitDice } = character;
   return (
-    <ManageHpButton
-      character={character}
-      className="flex w-full items-center gap-4 rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 text-left shadow-card transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
-    >
+    <ManageHpButton className="flex w-full items-center gap-4 rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 text-left shadow-card transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600">
       <span className="min-w-0 flex-1">
         <HpMeter
           current={hitPoints.current}
