@@ -55,78 +55,8 @@ import type {
   SpellcastingOperation,
 } from "@/types/character";
 import type { AuthProviderInfo, AuthUser } from "@/types/auth";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
-
-// Centralized handling for an expired/absent session. AuthProvider registers a
-// handler (which flips auth state to "anonymous" so the router shows the login
-// screen) so a 401 from ANY domain call is handled in one place — never per
-// call site. The auth bootstrap (fetchMe) deliberately bypasses this: a 401
-// there is the expected "not signed in" answer, not a session that just died.
-let unauthorizedHandler: (() => void) | null = null;
-export function setUnauthorizedHandler(handler: (() => void) | null): void {
-  unauthorizedHandler = handler;
-}
-
-// Always send the session cookie (cross-origin in dev: 5173 → 4000), and route
-// every domain response through the shared 401 handler.
-async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(input, { credentials: "include", ...init });
-  if (response.status === 401) unauthorizedHandler?.();
-  return response;
-}
-
-// New endpoint? return request<T>(path, init, "Failed to …") for a JSON reply, or send(path, init, "Failed to …") for a void/204 one.
-
-// Shared non-ok handling: surface the server's { error } message, else a labeled fallback.
-async function throwIfNotOk(response: Response, errorLabel: string): Promise<void> {
-  if (response.ok) return;
-  const body = await response.json().catch(() => null);
-  throw new Error(body?.error ?? `${errorLabel} (${response.status})`);
-}
-
-// apiFetch → ok-check → parsed JSON. The one flow every JSON-returning helper funnels through.
-async function request<T>(path: string, init: RequestInit | undefined, errorLabel: string): Promise<T> {
-  const response = await apiFetch(`${API_URL}${path}`, init);
-  await throwIfNotOk(response, errorLabel);
-  return response.json() as Promise<T>;
-}
-
-// apiFetch → ok-check for endpoints with no body to parse (deletes, 204s, best-effort logs).
-async function send(path: string, init: RequestInit | undefined, errorLabel: string): Promise<void> {
-  const response = await apiFetch(`${API_URL}${path}`, init);
-  await throwIfNotOk(response, errorLabel);
-}
-
-// JSON headers for a POST/PATCH body — shared by every write helper below.
-const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
-  method,
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body),
-});
-
-// Shared POST-check-throw-json flow for the intent-bearing transaction endpoints:
-// POST …/characters/:id/<domain>/transactions with { operations }, returning the
-// full updated Character. Every uniform domain funnels through here — the only
-// per-domain differences are the URL segment and the error label. (applyHitPoint-
-// Operations and applyExperienceOperations deliberately don't use this: HP unwraps
-// { character, concentrationChecks } and XP threads an optional sessionId.
-// submitLevelUp doesn't either: its body is the structured LevelUpSubmission
-// itself, not an { operations } batch. Class/subclass abilities go through
-// applyAbilityTransactions instead (#1275): extra abilityKey URL segment,
-// heterogeneous response type.)
-async function postTransactions<TOp>(
-  characterId: string,
-  domain: string,
-  operations: TOp[],
-  errorLabel: string,
-): Promise<Character> {
-  return request<Character>(
-    `/characters/${characterId}/${domain}/transactions`,
-    jsonBody({ operations }),
-    errorLabel,
-  );
-}
+export { setUnauthorizedHandler } from "@/api/http";
+import { apiFetch, jsonBody, postTransactions, rawFetch, request, send } from "@/api/http";
 
 // The single seam onto the shared ability endpoint (#1275): every automated
 // class/subclass feature POSTs the same { operations } batch, choosing the
@@ -157,11 +87,11 @@ export async function fetchAuthProviders(): Promise<AuthProviderInfo[]> {
   return data.providers;
 }
 
-// The current session's user, or null when not signed in. Uses a plain
-// credentialed fetch (not apiFetch) so an expected 401 here does NOT trip the
-// global unauthorized handler — this IS the "are we signed in?" probe.
+// The current session's user, or null when not signed in. Uses rawFetch (not
+// apiFetch) so an expected 401 here does NOT trip the global unauthorized
+// handler — this IS the "are we signed in?" probe.
 export async function fetchMe(): Promise<AuthUser | null> {
-  const response = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+  const response = await rawFetch("/auth/me");
   if (response.status === 401) return null;
   if (!response.ok) {
     throw new Error(`Failed to fetch current user (${response.status})`);
@@ -177,7 +107,7 @@ export async function logout(): Promise<void> {
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const response = await apiFetch(`${API_URL}/health`);
+    const response = await apiFetch("/health");
     if (!response.ok) return false;
     const data = await response.json();
     return data.status === "ok";
@@ -191,7 +121,7 @@ export async function fetchCharacters(): Promise<CharacterSummary[]> {
 }
 
 export async function fetchCharacter(id: string): Promise<Character | null> {
-  const response = await apiFetch(`${API_URL}/characters/${id}`);
+  const response = await apiFetch(`/characters/${id}`);
   // 404 (missing) and 403 (not the caller's) both resolve to null so the sheet
   // page renders its graceful "not found" screen — and a 403 doesn't reveal that
   // the character exists. (A 401 is handled globally by apiFetch → login.)
