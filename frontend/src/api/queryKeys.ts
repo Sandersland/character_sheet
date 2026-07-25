@@ -13,4 +13,11 @@ export const characterKeys = {
   detail: (id: string | null | undefined) => [...characterKeys.all, "detail", id] as const,
 };
 
+export const campaignKeys = {
+  all: ["campaigns"] as const,
+  scope: (id: string | null | undefined) => [...campaignKeys.all, id] as const,
+  entities: (id: string | null | undefined) => [...campaignKeys.scope(id), "entities"] as const,
+  merges: (id: string | null | undefined) => [...campaignKeys.scope(id), "merges"] as const,
+};
+
 export const referenceKeys = { all: ["reference"] as const };
