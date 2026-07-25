@@ -12,6 +12,7 @@
 
 import { applyAdvancementTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { abilityAbbr } from "@/lib/abilities";
 import { entryDetail } from "@/lib/advancement";
 import type { AdvancementEntry, AdvancementOperation, Character } from "@/types/character";
@@ -19,7 +20,6 @@ import AdvancementPanel from "@/features/advancement/AdvancementPanel";
 
 interface Props {
   character: Character;
-  onUpdate: (updated: Character) => void;
 }
 
 /** Pretty-print a single AdvancementEntry for the list view. */
@@ -33,13 +33,14 @@ function entryLabel(entry: AdvancementEntry): string {
     .join(", ");
 }
 
-export default function AdvancementSection({ character, onUpdate }: Props) {
+export default function AdvancementSection({ character }: Props) {
+  const { setCharacter } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: AdvancementOperation[]) => applyAdvancementTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
   const busy = mutation.isPending;
   const error = mutation.error;
