@@ -98,7 +98,6 @@ function JournalPageBody({ character }: { character: Character }) {
 
   const manuscript = selectedChapter ? (
     <ManuscriptPage
-      character={character}
       chapter={selectedChapter}
       entities={byId}
       canRename={selectedChapter.sessionId != null && selectedChapter.participantIds.includes(character.id)}
@@ -185,7 +184,6 @@ function JournalDesktopView(props: JournalViewProps) {
       </div>
       {captureOpen && (
         <CapturePalette
-          character={character}
           sessionId={props.selectedSessionId}
           onClose={closeCapture}
         />
@@ -243,7 +241,6 @@ function JournalMobileView(props: JournalViewProps) {
       )}
       {captureOpen && (
         <CapturePalette
-          character={character}
           sessionId={props.selectedSessionId}
           onClose={() => setCaptureOpen(false)}
         />

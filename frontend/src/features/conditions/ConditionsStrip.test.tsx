@@ -3,6 +3,8 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character, ConditionsState } from "@/types/character";
@@ -25,12 +27,18 @@ beforeEach(() => {
 });
 
 // ConditionsStrip's nested ConditionsSheetBody reads useCurrentCharacter(), so
-// every render seeds the cache and mounts CurrentCharacterProvider.
+// every render seeds the cache and mounts CurrentCharacterProvider. "rerender"
+// writes the new character straight into the cache — the same mechanism a
+// mutation's onSuccess uses in production — since the component no longer has
+// a prop to receive a fresh value through.
 function render(character: Character) {
-  const result = renderWithCharacter(<ConditionsStrip character={character} />, character);
+  const result = renderWithCharacter(<ConditionsStrip />, character);
   return {
     ...result,
-    rerender: (next: Character) => result.rerender(<ConditionsStrip character={next} />),
+    rerender: (next: Character) => {
+      getQueryClient().setQueryData(characterKeys.detail(character.id), next);
+      result.rerender(<ConditionsStrip />);
+    },
   };
 }
 

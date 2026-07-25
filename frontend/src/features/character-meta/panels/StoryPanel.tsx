@@ -11,7 +11,7 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 export default function StoryPanel({ character }: SheetPanelProps) {
   return (
     <div className="flex flex-col gap-6">
-      <JournalDoorway character={character} />
+      <JournalDoorway />
       <IdentityCard character={character} />
     </div>
   );

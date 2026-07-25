@@ -28,7 +28,7 @@ export default function CombatPanel({ character }: SheetPanelProps) {
         character={character}
         turnSlot={<SessionDoorwayCard characterId={character.id} />}
         hpSlot={<HitPointTracker character={character} />}
-        conditionsSlot={<ConditionsStrip character={character} />}
+        conditionsSlot={<ConditionsStrip />}
         logRow={<CombatLogRow mode="idle" characterId={character.id} onOpen={setLogSessionId} />}
       />
 

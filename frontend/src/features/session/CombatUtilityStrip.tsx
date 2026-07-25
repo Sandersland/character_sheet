@@ -103,7 +103,7 @@ export default function CombatUtilityStrip({ character }: Props) {
         <BottomSheet title="Conditions" onClose={() => setSheet(null)}>
           {/* key={sheet} remounts on a mode switch so `defaultAddOpen` (read only
               at mount by AddConditionPanel) always reflects the current mode. */}
-          <ConditionsSheetBody key={sheet} character={character} defaultAddOpen={sheet === "add"} />
+          <ConditionsSheetBody key={sheet} defaultAddOpen={sheet === "add"} />
         </BottomSheet>
       )}
     </>

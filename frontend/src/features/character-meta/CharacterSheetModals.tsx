@@ -66,7 +66,6 @@ export default function CharacterSheetModals({
 
       {captureOpen && (
         <CapturePalette
-          character={character}
           sessionId={captureSessionId}
           session={captureSession}
           onClose={onCloseCapture}

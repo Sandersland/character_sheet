@@ -10,6 +10,7 @@
 import { Minus, Plus, X } from "lucide-react";
 
 import { applyConditionTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiHealthNormal } from "@/components/ui/icons";
@@ -19,17 +20,17 @@ import {
   EXHAUSTION_MAX,
   exhaustionEffect,
 } from "@/lib/conditions";
-import type { Character, ConditionKey, ConditionOperation } from "@/types/character";
+import type { ConditionKey, ConditionOperation } from "@/types/character";
 import AddConditionPanel from "@/features/conditions/AddConditionPanel";
 
 interface Props {
-  character: Character;
   /** Open the add-condition picker expanded — set when a host launches this body
    *  straight into "add" mode (the live-Combat "+ Add" trigger, #982). */
   defaultAddOpen?: boolean;
 }
 
-export default function ConditionsSheetBody({ character, defaultAddOpen }: Props) {
+export default function ConditionsSheetBody({ defaultAddOpen }: Props) {
+  const { character } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: ConditionOperation[]) => applyConditionTransactions(character.id, ops),

@@ -13,10 +13,10 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
-import { summarizeJournalDoorway } from "@/features/journal/journalDoorwaySummary";
+import { summarizeJournalDoorway, type JournalDoorwaySummary } from "@/features/journal/journalDoorwaySummary";
 import { useChronicle } from "@/features/journal/useChronicle";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatRelativeDay } from "@/lib/formatJournalDate";
-import type { Character } from "@/types/character";
 
 // The closed book must read as a dark-red tome in BOTH themes, so its cover, spine
 // and gilt use fixed hex (the garnet-*/gold-* tokens invert in dark mode). Values
@@ -48,30 +48,15 @@ function ClosedBook() {
   );
 }
 
-export default function JournalDoorway({ character }: { character: Character }) {
+export default function JournalDoorway() {
+  const { character } = useCurrentCharacter();
   const { sessions } = useChronicle(character);
   const summary = useMemo(
     () => summarizeJournalDoorway(character.journal, sessions),
     [character.journal, sessions],
   );
 
-  const title = summary.isEmpty
-    ? "Begin your chronicle"
-    : summary.currentChapterTitle ?? "Between sessions";
-
-  let subtitle: string;
-  if (summary.isEmpty) {
-    subtitle = "Your first note opens the book.";
-  } else {
-    const parts = [`${summary.noteCount} ${summary.noteCount === 1 ? "note" : "notes"}`];
-    if (summary.chapterCount > 0) {
-      parts.push(`${summary.chapterCount} ${summary.chapterCount === 1 ? "chapter" : "chapters"}`);
-    }
-    if (summary.lastWrittenAt) {
-      parts.push(`last written ${formatRelativeDay(summary.lastWrittenAt)}`);
-    }
-    subtitle = parts.join(" · ");
-  }
+  const { title, subtitle } = doorwayCopy(summary);
 
   return (
     <Link
@@ -92,4 +77,25 @@ export default function JournalDoorway({ character }: { character: Character }) 
       </span>
     </Link>
   );
+}
+
+// Title/subtitle copy, split out of the component (no JSX) so its branching
+// doesn't count against JournalDoorway's own cognitive budget.
+function doorwayCopy(summary: JournalDoorwaySummary): { title: string; subtitle: string } {
+  if (summary.isEmpty) {
+    return { title: "Begin your chronicle", subtitle: "Your first note opens the book." };
+  }
+
+  const parts = [`${summary.noteCount} ${summary.noteCount === 1 ? "note" : "notes"}`];
+  if (summary.chapterCount > 0) {
+    parts.push(`${summary.chapterCount} ${summary.chapterCount === 1 ? "chapter" : "chapters"}`);
+  }
+  if (summary.lastWrittenAt) {
+    parts.push(`last written ${formatRelativeDay(summary.lastWrittenAt)}`);
+  }
+
+  return {
+    title: summary.currentChapterTitle ?? "Between sessions",
+    subtitle: parts.join(" · "),
+  };
 }
