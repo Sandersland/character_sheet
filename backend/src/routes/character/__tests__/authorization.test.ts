@@ -47,13 +47,11 @@ describe("auth gate (requireAuth)", () => {
   });
 
   it("401s an unauthenticated request to a protected route", async () => {
-    // eslint-disable-next-line no-restricted-syntax -- asserts only the HTTP status, never list contents
     const res = await supertest(createApp()).get("/api/characters");
     expect(res.status).toBe(401);
   });
 
   it("allows an authenticated request through the gate", async () => {
-    // eslint-disable-next-line no-restricted-syntax -- asserts only the HTTP status, never list contents
     const res = await supertest(createApp()).get("/api/characters").set("Cookie", cookie);
     expect(res.status).toBe(200);
   });
@@ -90,12 +88,9 @@ describe("character ownership (#101)", () => {
   });
 
   it("GET /api/characters returns only the caller's characters", async () => {
-    // eslint-disable-next-line no-restricted-syntax -- owner-scoping test: asserts presence/absence of THIS suite's own fixtures by id, which is the behavior under test
     const res = await supertest(createApp()).get("/api/characters").set("Cookie", cookieA);
     expect(res.status).toBe(200);
-    const ids = (res.body as { id: string }[]).map((c) => c.id);
-    expect(ids).toContain(CHAR_A);
-    expect(ids).not.toContain(CHAR_B);
+    expect((res.body as { id: string }[]).map((c) => c.id)).toEqual([CHAR_A]);
   });
 
   it("lets the owner read their own character", async () => {
