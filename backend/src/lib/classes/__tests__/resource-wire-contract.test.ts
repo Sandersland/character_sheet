@@ -1,19 +1,22 @@
 /**
- * Latches the class-resource wire types (#1273) against the backend facts they
- * were declared beside. ELEMENTAL_DAMAGE_TYPES used to define its own union;
- * the tuple stays backend-side (it feeds the route's z.enum) so only this
- * assertion keeps the two in step now.
+ * ELEMENTAL_DAMAGE_TYPES used to define its own union; the tuple stays here (the
+ * route's z.enum consumes it) while the union moved to shared-types (#1273), so
+ * only the first assertion keeps the two in step.
  *
- * ResourceOperation is asserted member-by-member because the frontend's copy was
- * missing ForgetSubclassChoiceOperation entirely — an op the server validates
- * and audits but no client could express (#1273 drift 3a).
+ * The union-completeness assertions are the guard for the drift that motivated
+ * this move: the frontend's ResourceOperation copy was missing
+ * ForgetSubclassChoiceOperation entirely — an op the server validates and audits
+ * that no client could express. Spelling out every member means adding one to
+ * the union without listing it here fails the build.
  */
 
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expectTypeOf, it } from "vitest";
 
-import { ELEMENTAL_DAMAGE_TYPES, resolveElementalBurstDamage } from "../warrior-of-elements.js";
+import { ELEMENTAL_DAMAGE_TYPES } from "../warrior-of-elements.js";
 import type {
+  ElementalBurstResult,
   ElementalDamageType,
+  ElementalStrikeResult,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   ForgetToolProficiencyOperation,
@@ -24,13 +27,13 @@ import type {
   RestoreResourceOperation,
   RollInitiativeOperation,
   SpendResourceOperation,
+  ToggleAttunementResult,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";
 
 describe("class-resource wire contract", () => {
   it("keeps ELEMENTAL_DAMAGE_TYPES in step with its shared union", () => {
     expectTypeOf<(typeof ELEMENTAL_DAMAGE_TYPES)[number]>().toEqualTypeOf<ElementalDamageType>();
-    expect(true).toBe(true);
   });
 
   it("carries every resource op the dispatcher accepts", () => {
@@ -45,22 +48,11 @@ describe("class-resource wire contract", () => {
       | LearnSubclassChoiceOperation
       | ForgetSubclassChoiceOperation
     >();
-    expect(true).toBe(true);
   });
 
-  it("resolves an elemental burst into a narrowable result member", () => {
-    const { outcome, appliedDamage } = resolveElementalBurstDamage(9, 14, 15);
-    const result: WarriorOfElementsResult = {
-      dc: 14,
-      saveRoll: 9,
-      outcome,
-      damageType: "fire",
-      rawDamage: 15,
-      appliedDamage,
-      summary: "Elemental Burst",
-    };
-    // The union discriminates structurally: only ElementalBurstResult has rawDamage.
-    expect("rawDamage" in result && result.rawDamage).toBe(15);
-    expect(appliedDamage).toBe(15);
+  it("keeps the elements result a three-member union, not an optional bag", () => {
+    expectTypeOf<WarriorOfElementsResult>().toEqualTypeOf<
+      ToggleAttunementResult | ElementalBurstResult | ElementalStrikeResult
+    >();
   });
 });

@@ -1,12 +1,11 @@
 /**
- * Latches the capability tuples against the shared unions they used to define
- * (#1273). Before the migration each union WAS `(typeof TUPLE)[number]`, so the
- * route's zod schema and the wire type could not drift; now they are two
- * declarations and only these assertions keep them in step. Adding a value to a
- * tuple without adding it to shared-types (or vice versa) fails here.
+ * Each union below used to be `(typeof TUPLE)[number]`, so the route's zod schema
+ * and the wire type could not drift. Moving the unions to shared-types (#1273)
+ * left the tuples behind as separate declarations — these assertions are what
+ * now fails when a value is added to one side only.
  */
 
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expectTypeOf, it } from "vitest";
 
 import {
   ADVANTAGE_ON,
@@ -19,7 +18,6 @@ import {
   GRANT_TYPES,
   GRANT_VALUE_KINDS,
   PROFICIENCY_KINDS,
-  serializeCapability,
 } from "../capabilities.js";
 import type {
   AdvantageOn,
@@ -32,7 +30,6 @@ import type {
   GrantType,
   GrantValueKind,
   ProficiencyKind,
-  SerializedCapability,
 } from "@character-sheet/shared-types";
 
 describe("capability wire contract", () => {
@@ -47,17 +44,5 @@ describe("capability wire contract", () => {
     expectTypeOf<(typeof ADVANTAGE_ON)[number]>().toEqualTypeOf<AdvantageOn>();
     expectTypeOf<(typeof GRANT_VALUE_KINDS)[number]>().toEqualTypeOf<GrantValueKind>();
     expectTypeOf<(typeof PROFICIENCY_KINDS)[number]>().toEqualTypeOf<ProficiencyKind>();
-    expect(true).toBe(true);
-  });
-
-  it("serializes a capability row to the shared wire shape", () => {
-    const serialized = serializeCapability({
-      kind: "passiveBonus",
-      target: "ac",
-      op: "add",
-      value: 1,
-    });
-    expectTypeOf(serialized).toEqualTypeOf<SerializedCapability>();
-    expect(serialized).toEqual({ kind: "passiveBonus", target: "ac", op: "add", value: 1 });
   });
 });

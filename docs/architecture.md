@@ -66,7 +66,7 @@ The level-up ceremony endpoint (`/level-up/transactions`) is the **composition v
 
 ### Cross-tier shared types
 
-Wire types shared by both tiers (backend transaction-op inputs the frontend must construct, and the shapes the serializers return) are declared **once** in the `@character-sheet/shared-types` workspace (`packages/shared-types/`) and never hand-mirrored. Consume via `import type` only — nothing reaches either runtime bundle, and tsc catches the drift a mirror used to hide (#820). Add a family as one file under `src/`, re-export it from `index.ts`, then re-export the names each tier uses from that tier's existing public module (backend `lib/…`, frontend `types/character/*.ts`) so downstream imports never change.
+Wire types shared by both tiers (backend transaction-op inputs the frontend must construct, and the shapes the serializers return) are declared **once** in the `@character-sheet/shared-types` workspace (`packages/shared-types/`) and never hand-mirrored. Consume via `import type` only — nothing reaches either runtime bundle, and tsc catches the drift a mirror used to hide (#820). Add a family as one file under `src/`, re-export it from `index.ts`, then re-export the names each tier uses from that tier's existing public module (backend `lib/…`, frontend `types/character/*.ts`) so downstream imports never change. Put only the *consumed* names in those per-tier re-export blocks — a name that was previously used inside its declaring module becomes a dead export the moment it is only forwarded, and the zero-dead-export gate is repo-wide.
 
 Two rules the package can't enforce for you:
 
