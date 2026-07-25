@@ -3,5 +3,6 @@
 // (#820). Pure types only: every consumer imports via `import type`, so nothing
 // here reaches either runtime bundle. Add one file per mirror family and re-export
 // it here.
+export type * from "./session.js";
 export type * from "./spellcasting.js";
 export type * from "./edition.js";
