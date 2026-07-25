@@ -23,6 +23,7 @@ import {
 import { useChronicle } from "@/features/journal/useChronicle";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
+import { CurrentCharacterProvider } from "@/hooks/CurrentCharacterProvider";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
@@ -37,7 +38,11 @@ export default function JournalPage() {
   if (character === undefined) return showSpinner ? <Spinner variant="page" /> : null;
   if (character === null) return <CharacterLoadError variant="not-found" characterId={id} />;
 
-  return <JournalPageBody character={character} onUpdate={setCharacter} />;
+  return (
+    <CurrentCharacterProvider id={character.id}>
+      <JournalPageBody character={character} onUpdate={setCharacter} />
+    </CurrentCharacterProvider>
+  );
 }
 
 // Per-chapter note counts from the live journal, so the spine stays current as

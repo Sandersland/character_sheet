@@ -18,16 +18,16 @@ import { createContext, useContext, type ReactNode } from "react";
 
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import { useTurnState, type TurnStateView } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 const TurnStateContext = createContext<TurnStateView | null>(null);
 
 interface Props {
-  character: Character;
   children: ReactNode;
 }
 
-export function TurnStateProvider({ character, children }: Props) {
+export function TurnStateProvider({ children }: Props) {
+  const { character } = useCurrentCharacter();
   const { status, sessionId } = useLiveSession();
   const view = useTurnState(character, status === "liveJoined" ? sessionId : null);
   return <TurnStateContext.Provider value={view}>{children}</TurnStateContext.Provider>;

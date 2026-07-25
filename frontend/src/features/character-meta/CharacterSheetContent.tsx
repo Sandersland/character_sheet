@@ -39,7 +39,7 @@ interface CharacterSheetContentProps {
 export default function CharacterSheetContent(props: CharacterSheetContentProps) {
   return (
     <LiveSessionProvider characterId={props.character.id}>
-      <TurnStateProvider character={props.character}>
+      <TurnStateProvider>
         <CharacterSheetWorkspace {...props} />
       </TurnStateProvider>
     </LiveSessionProvider>
