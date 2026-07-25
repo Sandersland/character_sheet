@@ -1,7 +1,7 @@
 import { Prisma, type EquipSlot } from "@/generated/prisma/client.js";
 import { clearBuffsByTargetInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
 import { logEvent } from "@/lib/activity/events.js";
-import type { ItemCategoryName, ArmorCategoryName } from "./item-detail-inputs.js";
+import type { ItemCategory, ArmorCategory } from "./item-detail-inputs.js";
 import { InvalidInventoryOperationError } from "./inventory-currency.js";
 import {
   type InventoryItemWithDetails,
@@ -31,10 +31,10 @@ function slotLabel(slot: EquipSlot): string {
 
 // Minimal shape the placement rules read — a subset of InventoryItemWithDetails.
 export interface PlaceableItem {
-  category: ItemCategoryName;
+  category: ItemCategory;
   slot: EquipSlot | null;
   weaponDetail: { twoHanded: boolean } | null;
-  armorDetail: { armorCategory: ArmorCategoryName } | null;
+  armorDetail: { armorCategory: ArmorCategory } | null;
 }
 
 function isTwoHandedWeapon(item: PlaceableItem): boolean {

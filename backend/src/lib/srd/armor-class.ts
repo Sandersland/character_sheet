@@ -1,7 +1,7 @@
-import type { ArmorCategoryName } from "@/lib/inventory/item-detail-inputs.js";
+import type { ArmorCategory } from "@/lib/inventory/item-detail-inputs.js";
 
 // Body armor excludes shields (handled via hasShield, never passed as body armor).
-export type BodyArmorCategory = Exclude<ArmorCategoryName, "shield">;
+export type BodyArmorCategory = Exclude<ArmorCategory, "shield">;
 
 // One labeled addend of the derived AC; the wire shape for armorClassBreakdown.
 // reminder carries condition text for an addend not auto-applied (value 0, #383).
