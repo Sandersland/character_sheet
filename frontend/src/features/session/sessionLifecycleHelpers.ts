@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useRef, useState, type MutableRefObject } from "react";
+import { useMutation } from "@tanstack/react-query";
 
 import { applyExperienceOperations, endSession, endSoloSession, leaveSession } from "@/api/client";
 import { clearTurnState } from "@/features/session/turnStatePersistence";
@@ -14,24 +15,29 @@ import type { Session } from "@/types/character";
 
 /**
  * The pending/error state + try-catch wrapper both lifecycle hooks share for an
- * async lifecycle action (End, Leave). `run(fn, fallback)` flips `pending`,
- * clears the error, runs `fn`, and surfaces a message on failure.
+ * async lifecycle action (End, Leave). `run(fn, fallback)` clears the error,
+ * runs `fn` through a plain useMutation (no character-cache write here — these
+ * endpoints don't return a Character, see #1283 shape D), and surfaces a
+ * message on failure. `fallbackMsg` stays per-call (not fixed at the hook's
+ * construction like useCharacterMutation) since End and Leave share this one
+ * instance but want different copy.
  */
 export function usePendingAction() {
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = useCallback(async (fn: () => Promise<void>, fallbackMsg: string) => {
-    setPending(true);
-    setError(null);
-    try {
-      await fn();
-    } catch (err) {
-      setError(errorMessage(err, fallbackMsg));
-    } finally {
-      setPending(false);
-    }
-  }, []);
-  return { pending, error, setError, run };
+  const mutation = useMutation({ mutationFn: (fn: () => Promise<void>) => fn() });
+
+  const run = useCallback(
+    async (fn: () => Promise<void>, fallbackMsg: string) => {
+      setError(null);
+      try {
+        await mutation.mutateAsync(fn);
+      } catch (err) {
+        setError(errorMessage(err, fallbackMsg));
+      }
+    },
+    [mutation],
+  );
+  return { pending: mutation.isPending, error, setError, run };
 }
 
 /**
