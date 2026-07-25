@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { applyHitPointOperations } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { rollDie } from "@/lib/dice";
 import type { Character, HitPointOperation } from "@/types/character";
 
@@ -11,31 +11,32 @@ import type { Character, HitPointOperation } from "@/types/character";
  * they carry no concentration check — the minimal post here is sufficient.
  */
 export function useDeathSaves(character: Character, onUpdate: (c: Character) => void) {
-  const [pending, setPending] = useState(false);
+  const isDying = character.hitPoints.current === 0;
+
   // Surface transaction failures to the caller so each consumer can render them
   // (#744) — the old shared submit() in HitPointTracker set an error; the hook
   // must keep that behaviour rather than swallow it.
-  const [error, setError] = useState<string | null>(null);
-  const isDying = character.hitPoints.current === 0;
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: HitPointOperation[]) => applyHitPointOperations(character.id, ops),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Something went wrong — try again",
+    onCharacterWritten: (r) => onUpdate(r.character),
+  });
 
   async function post(ops: HitPointOperation[]) {
-    setPending(true);
-    setError(null);
     try {
-      const { character: updated } = await applyHitPointOperations(character.id, ops);
-      onUpdate(updated);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong — try again");
-    } finally {
-      setPending(false);
+      await mutation.mutateAsync(ops);
+    } catch {
+      // mutation.error already carries the message; nothing further to do here.
     }
   }
 
   return {
     isDying,
     deathSaves: character.hitPoints.deathSaves,
-    pending,
-    error,
+    pending: mutation.isPending,
+    error: mutation.error,
     onRollDeathSave: () => post([{ type: "deathSave", roll: rollDie(20) }]),
     onStabilize: () => post([{ type: "stabilize" }]),
   };
