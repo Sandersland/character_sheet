@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import WarriorOfElementsSection from "@/features/class/WarriorOfElementsSection";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, WarriorOfElementsOperation } from "@/types/character";
 
 function makeCharacter(over?: {
@@ -26,11 +27,20 @@ function makeCharacter(over?: {
   } as unknown as Character;
 }
 
+// WarriorOfElementsSection reads useCurrentCharacter(), so every render seeds
+// the cache and mounts CurrentCharacterProvider via renderWithCharacter.
+function render(character: Character, onOperations: (ops: WarriorOfElementsOperation[]) => void) {
+  return renderWithCharacter(
+    <WarriorOfElementsSection busy={false} onOperations={onOperations} />,
+    character,
+  );
+}
+
 describe("WarriorOfElementsSection", () => {
   it("toggles Elemental Attunement on (active: true) when not attuned", async () => {
     const user = userEvent.setup();
     const onOperations = vi.fn<(ops: WarriorOfElementsOperation[]) => void>();
-    render(<WarriorOfElementsSection character={makeCharacter()} busy={false} onOperations={onOperations} />);
+    render(makeCharacter(), onOperations);
 
     await user.click(screen.getByRole("button", { name: "Attune" }));
     expect(onOperations).toHaveBeenCalledWith([{ type: "toggleElementalAttunement", active: true }]);
@@ -39,7 +49,7 @@ describe("WarriorOfElementsSection", () => {
   it("ends Attunement (active: false) when already attuned", async () => {
     const user = userEvent.setup();
     const onOperations = vi.fn<(ops: WarriorOfElementsOperation[]) => void>();
-    render(<WarriorOfElementsSection character={makeCharacter({ attuned: true })} busy={false} onOperations={onOperations} />);
+    render(makeCharacter({ attuned: true }), onOperations);
 
     expect(screen.getByRole("status")).toHaveTextContent(/Attunement active/i);
     await user.click(screen.getByRole("button", { name: "End" }));
@@ -49,7 +59,7 @@ describe("WarriorOfElementsSection", () => {
   it("casts Elemental Burst with the chosen damage type and a positive roll", async () => {
     const user = userEvent.setup();
     const onOperations = vi.fn<(ops: WarriorOfElementsOperation[]) => void>();
-    render(<WarriorOfElementsSection character={makeCharacter()} busy={false} onOperations={onOperations} />);
+    render(makeCharacter(), onOperations);
 
     await user.selectOptions(screen.getByLabelText("Burst damage type"), "cold");
     await user.click(screen.getByRole("button", { name: "Cast" }));
@@ -66,13 +76,13 @@ describe("WarriorOfElementsSection", () => {
 
   it("hides Elemental Burst below level 6 (elementalBurstAvailable falsey)", () => {
     const onOperations = vi.fn();
-    render(<WarriorOfElementsSection character={makeCharacter({ burstAvailable: false })} busy={false} onOperations={onOperations} />);
+    render(makeCharacter({ burstAvailable: false }), onOperations);
     expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
   });
 
   it("disables Attune when Focus is exhausted", () => {
     const onOperations = vi.fn();
-    render(<WarriorOfElementsSection character={makeCharacter({ focusRemaining: 0 })} busy={false} onOperations={onOperations} />);
+    render(makeCharacter({ focusRemaining: 0 }), onOperations);
     expect(screen.getByRole("button", { name: "Attune" })).toBeDisabled();
   });
 });

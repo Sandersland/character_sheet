@@ -1,14 +1,15 @@
-import type { Character, ClassOption } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import type { ClassOption } from "@/types/character";
 
 interface Props {
-  character: Character;
   classDef: ClassOption | undefined;
   needsSubclass: boolean;
   busy: boolean;
   onChoose: (subclassId: string) => void;
 }
 
-export default function SubclassSection({ character, classDef, needsSubclass, busy, onChoose }: Props) {
+export default function SubclassSection({ classDef, needsSubclass, busy, onChoose }: Props) {
+  const { character } = useCurrentCharacter();
   if (!character.subclass && !needsSubclass) return null;
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
