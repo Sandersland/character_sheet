@@ -4,6 +4,7 @@
 import { useState } from "react";
 
 import { applySpellcastingTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { planCast, type CastResult } from "@/lib/spellCast";
 import { canPrepare, preparedBudget } from "@/lib/spellList";
 import type {
@@ -14,20 +15,26 @@ import type {
 } from "@/types/character";
 
 export function useSpellcasting(character: Character, onUpdate: (c: Character) => void) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [castResult, setCastResult] = useState<CastResult | null>(null);
   const [addPanelOpen, setAddPanelOpen] = useState(false);
+  // The prepared-cap pre-block fires before any request is sent, so it needs
+  // its own slot — a mutation's error only clears on its NEXT mutate() call.
+  const [prepareCapError, setPrepareCapError] = useState<string | null>(null);
+
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: SpellcastingOperation[]) => applySpellcastingTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Something went wrong.",
+    onCharacterWritten: onUpdate,
+  });
 
   async function send(ops: SpellcastingOperation[]) {
-    setBusy(true);
-    setError(null);
+    setPrepareCapError(null);
     try {
-      onUpdate(await applySpellcastingTransactions(character.id, ops));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
+      await mutation.mutateAsync(ops);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 
@@ -45,7 +52,7 @@ export function useSpellcasting(character: Character, onUpdate: (c: Character) =
     // Optimistic pre-block at the derived cap (#883); the server enforces it too.
     const budget = preparedBudget(character.spellcasting!);
     if (!canPrepare(spell, budget)) {
-      setError(`You can prepare at most ${budget.limit} spells.`);
+      setPrepareCapError(`You can prepare at most ${budget.limit} spells.`);
       return;
     }
     send([{ type: "prepareSpell", entryId: spell.id }]);
@@ -70,7 +77,7 @@ export function useSpellcasting(character: Character, onUpdate: (c: Character) =
   }
 
   return {
-    busy, error, castResult, addPanelOpen,
+    busy: mutation.isPending, error: prepareCapError ?? mutation.error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
     handleCast, handlePrepare, handleForget, handleLearn, handleSwap,
   };

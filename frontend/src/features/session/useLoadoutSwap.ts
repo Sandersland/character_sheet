@@ -17,6 +17,7 @@
 import { useState } from "react";
 
 import { applyInventoryTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { equippedLoadoutLabel, itemsInSlot } from "@/lib/paperDoll";
 import { NO_BUDGET_REASON, planInteractionSpend, type InteractionSpend } from "@/lib/loadoutPicker";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -73,9 +74,31 @@ export function useLoadoutSwap(
   turnState: TurnState & TurnStateActions,
   onUpdate: (c: Character) => void,
 ) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [lastSwap, setLastSwap] = useState<CommittedSwap | null>(null);
+  // The "nothing can pay for this" guard fires before either mutation starts,
+  // so it needs its own slot — a mutation's own error clears the moment its
+  // NEXT mutate() call fires, but this guard never calls mutate() at all.
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+
+  // Two separate mutations (not one shared instance) because swap and refund
+  // keep distinct fallback copy ("Swap failed" vs "Refund failed") — both
+  // still share one `character-${id}` scope, so a swap and its refund never race.
+  const swapMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: InventoryOperation[]) => applyInventoryTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Swap failed — try again.",
+    onCharacterWritten: onUpdate,
+  });
+  const refundMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: InventoryOperation[]) => applyInventoryTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Refund failed — try again.",
+    onCharacterWritten: onUpdate,
+  });
+  const busy = swapMutation.isPending || refundMutation.isPending;
+  const error = budgetError ?? swapMutation.error ?? refundMutation.error;
 
   // Plan how `unitsNeeded` interactions get paid: from the budget when it
   // covers them, else the Action, else null (nothing can pay).
@@ -90,19 +113,14 @@ export function useLoadoutSwap(
 
   async function commitSwap(ops: InventoryOperation[], inverseOps: InventoryOperation[], payment: InteractionSpend | "action") {
     const previousLabel = equippedLoadoutLabel(character.inventory);
-    setBusy(true);
-    setError(null);
+    setBudgetError(null);
     try {
-      const updated = await applyInventoryTransactions(character.id, ops);
+      await swapMutation.mutateAsync(ops);
       if (payment === "action") turnState.consumeAction();
       else turnState.spendInteractionBudget(payment);
-      onUpdate(updated);
       setLastSwap({ inverseOps, spend: payment === "action" ? null : payment, previousLabel });
     } catch (e) {
       console.error("loadout swap failed", e);
-      setError("Swap failed — try again.");
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -116,7 +134,7 @@ export function useLoadoutSwap(
     const { ops, inverseOps, interactionsNeeded } = buildSwapOps(incoming, mainOcc, offOcc, slot);
     const payment = planPayment(interactionsNeeded);
     if (payment === null) {
-      setError(NO_BUDGET_REASON);
+      setBudgetError(NO_BUDGET_REASON);
       return;
     }
     await commitSwap(ops, inverseOps, payment);
@@ -130,7 +148,7 @@ export function useLoadoutSwap(
     // stow) — budget/Action-gated like any other, not unconditionally free.
     const payment = planPayment(1);
     if (payment === null) {
-      setError(NO_BUDGET_REASON);
+      setBudgetError(NO_BUDGET_REASON);
       return;
     }
     const ops: InventoryOperation[] = [{ type: "setEquipped", inventoryItemId: occupant.id, equipped: false }];
@@ -140,26 +158,24 @@ export function useLoadoutSwap(
 
   // Clear the committed-swap affordance — called at end of turn so the Refund
   // is bounded to the turn of the swap (no cross-turn action-economy leak).
+  // All three error sources must clear together: the exposed `error` folds
+  // budgetError over both mutations, so clearing one still shows a stale one.
   function reset() {
     setLastSwap(null);
-    setError(null);
+    setBudgetError(null);
+    swapMutation.reset();
+    refundMutation.reset();
   }
 
   async function refund() {
     if (busy || !lastSwap) return;
-    setBusy(true);
-    setError(null);
     try {
-      const updated = await applyInventoryTransactions(character.id, lastSwap.inverseOps);
+      await refundMutation.mutateAsync(lastSwap.inverseOps);
       if (lastSwap.spend) turnState.refundInteractionBudget(lastSwap.spend);
       else turnState.refundAction();
-      onUpdate(updated);
       setLastSwap(null);
     } catch (e) {
       console.error("loadout refund failed", e);
-      setError("Refund failed — try again.");
-    } finally {
-      setBusy(false);
     }
   }
 

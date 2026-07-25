@@ -17,9 +17,8 @@
  *                    result. Throws (or rejects) on API error.
  */
 
-import { useState, useCallback } from "react";
-
 import { castManeuverTransaction } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character } from "@/types/character";
 
 export interface UseManeuverDieReturn {
@@ -34,27 +33,25 @@ export function useManeuverDie(
   character: Character,
   onUpdate: (c: Character) => void,
 ): UseManeuverDieReturn {
-  const [busy, setBusy] = useState(false);
-
   const pool = character.resources?.pools?.find((p) => p.key === "superiorityDice");
   const diceFaces = pool?.die ? parseInt(pool.die.replace("d", ""), 10) : 8;
   const dieLabel = pool?.die ?? "d8";
 
-  const spend = useCallback(
-    async (entryId: string): Promise<number> => {
-      setBusy(true);
-      try {
-        const { character: updated, results } = await castManeuverTransaction(character.id, [
-          { type: "castManeuver", entryId },
-        ]);
-        onUpdate(updated);
-        return results[0]?.roll ?? 0;
-      } finally {
-        setBusy(false);
-      }
-    },
-    [character.id, onUpdate],
-  );
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (entryId: string) => castManeuverTransaction(character.id, [{ type: "castManeuver", entryId }]),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Failed to cast maneuver",
+    onCharacterWritten: (r) => onUpdate(r.character),
+  });
 
-  return { pool, diceFaces, dieLabel, busy, spend };
+  // No try/catch here (unchanged from pre-#1283): a spend failure propagates to
+  // the caller (useManeuverActions' handleReactionManeuver/handleEffectManeuver),
+  // which is what surfaces it — this hook itself has never exposed `error`.
+  async function spend(entryId: string): Promise<number> {
+    const { results } = await mutation.mutateAsync(entryId);
+    return results[0]?.roll ?? 0;
+  }
+
+  return { pool, diceFaces, dieLabel, busy: mutation.isPending, spend };
 }

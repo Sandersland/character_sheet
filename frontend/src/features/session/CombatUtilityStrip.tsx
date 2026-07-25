@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { applyConditionTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import BottomSheet from "@/components/ui/BottomSheet";
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";
 import RestButton from "@/features/hitpoints/RestButton";
@@ -56,7 +57,6 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
   // null = closed; "manage" opens the sheet as-is; "add" opens it with the
   // condition picker already expanded (the "+ Add" affordance).
   const [sheet, setSheet] = useState<null | "manage" | "add">(null);
-  const [exhaustionBusy, setExhaustionBusy] = useState(false);
   const isBelowMd = useIsBelowMd();
   const { active, exhaustion } = character.conditions;
 
@@ -69,17 +69,22 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
 
   // Inline exhaustion step — the same setExhaustion transaction op the conditions
   // sheet fires, so exhaustion stays single-sourced through the client.
+  const exhaustionMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (level: number) => applyConditionTransactions(character.id, [{ type: "setExhaustion", level }]),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to update exhaustion.",
+    onCharacterWritten: onUpdate,
+  });
+  const exhaustionBusy = exhaustionMutation.isPending;
+
   async function stepExhaustion(next: number) {
     const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, next));
     if (clamped === exhaustion) return;
-    setExhaustionBusy(true);
     try {
-      const updated = await applyConditionTransactions(character.id, [
-        { type: "setExhaustion", level: clamped },
-      ]);
-      onUpdate(updated);
-    } finally {
-      setExhaustionBusy(false);
+      await exhaustionMutation.mutateAsync(clamped);
+    } catch {
+      // best-effort, no UI surface here — mirrors pre-#1283 behaviour.
     }
   }
 

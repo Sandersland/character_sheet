@@ -11,6 +11,7 @@
 import { useState } from "react";
 
 import { attemptStunningStrikeTransaction } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character, StunningStrikeAttemptResult } from "@/types/character";
@@ -30,22 +31,26 @@ function useStunningStrikeAttempt(
   currentRow: AttackTallyRow | null,
   onUpdate: (c: Character) => void,
 ) {
-  const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<StunningStrikeAttemptResult | null>(null);
   const used = turnState.stunningStrikeUsedThisTurn;
-  const canAttempt = !used && !busy && currentRow !== null;
 
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (usedThisTurn: boolean) => attemptStunningStrikeTransaction(character.id, usedThisTurn),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Failed to attempt Stunning Strike",
+    onCharacterWritten: (r) => onUpdate(r.character),
+  });
+  const canAttempt = !used && !mutation.isPending && currentRow !== null;
+
+  // No try/catch (unchanged from pre-#1283): this hook has never surfaced an
+  // error and never awaits its own promise elsewhere — a rejection propagates
+  // same as before.
   async function handleAttempt() {
     if (!canAttempt) return;
-    setBusy(true);
-    try {
-      const { character: updated, results } = await attemptStunningStrikeTransaction(character.id, used);
-      setResult(results[0] ?? null);
-      turnState.markStunningStrikeUsed();
-      onUpdate(updated);
-    } finally {
-      setBusy(false);
-    }
+    const { results } = await mutation.mutateAsync(used);
+    setResult(results[0] ?? null);
+    turnState.markStunningStrikeUsed();
   }
 
   return { used, canAttempt, result, handleAttempt };

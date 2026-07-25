@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { applyHitPointOperations } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
 import type { HpMode } from "@/lib/hpAmount";
 import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
@@ -31,14 +32,20 @@ function concentrationMessage(check: ConcentrationCheck): ConcentrationNote {
  * damage/heal/temp + concentration behave the same everywhere.
  */
 export function useHitPointApply(character: Character, onUpdate: (character: Character) => void) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [concentrationNote, setConcentrationNote] = useState<ConcentrationNote | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingConcentrationSave | null>(null);
 
   // Only spellcasters can concentrate, so the toggle is only shown for them.
   const isSpellcaster = character.spellcasting !== undefined;
   const [autoRollConcentration, setAutoRollConcentration] = useAutoRollConcentrationPref();
+
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: HitPointOperation[]) => applyHitPointOperations(character.id, ops),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Something went wrong — try again",
+    onCharacterWritten: (r) => onUpdate(r.character),
+  });
 
   /**
    * Submit a batch of operations, returns true on success. `silentConcentration`
@@ -49,14 +56,8 @@ export function useHitPointApply(character: Character, onUpdate: (character: Cha
     ops: HitPointOperation[],
     opts: { silentConcentration?: boolean } = {},
   ): Promise<boolean> {
-    setPending(true);
-    setError(null);
     try {
-      const { character: updated, concentrationChecks } = await applyHitPointOperations(
-        character.id,
-        ops,
-      );
-      onUpdate(updated);
+      const { concentrationChecks } = await mutation.mutateAsync(ops);
       if (!opts.silentConcentration) {
         const last = concentrationChecks.at(-1);
         if (last?.status === "pending") {
@@ -74,11 +75,8 @@ export function useHitPointApply(character: Character, onUpdate: (character: Cha
         }
       }
       return true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong — try again");
+    } catch {
       return false;
-    } finally {
-      setPending(false);
     }
   }
 
@@ -103,8 +101,8 @@ export function useHitPointApply(character: Character, onUpdate: (character: Cha
   }
 
   return {
-    pending,
-    error,
+    pending: mutation.isPending,
+    error: mutation.error,
     concentrationNote,
     pendingSave,
     setPendingSave,

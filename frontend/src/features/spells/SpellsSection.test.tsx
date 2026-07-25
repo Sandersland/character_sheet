@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, renderHook, screen } from "@testing-library/react";
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import SpellsSection from "@/features/spells/SpellsSection";
@@ -219,7 +219,10 @@ describe("SpellsSection preparation (grimoire runes)", () => {
 
     result.current.handleSwap("entry-drop", "entry-add");
 
-    expect(mockApply).toHaveBeenCalledTimes(1);
+    // A mutation's mutationFn call is dispatched via TanStack Query's internal
+    // notify batching (a microtask hop), not synchronously like the old raw
+    // fetch call — so this assertion now needs a tick.
+    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
     expect(mockApply).toHaveBeenCalledWith("wiz-1", [
       { type: "unprepareSpell", entryId: "entry-drop" },
       { type: "prepareSpell", entryId: "entry-add" },

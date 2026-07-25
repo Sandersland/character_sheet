@@ -15,6 +15,7 @@ import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { formatRollSpec, isNaturalTwenty } from "@/lib/dice";
 import { computeCastSpec } from "@/lib/spellCast";
 import { isAttackCantrip } from "@/lib/spellMeta";
@@ -51,9 +52,17 @@ export default function InlineSpellAttackSection({
 
   const [attackRolled, setAttackRolled] = useState<Record<string, boolean>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [lastAttack, setLastAttack] = useState<Record<string, RollResult | null>>({});
   const [lastDamage, setLastDamage] = useState<Record<string, RollResult | null>>({});
+
+  const castMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: Parameters<typeof applySpellcastingTransactions>[1]) =>
+      applySpellcastingTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Cast failed — try again.",
+    onCharacterWritten: onUpdate,
+  });
 
   const cantrips = (character.spellcasting?.spells ?? []).filter(isAttackCantrip);
   if (cantrips.length === 0) return null;
@@ -87,13 +96,9 @@ export default function InlineSpellAttackSection({
   async function handleCast(spell: Spell) {
     if (busyId) return;
     setBusyId(spell.id);
-    setError(null);
     const damageTotal = rollDamage(spell);
     try {
-      const updated = await applySpellcastingTransactions(character.id, [
-        { type: "castSpell", entryId: spell.id, roll: damageTotal },
-      ]);
-      onUpdate(updated);
+      await castMutation.mutateAsync([{ type: "castSpell", entryId: spell.id, roll: damageTotal }]);
       // The Attack action was already spent when the sheet opened (enterAttackMode).
       // grantExtraAction refunds that pre-commit so commitActionSpell's own
       // decrement nets to ZERO — recording the cantrip + tearing down attack mode
@@ -104,7 +109,6 @@ export default function InlineSpellAttackSection({
       setAttackRolled((prev) => ({ ...prev, [spell.id]: false }));
     } catch (e) {
       console.error("cantrip cast failed", e);
-      setError("Cast failed — try again.");
     } finally {
       setBusyId(null);
     }
@@ -129,7 +133,7 @@ export default function InlineSpellAttackSection({
           onCast={() => handleCast(spell)}
         />
       ))}
-      {error && <p className="pt-2 text-xs text-garnet-700">{error}</p>}
+      {castMutation.error && <p className="pt-2 text-xs text-garnet-700">{castMutation.error}</p>}
     </div>
   );
 }
