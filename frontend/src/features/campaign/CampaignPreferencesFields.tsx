@@ -1,6 +1,5 @@
-import { useState } from "react";
-
 import { updateCampaignPreferences } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { CampaignPreferences, Character } from "@/types/character";
 
 interface CampaignPreferencesFieldsProps {
@@ -49,19 +48,22 @@ export default function CampaignPreferencesFields({
     shareWithDm: false,
     autoFriendlyHealing: false,
   };
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (patch: Partial<CampaignPreferences>) => updateCampaignPreferences(character.id, patch),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to update preferences",
+    onCharacterWritten: onUpdate,
+  });
+  const saving = mutation.isPending;
+  const error = mutation.error;
 
   async function save(patch: Partial<CampaignPreferences>) {
-    setSaving(true);
-    setError(null);
     try {
-      const updated = await updateCampaignPreferences(character.id, patch);
-      onUpdate(updated);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update preferences");
-    } finally {
-      setSaving(false);
+      await mutation.mutateAsync(patch);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { updateCharacter } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character, Currency } from "@/types/character";
 import CurrencyEditForm from "@/features/inventory/CurrencyEditForm";
 import { formatCurrency } from "@/lib/currency";
@@ -14,24 +15,25 @@ interface CurrencyEditorProps {
 export default function CurrencyEditor({ character, onUpdate }: CurrencyEditorProps) {
   const [editing, setEditing] = useState(false);
   const [currency, setCurrency] = useState<Currency>(character.currency);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
 
   useEffect(() => {
     setCurrency(character.currency);
   }, [character.currency]);
 
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (next: Currency) => updateCharacter(character.id, { currency: next }),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to update purse.",
+    onCharacterWritten: onUpdate,
+  });
+
   async function save() {
-    setPending(true);
-    setError(false);
     try {
-      const updated = await updateCharacter(character.id, { currency });
-      onUpdate(updated);
+      await mutation.mutateAsync(currency);
       setEditing(false);
     } catch {
-      setError(true);
-    } finally {
-      setPending(false);
+      // mutation.error already carries the message.
     }
   }
 
@@ -43,7 +45,7 @@ export default function CurrencyEditor({ character, onUpdate }: CurrencyEditorPr
           type="button"
           onClick={() => {
             setCurrency(character.currency);
-            setError(false);
+            mutation.reset();
             setEditing(true);
           }}
           className="font-semibold text-garnet-700 hover:underline"
@@ -57,8 +59,8 @@ export default function CurrencyEditor({ character, onUpdate }: CurrencyEditorPr
   return (
     <CurrencyEditForm
       currency={currency}
-      pending={pending}
-      error={error}
+      pending={mutation.isPending}
+      error={mutation.error !== null}
       onChange={setCurrency}
       onSave={save}
       onCancel={() => setEditing(false)}
