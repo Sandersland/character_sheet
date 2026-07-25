@@ -114,7 +114,6 @@ function CharacterSheetWorkspace({
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:flex-1 md:overflow-visible">
         <CharacterSheetHeader
           character={character}
-          onUpdate={life.handleCharacterUpdate}
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
@@ -145,7 +144,6 @@ function CharacterSheetWorkspace({
 
         <CharacterSheetModals
           character={character}
-          onUpdate={onUpdate}
           captureSessionId={session.activeSessionId}
           captureSession={session.inActiveSession ? session.activeSession : null}
           deleteOpen={modals.deleteOpen}
@@ -177,7 +175,6 @@ function CharacterSheetWorkspace({
           <CharacterSheetBody
             character={character}
             reference={reference}
-            onUpdate={onUpdate}
             activeTab={activeTab}
             livePanel={livePanel}
             sessionLoading={live.status === "loading"}

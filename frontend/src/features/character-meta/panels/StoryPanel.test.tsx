@@ -24,7 +24,7 @@ function makeCharacter(partial: Partial<Character>): Character {
 function renderPanel(character: Character) {
   return render(
     <MemoryRouter>
-      <StoryPanel character={character} reference={null} onUpdate={vi.fn()} />
+      <StoryPanel character={character} reference={null} />
     </MemoryRouter>,
   );
 }

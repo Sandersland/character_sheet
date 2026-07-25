@@ -20,7 +20,6 @@ type SheetMenuItem = { label: string; onSelect: () => void; danger?: boolean; di
 // identity + HP readout + the live pill + the "Sheet actions" ⋯ menu.
 interface SubHeaderProps {
   character: Character;
-  onUpdate?: (character: Character) => void;
   pill: React.ReactNode;
   menuItems: SheetMenuItem[];
   onOpenSwitcher: () => void;
@@ -28,8 +27,6 @@ interface SubHeaderProps {
 
 interface MobileSheetHeaderProps {
   character: Character;
-  /** Opens the shared HP sheet from the HP readout; omit for a read-only row. */
-  onUpdate?: (character: Character) => void;
   /** Live-session controls folded into the "Sheet actions" menu while joined
    *  (#979). Non-null ⇒ a session is live and this character is in it. onLeave is
    *  omitted for a solo session (#1082) — Leave is campaign-only, End is not. */
@@ -135,7 +132,6 @@ function buildMenuItems(
  */
 export default function MobileSheetHeader({
   character,
-  onUpdate,
   sessionActions = null,
   liveRound = null,
   onGoToCombat,
@@ -160,7 +156,7 @@ export default function MobileSheetHeader({
   const openSwitcher = () => setSwitcherOpen(true);
 
   const renderVariant = (variant: HeaderVariant) => {
-    const shared = { character, onUpdate, pill, menuItems, onOpenSwitcher: openSwitcher };
+    const shared = { character, pill, menuItems, onOpenSwitcher: openSwitcher };
     return variant === "collapsed" ? <CollapsedBar {...shared} /> : <ExpandedSheetHeader {...shared} />;
   };
 
@@ -274,7 +270,7 @@ function CollapseAnimator({
  * · ⋯. The scroll-collapsed default — calm paper chrome so the panel below stays
  * the subject. Tapping the identity region opens the character switcher (#1027).
  */
-function CollapsedBar({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
+function CollapsedBar({ character, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
   const hp = (
     <>
@@ -303,16 +299,12 @@ function CollapsedBar({ character, onUpdate, pill, menuItems, onOpenSwitcher }: 
       </button>
 
       {/* HP — its own tap target (#982): opens the shared "Hit Points" sheet. */}
-      {onUpdate ? (
-        <ManageHpButton
-          character={character}
-          className="flex flex-none items-center gap-1.5 rounded-control px-1 py-0.5 transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
-        >
-          {hp}
-        </ManageHpButton>
-      ) : (
-        <div className="flex flex-none items-center gap-1.5">{hp}</div>
-      )}
+      <ManageHpButton
+        character={character}
+        className="flex flex-none items-center gap-1.5 rounded-control px-1 py-0.5 transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+      >
+        {hp}
+      </ManageHpButton>
 
       {pill}
       <OverflowMenu label="Sheet actions" items={menuItems} />
@@ -325,7 +317,7 @@ function CollapsedBar({ character, onUpdate, pill, menuItems, onOpenSwitcher }: 
  * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. The identity
  * (avatar + name + subtitle) is a button opening the character switcher (#1027).
  */
-function ExpandedSheetHeader({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
+function ExpandedSheetHeader({ character, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
 
   // "Race · Class Level" — classSummary carries per-class levels for multiclass;
@@ -371,26 +363,17 @@ function ExpandedSheetHeader({ character, onUpdate, pill, menuItems, onOpenSwitc
       </div>
 
       {/* Row 2: HP numbers + full-width meter + AC badge. HP taps through to the
-          shared "Hit Points" sheet (#982); read-only readout without onUpdate. */}
+          shared "Hit Points" sheet (#982). */}
       <div className="mt-2 flex items-center gap-2.5">
-        {onUpdate ? (
-          <ManageHpButton
-            character={character}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
-          >
-            <HpNumbers current={current} max={max} temp={temp} />
-            <span className="min-w-0 flex-1">
-              <MeterBar current={current} max={max} tone="vitality" label={`Hit points ${current} of ${max}`} />
-            </span>
-          </ManageHpButton>
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <HpNumbers current={current} max={max} temp={temp} />
-            <span className="min-w-0 flex-1">
-              <MeterBar current={current} max={max} tone="vitality" label={`Hit points ${current} of ${max}`} />
-            </span>
-          </div>
-        )}
+        <ManageHpButton
+          character={character}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+        >
+          <HpNumbers current={current} max={max} temp={temp} />
+          <span className="min-w-0 flex-1">
+            <MeterBar current={current} max={max} tone="vitality" label={`Hit points ${current} of ${max}`} />
+          </span>
+        </ManageHpButton>
         <AcBadge character={character} />
       </div>
     </header>

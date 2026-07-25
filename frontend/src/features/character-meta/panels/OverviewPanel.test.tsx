@@ -34,7 +34,7 @@ function makeCharacter(overrides: Partial<Character>): Character {
 }
 
 function renderPanel(character: Character) {
-  const props: SheetPanelProps = { character, reference: null, onUpdate: vi.fn() };
+  const props: SheetPanelProps = { character, reference: null };
   return render(
     <RollProvider>
       <OverviewPanel {...props} />

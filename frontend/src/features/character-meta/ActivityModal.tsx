@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { fetchActivity, fetchSessions, revertBatch } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import {
   categoryLabel,
   categoryTone,
@@ -12,7 +13,7 @@ import {
 import { groupByBatch, groupByDate } from "@/lib/timeline";
 import { summarizeSellBatch } from "@/lib/sellBatch";
 import { toggledSet } from "@/lib/toggleSet";
-import type { Character, CharacterEvent, CharacterEventCategory, CharacterEventField, Session } from "@/types/character";
+import type { CharacterEvent, CharacterEventCategory, CharacterEventField, Session } from "@/types/character";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
@@ -21,8 +22,6 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 interface ActivityModalProps {
   characterId: string;
   onClose: () => void;
-  /** Called with the refreshed character when an undo revert completes. */
-  onUpdate: (character: Character) => void;
   /** When set, scopes the timeline to one entity (e.g. a single InventoryItem). */
   entityId?: string;
 }
@@ -380,7 +379,8 @@ function useActivityEvents(filters: ActivityFilterState) {
   return { events, error, reload };
 }
 
-export default function ActivityModal({ characterId, onClose, onUpdate, entityId }: ActivityModalProps) {
+export default function ActivityModal({ characterId, onClose, entityId }: ActivityModalProps) {
+  const { setCharacter } = useCurrentCharacter();
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
   // Bulk-sale summary collapse (issue #104). Keyed by batch.key, kept INDEPENDENT
   // of expandedFields (keyed by event.id) so the summary line and the per-row
@@ -391,7 +391,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
     mutationFn: (batchId: string) => revertBatch(characterId, batchId),
     toCharacter: (c) => c,
     fallbackMessage: "Undo failed — try again.",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
 
   // Filter state. "all" category disables the category predicate; an empty

@@ -2,7 +2,7 @@ import Card from "@/components/ui/Card";
 import type { Character } from "@/types/character";
 
 // Read-only identity summary (#927): background + alignment name strings off the
-// wire. Pure display — no onUpdate, no API. Editable narrative fields land in #930.
+// wire. Pure display, no API. Editable narrative fields land in #930.
 export default function IdentityCard({ character }: { character: Character }) {
   return (
     <Card title="Identity" className="p-4">
