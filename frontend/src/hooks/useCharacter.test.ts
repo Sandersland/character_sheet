@@ -58,34 +58,6 @@ describe("useCharacter", () => {
     expect(fetchCharacter).not.toHaveBeenCalled();
   });
 
-  // RED: fails against a naive local-state hook (each mount owns its own
-  // state) — the property #1284's cache-write mutations are built on.
-  it("setCharacter is visible to a second consumer of the same id", async () => {
-    const character = makeCharacter();
-    fetchCharacter.mockResolvedValue(character);
-    const first = renderHook(() => useCharacter("c1"));
-    const second = renderHook(() => useCharacter("c1"));
-    await waitFor(() => expect(first.result.current.character).toEqual(character));
-    await waitFor(() => expect(second.result.current.character).toEqual(character));
-
-    const updated = makeCharacter({ name: "Aldric the Bold" });
-    act(() => first.result.current.setCharacter(updated));
-
-    await waitFor(() => expect(second.result.current.character).toEqual(updated));
-  });
-
-  // RED: fails against a naive un-memoised closure — the regression that
-  // would silently re-fire useCombatLifecycle's effect deep in the sheet
-  // (setCharacter is threaded into its deps as onUpdate).
-  it("setCharacter identity is stable across re-renders", async () => {
-    fetchCharacter.mockResolvedValue(makeCharacter());
-    const { result, rerender } = renderHook(() => useCharacter("c1"));
-    await waitFor(() => expect(result.current.character).not.toBeUndefined());
-    const before = result.current.setCharacter;
-    rerender();
-    expect(result.current.setCharacter).toBe(before);
-  });
-
   // RED (new behaviour, deliberate): not expressible against the old hook —
   // it has no refetch. Pins the `isError && data === undefined` guard that
   // stops a transient background-refetch blip from replacing a working sheet

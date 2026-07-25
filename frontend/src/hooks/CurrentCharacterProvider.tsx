@@ -16,9 +16,11 @@
  * cache once a character has loaded).
  */
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useCharacter } from "@/hooks/useCharacter";
+import { characterKeys } from "@/api/queryKeys";
 import type { Character } from "@/types/character";
 
 const CurrentCharacterIdContext = createContext<string | null>(null);
@@ -42,11 +44,22 @@ export function useCurrentCharacter(): CurrentCharacterValue {
   if (id === null) {
     throw new Error("useCurrentCharacter must be used inside <CurrentCharacterProvider>");
   }
-  const { character, setCharacter } = useCharacter(id);
+  const queryClient = useQueryClient();
+  const { character } = useCharacter(id);
   if (character == null) {
     throw new Error(
       "useCurrentCharacter: character is absent — CurrentCharacterProvider must mount only below a loaded guard",
     );
   }
+  // The ONE cache write every mutation's onCharacterWritten funnels through
+  // (#1284 C18 — moved out of useCharacter, which had no other consumer left).
+  // Memoised: threaded into effect deps deep in the sheet, where a new
+  // identity per render would re-fire them.
+  const setCharacter = useCallback(
+    (next: Character) => {
+      queryClient.setQueryData(characterKeys.detail(id), next);
+    },
+    [queryClient, id],
+  );
   return { character, setCharacter };
 }

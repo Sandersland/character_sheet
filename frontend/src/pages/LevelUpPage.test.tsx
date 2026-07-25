@@ -28,7 +28,7 @@ function renderPage() {
 }
 
 function stub(character: Character | null | undefined, error = false) {
-  useCharacterMock.mockReturnValue({ character, error, setCharacter: vi.fn() });
+  useCharacterMock.mockReturnValue({ character, error });
 }
 
 beforeEach(() => {
