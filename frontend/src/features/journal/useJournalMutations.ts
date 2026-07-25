@@ -3,35 +3,37 @@
 // updated Character flowing out through onUpdate. Callers keep their own UI state
 // (which row is editing/confirming) and clear it on a truthy result.
 
-import { useState } from "react";
-
 import { createJournalEntry, deleteJournalEntry, updateJournalEntry } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character } from "@/types/character";
 
+// Generic thunk runner — mirrors useClassTransactions' run(send) shape: the
+// mutationFn just invokes whichever thunk a call site passes, so create/
+// update/remove all share one scoped mutation instead of three.
 export function useJournalMutations(
   characterId: string,
   onUpdate: (character: Character) => void,
 ) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const mutation = useCharacterMutation<() => Promise<Character>, Character>({
+    characterId,
+    mutationFn: (action) => action(),
+    toCharacter: (c) => c,
+    fallbackMessage: "Something went wrong.",
+    onCharacterWritten: onUpdate,
+  });
 
   async function run(action: () => Promise<Character>): Promise<boolean> {
-    setBusy(true);
-    setError(null);
     try {
-      onUpdate(await action());
+      await mutation.mutateAsync(action);
       return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } catch {
       return false;
-    } finally {
-      setBusy(false);
     }
   }
 
   return {
-    busy,
-    error,
+    busy: mutation.isPending,
+    error: mutation.error,
     create: (input: Parameters<typeof createJournalEntry>[1]) =>
       run(() => createJournalEntry(characterId, input)),
     update: (entryId: string, patch: Parameters<typeof updateJournalEntry>[2]) =>
