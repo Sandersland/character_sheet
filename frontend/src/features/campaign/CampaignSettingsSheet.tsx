@@ -7,7 +7,6 @@ import type { Character } from "@/types/character";
 
 interface CampaignSettingsSheetProps {
   character: Character;
-  onUpdate: (c: Character) => void;
   onClose: () => void;
 }
 
@@ -20,7 +19,6 @@ interface CampaignSettingsSheetProps {
  */
 export default function CampaignSettingsSheet({
   character,
-  onUpdate,
   onClose,
 }: CampaignSettingsSheetProps) {
   const [campaignName, setCampaignName] = useState<string | null>(null);
@@ -53,7 +51,7 @@ export default function CampaignSettingsSheet({
       )}
       {/* Fields carry their own row dividers; the border just groups them. */}
       <div className="overflow-hidden rounded-card border border-parchment-200 bg-parchment-50">
-        <CampaignPreferencesFields character={character} onUpdate={onUpdate} />
+        <CampaignPreferencesFields character={character} />
       </div>
     </BottomSheet>
   );

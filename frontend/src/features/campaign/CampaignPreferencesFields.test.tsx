@@ -1,9 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { updateCampaignPreferences } from "@/api/client";
 import CampaignPreferencesFields from "@/features/campaign/CampaignPreferencesFields";
-import { cachedCharacter } from "@/test/renderWithCharacter";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({ updateCampaignPreferences: vi.fn() }));
@@ -17,17 +17,17 @@ function makeCharacter(over: Partial<Character> = {}): Character {
 }
 
 describe("CampaignPreferencesFields", () => {
-  // GENUINE RED (plan §0/§2/§9.4): today this calls updateCampaignPreferences()
-  // directly and only forwards the result via `onUpdate` — nothing writes the
-  // character query cache, so a toggle here would silently not reach any sibling
-  // reading useCurrentCharacter() until a full reload.
+  // Was GENUINE RED pre-#1284 C2 (plan §0/§2/§9.4): this used to call
+  // updateCampaignPreferences() directly and only forward the result via a
+  // since-deleted `onUpdate` prop — nothing wrote the character query cache.
+  // Now routed through useCharacterMutation + useCurrentCharacter().setCharacter.
   it("reaches the character cache after a preference toggle", async () => {
     const updated = makeCharacter({
       campaignPreferences: { shareWithDm: true, autoFriendlyHealing: false },
     });
     vi.mocked(updateCampaignPreferences).mockResolvedValue(updated);
 
-    render(<CampaignPreferencesFields character={makeCharacter()} onUpdate={vi.fn()} />);
+    renderWithCharacter(<CampaignPreferencesFields character={makeCharacter()} />, makeCharacter());
 
     screen.getByLabelText(/share sheet with dm/i).click();
 

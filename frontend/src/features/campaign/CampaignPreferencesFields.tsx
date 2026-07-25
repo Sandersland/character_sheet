@@ -1,10 +1,10 @@
 import { updateCampaignPreferences } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { CampaignPreferences, Character } from "@/types/character";
 
 interface CampaignPreferencesFieldsProps {
   character: Character;
-  onUpdate: (c: Character) => void;
 }
 
 // One labeled toggle row. Container + read/write wiring only — the underlying
@@ -42,8 +42,8 @@ function ToggleRow({ label, hint, checked, disabled, onChange }: ToggleRowProps)
 // prefs and writes each flag through the API client helper.
 export default function CampaignPreferencesFields({
   character,
-  onUpdate,
 }: CampaignPreferencesFieldsProps) {
+  const { setCharacter } = useCurrentCharacter();
   const prefs: CampaignPreferences = character.campaignPreferences ?? {
     shareWithDm: false,
     autoFriendlyHealing: false,
@@ -54,7 +54,7 @@ export default function CampaignPreferencesFields({
     mutationFn: (patch: Partial<CampaignPreferences>) => updateCampaignPreferences(character.id, patch),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to update preferences",
-    onCharacterWritten: onUpdate,
+    onCharacterWritten: setCharacter,
   });
   const saving = mutation.isPending;
   const error = mutation.error;
