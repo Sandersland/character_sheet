@@ -12,6 +12,7 @@ import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-cd-cast";
@@ -131,6 +132,45 @@ describe("Channel Divinity cast endpoint", () => {
     expect(cd.data).toMatchObject({ abilityName: "Channel Divinity: Turn Undead", saveDc: 13, kind: "announce" });
     expect(cd.summary).toMatch(/DC 13/);
     expect(events.some((e) => e.type === "spendResource")).toBe(true);
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one Turn Undead channel", async () => {
+    await createCharacter(XP_L2, "cleric", null);
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
+    expect(res.status).toBe(200);
+
+    const noResourcesUsed = {
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+    };
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "resources",
+        type: "castChannelDivinity",
+        summary: "Channeled Turn Undead (DC 13)",
+        before: null,
+        after: null,
+        data: {
+          abilityId: optionId["Channel Divinity: Turn Undead"],
+          abilityName: "Channel Divinity: Turn Undead",
+          kind: "announce",
+          saveAbility: "wisdom",
+          saveDc: 13,
+          reminder: "Targets make a wisdom save (DC 13) or are turned/affected for 1 minute.",
+        },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 1 Channel Divinity — 0/1 remaining",
+        before: noResourcesUsed,
+        after: { resources: { ...noResourcesUsed.resources, used: { channelDivinity: 1 } } },
+        data: { key: "channelDivinity", amount: 1, remaining: 0, roll: null },
+      },
+    ]);
   });
 
   it("Paladin Devotion Sacred Weapon applies a real attackRoll buff (max(1,Cha) = +3) and revert clears it", async () => {

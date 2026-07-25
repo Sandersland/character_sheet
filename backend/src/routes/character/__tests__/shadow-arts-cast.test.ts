@@ -13,6 +13,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { shadowArtEffectSpec, SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-shadow-cast";
@@ -185,6 +186,54 @@ describe("Shadow Arts cast endpoint", () => {
     expect(castEvent!.before).toBeNull();
     expect(castEvent!.after).toBeNull();
     expect(castEvent!.data).toEqual({ shadowArtId: darknessId, focusSpent: 1 });
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged. Widens the #642 oracle above to the spendResource event.
+  it("pins the audit trail of one Shadow Arts cast (incl. the focus spend)", async () => {
+    await createMonk(XP_L3, "warrior of shadow");
+    const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    expect(res.status).toBe(200);
+    const noResourcesUsed = {
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+    };
+    const noSpellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null };
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "resources",
+        type: "castShadowArt",
+        summary: "Cast Shadow Arts: Darkness (Spent 1 Focus Points — 2/3 remaining)",
+        before: null,
+        after: null,
+        data: { shadowArtId: darknessId, focusSpent: 1 },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 1 Focus Points — 2/3 remaining",
+        before: noResourcesUsed,
+        after: { resources: { ...noResourcesUsed.resources, used: { focus: 1 } } },
+        data: { key: "focus", amount: 1, remaining: 2, roll: null },
+      },
+      {
+        category: "spellcasting",
+        type: "castShadowArt",
+        summary: "Concentrating on Shadow Arts: Darkness",
+        before: { spellcasting: noSpellcasting },
+        after: {
+          spellcasting: {
+            ...noSpellcasting,
+            concentratingOn: {
+              entryId: `${SHADOW_ART_CONCENTRATION_PREFIX}${darknessId}`,
+              spellName: "Shadow Arts: Darkness",
+            },
+          },
+        },
+        data: { shadowArtId: darknessId, shadowArtName: "Shadow Arts: Darkness" },
+      },
+    ]);
   });
 
   it("logs an undoable cast: revert refunds focus and restores concentration to null", async () => {

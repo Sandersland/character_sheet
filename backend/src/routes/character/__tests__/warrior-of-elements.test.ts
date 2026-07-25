@@ -13,6 +13,7 @@ import { createApp } from "@/app.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ELEMENTAL_ATTUNEMENT_BUFF_KEY } from "@/lib/classes/warrior-of-elements.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-warrior-of-elements";
@@ -120,6 +121,50 @@ describe("POST /api/characters/:id/elements/transactions", () => {
     expect(off.status).toBe(200);
     expect(off.body.results[0].active).toBe(false);
     expect((await activeBuffs()).some((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY)).toBe(false);
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one Elemental Attunement toggle", async () => {
+    await createMonk(17, "Warrior of the Elements");
+    const res = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
+    expect(res.status).toBe(200);
+
+    const noResourcesUsed = {
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+    };
+    const buff = {
+      id: expect.any(String), key: ELEMENTAL_ATTUNEMENT_BUFF_KEY, source: "Elemental Attunement",
+      target: "elementalAttunement", modifier: 0, duration: "while-active",
+    };
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "effects",
+        type: "buffApplied",
+        summary: "Elemental Attunement: +0 to elementalAttunement",
+        before: { activeEffects: { buffs: [] } },
+        after: { activeEffects: { buffs: [buff] } },
+        data: { key: "elementalAttunement", target: "elementalAttunement", modifier: 0, sourceEntryId: null },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 1 Focus Points — 16/17 remaining",
+        before: noResourcesUsed,
+        after: { resources: { ...noResourcesUsed.resources, used: { focus: 1 } } },
+        data: { key: "focus", amount: 1, remaining: 16, roll: null },
+      },
+      {
+        category: "resources",
+        type: "toggleElementalAttunement",
+        summary: "Elemental Attunement — imbued with elemental energy for 10 minutes (or until Incapacitated).",
+        before: null,
+        after: null,
+        data: { active: true },
+      },
+    ]);
   });
 
   it("cannot activate Elemental Attunement twice", async () => {

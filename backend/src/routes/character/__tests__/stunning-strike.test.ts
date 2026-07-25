@@ -11,6 +11,7 @@ import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-stunning-strike";
@@ -86,6 +87,39 @@ describe("POST /api/characters/:id/stunning-strike/transactions", () => {
     // Focus was actually spent — the resource pool reflects it.
     const focusPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focusPool.remaining).toBe(4); // 5 total − 1 spent
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one Stunning Strike attempt", async () => {
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(res.status).toBe(200);
+    const { roll, outcome, summary } = res.body.results[0];
+    const noResourcesUsed = {
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+    };
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "resources",
+        type: "castStunningStrike",
+        summary,
+        before: null,
+        after: null,
+        data: { dc: 14, roll, outcome },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 1 Focus Points — 4/5 remaining",
+        before: noResourcesUsed,
+        after: { resources: { ...noResourcesUsed.resources, used: { focus: 1 } } },
+        data: { key: "focus", amount: 1, remaining: 4, roll: null },
+      },
+    ]);
   });
 
   it("the once-per-turn guard rejects a second attempt in the same turn", async () => {

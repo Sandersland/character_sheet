@@ -11,6 +11,7 @@ import supertest from "supertest";
 import { createApp } from "@/app.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-quivering-palm";
@@ -78,6 +79,49 @@ describe("POST /api/characters/:id/quivering-palm/transactions", () => {
     const focusPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focusPool.remaining).toBe(13); // 17 total − 4 spent
     expect(res.body.character.quiveringPalm).toEqual({ dc: 17, active: true });
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one setQuiveringPalm", async () => {
+    const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
+    expect(res.status).toBe(200);
+
+    const noResourcesUsed = {
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+    };
+    const buff = {
+      id: expect.any(String), key: "quiveringPalm", source: "Quivering Palm",
+      target: "quiveringPalm", modifier: 0, duration: "while-active",
+    };
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "effects",
+        type: "buffApplied",
+        summary: "Quivering Palm: +0 to quiveringPalm",
+        before: { activeEffects: { buffs: [] } },
+        after: { activeEffects: { buffs: [buff] } },
+        data: { key: "quiveringPalm", target: "quiveringPalm", modifier: 0, sourceEntryId: null },
+      },
+      {
+        category: "resources",
+        type: "setQuiveringPalm",
+        summary: "Quivering Palm — set imperceptible vibrations (lasts 17 days unless triggered or ended).",
+        before: null,
+        after: null,
+        data: { daysRemaining: 17 },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 4 Focus Points — 13/17 remaining",
+        before: noResourcesUsed,
+        after: { resources: { ...noResourcesUsed.resources, used: { focus: 4 } } },
+        data: { key: "focus", amount: 4, remaining: 13, roll: null },
+      },
+    ]);
   });
 
   it("cannot set again while already active ('only one creature at a time')", async () => {

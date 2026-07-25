@@ -14,6 +14,7 @@ import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-hand-of-harm";
@@ -86,6 +87,39 @@ describe("POST /api/characters/:id/hand-of-harm/transactions", () => {
 
     const focusPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focusPool.remaining).toBe(2); // 3 total − 1 spent
+  });
+
+  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
+  // the shared ability endpoint, so a green run afterwards is evidence the audit
+  // trail is unchanged.
+  it("pins the audit trail of one Hand of Harm hit", async () => {
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "dealHandOfHarm", usedThisTurn: false, roll: 7 }] });
+    expect(res.status).toBe(200);
+
+    const noResourcesUsed = {
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+    };
+
+    expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
+      {
+        category: "resources",
+        type: "dealHandOfHarm",
+        summary: "Hand of Harm — 7 necrotic damage.",
+        before: null,
+        after: null,
+        data: { necroticDamage: 7, poisoned: false, freeFromFlurry: false },
+      },
+      {
+        category: "resources",
+        type: "spendResource",
+        summary: "Spent 1 Focus Points — 2/3 remaining",
+        before: noResourcesUsed,
+        after: { resources: { ...noResourcesUsed.resources, used: { focus: 1 } } },
+        data: { key: "focus", amount: 1, remaining: 2, roll: null },
+      },
+    ]);
   });
 
   it("the once-per-turn guard rejects a second hit in the same turn", async () => {
