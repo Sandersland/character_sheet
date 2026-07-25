@@ -1,10 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchLevelUpPlan, submitLevelUp } from "@/api/client";
 import LevelUpCeremony from "@/features/level-up/LevelUpCeremony";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, LevelUpPlanResponse } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -36,14 +37,17 @@ const plan: LevelUpPlanResponse = {
   grantedSpells: [],
 };
 
+// LevelUpCeremony reads useCurrentCharacter(), so every render seeds the
+// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderCeremony() {
-  return render(
+  return renderWithCharacter(
     <MemoryRouter initialEntries={["/characters/c1/level-up"]}>
       <Routes>
-        <Route path="/characters/:id/level-up" element={<LevelUpCeremony character={character} />} />
+        <Route path="/characters/:id/level-up" element={<LevelUpCeremony />} />
         <Route path="/characters/:id" element={<div>SHEET</div>} />
       </Routes>
     </MemoryRouter>,
+    character,
   );
 }
 

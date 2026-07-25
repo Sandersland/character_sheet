@@ -132,7 +132,7 @@ function CharacterSheetWorkspace({
 
         {/* Armed level-up entry (#892): pinned under the header on every tab,
             above the mobile scroller so it can't scroll away. */}
-        <LevelUpBanner character={character} />
+        <LevelUpBanner />
 
         {/* Desktop: session doorway for non-joined states, pinned under the
             header; absent on the Combat tab and while joined (#1085). */}

@@ -4,11 +4,19 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import LevelUpPage from "@/pages/LevelUpPage";
 import { useCharacter } from "@/hooks/useCharacter";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 vi.mock("@/hooks/useCharacter", () => ({ useCharacter: vi.fn() }));
+// LevelUpCeremony now reads useCurrentCharacter() itself (#1284) rather than
+// taking a character prop, so the stub does the same — it still exercises
+// LevelUpPage's own CurrentCharacterProvider mount, backed by the mocked
+// useCharacter above.
 vi.mock("@/features/level-up/LevelUpCeremony", () => ({
-  default: ({ character }: { character: Character }) => <div>CEREMONY:{character.id}</div>,
+  default: function StubLevelUpCeremony() {
+    const { character } = useCurrentCharacter();
+    return <div>CEREMONY:{character.id}</div>;
+  },
 }));
 vi.mock("@/features/character-meta/CharacterLoadError", () => ({
   default: ({ variant }: { variant: string }) => <div>LOAD-ERROR:{variant}</div>,
