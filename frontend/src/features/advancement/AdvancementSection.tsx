@@ -11,15 +11,12 @@
  */
 
 import { applyAdvancementTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { abilityAbbr } from "@/lib/abilities";
 import { entryDetail } from "@/lib/advancement";
-import type { AdvancementEntry, AdvancementOperation, Character } from "@/types/character";
+import type { AdvancementEntry, AdvancementOperation } from "@/types/character";
 import AdvancementPanel from "@/features/advancement/AdvancementPanel";
-
-interface Props {
-  character: Character;
-}
 
 /** Pretty-print a single AdvancementEntry for the list view. */
 function entryLabel(entry: AdvancementEntry): string {
@@ -32,7 +29,8 @@ function entryLabel(entry: AdvancementEntry): string {
     .join(", ");
 }
 
-export default function AdvancementSection({ character }: Props) {
+export default function AdvancementSection() {
+  const { character } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: AdvancementOperation[]) => applyAdvancementTransactions(character.id, ops),

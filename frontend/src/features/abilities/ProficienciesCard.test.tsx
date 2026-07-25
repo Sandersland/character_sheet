@@ -36,10 +36,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 }
 
 function renderCard(character: Character = makeCharacter()) {
-  return renderWithCharacter(
-    <ProficienciesCard character={character} artisanTools={[]} />,
-    character,
-  );
+  return renderWithCharacter(<ProficienciesCard artisanTools={[]} />, character);
 }
 
 describe("ProficienciesCard", () => {

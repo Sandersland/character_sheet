@@ -24,7 +24,7 @@ function makeCharacter(): Character {
 // ExperienceTracker reads useCurrentCharacter(), so every render seeds the
 // cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
-  return renderWithCharacter(<ExperienceTracker character={character} />, character);
+  return renderWithCharacter(<ExperienceTracker />, character);
 }
 
 beforeEach(() => {

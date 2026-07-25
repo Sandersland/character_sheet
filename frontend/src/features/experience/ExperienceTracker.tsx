@@ -2,14 +2,11 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { applyExperienceOperations } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character, ExperienceOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
 import MeterBar from "@/components/ui/MeterBar";
-
-interface ExperienceTrackerProps {
-  character: Character;
-}
 
 type ApplyXp = (op: ExperienceOperation) => Promise<Character | null>;
 
@@ -36,7 +33,8 @@ function useExperienceActions(character: Character) {
   return { pending: mutation.isPending, error: Boolean(mutation.error), apply };
 }
 
-export default function ExperienceTracker({ character }: ExperienceTrackerProps) {
+export default function ExperienceTracker() {
+  const { character } = useCurrentCharacter();
   const { pending, error, apply } = useExperienceActions(character);
 
   return (
@@ -49,7 +47,7 @@ export default function ExperienceTracker({ character }: ExperienceTrackerProps)
       }
     >
       <div className="flex flex-col gap-3 p-4">
-        <ExperienceMeter character={character} />
+        <ExperienceMeter />
         <AwardXpForm pending={pending} apply={apply} />
         <SetExactTotalRow
           pending={pending}
@@ -66,7 +64,8 @@ export default function ExperienceTracker({ character }: ExperienceTrackerProps)
   );
 }
 
-function ExperienceMeter({ character }: { character: Character }) {
+function ExperienceMeter() {
+  const { character } = useCurrentCharacter();
   const { experiencePoints, currentLevelThreshold, nextLevelThreshold, level } = character;
   const isMaxed = nextLevelThreshold === null;
   const span = isMaxed ? 1 : nextLevelThreshold - currentLevelThreshold;
