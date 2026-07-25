@@ -13,7 +13,7 @@ vi.mock("@/features/character-meta/panels/MagicPanel", () => ({ default: () => n
 vi.mock("@/features/character-meta/panels/StoryPanel", () => ({ default: () => null }));
 
 const character = { id: "c1", spellcasting: undefined } as unknown as Character;
-const props = { character, reference: null, onUpdate: vi.fn() };
+const props = { character, reference: null };
 
 describe("CharacterSheetBody combat slot (#960)", () => {
   it("renders the static CombatPanel on Combat when there is no live panel", () => {

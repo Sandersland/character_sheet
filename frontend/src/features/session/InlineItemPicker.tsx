@@ -2,7 +2,7 @@
  * InlineItemPicker — inline consumable-item list for the TurnHub's item resolution.
  *
  * Lists consumable inventory items. On Use: rolls heal dice if present, sends
- * applyActionTransactions with the roll total, and calls onUpdate + onClose.
+ * applyActionTransactions with the roll total, and calls onCommit + onClose.
  */
 
 import { applyActionTransactions } from "@/api/client";
@@ -12,7 +12,6 @@ import type { Character } from "@/types/character";
 
 interface InlineItemPickerProps {
   character: Character;
-  onUpdate: (c: Character) => void;
   /** Commit the action slot once an item is used (#765) — tag the batch for undo. */
   onCommit: (batchId?: string) => void;
   onClose: () => void;
@@ -20,7 +19,6 @@ interface InlineItemPickerProps {
 
 export default function InlineItemPicker({
   character,
-  onUpdate,
   onCommit,
   onClose,
 }: InlineItemPickerProps) {
@@ -32,7 +30,6 @@ export default function InlineItemPicker({
       return c;
     },
     fallbackMessage: "Failed to use item.",
-    onCharacterWritten: onUpdate,
   });
 
   const consumables = character.inventory.filter((i) => i.category === "consumable");

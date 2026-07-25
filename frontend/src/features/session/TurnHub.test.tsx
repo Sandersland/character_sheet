@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import TurnHub from "@/features/session/TurnHub";
@@ -18,6 +18,7 @@ import {
   rollInitiativeTransaction,
 } from "@/api/client";
 import { axe } from "@/test/axe";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -76,12 +77,10 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 
 function Harness({
   character,
-  onUpdate,
   onLogChanged,
   onOpenLog,
 }: {
   character: Character;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   onOpenLog?: () => void;
 }) {
@@ -91,7 +90,6 @@ function Harness({
       character={character}
       sessionId="sess-1"
       turnState={turnState}
-      onUpdate={onUpdate}
       onLogChanged={onLogChanged}
       allies={[]}
       onOpenLog={onOpenLog}
@@ -100,14 +98,14 @@ function Harness({
 }
 
 function renderHub(character: Character = makeCharacter(), onOpenLog?: () => void) {
-  const onUpdate = vi.fn();
   const onLogChanged = vi.fn();
-  const result = render(
+  const result = renderWithCharacter(
     <RollProvider>
-      <Harness character={character} onUpdate={onUpdate} onLogChanged={onLogChanged} onOpenLog={onOpenLog} />
+      <Harness character={character} onLogChanged={onLogChanged} onOpenLog={onOpenLog} />
     </RollProvider>,
+    character,
   );
-  return { ...result, onUpdate, onLogChanged };
+  return { ...result, onLogChanged };
 }
 
 // Drive the hub from "Not in Combat" through to an active turn.

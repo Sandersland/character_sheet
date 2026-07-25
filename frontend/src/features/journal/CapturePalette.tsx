@@ -22,7 +22,6 @@ interface CapturePaletteProps {
   /** Live session, when known: the dock header shows its title + elapsed time. */
   session?: Session | null;
   onClose: () => void;
-  onUpdate: (character: Character) => void;
 }
 
 export default function CapturePalette({
@@ -30,12 +29,11 @@ export default function CapturePalette({
   sessionId,
   session,
   onClose,
-  onUpdate,
 }: CapturePaletteProps) {
   const composerRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useIsBelowMd();
   const { byId } = useCampaignEntities(character.campaignId);
-  const { busy, error, create, update, remove } = useJournalMutations(character.id, onUpdate);
+  const { busy, error, create, update, remove } = useJournalMutations(character.id);
 
   // The NOTE feed: newest-first, scoped to the active session when one is given.
   const notes = character.journal

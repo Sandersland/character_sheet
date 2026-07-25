@@ -1,7 +1,7 @@
 // Shared journal CRUD state machine for the journal-page surfaces (ManuscriptPage,
-// CapturePalette): one busy/error pair around the plain-REST client calls, with the
-// updated Character flowing out through onUpdate. Callers keep their own UI state
-// (which row is editing/confirming) and clear it on a truthy result.
+// CapturePalette): one busy/error pair around the plain-REST client calls, writing
+// the updated Character into the character query cache. Callers keep their own UI
+// state (which row is editing/confirming) and clear it on a truthy result.
 
 import { createJournalEntry, deleteJournalEntry, updateJournalEntry } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
@@ -10,16 +10,12 @@ import type { Character } from "@/types/character";
 // Generic thunk runner — mirrors useClassTransactions' run(send) shape: the
 // mutationFn just invokes whichever thunk a call site passes, so create/
 // update/remove all share one scoped mutation instead of three.
-export function useJournalMutations(
-  characterId: string,
-  onUpdate: (character: Character) => void,
-) {
+export function useJournalMutations(characterId: string) {
   const mutation = useCharacterMutation<() => Promise<Character>, Character>({
     characterId,
     mutationFn: (action) => action(),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: onUpdate,
   });
 
   async function run(action: () => Promise<Character>): Promise<boolean> {

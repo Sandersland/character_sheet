@@ -29,7 +29,6 @@ interface InlineSpellAttackSectionProps {
   character: Character;
   sessionId: string;
   turnState: TurnState & TurnStateActions;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
 }
 
@@ -44,7 +43,6 @@ export default function InlineSpellAttackSection({
   character,
   sessionId,
   turnState,
-  onUpdate,
   onLogChanged,
 }: InlineSpellAttackSectionProps) {
   const { roll } = useRoll();
@@ -61,7 +59,6 @@ export default function InlineSpellAttackSection({
       applySpellcastingTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Cast failed — try again.",
-    onCharacterWritten: onUpdate,
   });
 
   const cantrips = (character.spellcasting?.spells ?? []).filter(isAttackCantrip);

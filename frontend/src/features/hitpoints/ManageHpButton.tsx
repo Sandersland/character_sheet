@@ -6,7 +6,6 @@ import type { Character } from "@/types/character";
 
 interface Props {
   character: Character;
-  onUpdate: (character: Character) => void;
   /** Styling for the trigger button — the host supplies its own chip/tile shell. */
   className?: string;
   /** The visual readout rendered inside the trigger (HP value, meter, etc.). */
@@ -22,7 +21,7 @@ interface Props {
  * it during play. The sheet stays open after an apply, so a player can chain
  * damage/heal without re-opening it.
  */
-export default function ManageHpButton({ character, onUpdate, className, children }: Props) {
+export default function ManageHpButton({ character, className, children }: Props) {
   const [open, setOpen] = useState(false);
 
   // Dynamic accessible name so a screen-reader user hears the HP numbers, not
@@ -45,7 +44,7 @@ export default function ManageHpButton({ character, onUpdate, className, childre
 
       {open && (
         <BottomSheet title="Hit Points" onClose={() => setOpen(false)}>
-          <HpSheetBody character={character} onUpdate={onUpdate} />
+          <HpSheetBody character={character} />
         </BottomSheet>
       )}
     </>

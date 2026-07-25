@@ -21,7 +21,6 @@ interface ManuscriptPageProps {
   character: Character;
   chapter: ChronicleChapter;
   entities: Map<string, CampaignEntity>;
-  onUpdate: (character: Character) => void;
   /** True when this character participates in the session (may rename the chapter). */
   canRename: boolean;
   /** Persist a new chapter title (PATCH session); resolves true on success. */
@@ -52,11 +51,10 @@ export default function ManuscriptPage({
   character,
   chapter,
   entities,
-  onUpdate,
   canRename,
   onRename,
 }: ManuscriptPageProps) {
-  const { busy, error, create, update, remove } = useJournalMutations(character.id, onUpdate);
+  const { busy, error, create, update, remove } = useJournalMutations(character.id);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [entryPanelOpen, setEntryPanelOpen] = useState(false);

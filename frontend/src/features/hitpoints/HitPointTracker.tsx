@@ -14,15 +14,14 @@ import { useRestActions } from "@/features/hitpoints/useRestActions";
 
 interface HitPointTrackerProps {
   character: Character;
-  onUpdate: (character: Character) => void;
 }
 
-export default function HitPointTracker({ character, onUpdate }: HitPointTrackerProps) {
+export default function HitPointTracker({ character }: HitPointTrackerProps) {
   const { hitPoints, hitDice } = character;
 
   // Shared HP-apply engine, death-save controls (#736), and rest actions.
-  const hp = useHitPointApply(character, onUpdate);
-  const deathSaveCtl = useDeathSaves(character, onUpdate);
+  const hp = useHitPointApply(character);
+  const deathSaveCtl = useDeathSaves(character);
   const rest = useRestActions(character, hp.submit);
 
   return (

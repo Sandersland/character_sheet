@@ -8,7 +8,6 @@ import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
 
 interface HpSheetBodyProps {
   character: Character;
-  onUpdate: (character: Character) => void;
 }
 
 /**
@@ -16,8 +15,8 @@ interface HpSheetBodyProps {
  * plus concentration surfacing, both wired through useHitPointApply so damage,
  * heal, temp HP, and concentration checks behave identically to the Rest tab.
  */
-export default function HpSheetBody({ character, onUpdate }: HpSheetBodyProps) {
-  const hp = useHitPointApply(character, onUpdate);
+export default function HpSheetBody({ character }: HpSheetBodyProps) {
+  const hp = useHitPointApply(character);
   const resistedTypes = [...activeResistedDamageTypes(character.activeEffects?.buffs ?? [])];
 
   return (

@@ -14,7 +14,6 @@ import type { Character } from "@/types/character";
 
 export function useManeuverActions(
   character: Character,
-  onUpdate: (c: Character) => void,
   {
     consumeReaction,
     closeReactionMenu,
@@ -27,7 +26,7 @@ export function useManeuverActions(
     setEffectMessage: (message: string) => void;
   },
 ) {
-  const { pool: superiorityPool, dieLabel, busy: dieBusy, spend: spendDie } = useManeuverDie(character, onUpdate);
+  const { pool: superiorityPool, dieLabel, busy: dieBusy, spend: spendDie } = useManeuverDie(character);
   const [maneuverError, setManeuverError] = useState<string | null>(null);
   const superiorityRemaining = superiorityPool?.remaining ?? 0;
 

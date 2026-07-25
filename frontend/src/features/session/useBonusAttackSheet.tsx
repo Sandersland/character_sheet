@@ -132,7 +132,6 @@ function useBonusAttackRoll({
 interface UseBonusAttackSheetArgs extends UseBonusAttackRollArgs {
   /** Whether Roll to hit should be disabled — each caller defines its own "spent" rule. */
   attacksExhausted: boolean;
-  onUpdate: (c: Character) => void;
 }
 
 export function useBonusAttackSheet({
@@ -142,12 +141,11 @@ export function useBonusAttackSheet({
   entry,
   recordAttack,
   attacksExhausted,
-  onUpdate,
   onLogChanged,
   manualMode,
   onFirstStrike,
 }: UseBonusAttackSheetArgs) {
-  const die = useManeuverDie(character, onUpdate);
+  const die = useManeuverDie(character);
   const roll = useBonusAttackRoll({
     character,
     turnState,
@@ -174,7 +172,6 @@ export function useBonusAttackSheet({
       view={roll.boundView}
       attacksExhausted={attacksExhausted}
       die={die}
-      onUpdate={onUpdate}
     />
   );
 

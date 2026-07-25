@@ -39,7 +39,6 @@ interface InlineOffHandPickerProps {
   onClose: () => void;
   /** Back out before rolling — refunds the bonus action and reopens the menu. */
   onCancel: () => void;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   /** "twf" (default): the off-hand weapon swing. "unarmed": Martial Arts'
    *  Bonus Unarmed Strike (#1218) — same shell, locked to the Unarmed Strike
@@ -53,7 +52,6 @@ export default function InlineOffHandPicker({
   sessionId,
   onClose,
   onCancel,
-  onUpdate,
   onLogChanged,
   variant = "twf",
 }: InlineOffHandPickerProps) {
@@ -83,7 +81,6 @@ export default function InlineOffHandPicker({
     entry,
     recordAttack: turnState.recordTwfAttack,
     attacksExhausted: rolled,
-    onUpdate,
     onLogChanged,
   });
 

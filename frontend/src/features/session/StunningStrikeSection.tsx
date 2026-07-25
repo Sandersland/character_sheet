@@ -29,7 +29,6 @@ function useStunningStrikeAttempt(
   character: Character,
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
-  onUpdate: (c: Character) => void,
 ) {
   const [result, setResult] = useState<StunningStrikeAttemptResult | null>(null);
   const used = turnState.stunningStrikeUsedThisTurn;
@@ -39,7 +38,6 @@ function useStunningStrikeAttempt(
     mutationFn: (usedThisTurn: boolean) => attemptStunningStrikeTransaction(character.id, usedThisTurn),
     toCharacter: (r) => r.character,
     fallbackMessage: "Failed to attempt Stunning Strike",
-    onCharacterWritten: (r) => onUpdate(r.character),
   });
   const canAttempt = !used && !mutation.isPending && currentRow !== null;
 
@@ -61,21 +59,18 @@ interface StunningStrikeSectionProps {
   turnState: TurnState & TurnStateActions;
   /** The bound hit row this attempt is riding on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function StunningStrikeSection({
   character,
   turnState,
   currentRow,
-  onUpdate,
 }: StunningStrikeSectionProps) {
   const { stunningStrike } = character;
   const { used, canAttempt, result, handleAttempt } = useStunningStrikeAttempt(
     character,
     turnState,
     currentRow,
-    onUpdate,
   );
 
   // Only monks (L5+) have Stunning Strike; nothing to attempt until a hit lands.

@@ -18,7 +18,7 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
  * characters. Saving throws stay inside AbilityScoresPanel; full slot/spell
  * management is on Magic.
  */
-export default function OverviewPanel({ character, reference, onUpdate }: SheetPanelProps) {
+export default function OverviewPanel({ character, reference }: SheetPanelProps) {
   return (
     <div className="flex flex-col gap-6">
       {/* Prof/Speed/Init left the compact header (#1026); on phones they sit
@@ -43,14 +43,13 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
               <ProficienciesCard
                 character={character}
                 artisanTools={reference?.artisanTools ?? []}
-                onUpdate={onUpdate}
               />
             </Card>
           )}
         </div>
 
         <div className="flex flex-col gap-6">
-          <ExperienceTracker character={character} onUpdate={onUpdate} />
+          <ExperienceTracker character={character} />
 
           {character.spellcasting && (
             <Card title="Spell Slots" className="p-4">
@@ -62,7 +61,7 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
             // #advancement-card anchor is load-bearing: HpNotices deep-links here.
             <div id="advancement-card">
               <Card title="Advancements" className="p-4">
-                <AdvancementSection character={character} onUpdate={onUpdate} />
+                <AdvancementSection character={character} />
               </Card>
             </div>
           )}

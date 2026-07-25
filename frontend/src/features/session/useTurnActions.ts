@@ -37,13 +37,11 @@ export function useTurnActions({
   character,
   sessionId,
   turnState,
-  onUpdate,
   onLogChanged,
 }: {
   character: Character;
   sessionId: string;
   turnState: TurnState & TurnStateActions;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
 }) {
   const {
@@ -76,7 +74,7 @@ export function useTurnActions({
   const { activeResolution, openResolution, closeResolution } = useActiveResolution();
   // Mid-turn weapon change (#815) — hoisted here so both the resolution sheet
   // and the persistent under-slot Refund strip read one committed-swap state.
-  const loadoutSwap = useLoadoutSwap(character, turnState, onUpdate);
+  const loadoutSwap = useLoadoutSwap(character, turnState);
 
   const {
     busy,
@@ -86,7 +84,7 @@ export function useTurnActions({
     undoBatch,
     spendActionSurge,
     rollInitiative,
-  } = useTurnActionMutations(character.id, onUpdate);
+  } = useTurnActionMutations(character.id);
   // reactionMessage: last reaction result; effectMessage: effect-maneuver result.
   const [reactionMessage, setReactionMessage] = useState<string | null>(null);
   const [effectMessage, setEffectMessage] = useState<string | null>(null);
@@ -106,7 +104,7 @@ export function useTurnActions({
     resetManeuverError,
     handleReactionManeuver,
     handleEffectManeuver,
-  } = useManeuverActions(character, onUpdate, {
+  } = useManeuverActions(character, {
     consumeReaction,
     closeReactionMenu: () => setShowReactionMenu(false),
     setReactionMessage,

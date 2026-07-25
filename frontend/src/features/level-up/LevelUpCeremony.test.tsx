@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { fetchLevelUpPlan, fetchReference, submitLevelUp } from "@/api/client";
 import LevelUpCeremony from "@/features/level-up/LevelUpCeremony";
 import { axe } from "@/test/axe";
+import { cachedCharacter } from "@/test/renderWithCharacter";
 import type { Character, LevelUpPlanResponse, LevelUpStep, ReferenceData } from "@/types/character";
 
 vi.mock("@/api/client", () => ({ fetchLevelUpPlan: vi.fn(), fetchReference: vi.fn(), submitLevelUp: vi.fn() }));
@@ -31,22 +32,13 @@ function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target
   };
 }
 
-function renderCeremony(over?: {
-  character?: Character;
-  onCharacterChange?: (updated: Character) => void;
-  url?: string;
-}) {
+function renderCeremony(over?: { character?: Character; url?: string }) {
   return render(
     <MemoryRouter initialEntries={[over?.url ?? "/characters/c1/level-up"]}>
       <Routes>
         <Route
           path="/characters/:id/level-up"
-          element={
-            <LevelUpCeremony
-              character={over?.character ?? character}
-              onCharacterChange={over?.onCharacterChange}
-            />
-          }
+          element={<LevelUpCeremony character={over?.character ?? character} />}
         />
         <Route path="/characters/:id" element={<div>SHEET</div>} />
       </Routes>
@@ -273,12 +265,11 @@ describe("LevelUpCeremony — class choice (#1170)", () => {
 // #1170: BG3-style per-level choice — Confirm on a level that leaves more
 // pending offers "Level up again" instead of leaving the ceremony.
 describe("LevelUpCeremony — level up again (#1170)", () => {
-  it("shows the interstitial (not the sheet) when levels remain, and updates the character via onCharacterChange", async () => {
+  it("shows the interstitial (not the sheet) when levels remain, and writes the submitted character to the cache", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
-    const onCharacterChange = vi.fn();
     const user = userEvent.setup();
-    renderCeremony({ onCharacterChange });
+    renderCeremony();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /take average/i }));
@@ -287,7 +278,7 @@ describe("LevelUpCeremony — level up again (#1170)", () => {
 
     expect(await screen.findByText(/level applied/i)).toBeInTheDocument();
     expect(screen.getByText(/one more advancement waiting/i)).toBeInTheDocument();
-    expect(onCharacterChange).toHaveBeenCalledWith({ id: "c1", pendingLevelUps: 1 });
+    expect(cachedCharacter("c1")).toEqual({ id: "c1", pendingLevelUps: 1 });
     expect(screen.queryByText("SHEET")).not.toBeInTheDocument();
   });
 

@@ -12,10 +12,12 @@ export interface UseCharacterMutationOptions<TVars, TResult> {
    *  land in the cached character (#1283 §1). */
   toCharacter: (result: TResult) => Character;
   fallbackMessage: string;
-  /** Fires with the raw TResult after a successful write — the seam for a
-   *  side effect on a DIFFERENT resource than the character cache (e.g.
-   *  useCombatLifecycle's session-log bump), and for callers that still need
-   *  the pre-#1283 `onUpdate(character)` callback invoked (#1284 retires it). */
+  /** Fires with the raw TResult after a successful write — a side-effect seam
+   *  for a DIFFERENT resource than the character cache (e.g. useLevelUpCeremony's
+   *  onSubmitted, which re-triggers the level-again flow). Never use this to
+   *  write the character cache yourself — `onSuccess` already did that with
+   *  `toCharacter`'s narrowed result; a raw `TResult` here still carries shape
+   *  B/C's `results`/`batchId` keys and re-writing it re-pollutes the cache. */
   onCharacterWritten?: (result: TResult) => void;
 }
 

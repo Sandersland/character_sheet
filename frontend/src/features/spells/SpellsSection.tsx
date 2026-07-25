@@ -22,7 +22,6 @@ import { useSpellcasting } from "@/features/spells/useSpellcasting";
 
 interface SpellsSectionProps {
   character: Character;
-  onUpdate: (character: Character) => void;
   /** A live session is active — the Cast door defers to the Combat tab (#1162). */
   isLive?: boolean;
   onGoToCombat?: () => void;
@@ -30,7 +29,6 @@ interface SpellsSectionProps {
 
 export default function SpellsSection({
   character,
-  onUpdate,
   isLive = false,
   onGoToCombat = () => {},
 }: SpellsSectionProps) {
@@ -45,7 +43,7 @@ export default function SpellsSection({
     busy, error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
     handleCast, handlePrepare, handleForget, handleLearn, handleSwap,
-  } = useSpellcasting(character, onUpdate);
+  } = useSpellcasting(character);
 
   // The grimoire (prepare/swap/learn) is a distinct view reached from the record's
   // "Manage spellbook →" — not rendered alongside the record block.

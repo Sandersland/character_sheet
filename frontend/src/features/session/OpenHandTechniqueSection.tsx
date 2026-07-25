@@ -30,14 +30,12 @@ interface OpenHandTechniqueSectionProps {
   turnState: TurnState & TurnStateActions;
   /** The bound Flurry hit row this rider rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function OpenHandTechniqueSection({
   character,
   turnState,
   currentRow,
-  onUpdate,
 }: OpenHandTechniqueSectionProps) {
   const { openHandTechnique } = character;
   const [result, setResult] = useState<OpenHandRiderResult | null>(null);
@@ -47,7 +45,6 @@ export default function OpenHandTechniqueSection({
     mutationFn: (rider: OpenHandRider) => imposeOpenHandRiderTransaction(character.id, rider, used),
     toCharacter: (r) => r.character,
     fallbackMessage: "Failed to impose Open Hand Technique rider",
-    onCharacterWritten: (r) => onUpdate(r.character),
   });
   const canImpose = !used && !mutation.isPending && currentRow !== null;
 

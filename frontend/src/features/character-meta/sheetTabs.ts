@@ -12,14 +12,12 @@ export interface SheetTab {
   badge?: ReactNode;
 }
 
-/** Props every tab panel receives — the character, loaded reference data, and the
- *  optimistic-update setter threaded down from the sheet page. isLive/onGoToCombat
- *  are unused by most panels; Magic's Cast door reads them to defer casting to the
- *  Combat tab during a live session (#1162). */
+/** Props every tab panel receives — the character and loaded reference data.
+ *  isLive/onGoToCombat are unused by most panels; Magic's Cast door reads them
+ *  to defer casting to the Combat tab during a live session (#1162). */
 export interface SheetPanelProps {
   character: Character;
   reference: ReferenceData | null;
-  onUpdate: (c: Character) => void;
   isLive?: boolean;
   onGoToCombat?: () => void;
 }

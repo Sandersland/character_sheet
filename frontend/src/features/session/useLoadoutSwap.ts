@@ -69,11 +69,7 @@ function buildSwapOps(
 
 export type LoadoutSwapControls = ReturnType<typeof useLoadoutSwap>;
 
-export function useLoadoutSwap(
-  character: Character,
-  turnState: TurnState & TurnStateActions,
-  onUpdate: (c: Character) => void,
-) {
+export function useLoadoutSwap(character: Character, turnState: TurnState & TurnStateActions) {
   const [lastSwap, setLastSwap] = useState<CommittedSwap | null>(null);
   // The "nothing can pay for this" guard fires before either mutation starts,
   // so it needs its own slot — a mutation's own error clears the moment its
@@ -88,14 +84,12 @@ export function useLoadoutSwap(
     mutationFn: (ops: InventoryOperation[]) => applyInventoryTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Swap failed — try again.",
-    onCharacterWritten: onUpdate,
   });
   const refundMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: InventoryOperation[]) => applyInventoryTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Refund failed — try again.",
-    onCharacterWritten: onUpdate,
   });
   const busy = swapMutation.isPending || refundMutation.isPending;
   const error = budgetError ?? swapMutation.error ?? refundMutation.error;

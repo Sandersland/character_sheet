@@ -89,7 +89,6 @@ export type { CastSettleView } from "@/lib/spellCast";
 export interface UseSpellPickerOptions {
   character: Character;
   sessionId: string;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   slot: EconomySlot;
   slotAvailable: boolean;
@@ -121,7 +120,6 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
   const {
     character,
     sessionId,
-    onUpdate,
     onLogChanged,
     slot,
     slotAvailable,
@@ -146,7 +144,6 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
       applySpellcastingTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: onUpdate,
   });
 
   const [rowStates, setRowStates] = useState<Record<string, SpellRowState>>({});

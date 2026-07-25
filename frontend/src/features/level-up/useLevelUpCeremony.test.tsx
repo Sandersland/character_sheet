@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { fetchLevelUpPlan, fetchReference, submitLevelUp } from "@/api/client";
 import { useLevelUpCeremony } from "@/features/level-up/useLevelUpCeremony";
+import { cachedCharacter } from "@/test/renderWithCharacter";
 import type { Character, LevelUpPlanResponse, LevelUpStep, ReferenceData } from "@/types/character";
 
 vi.mock("@/api/client", () => ({ fetchLevelUpPlan: vi.fn(), fetchReference: vi.fn(), submitLevelUp: vi.fn() }));
@@ -320,8 +321,7 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
   it("shows the level-again interstitial instead of navigating away when levels remain", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
-    const onCharacterChange = vi.fn();
-    const { result } = renderHook(() => useLevelUpCeremony(character, onCharacterChange), {
+    const { result } = renderHook(() => useLevelUpCeremony(character), {
       wrapper: makeWrapper(),
     });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
@@ -329,7 +329,7 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     act(() => result.current.setDraft((d) => ({ ...d, hp: { method: "average" } })));
     await act(() => result.current.confirm());
 
-    expect(onCharacterChange).toHaveBeenCalledWith({ id: "c1", pendingLevelUps: 1 });
+    expect(cachedCharacter("c1")).toEqual({ id: "c1", pendingLevelUps: 1 });
     expect(result.current.levelAgain?.remaining).toBe(1);
   });
 

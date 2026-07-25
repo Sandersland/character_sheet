@@ -36,8 +36,6 @@ interface InlineFlurryPickerProps {
   onClose: () => void;
   /** Back out before rolling any strike — refunds the bonus action. No Focus is spent yet, so there's nothing to refund there. */
   onCancel: () => void;
-  /** Required for ManeuversDisclosure to push resource spend results back up. */
-  onUpdate: (c: Character) => void;
   /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
   /** Spends the 1 Focus Point — fired once, on the first strike roll (#1217). */
@@ -50,7 +48,6 @@ export default function InlineFlurryPicker({
   sessionId,
   onClose,
   onCancel,
-  onUpdate,
   onLogChanged,
   onCommitFocusSpend,
 }: InlineFlurryPickerProps) {
@@ -82,7 +79,6 @@ export default function InlineFlurryPicker({
     recordAttack: turnState.recordFlurryAttack,
     attacksExhausted,
     onFirstStrike: onCommitFocusSpend,
-    onUpdate,
     onLogChanged,
     manualMode: attackMode,
   });
@@ -90,12 +86,7 @@ export default function InlineFlurryPicker({
   const isMobile = useIsBelowMd();
 
   const openHandTechnique = boundView && (
-    <OpenHandTechniqueSection
-      character={character}
-      turnState={turnState}
-      currentRow={currentRow}
-      onUpdate={onUpdate}
-    />
+    <OpenHandTechniqueSection character={character} turnState={turnState} currentRow={currentRow} />
   );
 
   const rollModeRow = (

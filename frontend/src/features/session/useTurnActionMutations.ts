@@ -15,7 +15,7 @@ import { applyActionTransactions, revertBatch, rollInitiativeTransaction } from 
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { ActionOperation, Character, ResourceOpResult } from "@/types/character";
 
-export function useTurnActionMutations(characterId: string, onUpdate: (c: Character) => void) {
+export function useTurnActionMutations(characterId: string) {
   const actionMutation = useCharacterMutation({
     characterId,
     mutationFn: (ops: ActionOperation[]) => applyActionTransactions(characterId, ops),
@@ -24,7 +24,6 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
       return character;
     },
     fallbackMessage: "Action failed.",
-    onCharacterWritten: onUpdate,
   });
 
   const undoMutation = useCharacterMutation({
@@ -32,7 +31,6 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
     mutationFn: (batchId: string) => revertBatch(characterId, batchId),
     toCharacter: (c) => c,
     fallbackMessage: "Undo failed.",
-    onCharacterWritten: onUpdate,
   });
 
   const actionSurgeMutation = useCharacterMutation({
@@ -43,7 +41,6 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
       return character;
     },
     fallbackMessage: "Action Surge failed.",
-    onCharacterWritten: onUpdate,
   });
 
   // Best-effort (no UI error surface, mirrors pre-#1283 console.error-only
@@ -56,7 +53,6 @@ export function useTurnActionMutations(characterId: string, onUpdate: (c: Charac
       return character;
     },
     fallbackMessage: "Failed to roll initiative.",
-    onCharacterWritten: onUpdate,
   });
 
   async function sendAction(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {

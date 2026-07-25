@@ -31,7 +31,6 @@ import type { AvailableAction, Character } from "@/types/character";
 
 export interface UseDeflectAttacksReactionArgs {
   character: Character;
-  onUpdate: (c: Character) => void;
   availableActions: AvailableAction[];
   /** turnState's reactionUsed — pending resets to false whenever this does. */
   reactionUsed: boolean;
@@ -52,7 +51,6 @@ export interface UseDeflectAttacksReactionReturn {
 
 export function useDeflectAttacksReaction({
   character,
-  onUpdate,
   availableActions,
   reactionUsed,
   consumeReaction,
@@ -75,7 +73,6 @@ export function useDeflectAttacksReaction({
       return c;
     },
     fallbackMessage: "Redirect failed.",
-    onCharacterWritten: onUpdate,
   });
 
   // Reuses deriveActions' own resourceKey gating (focus remaining >= 1) rather

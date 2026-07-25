@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import { RollProvider } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions, logRoll } from "@/api/client";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Spell } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -45,19 +46,19 @@ function makeTurnState(): TurnState & TurnStateActions {
   } as unknown as TurnState & TurnStateActions;
 }
 
-function renderSection(character: Character, turnState = makeTurnState(), onUpdate = vi.fn()) {
-  render(
+function renderSection(character: Character, turnState = makeTurnState()) {
+  renderWithCharacter(
     <RollProvider>
       <InlineSpellAttackSection
         character={character}
         sessionId="sess-1"
         turnState={turnState}
-        onUpdate={onUpdate}
         onLogChanged={vi.fn()}
       />
     </RollProvider>,
+    character,
   );
-  return { turnState, onUpdate };
+  return { turnState };
 }
 
 describe("InlineSpellAttackSection (#734)", () => {
@@ -69,16 +70,17 @@ describe("InlineSpellAttackSection (#734)", () => {
   });
 
   it("renders nothing when the character has no attack cantrips", () => {
-    const { container } = render(
+    const character = makeCharacter([sacredFlame]);
+    const { container } = renderWithCharacter(
       <RollProvider>
         <InlineSpellAttackSection
-          character={makeCharacter([sacredFlame])}
+          character={character}
           sessionId="s"
           turnState={makeTurnState()}
-          onUpdate={vi.fn()}
           onLogChanged={vi.fn()}
         />
       </RollProvider>,
+      character,
     );
     expect(container.textContent).not.toMatch(/Spell attacks/);
   });
@@ -107,8 +109,9 @@ describe("InlineSpellAttackSection (#734)", () => {
 
   it("Cast rolls damage, posts the cantrip castSpell op, and grants-then-commits so the action nets to −1 (no double-spend)", async () => {
     const user = userEvent.setup();
-    const { turnState, onUpdate } = renderSection(makeCharacter([fireBolt]));
-    mockCast.mockResolvedValue(makeCharacter([fireBolt]));
+    const { turnState } = renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
 
     await user.click(screen.getByRole("button", { name: /^Attack/ }));
     await user.click(screen.getByRole("button", { name: "Cast" }));
@@ -120,7 +123,7 @@ describe("InlineSpellAttackSection (#734)", () => {
     );
     // Cantrip op omits slotLevel.
     expect(mockCast.mock.calls[0][1][0]).not.toHaveProperty("slotLevel");
-    expect(onUpdate).toHaveBeenCalled();
+    expect(cachedCharacter("char-1")).toEqual(updated);
     // Grant-then-commit nets to zero action decrement (no double-spend on Action Surge).
     expect(turnState.grantExtraAction).toHaveBeenCalledOnce();
     expect(turnState.commitActionSpell).toHaveBeenCalledWith(0);
@@ -141,14 +144,15 @@ describe("InlineSpellAttackSection — nat-20 auto-crit (#766)", () => {
     const user = userEvent.setup();
     // 0.95 → nat 20 on the d20 to-hit, top face on the 1d10 damage.
     vi.spyOn(Math, "random").mockReturnValue(0.95);
-    const { onUpdate } = renderSection(makeCharacter([fireBolt]));
-    mockCast.mockResolvedValue(makeCharacter([fireBolt]));
+    renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
 
     await user.click(screen.getByRole("button", { name: /^Attack/ }));
     expect(screen.getByText(/Critical hit!/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Cast" }));
-    await waitFor(() => expect(onUpdate).toHaveBeenCalled());
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
 
     const damageCall = vi
       .mocked(logRoll)

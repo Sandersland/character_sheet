@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character } from "@/types/character";
 
@@ -20,6 +21,12 @@ function makeCharacter(): Character {
   } as unknown as Character;
 }
 
+// ExperienceTracker reads useCurrentCharacter(), so every render seeds the
+// cache and mounts CurrentCharacterProvider via renderWithCharacter.
+function render(character: Character) {
+  return renderWithCharacter(<ExperienceTracker character={character} />, character);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(client.applyExperienceOperations).mockResolvedValue(makeCharacter());
@@ -27,13 +34,13 @@ beforeEach(() => {
 
 describe("ExperienceTracker (issue #225)", () => {
   it("shows the Level N accessory", () => {
-    render(<ExperienceTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
     expect(screen.getByText("Level 3")).toBeInTheDocument();
   });
 
   it("Award XP fires an award op", async () => {
     const user = userEvent.setup();
-    render(<ExperienceTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.type(screen.getByRole("spinbutton", { name: /xp to award/i }), "450");
     await user.click(screen.getByRole("button", { name: /award xp/i }));
@@ -43,13 +50,13 @@ describe("ExperienceTracker (issue #225)", () => {
   });
 
   it("Award XP is disabled until a value is entered", () => {
-    render(<ExperienceTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
     expect(screen.getByRole("button", { name: /award xp/i })).toBeDisabled();
   });
 
   it("Set exact total is hidden until toggled, then fires a set op", async () => {
     const user = userEvent.setup();
-    render(<ExperienceTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     // Hidden by default.
     expect(
@@ -68,14 +75,14 @@ describe("ExperienceTracker (issue #225)", () => {
   });
 
   it("captions the XP remaining to the next level", () => {
-    render(<ExperienceTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
     // 2700 next − 900 current = 1800 to Level 4.
     expect(screen.getByText(/1,800 XP to Level 4/i)).toBeInTheDocument();
   });
 
   it("shows Max level and hides the caption at the cap", () => {
     const maxed = { ...makeCharacter(), nextLevelThreshold: null } as unknown as Character;
-    render(<ExperienceTracker character={maxed} onUpdate={vi.fn()} />);
+    render(maxed);
     expect(screen.getByText(/max level/i)).toBeInTheDocument();
     expect(screen.queryByText(/XP to Level/i)).not.toBeInTheDocument();
   });

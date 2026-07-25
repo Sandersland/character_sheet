@@ -7,7 +7,6 @@ import type { Character, Session } from "@/types/character";
 
 interface CharacterSheetModalsProps {
   character: Character;
-  onUpdate: (c: Character) => void;
   captureSessionId?: string;
   captureSession?: Session | null;
   deleteOpen: boolean;
@@ -24,7 +23,6 @@ interface CharacterSheetModalsProps {
 
 export default function CharacterSheetModals({
   character,
-  onUpdate,
   captureSessionId,
   captureSession,
   deleteOpen,
@@ -49,11 +47,7 @@ export default function CharacterSheetModals({
       )}
 
       {activityOpen && (
-        <ActivityModal
-          characterId={character.id}
-          onClose={onCloseActivity}
-          onUpdate={onUpdate}
-        />
+        <ActivityModal characterId={character.id} onClose={onCloseActivity} />
       )}
 
       {sessionsOpen && (
@@ -67,11 +61,7 @@ export default function CharacterSheetModals({
       {/* Guard on campaignId too: the sheet fetches the campaign, so it's
           meaningless for a campaign-less character (#1087). */}
       {campaignSettingsOpen && character.campaignId && (
-        <CampaignSettingsSheet
-          character={character}
-          onUpdate={onUpdate}
-          onClose={onCloseCampaignSettings}
-        />
+        <CampaignSettingsSheet character={character} onClose={onCloseCampaignSettings} />
       )}
 
       {captureOpen && (
@@ -80,7 +70,6 @@ export default function CharacterSheetModals({
           sessionId={captureSessionId}
           session={captureSession}
           onClose={onCloseCapture}
-          onUpdate={onUpdate}
         />
       )}
     </>

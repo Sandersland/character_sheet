@@ -1,17 +1,19 @@
-import { useEffect, type ReactElement } from "react";
+import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render as rtlRender, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { RollResult } from "@/lib/dice";
 import type { Character, ConcentrationCheck } from "@/types/character";
 
 // Mock the API client — HitPointTracker batches HP ops and swaps the returned
-// character via onUpdate, then toasts any concentration check (issue #41).
-// logRoll backs the concentration save's session-log emit (issue #460).
+// character via the character cache (useCharacterMutation), then toasts any
+// concentration check (issue #41). logRoll backs the concentration save's
+// session-log emit (issue #460).
 vi.mock("@/api/client", () => ({
   applyHitPointOperations: vi.fn(),
   logRoll: vi.fn().mockResolvedValue(undefined),
@@ -19,8 +21,15 @@ vi.mock("@/api/client", () => ({
 
 // The concentration-save modal reads useRoll(); every render is wrapped so it
 // resolves (matching the app, where HitPointTracker always sits in a RollProvider).
-function render(ui: ReactElement) {
-  return rtlRender(<RollProvider>{ui}</RollProvider>);
+// HitPointTracker also reads useCurrentCharacter(), so every render seeds the
+// cache and mounts CurrentCharacterProvider via renderWithCharacter.
+function render(character: Character) {
+  return renderWithCharacter(
+    <RollProvider>
+      <HitPointTracker character={character} />
+    </RollProvider>,
+    character,
+  );
 }
 
 // Mock the 3D DiceRoller (issue #76): the real one mounts a Three.js Canvas that
@@ -109,7 +118,7 @@ function check(partial: Partial<ConcentrationCheck>): ConcentrationCheck {
 describe("HitPointTracker segmented action control (issue #225)", () => {
   it("damage is the default mode and fires a damage op", async () => {
     mockResolve([]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await applyDamage();
 
@@ -120,7 +129,7 @@ describe("HitPointTracker segmented action control (issue #225)", () => {
   it("switching to Heal fires a heal op (vitality verb)", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("radio", { name: /heal/i }));
     await user.type(screen.getByRole("spinbutton", { name: /heal amount/i }), "5");
@@ -133,7 +142,7 @@ describe("HitPointTracker segmented action control (issue #225)", () => {
   it("switching to Temp HP fires a setTemp op", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("radio", { name: /temp hp/i }));
     await user.type(screen.getByRole("spinbutton", { name: /temporary hit points/i }), "7");
@@ -146,7 +155,7 @@ describe("HitPointTracker segmented action control (issue #225)", () => {
   it("the stepper +/- adjusts the shared amount", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     const field = screen.getByRole("spinbutton", { name: /damage amount/i });
     await user.click(screen.getByRole("button", { name: /increase amount/i }));
@@ -159,7 +168,7 @@ describe("HitPointTracker segmented action control (issue #225)", () => {
   it("Enter submits the active mode", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("radio", { name: /heal/i }));
     const field = screen.getByRole("spinbutton", { name: /heal amount/i });
@@ -175,7 +184,7 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
     mockResolve([
       check({ held: true, roll: 12, saveBonus: 2, total: 14, dc: 12 }),
     ]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await applyDamage();
 
@@ -189,7 +198,7 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
     mockResolve([
       check({ held: false, roll: 3, saveBonus: 2, total: 5, dc: 12 }),
     ]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await applyDamage();
 
@@ -203,7 +212,7 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
     mockResolve([
       check({ reason: "death", held: false, saveBonus: null, damage: 999 }),
     ]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await applyDamage();
 
@@ -214,7 +223,7 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
 
   it("shows no banner when there is no concentration check", async () => {
     mockResolve([]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await applyDamage();
 
@@ -226,7 +235,7 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
 describe("HitPointTracker interactive concentration save (issue #76)", () => {
   it("auto-roll on (default) shows the banner and no save modal", async () => {
     mockResolve([check({ held: true, roll: 12, saveBonus: 2, total: 14, dc: 12 })]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await applyDamage();
 
@@ -242,7 +251,7 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
     mockResolve([
       check({ status: "pending", entryId: "entry-1", dc: 15, saveBonus: 2, held: null, damage: 30 }),
     ]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("checkbox", { name: /auto-roll concentration saves/i }));
     await applyDamage();
@@ -269,7 +278,7 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
         character: makeCharacter(),
         concentrationChecks: [check({ held: true, roll: SAVE_DIE, saveBonus: 2, total: 16, dc: 15, damage: 30 })],
       });
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("checkbox", { name: /auto-roll concentration saves/i }));
     await applyDamage();
@@ -315,7 +324,7 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
   it("sends an optional damage type with the damage op", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "8");
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "fire");
@@ -328,7 +337,7 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
   it("shows the auto-halve preview for a resisted type and applies resistance by default", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={rageCharacter()} onUpdate={vi.fn()} />);
+    render(rageCharacter());
 
     await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "12");
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
@@ -343,7 +352,7 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
   it("lets the player decline the auto-halve (manual override)", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={rageCharacter()} onUpdate={vi.fn()} />);
+    render(rageCharacter());
 
     await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "12");
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
@@ -358,7 +367,7 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
   it("does not show a resistance preview for a non-matching type", async () => {
     const user = userEvent.setup();
     mockResolve([]);
-    render(<HitPointTracker character={rageCharacter()} onUpdate={vi.fn()} />);
+    render(rageCharacter());
 
     await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "12");
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "fire");

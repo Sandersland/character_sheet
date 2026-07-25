@@ -31,7 +31,7 @@ function concentrationMessage(check: ConcentrationCheck): ConcentrationNote {
  * The HP tracker (HitPointTracker) and the session HP sheet both consume this, so
  * damage/heal/temp + concentration behave the same everywhere.
  */
-export function useHitPointApply(character: Character, onUpdate: (character: Character) => void) {
+export function useHitPointApply(character: Character) {
   const [concentrationNote, setConcentrationNote] = useState<ConcentrationNote | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingConcentrationSave | null>(null);
 
@@ -44,7 +44,6 @@ export function useHitPointApply(character: Character, onUpdate: (character: Cha
     mutationFn: (ops: HitPointOperation[]) => applyHitPointOperations(character.id, ops),
     toCharacter: (r) => r.character,
     fallbackMessage: "Something went wrong — try again",
-    onCharacterWritten: (r) => onUpdate(r.character),
   });
 
   /**

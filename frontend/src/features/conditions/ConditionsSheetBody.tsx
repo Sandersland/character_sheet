@@ -24,19 +24,17 @@ import AddConditionPanel from "@/features/conditions/AddConditionPanel";
 
 interface Props {
   character: Character;
-  onUpdate: (updated: Character) => void;
   /** Open the add-condition picker expanded — set when a host launches this body
    *  straight into "add" mode (the live-Combat "+ Add" trigger, #982). */
   defaultAddOpen?: boolean;
 }
 
-export default function ConditionsSheetBody({ character, onUpdate, defaultAddOpen }: Props) {
+export default function ConditionsSheetBody({ character, defaultAddOpen }: Props) {
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: ConditionOperation[]) => applyConditionTransactions(character.id, ops),
     toCharacter: (c) => c,
     fallbackMessage: "Something went wrong.",
-    onCharacterWritten: onUpdate,
   });
   const busy = mutation.isPending;
   const error = mutation.error;

@@ -19,7 +19,6 @@ export function useQuiveringPalmActions(
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
   active: boolean,
-  onUpdate: (c: Character) => void,
 ) {
   const [message, setMessage] = useState<string | null>(null);
 
@@ -31,14 +30,12 @@ export function useQuiveringPalmActions(
     mutationFn: () => setQuiveringPalmTransaction(character.id),
     toCharacter: (r) => r.character,
     fallbackMessage: "Set failed.",
-    onCharacterWritten: (r) => onUpdate(r.character),
   });
   const triggerMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (roll: number) => triggerQuiveringPalmTransaction(character.id, roll),
     toCharacter: (r) => r.character,
     fallbackMessage: "Trigger failed.",
-    onCharacterWritten: (r) => onUpdate(r.character),
   });
   const busy = setMutation.isPending || triggerMutation.isPending;
   const error = setMutation.error ?? triggerMutation.error;

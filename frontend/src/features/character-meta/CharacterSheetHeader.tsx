@@ -12,10 +12,6 @@ import type { Character } from "@/types/character";
 
 interface CharacterSheetHeaderProps {
   character: Character;
-  /** Propagates HP edits so damage/heal also bumps the session log (#982).
-   *  Used by the mobile header's tappable HP readout; desktop live-play HP
-   *  lives in CombatUtilityStrip (#1085). */
-  onUpdate: (c: Character) => void;
   tabs: SheetTab[];
   activeTab: SheetTabId;
   onTabChange: (id: SheetTabId) => void;
@@ -102,7 +98,6 @@ function withCombatLivePip(tabs: SheetTab[], isLive: boolean): SheetTab[] {
  */
 export default function CharacterSheetHeader({
   character,
-  onUpdate,
   tabs,
   activeTab,
   onTabChange,
@@ -126,7 +121,6 @@ export default function CharacterSheetHeader({
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
       <MobileSheetHeader
         character={character}
-        onUpdate={onUpdate}
         sessionActions={buildSessionActions(
           isLiveJoined,
           sessionActionBusy,
@@ -186,7 +180,7 @@ function DesktopBanner({
   onOpenActivity,
   onOpenDelete,
   onOpenCampaignSettings,
-}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat" | "onUpdate">) {
+}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat">) {
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
   return (

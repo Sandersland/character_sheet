@@ -4,7 +4,7 @@ import SessionAddXpForm from "@/features/session/SessionAddXpForm";
 import SessionJournalList from "@/features/session/SessionJournalList";
 import { useSessionRecapDetail } from "@/features/session/useSessionRecapDetail";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
-import type { Character, Session } from "@/types/character";
+import type { Session } from "@/types/character";
 
 interface SessionSummaryModalProps {
   /** Owning character — needed to retroactively award XP to this session. */
@@ -12,11 +12,6 @@ interface SessionSummaryModalProps {
   /** The ended session whose recap + participants are displayed. */
   session: Session;
   onClose: () => void;
-  /**
-   * Called with the updated character after a retroactive XP award lands, so the
-   * parent sheet's XP can refresh live (otherwise it only updates on reload).
-   */
-  onCharacterUpdate?: (character: Character) => void;
 }
 
 // Read-only end-of-session recap (#245): the campaign aggregate, each
@@ -26,7 +21,6 @@ export default function SessionSummaryModal({
   characterId,
   session,
   onClose,
-  onCharacterUpdate,
 }: SessionSummaryModalProps) {
   const { recap, participants, journalEntries, applyRefreshed } = useSessionRecapDetail(
     characterId,
@@ -62,7 +56,6 @@ export default function SessionSummaryModal({
             characterId={characterId}
             sessionId={session.id}
             onAwarded={applyRefreshed}
-            onCharacterUpdate={onCharacterUpdate}
           />
         )}
       </div>

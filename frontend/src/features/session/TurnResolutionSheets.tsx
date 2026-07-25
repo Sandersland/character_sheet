@@ -48,7 +48,6 @@ interface TurnResolutionSheetsProps {
   closeResolution: () => void;
   setShowActionMenu: React.Dispatch<React.SetStateAction<boolean>>;
   setShowBonusMenu: React.Dispatch<React.SetStateAction<boolean>>;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   allies: AllyOption[];
   send: React.ComponentProps<typeof LayOnHandsInput>["onSend"];
@@ -99,7 +98,6 @@ function AttackResolutionSheet({
   turnState,
   closeResolution,
   setShowActionMenu,
-  onUpdate,
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
@@ -108,7 +106,6 @@ function AttackResolutionSheet({
   | "turnState"
   | "closeResolution"
   | "setShowActionMenu"
-  | "onUpdate"
   | "onLogChanged"
 >) {
   // Attacks all spent → finalize; attacks remain → leave the action LIVE so the
@@ -132,7 +129,6 @@ function AttackResolutionSheet({
           closeResolution();
           setShowActionMenu(true);
         }}
-        onUpdate={onUpdate}
         onLogChanged={onLogChanged}
       />
     </BottomSheet>
@@ -146,7 +142,6 @@ function TwfResolutionSheet({
   activeResolution,
   closeResolution,
   setShowBonusMenu,
-  onUpdate,
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
@@ -156,7 +151,6 @@ function TwfResolutionSheet({
   | "activeResolution"
   | "closeResolution"
   | "setShowBonusMenu"
-  | "onUpdate"
   | "onLogChanged"
 >) {
   // Martial Arts Bonus Unarmed Strike (#1218) shares this sheet + the TWF
@@ -184,7 +178,6 @@ function TwfResolutionSheet({
           closeResolution();
           setShowBonusMenu(true);
         }}
-        onUpdate={onUpdate}
         onLogChanged={onLogChanged}
       />
     </BottomSheet>
@@ -207,7 +200,6 @@ function FlurryResolutionSheet({
   turnState,
   closeResolution,
   setShowBonusMenu,
-  onUpdate,
   onLogChanged,
   send,
 }: Pick<
@@ -217,7 +209,6 @@ function FlurryResolutionSheet({
   | "turnState"
   | "closeResolution"
   | "setShowBonusMenu"
-  | "onUpdate"
   | "onLogChanged"
   | "send"
 >) {
@@ -246,7 +237,6 @@ function FlurryResolutionSheet({
           closeResolution();
           setShowBonusMenu(true);
         }}
-        onUpdate={onUpdate}
         onLogChanged={onLogChanged}
         onCommitFocusSpend={() => {
           void send("flurryOfBlows");
@@ -260,13 +250,11 @@ function ItemResolutionSheet({
   character,
   turnState,
   closeResolution,
-  onUpdate,
-}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "closeResolution" | "onUpdate">) {
+}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "closeResolution">) {
   return (
     <BottomSheet title="Use an item" subtitle="Nothing is spent until you use an item" onClose={closeResolution}>
       <InlineItemPicker
         character={character}
-        onUpdate={onUpdate}
         onCommit={(batchId) => {
           turnState.consumeAction();
           if (batchId) turnState.attachBatchId(batchId);
@@ -301,7 +289,6 @@ function SpellResolutionSheet({
   turnState,
   activeResolution,
   closeResolution,
-  onUpdate,
   onLogChanged,
   allies,
 }: Pick<
@@ -311,7 +298,6 @@ function SpellResolutionSheet({
   | "turnState"
   | "activeResolution"
   | "closeResolution"
-  | "onUpdate"
   | "onLogChanged"
   | "allies"
 >) {
@@ -338,7 +324,6 @@ function SpellResolutionSheet({
       <InlineSpellPicker
         character={character}
         sessionId={sessionId}
-        onUpdate={onUpdate}
         onClose={closeResolution}
         onLogChanged={onLogChanged}
         slot={slot}

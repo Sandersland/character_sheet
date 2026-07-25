@@ -37,7 +37,6 @@ describe("LiveTurnBody (#1086)", () => {
         character={makeCharacter()}
         session={session}
         turnState={turnState}
-        onUpdate={vi.fn()}
         onLogChanged={vi.fn()}
       />,
     );
@@ -50,7 +49,6 @@ describe("LiveTurnBody (#1086)", () => {
         character={makeCharacter()}
         session={session}
         turnState={turnState}
-        onUpdate={vi.fn()}
         onLogChanged={vi.fn()}
       />,
     );
@@ -66,7 +64,6 @@ describe("LiveTurnBody (#1086)", () => {
         character={makeCharacter()}
         session={session}
         turnState={turnState}
-        onUpdate={vi.fn()}
         onLogChanged={vi.fn()}
         onOpenLog={onOpenLog}
       />,

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 
 import AdvancementSection from "@/features/advancement/AdvancementSection";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { AdvancementEntry, Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -9,7 +10,11 @@ vi.mock("@/api/client", () => ({
   applyAdvancementTransactions: vi.fn(),
 }));
 
-const noop = () => {};
+// AdvancementSection reads useCurrentCharacter(), so every render seeds the
+// cache and mounts CurrentCharacterProvider via renderWithCharacter.
+function render(character: Character) {
+  return renderWithCharacter(<AdvancementSection character={character} />, character);
+}
 
 function makeCharacter(advancements: AdvancementEntry[]): Character {
   return {
@@ -73,7 +78,7 @@ const asiEmpty: AdvancementEntry = {
 
 describe("AdvancementSection entryDetail rendering", () => {
   it("renders the full feat detail joined with ' · '", () => {
-    render(<AdvancementSection character={makeCharacter([featFull])} onUpdate={noop} />);
+    render(makeCharacter([featFull]));
     expect(
       screen.getByText(
         "+2 Strength · +5/level max HP · +1 initiative · Prof: Athletics · Save prof: Constitution"
@@ -82,19 +87,17 @@ describe("AdvancementSection entryDetail rendering", () => {
   });
 
   it("falls back to the feat description when there is nothing to summarize", () => {
-    render(<AdvancementSection character={makeCharacter([featFallback])} onUpdate={noop} />);
+    render(makeCharacter([featFallback]));
     expect(screen.getByText("Grants darkvision.")).toBeInTheDocument();
   });
 
   it("renders the full ASI detail joined with ', '", () => {
-    render(<AdvancementSection character={makeCharacter([asiFull])} onUpdate={noop} />);
+    render(makeCharacter([asiFull]));
     expect(screen.getByText("+5 max HP, +3 initiative")).toBeInTheDocument();
   });
 
   it("renders no detail line for an all-zero ASI", () => {
-    const { container } = render(
-      <AdvancementSection character={makeCharacter([asiEmpty])} onUpdate={noop} />
-    );
+    const { container } = render(makeCharacter([asiEmpty]));
     expect(container.querySelectorAll("p.leading-relaxed").length).toBe(0);
   });
 });

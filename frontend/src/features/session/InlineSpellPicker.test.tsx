@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions, logRoll } from "@/api/client";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Spell } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -99,14 +100,13 @@ function makeCharacter(spells: Spell[] = ALL_SPELLS): Character {
 const updatedChar = makeCharacter();
 
 interface Spies {
-  onUpdate: ReturnType<typeof vi.fn>;
   onClose: ReturnType<typeof vi.fn>;
   onLogChanged: ReturnType<typeof vi.fn>;
   onCommitSlot: ReturnType<typeof vi.fn>;
   onCastSettled: ReturnType<typeof vi.fn>;
   /** Re-render with a new `character` prop — simulates the real parent
-   *  re-rendering after `onUpdate` lands (the test harness's `onUpdate` spy
-   *  doesn't do this automatically). */
+   *  re-rendering after the cache write lands (structural-sharing pin lives
+   *  elsewhere; this harness's rerender doesn't happen automatically). */
   rerenderWithCharacter: (character: Character) => void;
 }
 
@@ -120,7 +120,6 @@ function renderPicker(
   } = {},
 ): Spies {
   const spies = {
-    onUpdate: vi.fn(),
     onClose: vi.fn(),
     onLogChanged: vi.fn(),
     onCommitSlot: vi.fn(),
@@ -131,7 +130,6 @@ function renderPicker(
       <InlineSpellPicker
         character={c}
         sessionId="sess-1"
-        onUpdate={spies.onUpdate}
         onClose={spies.onClose}
         onLogChanged={spies.onLogChanged}
         slot={opts.slot ?? "action"}
@@ -145,7 +143,7 @@ function renderPicker(
       />
     </RollProvider>
   );
-  const { rerender } = render(view(character));
+  const { rerender } = renderWithCharacter(view(character), character);
   return { ...spies, rerenderWithCharacter: (c: Character) => rerender(view(c)) };
 }
 
@@ -179,7 +177,7 @@ describe("InlineSpellPicker — characterization", () => {
       expect.objectContaining({ type: "castSpell", entryId: "sp-cantrip" }),
     ]);
     expect(spies.onCommitSlot).toHaveBeenCalledWith(0);
-    await waitFor(() => expect(spies.onUpdate).toHaveBeenCalledWith(updatedChar));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updatedChar));
   });
 
   // #1163: upcasting moved into the big spell card — the compact row carries
@@ -233,7 +231,7 @@ describe("InlineSpellPicker — characterization", () => {
     ]);
     // Slot must not be committed a second time on cast.
     expect(spies.onCommitSlot).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(spies.onUpdate).toHaveBeenCalledWith(updatedChar));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updatedChar));
   });
 
   it("Done closes the panel", async () => {
@@ -296,7 +294,7 @@ describe("InlineSpellPicker — post-cast feedback (#1164)", () => {
 
     const spies = renderPicker(before);
     await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
-    await waitFor(() => expect(spies.onUpdate).toHaveBeenCalledWith(after));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(after));
 
     // The parent re-renders with the updated (now slot-exhausted) character.
     spies.rerenderWithCharacter(after);

@@ -15,11 +15,10 @@ import SubclassSection from "@/features/class/SubclassSection";
 interface Props {
   character: Character;
   referenceClasses: ClassOption[];
-  onUpdate: (updated: Character) => void;
 }
 
-export default function ClassFeaturesSection({ character, referenceClasses, onUpdate }: Props) {
-  const { busy, error, run } = useClassTransactions(character.id, onUpdate);
+export default function ClassFeaturesSection({ character, referenceClasses }: Props) {
+  const { busy, error, run } = useClassTransactions(character.id);
   const view = deriveClassFeatureView(character, referenceClasses);
 
   return (

@@ -19,15 +19,14 @@ import { useState } from "react";
 
 interface InventoryListProps {
   character: Character;
-  onUpdate: (character: Character) => void;
 }
 
 // The sheet's inventory editor: category-sectioned rows + add/sell panels, all funneling through one submitOperations that calls POST .../inventory/transactions and swaps in the returned character.
-export default function InventoryList({ character, onUpdate }: InventoryListProps) {
+export default function InventoryList({ character }: InventoryListProps) {
   const catalog = useItemCatalog();
   const isMobile = useIsBelowMd();
   const { pending, error, addOpen, editingId, setAddOpen, setEditingId, applyOps, submitOperations } =
-    useInventoryTransactions(character, onUpdate);
+    useInventoryTransactions(character);
   const sell = useSellSelection();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -116,7 +115,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         addPanel={addPanel}
         error={error}
         body={body}
-        currency={<CurrencyEditor character={character} onUpdate={onUpdate} />}
+        currency={<CurrencyEditor character={character} />}
         onAdd={() => {
           setEditingId(null);
           setAddOpen(true);
@@ -175,7 +174,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
 
         {body}
 
-        <CurrencyEditor character={character} onUpdate={onUpdate} />
+        <CurrencyEditor character={character} />
       </div>
     </Card>
   );

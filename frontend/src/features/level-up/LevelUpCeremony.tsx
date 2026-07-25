@@ -168,13 +168,10 @@ function ReadyStep({
 
 interface Props {
   character: Character;
-  /** Refreshes the sheet's character after a "level up again" loop (#1170) — the
-   *  next iteration's steps (HP max, dropped die, etc.) must see the applied level. */
-  onCharacterChange?: (updated: Character) => void;
 }
 
-export default function LevelUpCeremony({ character, onCharacterChange }: Props) {
-  const c = useLevelUpCeremony(character, onCharacterChange);
+export default function LevelUpCeremony({ character }: Props) {
+  const c = useLevelUpCeremony(character);
   const showSpinner = useDelayedFlag(c.plan === null && !c.planError);
   const phase = ceremonyPhase(c);
 

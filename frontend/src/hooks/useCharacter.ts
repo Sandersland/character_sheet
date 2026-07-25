@@ -1,12 +1,12 @@
-import { useCallback } from "react";
-import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 
 import { fetchCharacter } from "@/api/client";
 import { characterKeys } from "@/api/queryKeys";
-import type { Character } from "@/types/character";
 
+// No `setCharacter` here (#1284): every write goes through useCharacterMutation's
+// onSuccess instead. A page reads this hook directly only to render the
+// load/error/not-found guard, never to mutate.
 export function useCharacter(id: string | undefined) {
-  const queryClient = useQueryClient();
   const { data, isError } = useQuery({
     queryKey: characterKeys.detail(id),
     // skipToken (not `enabled`) keeps the no-id case type-safe: the query stays
@@ -15,19 +15,9 @@ export function useCharacter(id: string | undefined) {
     queryFn: id ? () => fetchCharacter(id) : skipToken,
   });
 
-  // The cache write that keeps the whole onUpdate chain working untouched until
-  // #1284 retires it. Memoised because it is threaded as `onUpdate` into effect
-  // deps deep in the sheet, where a new identity per render re-fires them.
-  const setCharacter = useCallback(
-    (next: Character) => {
-      queryClient.setQueryData(characterKeys.detail(id), next);
-    },
-    [queryClient, id],
-  );
-
   // Tri-state, unchanged for consumers: undefined = in flight (or no id yet),
   // null = 404/403 (fetchCharacter resolves null, it does not throw), Character =
   // loaded. `error` means "nothing to show" — while stale data is on screen a
   // failed background refetch must not swap a working sheet for the error page.
-  return { character: data, error: isError && data === undefined, setCharacter };
+  return { character: data, error: isError && data === undefined };
 }

@@ -30,7 +30,6 @@ function useSneakAttackRoll(
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
   eligible: boolean,
-  onUpdate: (c: Character) => void,
 ) {
   const [rolled, setRolled] = useState<number | null>(null);
   const used = turnState.sneakAttackUsedThisTurn;
@@ -40,7 +39,6 @@ function useSneakAttackRoll(
     mutationFn: () => rollSneakAttackTransaction(character.id, eligible, used),
     toCharacter: (r) => r.character,
     fallbackMessage: "Failed to roll Sneak Attack",
-    onCharacterWritten: (r) => onUpdate(r.character),
   });
   const canRoll = eligible && !used && !mutation.isPending && currentRow !== null;
 
@@ -63,14 +61,12 @@ interface SneakAttackSectionProps {
   turnState: TurnState & TurnStateActions;
   /** The current hit row the roll folds into; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function SneakAttackSection({
   character,
   turnState,
   currentRow,
-  onUpdate,
 }: SneakAttackSectionProps) {
   const { sneakAttack } = character;
   const [eligible, setEligible] = useState(false);
@@ -79,7 +75,6 @@ export default function SneakAttackSection({
     turnState,
     currentRow,
     eligible,
-    onUpdate,
   );
 
   // Only rogues have Sneak Attack; nothing to fold into until a hit lands.

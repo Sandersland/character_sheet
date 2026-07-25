@@ -206,10 +206,7 @@ function useLevelUpSubmit(
   return { confirm, submitting: mutation.isPending, submitError: mutation.error };
 }
 
-export function useLevelUpCeremony(
-  character: Character,
-  onCharacterChange?: (updated: Character) => void,
-): LevelUpCeremony {
+export function useLevelUpCeremony(character: Character): LevelUpCeremony {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // #1131/#1170: `?classId=` seeds a NEW class, `?entry=` seeds a specific
@@ -240,11 +237,7 @@ export function useLevelUpCeremony(
   const skipPlan = choice.status !== "resolved" || levelAgain != null;
   const { plan, planError } = useLevelUpPlan(character.id, choice.target, draft.subclassId, skipPlan);
 
-  function handleSubmitted(updated: Character): void {
-    onCharacterChange?.(updated);
-    reportSubmitted(updated);
-  }
-  const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, choice.target, draft, handleSubmitted);
+  const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, choice.target, draft, reportSubmitted);
 
   const steps = plan?.steps ?? [];
   const stepIndex = stepPosition(steps.map(stepKey), currentKey);

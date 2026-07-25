@@ -32,7 +32,7 @@ describe("useCombatLifecycle leave errors (#979)", () => {
   it("surfaces a leaveError when Leave Session fails, and dismissLeaveError clears it", async () => {
     mockLeave.mockRejectedValueOnce(new Error("network"));
     const { result } = renderHook(() =>
-      useCombatLifecycle({ character, session, onUpdate: vi.fn(), live: makeLive() }),
+      useCombatLifecycle({ character, session, live: makeLive() }),
     );
 
     await act(async () => {
@@ -48,7 +48,7 @@ describe("useCombatLifecycle leave errors (#979)", () => {
     mockLeave.mockResolvedValueOnce(undefined as never);
     const live = makeLive();
     const { result } = renderHook(() =>
-      useCombatLifecycle({ character, session, onUpdate: vi.fn(), live }),
+      useCombatLifecycle({ character, session, live }),
     );
 
     await act(async () => {
@@ -60,7 +60,7 @@ describe("useCombatLifecycle leave errors (#979)", () => {
 
   it("no-ops handleLeave with a null (not-yet-joined) session", async () => {
     const { result } = renderHook(() =>
-      useCombatLifecycle({ character, session: null, onUpdate: vi.fn(), live: makeLive() }),
+      useCombatLifecycle({ character, session: null, live: makeLive() }),
     );
     await act(async () => {
       await result.current.handleLeave();
@@ -74,7 +74,7 @@ describe("useCombatLifecycle solo sessions (#1082)", () => {
   it("ends a solo session via endSoloSession, not the campaign endSession", async () => {
     mockEndSolo.mockResolvedValueOnce({ session: soloSession });
     const { result } = renderHook(() =>
-      useCombatLifecycle({ character, session: soloSession, onUpdate: vi.fn(), live: makeLive() }),
+      useCombatLifecycle({ character, session: soloSession, live: makeLive() }),
     );
 
     await act(async () => {
@@ -88,7 +88,7 @@ describe("useCombatLifecycle solo sessions (#1082)", () => {
   it("ends a campaign session via endSession (unchanged)", async () => {
     mockEnd.mockResolvedValueOnce({ session });
     const { result } = renderHook(() =>
-      useCombatLifecycle({ character, session, onUpdate: vi.fn(), live: makeLive() }),
+      useCombatLifecycle({ character, session, live: makeLive() }),
     );
 
     await act(async () => {
@@ -101,17 +101,17 @@ describe("useCombatLifecycle solo sessions (#1082)", () => {
 
   it("canLeave is true only for a joined campaign session — false for solo and no session", () => {
     const campaign = renderHook(() =>
-      useCombatLifecycle({ character, session, onUpdate: vi.fn(), live: makeLive() }),
+      useCombatLifecycle({ character, session, live: makeLive() }),
     );
     expect(campaign.result.current.canLeave).toBe(true);
 
     const solo = renderHook(() =>
-      useCombatLifecycle({ character, session: soloSession, onUpdate: vi.fn(), live: makeLive() }),
+      useCombatLifecycle({ character, session: soloSession, live: makeLive() }),
     );
     expect(solo.result.current.canLeave).toBe(false);
 
     const none = renderHook(() =>
-      useCombatLifecycle({ character, session: null, onUpdate: vi.fn(), live: makeLive() }),
+      useCombatLifecycle({ character, session: null, live: makeLive() }),
     );
     expect(none.result.current.canLeave).toBe(false);
   });

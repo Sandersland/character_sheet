@@ -9,7 +9,6 @@ import MeterBar from "@/components/ui/MeterBar";
 
 interface ExperienceTrackerProps {
   character: Character;
-  onUpdate: (character: Character) => void;
 }
 
 type ApplyXp = (op: ExperienceOperation) => Promise<Character | null>;
@@ -18,13 +17,12 @@ type ApplyXp = (op: ExperienceOperation) => Promise<Character | null>;
 // character (or null on failure) so callers can resync their input fields.
 // `error` stays a boolean here (not the mutation's message) — deliberate,
 // matching this hook's pre-#1283 contract; don't widen it to a string.
-function useExperienceActions(character: Character, onUpdate: (c: Character) => void) {
+function useExperienceActions(character: Character) {
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (op: ExperienceOperation) => applyExperienceOperations(character.id, [op]),
     toCharacter: (c) => c,
     fallbackMessage: "Couldn't save — try again.",
-    onCharacterWritten: onUpdate,
   });
 
   const apply: ApplyXp = async (op) => {
@@ -38,8 +36,8 @@ function useExperienceActions(character: Character, onUpdate: (c: Character) => 
   return { pending: mutation.isPending, error: Boolean(mutation.error), apply };
 }
 
-export default function ExperienceTracker({ character, onUpdate }: ExperienceTrackerProps) {
-  const { pending, error, apply } = useExperienceActions(character, onUpdate);
+export default function ExperienceTracker({ character }: ExperienceTrackerProps) {
+  const { pending, error, apply } = useExperienceActions(character);
 
   return (
     <Card

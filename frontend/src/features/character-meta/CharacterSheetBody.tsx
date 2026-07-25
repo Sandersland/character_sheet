@@ -23,7 +23,6 @@ const STATIC_PANELS: Partial<Record<SheetTabId, (props: SheetPanelProps) => Reac
 interface CharacterSheetBodyProps {
   character: Character;
   reference: ReferenceData | null;
-  onUpdate: (c: Character) => void;
   activeTab: SheetTabId;
   /**
    * The live-Combat turn tracker (#960), when a session is live + joined. It
@@ -47,14 +46,13 @@ interface CharacterSheetBodyProps {
 export default function CharacterSheetBody({
   character,
   reference,
-  onUpdate,
   activeTab,
   livePanel,
   sessionLoading = false,
   isLive = false,
   onGoToCombat = () => {},
 }: CharacterSheetBodyProps) {
-  const panelProps = { character, reference, onUpdate, isLive, onGoToCombat };
+  const panelProps = { character, reference, isLive, onGoToCombat };
   const StaticPanel = STATIC_PANELS[activeTab];
   return (
     // <main> keeps the page's main landmark; the inner tabpanel carries the

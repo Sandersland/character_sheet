@@ -11,11 +11,9 @@ import type { Character } from "@/types/character";
 
 export default function TurnConcentrationBanner({
   character,
-  onUpdate,
   onLogChanged,
 }: {
   character: Character;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
 }) {
   const mutation = useCharacterMutation({
@@ -23,7 +21,6 @@ export default function TurnConcentrationBanner({
     mutationFn: () => applySpellcastingTransactions(character.id, [{ type: "dropConcentration" }]),
     toCharacter: (c) => c,
     fallbackMessage: "Failed to drop concentration.",
-    onCharacterWritten: onUpdate,
   });
   const concentratingOn = character.spellcasting?.concentratingOn ?? null;
   if (!concentratingOn) return null;

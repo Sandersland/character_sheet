@@ -49,7 +49,6 @@ interface InlineSpellPickerProps {
   character: Character;
   /** Active session id — spell attack rolls are logged against it. */
   sessionId: string;
-  onUpdate: (c: Character) => void;
   onClose: () => void;
   /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
@@ -267,7 +266,6 @@ function PickerContent({
 export default function InlineSpellPicker({
   character,
   sessionId,
-  onUpdate,
   onClose,
   onLogChanged,
   slot,
@@ -282,7 +280,6 @@ export default function InlineSpellPicker({
   const picker = useSpellPicker({
     character,
     sessionId,
-    onUpdate,
     onLogChanged,
     slot,
     slotAvailable,

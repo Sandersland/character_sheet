@@ -109,8 +109,6 @@ interface InlineAttackPickerProps {
    * action and returns to the action menu.
    */
   onCancel: () => void;
-  /** Required for ManeuverPrompt to push resource spend results back up to the page. */
-  onUpdate: (c: Character) => void;
   /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
 }
@@ -121,12 +119,11 @@ export default function InlineAttackPicker({
   sessionId,
   onClose,
   onCancel,
-  onUpdate,
   onLogChanged,
 }: InlineAttackPickerProps) {
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
-  const die = useManeuverDie(character, onUpdate);
+  const die = useManeuverDie(character);
   // The attack sheet's own ADV/DIS choice (#958) — replaces the retired global
   // roll-mode footer. Visible on the sheet, applied to each to-hit roll here.
   const [attackMode, setAttackMode] = useState<RollMode>("normal");
@@ -196,43 +193,26 @@ export default function InlineAttackPicker({
       view={boundView}
       attacksExhausted={view.attacksExhausted}
       die={die}
-      onUpdate={onUpdate}
     />
   );
   const sneakAttack = boundView && (
-    <SneakAttackSection
-      character={character}
-      turnState={turnState}
-      currentRow={currentRow}
-      onUpdate={onUpdate}
-    />
+    <SneakAttackSection character={character} turnState={turnState} currentRow={currentRow} />
   );
   const stunningStrike = boundView && (
-    <StunningStrikeSection
-      character={character}
-      turnState={turnState}
-      currentRow={currentRow}
-      onUpdate={onUpdate}
-    />
+    <StunningStrikeSection character={character} turnState={turnState} currentRow={currentRow} />
   );
   // Unlike the hit-gated riders above, Quivering Palm's Trigger isn't tied to a
   // hit this turn (it ends a prior Set, any time as a Magic action) — so this
   // mounts unconditionally rather than gating on boundView; the section itself
   // gates Set on currentRow and Trigger on the active flag (#1245).
   const quiveringPalm = (
-    <QuiveringPalmSection
-      character={character}
-      turnState={turnState}
-      currentRow={currentRow}
-      onUpdate={onUpdate}
-    />
+    <QuiveringPalmSection character={character} turnState={turnState} currentRow={currentRow} />
   );
   const spellAttacks = (
     <InlineSpellAttackSection
       character={character}
       sessionId={sessionId}
       turnState={turnState}
-      onUpdate={onUpdate}
       onLogChanged={onLogChanged}
     />
   );

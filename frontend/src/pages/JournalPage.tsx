@@ -23,6 +23,7 @@ import {
 import { useChronicle } from "@/features/journal/useChronicle";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
+import { CurrentCharacterProvider } from "@/hooks/CurrentCharacterProvider";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
@@ -30,14 +31,18 @@ import type { Character } from "@/types/character";
 
 export default function JournalPage() {
   const { id } = useParams();
-  const { character, error, setCharacter } = useCharacter(id);
+  const { character, error } = useCharacter(id);
   const showSpinner = useDelayedFlag(character === undefined && !error);
 
   if (error) return <CharacterLoadError variant="error" />;
   if (character === undefined) return showSpinner ? <Spinner variant="page" /> : null;
   if (character === null) return <CharacterLoadError variant="not-found" characterId={id} />;
 
-  return <JournalPageBody character={character} onUpdate={setCharacter} />;
+  return (
+    <CurrentCharacterProvider id={character.id}>
+      <JournalPageBody character={character} />
+    </CurrentCharacterProvider>
+  );
 }
 
 // Per-chapter note counts from the live journal, so the spine stays current as
@@ -52,13 +57,7 @@ function deriveNoteCounts(journal: Character["journal"]) {
   return { bySession, between };
 }
 
-function JournalPageBody({
-  character,
-  onUpdate,
-}: {
-  character: Character;
-  onUpdate: (character: Character) => void;
-}) {
+function JournalPageBody({ character }: { character: Character }) {
   const isMobile = useIsBelowMd();
   const { arcs, sessions, error, setSessions } = useChronicle(character);
   const { byId } = useCampaignEntities(character.campaignId);
@@ -102,7 +101,6 @@ function JournalPageBody({
       character={character}
       chapter={selectedChapter}
       entities={byId}
-      onUpdate={onUpdate}
       canRename={selectedChapter.sessionId != null && selectedChapter.participantIds.includes(character.id)}
       onRename={handleRename}
     />
@@ -114,7 +112,6 @@ function JournalPageBody({
 
   const shared = {
     character,
-    onUpdate,
     spine,
     effectiveId,
     filter,
@@ -133,7 +130,6 @@ function JournalPageBody({
 
 interface JournalViewProps {
   character: Character;
-  onUpdate: (character: Character) => void;
   spine: Spine;
   effectiveId: string | null;
   filter: string;
@@ -157,7 +153,7 @@ function BackLink({ character }: { character: Character }) {
 
 // Desktop: fixed spine + manuscript, side by side.
 function JournalDesktopView(props: JournalViewProps) {
-  const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
+  const { character, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   // useCaptureDock (not a bare useState) so ⌘J/Ctrl+J toggles the dock here too,
   // matching the sheet and session surfaces.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
@@ -192,7 +188,6 @@ function JournalDesktopView(props: JournalViewProps) {
           character={character}
           sessionId={props.selectedSessionId}
           onClose={closeCapture}
-          onUpdate={onUpdate}
         />
       )}
     </div>
@@ -201,7 +196,7 @@ function JournalDesktopView(props: JournalViewProps) {
 
 // Mobile: a chapters list that pushes to the manuscript page.
 function JournalMobileView(props: JournalViewProps) {
-  const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
+  const { character, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   const [pageOpen, setPageOpen] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
 
@@ -251,7 +246,6 @@ function JournalMobileView(props: JournalViewProps) {
           character={character}
           sessionId={props.selectedSessionId}
           onClose={() => setCaptureOpen(false)}
-          onUpdate={onUpdate}
         />
       )}
     </div>

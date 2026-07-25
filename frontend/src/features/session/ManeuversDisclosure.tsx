@@ -20,7 +20,6 @@ interface ManeuversDisclosureProps {
   view: AttackEntryView | null;
   attacksExhausted: boolean;
   die: UseManeuverDieReturn;
-  onUpdate: (c: Character) => void;
 }
 
 export default function ManeuversDisclosure({
@@ -29,7 +28,6 @@ export default function ManeuversDisclosure({
   view,
   attacksExhausted,
   die,
-  onUpdate,
 }: ManeuversDisclosureProps) {
   const [open, setOpen] = useState(false);
   const { pool, dieLabel } = die;
@@ -60,7 +58,6 @@ export default function ManeuversDisclosure({
               lastAttackRoll={view.lastAttackRoll}
               lastDamageRoll={view.lastDamageRoll}
               onRollsUpdated={view.onRollsUpdated}
-              onUpdate={onUpdate}
             />
           )}
           {view && (
@@ -71,7 +68,6 @@ export default function ManeuversDisclosure({
               lastAttackRoll={view.lastAttackRoll}
               lastDamageRoll={view.lastDamageRoll}
               onRollsUpdated={view.onRollsUpdated}
-              onUpdate={onUpdate}
             />
           )}
           <AttackOptionSection
