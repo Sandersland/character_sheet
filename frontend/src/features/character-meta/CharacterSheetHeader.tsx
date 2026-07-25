@@ -256,7 +256,7 @@ function DesktopBanner({
             onChange={(id) => onTabChange(id as SheetTabId)}
             idBase="sheet"
           />
-          <BannerVitals character={character} />
+          <BannerVitals />
         </div>
       </div>
     </header>

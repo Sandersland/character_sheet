@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 
 import CombatColumn from "@/features/session/CombatColumn";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 // The idle↔live parity contract (#1086): the slot order is fixed, so switching
@@ -18,16 +19,21 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
+// CombatColumn's nested ItemGrantsCard reads useCurrentCharacter(), so every
+// render seeds the cache and mounts CurrentCharacterProvider via
+// renderWithCharacter.
 describe("CombatColumn", () => {
   it("renders the fixed slot order: turn → HP → conditions → grants → log", () => {
-    render(
+    const character = makeCharacter();
+    renderWithCharacter(
       <CombatColumn
-        character={makeCharacter()}
+        character={character}
         turnSlot={<div>turn-content</div>}
         hpSlot={<div>hp-content</div>}
         conditionsSlot={<div>conditions-content</div>}
         logRow={<div>log-content</div>}
       />,
+      character,
     );
 
     const turn = screen.getByTestId("combat-turn");
@@ -43,28 +49,32 @@ describe("CombatColumn", () => {
   });
 
   it("omits the HP slot wrapper when no HP content is supplied (mobile live keeps HP in the header)", () => {
-    render(
+    const character = makeCharacter();
+    renderWithCharacter(
       <CombatColumn
-        character={makeCharacter()}
+        character={character}
         turnSlot={<div>turn-content</div>}
         hpSlot={null}
         conditionsSlot={<div>conditions-content</div>}
         logRow={<div>log-content</div>}
       />,
+      character,
     );
     expect(screen.queryByTestId("combat-hp")).toBeNull();
     expect(screen.getByTestId("combat-conditions")).toBeInTheDocument();
   });
 
   it("self-hides the item-grants card when the character has no granted defenses", () => {
-    render(
+    const character = makeCharacter({ resistances: [] });
+    renderWithCharacter(
       <CombatColumn
-        character={makeCharacter({ resistances: [] })}
+        character={character}
         turnSlot={<div>turn-content</div>}
         hpSlot={<div>hp-content</div>}
         conditionsSlot={<div>conditions-content</div>}
         logRow={<div>log-content</div>}
       />,
+      character,
     );
     expect(screen.queryByText("Resistances & Traits")).toBeNull();
   });

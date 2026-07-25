@@ -1,14 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import BannerVitals from "@/features/character-meta/BannerVitals";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
-
-function renderWithRoll(ui: React.ReactElement) {
-  return render(<RollProvider>{ui}</RollProvider>);
-}
 
 const mockCharacter: Character = {
   id: "char-1",
@@ -72,9 +69,21 @@ const mockCharacter: Character = {
   journal: [],
 };
 
+// BannerVitals (and its nested ArmorClassBreakdown) reads useCurrentCharacter(),
+// so every render seeds the cache and mounts CurrentCharacterProvider via
+// renderWithCharacter.
+function renderWithRoll() {
+  return renderWithCharacter(
+    <RollProvider>
+      <BannerVitals />
+    </RollProvider>,
+    mockCharacter,
+  );
+}
+
 describe("BannerVitals", () => {
   it("renders armor class as a disclosure button (no manual input)", () => {
-    const { container } = renderWithRoll(<BannerVitals character={mockCharacter} />);
+    const { container } = renderWithRoll();
     expect(screen.getByText("14")).toBeInTheDocument();
     expect(container.querySelector("input")).toBeNull();
     expect(screen.getByRole("button", { name: "Armor Class breakdown" })).toBeInTheDocument();
@@ -82,7 +91,7 @@ describe("BannerVitals", () => {
 
   it("clicking the AC tile opens the breakdown with labels, values, and total", async () => {
     const user = userEvent.setup();
-    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    renderWithRoll();
     await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
     const dialog = screen.getByRole("dialog", { name: "Armor Class breakdown" });
     expect(dialog).toHaveTextContent("Leather");
@@ -95,7 +104,7 @@ describe("BannerVitals", () => {
 
   it("Escape closes the breakdown popover", async () => {
     const user = userEvent.setup();
-    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    renderWithRoll();
     await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
@@ -103,7 +112,7 @@ describe("BannerVitals", () => {
   });
 
   it("renders speed with ft suffix and proficiency as a formatted modifier", () => {
-    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    renderWithRoll();
     expect(screen.getByText("35 ft")).toBeInTheDocument();
     expect(screen.getByText("+2")).toBeInTheDocument(); // proficiencyBonus=2
   });
@@ -111,13 +120,13 @@ describe("BannerVitals", () => {
   // #1085: HP left the header entirely (it lives in the Combat tab). The banner
   // is four self-labeled stat cards, no HP readout and no manage-HP entry point.
   it("renders no HP readout or manage-HP control in the header", () => {
-    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    renderWithRoll();
     expect(screen.queryByText(/hit points/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /manage hit points/i })).not.toBeInTheDocument();
   });
 
   it("renders exactly four self-labeled stat cards: AC / Initiative / Speed / Proficiency", () => {
-    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    renderWithRoll();
     expect(screen.getByText("Armor Class")).toBeInTheDocument();
     expect(screen.getByText("Initiative")).toBeInTheDocument();
     expect(screen.getByText("Speed")).toBeInTheDocument();

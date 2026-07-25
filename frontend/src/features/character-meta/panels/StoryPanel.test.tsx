@@ -22,12 +22,13 @@ function makeCharacter(partial: Partial<Character>): Character {
   } as unknown as Character;
 }
 
-// JournalDoorway (rendered inside StoryPanel) reads useCurrentCharacter(), so
-// every render seeds the cache and mounts CurrentCharacterProvider.
+// StoryPanel and its nested JournalDoorway/IdentityCard read
+// useCurrentCharacter(), so every render seeds the cache and mounts
+// CurrentCharacterProvider.
 function renderPanel(character: Character) {
   return renderWithCharacter(
     <MemoryRouter>
-      <StoryPanel character={character} reference={null} />
+      <StoryPanel />
     </MemoryRouter>,
     character,
   );

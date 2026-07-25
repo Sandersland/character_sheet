@@ -79,7 +79,7 @@ function AcBadge({ character }: { character: Character }) {
         </>
       }
     >
-      <ArmorClassBreakdown character={character} />
+      <ArmorClassBreakdown />
     </Popover>
   );
 }
