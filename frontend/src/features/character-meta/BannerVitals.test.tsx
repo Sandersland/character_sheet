@@ -13,6 +13,7 @@ function renderWithRoll(ui: React.ReactElement) {
 const mockCharacter: Character = {
   id: "char-1",
   ownerId: "user-1",
+  rulesEdition: "EDITION_2024",
   name: "Aria Swiftwind",
   race: "Elf",
   class: "Ranger",

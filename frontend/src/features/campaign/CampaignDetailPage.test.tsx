@@ -31,6 +31,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     id: "camp-1",
     name: "The Sunless Citadel",
     ownerId: "u1",
+    rulesEdition: "EDITION_2024",
     inviteCode: "abc123",
     createdAt: new Date().toISOString(),
     role: "OWNER",

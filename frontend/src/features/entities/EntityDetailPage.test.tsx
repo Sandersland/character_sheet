@@ -90,6 +90,7 @@ function campaign(
     id: CAMPAIGN_ID,
     name: "Camp",
     ownerId: "u1",
+    rulesEdition: "EDITION_2024",
     inviteCode: "x",
     createdAt: "",
     members: [],

@@ -178,6 +178,9 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
       });
       if (soloActive) return "soloSessionActive";
 
+      // rulesEdition is deliberately not written here: joining a campaign never
+      // converts a character's edition (write-once, #1281). A character whose
+      // edition differs from the campaign's is a warning surface owned by #1286.
       const { count } = await tx.character.updateMany({
         where: { id: characterId, OR: [{ campaignId: null }, { campaignId }] },
         data: { campaignId },

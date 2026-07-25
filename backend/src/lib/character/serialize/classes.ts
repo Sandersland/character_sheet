@@ -10,6 +10,7 @@ import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
@@ -208,7 +209,7 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
     // Per-entry subclass clamp-on-read (issue #125): hide a subclass whose
     // grant level exceeds this entry's effective level. Mirrors reconcileSubclass.
     const effectiveLevel = effectiveEntryLevel(level, row.classEntries.length, totalLevel);
-    const subclassVisible = subclassActiveAt(effectiveLevel, entry.class?.subclassLevel);
+    const subclassVisible = subclassActiveAt(effectiveLevel, entry.class?.subclassLevel, editionOf(row));
     out.push({
       id: entry.id,
       name: entry.name,

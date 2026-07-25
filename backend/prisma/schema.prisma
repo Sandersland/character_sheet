@@ -45,6 +45,15 @@ model Character {
   campaignId  String?
   campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
+  // Authoritative rules edition for this sheet (#1281/#1285), read only through
+  // editionOf. Persisted for the same reason as ownerId — it isn't a function of
+  // any other column, so derive-don't-persist doesn't apply. It lives here and
+  // not only on Campaign because a character may link to several campaigns and a
+  // solo session (#1080) has none. Write-once (decided 2026-07-25): set by the
+  // create transaction, absent from PATCH and every transaction op, which is what
+  // lets each LEVEL_GATED_RECONCILERS entry treat edition as a constant.
+  rulesEdition RulesEdition @default(EDITION_2024)
+
   experiencePoints Int @default(0)
 
   initiativeBonus Int
@@ -132,6 +141,10 @@ model User {
 model Campaign {
   id         String   @id @default(uuid())
   name       String
+  // The DM's default for characters created into this campaign (#1285). Never
+  // authoritative for an existing sheet — Character.rulesEdition is, and joining
+  // a campaign never converts it.
+  rulesEdition RulesEdition @default(EDITION_2024)
   ownerId    String
   owner      User     @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   // Opaque random join code (same crypto as session tokens). Unique so /join
@@ -180,6 +193,13 @@ model CampaignArc {
 enum CampaignRole {
   OWNER
   PLAYER
+}
+
+// 2014 = SRD 5.1, 2024 = SRD 5.2 (#1281). Both are supported editions; neither
+// is legacy.
+enum RulesEdition {
+  EDITION_2014
+  EDITION_2024
 }
 
 model CampaignMembership {
