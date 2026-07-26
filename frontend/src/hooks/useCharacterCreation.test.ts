@@ -105,6 +105,7 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     rulesEdition: "EDITION_2024",
     campaignId: null,
     campaignName: null,
+    createdId: null,
   };
   localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...base, ...overrides }));
 }
@@ -330,6 +331,41 @@ describe("useCharacterCreation", () => {
       await result.current.save();
     });
     // Retry: the character from the first attempt is reused — no second create.
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+    expect(addCharacterToCampaign).toHaveBeenCalledTimes(2);
+    expect(addCharacterToCampaign).toHaveBeenLastCalledWith("char-99", "camp-1");
+    expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
+  });
+
+  // #1286: CharacterDraft (including campaignId) is persisted to localStorage,
+  // but a plain useState-held "pending created id" would NOT survive a page
+  // refresh — a remounted hook reads only what's in the draft, sees no id, and
+  // would call createCharacter again, orphaning the first character. This test
+  // exercises that exact sequence: unmount (tears down all React state, as a
+  // refresh would) then mount a brand-new hook instance before retrying.
+  it("survives a refresh: a remounted hook resumes the pending created id instead of re-creating", async () => {
+    addCharacterToCampaign.mockRejectedValueOnce(new Error("Campaign not found")).mockResolvedValueOnce({});
+    seedDraft({ ...validDraft(), campaignId: "camp-1" });
+
+    const first = await mount();
+    await act(async () => {
+      await first.result.current.save();
+    });
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+    expect(first.result.current.submitError).toMatch(/Campaign not found/);
+
+    // Simulate a refresh: the component tree — and any plain useState — is
+    // torn down. Only what useCharacterDraft persisted to localStorage survives.
+    first.unmount();
+
+    const second = await mount();
+    await act(async () => {
+      await second.result.current.save();
+    });
+
+    // Exactly one createCharacter across the whole sequence, spanning the
+    // "refresh" — the remount must resume the pending id, not create a second
+    // character.
     expect(createCharacter).toHaveBeenCalledTimes(1);
     expect(addCharacterToCampaign).toHaveBeenCalledTimes(2);
     expect(addCharacterToCampaign).toHaveBeenLastCalledWith("char-99", "camp-1");

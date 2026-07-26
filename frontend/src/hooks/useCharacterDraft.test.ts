@@ -97,4 +97,19 @@ describe("useCharacterDraft", () => {
     act(() => result.current.clear());
     expect(result.current.draft.campaignName).toBeNull();
   });
+
+  // #1286: createdId must be part of the PERSISTED draft, not a hook-local
+  // useState — a page refresh keeps the draft (via localStorage) but discards
+  // any component state, so this is what lets a retry after a refresh resume
+  // the pending create instead of calling createCharacter again.
+  it("carries createdId, reset to null on clear()", () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    expect(result.current.draft.createdId).toBeNull();
+
+    act(() => result.current.update({ createdId: "char-1" }));
+    expect(result.current.draft.createdId).toBe("char-1");
+
+    act(() => result.current.clear());
+    expect(result.current.draft.createdId).toBeNull();
+  });
 });

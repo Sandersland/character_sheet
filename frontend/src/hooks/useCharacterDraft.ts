@@ -66,6 +66,11 @@ export interface CharacterDraft {
   /** #1286: the chosen campaign's display name, carried alongside campaignId so
    *  the Review step can echo it without a second fetch. Null for solo. */
   campaignName: string | null;
+  /** #1286: set once createCharacter succeeds, so a retry (even after a page
+   *  refresh) resumes the campaign attach instead of calling createCharacter
+   *  again — createCharacter is not idempotent, and this field (unlike a
+   *  useState) survives the refresh because the whole draft is persisted. */
+  createdId: string | null;
 }
 
 const EMPTY_DRAFT: CharacterDraft = {
@@ -93,6 +98,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   rulesEdition: null,
   campaignId: null,
   campaignName: null,
+  createdId: null,
 };
 
 /**

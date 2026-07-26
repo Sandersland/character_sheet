@@ -72,10 +72,6 @@ export function useCharacterCreation(): CharacterCreation {
   const { reference, error: referenceError } = useReferenceData();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // A create that succeeded but whose campaign attach then failed (or any retry
-  // of that state): holds the id so a retry attaches instead of re-creating —
-  // createCharacter is not idempotent, so a plain retry would orphan-and-duplicate.
-  const [createdId, setCreatedId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<Item[]>([]);
   const showSpinner = useDelayedFlag(!reference && !referenceError);
 
@@ -136,12 +132,11 @@ export function useCharacterCreation(): CharacterCreation {
     navigate("/");
   }
 
-  // Wraps useCharacterDraft's clear so Start Over also drops any pending
-  // created-but-unattached id — otherwise a totally different draft, saved
-  // later, would resume the abandoned attempt's id instead of creating fresh.
+  // Wraps useCharacterDraft's clear so Start Over also resets submitError —
+  // clearDraft() alone already drops any pending created-but-unattached id
+  // (draft.createdId, part of the same persisted object).
   function clear() {
     clearDraft();
-    setCreatedId(null);
     setSubmitError(null);
   }
 
@@ -149,9 +144,11 @@ export function useCharacterCreation(): CharacterCreation {
     if (missing.length > 0 || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
-    // A prior attempt's successful create (attach failed after it) resumes
-    // from its id; otherwise this call's own createCharacter sets it below.
-    let id = createdId;
+    // #1286: read from the persisted draft, not a useState — createCharacter is
+    // not idempotent, and a plain useState-held id would be lost on a page
+    // refresh (CharacterDraft is persisted; component state is not), silently
+    // reopening the orphan-and-duplicate bug this field exists to close.
+    let id = draft.createdId;
     try {
       if (!id) {
         const payload = buildCreatePayload(
@@ -162,9 +159,9 @@ export function useCharacterCreation(): CharacterCreation {
         );
         const created = await createCharacter(payload);
         id = created.id;
-        setCreatedId(id);
+        update({ createdId: id });
       }
-      // #1286: campaignId was resolved (and its edition inherited) at the
+      // campaignId was resolved (and its edition inherited) at the
       // CreationEntryGate before the ceremony started; attach reuses the
       // existing join endpoint instead of adding a second creation-time mutation
       // path. Editions always match here (inherited, never re-picked), so this
