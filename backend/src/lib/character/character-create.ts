@@ -389,9 +389,20 @@ function applyBackgroundSpread(
 
 // Snapshots the background's Origin feat into a slot-exempt AdvancementEntry
 // (#1130). Magic Initiate's granted class is folded into the description snapshot.
-function buildOriginEntry(background: ResolvedBackground): AdvancementEntry | null {
-  const feat = background?.originFeat;
-  if (!feat) return null;
+//
+// Background.originFeatId is a single FK, fixed once at seed time to a
+// representative row (the reference-display default — same "no character to
+// resolve against" reasoning as reference.ts's subclassLevel hardcode). A
+// character actually being CREATED has an edition, so re-resolve the feat by
+// NAME against THIS character's edition (#1306) rather than trust whichever
+// row got baked — Alert forks by edition, so a 2014 character creating with a
+// background whose baked FK happens to point at the 2024 row must still land
+// on the 2014 row. Falls back to the baked row when no closer match exists.
+async function buildOriginEntry(background: ResolvedBackground, edition: RulesEdition): Promise<AdvancementEntry | null> {
+  if (!background?.originFeat) return null;
+  const baked = background.originFeat;
+  const candidates = await prisma.feat.findMany({ where: { name: baked.name, ...editionOrShared(edition) } });
+  const feat = resolveEditionRow(candidates, edition) ?? baked;
   const flavor = feat.name === "Magic Initiate" ? MAGIC_INITIATE_CLASS_BY_BACKGROUND[background.name] : undefined;
   const featDescription = flavor ? `${feat.description}\n\nBackground grant: ${flavor} spell list.` : feat.description;
   return {
@@ -413,10 +424,11 @@ function buildOriginEntry(background: ResolvedBackground): AdvancementEntry | nu
 // effective scores (baked BEFORE deriveCreatedCharacter so HP/init are correct)
 // and snapshot the Origin feat. A spec-less/custom background rejects any spread
 // but still grants its (absent) feat; omitting the spread applies no bump.
-function resolveBackgroundGrants(
+async function resolveBackgroundGrants(
   input: CreateCharacterBody,
   background: ResolvedBackground,
-): PhaseResult<BackgroundGrants> {
+  edition: RulesEdition,
+): Promise<PhaseResult<BackgroundGrants>> {
   const spread = input.backgroundAbilities;
   const choices = background?.abilityChoices ?? [];
 
@@ -431,7 +443,7 @@ function resolveBackgroundGrants(
   return {
     ok: true,
     effectiveScores: applyBackgroundSpread(input.abilityScores, spread),
-    originEntry: buildOriginEntry(background),
+    originEntry: await buildOriginEntry(background, edition),
   };
 }
 
@@ -817,7 +829,10 @@ export async function createCharacter(
   const selections = await resolveSelections(input);
   if (!selections.ok) return selections;
 
-  const grants = resolveBackgroundGrants(input, selections.background);
+  // Re-derives the same edition resolveSelections used (DEFAULT_RULES_EDITION
+  // is the shared constant that keeps the two independent resolutions from
+  // drifting — same pattern as the rulesEdition write further down).
+  const grants = await resolveBackgroundGrants(input, selections.background, input.rulesEdition ?? DEFAULT_RULES_EDITION);
   if (!grants.ok) return grants;
 
   const equipment = await materializeStartingEquipment(input, selections.primaryClassChoice.name);
