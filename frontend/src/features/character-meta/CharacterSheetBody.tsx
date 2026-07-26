@@ -7,7 +7,7 @@ import type { SheetPanelProps, SheetTabId } from "@/features/character-meta/shee
 import type { ReferenceData } from "@/types/character";
 
 // #1279: these three panels are the sheet's heaviest per-tab trees (spells,
-// inventory, journal) — route-lazied so their weight loads on first activation
+// inventory, journal) — tab-lazied so their weight loads on first activation
 // of that tab rather than riding along with the sheet's own chunk. Overview and
 // Class stay eager: Overview is the tab shown on first sheet load, and Class
 // isn't one of the heavy trees, so lazying them would only add a request with

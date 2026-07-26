@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
-import type { Character } from "@/types/character";
 
 // Stub the panels so we assert only the combat-branch routing (#960 slot logic).
 vi.mock("@/features/character-meta/panels/OverviewPanel", () => ({ default: () => <div>overview-panel</div> }));
@@ -12,12 +11,11 @@ vi.mock("@/features/character-meta/panels/InventoryPanel", () => ({ default: () 
 vi.mock("@/features/character-meta/panels/MagicPanel", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/panels/StoryPanel", () => ({ default: () => null }));
 
-const character = { id: "c1", spellcasting: undefined } as unknown as Character;
-const props = { character, reference: null };
+const props = { reference: null };
 
 describe("CharacterSheetBody combat slot (#960)", () => {
   it("renders the static CombatPanel on Combat when there is no live panel", async () => {
-    // CombatPanel is route-lazied (#1279) — the mock still resolves, just on
+    // CombatPanel is tab-lazied (#1279) — the mock still resolves, just on
     // a microtask, so this assertion needs to await it.
     render(<CharacterSheetBody {...props} activeTab="combat" />);
     expect(await screen.findByText("static-combat-panel")).toBeInTheDocument();
