@@ -47,21 +47,31 @@ function deriveManeuverIds(resources: CharacterResources | undefined): string[] 
     .map((m) => m.maneuverId as string);
 }
 
+// Warrior of the Elements/Shadow entitlement is availableActions[] presence
+// (#1315) — the same gated DERIVED_ACTIONS rows the turn tracker reads —
+// rather than a resources boolean, so it's independent of the resources block.
+function hasAction(character: Character, key: string): boolean {
+  return (character.availableActions ?? []).some((a) => a.key === key);
+}
+
 function deriveFlags(character: Character): ClassFeatureFlags {
   // Fighting Style is a feat partition (#1137): entitlement follows the slot
   // total, and the taken feats are the fightingStyle-slot advancements — both
   // independent of the resources block.
   const hasFightingStyle = (character.fightingStyleSlots?.total ?? 0) > 0;
   const fightingStyleFeats = (character.advancements ?? []).filter((a) => a.slot === "fightingStyle");
+  const hasElementsWarrior = hasAction(character, "elementalAttunement");
+  const hasShadowArts = hasAction(character, "shadowArts");
+  const hasCloakOfShadows = hasAction(character, "cloakOfShadows");
   const resources: CharacterResources | undefined = character.resources;
   if (!resources) {
     return {
       hasPools: false,
       hasManeuvers: false,
-      hasElementsWarrior: false,
-      hasShadowArts: false,
+      hasElementsWarrior,
+      hasShadowArts,
       hasChannelDivinity: false,
-      hasCloakOfShadows: false,
+      hasCloakOfShadows,
       hasFeatures: false,
       hasFightingStyle,
       fightingStyleFeats,
@@ -70,10 +80,10 @@ function deriveFlags(character: Character): ClassFeatureFlags {
   return {
     hasPools: resources.pools.length > 0,
     hasManeuvers: resources.maneuverChoiceCount !== undefined,
-    hasElementsWarrior: resources.elementalAttunementAvailable === true,
-    hasShadowArts: resources.shadowArtsAvailable === true,
+    hasElementsWarrior,
+    hasShadowArts,
     hasChannelDivinity: resources.pools.some((p) => p.key === "channelDivinity"),
-    hasCloakOfShadows: resources.cloakOfShadowsAvailable === true,
+    hasCloakOfShadows,
     hasFeatures: resources.features.length > 0,
     hasFightingStyle,
     fightingStyleFeats,

@@ -20,6 +20,7 @@ import {
   consumableCount,
   mainWeaponSummary,
   offHandSummary,
+  partitionClassActions,
   twfHint,
 } from "@/lib/turnOptions";
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
@@ -115,12 +116,7 @@ export function useTurnActions({
   // Derive available class actions from character data.
   const availableActions: AvailableAction[] = character.availableActions ?? [];
   const raging = activeDurableBuffKeys.includes("rage");
-  const classActions = availableActions.filter((a) => a.cost === "action");
-  // While raging, swap the Rage affordance for End Rage (both are bonus actions).
-  const classBonusActions = availableActions.filter(
-    (a) => a.cost === "bonusAction" && a.key !== (raging ? "rage" : "endRage"),
-  );
-  const classReactions = availableActions.filter((a) => a.cost === "reaction");
+  const { classActions, classBonusActions, classReactions } = partitionClassActions(availableActions, raging);
 
   // Action Surge pool — Fighter-only resource.
   const actionSurgePool = character.resources?.pools?.find((p) => p.key === "actionSurge");

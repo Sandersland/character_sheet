@@ -408,7 +408,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
 
     // Class-specific available actions for the turn tracker (universal ones
     // render client-side from UNIVERSAL_ACTIONS).
-    availableActions: buildAvailableActionsView(primaryClass, progress.level, resources, unarmoredUnshielded),
+    availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded),
 
     // Combat attack rows — derived at read time; the frontend renders these
     // directly in AttacksPanel rather than recomputing attack math on the client.

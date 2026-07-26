@@ -222,24 +222,21 @@ export function deriveEntryScopedResourcesForCharacterRow(row: {
   return { derived, level };
 }
 
-// Every scalar/boolean field a class/subclass's deriveExtras can contribute
-// (choice-cap fields like maneuverChoiceCount, and gate booleans like
-// shadowArtsAvailable/elementalBurstAvailable), overlaid per class entry by
-// deriveEntryScopedResources. Generic over whatever ExtrasFn returns (#1206) —
-// a class appears at most once in classEntries, so listing every such field
-// here needs no per-field cross-entry collision handling. `subclassChoices` is
-// excluded: it concats across entries instead of overlaying (below). The pool
-// `resources` and `features` layers are entry-scoped separately (#1071, #1206).
-// Kept as a typed list so the overlay loop and its "has anything to
-// contribute" check share one enumeration.
+// Every scalar field a class/subclass's deriveExtras can contribute (choice-cap
+// fields like maneuverChoiceCount/maneuverSaveDC/toolProfChoiceCount), overlaid
+// per class entry by deriveEntryScopedResources. Generic over whatever ExtrasFn
+// returns (#1206) — a class appears at most once in classEntries, so listing
+// every such field here needs no per-field cross-entry collision handling.
+// `subclassChoices` is excluded: it concats across entries instead of
+// overlaying (below). The pool `resources` and `features` layers are
+// entry-scoped separately (#1071, #1206). Level-gated action-availability
+// gates (Shadow Arts, Elemental Burst, …) no longer live here — they moved to
+// DERIVED_ACTIONS rows (actions.ts, #1315). Kept as a typed list so the overlay
+// loop and its "has anything to contribute" check share one enumeration.
 const EXTRAS_FIELDS = [
   "maneuverChoiceCount",
   "maneuverSaveDC",
   "toolProfChoiceCount",
-  "elementalAttunementAvailable",
-  "elementalBurstAvailable",
-  "shadowArtsAvailable",
-  "cloakOfShadowsAvailable",
 ] as const satisfies readonly (keyof Omit<DerivedClassInfo, "resources" | "features" | "subclassChoices">)[];
 
 // Whether an entry's own-level derivation has any extras field to overlay
@@ -250,9 +247,9 @@ function entryContributesExtras(info: DerivedClassInfo): boolean {
 
 // Assigns through a generic key so TS correlates each EXTRAS_FIELDS entry's
 // key with its own value type — a plain `target[field] = info[field]` inside
-// the loop below doesn't typecheck because EXTRAS_FIELDS mixes numeric
-// (maneuverChoiceCount) and boolean (shadowArtsAvailable) fields, and a
-// non-generic union-typed key can't be correlated to a union-typed value.
+// the loop below doesn't typecheck against a non-generic union-typed key,
+// which can't be correlated to a union-typed value (a future extras field
+// could reintroduce a mixed-type union here, same as before #1315).
 function assignDefined<T, K extends keyof T>(target: T, key: K, value: T[K] | undefined): void {
   if (value !== undefined) target[key] = value;
 }
@@ -351,20 +348,19 @@ function collectEntryScopedFeatures(
 /**
  * Entry-scoped resource caps + pools + features for multiclass level-up
  * (#1177 caps, #1071 pools, #1206 features + extras): the EXTRAS_FIELDS
- * (maneuverChoiceCount/SaveDC, toolProfChoiceCount, subclassChoices, and gate
- * booleans like shadowArtsAvailable/elementalBurstAvailable), the `resources`
- * pool layer (focus, superiority dice, rage, sorcery points, …), and the
- * `features` list are all re-derived per class entry at that entry's OWN
- * effective level and merged — so a secondary Battle Master's maneuver cap,
- * its superiority-dice pool, AND its features all come from the fighter
+ * (maneuverChoiceCount/SaveDC, toolProfChoiceCount, subclassChoices), the
+ * `resources` pool layer (focus, superiority dice, rage, sorcery points, …),
+ * and the `features` list are all re-derived per class entry at that entry's
+ * OWN effective level and merged — so a secondary Battle Master's maneuver
+ * cap, its superiority-dice pool, AND its features all come from the fighter
  * entry's own level, not the primary entry's or the summed total (PHB'24
- * p.163: each class's pool scales to that class's own level). This also means
- * a secondary Warrior of Shadow monk's shadowArtsAvailable/
- * cloakOfShadowsAvailable now key off the MONK entry's own level rather than
- * never appearing (the old primary-only overlay). `effectiveEntryLevel`
- * collapses to the XP-derived total for single-class characters, so
- * single-class output is byte-identical to a bare deriveResources() call (see
- * the parity tests).
+ * p.163: each class's pool scales to that class's own level). Level-gated
+ * action-availability gates (a secondary Warrior of Shadow monk's shadowArts/
+ * cloakOfShadows) are entry-scoped the same way, but through
+ * deriveEntryScopedActions (actions.ts, #1315) rather than this function.
+ * `effectiveEntryLevel` collapses to the XP-derived total for single-class
+ * characters, so single-class output is byte-identical to a bare
+ * deriveResources() call (see the parity tests).
  */
 export function deriveEntryScopedResources(
   classEntries: { name: string; subclass?: string | null; level: number }[],

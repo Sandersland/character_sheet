@@ -364,29 +364,18 @@ export const monk: ClassDefinition = {
     "warrior of shadow": {
       grantLevel: 3,
       features: WARRIOR_OF_SHADOW_FEATURES,
-      deriveExtras: (level) => {
-        const extras: { shadowArtsAvailable?: boolean; cloakOfShadowsAvailable?: boolean } = {};
-        if (level >= 3) extras.shadowArtsAvailable = true;
-        // Cloak of Shadows moved 11 -> 17 in the 2024 rewrite (#1246): L11 is now
-        // Improved Shadow Step, a reminder-only Shadow Step upgrade with no gate
-        // boolean of its own (mirrors Shadow Step itself).
-        if (level >= 17) extras.cloakOfShadowsAvailable = true;
-        return extras;
-      },
+      // Shadow Arts (L3) / Cloak of Shadows (L17, moved from 11 in the 2024
+      // rewrite #1246) gates live as DERIVED_ACTIONS rows (actions.ts) rather
+      // than deriveExtras booleans — one shared level-gate registry for every
+      // monk action instead of a second copy here (#1315).
     },
     "warrior of the elements": {
       grantLevel: 3,
       features: WARRIOR_OF_THE_ELEMENTS_FEATURES,
-      // Gate flags for the two Focus-spending session actions (Elemental
-      // Attunement toggle at L3, Elemental Burst at L6). The save DC for both is
-      // the monk's focus save DC (surfaced via the Focus pool), so no separate
-      // DC field is derived here.
-      deriveExtras: (level) => {
-        const extras: { elementalAttunementAvailable?: boolean; elementalBurstAvailable?: boolean } = {};
-        if (level >= 3) extras.elementalAttunementAvailable = true;
-        if (level >= 6) extras.elementalBurstAvailable = true;
-        return extras;
-      },
+      // Elemental Attunement (L3) / Elemental Burst (L6) gates live as
+      // DERIVED_ACTIONS rows (actions.ts) rather than deriveExtras booleans
+      // (#1315). The save DC for both is the monk's focus save DC (surfaced
+      // via the Focus pool), so no separate DC field is derived here.
     },
     "warrior of mercy": {
       grantLevel: 3,

@@ -7,7 +7,7 @@ import {
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
-import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
+import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -67,10 +67,6 @@ function buildResourcesPayload(
     features: derivedRes.features,
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
-    elementalAttunementAvailable: derivedRes.elementalAttunementAvailable,
-    elementalBurstAvailable: derivedRes.elementalBurstAvailable,
-    shadowArtsAvailable: derivedRes.shadowArtsAvailable,
-    cloakOfShadowsAvailable: derivedRes.cloakOfShadowsAvailable,
     pools: derivedRes.resources.map((pool) => ({
       key: pool.key,
       label: pool.label,
@@ -164,12 +160,14 @@ export function applyFeatLayer(
   return { featBonuses, effectiveMaxHp, featProficiencies };
 }
 
-// Class-specific available actions for the turn tracker — derived from
-// class/subclass/level + current resource pools. Universal actions are
-// rendered client-side from UNIVERSAL_ACTIONS;
+// Class-specific available actions for the turn tracker — derived from EVERY
+// class entry at its own effective level (#1206/#1315), not just the primary
+// entry at total level, so a secondary class's gated actions (e.g. a Warrior
+// of Shadow monk's shadowArts/cloakOfShadows) surface even when it isn't
+// primary. Universal actions are rendered client-side from UNIVERSAL_ACTIONS;
 // only class-specific ones live here to avoid double-rendering.
 export function buildAvailableActionsView(
-  primaryClass: PrimaryClass,
+  classEntries: CharacterWithRelations["classEntries"],
   level: number,
   resources: object | undefined,
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218) —
@@ -180,13 +178,7 @@ export function buildAvailableActionsView(
     resources && "pools" in resources
       ? (resources as { pools: { key: string; remaining: number }[] }).pools
       : [];
-  return deriveActions(
-    primaryClass?.name ?? "",
-    primaryClass?.subclass ?? undefined,
-    level,
-    pools,
-    unarmoredUnshielded,
-  );
+  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded);
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

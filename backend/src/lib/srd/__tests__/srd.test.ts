@@ -247,23 +247,11 @@ describe("deriveResources — Monk Focus", () => {
 });
 
 // ── Monk — Warrior of the Elements (2024) ─────────────────────────────────────
+// The Elemental Attunement/Elemental Burst level gates moved off DerivedClassInfo
+// booleans onto DERIVED_ACTIONS rows (#1315) — see actions.test.ts's "Warrior of
+// the Elements" describe block for that gating coverage.
 
 describe("deriveResources — Warrior of the Elements", () => {
-  it("does not set the elemental gate flags below grant level 3", () => {
-    const result = deriveResources("monk", "warrior of the elements", 2, ABILITY_SCORES, PROF_2, "EDITION_2024");
-    expect(result!.elementalAttunementAvailable).toBeUndefined();
-    expect(result!.elementalBurstAvailable).toBeUndefined();
-  });
-
-  it("gates Elemental Attunement at L3 and Elemental Burst at L6", () => {
-    const l3 = deriveResources("monk", "warrior of the elements", 3, ABILITY_SCORES, PROF_2, "EDITION_2024");
-    expect(l3!.elementalAttunementAvailable).toBe(true);
-    expect(l3!.elementalBurstAvailable).toBeUndefined();
-    const l6 = deriveResources("monk", "warrior of the elements", 6, ABILITY_SCORES, PROF_3, "EDITION_2024");
-    expect(l6!.elementalAttunementAvailable).toBe(true);
-    expect(l6!.elementalBurstAvailable).toBe(true);
-  });
-
   it("surfaces all four fixed features by level 17", () => {
     const result = deriveResources("monk", "warrior of the elements", 17, ABILITY_SCORES, PROF_2, "EDITION_2024");
     const names = result!.features.filter((f) => f.source === "subclass").map((f) => f.name);
@@ -282,26 +270,16 @@ describe("deriveResources — Warrior of the Elements", () => {
     const result = deriveResources("monk", "warrior of the elements", 2, ABILITY_SCORES, PROF_2, "EDITION_2024");
     expect(result!.features.some((f) => f.source === "subclass")).toBe(false);
   });
-
-  it("leaves other monks unaffected (no elemental gate flags)", () => {
-    const openHand = deriveResources("monk", "warrior of the open hand", 6, ABILITY_SCORES, PROF_3, "EDITION_2024");
-    expect(openHand!.elementalAttunementAvailable).toBeUndefined();
-    const noSub = deriveResources("monk", undefined, 6, ABILITY_SCORES, PROF_3, "EDITION_2024");
-    expect(noSub!.elementalAttunementAvailable).toBeUndefined();
-  });
 });
 
 // ── Monk — Warrior of Shadow (2024 rewrite, SRD 5.2, #1246) ──────────────────
+// The Shadow Arts/Cloak of Shadows level gates moved off DerivedClassInfo
+// booleans onto DERIVED_ACTIONS rows (#1315) — see actions.test.ts's "Warrior
+// of Shadow" describe block for that gating coverage.
 
 describe("deriveResources — Warrior of Shadow", () => {
-  it("does not set shadowArtsAvailable below grant level 3", () => {
-    const result = deriveResources("monk", "warrior of shadow", 2, ABILITY_SCORES, PROF_2, "EDITION_2024");
-    expect(result!.shadowArtsAvailable).toBeUndefined();
-  });
-
-  it("sets shadowArtsAvailable at level 3, describing the 1-focus Darkness cast plus Minor Illusion + Darkvision", () => {
+  it("describes the 1-focus Darkness cast plus Minor Illusion + Darkvision at level 3", () => {
     const result = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, PROF_2, "EDITION_2024");
-    expect(result!.shadowArtsAvailable).toBe(true);
     const feature = result!.features.find((f) => f.name === "Shadow Arts");
     expect(feature?.description).toMatch(/1 focus/i);
     expect(feature?.description).toMatch(/darkness/i);
@@ -316,21 +294,6 @@ describe("deriveResources — Warrior of Shadow", () => {
     expect(result!.features.some((f) => f.name === "Improved Shadow Step")).toBe(true);
     // Cloak of Shadows hasn't unlocked yet at L11 — it moved to L17.
     expect(result!.features.some((f) => f.name === "Cloak of Shadows")).toBe(false);
-    expect(result!.cloakOfShadowsAvailable).toBeUndefined();
-  });
-
-  it("does not set cloakOfShadowsAvailable below level 17", () => {
-    for (const level of [3, 6, 11, 16]) {
-      const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4, "EDITION_2024");
-      expect(result!.cloakOfShadowsAvailable).toBeUndefined();
-    }
-  });
-
-  it("sets cloakOfShadowsAvailable at level 17 and above (moved from L11 in the 2024 rewrite)", () => {
-    for (const level of [17, 20]) {
-      const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4, "EDITION_2024");
-      expect(result!.cloakOfShadowsAvailable).toBe(true);
-    }
   });
 
   it("surfaces the Cloak of Shadows feature at level 17", () => {
@@ -343,13 +306,6 @@ describe("deriveResources — Warrior of Shadow", () => {
       const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4, "EDITION_2024");
       expect(result!.features.some((f) => f.name === "Opportunist")).toBe(false);
     }
-  });
-
-  it("leaves other monks unaffected (no cloakOfShadowsAvailable)", () => {
-    const openHand = deriveResources("monk", "warrior of the open hand", 17, ABILITY_SCORES, PROF_4, "EDITION_2024");
-    expect(openHand!.cloakOfShadowsAvailable).toBeUndefined();
-    const noSub = deriveResources("monk", undefined, 17, ABILITY_SCORES, PROF_4, "EDITION_2024");
-    expect(noSub!.cloakOfShadowsAvailable).toBeUndefined();
   });
 });
 

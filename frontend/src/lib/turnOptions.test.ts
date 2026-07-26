@@ -14,6 +14,7 @@ import {
   mainWeaponSummary,
   moreActionsPreview,
   offHandSummary,
+  partitionClassActions,
   poolBadgeFor,
   twfHint,
 } from "@/lib/turnOptions";
@@ -382,6 +383,63 @@ describe("twfHint", () => {
   it("generic fallback when fewer than two light weapons are owned", () => {
     const c = makeCharacter({ inventory: [weaponItem()] } as Partial<Character>);
     expect(twfHint(c)).toBe("Off-hand attack needs two light weapons equipped.");
+  });
+});
+
+describe("partitionClassActions", () => {
+  const action = (key: string, cost: AvailableAction["cost"]): AvailableAction => ({
+    key,
+    name: key,
+    cost,
+    enabled: true,
+  });
+
+  // #1315: shadowArts/cloakOfShadows/elementalBurst are cost:"action"
+  // DERIVED_ACTIONS rows with NO frontend resolver — they cast through their
+  // own dedicated /abilities/shadow-arts and /abilities/warrior-of-elements
+  // endpoints + Class-tab sections (ShadowArtsSection/CloakOfShadowsSection/
+  // WarriorOfElementsSection), not the generic turn-hub dispatch. Before this
+  // fix they still reached classActions and rendered a clickable card:
+  // planActionClick's no-resolver fallback is {consumeSlot:true, send:"none"}
+  // — clicking it would burn the character's Action and do nothing (no focus
+  // spent, no cast, no invisibility). partitionClassActions must drop any
+  // action with no resolver instead of letting it through.
+  it("drops action-cost rows with no resolver instead of letting them consume the slot", () => {
+    const { classActions } = partitionClassActions(
+      [action("secondWind", "action"), action("shadowArts", "action"), action("cloakOfShadows", "action"), action("elementalBurst", "action")],
+      false,
+    );
+    const keys = classActions.map((a) => a.key);
+    expect(keys).toEqual(["secondWind"]);
+  });
+
+  it("invariant: every key in every partition has a registered resolver (never consumes a slot for nothing)", () => {
+    const availableActions = [
+      action("secondWind", "action"),
+      action("shadowArts", "action"),
+      action("cloakOfShadows", "action"),
+      action("elementalBurst", "action"),
+      action("bardicInspiration", "bonusAction"),
+      action("deflectAttacks", "reaction"),
+    ];
+    const { classActions, classBonusActions, classReactions } = partitionClassActions(availableActions, false);
+    for (const a of [...classActions, ...classBonusActions, ...classReactions]) {
+      expect(resolverFor(a.key), `${a.key} has no resolver but reached a turn-hub partition`).toBeDefined();
+    }
+  });
+
+  it("still swaps rage/endRage by the raging flag (unchanged behavior)", () => {
+    const availableActions = [action("rage", "bonusAction"), action("endRage", "bonusAction")];
+    expect(partitionClassActions(availableActions, false).classBonusActions.map((a) => a.key)).toEqual(["rage"]);
+    expect(partitionClassActions(availableActions, true).classBonusActions.map((a) => a.key)).toEqual(["endRage"]);
+  });
+
+  it("partitions by cost (action/bonusAction/reaction) same as before", () => {
+    const availableActions = [action("secondWind", "bonusAction"), action("deflectAttacks", "reaction"), action("cunningAction", "bonusAction")];
+    const { classActions, classBonusActions, classReactions } = partitionClassActions(availableActions, false);
+    expect(classActions).toEqual([]);
+    expect(classBonusActions.map((a) => a.key)).toEqual(["secondWind", "cunningAction"]);
+    expect(classReactions.map((a) => a.key)).toEqual(["deflectAttacks"]);
   });
 });
 
