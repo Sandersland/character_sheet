@@ -40,10 +40,11 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // The damage event lands on the session log — opened on demand from the one-line
-  // log row (#1086; the always-visible rail is gone).
+  // log row (#1086; the always-visible rail is gone). Matched on the chat-feed
+  // sentence rather than a bare type label, which the #1237 redesign removed.
   await page.getByRole("button", { name: /open session log/i }).click();
   await expect(
-    page.getByRole("dialog", { name: "Session Log" }).getByText("damage", { exact: true }).first(),
+    page.getByRole("dialog", { name: "Session Log" }).getByText(/Took \d+.*damage/).first(),
   ).toBeVisible();
 
   expect(errors).toEqual([]);

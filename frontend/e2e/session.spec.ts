@@ -72,10 +72,11 @@ test("session: desktop live Combat has no rails; a roll lands in the on-demand l
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Open the on-demand log overlay (a right Drawer) — the attack roll landed in it
-  // without any tab switch.
+  // without any tab switch. Matched on the chat-feed sentence rather than a bare
+  // type label, which the #1237 redesign removed.
   await page.getByRole("button", { name: /open session log/i }).click();
   const logDrawer = page.getByRole("dialog", { name: "Session Log" });
-  await expect(logDrawer.getByText("attack").first()).toBeVisible();
+  await expect(logDrawer.getByText(/Rolled |hit for |missed/).first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
