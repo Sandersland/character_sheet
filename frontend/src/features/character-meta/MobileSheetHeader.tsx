@@ -9,6 +9,7 @@ import Popover from "@/components/ui/Popover";
 import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import CharacterSwitcherSheet from "@/features/character-meta/CharacterSwitcherSheet";
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
+import PreferencesSheet from "@/features/preferences/PreferencesSheet";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { EDITION_LABELS } from "@/lib/editionCopy";
@@ -99,16 +100,21 @@ function HpNumbers({ current, max, temp }: { current: number; max: number; temp:
 
 // One menu, not two (#979): while joined, Leave/End Session join Note/Sessions/
 // Activity/All characters (above Delete). "All characters" (#1027) is the ⋮
-// discoverability fallback for the identity-tap switcher.
+// discoverability fallback for the identity-tap switcher. "Preferences…" is
+// unconditional (#1167): this immersive mobile shell hides AppHeader/AccountMenu
+// (`hidden md:flex`), so without this item mobile would lose that route entirely
+// while the sheet is open — other mobile routes (/, /campaigns, journal) keep it.
 function buildMenuItems(
   handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete" | "onOpenCampaignSettings">,
   onAllCharacters: () => void,
+  onOpenPreferences: () => void,
   sessionActions: MobileSheetHeaderProps["sessionActions"],
 ): SheetMenuItem[] {
   return [
     { label: "＋ Note", onSelect: handlers.onOpenCapture },
     { label: "Sessions", onSelect: handlers.onOpenSessions },
     { label: "Activity", onSelect: handlers.onOpenActivity },
+    { label: "Preferences…", onSelect: onOpenPreferences },
     ...(handlers.onOpenCampaignSettings
       ? [{ label: "Campaign settings…", onSelect: handlers.onOpenCampaignSettings }]
       : []),
@@ -146,11 +152,16 @@ export default function MobileSheetHeader({
   const { character } = useCurrentCharacter();
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  // Self-contained like switcherOpen (#1027) — the mobile sheet's own
+  // Preferences entry point (#1167), needed because this route's own chrome
+  // hides AppHeader/AccountMenu on mobile (`hidden md:flex`).
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
   const menuItems = buildMenuItems(
     { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete, onOpenCampaignSettings },
     () => navigate("/"),
+    () => setPrefsOpen(true),
     sessionActions,
   );
   const live = sessionActions !== null;
@@ -170,6 +181,13 @@ export default function MobileSheetHeader({
         reducedMotion={reducedMotion}
       />
       {switcherOpen && <CharacterSwitcherSheet currentId={character.id} onClose={() => setSwitcherOpen(false)} />}
+      {prefsOpen && (
+        <PreferencesSheet
+          onClose={() => setPrefsOpen(false)}
+          campaignId={character.campaignId}
+          onOpenCampaignSettings={onOpenCampaignSettings}
+        />
+      )}
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
@@ -6,6 +7,7 @@ import BannerVitals from "@/features/character-meta/BannerVitals";
 import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
 import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import PreferencesSheet from "@/features/preferences/PreferencesSheet";
 import Tabs from "@/components/ui/Tabs";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { EDITION_LABELS } from "@/lib/editionCopy";
@@ -233,6 +235,7 @@ function DesktopBanner({
             <BackendStatus />
             <BannerActions
               uncampaigned={!character.campaignId}
+              campaignId={character.campaignId}
               isLive={isLive}
               liveRound={liveRound}
               isLiveJoined={isLiveJoined}
@@ -275,12 +278,61 @@ const BANNER_LINK =
 const BANNER_KEBAB =
   "flex h-7 w-7 items-center justify-center rounded-control text-parchment-700 transition-colors hover:bg-parchment-100 hover:text-parchment-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600";
 
+/** Pure kebab item-list builder (#1167), mirrors MobileSheetHeader's buildMenuItems.
+ *  Delete always gets separatorBefore: with Preferences always present above it, a
+ *  bare Delete never sits alone. Extracted (like campaignSettingsHandler above) so
+ *  BannerSheetActions stays under the complexity ceiling. */
+function buildBannerMenuItems(
+  onOpenPreferences: () => void,
+  onOpenDelete: () => void,
+  onOpenCampaignSettings?: () => void,
+): { label: string; onSelect: () => void; danger?: boolean; separatorBefore?: boolean }[] {
+  return [
+    { label: "Preferences…", onSelect: onOpenPreferences },
+    ...(onOpenCampaignSettings
+      ? [{ label: "Campaign settings…", onSelect: onOpenCampaignSettings }]
+      : []),
+    { label: "Delete", onSelect: onOpenDelete, danger: true, separatorBefore: true },
+  ];
+}
+
+/** The desktop kebab + its own PreferencesSheet mount, split out of BannerActions
+ *  (#1167) so this state/branching doesn't inflate that component's complexity.
+ *  Same desktop entry into PreferencesSheet as the mobile ⋯ menu, so a
+ *  campaign-attached character gets a working "Campaign settings →" cross-link
+ *  here too, not only on mobile. */
+function BannerSheetActions({
+  campaignId,
+  onOpenDelete,
+  onOpenCampaignSettings,
+}: {
+  campaignId?: string;
+  onOpenDelete: () => void;
+  onOpenCampaignSettings?: () => void;
+}) {
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const menuItems = buildBannerMenuItems(() => setPrefsOpen(true), onOpenDelete, onOpenCampaignSettings);
+  return (
+    <>
+      <OverflowMenu label="Sheet actions" triggerClassName={BANNER_KEBAB} items={menuItems} />
+      {prefsOpen && (
+        <PreferencesSheet
+          onClose={() => setPrefsOpen(false)}
+          campaignId={campaignId}
+          onOpenCampaignSettings={onOpenCampaignSettings}
+        />
+      )}
+    </>
+  );
+}
+
 /** The desktop banner's right-hand action cluster (#985/#1085) — the sole live
  *  indicator now the under-tabs strip is gone: a `Live · Round N` pill + ＋ Note,
  *  plus Leave/End Session while joined. Delete is demoted behind the ⋯ overflow so
  *  it never sits next to End session. */
 function BannerActions({
   uncampaigned,
+  campaignId,
   isLive,
   liveRound,
   isLiveJoined,
@@ -294,6 +346,7 @@ function BannerActions({
   onEndSession,
 }: {
   uncampaigned: boolean;
+  campaignId?: string;
   isLive: boolean;
   liveRound: number | null;
   isLiveJoined: boolean;
@@ -306,15 +359,6 @@ function BannerActions({
   onLeaveSession?: () => void;
   onEndSession?: () => void;
 }) {
-  // Caller already gates on campaign attachment (#1087). separatorBefore rides on
-  // the settings item so a lone Delete never grows a stray divider.
-  const showSettings = Boolean(onOpenCampaignSettings);
-  const menuItems = [
-    ...(showSettings
-      ? [{ label: "Campaign settings…", onSelect: onOpenCampaignSettings! }]
-      : []),
-    { label: "Delete", onSelect: onOpenDelete, danger: true, separatorBefore: showSettings },
-  ];
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
       {isLive && (
@@ -362,7 +406,11 @@ function BannerActions({
           End Session
         </button>
       )}
-      <OverflowMenu label="Sheet actions" triggerClassName={BANNER_KEBAB} items={menuItems} />
+      <BannerSheetActions
+        campaignId={campaignId}
+        onOpenDelete={onOpenDelete}
+        onOpenCampaignSettings={onOpenCampaignSettings}
+      />
     </div>
   );
 }

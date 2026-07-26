@@ -12,7 +12,10 @@ interface BottomSheetProps {
   /** Widen the md+ centered dialog to 42rem for two-column bodies (#811). Mobile is unaffected. */
   wide?: boolean;
   onClose: () => void;
-  children: ReactNode;
+  /** A render-prop form hands the child `requestClose` — the same slide-out/close
+   *  path the grabber, Escape, and scrim already use (#782) — for a content button
+   *  that both fires its own handler and closes the sheet (e.g. a cross-link). */
+  children: ReactNode | ((requestClose: () => void) => ReactNode);
 }
 
 /**
@@ -113,7 +116,7 @@ export default function BottomSheet({ title, subtitle, wide = false, onClose, ch
           {...contentProps}
           className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-1"
         >
-          {children}
+          {typeof children === "function" ? children(requestClose) : children}
         </div>
       </div>
     </div>,
