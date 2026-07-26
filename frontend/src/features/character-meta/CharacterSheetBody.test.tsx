@@ -16,9 +16,11 @@ const character = { id: "c1", spellcasting: undefined } as unknown as Character;
 const props = { character, reference: null };
 
 describe("CharacterSheetBody combat slot (#960)", () => {
-  it("renders the static CombatPanel on Combat when there is no live panel", () => {
+  it("renders the static CombatPanel on Combat when there is no live panel", async () => {
+    // CombatPanel is route-lazied (#1279) — the mock still resolves, just on
+    // a microtask, so this assertion needs to await it.
     render(<CharacterSheetBody {...props} activeTab="combat" />);
-    expect(screen.getByText("static-combat-panel")).toBeInTheDocument();
+    expect(await screen.findByText("static-combat-panel")).toBeInTheDocument();
   });
 
   it("suppresses the static panel while the live session is still loading (no flash)", () => {

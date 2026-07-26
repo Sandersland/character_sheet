@@ -15,10 +15,12 @@ import JoinCampaignRoute from "@/features/campaign/JoinCampaignRoute";
 import EntityDetailPage from "@/features/entities/EntityDetailPage";
 import AboutPage from "@/pages/AboutPage";
 import CharacterListPage from "@/pages/CharacterListPage";
-import CharacterSheetPage from "@/pages/CharacterSheetPage";
 
-// Route-lazy the heavy non-initial surfaces: character creation, the journal,
-// and the level-up ceremony.
+// Route-lazy every non-landing surface: the character sheet (#1279 — by far the
+// heaviest tree, pulling in spells/inventory/journal/session) plus character
+// creation, the journal, and the level-up ceremony. CharacterListPage stays
+// eager — it is the landing route and must paint with no extra round trip.
+const CharacterSheetPage = lazy(() => import("@/pages/CharacterSheetPage"));
 const CharacterCreatePage = lazy(() => import("@/pages/CharacterCreatePage"));
 const JournalPage = lazy(() => import("@/pages/JournalPage"));
 const LevelUpPage = lazy(() => import("@/pages/LevelUpPage"));
