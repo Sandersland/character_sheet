@@ -5,12 +5,9 @@
 // option A "Quiet Manuscript" + frame A′ (desktop) / frame C (mobile).
 
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 
-import { updateSessionTitle } from "@/api/client";
-import Spinner from "@/components/ui/Spinner";
 import { ArrowLeft } from "@/components/ui/icons";
-import CharacterLoadError from "@/features/character-meta/CharacterLoadError";
 import CapturePalette from "@/features/journal/CapturePalette";
 import ChronicleSpine from "@/features/journal/ChronicleSpine";
 import ManuscriptPage from "@/features/journal/ManuscriptPage";
@@ -21,27 +18,19 @@ import {
   type ChronicleSpine as Spine,
 } from "@/features/journal/chronicle";
 import { useChronicle } from "@/features/journal/useChronicle";
+import { useRenameChapterMutation } from "@/features/journal/useRenameChapterMutation";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
-import { CurrentCharacterProvider, useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
-import { useCharacter } from "@/hooks/useCharacter";
-import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { CharacterRouteGate } from "@/hooks/CharacterRouteGate";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import type { Character } from "@/types/character";
 
 export default function JournalPage() {
-  const { id } = useParams();
-  const { character, error } = useCharacter(id);
-  const showSpinner = useDelayedFlag(character === undefined && !error);
-
-  if (error) return <CharacterLoadError variant="error" />;
-  if (character === undefined) return showSpinner ? <Spinner variant="page" /> : null;
-  if (character === null) return <CharacterLoadError variant="not-found" characterId={id} />;
-
   return (
-    <CurrentCharacterProvider id={character.id}>
+    <CharacterRouteGate>
       <JournalPageBody />
-    </CurrentCharacterProvider>
+    </CharacterRouteGate>
   );
 }
 
@@ -60,8 +49,9 @@ function deriveNoteCounts(journal: Character["journal"]) {
 function JournalPageBody() {
   const { character } = useCurrentCharacter();
   const isMobile = useIsBelowMd();
-  const { arcs, sessions, error, setSessions } = useChronicle(character);
+  const { arcs, sessions, error } = useChronicle(character);
   const { byId } = useCampaignEntities(character.campaignId);
+  const renameMutation = useRenameChapterMutation(character.id);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -89,8 +79,11 @@ function JournalPageBody() {
   async function handleRename(title: string): Promise<boolean> {
     if (!character.campaignId || !selectedChapter?.sessionId) return false;
     try {
-      await updateSessionTitle(character.campaignId, selectedChapter.sessionId, title);
-      setSessions((prev) => prev.map((s) => (s.id === selectedChapter.sessionId ? { ...s, title } : s)));
+      await renameMutation.mutateAsync({
+        campaignId: character.campaignId,
+        sessionId: selectedChapter.sessionId,
+        title,
+      });
       return true;
     } catch {
       return false;
