@@ -26,3 +26,10 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 export function editionOf(row: { rulesEdition: RulesEdition }): RulesEdition {
   return row.rulesEdition;
 }
+
+// Mirrors Character.rulesEdition's Prisma `@default(EDITION_2024)` — the ONE
+// place validation code names that default explicitly, for the rare case where
+// a decision (e.g. character-create.ts's creation-time subclass gate check)
+// must resolve an edition before the row exists to read `rulesEdition` from.
+// Deliberate-coupling latch: change the schema default, change this too.
+export const DEFAULT_RULES_EDITION: RulesEdition = "EDITION_2024";

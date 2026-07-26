@@ -18,6 +18,29 @@ export const campaignKeys = {
   scope: (id: string | null | undefined) => [...campaignKeys.all, id] as const,
   entities: (id: string | null | undefined) => [...campaignKeys.scope(id), "entities"] as const,
   merges: (id: string | null | undefined) => [...campaignKeys.scope(id), "merges"] as const,
+  items: (id: string | null | undefined) => [...campaignKeys.scope(id), "items"] as const,
 };
 
 export const referenceKeys = { all: ["reference"] as const };
+
+// The SRD item catalog (`GET /items`) — a separate endpoint from `/reference`,
+// so it gets its own key rather than overloading referenceKeys.
+export const catalogKeys = { items: () => ["catalog", "items"] as const };
+
+// The character's session-doorway + full-active-session reads (#1299), lifted
+// out of LiveSessionProvider's own useState so a lifecycle mutation elsewhere
+// (join/start/leave/end) can invalidate them instead of poking a callback.
+export const sessionKeys = {
+  all: ["sessions"] as const,
+  doorway: (characterId: string | null | undefined) => [...sessionKeys.all, "doorway", characterId] as const,
+  active: (characterId: string | null | undefined) => [...sessionKeys.all, "active", characterId] as const,
+  // A campaign's session list (SessionsModal) — distinct from `chronicle`
+  // below: same campaign, but a different endpoint/shape (fetchCampaignSessions
+  // vs fetchChronicleSessions), so they cannot share one cache entry.
+  campaignList: (campaignId: string | null | undefined) =>
+    [...sessionKeys.all, "campaignList", campaignId] as const,
+  // The journal's per-character chronicle read (arcs + sessions together, since
+  // useChronicle always fetches both in parallel and treats them as one unit).
+  chronicle: (campaignId: string | null | undefined, characterId: string | null | undefined) =>
+    [...sessionKeys.all, "chronicle", campaignId, characterId] as const,
+};

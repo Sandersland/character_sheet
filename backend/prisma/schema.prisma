@@ -591,8 +591,10 @@ model CharacterClass {
   skillChoiceCount Int
   skillChoices     String[] // eligible skill names to choose from
   isSpellcaster    Boolean  @default(false)
-  // Character level at which this class first grants a subclass choice.
-  // Cleric/Sorcerer/Warlock = 1, Wizard/Druid = 2, most others = 3.
+  // The 2014 (PHB'14) level at which this class first grants a subclass choice
+  // — Cleric/Sorcerer/Warlock = 1, Wizard/Druid = 2, most others = 3. SRD 5.2
+  // (2024) ignores this column outright: subclassGateLevel hardcodes 3 for
+  // every class under EDITION_2024, so one row serves both editions (#1308).
   subclassLevel    Int      @default(3)
   // Tool proficiency grants — fixed tools the class always grants.
   toolProficiencies  String[] @default([])

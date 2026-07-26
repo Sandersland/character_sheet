@@ -63,6 +63,7 @@ const MANEUVER_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, subclass: true, level: true },

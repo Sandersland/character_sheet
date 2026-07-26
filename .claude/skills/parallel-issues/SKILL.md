@@ -113,7 +113,7 @@ Launch one background subagent per issue (`run_in_background: true`), so they bu
      ```bash
      docker compose exec -T backend sh -c 'cd /app/backend && npx vitest run <test-file>'
      ```
-     Running the **whole** backend suite in a worktree needs `--fileParallelism=false` — at default parallelism the workers contend on the stack's small Postgres pool and produce cross-domain 500s that look like real regressions. (A `PrismaClientValidationError`, by contrast, is always a genuinely broken fixture.)
+     Run the **whole** backend suite with a plain `npx vitest run` — **never** `--fileParallelism=false`. Since #1269 each vitest worker gets its own database cloned from a migrated+seeded template, so cross-file interference is a leaking fixture, not pool contention, and the override only hides it (`docs/testing.md`, and the latch comment in `backend/vitest.config.ts`). If the container OOMs instead, `--maxWorkers=2` is the right lever.
    - **Schema changes** — migrate **and regenerate the client in the same step** (a stale client after `migrate dev` causes confusing runtime errors like `Invalid value for argument 'type'. Expected <Enum>` even though the migration succeeded):
      ```bash
      docker compose exec -T backend sh -c 'cd /app/backend && npx prisma migrate dev --name <change> && npx prisma generate'

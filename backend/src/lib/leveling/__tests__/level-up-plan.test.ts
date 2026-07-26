@@ -8,9 +8,12 @@ import {
 
 const ABILITIES = { strength: 16, dexterity: 14, constitution: 14, intelligence: 12, wisdom: 12, charisma: 10 };
 
-// Builds a single-class character in the pre-level-up state.
+// Builds a single-class character in the pre-level-up state. 2024 by default —
+// this suite's fixture-level TargetClassEntry.subclassLevel values already
+// stand in for the edition-resolved gate (#1308's comment on TargetClassEntry);
+// deriveResources' OWN edition threading (#1291) is covered separately.
 function char(name: string, level: number, subclass: string | null = null): LevelUpPlanCharacter {
-  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }] };
+  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], edition: "EDITION_2024" };
 }
 
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {

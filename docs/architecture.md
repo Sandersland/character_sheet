@@ -2,7 +2,7 @@
 
 Read this when you need the cross-cutting data patterns (catalog+snapshot, JSON columns, audit log, transaction pattern) or the auth/ownership model. For inventories of what exists, read the code — it is the source of truth:
 
-- **Routers:** `backend/src/app.ts` mounts. Catalog/plain-REST routers mount at `/api`; character-scoped mutation routers mount on their owned sub-path under `/api/characters/:id` via `Router({ mergeParams: true })`.
+- **Routers:** registered in `backend/src/routes/manifest.ts` (`{ router, mount, scope }`), mounted by `app.ts`. Catalog/plain-REST routers mount at `/api`; character-scoped mutation routers mount on their owned sub-path under `/api/characters/:id` via `Router({ mergeParams: true })`.
 - **Domain logic:** `ls backend/src/lib/` — domain folders (`auth`, `activity`, `srd`, `rules`, `classes`, `leveling`, `spellcasting`, `combat`, `inventory`, `character`, `session`, `campaign`, `core`, `http`).
 - **Frontend routes:** `frontend/src/App.tsx`.
 - **Schema:** `backend/prisma/schema.prisma` — model comments carry the per-model reasoning.
@@ -35,7 +35,7 @@ Item mechanics live in category detail tables (`Item*Detail` + their `Inventory*
 
 `Character.rulesEdition` is authoritative for a sheet; `Campaign.rulesEdition` is only the default a new character is created with (a character may link to several campaigns, and a solo session #1080 has none). It is **write-once** — set by the create transaction, excluded from `PATCH /characters/:id` and from every transaction op — so no reconciler ever has to handle an edition change (#1281, 2026-07-25).
 
-Rules code obtains it exactly one way: `editionOf` (`lib/rules/edition.ts`). The parameter is required, so a `select` that omits `rulesEdition` is a compile error rather than a silent 2024 default. A rule that varies by edition takes `edition` as its last parameter and stays one function per rule; a rule that is edition-invariant — the majority (XP/PB, every spell-slot table, death saves, ASI levels, multiclass prerequisites, Unarmored Defense) — takes no `edition`. `subclassGateLevel` is the pattern-setter, and shows the required discipline: its reconcile-on-write, clamp-on-read and write-side-validation callers all resolve through it, so the three can never disagree.
+Rules code obtains it exactly one way: `editionOf` (`lib/rules/edition.ts`). The parameter is required, so a `select` that omits `rulesEdition` is a compile error rather than a silent 2024 default. A rule that varies by edition takes `edition` as its last parameter and stays one function per rule; a rule that is edition-invariant — the majority (XP/PB, every spell-slot table, death saves, ASI levels, multiclass prerequisites, Unarmored Defense) — takes no `edition`. `subclassGateLevel` is the pattern-setter, and shows the required discipline: its reconcile-on-write (`reconcileSubclass`), clamp-on-read (`buildClassesView`), write-side-validation (`applySetSubclass`, post-creation subclass set), level-up-plan resolution (`subclassLevelFor`), creation-time validation (`resolveSubclass`/`resolveSubclassName`), and feature/pool derivation (`isSubclassActive`, #1291) callers all resolve through it, so none of the six can disagree (#1308, #1291).
 
 ### JSON columns on Character
 

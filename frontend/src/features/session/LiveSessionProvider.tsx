@@ -5,25 +5,19 @@
  * live strip, the nav pip, and the doorway can all render off one server-derived
  * source (no per-surface fetch, no polling). Mount once above the sheet body.
  *
- * The doorway read is fetch-once by nature, so this exposes an explicit
- * `refresh()` (call after every start/join/leave/end) and self-refreshes on
- * `visibilitychange` — a DM-ended session must not leave a zombie live tracker
- * until a full reload. When live+joined it also loads the FULL `Session`
- * (participants) that `partyHealAllies`/`SessionOverlays` need — one extra read,
- * only when joined, via the existing `fetchActiveSession` (no new endpoint).
+ * Doorway + full-session reads are query-cache-backed (#1299, sessionKeys) with
+ * an explicit `refresh()` for callers that just mutated session state elsewhere
+ * (start/join/leave/end) and can't wait for the next natural refetch. When
+ * live+joined it also loads the FULL `Session` (participants) that
+ * `partyHealAllies`/`SessionOverlays` need — one extra read, only when joined,
+ * via the existing `fetchActiveSession` (no new endpoint).
  */
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchActiveSession, fetchSessionDoorway } from "@/api/client";
+import { sessionKeys } from "@/api/queryKeys";
 import type { Session, SessionDoorwayState } from "@/types/character";
 
 export type LiveSessionStatus = "loading" | "none" | "liveNotJoined" | "liveJoined";
@@ -61,51 +55,84 @@ interface Props {
 }
 
 export function LiveSessionProvider({ characterId, children }: Props) {
-  const [doorway, setDoorway] = useState<SessionDoorwayState | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const queryClient = useQueryClient();
   const [logRefresh, setLogRefresh] = useState(0);
   const [endedSession, setEndedSession] = useState<Session | null>(null);
-  // Monotonic request nonce: rapid refreshes (e.g. successive visibilitychange
-  // events) race, and a slow stale response must never overwrite a newer one —
-  // that would resurrect a zombie tracker. Only the latest in-flight call writes.
-  const refreshSeqRef = useRef(0);
 
+  // The doorway is the one query in the app that WANTS focus refetching:
+  // queryClient.ts sets refetchOnWindowFocus:false globally because a stray
+  // refetch could land mid-transaction, but a DM-ended session must not leave a
+  // zombie live tracker until the player happens to reload — so this query
+  // opts back in explicitly, and staleTime 0 (overriding the global 30s) so a
+  // focus check always finds it stale enough to actually refetch. Replaces the
+  // old manual visibilitychange listener.
+  const doorwayQuery = useQuery({
+    queryKey: sessionKeys.doorway(characterId),
+    queryFn: () => fetchSessionDoorway(characterId),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
+  const doorway = doorwayQuery.data ?? null;
+  const loaded = doorwayQuery.isSuccess || doorwayQuery.isError;
+  const activeNow = doorway?.session?.status === "active" && doorway.session.joined;
+
+  // Same focus-refetch opt-in as the doorway, for the same reason: while
+  // joined, a stale participant list is exactly the kind of thing a focus
+  // refetch should catch (someone left/joined while backgrounded).
+  const activeQuery = useQuery({
+    queryKey: sessionKeys.active(characterId),
+    queryFn: () => fetchActiveSession(characterId),
+    enabled: activeNow,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
+  // Gate on `activeNow`, not just the query's own data: disabling a query
+  // leaves its last-fetched data sitting in the cache, and this must drop back
+  // to null the instant the doorway itself says not-joined (a leave/end must
+  // not leave stale participants behind for `session`).
+  const session = activeNow ? (activeQuery.data ?? null) : null;
+
+  // Re-resolve both reads now, for callers that just changed session state
+  // out-of-band (start/join/leave/end — see useCombatLifecycle, useSessionDoorway)
+  // and can't wait for the next natural refetch.
+  //
+  // The active-session key CANNOT be handled the same way as the doorway: its
+  // useQuery observer above is still enabled:false at this point (the fresh
+  // doorway data hasn't rendered yet — query-cache notifications and React's
+  // render are both deferred past this synchronous point), so invalidating it
+  // would be a no-op (refetchQueries skips disabled queries). Fetching it
+  // directly means refresh() cannot resolve before the full session exists —
+  // #963's callers need that to route to the live tracker, not a stale static
+  // panel. The not-joined branch drops any previous session's participants so
+  // a later join of a DIFFERENT session can't transiently show the old roster.
+  //
+  // The manual seq-ref race guard is gone; TanStack Query's own machinery
+  // covers both races it protected against: the FIRST fetch for a key is
+  // shared (a second caller gets the same in-flight promise back), and every
+  // fetch after that first success is superseded via cancelRefetch:true
+  // (query-core's default), which cancels the older in-flight request so its
+  // response can never land. Never rejects, matching the old contract: a
+  // failed refresh just leaves the reactive queries above to report it via
+  // isError.
   const refresh = useCallback(async () => {
-    const seq = ++refreshSeqRef.current;
     try {
-      const d = await fetchSessionDoorway(characterId);
-      // The doorway lacks participants — the live panel needs the full Session
-      // (partyHealAllies, SessionOverlays). One extra read, only when joined.
-      const full =
-        d.session?.status === "active" && d.session.joined
-          ? await fetchActiveSession(characterId)
-          : null;
-      if (seq !== refreshSeqRef.current) return; // a newer refresh has started
-      setDoorway(d);
-      setSession(full);
+      await queryClient.invalidateQueries({ queryKey: sessionKeys.doorway(characterId) });
+      const fresh = queryClient.getQueryData<SessionDoorwayState>(sessionKeys.doorway(characterId));
+      if (fresh?.session?.status === "active" && fresh.session.joined) {
+        await queryClient.fetchQuery({
+          queryKey: sessionKeys.active(characterId),
+          queryFn: () => fetchActiveSession(characterId),
+          staleTime: 0,
+        });
+      } else {
+        queryClient.removeQueries({ queryKey: sessionKeys.active(characterId) });
+      }
     } catch {
-      if (seq !== refreshSeqRef.current) return;
-      setDoorway(null);
-      setSession(null);
-    } finally {
-      if (seq === refreshSeqRef.current) setLoaded(true);
+      // Swallowed — see the comment above.
     }
-  }, [characterId]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  // Re-resolve when the tab regains visibility — the session may have been
-  // started/ended elsewhere while backgrounded. Event-driven, not polling.
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refresh]);
+  }, [characterId, queryClient]);
 
   const bumpLog = useCallback(() => setLogRefresh((n) => n + 1), []);
 

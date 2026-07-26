@@ -5,6 +5,7 @@ import CustomFeatForm from "@/features/advancement/CustomFeatForm";
 import type { FeatView, FeatViewAction } from "@/features/advancement/featView";
 import type { CustomFeatDraft } from "@/features/advancement/useCustomFeatDraft";
 import type { FeatCatalog } from "@/features/advancement/useFeatCatalog";
+import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
 import { abilityLabel } from "@/lib/abilities";
 import { abilityScorePreviews, featAbilityChipLabel } from "@/lib/featDisplay";
 import type { CatalogFeat } from "@/types/character";
@@ -53,6 +54,11 @@ function FeatDetail({
   onSubmit: () => void;
 }) {
   const needsChoice = feat.abilityOptions.length > 1;
+  const previews = abilityScorePreviews(feat, currentScores);
+  const checkedIndex = previews.findIndex((p) => p.key === abilityChoice);
+  const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(previews.length, checkedIndex, (index) =>
+    onChoose(previews[index].key),
+  );
   return (
     <div>
       <button
@@ -81,7 +87,7 @@ function FeatDetail({
             aria-label={`Choose +${feat.abilityIncrease} to`}
             className="grid gap-2 sm:grid-cols-3"
           >
-            {abilityScorePreviews(feat, currentScores).map((p) => {
+            {previews.map((p, i) => {
               const chosen = abilityChoice === p.key;
               return (
                 <button
@@ -90,7 +96,10 @@ function FeatDetail({
                   role="radio"
                   aria-checked={chosen}
                   aria-label={p.label}
+                  tabIndex={tabIndexFor(i)}
+                  ref={itemRef(i)}
                   onClick={() => onChoose(p.key)}
+                  onKeyDown={keyDownFor(i)}
                   className={`flex flex-col gap-0.5 rounded-control border p-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-garnet-400 ${
                     chosen
                       ? "border-garnet-600 bg-garnet-50 ring-2 ring-garnet-600"

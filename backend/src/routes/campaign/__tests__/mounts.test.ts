@@ -2,7 +2,7 @@
  * Router mount map (#501). Pins the owned-path + mergeParams refactor: external
  * URLs are unchanged, so every documented route must still resolve to its
  * handler. Two invariants:
- *   1. Hybrid routers (maneuvers/shadow-arts) still serve their
+ *   1. Catalog routers (maneuvers/shadow-arts) still serve their
  *      catalog GET at the top level (/api/<name>), not under /characters/:id.
  *   2. Every character-scoped route reaches its handler with `:id` merged in —
  *      proven by a bogus id yielding the domain 404 ("Character not found",
@@ -27,7 +27,7 @@ function agent() {
   return supertest.agent(createApp()).set("Cookie", COOKIE);
 }
 
-describe("hybrid catalog routers stay top-level", () => {
+describe("catalog routers stay top-level", () => {
   it.each(["/api/maneuvers", "/api/shadow-arts"])(
     "GET %s returns a catalog array",
     async (url) => {

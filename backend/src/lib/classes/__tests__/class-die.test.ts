@@ -7,7 +7,7 @@ const scores = { strength: 16, dexterity: 12 };
 
 // Battle Master DerivedClassInfo at a given fighter level.
 function battleMaster(level: number): DerivedClassInfo {
-  const info = deriveResources("fighter", "battle master", level, scores, 4);
+  const info = deriveResources("fighter", "battle master", level, scores, 4, "EDITION_2024");
   if (!info) throw new Error("expected battle master resources");
   return info;
 }

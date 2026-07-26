@@ -39,6 +39,7 @@ import type {
 } from "./spell-state.js";
 import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
@@ -884,6 +885,7 @@ const SPELLCASTING_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     // All entries (not just the primary) so the multiclass prepared-cap sum works.
@@ -915,7 +917,7 @@ function resolveArcaneRecoveryContext(
 ): { resources: ResourcesMutableState; available: boolean; wizardLevel: number } {
   const primary = row.classEntries[0];
   const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
-  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus);
+  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus, editionOf(row));
   return {
     resources: normalizeResourcesMutable(row.resources),
     available: Boolean(resourceInfo?.resources.some((r) => r.key === "arcaneRecovery")),

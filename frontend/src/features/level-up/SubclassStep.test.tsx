@@ -131,3 +131,82 @@ describe("SubclassStep", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("SubclassStep — radiogroup keyboard nav (#1111)", () => {
+  async function findRadios() {
+    return [
+      await screen.findByRole("radio", { name: "Battle Master" }),
+      screen.getByRole("radio", { name: "Champion" }),
+      screen.getByRole("radio", { name: "Eldritch Knight" }),
+    ];
+  }
+
+  it("falls back to the first card for Tab focus when none is checked yet", async () => {
+    renderStep();
+    const radios = await findRadios();
+    expect(radios[0]).toHaveAttribute("tabindex", "0");
+    radios.slice(1).forEach((r) => expect(r).toHaveAttribute("tabindex", "-1"));
+  });
+
+  it("moves the roving tabIndex to the checked card once one is chosen", async () => {
+    renderStep();
+    const user = userEvent.setup();
+    const radios = await findRadios();
+    await user.click(radios[1]);
+    radios.forEach((r) => expect(r).toHaveAttribute("tabindex", r === radios[1] ? "0" : "-1"));
+  });
+
+  it("keeps only one card in the tab order", async () => {
+    renderStep();
+    const radios = await findRadios();
+    const tabbable = radios.filter((r) => r.getAttribute("tabindex") === "0");
+    expect(tabbable).toHaveLength(1);
+  });
+
+  it("lets Tab enter the group once and leave it on the next Tab", async () => {
+    renderStep();
+    const user = userEvent.setup();
+    const radios = await findRadios();
+    document.body.focus();
+
+    await user.tab();
+    expect(document.activeElement).toBe(radios[0]);
+
+    await user.tab();
+    expect(radios).not.toContain(document.activeElement);
+  });
+
+  it("ArrowRight/ArrowDown move focus and selection forward, wrapping at the end", async () => {
+    renderStep();
+    const user = userEvent.setup();
+    const radios = await findRadios();
+    radios[0].focus();
+
+    await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).toBe(radios[1]);
+    expect(radios[1]).toHaveAttribute("aria-checked", "true");
+
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(radios[2]);
+    expect(radios[2]).toHaveAttribute("aria-checked", "true");
+
+    await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).toBe(radios[0]);
+    expect(radios[0]).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("ArrowLeft/ArrowUp move focus and selection backward, wrapping at the start", async () => {
+    renderStep();
+    const user = userEvent.setup();
+    const radios = await findRadios();
+    radios[0].focus();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(document.activeElement).toBe(radios[2]);
+    expect(radios[2]).toHaveAttribute("aria-checked", "true");
+
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(radios[1]);
+    expect(radios[1]).toHaveAttribute("aria-checked", "true");
+  });
+});

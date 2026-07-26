@@ -2,17 +2,28 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 
 import { fetchSessionDoorway, startCampaignSession } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
 import { LiveSessionProvider } from "@/features/session/LiveSessionProvider";
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
-import type { SessionDoorwayState } from "@/types/character";
+import type { Character, Session, SessionDoorwayState } from "@/types/character";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", () => ({ useNavigate: () => navigateMock }));
 
+const startedSession: Session = {
+  id: "s1",
+  campaignId: "camp1",
+  status: "active",
+  startedAt: "2026-07-25T00:00:00Z",
+  participants: [],
+};
+const startedCharacter = { id: "c1", name: "post-start" } as unknown as Character;
+
 vi.mock("@/api/client", () => ({
   fetchSessionDoorway: vi.fn(),
   fetchActiveSession: vi.fn().mockResolvedValue(null),
-  startCampaignSession: vi.fn().mockResolvedValue(undefined),
+  startCampaignSession: vi.fn(),
   joinSession: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -27,6 +38,7 @@ describe("useSessionDoorway.onAction jumps to Combat in-workspace (#963)", () =>
   beforeEach(() => {
     navigateMock.mockClear();
     mockStart.mockClear();
+    mockStart.mockResolvedValue({ session: startedSession, character: startedCharacter });
     mockDoorway.mockResolvedValue(startableDoorway());
   });
 
@@ -47,5 +59,7 @@ describe("useSessionDoorway.onAction jumps to Combat in-workspace (#963)", () =>
     await waitFor(() => expect(mockStart).toHaveBeenCalledWith("camp1", "c1"));
     expect(onEnterCombat).toHaveBeenCalledTimes(1);
     expect(navigateMock).not.toHaveBeenCalled();
+    // #1299: the returned character is an exact cache write, not a refetch.
+    expect(getQueryClient().getQueryData(characterKeys.detail("c1"))).toBe(startedCharacter);
   });
 });

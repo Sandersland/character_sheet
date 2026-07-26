@@ -69,9 +69,12 @@ describe("TurnStateProvider single instance + useLiveRound", () => {
       doorway({ kind: "liveNotJoined", session: { id: "s1", status: "active", startedAt: "x", scheduledAt: null, title: null, joined: false, round: 4 } }),
     );
     renderStack();
-    // Not joined → turn context null; useLiveRound falls back to the doorway's server round.
+    // Not joined → turn context null; useLiveRound falls back to the doorway's
+    // server round. Both assertions need their own waitFor: "null" is also the
+    // pre-fetch value, so the first check alone could pass before the
+    // query-backed doorway read has actually landed (#1299).
     await waitFor(() => expect(screen.getByTestId("turn")).toHaveTextContent("null"));
-    expect(screen.getByTestId("round")).toHaveTextContent("4");
+    await waitFor(() => expect(screen.getByTestId("round")).toHaveTextContent("4"));
   });
 
   it("exposes the LOCAL round from the mounted tracker when joined + in combat", async () => {

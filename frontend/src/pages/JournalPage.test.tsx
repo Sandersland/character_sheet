@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import JournalPage from "@/pages/JournalPage";
 import * as client from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { sessionKeys } from "@/api/queryKeys";
 import { __resetCampaignEntitiesCacheForTests } from "@/hooks/useCampaignEntities";
 import type { CampaignArc, Character, ChronicleSession, JournalEntry } from "@/types/character";
 
@@ -166,5 +168,11 @@ describe("JournalPage", () => {
       expect(client.updateSessionTitle).toHaveBeenCalledWith("camp-1", "s1", "New Name"),
     );
     expect(await screen.findByRole("heading", { name: "New Name" })).toBeInTheDocument();
+    // #1299 review: the rename is a query-cache write now, not a local splice —
+    // confirm the chronicle query itself carries the new title.
+    const cached = getQueryClient().getQueryData<{ sessions: ChronicleSession[] }>(
+      sessionKeys.chronicle("camp-1", "char-1"),
+    );
+    expect(cached?.sessions.find((s) => s.id === "s1")?.title).toBe("New Name");
   });
 });

@@ -15,9 +15,10 @@ const abilityScoresSchema = z.object({
 const classChoiceSchema = z.object({
   name: z.string().min(1),
   subclass: z.string().nullable().optional(),
-  // Catalog subclass FK — required when the class grants its subclass at
-  // creation level (Cleric L1, Sorcerer L1, Warlock L1). Null/absent for
-  // classes whose subclass is chosen post-creation (Fighter L3, etc.).
+  // Catalog subclass FK — only legal when the class's EDITION-RESOLVED gate is
+  // creation level (2014 Cleric/Sorcerer/Warlock L1, #1308); resolveSubclass
+  // rejects it otherwise (e.g. the same classes under 2024, gate 3). Null/absent
+  // for classes whose subclass is chosen post-creation (Fighter L3, etc.).
   subclassId: z.string().optional(),
 });
 

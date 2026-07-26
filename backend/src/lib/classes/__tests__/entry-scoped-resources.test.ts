@@ -25,8 +25,8 @@ describe("deriveEntryScopedResources", () => {
     const profBonus = proficiencyBonusForLevel(level);
     const entries = [{ name: "fighter", subclass: "battle master", level }];
 
-    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus);
-    const bare = deriveResources("fighter", "battle master", level, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const bare = deriveResources("fighter", "battle master", level, ABILITY_SCORES, profBonus, "EDITION_2024");
 
     expect(derived).toEqual(bare);
   });
@@ -36,8 +36,8 @@ describe("deriveEntryScopedResources", () => {
     const profBonus = proficiencyBonusForLevel(level);
     const entries = [{ name: "monk", subclass: "warrior of the elements", level }];
 
-    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus);
-    const bare = deriveResources("monk", "warrior of the elements", level, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const bare = deriveResources("monk", "warrior of the elements", level, ABILITY_SCORES, profBonus, "EDITION_2024");
 
     expect(derived).toEqual(bare);
   });
@@ -50,13 +50,13 @@ describe("deriveEntryScopedResources", () => {
       { name: "fighter", subclass: "battle master", level: 7 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
 
     // Fighter-7 Battle Master maneuver cap is 5 (battleMasterManeuverCount) — NOT
     // the count a level-10 Battle Master would have (still 5 here, so also pin
     // the entry-level DC which differs from a total-level derivation).
     expect(derived?.maneuverChoiceCount).toBe(5);
-    const bareAtEntryLevel = deriveResources("fighter", "battle master", 7, ABILITY_SCORES, profBonus);
+    const bareAtEntryLevel = deriveResources("fighter", "battle master", 7, ABILITY_SCORES, profBonus, "EDITION_2024");
     expect(derived?.maneuverSaveDC).toBe(bareAtEntryLevel?.maneuverSaveDC);
   });
 
@@ -68,12 +68,12 @@ describe("deriveEntryScopedResources", () => {
       { name: "wizard", subclass: "school of evocation", level: 6 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
 
     // Fighter-4 Battle Master maneuver cap is 3 (battleMasterManeuverCount < 7 →
     // 3) — a total-level (10) derivation would wrongly report 7.
     expect(derived?.maneuverChoiceCount).toBe(3);
-    const wrongTotalLevelCount = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus);
+    const wrongTotalLevelCount = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
     expect(wrongTotalLevelCount?.maneuverChoiceCount).toBe(7);
     expect(derived?.maneuverChoiceCount).not.toBe(wrongTotalLevelCount?.maneuverChoiceCount);
   });
@@ -86,7 +86,7 @@ describe("deriveEntryScopedResources", () => {
       { name: "ranger", subclass: "hunter", level: 3 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
 
     expect(derived?.subclassChoices).toBeDefined();
     const huntersPrey = derived?.subclassChoices?.find((c) => c.key === "huntersPrey");
@@ -105,7 +105,7 @@ describe("deriveEntryScopedResources", () => {
       { name: "fighter", subclass: "battle master", level: 3 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
 
     const focus = derived?.resources.find((r) => r.key === "focus");
     // Focus total = monk level (5), NOT total character level (8).
@@ -125,8 +125,8 @@ describe("deriveEntryScopedResources", () => {
     const profBonus = proficiencyBonusForLevel(level);
     const entries = [{ name: "monk", subclass: undefined, level }];
 
-    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus);
-    const bare = deriveResources("monk", undefined, level, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const bare = deriveResources("monk", undefined, level, ABILITY_SCORES, profBonus, "EDITION_2024");
 
     expect(derived?.resources).toEqual(bare?.resources);
   });
@@ -142,12 +142,12 @@ describe("deriveEntryScopedResources", () => {
       { name: "fighter", subclass: "battle master", level: 3 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
     const derivedNames = new Set(derived?.features?.map((f) => f.name));
 
-    const bareMonkAt5 = deriveResources("monk", undefined, 5, ABILITY_SCORES, profBonus);
-    const bareFighterAt3 = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, profBonus);
-    const bareMonkAt8 = deriveResources("monk", undefined, 8, ABILITY_SCORES, profBonus);
+    const bareMonkAt5 = deriveResources("monk", undefined, 5, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const bareFighterAt3 = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const bareMonkAt8 = deriveResources("monk", undefined, 8, ABILITY_SCORES, profBonus, "EDITION_2024");
     const monkAt5Names = new Set(bareMonkAt5?.features.map((f) => f.name));
 
     // Every monk-L5 feature and every fighter-L3 feature is present...
@@ -179,14 +179,14 @@ describe("deriveEntryScopedResources", () => {
       { name: "monk", subclass: "warrior of shadow", level: 3 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus);
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
 
-    const bareMonkAtEntryLevel = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, profBonus);
+    const bareMonkAtEntryLevel = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, profBonus, "EDITION_2024");
     expect(derived?.shadowArtsAvailable).toBe(bareMonkAtEntryLevel?.shadowArtsAvailable);
     expect(derived?.shadowArtsAvailable).toBe(true);
     // The primary (fighter) never sets this field — proves the value came
     // from overlaying the SECONDARY entry's own derivation, not the primary's.
-    const bareFighterPrimary = deriveResources("fighter", undefined, totalLevel, ABILITY_SCORES, profBonus);
+    const bareFighterPrimary = deriveResources("fighter", undefined, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
     expect(bareFighterPrimary?.shadowArtsAvailable).toBeUndefined();
   });
 });

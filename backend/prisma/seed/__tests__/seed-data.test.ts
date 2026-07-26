@@ -33,6 +33,7 @@ import { PACKS } from "../packs.js";
 import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
 import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
+import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 
 // The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
@@ -61,6 +62,31 @@ describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
     expect(grant).toBeDefined();
     expect(grant!.gateLevel).toBe(3);
     expect(grant!.castingAbility).toBe("wisdom");
+  });
+});
+
+// #1308: CLASSES.subclassLevel holds the PHB'14 gate (subclassGateLevel ignores
+// it entirely under 2024), so a reseed that "cleans up" these to a uniform 3
+// would silently regress every 2014 campaign's subclass timing. Pins the exact
+// PHB'14 citations rather than just checking they're non-3.
+describe("CLASSES — 2014 subclass gate levels (#1308)", () => {
+  const subclassLevelByName = new Map(CLASSES.map((c) => [c.name, c.subclassLevel]));
+
+  it("Cleric/Sorcerer/Warlock gate at 1st level (Divine Domain/Sorcerous Origin/Otherworldly Patron, PHB'14 pp. 57/99/105)", () => {
+    expect(subclassLevelByName.get("Cleric")).toBe(1);
+    expect(subclassLevelByName.get("Sorcerer")).toBe(1);
+    expect(subclassLevelByName.get("Warlock")).toBe(1);
+  });
+
+  it("Druid/Wizard gate at 2nd level (Druid Circle/Arcane Tradition, PHB'14 pp. 66/114)", () => {
+    expect(subclassLevelByName.get("Druid")).toBe(2);
+    expect(subclassLevelByName.get("Wizard")).toBe(2);
+  });
+
+  it("every other class stays at 3rd level", () => {
+    const early = new Set(["Cleric", "Sorcerer", "Warlock", "Druid", "Wizard"]);
+    const wrong = CLASSES.filter((c) => !early.has(c.name) && c.subclassLevel !== 3).map((c) => c.name);
+    expect(wrong, "classes drifted off the 3rd-level default").toEqual([]);
   });
 });
 
@@ -434,10 +460,15 @@ describe("referential integrity", () => {
     expect([...new Set(dangling)], "pack references an item missing from ITEMS").toEqual([]);
   });
 
-  // Cross-source (#1128): the seed subclassLevel (drives the level-up choice
-  // step) must equal the class-definition grantLevel (drives feature/pool
-  // derivation) — the single rule split across two files must not drift.
-  it("every seed subclassLevel matches its class-definition grantLevel", () => {
+  // Cross-source (#1128, briefly rescoped by #1308, restored by #1291): the
+  // class-definition grantLevel table (registry.ts isSubclassActive) and
+  // CLASSES.subclassLevel (the catalog column) are BOTH 2014-scoped now —
+  // isSubclassActive resolves grantLevel through subclassActiveAt, the exact
+  // gate buildClassesView resolves subclassLevel through, so the two values
+  // must mean the same PHB'14 level and can go back to direct equality (the
+  // ORIGINAL #1128 contract, before #1308 had to loosen it to a 2024-resolved
+  // comparison while only the catalog column carried 2014 values).
+  it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
       Barbarian: barbarian, Bard: bard, Cleric: cleric, Druid: druid, Fighter: fighter,
       Monk: monk, Paladin: paladin, Ranger: ranger, Rogue: rogue, Sorcerer: sorcerer,
@@ -448,16 +479,23 @@ describe("referential integrity", () => {
         .filter(([, sub]) => (sub.grantLevel ?? 3) !== seedClass.subclassLevel)
         .map(([key]) => `${seedClass.name}/${key}`),
     );
-    expect(drift, "subclass grantLevel differs from seed subclassLevel").toEqual([]);
+    expect(drift, "class-definition grantLevel differs from seed subclassLevel").toEqual([]);
   });
 
-  // 2024 rules: a subclass grants nothing before its choice level (#1128), so no
-  // granted-spell row may fire below the class's subclassLevel.
-  it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its class's subclassLevel", () => {
-    const subclassLevelByClass = new Map(CLASSES.map((c) => [c.name, c.subclassLevel]));
+  // Unlike the grantLevel drift test above (reverted to direct equality by
+  // #1291, now that both tables are 2014-scoped), THIS check stays resolved
+  // through subclassGateLevel(..., EDITION_2024): these gateLevel values are
+  // 2024-only content (#1128) — e.g. Life Domain's earliest tier is authored
+  // as gateLevel 3 because 2024 doesn't grant the subclass before level 3, so
+  // its two 2014 tiers (1st/3rd) collapsed into one. Comparing against the raw
+  // (now 2014-scoped) subclassLevel column would wrongly flag every such row.
+  it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its class's 2024-resolved subclass gate", () => {
+    const subclassLevelByClass = new Map(
+      CLASSES.map((c) => [c.name, subclassGateLevel(c.subclassLevel, "EDITION_2024")]),
+    );
     const early = SUBCLASS_GRANTED_SPELLS.filter(
       (row) => row.gateLevel < (subclassLevelByClass.get(row.className) ?? 0),
     ).map((row) => `${row.className}/${row.subclassName}/${row.spellName}@${row.gateLevel}`);
-    expect(early, "granted spell gated below its subclass grant level").toEqual([]);
+    expect(early, "granted spell gated below its 2024-resolved subclass gate").toEqual([]);
   });
 });
