@@ -192,7 +192,10 @@ export function parseRollInput(req: Request, res: Response): RollInput | null {
     skill: typeof b.skill === "string" ? b.skill : undefined,
     dc: typeof b.dc === "number" ? b.dc : undefined,
     rollMode: b.rollMode as RollMode | undefined,
-    swingId: typeof b.swingId === "string" ? b.swingId : undefined,
+    // Trimmed like `source`: the gate accepts " abc " as non-empty, and an
+    // untrimmed id would silently fail the swingId equality join the combat
+    // log groups a swing by (#1235).
+    swingId: typeof b.swingId === "string" ? b.swingId.trim() : undefined,
     verdict: b.verdict as RollEventVerdict | undefined,
     nat20: typeof b.nat20 === "boolean" ? b.nat20 : undefined,
     nat1: typeof b.nat1 === "boolean" ? b.nat1 : undefined,

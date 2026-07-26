@@ -11,6 +11,7 @@ import type {
   CastStatMode,
   ItemCategory,
   ProficiencyKind,
+  RollEventAttackComponents,
   SerializedCapability,
   WeaponClass,
   WeaponDetailInput,
@@ -92,12 +93,7 @@ export interface WeaponDetail {
    * `deriveWeaponAttackComponents`, for the combat-log drill-in (#1235). Sums to
    * `attackBonus` by construction; present on `InventoryItem.weapon` only.
    */
-  attackBonusComponents?: {
-    abilityMod: number;
-    proficiencyBonus: number;
-    rangedBonus: number;
-    attackRollBonus: number;
-  };
+  attackBonusComponents?: RollEventAttackComponents;
   /**
    * Derived damage roll spec — grip-resolved at read time by `deriveWeaponDamage`.
    * Encodes the correct die for versatile weapons based on what else
