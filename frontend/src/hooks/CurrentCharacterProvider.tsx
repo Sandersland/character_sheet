@@ -10,7 +10,7 @@
  * query share one cache entry (same key -> one fetch, one cached copy),
  * instead of risking drift between two independent reads.
  *
- * Mount only below a loaded tri-state guard (see CharacterSheetPage): this
+ * Mount only below a loaded tri-state guard (see CharacterRouteGate): this
  * hook throws if the character is absent, because at that point absence is a
  * wiring bug, not a loading state (#1284 R5 — no production path clears the
  * cache once a character has loaded).
