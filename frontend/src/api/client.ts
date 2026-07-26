@@ -16,3 +16,4 @@ export * from "@/api/campaign";
 export * from "@/api/entities";
 export * from "@/api/journal";
 export * from "@/api/session";
+export * from "@/api/preferences";

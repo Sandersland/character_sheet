@@ -7,9 +7,14 @@
  * `system` follows the OS `prefers-color-scheme`; `light`/`dark` pin a theme.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-export type ThemePreference = "light" | "dark" | "system";
+import { usePreferencesSync, type ThemePreference } from "@/hooks/usePreferencesSync";
+
+// Re-exported (not defined here) so usePreferencesSync.ts stays the single
+// owner of the type — see that file's banner for why (avoids a hooks/types
+// import cycle now that theme is account-synced, #1178).
+export type { ThemePreference };
 export type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "cs:pref:theme";
@@ -48,12 +53,28 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
   return preference === "system" ? getSystemTheme() : preference;
 }
 
-/** React hook over the preference: reads once on mount and persists on change. */
+/**
+ * React hook over the preference: paints from localStorage first (works
+ * before auth resolves / offline), then adopts the account-synced value once
+ * PreferencesProvider resolves one (#1178) — which wins over a differing local
+ * value and gets mirrored back into localStorage for the next cold start.
+ */
 export function useThemePreference(): [ThemePreference, (value: ThemePreference) => void] {
+  const { synced, setPreference } = usePreferencesSync();
   const [value, setValue] = useState<ThemePreference>(loadThemePreference);
-  const set = useCallback((next: ThemePreference) => {
-    setValue(next);
-    saveThemePreference(next);
-  }, []);
+
+  useEffect(() => {
+    if (synced === undefined) return;
+    setValue(synced.theme);
+  }, [synced]);
+
+  const set = useCallback(
+    (next: ThemePreference) => {
+      setValue(next);
+      saveThemePreference(next);
+      setPreference("theme", next);
+    },
+    [setPreference],
+  );
   return [value, set];
 }

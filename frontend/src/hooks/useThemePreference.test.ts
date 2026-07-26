@@ -1,11 +1,27 @@
+import { createElement, type ReactNode } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { renderHook, act } from "@testing-library/react";
 
 import {
   loadThemePreference,
   saveThemePreference,
   getSystemTheme,
   resolveTheme,
+  useThemePreference,
 } from "@/hooks/useThemePreference";
+import { PreferencesContext } from "@/hooks/usePreferencesSync";
+import type { UserPreferences } from "@/types/auth";
+
+const SYNCED: UserPreferences = { theme: "light", diceRollStyle: "animated", autoRollConcentration: true };
+
+// Wraps the hook in a controlled PreferencesContext value, standing in for
+// PreferencesProvider (#1178) so these stay unit tests of useThemePreference
+// alone (PreferencesProvider.test.tsx covers the reconcile-on-login logic).
+function withSynced(synced: UserPreferences | undefined, setPreference = vi.fn()) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(PreferencesContext.Provider, { value: { synced, setPreference } }, children);
+  };
+}
 
 function stubMatchMedia(dark: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -61,5 +77,34 @@ describe("theme preference (issue #210)", () => {
     expect(resolveTheme("system")).toBe("dark");
     stubMatchMedia(false);
     expect(resolveTheme("system")).toBe("light");
+  });
+
+  describe("useThemePreference sync (#1178)", () => {
+    it("falls back to localStorage when no synced value exists", () => {
+      localStorage.setItem("cs:pref:theme", "dark");
+      const { result } = renderHook(() => useThemePreference());
+      expect(result.current[0]).toBe("dark");
+    });
+
+    it("prefers the synced value over a differing localStorage value once loaded", () => {
+      localStorage.setItem("cs:pref:theme", "dark");
+      const { result } = renderHook(() => useThemePreference(), {
+        wrapper: withSynced(SYNCED),
+      });
+      expect(result.current[0]).toBe("light");
+    });
+
+    it("writing mirrors into localStorage and pushes through setPreference", () => {
+      const setPreference = vi.fn();
+      const { result } = renderHook(() => useThemePreference(), {
+        wrapper: withSynced(undefined, setPreference),
+      });
+
+      act(() => result.current[1]("dark"));
+
+      expect(result.current[0]).toBe("dark");
+      expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
+      expect(setPreference).toHaveBeenCalledWith("theme", "dark");
+    });
   });
 });
