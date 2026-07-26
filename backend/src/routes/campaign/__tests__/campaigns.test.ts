@@ -90,6 +90,26 @@ describe("campaigns (#246)", () => {
     expect(fetched.body.rulesEdition).toBe("EDITION_2024");
   });
 
+  // #1286: the DM picks the edition at campaign creation; it's the default new
+  // characters inherit (never authoritative for an existing sheet).
+  it("honours an explicit rulesEdition on create", async () => {
+    const created = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "Edition Fourteen", rulesEdition: "EDITION_2014" });
+
+    expect(created.status).toBe(201);
+    expect(created.body.rulesEdition).toBe("EDITION_2014");
+  });
+
+  it("400s an unknown rulesEdition value on create", async () => {
+    const res = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "Bad Edition", rulesEdition: "EDITION_2000" });
+    expect(res.status).toBe(400);
+  });
+
   it("lets a second user join via invite code as PLAYER", async () => {
     const created = await supertest(createApp())
       .post("/api/campaigns")
@@ -148,10 +168,65 @@ describe("campaigns (#246)", () => {
     expect(res.body.campaignId).toBe(id);
   });
 
+  // #1286 supersedes the old "warn, never auto-convert" stance: a mismatched
+  // join is now blocked outright, before it ever reaches the attach updateMany.
+  it("blocks attaching a character whose rulesEdition differs from the campaign's, naming both editions", async () => {
+    const createdChar = await supertest(createApp())
+      .post("/api/characters")
+      .set("Cookie", cookieA)
+      .send({
+        name: "test-campaigns-char-edition-mismatch",
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: "Fighter" }],
+        abilityScores: {
+          strength: 15,
+          dexterity: 14,
+          constitution: 14,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 8,
+        },
+        rulesEdition: "EDITION_2014",
+      });
+    expect(createdChar.status).toBe(201);
+    const charId = createdChar.body.id as string;
+
+    try {
+      const campaign = await supertest(createApp())
+        .post("/api/campaigns")
+        .set("Cookie", cookieA)
+        .send({ name: "Edition Mismatch Campaign" });
+      expect(campaign.body.rulesEdition).toBe("EDITION_2024");
+
+      const attach = await supertest(createApp())
+        .post(`/api/campaigns/${campaign.body.id as string}/characters`)
+        .set("Cookie", cookieA)
+        .send({ characterId: charId });
+
+      expect(attach.status).toBe(409);
+      expect(attach.body.error).toMatch(/2014 rules/);
+      expect(attach.body.error).toMatch(/2024 rules/);
+      expect(attach.body.error).toMatch(/can't be changed/i);
+
+      // Never wrote the mismatched campaignId (rejected before the updateMany).
+      const stillUnattached = await prisma.character.findUniqueOrThrow({
+        where: { id: charId },
+        select: { campaignId: true, rulesEdition: true },
+      });
+      expect(stillUnattached.campaignId).toBeNull();
+      expect(stillUnattached.rulesEdition).toBe("EDITION_2014");
+    } finally {
+      await prisma.character.deleteMany({ where: { id: charId } });
+    }
+  });
+
   // Regression pin, not red-first (#1285/#1286): passes today because the
   // attach handler's updateMany only ever sets campaignId. Its job is to fail
-  // the day a future picker/mapper starts touching rulesEdition on attach.
-  it("does not convert a character's rulesEdition when it joins a campaign", async () => {
+  // the day a future picker/mapper starts touching rulesEdition on a
+  // same-edition attach (the mismatch guard above only rejects; it never mutates).
+  it("does not convert a character's rulesEdition when it joins a same-edition campaign", async () => {
     const createdChar = await supertest(createApp())
       .post("/api/characters")
       .set("Cookie", cookieA)
@@ -179,8 +254,8 @@ describe("campaigns (#246)", () => {
       const campaign = await supertest(createApp())
         .post("/api/campaigns")
         .set("Cookie", cookieA)
-        .send({ name: "Edition Pin Campaign" });
-      expect(campaign.body.rulesEdition).toBe("EDITION_2024");
+        .send({ name: "Edition Pin Campaign", rulesEdition: "EDITION_2014" });
+      expect(campaign.body.rulesEdition).toBe("EDITION_2014");
 
       const attach = await supertest(createApp())
         .post(`/api/campaigns/${campaign.body.id as string}/characters`)

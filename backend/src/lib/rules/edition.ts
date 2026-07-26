@@ -33,3 +33,10 @@ export function editionOf(row: { rulesEdition: RulesEdition }): RulesEdition {
 // must resolve an edition before the row exists to read `rulesEdition` from.
 // Deliberate-coupling latch: change the schema default, change this too.
 export const DEFAULT_RULES_EDITION: RulesEdition = "EDITION_2024";
+
+// Plain-language labels for user-facing text (e.g. the campaign-join mismatch
+// error, #1286) — players say "2014/2024 rules", never "SRD 5.1/5.2".
+export const RULES_EDITION_LABELS: Record<RulesEdition, string> = {
+  EDITION_2014: "2014 rules",
+  EDITION_2024: "2024 rules",
+};
