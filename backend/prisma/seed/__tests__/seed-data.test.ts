@@ -33,6 +33,7 @@ import { PACKS } from "../packs.js";
 import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
 import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
+import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 
 // The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
@@ -61,6 +62,31 @@ describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
     expect(grant).toBeDefined();
     expect(grant!.gateLevel).toBe(3);
     expect(grant!.castingAbility).toBe("wisdom");
+  });
+});
+
+// #1308: CLASSES.subclassLevel holds the PHB'14 gate (subclassGateLevel ignores
+// it entirely under 2024), so a reseed that "cleans up" these to a uniform 3
+// would silently regress every 2014 campaign's subclass timing. Pins the exact
+// PHB'14 citations rather than just checking they're non-3.
+describe("CLASSES — 2014 subclass gate levels (#1308)", () => {
+  const subclassLevelByName = new Map(CLASSES.map((c) => [c.name, c.subclassLevel]));
+
+  it("Cleric/Sorcerer/Warlock gate at 1st level (Divine Domain/Sorcerous Origin/Otherworldly Patron, PHB'14 pp. 57/99/105)", () => {
+    expect(subclassLevelByName.get("Cleric")).toBe(1);
+    expect(subclassLevelByName.get("Sorcerer")).toBe(1);
+    expect(subclassLevelByName.get("Warlock")).toBe(1);
+  });
+
+  it("Druid/Wizard gate at 2nd level (Druid Circle/Arcane Tradition, PHB'14 pp. 66/114)", () => {
+    expect(subclassLevelByName.get("Druid")).toBe(2);
+    expect(subclassLevelByName.get("Wizard")).toBe(2);
+  });
+
+  it("every other class stays at 3rd level", () => {
+    const early = new Set(["Cleric", "Sorcerer", "Warlock", "Druid", "Wizard"]);
+    const wrong = CLASSES.filter((c) => !early.has(c.name) && c.subclassLevel !== 3).map((c) => c.name);
+    expect(wrong, "classes drifted off the 3rd-level default").toEqual([]);
   });
 });
 
@@ -434,10 +460,14 @@ describe("referential integrity", () => {
     expect([...new Set(dangling)], "pack references an item missing from ITEMS").toEqual([]);
   });
 
-  // Cross-source (#1128): the seed subclassLevel (drives the level-up choice
-  // step) must equal the class-definition grantLevel (drives feature/pool
-  // derivation) — the single rule split across two files must not drift.
-  it("every seed subclassLevel matches its class-definition grantLevel", () => {
+  // Cross-source (#1128, revised #1308): the class-definition grantLevel table
+  // (registry.ts isSubclassActive) is edition-blind and drives feature/pool
+  // derivation only for the 2024 gate — CLASSES.subclassLevel is now the 2014
+  // gate (subclassGateLevel-scoped) and legitimately differs from it for
+  // Cleric/Sorcerer/Warlock/Druid/Wizard. Compare grantLevel against the
+  // 2024-resolved gate, not the raw 2014 catalog column, so this test stays a
+  // real drift guard instead of breaking on every intentional 2014/2024 split.
+  it("every class-definition grantLevel matches the 2024-resolved subclass gate", () => {
     const defByName: Record<string, ClassDefinition> = {
       Barbarian: barbarian, Bard: bard, Cleric: cleric, Druid: druid, Fighter: fighter,
       Monk: monk, Paladin: paladin, Ranger: ranger, Rogue: rogue, Sorcerer: sorcerer,
@@ -445,10 +475,10 @@ describe("referential integrity", () => {
     };
     const drift = CLASSES.flatMap((seedClass) =>
       Object.entries(defByName[seedClass.name]?.subclasses ?? {})
-        .filter(([, sub]) => (sub.grantLevel ?? 3) !== seedClass.subclassLevel)
+        .filter(([, sub]) => (sub.grantLevel ?? 3) !== subclassGateLevel(seedClass.subclassLevel, "EDITION_2024"))
         .map(([key]) => `${seedClass.name}/${key}`),
     );
-    expect(drift, "subclass grantLevel differs from seed subclassLevel").toEqual([]);
+    expect(drift, "class-definition grantLevel differs from the 2024-resolved subclass gate").toEqual([]);
   });
 
   // 2024 rules: a subclass grants nothing before its choice level (#1128), so no
