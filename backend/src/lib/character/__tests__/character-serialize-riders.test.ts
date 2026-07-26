@@ -1,5 +1,5 @@
 // Rider contract (#1316): sneakAttack/stunningStrike/openHandTechnique/
-// quiveringPalm/maneuverSaveDC are emitted ONLY when the character has them —
+// quiveringPalm/maneuvers are emitted ONLY when the character has them —
 // absent keys off-class/subclass/level, never `null`. Headline case: a
 // Battle Master Fighter's payload carries none of the monk/rogue keys.
 
@@ -22,6 +22,8 @@ const CHAR_IDS = [
   "riders-open-hand-l16",
   "riders-open-hand-l17",
   "riders-shadow-l17",
+  "riders-no-classes",
+  "riders-rogue3-monk5",
 ];
 
 async function serialize(characterId: string) {
@@ -74,11 +76,12 @@ describe("serializeCharacter rider contract (#1316)", () => {
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");
 
-    // maneuverSaveDC folds into the same rider contract, at the top level —
-    // Str 16 (+3) > Dex 10 (0), prof +3 → DC 14.
-    expect(payload).toHaveProperty("maneuverSaveDC", { saveDC: 14 });
+    // maneuverSaveDC folds into the same rider contract, at the top level,
+    // named for the feature like every other rider (`maneuvers`, not
+    // `maneuverSaveDC`) — Str 16 (+3) > Dex 10 (0), prof +3 → DC 14.
+    expect(payload).toHaveProperty("maneuvers", { saveDC: 14 });
     // maneuverChoiceCount/toolProfChoiceCount stay put in resources (#1316) —
-    // only maneuverSaveDC moved out.
+    // only the save DC moved out.
     expect((payload.resources as { maneuverChoiceCount?: number }).maneuverChoiceCount).toBe(5);
     expect(payload.resources).not.toHaveProperty("maneuverSaveDC");
   });
@@ -101,7 +104,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
     expect(payload).not.toHaveProperty("stunningStrike");
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");
-    expect(payload).not.toHaveProperty("maneuverSaveDC");
+    expect(payload).not.toHaveProperty("maneuvers");
   });
 
   it("a base monk below level 5 has no Stunning Strike (one below the gate)", async () => {
@@ -235,5 +238,55 @@ describe("serializeCharacter rider contract (#1316)", () => {
     expect(payload).not.toHaveProperty("quiveringPalm");
     // Base monk feature still gates purely on monk level, regardless of subclass.
     expect(payload.stunningStrike).toEqual({ saveDC: 17 });
+  });
+
+  it("a character with zero class entries carries no rider keys at all", async () => {
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        id: "riders-no-classes",
+        name: "Classless Snapshot",
+        experiencePoints: 0,
+        hitDice: { total: 0, die: "d8", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+        classEntries: { create: [] },
+      },
+    });
+    const payload = await serialize("riders-no-classes");
+
+    expect(payload).not.toHaveProperty("sneakAttack");
+    expect(payload).not.toHaveProperty("stunningStrike");
+    expect(payload).not.toHaveProperty("openHandTechnique");
+    expect(payload).not.toHaveProperty("quiveringPalm");
+    expect(payload).not.toHaveProperty("maneuvers");
+  });
+
+  it("a Rogue 3 / Monk 5 multiclass carries both riders, each gated on its own entry's level", async () => {
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        id: "riders-rogue3-monk5",
+        name: "Rogue3Monk5 Snapshot",
+        experiencePoints: 34000, // level 8 (rogue 3 + monk 5), proficiency +3
+        hitDice: { total: 8, die: "d8", spent: 8 },
+        abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
+        classEntries: {
+          create: [
+            { name: "rogue", position: 0, level: 3 },
+            { name: "monk", position: 1, level: 5 },
+          ],
+        },
+      },
+    });
+    const payload = await serialize("riders-rogue3-monk5");
+
+    // Sneak Attack gates on the rogue entry's own level (3), not the total
+    // character level (8) — same for Stunning Strike against the monk entry.
+    expect(payload.sneakAttack).toEqual({ dice: { count: 2, faces: 6 } });
+    // Wis 16 (+3), prof +3 (character level 8) → DC 14.
+    expect(payload.stunningStrike).toEqual({ saveDC: 14 });
+    expect(payload).not.toHaveProperty("openHandTechnique");
+    expect(payload).not.toHaveProperty("quiveringPalm");
+    expect(payload).not.toHaveProperty("maneuvers");
   });
 });
