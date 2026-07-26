@@ -51,8 +51,10 @@ export default tseslint.config(
     // full-factory replacement (#1297) — the mock silently stops applying and
     // the test hits real fetch. client.ts is the mockable barrel; queryKeys/
     // queryClient are key builders and a QueryClient instance, not fetch
-    // wrappers, so hooks legitimately import them directly.
-    files: ["src/{features,pages,hooks,components,lib}/**/*.{ts,tsx}"],
+    // wrappers, so hooks legitimately import them directly. Applied repo-wide
+    // under src/ (failure-closed: a new directory is covered by default) —
+    // src/api/** is exempted below, by name, not by omission.
+    files: ["src/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -67,5 +69,12 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // The api layer itself: domain modules legitimately import @/api/http,
+    // and client.ts's barrel imports every domain module. Flat config is
+    // last-match-wins per rule, so this later "off" overrides the block above.
+    files: ["src/api/**/*.{ts,tsx}"],
+    rules: { "no-restricted-imports": "off" },
   }
 );
