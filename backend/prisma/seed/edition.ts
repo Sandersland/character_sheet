@@ -1,6 +1,8 @@
-// Local mirror of the backend/shared-types RulesEdition union (#1306) — seed
-// data modules can't import `@/lib/` or the shared-types package (tsx has no
-// alias resolution here, same limitation noted on FeatCategory in feats.ts).
-// `undefined`/omitted on a seed row means "shared" (NULL column, valid in both
-// editions); only a genuinely diverging row sets this explicitly.
-export type SeedEdition = "EDITION_2014" | "EDITION_2024";
+import type { RulesEdition } from "@character-sheet/shared-types";
+
+// `@character-sheet/shared-types` is an ordinary workspace package (plain
+// node resolution, not the `@/` tsconfig alias FeatCategory's mirror comment
+// warns seed modules away from), so this aliases the real type instead of
+// hand-duplicating it. `undefined`/omitted on a seed row means "shared" (NULL
+// column, valid in both editions); only a genuinely diverging row sets this.
+export type SeedEdition = RulesEdition;

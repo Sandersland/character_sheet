@@ -622,9 +622,8 @@ model Subclass {
   // forks into one row per edition sharing this name (#1306). Kept named
   // "classId_name" (not classId_name_edition) so the compound-key literal at
   // every existing call site only grows an `edition` field, not a rename.
-  // NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow
-  // in lib/rules/catalog-edition.ts, the single place the exact/NULL fallback
-  // ordering is expressed.
+  // NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow,
+  // the single place the exact/NULL fallback ordering is expressed.
   edition     RulesEdition?
 
   selections    CharacterClassEntry[]
@@ -669,8 +668,8 @@ model Background {
   // NULL = valid in both editions; only a genuinely diverging background forks
   // into one row per edition sharing this name (#1306). The migration's unique
   // index on (name, edition) uses NULLS NOT DISTINCT so two NULL-edition rows
-  // sharing a name are still rejected — see resolveEditionRow in
-  // lib/rules/catalog-edition.ts, the single place the fallback ordering lives.
+  // sharing a name are still rejected — see resolveEditionRow, the single
+  // place the fallback ordering lives.
   edition            RulesEdition?
 
   selections CharacterBackground[]
@@ -1025,8 +1024,8 @@ model Feat {
   // NULL = valid in both editions; a diverging feat (e.g. Alert) forks into one
   // row per edition sharing this name (#1306). The migration's unique index on
   // (name, edition) uses NULLS NOT DISTINCT so two NULL-edition rows sharing a
-  // name are still rejected — see resolveEditionRow in lib/rules/catalog-edition.ts,
-  // the single place the exact/NULL fallback ordering is expressed.
+  // name are still rejected — see resolveEditionRow, the single place the
+  // exact/NULL fallback ordering is expressed.
   edition           RulesEdition?
 
   // Backgrounds that grant this feat as their Origin feat (PHB'24).

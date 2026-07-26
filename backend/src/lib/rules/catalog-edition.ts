@@ -30,9 +30,42 @@ export function resolveEditionRow<T extends EditionTagged>(
  * ever resolve to (its own edition, or the shared NULL row) — narrows a
  * `findMany` before handing the (at most two) candidates to
  * `resolveEditionRow`, rather than fetching every edition's rows.
+ *
+ * Wrapped in `AND` (not a bare `{ OR: [...] }`) so `{ ...someWhere,
+ * ...editionOrShared(edition) }` can never silently clobber a sibling `OR` at
+ * the same call site — a real risk once a caller's own filter needs an `OR`
+ * too, and the wrong answer would be a silently-too-broad query, not a type
+ * error. (A nullable-enum `{ in: [edition, null] }` looks like the obvious
+ * alternative but Prisma rejects `null` inside `in` outright — verified
+ * directly against this schema, not assumed.)
  */
-export function editionOrShared(edition: RulesEdition): { OR: [{ edition: RulesEdition }, { edition: null }] } {
-  return { OR: [{ edition }, { edition: null }] };
+export function editionOrShared(edition: RulesEdition): { AND: [{ OR: [{ edition: RulesEdition }, { edition: null }] }] } {
+  return { AND: [{ OR: [{ edition }, { edition: null }] }] };
+}
+
+/**
+ * Resolve a full catalog LIST for a character's edition — groups candidates
+ * by `name` (their business key) and applies `resolveEditionRow` per group,
+ * so a caller serving a picker (e.g. `GET /api/feats`) returns exactly one
+ * row per name instead of every edition's rows. Order of the input is
+ * preserved for each group's first occurrence.
+ */
+export function resolveEditionCatalog<T extends EditionTagged & { name: string }>(
+  rows: T[],
+  edition: RulesEdition,
+): T[] {
+  const byName = new Map<string, T[]>();
+  for (const row of rows) {
+    const group = byName.get(row.name);
+    if (group) group.push(row);
+    else byName.set(row.name, [row]);
+  }
+  const resolved: T[] = [];
+  for (const group of byName.values()) {
+    const row = resolveEditionRow(group, edition);
+    if (row) resolved.push(row);
+  }
+  return resolved;
 }
 
 /**
@@ -46,6 +79,14 @@ export function editionOrShared(edition: RulesEdition): { OR: [{ edition: RulesE
  * `findFirst` has no such restriction (a plain filter lowers to `IS NULL`
  * correctly), so both seed.ts and test fixtures upsert find-then-write
  * instead of the compound-key shortcut whenever `edition` may be null.
+ *
+ * Seed- and test-fixture-only — do NOT call this from a request path. The
+ * find-then-write isn't transactional: it's safe here because seed.ts runs
+ * single-threaded and each vitest worker owns its own database (#1269), but a
+ * concurrent request handler racing two callers could still lose to a
+ * genuine duplicate between the `findFirst` and the `create` (which would
+ * then fail loudly against NULLS NOT DISTINCT, not corrupt data — but that's
+ * still the wrong shape for a transaction handler).
  */
 export async function upsertEditionRow<Where extends object, Create, Update, Row extends { id: string }>(
   model: {
