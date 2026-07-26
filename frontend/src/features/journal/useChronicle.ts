@@ -17,6 +17,15 @@ export function useChronicle(character: Character | null | undefined) {
 
   // Arcs + sessions are always fetched together and treated as one read model
   // by every consumer — one query, not two independently-loading pieces.
+  //
+  // staleTime:0 (overriding the global 30s), same rationale as SessionsModal:
+  // nothing invalidates this key when a session ends (useCombatLifecycle only
+  // touches the doorway/active-session keys), and JournalDoorway keeps this
+  // query alive on the always-mounted sheet — so without staleTime:0, opening
+  // the journal minutes after ending a session could still see this same key
+  // as "fresh" and skip refetching, showing a chronicle missing the chapter
+  // that just ended. A fresh mount (e.g. navigating to /journal) must always
+  // confirm with the network.
   const { data, isLoading, isError } = useQuery({
     queryKey: sessionKeys.chronicle(campaignId, characterId),
     queryFn:
@@ -29,6 +38,7 @@ export function useChronicle(character: Character | null | undefined) {
             return { arcs, sessions };
           }
         : skipToken,
+    staleTime: 0,
   });
 
   return {

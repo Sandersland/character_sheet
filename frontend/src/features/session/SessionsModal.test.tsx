@@ -104,4 +104,22 @@ describe("SessionsModal (#1299 review — session list onto sessionKeys)", () =>
     expect(screen.getByText("Cached Session")).toBeInTheDocument();
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("camp-1"));
   });
+
+  // Re-review: query-core sets status:'error' even when `data` is retained —
+  // opening the modal offline with a warm cache must still show the
+  // last-known list, with the error line ADDED alongside it, not instead of it
+  // (the pre-#1299 render always emitted both side by side).
+  it("shows the error line alongside a cached list when a background refetch fails", async () => {
+    getQueryClient().setQueryData(sessionKeys.campaignList("camp-1"), [
+      makeSession({ id: "s1", title: "Cached Session" }),
+    ]);
+    mockFetch.mockRejectedValue(new Error("network down"));
+
+    render(<SessionsModal characterId="c1" campaignId="camp-1" onClose={vi.fn()} />);
+
+    expect(
+      await screen.findByText("Couldn't load sessions — try again."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Cached Session")).toBeInTheDocument();
+  });
 });

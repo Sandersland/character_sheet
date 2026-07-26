@@ -58,6 +58,11 @@ function SessionRow({ session, onSelect }: { session: Session; onSelect: (s: Ses
   );
 }
 
+// Error and list are siblings, not exclusive branches: query-core sets
+// status:'error' even when `data` is retained, so a failed background
+// refetch of a warm cache must show the error line ALONGSIDE the last-known
+// list, not instead of it (re-review — an early-return-on-error regressed
+// this).
 function SessionsListBody({
   list,
   error,
@@ -69,21 +74,26 @@ function SessionsListBody({
   showSpinner: boolean;
   onSelect: (s: Session) => void;
 }) {
-  if (error) return <p className="text-xs font-semibold text-garnet-700">{error}</p>;
-  if (list === null) return showSpinner ? <Spinner /> : null;
-  if (list.length === 0) {
-    return (
-      <p className="py-6 text-center text-sm text-parchment-600">
-        No sessions yet. Start a session from the character sheet to begin live play.
-      </p>
-    );
-  }
   return (
-    <ul className="flex flex-col gap-2">
-      {list.map((session) => (
-        <SessionRow key={session.id} session={session} onSelect={onSelect} />
-      ))}
-    </ul>
+    <>
+      {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
+
+      {list === null && !error && showSpinner && <Spinner />}
+
+      {list !== null && list.length === 0 && (
+        <p className="py-6 text-center text-sm text-parchment-600">
+          No sessions yet. Start a session from the character sheet to begin live play.
+        </p>
+      )}
+
+      {list && list.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {list.map((session) => (
+            <SessionRow key={session.id} session={session} onSelect={onSelect} />
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
