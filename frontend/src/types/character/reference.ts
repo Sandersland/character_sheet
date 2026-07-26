@@ -2,7 +2,7 @@
  * Character-creation reference data (GET /api/reference) and the create-character body.
  */
 
-import type { ClassStartingEquipment } from "@character-sheet/shared-types";
+import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 
@@ -136,4 +136,7 @@ export interface CreateCharacterInput {
   startingEquipment?: StartingEquipmentInput;
   /** #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids). */
   spells?: { cantripIds: string[]; spellIds: string[] };
+  /** #1286: resolved by CreationEntryGate before the ceremony starts — inherited
+   *  from the chosen campaign, or explicitly picked for solo. Write-once. */
+  rulesEdition?: RulesEdition;
 }

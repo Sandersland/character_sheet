@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { createCharacter, fetchItems } from "@/api/client";
+import { addCharacterToCampaign, createCharacter, fetchItems } from "@/api/client";
 import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import type { ToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import {
@@ -20,6 +20,7 @@ import type {
 import { stepPosition } from "@/lib/ceremonySteps";
 import { creationMissing, creationStepMissing, creationSteps } from "@/lib/creationSteps";
 import type { CreationStepKey } from "@/lib/creationSteps";
+import { errorMessage } from "@/lib/errorMessage";
 import type { Item, ReferenceData, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
@@ -46,7 +47,9 @@ export interface CharacterCreation {
   missing: string[];
   isValid: boolean;
   submitting: boolean;
-  submitError: boolean;
+  /** The real error text (create OR the campaign attach), or null. Never a
+   *  generic "check the form" — by the time save() can run, the form IS valid. */
+  submitError: string | null;
   save: () => Promise<void>;
   /** The ceremony walk (#1176) — spells step only for a level-1 caster. */
   steps: CreationStepKey[];
@@ -65,10 +68,10 @@ export interface CharacterCreation {
 // derivations (in characterCreation), validation gating, and submit.
 export function useCharacterCreation(): CharacterCreation {
   const navigate = useNavigate();
-  const { draft, update, clear } = useCharacterDraft();
+  const { draft, update, clear: clearDraft } = useCharacterDraft();
   const { reference, error: referenceError } = useReferenceData();
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<Item[]>([]);
   const showSpinner = useDelayedFlag(!reference && !referenceError);
 
@@ -129,23 +132,53 @@ export function useCharacterCreation(): CharacterCreation {
     navigate("/");
   }
 
+  // Wraps useCharacterDraft's clear so Start Over also resets submitError —
+  // clearDraft() alone already drops any pending created-but-unattached id
+  // (draft.createdId, part of the same persisted object).
+  function clear() {
+    clearDraft();
+    setSubmitError(null);
+  }
+
   async function save() {
     if (missing.length > 0 || submitting) return;
     setSubmitting(true);
-    setSubmitError(false);
+    setSubmitError(null);
+    // #1286: read from the persisted draft, not a useState — createCharacter is
+    // not idempotent, and a plain useState-held id would be lost on a page
+    // refresh (CharacterDraft is persisted; component state is not), silently
+    // reopening the orphan-and-duplicate bug this field exists to close.
+    let id = draft.createdId;
     try {
-      const payload = buildCreatePayload(
-        draft,
-        selections,
-        skillChoices,
-        toolChoices.selectedToolChoices
-      );
-      const created = await createCharacter(payload);
+      if (!id) {
+        const payload = buildCreatePayload(
+          draft,
+          selections,
+          skillChoices,
+          toolChoices.selectedToolChoices
+        );
+        const created = await createCharacter(payload);
+        id = created.id;
+        update({ createdId: id });
+      }
+      // campaignId was resolved (and its edition inherited) at the
+      // CreationEntryGate before the ceremony started; attach reuses the
+      // existing join endpoint instead of adding a second creation-time mutation
+      // path. Editions always match here (inherited, never re-picked), so this
+      // never hits the join's edition-mismatch guard. Re-attaching the same
+      // campaign is an idempotent no-op server-side, so a retry is safe.
+      if (draft.campaignId) {
+        await addCharacterToCampaign(id, draft.campaignId);
+      }
       clear();
       // Replace (not push) so the now-stale empty form doesn't linger in history.
-      navigate(`/characters/${created.id}`, { replace: true });
-    } catch {
-      setSubmitError(true);
+      navigate(`/characters/${id}`, { replace: true });
+    } catch (err) {
+      setSubmitError(
+        id
+          ? `Character created, but couldn't join the campaign — ${errorMessage(err, "try again")}`
+          : errorMessage(err, "Couldn't save. Try again."),
+      );
     } finally {
       setSubmitting(false);
     }

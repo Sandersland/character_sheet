@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
+import { passEntryGate } from "./helpers/creation";
 import { uniqueName } from "./helpers/api";
 
 // The creation ceremony (#1176) walks one step at a time behind a Continue gate;
@@ -22,6 +23,7 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   // the auth boot and can land on the sign-in page).
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page);
 
   // Identity step. Labels carry a trailing "*" required marker, so anchor at the
   // start; ^Class also keeps it from matching the Subclass field.
@@ -73,6 +75,7 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page);
 
   // Identity step.
   await page.getByLabel(/^Name/).fill(name);

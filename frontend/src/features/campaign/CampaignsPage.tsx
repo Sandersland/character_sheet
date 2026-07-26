@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import EditionPicker from "@/components/ui/EditionPicker";
 import EmptyState from "@/components/ui/EmptyState";
 import Spinner from "@/components/ui/Spinner";
 import { createCampaign, fetchCampaigns } from "@/api/client";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { RULES_EDITIONS } from "@/lib/editionCopy";
 import type { Campaign } from "@/types/character";
+
+// RULES_EDITIONS[0] is EDITION_2024 (mirrors Campaign.rulesEdition's Prisma
+// column default) — the picker's pre-checked card, not a hardcoded literal here.
+const DEFAULT_EDITION = RULES_EDITIONS[0];
 
 const inputCls =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
@@ -20,6 +28,7 @@ const primaryBtn =
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [name, setName] = useState("");
+  const [rulesEdition, setRulesEdition] = useState<RulesEdition>(DEFAULT_EDITION);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const showSpinner = useDelayedFlag(campaigns === null);
@@ -43,8 +52,9 @@ export default function CampaignsPage() {
     setPending(true);
     setError(null);
     try {
-      await createCampaign(name.trim());
+      await createCampaign(name.trim(), rulesEdition);
       setName("");
+      setRulesEdition(DEFAULT_EDITION);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create campaign");
@@ -85,6 +95,14 @@ export default function CampaignsPage() {
                 placeholder="The Sunless Citadel"
                 className={inputCls}
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className={labelCls}>Rules edition</span>
+              <EditionPicker value={rulesEdition} onChange={setRulesEdition} label="Rules edition" />
+              <p className="text-xs text-parchment-500">
+                Sets the rules every character joining this campaign must use. Can't be changed after the
+                campaign is created.
+              </p>
             </div>
             <button type="submit" className={primaryBtn} disabled={pending || !name.trim()}>
               Create campaign
