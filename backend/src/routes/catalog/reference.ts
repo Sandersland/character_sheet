@@ -43,10 +43,13 @@ referenceRouter.get("/reference", async (_req, res) => {
     isSpellcaster: c.isSpellcaster,
     // This endpoint has no character, so no rulesEdition to resolve against —
     // the catalog column is 2014-only (#1308), and no frontend surface resolves
-    // the edition seam yet (deferred per-edition frontend work, follow-up
-    // filed). Serving it resolved for 2024 (always 3) is the only value this
-    // endpoint can honestly give today; serving it raw would make the
-    // 2024-default creation flow originate a 2014 rule and get rejected.
+    // the edition seam yet (#1325). Serving it resolved for 2024 (always 3) is
+    // the only value this endpoint can honestly give today; serving it raw
+    // would make the creation flow originate a 2014 rule and get rejected.
+    // Deliberately NOT DEFAULT_RULES_EDITION: that names the edition a new
+    // character defaults to, and coupling the two would let a change to the
+    // creation default silently change what this catalog reports. #1325
+    // replaces this with real per-edition resolution.
     subclassLevel: subclassGateLevel(c.subclassLevel, "EDITION_2024"),
     // Tool proficiency fields — parallel to skillChoices/skillChoiceCount.
     toolProficiencies: c.toolProficiencies,

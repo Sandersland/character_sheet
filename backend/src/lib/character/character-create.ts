@@ -759,12 +759,13 @@ async function persistCreatedCharacter(
       name: input.name,
       alignment: input.alignment,
       portraitUrl: input.portraitUrl ?? null,
-      // The only write of rulesEdition (write-once, #1285). Not the same
-      // `edition` value resolveSelections computed for the creation-time
-      // subclass gate check (input isn't threaded that far) but the same
-      // formula via DEFAULT_RULES_EDITION, so the two independent resolutions
-      // can't drift apart; written explicitly rather than left to the Prisma
-      // column default so both sites name one literal.
+      // The only write of rulesEdition (write-once, #1285). The `edition` local
+      // that resolveSelections computed for the creation-time subclass gate
+      // check isn't returned to its caller, so this re-derives it from the same
+      // input by the same formula via DEFAULT_RULES_EDITION — that shared
+      // constant is what keeps the two independent resolutions from drifting.
+      // Written explicitly rather than left to the Prisma column default so
+      // both sites name one literal.
       rulesEdition: input.rulesEdition ?? DEFAULT_RULES_EDITION,
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: effectiveScores,
