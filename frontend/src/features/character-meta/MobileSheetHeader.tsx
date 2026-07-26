@@ -10,6 +10,7 @@ import CharacterSwitcherSheet from "@/features/character-meta/CharacterSwitcherS
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { EDITION_LABELS } from "@/lib/editionCopy";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
 
 type HeaderVariant = "expanded" | "collapsed";
@@ -353,6 +354,9 @@ function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps
             </span>
             <span className="block truncate text-xs text-parchment-600">
               {character.race} · {classLine}
+            </span>
+            <span className="block truncate text-[11px] text-parchment-500">
+              {EDITION_LABELS[character.rulesEdition]}
             </span>
           </span>
         </button>
