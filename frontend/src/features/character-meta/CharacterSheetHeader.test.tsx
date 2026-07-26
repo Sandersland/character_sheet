@@ -10,6 +10,14 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { SheetTab } from "@/features/character-meta/sheetTabs";
 import type { Character } from "@/types/character";
 
+// Both the mobile and desktop chrome render a "Sheet actions" trigger; the
+// desktop one is last. Indexing by position broke the moment their DOM order moved.
+function desktopSheetActions(): HTMLElement {
+  const triggers = screen.getAllByRole("button", { name: /sheet actions/i });
+  return triggers[triggers.length - 1];
+}
+
+
 // BackendStatus pings the API on mount; keep it quiet + healthy in tests.
 vi.mock("@/api/client", () => ({ checkHealth: vi.fn().mockResolvedValue(true) }));
 
@@ -136,7 +144,7 @@ describe("CharacterSheetHeader campaign settings (#1087)", () => {
   it("shows 'Campaign settings…' in the desktop ⋮ and fires its handler when campaign-attached", () => {
     const onOpenCampaignSettings = vi.fn();
     renderHeader({ activeTab: "overview", onOpenCampaignSettings });
-    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    fireEvent.click(desktopSheetActions());
     fireEvent.click(screen.getByRole("menuitem", { name: /campaign settings/i }));
     expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
   });
@@ -149,7 +157,7 @@ describe("CharacterSheetHeader campaign settings (#1087)", () => {
       },
       makeCharacter({ campaignId: undefined }),
     );
-    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    fireEvent.click(desktopSheetActions());
     expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
   });
 });
@@ -159,7 +167,7 @@ describe("CharacterSheetHeader desktop Preferences entry (#1167)", () => {
     const onOpenCampaignSettings = vi.fn();
     renderHeader({ activeTab: "overview", onOpenCampaignSettings });
 
-    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    fireEvent.click(desktopSheetActions());
     fireEvent.click(screen.getByRole("menuitem", { name: /preferences/i }));
 
     expect(screen.getByRole("dialog", { name: /preferences/i })).toBeInTheDocument();
@@ -173,7 +181,7 @@ describe("CharacterSheetHeader desktop Preferences entry (#1167)", () => {
       makeCharacter({ campaignId: undefined }),
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    fireEvent.click(desktopSheetActions());
     fireEvent.click(screen.getByRole("menuitem", { name: /preferences/i }));
 
     expect(screen.getByRole("dialog", { name: /preferences/i })).toBeInTheDocument();

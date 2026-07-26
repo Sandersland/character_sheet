@@ -67,8 +67,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-// Mirrors CampaignPreferencesFields' ToggleRow but standalone — this surface has
-// only one boolean toggle today, not worth sharing a component for yet.
+// Shaped like CampaignPreferencesFields' ToggleRow but standalone — one boolean
+// toggle today isn't worth sharing a component for. It differs deliberately in
+// one way: the row is a <label>, so clicking the text toggles. The retired
+// AutoRollConcentrationToggle behaved that way and losing it here would be a
+// regression for the same control (#1166); the campaign twin still needs it.
 function ToggleRow({
   label,
   hint,
@@ -81,7 +84,7 @@ function ToggleRow({
   onChange: (next: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-control border border-parchment-200 px-3 py-2.5">
+    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-control border border-parchment-200 px-3 py-2.5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-garnet-600">
       <span className="flex flex-col">
         <span className="text-sm font-semibold text-parchment-800">{label}</span>
         <span className="text-xs text-parchment-600">{hint}</span>
@@ -93,7 +96,7 @@ function ToggleRow({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-    </div>
+    </label>
   );
 }
 

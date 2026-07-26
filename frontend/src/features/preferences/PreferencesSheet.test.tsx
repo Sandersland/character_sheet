@@ -100,6 +100,18 @@ describe("PreferencesSheet (#1167)", () => {
     expect(toggle).not.toBeChecked();
   });
 
+  it("toggles when the row's label TEXT is clicked, not just the box", async () => {
+    // The retired AutoRollConcentrationToggle wrapped its row in a <label>, so
+    // clicking the text worked; a <span> row would silently drop that (#1166).
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.click(screen.getByText(/auto-roll concentration saves/i));
+
+    expect(screen.getByRole("checkbox", { name: /auto-roll concentration saves/i })).not.toBeChecked();
+    expect(localStorage.getItem("cs:pref:autoRollConcentration")).toBe("false");
+  });
+
   it("omits the Campaign settings link when no campaignId is supplied", () => {
     renderSheet();
     expect(screen.queryByRole("button", { name: /campaign settings/i })).not.toBeInTheDocument();
