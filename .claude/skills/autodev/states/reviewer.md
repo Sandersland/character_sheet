@@ -18,8 +18,8 @@ Worker's claim — chunks: {{chunks}} · tests: {{testsSummary}}
 5. **It compiles and passes — run it yourself, in the containers** (the backend container already has `DATABASE_URL` set — never override it):
    - `docker compose exec -T backend sh -c 'cd /app/backend && npx tsc --noEmit'` (and frontend twin)
    - `docker compose exec -T backend sh -c 'cd /app/backend && npm run lint'` (and frontend twin)
-   - `docker compose exec -T backend sh -c 'cd /app/backend && npx vitest run --fileParallelism=false'` and `docker compose exec -T frontend sh -c 'cd /app/frontend && npx vitest run'`
-   - `/app` is the repo ROOT — `cd` to the workspace or the `@/` alias won't resolve and every test file fails to collect (false red). The backend suite needs `--fileParallelism=false` in a worktree: at default parallelism the workers contend on the stack's Postgres pool and throw cross-domain 500s that look like regressions.
+   - `docker compose exec -T backend sh -c 'cd /app/backend && npx vitest run'` and `docker compose exec -T frontend sh -c 'cd /app/frontend && npx vitest run'`
+   - `/app` is the repo ROOT — `cd` to the workspace or the `@/` alias won't resolve and every test file fails to collect (false red). Never add `--fileParallelism=false`: since #1269 each worker owns its own database, so cross-file interference is a leaking fixture the override would only hide (`docs/testing.md`). If the container OOMs, use `--maxWorkers=2`.
 6. **UI surface** (uiSurface = {{uiSurface}}): if true, verify it in this worktree's own running stack. Do this LAST, after all test/lint runs — the backend suite's auth fixtures delete the dev-login user (cascading its characters), so anything created earlier is wiped; the e2e suite's `global-setup.ts` re-seeds the personas after that wipe, which is exactly why it runs here.
    1. **Run the full deterministic e2e suite** — one command; `frontend/e2e/global-setup.ts` owns persona seeding (it idempotently re-creates **Smoke Fighter** L1 + **Wizard L5** after the backend suite wiped `dev-user-local`), so you never hand-roll character-creation curls:
       ```
