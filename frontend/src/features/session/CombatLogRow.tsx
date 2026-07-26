@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { fetchSession, fetchSessions } from "@/api/client";
 import { ChevronRight } from "@/components/ui/icons";
+import { visibleLogEvents } from "@/lib/sessionLogFeed";
 import type { CharacterEvent, Session } from "@/types/character";
 
 // Idle: surface the most recent ended session, tapping opens its log. Live: a
@@ -78,11 +79,9 @@ function LiveLogRow({
     fetchSession(characterId, sessionId)
       .then((data) => {
         if (!alive) return;
-        // Match the SessionLog feed: drop reverted/undo + the noisy round markers.
-        const events = (data.events as CharacterEvent[]).filter(
-          (e) => !e.reverted && e.type !== "revert" && e.type !== "combatRoundAdvanced",
-        );
-        setCount(events.length);
+        // Shares SessionLog's exact filter (`visibleLogEvents`) so the two
+        // counts can't drift — a #1237 regression guard (see its test).
+        setCount(visibleLogEvents(data.events as CharacterEvent[]).length);
       })
       .catch(() => {
         if (alive) setCount(null);

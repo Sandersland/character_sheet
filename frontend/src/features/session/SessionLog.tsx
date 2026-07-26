@@ -1,138 +1,35 @@
 /**
- * SessionLog — read-only event timeline for a single play session.
+ * SessionLog — BG3-style chat feed for a single play session (#1237).
  *
  * Fetches all CharacterEvents whose sessionId matches the current session and
- * renders them newest-first. Re-fetches on every mount; a caller that keeps the
- * log mounted across live mutations can pass the optional `refreshKey` prop (the
- * character object or a version counter) to trigger additional re-fetches.
+ * renders them as one sentence per event, newest at the BOTTOM (chat
+ * convention), opening scrolled to the latest. Re-fetches on every mount; a
+ * caller that keeps the log mounted across live mutations can pass the
+ * optional `refreshKey` prop (the character object or a version counter) to
+ * trigger additional re-fetches.
+ *
+ * All the event → sentence/tone/drill-in logic is pure and lives in
+ * `lib/sessionLogFeed.ts` — this component only maps that data onto markup.
  *
  * Intentionally read-only — no undo here. Use ActivityModal on the character
  * sheet for the full undo-capable history.
  */
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { fetchSession } from "@/api/client";
-import Badge from "@/components/ui/Badge";
+import { ChevronRight } from "@/components/ui/icons";
 import Spinner from "@/components/ui/Spinner";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
-import { formatRollBreakdown } from "@/lib/dice";
-import { categoryTone } from "@/lib/events";
+import { damageTypeTone, logToneClass } from "@/lib/events";
+import {
+  buildFeedItems,
+  type DrillInRow,
+  type FeedItem,
+  type FeedRow,
+  type LogSegment,
+} from "@/lib/sessionLogFeed";
 import type { CharacterEvent } from "@/types/character";
-
-// Category → badge tone resolves through the shared categoryTone lookup so new
-// event categories stay covered. The session log keeps its own terser TYPE_LABEL
-// map below (e.g. "combat" vs the activity log's "Combat started").
-//
-// Coverage is a forcing function, not a suggestion (#983): SessionLog.test.tsx
-// iterates every CharacterEventType and asserts an explicit entry here, so a
-// newly-added event type is a failing test rather than a silently humanized key.
-// The `humanizeEventType` fallback (below) is the runtime safety net for a
-// backend-only type that outruns the frontend union — never a raw camelCase leak.
-export const TYPE_LABEL: Partial<Record<string, string>> = {
-  acquired: "acquired",
-  bought: "bought",
-  sold: "sold",
-  consumed: "consumed",
-  removed: "removed",
-  equipped: "equipped",
-  unequipped: "unequipped",
-  damage: "damage",
-  heal: "healed",
-  setTemp: "temp HP",
-  shortRest: "short rest",
-  longRest: "long rest",
-  levelUp: "level up",
-  levelDown: "level down",
-  deathSave: "death save",
-  stabilize: "stabilize",
-  xpAward: "XP",
-  xpSet: "XP set",
-  currencyAdjust: "currency",
-  castSpell: "cast",
-  expendSlot: "slot used",
-  restoreSlot: "slot restored",
-  learnSpell: "learned",
-  forgetSpell: "forgotten",
-  prepareSpell: "prepared",
-  unprepareSpell: "unprepared",
-  concentrationDropped: "concentration",
-  subclassChosen: "subclass",
-  subclassRemoved: "subclass removed",
-  fightingStyleChosen: "fighting style",
-  fightingStyleRemoved: "style removed",
-  spendResource: "resource used",
-  restoreResource: "resource restored",
-  learnManeuver: "maneuver learned",
-  forgetManeuver: "maneuver forgotten",
-  maneuversReconciled: "maneuvers",
-  learnToolProficiency: "tool learned",
-  forgetToolProficiency: "tool forgotten",
-  toolProficienciesReconciled: "tools",
-  abilityScoreImprovement: "ASI",
-  featTaken: "feat",
-  advancementRemoved: "advancement removed",
-  advancementsReconciled: "advancements",
-  sessionStarted: "session",
-  sessionEnded: "session end",
-  combatStarted: "combat",
-  combatEnded: "combat end",
-  combatRoundAdvanced: "round",
-  conditionApplied: "condition",
-  conditionRemoved: "condition removed",
-  exhaustionSet: "exhaustion",
-  attackRoll: "attack",
-  damageRoll: "damage",
-  checkRoll: "check",
-  saveRoll: "save",
-  initiativeRoll: "initiative",
-  awarded: "loot",
-  revoked: "revoked",
-  revert: "undo",
-};
-
-// Degrade an unmapped event type to spaced lower-case words (e.g. `someNewType`
-// → "some new type") so a future type never renders its raw camelCase key.
-function humanizeEventType(type: string): string {
-  return type.replace(/([A-Z])/g, " $1").toLowerCase().trim();
-}
-
-/** Resolve an event type to its terse session-log label, humanizing the tail. */
-function typeLabel(type: string): string {
-  return TYPE_LABEL[type] ?? humanizeEventType(type);
-}
-
-// DM award/revoke loot events (#382) carry the recipient in data.recipientName.
-// The session feed spans the whole party, so append "→ Recipient" to name who
-// the grant landed on (the stored summary alone doesn't say).
-function lootSummary(event: CharacterEvent): string | null {
-  if (event.type !== "awarded" && event.type !== "revoked") return null;
-  const recipient = (event.data as { recipientName?: string } | undefined)?.recipientName;
-  return recipient ? `${event.summary} → ${recipient}` : event.summary;
-}
-
-// Roll events logged by the new client carry their kept die faces in `data.faces`.
-// When present, rebuild the summary with the raw breakdown injected after the dice
-// token (e.g. "Longsword: 17 (1d20 (12) + 5)") so the log mirrors the roll toast.
-// Old events lack faces → return null and fall back to the stored summary.
-type RollEventData = {
-  source?: string;
-  total?: number;
-  specLabel?: string | null;
-  damageType?: string | null;
-  faces?: number[] | null;
-};
-
-function rollBreakdownSummary(event: CharacterEvent): string | null {
-  if (event.type !== "attackRoll" && event.type !== "damageRoll") return null;
-  const data = event.data as RollEventData | undefined;
-  if (!data?.faces || data.faces.length === 0 || typeof data.specLabel !== "string") {
-    return null;
-  }
-  const breakdown = formatRollBreakdown(data.specLabel, data.faces);
-  const damagePart = data.damageType ? ` ${data.damageType}` : "";
-  return `${data.source}: ${data.total}${damagePart} (${breakdown})`;
-}
 
 interface SessionLogProps {
   characterId: string;
@@ -146,57 +43,128 @@ interface SessionLogProps {
   refreshKey?: unknown;
 }
 
-// Build a round-per-event map by walking events oldest-first (list arrives
-// newest-first). Combat markers (combatStarted/combatRoundAdvanced/combatEnded)
-// anchor the round counter; every other event inside a combat block is tagged
-// with the current round so its R{n} chip renders.
-function buildRoundMap(activeEvents: CharacterEvent[]): Map<string, number> {
-  const roundById = new Map<string, number>();
-  let currentRound: number | null = null;
-  for (const e of [...activeEvents].reverse()) {
-    if (e.type === "combatStarted") {
-      currentRound = 1;
-    } else if (e.type === "combatRoundAdvanced") {
-      const dataRound = (e.data as { round?: number } | undefined)?.round;
-      currentRound = dataRound ?? (currentRound !== null ? currentRound + 1 : 2);
-    } else if (e.type === "combatEnded") {
-      currentRound = null;
-    } else if (currentRound !== null) {
-      roundById.set(e.id, currentRound);
-    }
-  }
-  return roundById;
+function segmentClass(seg: LogSegment, row: FeedRow): string {
+  const tone =
+    seg.damageType !== undefined
+      ? (damageTypeTone(seg.damageType) ?? logToneClass(row.tone))
+      : logToneClass(seg.tone ?? row.tone);
+  const italic = (seg.italic ?? row.italic) ? "italic" : "";
+  const weight = seg.bold ? "font-semibold" : "";
+  return [tone, weight, italic].filter(Boolean).join(" ");
 }
 
-// A row in the rendered feed: either a standalone event, or a run of ≥2
-// consecutive same-type roll events collapsed behind a disclosure (#983). Roll
-// spam (a party's worth of initiative rolls) otherwise buries everything else.
-type FeedRow =
-  | { kind: "event"; event: CharacterEvent }
-  | { kind: "rollRun"; head: CharacterEvent; rest: CharacterEvent[] };
+function Sentence({ row }: { row: FeedRow }) {
+  return (
+    <>
+      {row.segments.map((seg, i) => (
+        <span key={i} className={segmentClass(seg, row)}>
+          {seg.text}
+        </span>
+      ))}
+    </>
+  );
+}
 
-// Walk the newest-first display list, collapsing each maximal run of adjacent
-// roll events that share a type (≥2 long) into one rollRun. Non-roll events and
-// a differing type break the run, so interleaved events stay in place.
-function groupRollRuns(events: CharacterEvent[]): FeedRow[] {
-  const rows: FeedRow[] = [];
-  for (let i = 0; i < events.length; ) {
-    const head = events[i];
-    if (head.category === "roll") {
-      let j = i + 1;
-      while (j < events.length && events[j].category === "roll" && events[j].type === head.type) {
-        j += 1;
-      }
-      if (j - i >= 2) {
-        rows.push({ kind: "rollRun", head, rest: events.slice(i + 1, j) });
-        i = j;
-        continue;
-      }
-    }
-    rows.push({ kind: "event", event: head });
-    i += 1;
+function DrillInLine({ d }: { d: DrillInRow }) {
+  if (d.formula === undefined) {
+    // Standalone italic aside (e.g. "Called a miss — no damage rolled.").
+    return d.note ? <p className="text-[12.5px] italic text-parchment-500">{d.note}</p> : null;
   }
-  return rows;
+  return (
+    <div className="flex gap-2 text-[12.5px]">
+      <span className="w-[52px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-parchment-400">
+        {d.label}
+      </span>
+      <span className="tabular-nums text-parchment-700">
+        {d.formula} = <b className="text-parchment-900">{d.total}</b>
+        {d.note && <span className="ml-1 italic text-parchment-500">· {d.note}</span>}
+      </span>
+    </div>
+  );
+}
+
+// A plain event line — no drill-in, e.g. "Session started.", "Healed 6 HP."
+function PlainRow({ row }: { row: FeedRow }) {
+  return (
+    <li className="rounded-control px-3 py-1.5 text-sm leading-relaxed">
+      <Sentence row={row} />
+    </li>
+  );
+}
+
+// A roll-category line — `<details>` so the summary hover/tap reveals the
+// decomposed breakdown (#1235). Chevron stays dimly visible at rest so touch
+// users see the affordance without relying on hover.
+function RollRow({ row }: { row: FeedRow }) {
+  return (
+    <li>
+      <details className="group rounded-control px-3 py-1.5 text-sm leading-relaxed">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-2 [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0">
+            <Sentence row={row} />
+          </span>
+          <ChevronRight
+            aria-hidden="true"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-parchment-400 transition-transform group-open:rotate-90 group-open:text-parchment-700"
+          />
+        </summary>
+        <div className="mt-1 space-y-1 border-l-2 border-parchment-200 pl-3.5">
+          {(row.drillIn ?? []).map((d, i) => (
+            <DrillInLine key={i} d={d} />
+          ))}
+        </div>
+      </details>
+    </li>
+  );
+}
+
+function FeedRowView({ row }: { row: FeedRow }) {
+  return row.drillIn ? <RollRow row={row} /> : <PlainRow row={row} />;
+}
+
+// Round separator: centered uppercase label flanked by hairlines (#1237),
+// replacing the old per-row R{n} badge.
+function RoundSeparator({ round }: { round: number }) {
+  return (
+    <li aria-hidden="true" className="flex items-center gap-2 px-1 py-1">
+      <span className="h-px flex-1 bg-parchment-200" />
+      <span className="text-[10.5px] font-bold uppercase tracking-wide text-parchment-400">
+        Round {round}
+      </span>
+      <span className="h-px flex-1 bg-parchment-200" />
+    </li>
+  );
+}
+
+// A collapsed run of ≥2 consecutive same-kind roll rows (#983): the newest
+// stays visible in place; the disclosure sits above it and reveals the rest
+// (oldest-first) when expanded.
+function RollRunView({
+  item,
+  expanded,
+  onToggle,
+}: {
+  item: Extract<FeedItem, { kind: "rollRun" }>;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <li>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="flex items-center gap-1 px-3 text-xs font-medium text-parchment-500 hover:text-parchment-700"
+        >
+          <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+          {expanded ? `Hide ${item.label}` : item.label}
+        </button>
+      </li>
+      {expanded && item.hidden.map((r) => <FeedRowView key={r.id} row={r} />)}
+      <FeedRowView row={item.visible} />
+    </>
+  );
 }
 
 export default function SessionLog({ characterId, sessionId, refreshKey }: SessionLogProps) {
@@ -204,6 +172,7 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
   const [error, setError] = useState<string | null>(null);
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const showSpinner = useDelayedFlag(!events && !error);
+  const bottomRef = useRef<HTMLLIElement>(null);
 
   const toggleRun = (id: string) =>
     setExpandedRuns((prev) => {
@@ -221,6 +190,12 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
       .catch(() => setError("Couldn't load session log — try again."));
   }, [characterId, sessionId, refreshKey]);
 
+  // Open already scrolled to the latest event (chat convention) — instant, not
+  // animated, since this fires on load/refresh, not on a user-driven append.
+  useEffect(() => {
+    if (events) bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [events]);
+
   if (error) {
     return <p className="text-xs font-semibold text-garnet-700">{error}</p>;
   }
@@ -229,10 +204,9 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
     return showSpinner ? <Spinner /> : null;
   }
 
-  // Filter out reverted events — they're confusing without context.
-  const activeEvents = events.filter((e) => !e.reverted && e.type !== "revert");
+  const items = buildFeedItems(events);
 
-  if (activeEvents.length === 0) {
+  if (items.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-parchment-600">
         No events yet — actions taken during this session will appear here.
@@ -240,54 +214,22 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
     );
   }
 
-  const roundById = buildRoundMap(activeEvents);
-
-  // combatRoundAdvanced markers drive the R{n} chip walk above but are too noisy to
-  // show as their own rows — every other entry already carries its round chip.
-  const displayEvents = activeEvents.filter((e) => e.type !== "combatRoundAdvanced");
-  const rows = groupRollRuns(displayEvents);
-
-  const renderRow = (event: CharacterEvent) => {
-    const round = roundById.get(event.id);
-    return (
-      <li key={event.id} className="flex flex-wrap items-center gap-2 py-1 text-sm">
-        {round !== undefined && <Badge tone="neutral">R{round}</Badge>}
-        <Badge tone={categoryTone(event.category)}>{typeLabel(event.type)}</Badge>
-        <span className="text-parchment-800">
-          {rollBreakdownSummary(event) ?? lootSummary(event) ?? event.summary}
-        </span>
-      </li>
-    );
-  };
-
   return (
-    <ul className="flex flex-col gap-2">
-      {rows.map((row) => {
-        if (row.kind === "event") return renderRow(row.event);
-
-        const { head, rest } = row;
-        const expanded = expandedRuns.has(head.id);
-        const label = typeLabel(head.type);
+    <ul className="flex flex-col gap-0.5 px-1.5 pb-3.5 pt-2">
+      {items.map((item) => {
+        if (item.kind === "separator") return <RoundSeparator key={item.id} round={item.round} />;
+        if (item.kind === "row") return <FeedRowView key={item.row.id} row={item.row} />;
         return (
-          <Fragment key={head.id}>
-            {renderRow(head)}
-            <li>
-              <button
-                type="button"
-                onClick={() => toggleRun(head.id)}
-                aria-expanded={expanded}
-                className="flex items-center gap-1 text-xs font-medium text-parchment-600 hover:text-parchment-800"
-              >
-                <span aria-hidden>{expanded ? "▾" : "▸"}</span>
-                {expanded
-                  ? `Hide ${rest.length} earlier ${label} rolls`
-                  : `${rest.length} earlier ${label} rolls`}
-              </button>
-            </li>
-            {expanded && rest.map((event) => renderRow(event))}
+          <Fragment key={item.id}>
+            <RollRunView
+              item={item}
+              expanded={expandedRuns.has(item.id)}
+              onToggle={() => toggleRun(item.id)}
+            />
           </Fragment>
         );
       })}
+      <li ref={bottomRef} aria-hidden="true" />
     </ul>
   );
 }

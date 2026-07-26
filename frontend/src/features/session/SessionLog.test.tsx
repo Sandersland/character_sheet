@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 
-import SessionLog, { TYPE_LABEL } from "@/features/session/SessionLog";
+import SessionLog from "@/features/session/SessionLog";
 import { fetchSession } from "@/api/client";
-import type { CharacterEvent, CharacterEventType } from "@/types/character";
+import type { CharacterEvent } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchSession: vi.fn(),
@@ -33,36 +33,86 @@ function renderWith(events: CharacterEvent[]) {
   return render(<SessionLog characterId="char-1" sessionId="sess-1" refreshKey={0} />);
 }
 
-describe("SessionLog roll breakdown", () => {
-  it("shows the raw die breakdown for a roll event with faces", async () => {
+// Sentences are split across multiple <span> segments (bold/toned pieces), so
+// a plain text query matches every ancestor span — find the containing <li> instead.
+function findRow(substring: string): Promise<HTMLElement> {
+  return screen.findByText(
+    (_, element) => element?.tagName === "LI" && Boolean(element.textContent?.includes(substring)),
+  );
+}
+
+describe("SessionLog (#1237 chat feed)", () => {
+  it("renders a swing as one sentence with the total emphasized and the weapon name bold", async () => {
     renderWith([
       makeEvent({
+        id: "dmg",
+        type: "damageRoll",
+        category: "roll",
+        summary: "Shortsword: 8 piercing",
+        data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit" },
+      }),
+      makeEvent({
+        id: "atk",
         type: "attackRoll",
-        summary: "Longsword: 17 (1d20 + 5)",
-        data: { source: "Longsword", total: 17, specLabel: "1d20 + 5", faces: [12] },
+        category: "roll",
+        summary: "Shortsword: 17",
+        data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s1", verdict: "hit" },
       }),
     ]);
 
-    expect(await screen.findByText("Longsword: 17 (1d20 (12) + 5)")).toBeInTheDocument();
+    const row = await findRow("Shortsword — hit for");
+    expect(row.textContent).toContain("8");
+    expect(row.textContent).toContain("piercing");
+    // Only one line — attack + damage merged into a single swing (the scroll
+    // sentinel li is aria-hidden and excluded from the listitem role query).
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
-  it("includes damage type and multi-die faces", async () => {
+  it("expands a roll line's drill-in on click, showing the decomposed attack + damage math", async () => {
     renderWith([
       makeEvent({
-        id: "evt-dmg",
+        id: "dmg",
         type: "damageRoll",
-        summary: "Longsword: 8 slashing (2d6)",
+        category: "roll",
         data: {
-          source: "Longsword",
-          total: 8,
-          specLabel: "2d6",
-          damageType: "slashing",
-          faces: [3, 5],
+          kind: "damage", source: "Shortsword", total: 8, damageType: "piercing",
+          specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit",
+          damageComponents: { abilityMod: 4, meleeDamageBonus: 0 },
+        },
+      }),
+      makeEvent({
+        id: "atk",
+        type: "attackRoll",
+        category: "roll",
+        data: {
+          kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5",
+          faces: [12], swingId: "s1", verdict: "hit",
+          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
         },
       }),
     ]);
 
-    expect(await screen.findByText("Longsword: 8 slashing (2d6 (3, 5))")).toBeInTheDocument();
+    const row = await findRow("Shortsword — hit for");
+    // A closed <details>'s children stay in the DOM (just CSS-hidden) — assert
+    // via visibility, not presence, that the drill-in starts collapsed.
+    const proficiency = within(row).getByText(/Proficiency/);
+    expect(proficiency).not.toBeVisible();
+    fireEvent.click(row.querySelector("summary")!);
+    expect(proficiency).toBeVisible();
+  });
+
+  it("renders a miss as an italic, muted line with no damage", async () => {
+    renderWith([
+      makeEvent({
+        id: "atk",
+        type: "attackRoll",
+        category: "roll",
+        data: { kind: "attack", source: "Shortsword", total: 9, specLabel: "1d20 + 3", faces: [5], swingId: "s2", verdict: "miss" },
+      }),
+    ]);
+
+    const row = await findRow("— missed.");
+    expect(row.textContent).toContain("Shortsword");
   });
 
   it("names the recipient on a DM loot award event (#382)", async () => {
@@ -77,19 +127,18 @@ describe("SessionLog roll breakdown", () => {
     ]);
 
     expect(await screen.findByText("Awarded Flametongue ×2 → Bruenor")).toBeInTheDocument();
-    expect(screen.getByText("loot")).toBeInTheDocument();
   });
 
   // #962: the Combat Turn/Log sub-nav mounts the log on demand, so it renders
   // without a refreshKey — each mount refetches on its own.
   it("fetches and renders with no refreshKey prop", async () => {
     mockFetchSession.mockResolvedValue({
-      events: [makeEvent({ summary: "Longsword: 17 (1d20 + 5)" })],
+      events: [makeEvent({ category: "hitPoints", type: "damage", data: { amount: 5 } })],
     } as never);
 
     render(<SessionLog characterId="char-1" sessionId="sess-1" />);
 
-    expect(await screen.findByText(/Longsword: 17/)).toBeInTheDocument();
+    expect(await screen.findByText("Took 5 damage.")).toBeInTheDocument();
     expect(mockFetchSession).toHaveBeenCalledWith("char-1", "sess-1");
   });
 
@@ -108,139 +157,62 @@ describe("SessionLog roll breakdown", () => {
     await waitFor(() => expect(mockFetchSession).toHaveBeenCalledTimes(2));
   });
 
-  it("falls back to the stored summary for old events without faces", async () => {
+  it("filters out reverted events and revert entries", async () => {
     renderWith([
-      makeEvent({
-        type: "attackRoll",
-        summary: "Longsword: 17 (1d20 + 5)",
-        data: { source: "Longsword", total: 17, specLabel: "1d20 + 5", faces: null },
-      }),
+      makeEvent({ id: "a", category: "hitPoints", type: "damage", reverted: true, data: { amount: 99 } }),
+      makeEvent({ id: "b", category: "hitPoints", type: "revert" }),
+      makeEvent({ id: "c", category: "hitPoints", type: "damage", data: { amount: 4 } }),
     ]);
 
-    expect(await screen.findByText("Longsword: 17 (1d20 + 5)")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.queryByText(/\(1d20 \(/)).not.toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Took 4 damage.")).toBeInTheDocument();
+    expect(screen.queryByText(/99/)).not.toBeInTheDocument();
   });
 });
 
-// Every event type in the frontend union, kept exhaustive by the compile-time
-// guard below — omit one and typecheck fails, forcing this list (and the
-// coverage assertion) current. (#983)
-const ALL_EVENT_TYPES = [
-  "acquired", "consumed", "sold", "bought", "removed",
-  "awarded", "revoked",
-  "damage", "heal", "setTemp", "shortRest", "longRest",
-  "levelUp", "levelDown", "deathSave", "stabilize",
-  "xpAward", "xpSet",
-  "currencyAdjust",
-  "castSpell", "expendSlot", "restoreSlot",
-  "learnSpell", "forgetSpell", "prepareSpell", "unprepareSpell",
-  "concentrationDropped",
-  "subclassChosen", "subclassRemoved",
-  "fightingStyleChosen", "fightingStyleRemoved",
-  "spendResource", "restoreResource",
-  "learnManeuver", "forgetManeuver", "maneuversReconciled",
-  "learnToolProficiency", "forgetToolProficiency", "toolProficienciesReconciled",
-  "abilityScoreImprovement", "featTaken",
-  "advancementRemoved", "advancementsReconciled",
-  "equipped", "unequipped",
-  "sessionStarted", "sessionEnded",
-  "combatStarted", "combatEnded", "combatRoundAdvanced",
-  "conditionApplied", "conditionRemoved", "exhaustionSet",
-  "attackRoll", "damageRoll",
-  "checkRoll", "saveRoll", "initiativeRoll",
-  "revert",
-] as const satisfies readonly CharacterEventType[];
+describe("SessionLog ordering — newest at the bottom (#1237)", () => {
+  it("renders the newest fetched event as the LAST row and opens scrolled to it", async () => {
+    renderWith([
+      makeEvent({ id: "newest", category: "hitPoints", type: "damage", data: { amount: 3 } }),
+      makeEvent({ id: "oldest", category: "hitPoints", type: "damage", data: { amount: 9 } }),
+    ]);
 
-// Fails typecheck if ALL_EVENT_TYPES omits any CharacterEventType member.
-type _Complete =
-  Exclude<CharacterEventType, (typeof ALL_EVENT_TYPES)[number]> extends never ? true : never;
-
-describe("SessionLog TYPE_LABEL coverage", () => {
-  it("has an explicit label for every event type (no silent humanizer reliance)", () => {
-    const complete: _Complete = true;
-    expect(complete).toBe(true);
-    for (const type of ALL_EVENT_TYPES) {
-      expect(TYPE_LABEL[type], `TYPE_LABEL is missing an explicit entry for "${type}"`).toBeDefined();
-    }
+    await screen.findByText("Took 9 damage.");
+    const rows = screen.getAllByRole("listitem").filter((li) => li.textContent?.includes("damage"));
+    expect(rows[0].textContent).toContain("9");
+    expect(rows[rows.length - 1].textContent).toContain("3");
   });
 });
 
-describe("SessionLog event labels", () => {
-  it("labels initiativeRoll and conditionApplied without leaking the raw key", async () => {
-    renderWith([
-      makeEvent({ id: "i", category: "roll", type: "initiativeRoll", summary: "Initiative: 14" }),
-      makeEvent({ id: "c", category: "conditions", type: "conditionApplied", summary: "Poisoned" }),
-    ]);
-
-    expect(await screen.findByText("initiative")).toBeInTheDocument();
-    expect(screen.getByText("condition")).toBeInTheDocument();
-    expect(screen.queryByText("initiativeRoll")).not.toBeInTheDocument();
-    expect(screen.queryByText("conditionApplied")).not.toBeInTheDocument();
-  });
-
-  it("humanizes an unmapped event type instead of leaking the camelCase key", async () => {
-    renderWith([
-      makeEvent({ id: "x", category: "class", type: "someFutureType" as CharacterEventType, summary: "A future thing" }),
-    ]);
-
-    expect(await screen.findByText("some future type")).toBeInTheDocument();
-    expect(screen.queryByText("someFutureType")).not.toBeInTheDocument();
-  });
-});
-
-describe("SessionLog roll-run collapsing", () => {
+describe("SessionLog roll-run collapsing (#983, preserved)", () => {
   it("collapses 12 consecutive initiative rolls to one row plus an expandable disclosure", async () => {
     const rolls = Array.from({ length: 12 }, (_, i) =>
       makeEvent({
         id: `init-${i}`,
         category: "roll",
         type: "initiativeRoll",
-        summary: `Initiative: ${20 - i}`,
+        data: { kind: "initiative", source: "Initiative", total: 20 - i, specLabel: "1d20", faces: [20 - i] },
       }),
     );
     renderWith(rolls);
 
-    // Only the newest initiative row is visible; the rest hide behind a disclosure.
-    expect(await screen.findByText("Initiative: 20")).toBeInTheDocument();
-    expect(screen.queryByText("Initiative: 19")).not.toBeInTheDocument();
-    expect(screen.queryByText("Initiative: 9")).not.toBeInTheDocument();
+    // Only the newest initiative row is rendered — the hidden 11 are collapsed
+    // behind the disclosure and not in the DOM at all until expanded (unlike
+    // native <details>, whose closed children stay present but hidden).
+    await screen.findByText(/11 earlier initiative rolls/);
+    expect(document.querySelectorAll("details")).toHaveLength(1);
+    const visibleRow = await findRow("Rolled");
+    expect(visibleRow.textContent).toContain("20");
 
-    const disclosure = screen.getByText(/11 earlier initiative rolls/);
-    fireEvent.click(disclosure);
+    fireEvent.click(screen.getByText(/11 earlier initiative rolls/));
 
     // Expanding reveals every hidden row.
-    expect(await screen.findByText("Initiative: 19")).toBeInTheDocument();
-    expect(screen.getByText("Initiative: 9")).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelectorAll("details")).toHaveLength(12));
   });
+});
 
-  it("breaks the run on an interleaved non-roll event and leaves other types untouched", async () => {
-    renderWith([
-      makeEvent({ id: "i1", category: "roll", type: "initiativeRoll", summary: "Initiative: 18" }),
-      makeEvent({ id: "i2", category: "roll", type: "initiativeRoll", summary: "Initiative: 15" }),
-      makeEvent({ id: "d1", category: "hitPoints", type: "damage", summary: "Took 5 damage" }),
-      makeEvent({ id: "i3", category: "roll", type: "initiativeRoll", summary: "Initiative: 12" }),
-      makeEvent({ id: "i4", category: "roll", type: "initiativeRoll", summary: "Initiative: 10" }),
-    ]);
-
-    // Two separate 2-long runs, each collapsed independently around the damage row.
-    expect(await screen.findByText("Initiative: 18")).toBeInTheDocument();
-    expect(screen.getByText("Took 5 damage")).toBeInTheDocument();
-    expect(screen.getByText("Initiative: 12")).toBeInTheDocument();
-    expect(screen.queryByText("Initiative: 15")).not.toBeInTheDocument();
-    expect(screen.queryByText("Initiative: 10")).not.toBeInTheDocument();
-    expect(screen.getAllByText(/1 earlier initiative rolls/)).toHaveLength(2);
-  });
-
-  it("does not collapse consecutive non-roll events", async () => {
-    renderWith([
-      makeEvent({ id: "d1", category: "hitPoints", type: "damage", summary: "Took 5 damage" }),
-      makeEvent({ id: "d2", category: "hitPoints", type: "damage", summary: "Took 3 damage" }),
-    ]);
-
-    expect(await screen.findByText("Took 5 damage")).toBeInTheDocument();
-    expect(screen.getByText("Took 3 damage")).toBeInTheDocument();
-    expect(screen.queryByText(/earlier/)).not.toBeInTheDocument();
+describe("SessionLog empty state", () => {
+  it("shows an empty-state message when there are no displayable events", async () => {
+    renderWith([]);
+    expect(await screen.findByText(/No events yet/)).toBeInTheDocument();
   });
 });
