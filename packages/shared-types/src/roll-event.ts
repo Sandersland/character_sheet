@@ -36,9 +36,9 @@ export interface RollEventModeSource {
 
 /**
  * Decomposed to-hit addends for a weapon attack roll (`deriveWeaponAttackComponents`).
- * `abilityMod + proficiencyBonus + rangedBonus + attackRollBonus` sums to the
- * attack event's `total` minus any manual roll-mode flat modifier — see
- * `RollEventData.total` for what it composes with.
+ * `abilityMod + proficiencyBonus + rangedBonus + attackRollBonus` is the flat
+ * half of `total`; the rest is the d20 plus any flat roll-mode modifier
+ * (exhaustion), which is why the four do not sum to `total` on their own.
  */
 export interface RollEventAttackComponents {
   abilityMod: number;

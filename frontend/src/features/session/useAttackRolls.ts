@@ -85,9 +85,9 @@ export function useAttackRolls({
   // swingId correlates an entry's attack roll event with its damage roll event
   // as one swing (#1235) — client-generated because the route's own `batchId`
   // is minted fresh per HTTP request and can't span two separate logRoll
-  // calls. A ref (not state): written and read synchronously within the same
-  // handler tick, and regenerated on every new attack so a second swing on
-  // the same entry never reuses the stale id.
+  // calls. A ref (not state) because it must survive from handleAttack to a
+  // LATER handleDamage click without forcing a re-render in between; it is
+  // regenerated per attack so a second swing never reuses the stale id.
   const swingIdRef = useRef<Record<string, string>>({});
 
   // A row rolls crit damage when it IS the current tally row and that row's
