@@ -25,13 +25,15 @@ You are the **Worker** state of an autonomous development pipeline. Your goal: f
 
 ## Run ALL tooling inside the containers, not on the host
 
-This worktree's `node_modules` are empty Docker-volume mountpoints — host-run `npx` fails. Source is bind-mounted at `/app`, so your edits are live in-container immediately.
+This worktree's `node_modules` are empty Docker-volume mountpoints — host-run `npx` fails. The **repo root** is bind-mounted at `/app` (workspaces at `/app/backend` and `/app/frontend`), so your edits are live in-container immediately. Always `cd` to the workspace: from `/app` the `@/` alias doesn't resolve and every test file fails to collect — a false red, not a breakage.
 
-- Backend tests: `docker compose exec -T backend sh -c 'cd /app && npx vitest run <test-file>'`
-- Frontend tests: `docker compose exec -T frontend sh -c 'cd /app && npx vitest run <test-file>'`
-- Schema change: `docker compose exec -T backend sh -c 'cd /app && npx prisma migrate dev --name <change> && npx prisma generate'` then `docker compose restart backend` and wait for {{backendUrl}}/health → 200 (`/characters` 401s behind auth).
-- Typecheck: `docker compose exec -T backend sh -c 'cd /app && npx tsc --noEmit'` (and same for frontend).
-- Lint (CI runs it — must be clean): `docker compose exec -T backend sh -c 'cd /app && npm run lint'` and the frontend twin.
+- Backend tests: `docker compose exec -T backend sh -c 'cd /app/backend && npx vitest run <test-file>'`
+- Frontend tests: `docker compose exec -T frontend sh -c 'cd /app/frontend && npx vitest run <test-file>'`
+- Schema change: `docker compose exec -T backend sh -c 'cd /app/backend && npx prisma migrate dev --name <change> && npx prisma generate'` then `docker compose restart backend` and wait for {{backendUrl}}/health → 200 (`/characters` 401s behind auth).
+- Typecheck: `docker compose exec -T backend sh -c 'cd /app/backend && npx tsc --noEmit'` (and same for frontend).
+- Lint (CI runs it — must be clean): `docker compose exec -T backend sh -c 'cd /app/backend && npm run lint'` and the frontend twin.
+
+Both containers run `npm install` on start to reconcile the volume with `package.json`; tooling fired before that finishes reports `Failed to resolve import "<pkg>"` for anything the branch added. Wait for the stack to be ready first.
 
 ## Work loop — per committable chunk
 

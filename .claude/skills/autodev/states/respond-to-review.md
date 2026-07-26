@@ -31,11 +31,11 @@ One structured comment covering **every** finding (address and decline). If ther
 
 ## 4. Fix the accepted findings, test-first
 
-Run ALL tooling inside the containers — this worktree's `node_modules` are empty mountpoints; source is bind-mounted at `/app`:
+Run ALL tooling inside the containers — this worktree's `node_modules` are empty mountpoints; the repo **root** is bind-mounted at `/app`, so `cd` to the workspace or the `@/` alias won't resolve (every test file fails to collect — a false red):
 
-- Tests: `docker compose exec -T backend sh -c 'cd /app && npx vitest run <file>'` (and the frontend twin)
-- Typecheck: `docker compose exec -T backend sh -c 'cd /app && npx tsc --noEmit'` (both workspaces as touched)
-- Lint (CI fails on a miss): `docker compose exec -T backend sh -c 'cd /app && npm run lint'` (and the frontend twin)
+- Tests: `docker compose exec -T backend sh -c 'cd /app/backend && npx vitest run <file>'` (and the frontend twin, `cd /app/frontend`)
+- Typecheck: `docker compose exec -T backend sh -c 'cd /app/backend && npx tsc --noEmit'` (both workspaces as touched)
+- Lint (CI fails on a miss): `docker compose exec -T backend sh -c 'cd /app/backend && npm run lint'` (and the frontend twin)
 
 Per accepted finding (grouped into coherent chunks):
 1. Write the failing regression test FIRST and run it red — a test that passes before the fix proves nothing. Only mark a chunk test-N/A when there is genuinely no place to assert (say which).
