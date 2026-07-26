@@ -50,15 +50,20 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
     expect(survivingEditions).toEqual([null]);
   });
 
-  // GrantedAbility.name stays plain @unique (no divergent row can exist to
-  // disambiguate yet, #1306) — this proves the SAME where-shape reused by
-  // seedShadowArts' prune is structurally valid against that model too, ready
-  // the day a maneuver/shadow-art actually forks by edition.
-  it("GrantedAbility: the same where-shape correctly prunes an unseeded shared row", async () => {
-    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "d", edition: null } });
+  // GrantedAbility.name stays plain @unique — no divergent row CAN exist there
+  // yet (that needs a migration widening the constraint first), so this can't
+  // use the same-name-pair shape the two Feat tests above do. It still proves
+  // real discrimination without one: seed a single row tagged EDITION_2024,
+  // but list it in the seeded set under `edition: null`. A naive name-only
+  // notIn keeps it (the name string is present in the seeded list, full stop);
+  // the correct partitioned form puts it in the EDITION_2024 partition, whose
+  // seeded-names list is empty for this run, and deletes it.
+  it("GrantedAbility: a row seeded under the WRONG edition is still pruned (partitioning discriminates without a same-name pair)", async () => {
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "d", edition: "EDITION_2024" } });
 
+    const seeded = [{ name: NAME, edition: null }];
     await prisma.grantedAbility.deleteMany({
-      where: { source: "shadowArts", ...staleCatalogRowsWhere([]) },
+      where: staleCatalogRowsWhere(seeded, { source: "shadowArts" }),
     });
 
     const survivor = await prisma.grantedAbility.findFirst({ where: { name: NAME } });
