@@ -93,6 +93,25 @@ describe("PATCH /api/preferences (#1178)", () => {
     expect(row.preferences).toEqual({ theme: "dark", diceRollStyle: "quick" });
   });
 
+  it("concurrent patches of different keys all survive (no lost update)", async () => {
+    const [a, b, c] = await Promise.all([
+      agent(cookie).patch("/api/preferences").send({ theme: "dark" }),
+      agent(cookie).patch("/api/preferences").send({ diceRollStyle: "quick" }),
+      agent(cookie).patch("/api/preferences").send({ autoRollConcentration: false }),
+    ]);
+    expect([a.status, b.status, c.status]).toEqual([200, 200, 200]);
+
+    // Unlocked, all three read the same "never stored" base and the last writer
+    // wins with only its own key — this asserts the stored row, not a response,
+    // because each response is correct in isolation even when the write is lost.
+    const row = await prisma.user.findUniqueOrThrow({ where: { id: OWNER } });
+    expect(row.preferences).toEqual({
+      theme: "dark",
+      diceRollStyle: "quick",
+      autoRollConcentration: false,
+    });
+  });
+
   it("accepts an empty patch as a no-op", async () => {
     const res = await agent(cookie).patch("/api/preferences").send({});
     expect(res.status).toBe(200);

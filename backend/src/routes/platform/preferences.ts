@@ -25,16 +25,26 @@ preferencesRouter.patch("/preferences", async (req, res) => {
     return;
   }
 
-  const existing = await prisma.user.findUniqueOrThrow({
-    where: { id: req.user!.id },
-    select: { preferences: true },
-  });
+  const userId = req.user!.id;
 
-  // mergePreferencesPatch returns a plain object shaped by validated data
-  // (preferencesPatchSchema) merged onto whatever Prisma handed back as
-  // Json — safe to hand back to Prisma as InputJsonValue.
-  const merged = mergePreferencesPatch(existing.preferences, parseResult.data) as Prisma.InputJsonValue;
-  await prisma.user.update({ where: { id: req.user!.id }, data: { preferences: merged } });
+  // Read-modify-write under a row lock. Unlocked, two tabs patching DIFFERENT
+  // keys both read the same base and the later write drops the earlier key.
+  // The lock (not a plain `$transaction`, which under the default READ
+  // COMMITTED still lets both reads see the pre-write row) is what makes
+  // "patching key K never clobbers key L" true. A single SQL `||` jsonb merge
+  // would also be atomic but skips mergePreferencesPatch's sanitization of the
+  // stored base — pinned by the hostile-stored-base test.
+  const merged = await prisma.$transaction(async (tx) => {
+    const [row] = await tx.$queryRaw<{ preferences: unknown }[]>`
+      SELECT preferences FROM "User" WHERE id = ${userId} FOR UPDATE
+    `;
+    // mergePreferencesPatch returns a plain object shaped by validated data
+    // (preferencesPatchSchema) merged onto whatever the driver handed back as
+    // Json — safe to hand back to Prisma as InputJsonValue.
+    const next = mergePreferencesPatch(row?.preferences, parseResult.data) as Prisma.InputJsonValue;
+    await tx.user.update({ where: { id: userId }, data: { preferences: next } });
+    return next;
+  });
 
   res.json({ preferences: resolvePreferences(merged) });
 });

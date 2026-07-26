@@ -1,9 +1,10 @@
 /**
- * localStorage persistence for the dice-roll presentation preference (#945). A
- * single global per-browser choice, shaped exactly like the theme preference
- * (useThemePreference): `animated` plays the 3D DiceRollModal, `quick` skips it
- * for a compact result chip. All access is try/catch-guarded so a missing or
- * corrupted entry degrades gracefully to the default.
+ * The dice-roll presentation preference (#945): `animated` plays the 3D
+ * DiceRollModal, `quick` skips it for a compact result chip. Account-synced
+ * through PreferencesProvider (#1178) with localStorage as the first-paint
+ * cache, shaped exactly like the theme preference (useThemePreference). All
+ * localStorage access is try/catch-guarded so a missing or corrupted entry
+ * degrades gracefully to the default.
  */
 
 import { useCallback, useEffect, useState } from "react";

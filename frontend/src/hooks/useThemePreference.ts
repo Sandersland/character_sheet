@@ -1,8 +1,9 @@
 /**
- * localStorage persistence for the dark-mode theme preference. A single global
- * per-browser choice (not per-character), shaped like the concentration
- * preference (issue #76). All access is try/catch-guarded so a missing/corrupted
- * entry or a private-browsing restriction degrades gracefully to the default.
+ * The dark-mode theme preference. Account-synced through PreferencesProvider
+ * (#1178) with localStorage as the first-paint cache, so it follows the signed-in
+ * player across browsers rather than being a per-browser choice. All localStorage
+ * access is try/catch-guarded so a missing/corrupted entry or a private-browsing
+ * restriction degrades gracefully to the default.
  *
  * `system` follows the OS `prefers-color-scheme`; `light`/`dark` pin a theme.
  */
