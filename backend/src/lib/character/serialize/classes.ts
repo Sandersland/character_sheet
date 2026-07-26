@@ -67,10 +67,6 @@ function buildResourcesPayload(
     features: derivedRes.features,
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
-    elementalAttunementAvailable: derivedRes.elementalAttunementAvailable,
-    elementalBurstAvailable: derivedRes.elementalBurstAvailable,
-    shadowArtsAvailable: derivedRes.shadowArtsAvailable,
-    cloakOfShadowsAvailable: derivedRes.cloakOfShadowsAvailable,
     pools: derivedRes.resources.map((pool) => ({
       key: pool.key,
       label: pool.label,

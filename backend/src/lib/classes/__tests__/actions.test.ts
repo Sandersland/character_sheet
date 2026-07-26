@@ -746,10 +746,10 @@ describe("ACTION_EFFECT_FN — useObject", () => {
   });
 });
 
-// #1315: migrates shadowArtsAvailable/cloakOfShadowsAvailable off DerivedClassInfo
-// booleans and onto DERIVED_ACTIONS rows, like shadowStep/fleetStep above. Both
-// endpoints (shadow-arts.ts) still own the actual cast/activate — these rows only
-// express the level gate as data.
+// #1315: migrates the Warrior of Shadow feature-availability gates off
+// DerivedClassInfo booleans and onto DERIVED_ACTIONS rows, like shadowStep/
+// fleetStep above. The dedicated endpoint (shadow-arts.ts) still owns the
+// actual cast/activate — these rows only express the level gate as data.
 describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#1315)", () => {
   const SHADOW = "Warrior of Shadow";
 

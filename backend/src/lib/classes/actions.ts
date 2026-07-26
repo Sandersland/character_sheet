@@ -204,13 +204,13 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
         : "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
   },
   // Warrior of Shadow's Shadow Arts (L3) / Cloak of Shadows (L17) — migrated off
-  // the shadowArtsAvailable/cloakOfShadowsAvailable DerivedClassInfo booleans
-  // onto rows here (#1315), same as shadowStep above: the actual cast/activate
-  // stays in the dedicated shadow-arts.ts vertical (its own transactions
-  // endpoint), so neither row gets an ACTION_EFFECT_FN entry. Darkness's normal
-  // casting time is an action (SRD 5.2); Cloak of Shadows is explicitly a
-  // Magic action (also "action" here — this app doesn't distinguish Magic
-  // action from a bare action in the cost enum).
+  // a pair of DerivedClassInfo availability booleans onto rows here (#1315),
+  // same as shadowStep above: the actual cast/activate stays in the dedicated
+  // shadow-arts.ts vertical (its own transactions endpoint), so neither row
+  // gets an ACTION_EFFECT_FN entry. Darkness's normal casting time is an
+  // action (SRD 5.2); Cloak of Shadows is explicitly a Magic action (also
+  // "action" here — this app doesn't distinguish Magic action from a bare
+  // action in the cost enum).
   {
     key: "shadowArts",
     name: "Shadow Arts (Darkness)",
@@ -235,7 +235,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   },
 
   // Warrior of the Elements' two Focus-spending session actions (#1315,
-  // migrated off elementalAttunementAvailable/elementalBurstAvailable) — the
+  // migrated off a pair of DerivedClassInfo availability booleans) — the
   // real ops live in warrior-of-elements.ts's own endpoint, so neither row gets
   // an ACTION_EFFECT_FN entry. Elemental Attunement is explicitly "no action"
   // (SRD 5.2); Elemental Burst is a Magic action.

@@ -135,8 +135,8 @@ describe("Shadow Arts cast endpoint", () => {
     await createMonk(XP_L3, "warrior of shadow");
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
     expect(res.status).toBe(200);
-    // The serialized character surfaces the Shadow Arts gate flag for the FE panel.
-    expect(res.body.resources.shadowArtsAvailable).toBe(true);
+    // The serialized character surfaces the Shadow Arts gate via availableActions (#1315).
+    expect((res.body.availableActions as { key: string }[]).some((a) => a.key === "shadowArts")).toBe(true);
     const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focus.used).toBe(1);
 
@@ -410,7 +410,7 @@ describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
 });
 
 // Concentration clamp-on-read: the shadow-art: prefix is what keeps a Shadow Art's
-// concentration alive, NOT a blanket "shadowArtsAvailable" pass. A multiclass Warrior
+// concentration alive, NOT a blanket subclass-availability pass. A multiclass Warrior
 // of Shadow monk who forgets the spellbook spell they were concentrating on must drop it.
 describe("resolveConcentration clamp for multiclass Warrior of Shadow", () => {
   const MC_ID = "test-shadow-mc-stale-1";

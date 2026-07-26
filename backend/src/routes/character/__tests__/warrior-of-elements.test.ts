@@ -84,7 +84,7 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
   });
 
-  it("a level-17 Warrior of the Elements derives all four fixed features + gate flags", async () => {
+  it("a level-17 Warrior of the Elements derives all four fixed features + gated actions (#1315)", async () => {
     await createMonk(17, "Warrior of the Elements");
     const res = await agent().get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
@@ -98,8 +98,9 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     ]) {
       expect(featureNames).toContain(feature);
     }
-    expect(res.body.resources.elementalAttunementAvailable).toBe(true);
-    expect(res.body.resources.elementalBurstAvailable).toBe(true);
+    const actionKeys = (res.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(actionKeys).toContain("elementalAttunement");
+    expect(actionKeys).toContain("elementalBurst");
   });
 
   it("Elemental Attunement toggles a 10-min while-active buff, spending 1 Focus", async () => {
