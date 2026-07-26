@@ -12,12 +12,12 @@ import { authCookie } from "@/test-support/auth.js";
  * clamp-on-read, and the write-side validation all resolve to the *same*
  * edition's function.
  *
- * Every seeded class carries subclassLevel 3, so a purpose-built catalog class
- * with subclassLevel 2 is the only way to make the editions disagree today (a
- * PHB'14 Wizard gains its subclass at 2; the same sheet under SRD 5.2 does not).
- * Its name matches no entry in the registry's CLASSES map on purpose, so
+ * Seeded Cleric/Sorcerer/Warlock/Druid/Wizard now carry a real 2014 gate below 3
+ * too (#1308) — this fixture class predates that and stays useful for a
+ * different reason: its name matches no entry in the registry's CLASSES map, so
  * deriveResources returns null and the test exercises only the catalog-driven
- * gate — isSubclassActive's independent grantLevel table can't interfere.
+ * gate — isSubclassActive's independent (edition-blind) grantLevel table can't
+ * interfere.
  */
 const OWNER_ID = "owner-rules-edition-seam";
 const CLASS_NAME = "Rules Edition Seam Wizard";

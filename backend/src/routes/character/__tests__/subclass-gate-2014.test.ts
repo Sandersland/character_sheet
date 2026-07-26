@@ -179,3 +179,44 @@ describe("2014 subclass gate — seeded Cleric (gate 1) and Wizard (gate 2), #13
     expect((await get(id2024)).body.classes[0].subclass).toBe(fighterSubclass.name);
   });
 });
+
+// #1308: character-create.ts's resolveSubclass has its OWN edition-blind gate
+// check (characterClass.subclassLevel <= 1 / > 1) — a fourth call site the
+// issue didn't name, found because it broke the instant the catalog column
+// stopped being uniformly 3. A brand-new character is always level 1, so this
+// governs whether a subclassId may be supplied AT CREATION.
+describe("character creation subclass gate (#1308)", () => {
+  it("rejects a Life Domain subclassId at creation for a 2024 Cleric (gate 3, not creation)", async () => {
+    const res = await supertest(app)
+      .post("/api/characters")
+      .set("Cookie", COOKIE)
+      .send({
+        name: "1308 Gate Create Cleric 2024",
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: "Cleric", subclassId: lifeDomainId }],
+        abilityScores: BASE_ABILITY_SCORES,
+        rulesEdition: "EDITION_2024",
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/grants its subclass at level 3/);
+  });
+
+  it("accepts a Life Domain subclassId at creation for a 2014 Cleric (gate 1 = creation)", async () => {
+    const res = await supertest(app)
+      .post("/api/characters")
+      .set("Cookie", COOKIE)
+      .send({
+        name: "1308 Gate Create Cleric 2014",
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: "Cleric", subclassId: lifeDomainId }],
+        abilityScores: BASE_ABILITY_SCORES,
+        rulesEdition: "EDITION_2014",
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.classes[0].subclass).toBe("Life Domain");
+  });
+});

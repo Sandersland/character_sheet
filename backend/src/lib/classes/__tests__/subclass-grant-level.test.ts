@@ -1,7 +1,8 @@
 // 2024 rules: every class chooses its subclass at level 3 (#1128) — no subclass
-// feature or pool derives below level 3. The cross-source invariant that the
-// class-definition grantLevel matches the seed subclassLevel lives with the seed
-// structural checks (seed-data.test.ts), which can import the seed catalog.
+// feature or pool derives below level 3 (this table is edition-blind and pinned
+// to the 2024 gate, #1308/#1291). The cross-source invariant that grantLevel
+// matches that 2024-resolved gate lives with the seed structural checks
+// (seed-data.test.ts), which can import the seed catalog.
 import { describe, it, expect } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";

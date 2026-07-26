@@ -26,6 +26,8 @@ import {
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
+import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
 // Discriminated result: return just the new id so the route re-fetches by id
@@ -128,14 +130,17 @@ async function resolveFixedItems(
 }
 
 // Resolve a plain subclass name: link this class's catalog id when the name matches
-// AND the class grants a subclass at creation (level 1), so FK-keyed derivations
-// (granted spells #898) resolve; otherwise keep it a legacy/homebrew string with no
-// id (served once homebrew subclasses own catalog rows, #911).
+// AND the class grants a subclass at creation (level 1) UNDER THIS EDITION —
+// the catalog column is 2014-only (#1308), so this must gate through
+// subclassGateLevel, never the raw column — so FK-keyed derivations (granted
+// spells #898) resolve; otherwise keep it a legacy/homebrew string with no id
+// (served once homebrew subclasses own catalog rows, #911).
 async function resolveSubclassName(
   characterClass: ResolvedClass,
   name: string,
+  edition: RulesEdition,
 ): Promise<{ subclassId: string | null; subclassName: string }> {
-  if (characterClass.subclassLevel <= 1) {
+  if (subclassGateLevel(characterClass.subclassLevel, edition) <= 1) {
     const match = await prisma.subclass.findUnique({
       where: { classId_name: { classId: characterClass.id, name } },
       select: { id: true, name: true },
@@ -145,12 +150,15 @@ async function resolveSubclassName(
   return { subclassId: null, subclassName: name };
 }
 
-// Validate a subclass choice: it must belong to the chosen class and only
-// classes that grant subclasses at level 1 can have one at creation. A legacy
-// plain-string subclass (no id) is kept as-is for homebrew / pre-catalog data.
+// Validate a subclass choice: it must belong to the chosen class, and only a
+// class whose EDITION-RESOLVED gate is level 1 can have one at creation (a
+// brand-new character is always level 1) — 2014 Cleric/Sorcerer/Warlock (gate
+// 1) yes, the same Cleric under 2024 no (gate 3, #1308). A legacy plain-string
+// subclass (no id) is kept as-is for homebrew / pre-catalog data.
 async function resolveSubclass(
   primaryClassChoice: PrimaryClassChoice,
-  characterClass: ResolvedClass
+  characterClass: ResolvedClass,
+  edition: RulesEdition,
 ): Promise<PhaseResult<{ subclassId: string | null; subclassName: string | null }>> {
   if (primaryClassChoice.subclassId) {
     const subclass = await prisma.subclass.findUnique({
@@ -166,17 +174,18 @@ async function resolveSubclass(
         error: `Subclass "${subclass.name}" does not belong to ${characterClass.name}`,
       };
     }
-    if (characterClass.subclassLevel > 1) {
+    const gateLevel = subclassGateLevel(characterClass.subclassLevel, edition);
+    if (gateLevel > 1) {
       return {
         ok: false,
         status: 400,
-        error: `${characterClass.name} grants its subclass at level ${characterClass.subclassLevel}, not at creation (level 1)`,
+        error: `${characterClass.name} grants its subclass at level ${gateLevel}, not at creation (level 1)`,
       };
     }
     return { ok: true, subclassId: subclass.id, subclassName: subclass.name };
   }
   if (primaryClassChoice.subclass) {
-    return { ok: true, ...(await resolveSubclassName(characterClass, primaryClassChoice.subclass)) };
+    return { ok: true, ...(await resolveSubclassName(characterClass, primaryClassChoice.subclass, edition)) };
   }
   return { ok: true, subclassId: null, subclassName: null };
 }
@@ -306,7 +315,10 @@ async function resolveSelections(
     return { ok: false, status: 400, error: `Unknown class: ${primaryClassChoice.name}` };
   }
 
-  const subclass = await resolveSubclass(primaryClassChoice, characterClass);
+  // Write-once column (#1285): omitted input takes the schema default, the same
+  // default Prisma applies to the row this transaction is about to create.
+  const edition: RulesEdition = input.rulesEdition ?? "EDITION_2024";
+  const subclass = await resolveSubclass(primaryClassChoice, characterClass, edition);
   if (!subclass.ok) return subclass;
 
   const proficiencies = resolveProficiencies(input, race, characterClass, background);

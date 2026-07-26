@@ -14,9 +14,12 @@ export function effectiveEntryLevel(entryLevel: number, entryCount: number, deri
 // level 3, so the catalog column is ignored. 2014 (PHB'14): the catalog column
 // carries the per-class gate — Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, rest 3.
 //
-// Every seeded subclassLevel is currently 3, so both branches agree on shipped
-// data; edition-tagged 2014 catalog rows are the content-tagging sub-issue's job
-// (#1281). That is why the tests use a fixture class row with subclassLevel: 2.
+// CharacterClass.subclassLevel is seeded with the 2014 values (#1308) — it is a
+// 2014-only field, read by no other rule. Do not repurpose or edition-tag it:
+// changing what it holds changes this function's 2014 branch for every caller
+// (the reconciler in level-reconciliation.ts and the clamp-on-read in
+// serialize/classes.ts alike), which is exactly the coupling this function
+// exists to centralize.
 export function subclassGateLevel(
   subclassLevel: number | null | undefined,
   edition: RulesEdition,
