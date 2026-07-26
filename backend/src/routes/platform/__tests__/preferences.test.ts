@@ -101,9 +101,11 @@ describe("PATCH /api/preferences (#1178)", () => {
     ]);
     expect([a.status, b.status, c.status]).toEqual([200, 200, 200]);
 
-    // Unlocked, all three read the same "never stored" base and the last writer
-    // wins with only its own key — this asserts the stored row, not a response,
-    // because each response is correct in isolation even when the write is lost.
+    // FOR UPDATE serializes the three: each takes the row lock, reads the keys
+    // written so far, merges its own. Drop the lock and they all read the same
+    // "never stored" base and the last writer lands with only its own key.
+    // Asserted on the stored row rather than a response because every response
+    // looks correct in isolation either way — a lost write only shows up here.
     const row = await prisma.user.findUniqueOrThrow({ where: { id: OWNER } });
     expect(row.preferences).toEqual({
       theme: "dark",
