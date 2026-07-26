@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import CharacterCreatePage from "@/pages/CharacterCreatePage";
-import { createCharacter, fetchItems, fetchReference, fetchSpells } from "@/api/client";
+import { createCharacter, fetchCampaigns, fetchItems, fetchReference, fetchSpells } from "@/api/client";
 import type { ReferenceData } from "@/types/character";
 
 // Real: useCharacterDraft, useReferenceData, the ability/skill/tool DOM. Mock the
@@ -20,12 +20,15 @@ vi.mock("@/api/client", () => ({
   fetchReference: vi.fn(),
   fetchItems: vi.fn(),
   fetchSpells: vi.fn(),
+  fetchCampaigns: vi.fn(),
   createCharacter: vi.fn(),
+  addCharacterToCampaign: vi.fn(),
 }));
 
 const mockFetchReference = vi.mocked(fetchReference);
 const mockFetchItems = vi.mocked(fetchItems);
 const mockFetchSpells = vi.mocked(fetchSpells);
+const mockFetchCampaigns = vi.mocked(fetchCampaigns);
 const mockCreateCharacter = vi.mocked(createCharacter);
 
 // A tiny Bard catalog for the creation spell picker (#1131): one cantrip + one L1.
@@ -103,6 +106,9 @@ beforeEach(() => {
   mockFetchReference.mockResolvedValue(referenceFixture);
   mockFetchItems.mockResolvedValue([]);
   mockFetchSpells.mockResolvedValue(SPELL_CATALOG as never);
+  // Solo world by default (#1286): no campaigns to choose from, so the entry
+  // gate goes straight to the edition picker.
+  mockFetchCampaigns.mockResolvedValue([]);
   mockCreateCharacter.mockResolvedValue({ id: "new-1" } as never);
 });
 
@@ -115,6 +121,14 @@ function renderPage() {
 }
 
 const user = () => userEvent.setup();
+
+// #1286: the entry gate resolves rulesEdition before the ceremony's identity
+// step is reachable at all. Every ceremony-walking test accepts the 2024
+// default and continues past it first.
+async function passEntryGate(u: ReturnType<typeof userEvent.setup>) {
+  await screen.findByRole("radio", { name: "2024 rules" });
+  await u.click(screen.getByRole("button", { name: /continue/i }));
+}
 
 function railLabels(): (string | null)[] {
   return screen.getAllByRole("listitem").map((li) => li.getAttribute("aria-label"));
@@ -139,6 +153,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
   it("walks the rail and builds the create payload, navigating on confirm", async () => {
     const u = user();
     renderPage();
+    await passEntryGate(u);
 
     // Identity: Continue is disabled until the five fields are set.
     await screen.findByLabelText(/name/i);
@@ -187,6 +202,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
       portraitUrl: null,
       startingEquipment: undefined,
       spells: { cantripIds: ["sp-mockery"], spellIds: ["sp-charm"] },
+      rulesEdition: "EDITION_2024",
     });
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/characters/new-1", { replace: true }));
@@ -195,6 +211,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
   it("shows a Spells step in the rail for a level-1 caster (#1131)", async () => {
     const u = user();
     renderPage();
+    await passEntryGate(u);
     await u.selectOptions(await screen.findByLabelText(/class/i), "Bard");
     expect(railLabels()).toContain("Step 4: Spells");
   });
@@ -202,6 +219,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
   it("has no Spells step in the rail for a non-caster (#1131)", async () => {
     const u = user();
     renderPage();
+    await passEntryGate(u);
     await u.selectOptions(await screen.findByLabelText(/class/i), "Fighter");
     expect(railLabels().some((l) => l?.includes("Spells"))).toBe(false);
   });
@@ -209,6 +227,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
   it("surfaces the ability spread + origin feat on the Abilities step and hides it on reset (#1130)", async () => {
     const u = user();
     renderPage();
+    await passEntryGate(u);
     await fillIdentity(u, { background: "Criminal" });
     await continueStep(u); // → Abilities
 
@@ -225,6 +244,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
   it("resets the spread mode when switching between two specced backgrounds (#1130)", async () => {
     const u = user();
     renderPage();
+    await passEntryGate(u);
     await fillIdentity(u, { background: "Criminal" });
     await continueStep(u); // → Abilities
 
@@ -243,6 +263,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
   it("keeps the +2/+1 selections when the already-active mode button is clicked (#1130)", async () => {
     const u = user();
     renderPage();
+    await passEntryGate(u);
     await fillIdentity(u, { background: "Criminal" });
     await continueStep(u); // → Abilities
 

@@ -42,6 +42,8 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     spellIds: [],
     equipmentDraft: null,
     step: "identity",
+    rulesEdition: "EDITION_2024",
+    campaignId: null,
     ...overrides,
   };
 }

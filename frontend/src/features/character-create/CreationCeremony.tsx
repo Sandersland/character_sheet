@@ -4,6 +4,7 @@
 
 import Spinner from "@/components/ui/Spinner";
 import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
+import CreationEntryGate from "@/features/character-create/CreationEntryGate";
 import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
@@ -143,6 +144,19 @@ function StartOverButton({ onClear }: { onClear: () => void }) {
 
 export default function CreationCeremony() {
   const c = useCharacterCreation();
+
+  // #1286: the entry gate resolves campaign + rulesEdition before the ceremony's
+  // own step model (creationSteps.ts) is reachable at all — it is impossible to
+  // reach the identity step with rulesEdition unresolved. Checked before the
+  // reference-data wait below: the gate itself doesn't need the catalog.
+  if (c.draft.rulesEdition === null) {
+    return (
+      <CreationEntryGate
+        onCancel={c.cancel}
+        onResolved={({ campaignId, rulesEdition }) => c.update({ campaignId, rulesEdition })}
+      />
+    );
+  }
 
   if (c.referenceError) return <ForgeLoadError />;
   const reference = c.reference;

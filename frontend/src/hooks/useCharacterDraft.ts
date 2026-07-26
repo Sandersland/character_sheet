@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { CreationStepKey } from "@/lib/creationSteps";
 import type { EquipmentDraft } from "@/lib/startingEquipment";
 import type { AbilityName, AbilityScores, SkillName } from "@/types/character";
@@ -55,6 +57,12 @@ export interface CharacterDraft {
   equipmentDraft: EquipmentDraft | null;
   /** #1176: the creation-ceremony step the player is on, so a reload resumes there. */
   step: CreationStepKey;
+  /** #1286: resolved by CreationEntryGate before the identity step is reachable —
+   *  null means the gate hasn't run yet (never a silently-applied default). */
+  rulesEdition: RulesEdition | null;
+  /** #1286: the campaign this character is being created for, or null for solo.
+   *  Set alongside rulesEdition by the same gate resolution. */
+  campaignId: string | null;
 }
 
 const EMPTY_DRAFT: CharacterDraft = {
@@ -79,6 +87,8 @@ const EMPTY_DRAFT: CharacterDraft = {
   spellIds: [],
   equipmentDraft: null,
   step: "identity",
+  rulesEdition: null,
+  campaignId: null,
 };
 
 /**

@@ -98,6 +98,10 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     spellIds: [],
     equipmentDraft: null,
     step: "identity",
+    // Every test here exercises post-gate ceremony behavior (#1286); the gate
+    // itself is CreationEntryGate.test.tsx's job.
+    rulesEdition: "EDITION_2024",
+    campaignId: null,
   };
   localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...base, ...overrides }));
 }

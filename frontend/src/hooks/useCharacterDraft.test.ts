@@ -65,4 +65,23 @@ describe("useCharacterDraft", () => {
     act(() => result.current.clear());
     expect(result.current.draft.step).toBe("identity");
   });
+
+  // #1286: a fresh draft's rulesEdition is null (not silently defaulted) — this
+  // is what makes CreationEntryGate render instead of the ceremony until the
+  // gate resolves it.
+  it("starts with rulesEdition and campaignId unresolved (null)", () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    expect(result.current.draft.rulesEdition).toBeNull();
+    expect(result.current.draft.campaignId).toBeNull();
+  });
+
+  it("clear() resets rulesEdition back to null, re-surfacing the entry gate on Start Over", () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    act(() => result.current.update({ rulesEdition: "EDITION_2014", campaignId: "camp-1" }));
+    expect(result.current.draft.rulesEdition).toBe("EDITION_2014");
+
+    act(() => result.current.clear());
+    expect(result.current.draft.rulesEdition).toBeNull();
+    expect(result.current.draft.campaignId).toBeNull();
+  });
 });

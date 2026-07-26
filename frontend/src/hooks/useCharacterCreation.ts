@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { createCharacter, fetchItems } from "@/api/client";
+import { addCharacterToCampaign, createCharacter, fetchItems } from "@/api/client";
 import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import type { ToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import {
@@ -141,6 +141,14 @@ export function useCharacterCreation(): CharacterCreation {
         toolChoices.selectedToolChoices
       );
       const created = await createCharacter(payload);
+      // #1286: campaignId was resolved (and its edition inherited) at the
+      // CreationEntryGate before the ceremony started; attach now reuses the
+      // existing join endpoint instead of adding a second creation-time mutation
+      // path. Editions always match here (inherited, never re-picked), so this
+      // never hits the join's edition-mismatch guard.
+      if (draft.campaignId) {
+        await addCharacterToCampaign(created.id, draft.campaignId);
+      }
       clear();
       // Replace (not push) so the now-stale empty form doesn't linger in history.
       navigate(`/characters/${created.id}`, { replace: true });
