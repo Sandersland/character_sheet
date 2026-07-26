@@ -405,6 +405,57 @@ describe("roll kinds log under the `roll` category", () => {
     expect(dmg!.summary).toBe("Longsword: 9 slashing");
   });
 
+  // #1235: combat-log decomposition fields on the roll event's persisted `data`.
+  it("persists verdict/crit flags/modeSources/attackComponents and shares a swingId with its damage event", async () => {
+    const sessionId = await activeSession();
+    const modeSources = [{ mode: "disadvantage", kind: "attack", source: "Poisoned" }];
+    const attackComponents = { abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 };
+    const damageComponents = { abilityMod: 3, meleeDamageBonus: 0 };
+
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "attack", source: "Longsword", total: 8, swingId: "swing-a",
+      verdict: "hit", nat20: false, nat1: false, crit: false,
+      modeSources, attackComponents,
+    });
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "damage", source: "Longsword", total: 6, damageType: "slashing",
+      swingId: "swing-a", damageComponents,
+    });
+
+    const attack = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "attackRoll" } });
+    const dmg = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "damageRoll" } });
+    expect(attack!.data).toMatchObject({
+      swingId: "swing-a", verdict: "hit", nat20: false, nat1: false, crit: false,
+      modeSources, attackComponents,
+    });
+    expect(dmg!.data).toMatchObject({ swingId: "swing-a", damageComponents });
+    // Same swingId — this IS the correlation; each request's own `batchId` differs.
+    expect((attack!.data as { swingId: string }).swingId).toBe((dmg!.data as { swingId: string }).swingId);
+    expect(attack!.batchId).not.toBe(dmg!.batchId);
+  });
+
+  it("gives two unrelated swings distinct swingIds", async () => {
+    const sessionId = await activeSession();
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "attack", source: "Longsword", total: 8, swingId: "swing-a" });
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "attack", source: "Dagger", total: 12, swingId: "swing-b" });
+
+    const events = await prisma.characterEvent.findMany({ where: { characterId: CHAR_OWNER, type: "attackRoll" }, orderBy: { createdAt: "asc" } });
+    expect(events).toHaveLength(2);
+    const ids = events.map((e) => (e.data as { swingId: string }).swingId);
+    expect(ids).toEqual(["swing-a", "swing-b"]);
+  });
+
+  it("never persists target/outcome, even if a caller sends them (#1235 self-or-announce — no enemy/target model)", async () => {
+    const sessionId = await activeSession();
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "attack", source: "Longsword", total: 8,
+      target: { name: "Goblin" }, outcome: "dropped",
+    });
+    const attack = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "attackRoll" } });
+    expect(attack!.data).not.toHaveProperty("target");
+    expect(attack!.data).not.toHaveProperty("outcome");
+  });
+
   it("rejects an invalid kind, rollMode, or dc with 400", async () => {
     const sessionId = await activeSession();
     const badKind = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "perception", source: "x", total: 1 });

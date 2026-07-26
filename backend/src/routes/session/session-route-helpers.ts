@@ -1,6 +1,13 @@
 import type { Request, Response } from "express";
+import { z } from "zod";
 
 import type { RollKind, RollMode } from "@/lib/session/sessions.js";
+import type {
+  RollEventAttackComponents,
+  RollEventDamageComponents,
+  RollEventModeSource,
+  RollEventVerdict,
+} from "@character-sheet/shared-types";
 
 export interface RollInput {
   kind: RollKind;
@@ -13,10 +20,45 @@ export interface RollInput {
   skill: string | undefined;
   dc: number | undefined;
   rollMode: RollMode | undefined;
+  // #1235 combat-log decomposition — see RollEventData for the field-by-field
+  // rationale. `target`/`outcome` are deliberately ABSENT from this interface
+  // (and from parseRollInput's return below): no producer populates them, and
+  // the engine has no enemy/target model to populate them from (self-or-announce).
+  swingId: string | undefined;
+  verdict: RollEventVerdict | undefined;
+  nat20: boolean | undefined;
+  nat1: boolean | undefined;
+  crit: boolean | undefined;
+  modeSources: RollEventModeSource[] | undefined;
+  attackComponents: RollEventAttackComponents | undefined;
+  damageComponents: RollEventDamageComponents | undefined;
 }
 
 const VALID_KINDS: RollKind[] = ["attack", "damage", "check", "save", "initiative"];
 const VALID_MODES: RollMode[] = ["normal", "advantage", "disadvantage"];
+const VALID_VERDICTS: RollEventVerdict[] = ["hit", "miss", "crit"];
+
+// Nested #1235 objects validated via zod (permitted for new nested fields only —
+// see CLAUDE.md/#1235: the existing flat-field ROLL_CHECKS style stays hand-rolled).
+const modeSourceSchema = z.object({
+  mode: z.enum(["advantage", "disadvantage", "flat"]),
+  kind: z.enum(["attack", "check", "save", "initiative"]),
+  ability: z.string().optional(),
+  modifier: z.number().finite().optional(),
+  source: z.string(),
+});
+
+const attackComponentsSchema = z.object({
+  abilityMod: z.number().finite(),
+  proficiencyBonus: z.number().finite(),
+  rangedBonus: z.number().finite(),
+  attackRollBonus: z.number().finite(),
+});
+
+const damageComponentsSchema = z.object({
+  abilityMod: z.number().finite(),
+  meleeDamageBonus: z.number().finite(),
+});
 
 interface RollBody {
   kind?: unknown;
@@ -29,6 +71,15 @@ interface RollBody {
   skill?: unknown;
   dc?: unknown;
   rollMode?: unknown;
+  swingId?: unknown;
+  verdict?: unknown;
+  nat20?: unknown;
+  nat1?: unknown;
+  crit?: unknown;
+  modeSources?: unknown;
+  attackComponents?: unknown;
+  damageComponents?: unknown;
+  // target/outcome intentionally untyped here too — see RollInput's comment.
 }
 
 // Field validators, checked in order; the first failure's error is the 400 body.
@@ -53,6 +104,31 @@ const ROLL_CHECKS: { ok: (b: RollBody) => boolean; error: string }[] = [
   {
     ok: (b) => b.rollMode === undefined || VALID_MODES.includes(b.rollMode as RollMode),
     error: `rollMode must be one of ${VALID_MODES.join(", ")}`,
+  },
+  {
+    ok: (b) => b.swingId === undefined || (typeof b.swingId === "string" && b.swingId.trim() !== ""),
+    error: "swingId must be a non-empty string",
+  },
+  {
+    ok: (b) => b.verdict === undefined || VALID_VERDICTS.includes(b.verdict as RollEventVerdict),
+    error: `verdict must be one of ${VALID_VERDICTS.join(", ")}`,
+  },
+  { ok: (b) => b.nat20 === undefined || typeof b.nat20 === "boolean", error: "nat20 must be a boolean" },
+  { ok: (b) => b.nat1 === undefined || typeof b.nat1 === "boolean", error: "nat1 must be a boolean" },
+  { ok: (b) => b.crit === undefined || typeof b.crit === "boolean", error: "crit must be a boolean" },
+  {
+    ok: (b) =>
+      b.modeSources === undefined ||
+      (Array.isArray(b.modeSources) && b.modeSources.every((m) => modeSourceSchema.safeParse(m).success)),
+    error: "modeSources must be an array of valid roll-mode source objects",
+  },
+  {
+    ok: (b) => b.attackComponents === undefined || attackComponentsSchema.safeParse(b.attackComponents).success,
+    error: "attackComponents must be a valid decomposed-attack object",
+  },
+  {
+    ok: (b) => b.damageComponents === undefined || damageComponentsSchema.safeParse(b.damageComponents).success,
+    error: "damageComponents must be a valid decomposed-damage object",
   },
 ];
 
@@ -87,6 +163,15 @@ export function parseRollInput(req: Request, res: Response): RollInput | null {
     skill: typeof b.skill === "string" ? b.skill : undefined,
     dc: typeof b.dc === "number" ? b.dc : undefined,
     rollMode: b.rollMode as RollMode | undefined,
+    swingId: typeof b.swingId === "string" ? b.swingId : undefined,
+    verdict: b.verdict as RollEventVerdict | undefined,
+    nat20: typeof b.nat20 === "boolean" ? b.nat20 : undefined,
+    nat1: typeof b.nat1 === "boolean" ? b.nat1 : undefined,
+    crit: typeof b.crit === "boolean" ? b.crit : undefined,
+    modeSources: Array.isArray(b.modeSources) ? (b.modeSources as RollEventModeSource[]) : undefined,
+    attackComponents: b.attackComponents as RollEventAttackComponents | undefined,
+    damageComponents: b.damageComponents as RollEventDamageComponents | undefined,
+    // target/outcome: never read from `b` — see RollInput's comment (#1235).
   };
 }
 

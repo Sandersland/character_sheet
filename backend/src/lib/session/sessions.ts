@@ -8,6 +8,14 @@ import {
   type ParticipantSummary,
 } from "./session-summary.js";
 import type { Prisma } from "@/generated/prisma/client.js";
+import type {
+  RollEventAttackComponents,
+  RollEventDamageComponents,
+  RollEventKind,
+  RollEventMode,
+  RollEventModeSource,
+  RollEventVerdict,
+} from "@character-sheet/shared-types";
 
 // Session/combat domain errors carry the HTTP status the central `errorHandler`
 // maps. Default 409 (conflict — wrong session state / not a participant); pass
@@ -421,8 +429,11 @@ const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
   combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
 };
 
-export type RollKind = "attack" | "damage" | "check" | "save" | "initiative";
-export type RollMode = "normal" | "advantage" | "disadvantage";
+// Aliased (not redeclared) from the shared wire type (#1235/#820) — RollInput/
+// LogRollParams keep these short local names since they're used throughout
+// this file and session-route-helpers.ts.
+export type RollKind = RollEventKind;
+export type RollMode = RollEventMode;
 
 const ROLL_EVENT_TYPES: Record<RollKind, EventType> = {
   attack: "attackRoll",
@@ -448,6 +459,17 @@ interface LogRollParams {
   dc?: number;
   /** Advantage state the d20 was rolled with. */
   rollMode?: RollMode;
+  // #1235 combat-log decomposition fields — see RollEventData for the
+  // field-by-field rationale. target/outcome are deliberately absent (never
+  // accepted here, never persisted) — see logRollEvent's `data` object below.
+  swingId?: string;
+  verdict?: RollEventVerdict;
+  nat20?: boolean;
+  nat1?: boolean;
+  crit?: boolean;
+  modeSources?: RollEventModeSource[];
+  attackComponents?: RollEventAttackComponents;
+  damageComponents?: RollEventDamageComponents;
 }
 
 function buildRollSummary(params: LogRollParams): string {
@@ -471,7 +493,10 @@ export async function logRollEvent(
 ) {
   await assertActiveParticipant(sessionId, characterId);
 
-  const { kind, source, total, specLabel, damageType, faces, ability, skill, dc, rollMode } = params;
+  const {
+    kind, source, total, specLabel, damageType, faces, ability, skill, dc, rollMode,
+    swingId, verdict, nat20, nat1, crit, modeSources, attackComponents, damageComponents,
+  } = params;
   const batchId = randomUUID();
 
   return prisma.$transaction(async (tx) => {
@@ -482,6 +507,9 @@ export async function logRollEvent(
       summary: buildRollSummary(params),
       batchId,
       sessionId,
+      // target/outcome are NEVER written here — see LogRollParams' comment
+      // (#1235 reserves them on the wire type for a future target/outcome
+      // feature; the engine has no enemy/target model to populate them from).
       data: {
         kind,
         source,
@@ -493,6 +521,14 @@ export async function logRollEvent(
         skill: skill ?? null,
         dc: dc ?? null,
         rollMode: rollMode ?? null,
+        swingId: swingId ?? null,
+        verdict: verdict ?? null,
+        nat20: nat20 ?? null,
+        nat1: nat1 ?? null,
+        crit: crit ?? null,
+        modeSources: modeSources ?? null,
+        attackComponents: attackComponents ?? null,
+        damageComponents: damageComponents ?? null,
       },
     });
   });
