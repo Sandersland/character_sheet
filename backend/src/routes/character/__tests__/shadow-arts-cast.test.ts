@@ -265,15 +265,37 @@ describe("Shadow Arts cast endpoint", () => {
     expect(res.body.error).toMatch(/level 3/i);
   });
 
-  it("surfaces cloakOfShadowsAvailable only for an L17+ Warrior of Shadow monk (moved from L11, #1246)", async () => {
-    await createMonk(XP_L17, "warrior of shadow");
-    const l17 = await agent().get(`/api/characters/${FIXTURE_ID}`);
-    expect(l17.body.resources.cloakOfShadowsAvailable).toBe(true);
+  // #1315 shared-gate proof: the cast guard (shadow-arts.ts) and the wire
+  // availableActions[] value both resolve through deriveEntryScopedActions —
+  // never two independent copies of the level gate (CLAUDE.md's
+  // level-gated-registry rule). If a future edit duplicated the gate (e.g. a
+  // guard hardcoding a different threshold than the DERIVED_ACTIONS row), this
+  // test would catch the resulting divergence at the exact boundary levels:
+  // availableActions would say "available" while the guard still rejected, or
+  // vice versa.
+  it("shadowArts (L3) / cloakOfShadows (L17): availableActions[] presence and guard accept/reject move together at the boundary", async () => {
+    await createMonk(XP_L2, "warrior of shadow");
+    const l2 = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect((l2.body.availableActions as { key: string }[]).some((a) => a.key === "shadowArts")).toBe(false);
+    const l2Cast = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    expect(l2Cast.status).toBe(400);
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 
     await createMonk(XP_L3, "warrior of shadow");
     const l3 = await agent().get(`/api/characters/${FIXTURE_ID}`);
-    expect(l3.body.resources.cloakOfShadowsAvailable).toBeUndefined();
+    expect((l3.body.availableActions as { key: string }[]).some((a) => a.key === "shadowArts")).toBe(true);
+    expect((l3.body.availableActions as { key: string }[]).some((a) => a.key === "cloakOfShadows")).toBe(false);
+    const l3Cast = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    expect(l3Cast.status).toBe(200);
+    const l3CloakCast = await cast([{ type: "activateCloakOfShadows" }]);
+    expect(l3CloakCast.status).toBe(400);
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+
+    await createMonk(XP_L17, "warrior of shadow");
+    const l17 = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect((l17.body.availableActions as { key: string }[]).some((a) => a.key === "cloakOfShadows")).toBe(true);
+    const l17Cast = await cast([{ type: "activateCloakOfShadows" }]);
+    expect(l17Cast.status).toBe(200);
   });
 
   describe("activateCloakOfShadows (L17)", () => {

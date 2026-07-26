@@ -22,7 +22,8 @@
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type AbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { deriveEntryScopedResourcesForCharacterRow } from "./class-features.js";
+import { levelForExperience } from "@/lib/leveling/experience.js";
+import { deriveEntryScopedActions } from "./actions.js";
 import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { applyConditionInTx } from "@/lib/combat/conditions.js";
@@ -205,13 +206,16 @@ export async function applyShadowArtsOperations(
     select: FOCUS_CAST_CHARACTER_SELECT,
     notFound: (id) => new InvalidShadowArtOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      // shadowArtsAvailable/cloakOfShadowsAvailable are entry-scoped (#1206):
-      // they key off the MONK entry's own level, so a secondary Warrior of
-      // Shadow monk's gate is set correctly even when another class is primary.
-      const { derived } = deriveEntryScopedResourcesForCharacterRow(row);
+      // The shadowArts/cloakOfShadows gate is entry-scoped (#1206) — it keys off
+      // the MONK entry's own level, so a secondary Warrior of Shadow monk gates
+      // correctly even when another class is primary. Resolved through the SAME
+      // deriveEntryScopedActions the wire's availableActions[] uses (#1315) —
+      // never a second copy of the level gate.
+      const level = levelForExperience(row.experiencePoints);
+      const actions = deriveEntryScopedActions(row.classEntries, level, [], true);
 
       if (op.type === "activateCloakOfShadows") {
-        if (!derived?.cloakOfShadowsAvailable) {
+        if (!actions.some((a) => a.key === "cloakOfShadows")) {
           throw new InvalidShadowArtOperationError(
             "Only a Warrior of Shadow monk (level 17+) can use Cloak of Shadows",
           );
@@ -220,7 +224,7 @@ export async function applyShadowArtsOperations(
         return;
       }
 
-      if (!derived?.shadowArtsAvailable) {
+      if (!actions.some((a) => a.key === "shadowArts")) {
         throw new InvalidShadowArtOperationError(
           "Only a Warrior of Shadow monk (level 3+) can cast Shadow Arts spells",
         );
