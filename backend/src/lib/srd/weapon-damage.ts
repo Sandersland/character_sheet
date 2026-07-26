@@ -24,6 +24,11 @@ export type WeaponGrip = "one-handed" | "two-handed" | "versatile-two-handed";
  * from its damage unless the character has the Two-Weapon Fighting style (#732).
  * Exposing it here keeps the ability-selection rule server-side rather than
  * duplicating it on the frontend.
+ *
+ * `meleeDamageBonus` is the OTHER addend folded into `damageModifier` (an active
+ * "meleeDamage" buff, e.g. Rage) — surfaced alongside `abilityModifier` for the
+ * combat-log decomposition (#1235); `abilityModifier + meleeDamageBonus ===
+ * damageModifier` always, by construction (never re-derive it separately).
  */
 export function deriveWeaponDamage(
   weapon: {
@@ -47,12 +52,15 @@ export function deriveWeaponDamage(
   damageDiceFaces: number;
   damageModifier: number;
   abilityModifier: number;
+  /** The applied melee-damage buff addend — 0 (not omitted) for a ranged weapon or no active buff. */
+  meleeDamageBonus: number;
   damageType: string;
   grip: WeaponGrip;
 } {
   const isMelee = weapon.weaponRange === "melee";
   const abilityMod = weaponAbilityMod(weapon, effectiveScores);
-  const damageModifier = abilityMod + (isMelee ? meleeDamageBonus : 0);
+  const appliedMeleeDamageBonus = isMelee ? meleeDamageBonus : 0;
+  const damageModifier = abilityMod + appliedMeleeDamageBonus;
 
   // Resolve grip and choose dice.
   const isVersatile =
@@ -77,6 +85,7 @@ export function deriveWeaponDamage(
     damageDiceFaces,
     damageModifier,
     abilityModifier: abilityMod,
+    meleeDamageBonus: appliedMeleeDamageBonus,
     damageType: weapon.damageType,
     grip,
   };

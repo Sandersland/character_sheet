@@ -4,9 +4,10 @@ import {
   serializeWeaponDetail,
 } from "@/lib/inventory/itemDetail.js";
 import {
-  deriveWeaponAttackBonus,
+  deriveWeaponAttackComponents,
   deriveWeaponDamage,
 } from "@/lib/srd/srd.js";
+import type { WeaponAttackBonusComponents } from "@/lib/srd/srd.js";
 import {
   activatedMaxUses,
   chargePoolOf,
@@ -82,25 +83,33 @@ function buildInventoryWeaponView(
 ):
   | (ReturnType<typeof serializeWeaponDetail> & {
       attackBonus: number;
+      /** Decomposed addends of `attackBonus` — surfaced for the combat-log drill-in (#1235); sums to it by construction. */
+      attackBonusComponents: WeaponAttackBonusComponents;
       damage: ReturnType<typeof deriveWeaponDamage>;
     })
   | undefined {
   if (!row.weaponDetail) return undefined;
+  const attackBonusComponents = deriveWeaponAttackComponents(
+    {
+      name: row.name,
+      finesse: row.weaponDetail.finesse,
+      weaponClass: row.weaponDetail.weaponClass,
+      weaponRange: row.weaponDetail.weaponRange,
+    },
+    context.effectiveScores,
+    context.proficiencyBonus,
+    context.weaponGrants,
+    context.rangedAttackRollBonus,
+    context.attackRollBonus,
+  );
   return {
     ...serializeWeaponDetail(row.weaponDetail),
-    attackBonus: deriveWeaponAttackBonus(
-      {
-        name: row.name,
-        finesse: row.weaponDetail.finesse,
-        weaponClass: row.weaponDetail.weaponClass,
-        weaponRange: row.weaponDetail.weaponRange,
-      },
-      context.effectiveScores,
-      context.proficiencyBonus,
-      context.weaponGrants,
-      context.rangedAttackRollBonus,
-      context.attackRollBonus,
-    ),
+    attackBonus:
+      attackBonusComponents.abilityMod +
+      attackBonusComponents.proficiencyBonus +
+      attackBonusComponents.rangedBonus +
+      attackBonusComponents.attackRollBonus,
+    attackBonusComponents,
     damage: deriveWeaponDamage(
       {
         name: row.name,

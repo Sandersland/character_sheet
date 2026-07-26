@@ -103,6 +103,44 @@ export function weaponAbilityMod(
   return strMod;
 }
 
+/** The four addends that sum to `deriveWeaponAttackBonus`'s return value (#1235 combat-log decomposition). */
+export interface WeaponAttackBonusComponents {
+  abilityMod: number;
+  /** The proficiency bonus actually applied — 0 (not omitted) when not proficient, so callers can sum unconditionally. */
+  proficiencyBonus: number;
+  rangedBonus: number;
+  attackRollBonus: number;
+}
+
+/**
+ * Same inputs/rule as `deriveWeaponAttackBonus`, decomposed into its four
+ * addends instead of summed. `deriveWeaponAttackBonus` delegates here so the
+ * sum can never drift from the components — one rule, two views (#1235).
+ */
+export function deriveWeaponAttackComponents(
+  weapon: {
+    name: string;
+    finesse: boolean;
+    weaponClass?: string | null;
+    weaponRange?: string | null;
+  },
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  weaponGrants: ReadonlyArray<{ name: string }>,
+  rangedAttackRollBonus = 0,
+  attackRollBonus = 0,
+): WeaponAttackBonusComponents {
+  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
+  const proficient = isProficientWithWeapon(weapon, weaponGrants);
+  const rangedBonus = weapon.weaponRange === "ranged" ? rangedAttackRollBonus : 0;
+  return {
+    abilityMod,
+    proficiencyBonus: proficient ? proficiencyBonus : 0,
+    rangedBonus,
+    attackRollBonus,
+  };
+}
+
 export function deriveWeaponAttackBonus(
   weapon: {
     name: string;
@@ -121,8 +159,13 @@ export function deriveWeaponAttackBonus(
   /** Flat bonus from active "attackRoll" buffs (e.g. Sacred Weapon); #419. */
   attackRollBonus = 0,
 ): number {
-  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
-  const proficient = isProficientWithWeapon(weapon, weaponGrants);
-  const rangedBonus = weapon.weaponRange === "ranged" ? rangedAttackRollBonus : 0;
-  return abilityMod + (proficient ? proficiencyBonus : 0) + rangedBonus + attackRollBonus;
+  const c = deriveWeaponAttackComponents(
+    weapon,
+    effectiveScores,
+    proficiencyBonus,
+    weaponGrants,
+    rangedAttackRollBonus,
+    attackRollBonus,
+  );
+  return c.abilityMod + c.proficiencyBonus + c.rangedBonus + c.attackRollBonus;
 }

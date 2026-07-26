@@ -547,7 +547,8 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
           ammunition: false,
           // STR mod +3 (16), not proficient (no matching weapon grant on this fixture).
           attackBonus: 3,
-          damage: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, abilityModifier: 3, damageType: "slashing", grip: "one-handed" },
+          attackBonusComponents: { abilityMod: 3, proficiencyBonus: 0, rangedBonus: 0, attackRollBonus: 0 },
+          damage: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, abilityModifier: 3, meleeDamageBonus: 0, damageType: "slashing", grip: "one-handed" },
         },
         capabilities: [{ kind: "passiveBonus", target: "skill", targetKey: "athletics", op: "add", value: 1 }],
       },

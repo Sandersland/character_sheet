@@ -87,6 +87,18 @@ export interface WeaponDetail {
    */
   attackBonus?: number;
   /**
+   * The addends of `attackBonus` (ability mod / applied proficiency bonus /
+   * ranged Archery bonus / attack-roll buff) — server-derived alongside it via
+   * `deriveWeaponAttackComponents`, for the combat-log drill-in (#1235). Sums to
+   * `attackBonus` by construction; present on `InventoryItem.weapon` only.
+   */
+  attackBonusComponents?: {
+    abilityMod: number;
+    proficiencyBonus: number;
+    rangedBonus: number;
+    attackRollBonus: number;
+  };
+  /**
    * Derived damage roll spec — grip-resolved at read time by `deriveWeaponDamage`.
    * Encodes the correct die for versatile weapons based on what else
    * is equipped (1d10 when off-hand is free; 1d8 when a shield or second weapon
@@ -104,6 +116,8 @@ export interface WeaponDetail {
      * Two-Weapon Fighting style (#732).
      */
     abilityModifier?: number;
+    /** The OTHER addend folded into `damageModifier` (an active meleeDamage buff, e.g. Rage) — #1235 combat-log decomposition. */
+    meleeDamageBonus?: number;
     damageType: string;
     grip: "one-handed" | "two-handed" | "versatile-two-handed";
   };
