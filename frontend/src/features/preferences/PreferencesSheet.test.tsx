@@ -8,7 +8,7 @@ import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 
 // jsdom's matchMedia stub reports matches:false for every query, so BottomSheet
 // resolves to its mobile drag-to-dismiss close — synthesize the transitionend
-// it waits for, mirroring BottomSheet.test.tsx's own convention.
+// it waits for, mirroring BottomSheet's own convention.
 function fireTransitionEnd(el: HTMLElement) {
   const e = new Event("transitionend", { bubbles: true });
   Object.defineProperty(e, "propertyName", { value: "transform" });
@@ -17,7 +17,7 @@ function fireTransitionEnd(el: HTMLElement) {
 
 // #1167: the dedicated Preferences surface, reachable with or without a
 // character/campaign in view. No PreferencesProvider wrapper — mirrors
-// AccountMenu.test.tsx, which relies on the hooks' pure-localStorage fallback.
+// AccountMenu's own tests, which rely on the hooks' pure-localStorage fallback.
 function renderSheet(props: Partial<Parameters<typeof PreferencesSheet>[0]> = {}) {
   return render(
     <ThemeProvider>
@@ -113,15 +113,19 @@ describe("PreferencesSheet (#1167)", () => {
     expect(screen.queryByRole("checkbox", { name: /share sheet with dm/i })).not.toBeInTheDocument();
   });
 
-  it("firing the Campaign settings link calls the handler and closes this sheet", async () => {
+  it("firing the Campaign settings link calls the handler and closes this sheet via the shared exit animation", async () => {
     const user = userEvent.setup();
     const onOpenCampaignSettings = vi.fn();
     const onClose = vi.fn();
-    renderSheet({ campaignId: "camp-1", onOpenCampaignSettings, onClose });
+    const { baseElement } = renderSheet({ campaignId: "camp-1", onOpenCampaignSettings, onClose });
 
     await user.click(screen.getByRole("button", { name: /campaign settings/i }));
 
     expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
+    // Routes through BottomSheet's requestClose (#782), not an instant unmount —
+    // onClose defers to the slide-out transitionend, same as every other close path.
+    expect(onClose).not.toHaveBeenCalled();
+    fireTransitionEnd(baseElement.querySelector('[role="dialog"]') as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
