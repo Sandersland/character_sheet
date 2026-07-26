@@ -8,7 +8,7 @@ import {
   updateCampaignItem,
   updateEntity,
 } from "@/api/client";
-import { campaignKeys } from "@/api/queryKeys";
+import { campaignKeys, characterKeys } from "@/api/queryKeys";
 import { primeCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { CampaignEntity, CampaignItem, CampaignItemInput } from "@/types/character";
 
@@ -107,7 +107,7 @@ export function useCampaignItemMutations(campaignId: string, entities: CampaignE
   const awardMutation = useMutation({
     mutationFn: ({ item, characterId }: { item: CampaignItem; characterId: string }) =>
       awardCampaignItem(campaignId, item.id, { characterId }),
-    onSuccess: ({ holders }, { item }) => {
+    onSuccess: ({ holders }, { item, characterId }) => {
       // Award reveals the fronting entity — reflect it in the cache too.
       writeItems(
         itemsCache().map((i) =>
@@ -117,14 +117,19 @@ export function useCampaignItemMutations(campaignId: string, entities: CampaignE
         ),
       );
       if (item.entity) patchEntityInCache(item.entity.id, { visibility: "REVEALED" });
+      // #1283: an award touches both the items list (exact write above) AND
+      // the recipient's character (their inventory gained the item) — that
+      // side isn't returned here, so invalidate rather than guess its shape.
+      void queryClient.invalidateQueries({ queryKey: characterKeys.detail(characterId) });
     },
   });
 
   const revokeMutation = useMutation({
     mutationFn: ({ item, characterId }: { item: CampaignItem; characterId: string }) =>
       revokeCampaignItem(campaignId, item.id, { characterId }),
-    onSuccess: ({ holders }, { item }) => {
+    onSuccess: ({ holders }, { item, characterId }) => {
       writeItems(itemsCache().map((i) => (i.id === item.id ? { ...i, holders } : i)));
+      void queryClient.invalidateQueries({ queryKey: characterKeys.detail(characterId) });
     },
   });
 
