@@ -68,7 +68,9 @@ describe("LiveSessionProvider status mapping", () => {
     renderProvider();
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("liveJoined"));
     expect(mockActive).toHaveBeenCalledWith("c1");
-    expect(screen.getByTestId("parts")).toHaveTextContent("full");
+    // A separate wait: the full session is a dependent query that only starts
+    // once the doorway confirms liveJoined, so it settles a render later.
+    await waitFor(() => expect(screen.getByTestId("parts")).toHaveTextContent("full"));
   });
 });
 
@@ -103,16 +105,17 @@ describe("LiveSessionProvider refresh", () => {
     expect(screen.getByTestId("status")).toHaveTextContent("none");
   });
 
-  it("drops a stale refresh response so it cannot overwrite a newer one", async () => {
-    // Mount refresh (call A) hangs; a later refresh (call B) resolves to 'none'
-    // FIRST, then A resolves to a live session — A must be dropped as stale.
-    let resolveStale!: (v: SessionDoorwayState) => void;
-    const stale = new Promise<SessionDoorwayState>((r) => {
-      resolveStale = r;
+  // #1299: the manual seq-ref race guard is gone — TanStack Query's own request
+  // coalescing is what now guarantees a stale response can't win. A query key
+  // with a fetch already in flight shares that SAME promise rather than firing
+  // a second network call, so there is no "slow response overwrites a newer
+  // one" race left to have: there is only ever one in-flight fetch per key.
+  it("coalesces an overlapping refresh() into the mount fetch instead of double-fetching", async () => {
+    let resolveMount!: (v: SessionDoorwayState) => void;
+    const mountFetch = new Promise<SessionDoorwayState>((r) => {
+      resolveMount = r;
     });
-    mockDoorway.mockReturnValueOnce(stale);
-    mockDoorway.mockResolvedValueOnce(doorway({ kind: "none", session: null }));
-    mockActive.mockResolvedValue(fullSession);
+    mockDoorway.mockReturnValueOnce(mountFetch);
 
     let refreshFn: () => Promise<void> = async () => {};
     function Capture() {
@@ -125,20 +128,39 @@ describe("LiveSessionProvider refresh", () => {
         <Capture />
       </LiveSessionProvider>,
     );
-    // Mount refresh is in flight (hung); status is still loading.
     expect(screen.getByTestId("status")).toHaveTextContent("loading");
 
-    // A newer refresh resolves to 'none' and wins.
+    // Call refresh() while the mount fetch is still hanging.
+    const refreshPromise = refreshFn();
     await act(async () => {
-      await refreshFn();
+      resolveMount(doorway({ kind: "none", session: null }));
+      await refreshPromise;
     });
-    expect(screen.getByTestId("status")).toHaveTextContent("none");
 
-    // Now the stale mount refresh finally resolves to a LIVE session — dropped.
+    // Exactly one network call total — refresh() joined the mount fetch rather
+    // than starting a second one.
+    expect(mockDoorway).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("none"));
+  });
+
+  // #1299: the doorway is the one query that opts back into refetch-on-focus
+  // (queryClient.ts's global default is off) — a DM-ended session must not
+  // leave a zombie live tracker until the tab regains focus.
+  it("refetches the doorway when the window regains focus, without a manual refresh() call", async () => {
+    mockDoorway.mockResolvedValueOnce(doorway({ kind: "liveJoined", session: liveSession(true) }));
+    mockActive.mockResolvedValue(fullSession);
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("liveJoined"));
+    expect(mockDoorway).toHaveBeenCalledTimes(1);
+
+    // The DM ended it while this tab was backgrounded.
+    mockDoorway.mockResolvedValueOnce(doorway({ kind: "none", session: null }));
     await act(async () => {
-      resolveStale(doorway({ kind: "liveJoined", session: liveSession(true) }));
-      await stale;
+      window.dispatchEvent(new Event("visibilitychange"));
+      await Promise.resolve();
     });
-    expect(screen.getByTestId("status")).toHaveTextContent("none");
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("none"));
+    expect(mockDoorway).toHaveBeenCalledTimes(2);
   });
 });

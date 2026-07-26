@@ -21,3 +21,12 @@ export const campaignKeys = {
 };
 
 export const referenceKeys = { all: ["reference"] as const };
+
+// The character's session-doorway + full-active-session reads (#1299), lifted
+// out of LiveSessionProvider's own useState so a lifecycle mutation elsewhere
+// (join/start/leave/end) can invalidate them instead of poking a callback.
+export const sessionKeys = {
+  all: ["sessions"] as const,
+  doorway: (characterId: string | null | undefined) => [...sessionKeys.all, "doorway", characterId] as const,
+  active: (characterId: string | null | undefined) => [...sessionKeys.all, "active", characterId] as const,
+};
