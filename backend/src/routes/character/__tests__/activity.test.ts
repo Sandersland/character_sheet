@@ -52,6 +52,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 // Sessions are campaign-level (#245): create a throwaway campaign to host a
 // Session row when a test only needs a valid sessionId to tag events with.
@@ -479,11 +480,12 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
     });
     fighterClassId = cls.id;
 
-    const subclass = await prisma.subclass.upsert({
-      where: { classId_name: { classId: cls.id, name: SUBCLASS_NAME } },
-      create: { classId: cls.id, name: SUBCLASS_NAME, description: "Test subclass." },
-      update: {},
-    });
+    const subclass = await upsertEditionRow(
+      prisma.subclass,
+      { classId: cls.id, name: SUBCLASS_NAME, edition: null },
+      { classId: cls.id, name: SUBCLASS_NAME, description: "Test subclass." },
+      {},
+    );
     subclassId = subclass.id;
 
     await prisma.character.create({

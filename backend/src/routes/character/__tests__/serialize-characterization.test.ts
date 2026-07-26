@@ -18,6 +18,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-serialize-char";
 let COOKIE: string;
@@ -47,11 +48,12 @@ beforeAll(async () => {
     update: { subclassLevel: 3 },
   });
   fighterClassId = fighter.id;
-  const bm = await prisma.subclass.upsert({
-    where: { classId_name: { classId: fighter.id, name: BM_SUBCLASS_NAME } },
-    create: { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers." },
-    update: {},
-  });
+  const bm = await upsertEditionRow(
+    prisma.subclass,
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers." },
+    {},
+  );
   bmSubclassId = bm.id;
   const warlock = await prisma.characterClass.upsert({
     where: { name: WARLOCK_CLASS_NAME },
@@ -65,11 +67,12 @@ beforeAll(async () => {
     update: { subclassLevel: 3 },
   });
   monkClassId = monk.id;
-  const shadow = await prisma.subclass.upsert({
-    where: { classId_name: { classId: monk.id, name: SHADOW_SUBCLASS_NAME } },
-    create: { classId: monk.id, name: SHADOW_SUBCLASS_NAME, description: "Minor Illusion at 3." },
-    update: {},
-  });
+  const shadow = await upsertEditionRow(
+    prisma.subclass,
+    { classId: monk.id, name: SHADOW_SUBCLASS_NAME, edition: null },
+    { classId: monk.id, name: SHADOW_SUBCLASS_NAME, description: "Minor Illusion at 3." },
+    {},
+  );
   shadowSubclassId = shadow.id;
   // Warrior of Shadow grants Minor Illusion at L3 as data (#898).
   const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });

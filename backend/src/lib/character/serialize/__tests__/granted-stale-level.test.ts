@@ -5,6 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-granted-stale";
 const CHAR_ID = "test-granted-stale-1";
@@ -31,11 +32,12 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
       update: {},
     });
     monkClassId = cls.id;
-    const shadow = await prisma.subclass.upsert({
-      where: { classId_name: { classId: monkClassId, name: "Warrior of Shadow" } },
-      create: { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
-      update: {},
-    });
+    const shadow = await upsertEditionRow(
+      prisma.subclass,
+      { classId: monkClassId, name: "Warrior of Shadow", edition: null },
+      { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
+      {},
+    );
     shadowId = shadow.id;
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");

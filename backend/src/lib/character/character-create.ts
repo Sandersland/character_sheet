@@ -28,6 +28,7 @@ import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
+import { editionOrShared, resolveEditionRow } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -142,10 +143,11 @@ async function resolveSubclassName(
   edition: RulesEdition,
 ): Promise<{ subclassId: string | null; subclassName: string }> {
   if (subclassGateLevel(characterClass.subclassLevel, edition) <= 1) {
-    const match = await prisma.subclass.findUnique({
-      where: { classId_name: { classId: characterClass.id, name } },
-      select: { id: true, name: true },
+    const candidates = await prisma.subclass.findMany({
+      where: { classId: characterClass.id, name, ...editionOrShared(edition) },
+      select: { id: true, name: true, edition: true },
     });
+    const match = resolveEditionRow(candidates, edition);
     if (match) return { subclassId: match.id, subclassName: match.name };
   }
   return { subclassId: null, subclassName: name };
@@ -295,14 +297,22 @@ async function resolveSelections(
   // warn/queue when the same PrismaClient fires concurrent queries, and
   // these are cheap point-lookups, so there's no real cost to awaiting
   // each in turn.
+  // Write-once column (#1285): the row doesn't exist yet, so there's no
+  // `rulesEdition` to read via editionOf — DEFAULT_RULES_EDITION (lib/rules/edition.ts)
+  // names the same default the create call below lets the column apply, so the
+  // two can't drift apart. Resolved before the background lookup below, which
+  // needs it to pick the right edition-tagged row (#1306).
+  const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
+
   const race = await prisma.race.findUnique({ where: { name: input.race } });
   const characterClass = await prisma.characterClass.findUnique({
     where: { name: primaryClassChoice.name },
   });
-  const background = await prisma.background.findUnique({
-    where: { name: input.background },
+  const backgroundCandidates = await prisma.background.findMany({
+    where: { name: input.background, ...editionOrShared(edition) },
     include: { originFeat: true },
   });
+  const background = resolveEditionRow(backgroundCandidates, edition) ?? null;
 
   // Mechanical derivation needs a catalog anchor for race + class. The
   // background only grants skill-proficiency choices (no mechanical
@@ -316,11 +326,6 @@ async function resolveSelections(
     return { ok: false, status: 400, error: `Unknown class: ${primaryClassChoice.name}` };
   }
 
-  // Write-once column (#1285): the row doesn't exist yet, so there's no
-  // `rulesEdition` to read via editionOf — DEFAULT_RULES_EDITION (lib/rules/edition.ts)
-  // names the same default the create call below lets the column apply, so the
-  // two can't drift apart.
-  const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
   const subclass = await resolveSubclass(primaryClassChoice, characterClass, edition);
   if (!subclass.ok) return subclass;
 
