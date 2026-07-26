@@ -142,3 +142,48 @@ export const INVENTORY_EVENT_TYPES = [
   "consumed",
   "removed",
 ] as const;
+
+/**
+ * Semantic color roles for the session chat log (#1237's mockup color table).
+ * Only five roles exist — heal/resource/harm are the tinted ones; "default" and
+ * "muted" cover everything else (session/combat lifecycle, miss lines). Damage-
+ * type words route through `damageTypeTone` instead — a swing's damage type is
+ * a much finer-grained key than these roles.
+ */
+export type LogTone = "default" | "muted" | "heal" | "resource" | "harm";
+
+const LOG_TONE_CLASS: Record<LogTone, string> = {
+  default: "text-parchment-800",
+  muted: "text-parchment-500",
+  heal: "text-vitality-700",
+  resource: "text-gold-800",
+  harm: "text-garnet-700",
+};
+
+/** Tailwind text class for a chat-log line's semantic tone (#1237). */
+export function logToneClass(tone: LogTone): string {
+  return LOG_TONE_CLASS[tone];
+}
+
+// Elemental/energy damage types get their own --color-dmg-* hue; physical types
+// (piercing/slashing/bludgeoning) and any unmapped type are deliberately absent
+// so they fall through to neutral ink — only the amount is emphasized for those,
+// per the mockup ("hit for **8** piercing"). #1237
+const DAMAGE_TYPE_TONE_CLASS: Partial<Record<string, string>> = {
+  fire: "text-dmg-fire",
+  cold: "text-dmg-cold",
+  lightning: "text-dmg-lightning",
+  acid: "text-dmg-acid",
+  poison: "text-dmg-poison",
+  necrotic: "text-dmg-necrotic",
+  radiant: "text-dmg-radiant",
+  force: "text-dmg-force",
+  psychic: "text-dmg-psychic",
+  thunder: "text-dmg-thunder",
+};
+
+/** Tailwind text class for a damage-type word in the chat log, or null for a
+ *  physical/unknown type — callers fall back to the row's default ink (#1237). */
+export function damageTypeTone(damageType: string | null | undefined): string | null {
+  return damageType ? (DAMAGE_TYPE_TONE_CLASS[damageType] ?? null) : null;
+}

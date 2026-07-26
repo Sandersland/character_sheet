@@ -98,15 +98,23 @@
   --color-school-necromancy: oklch(0.48 0.08 150);
   --color-school-transmutation: oklch(0.52 0.1 200);
 
-  /* Damage-type pill tints (#1160): a minimal set; several types map onto one
-     token in spellFlavor (acid→poison, lightning/thunder→force). */
+  /* Damage-type ink (#1160 pill tints, #1237 full 10-type chat-log set): one hue
+     per type, all ≥4.5:1 against parchment-50 (verified via oklch→sRGB contrast
+     check, not eyeballed). fire anchors the #1237 mockup's --ember; cold's L was
+     darkened from 0.58→0.48 here (was 3.94:1, failing AA) since the chat log now
+     renders it as text, not just a low-opacity pill tint. lightning/acid/thunder
+     are new — spellFlavor's acid→poison / lightning,thunder→force aliasing predates
+     them and still applies to its own (unrelated) pill-tint use. */
   --color-dmg-fire: oklch(0.55 0.17 35);
-  --color-dmg-cold: oklch(0.58 0.12 230);
+  --color-dmg-cold: oklch(0.48 0.12 230);
+  --color-dmg-lightning: oklch(0.54 0.16 265);
+  --color-dmg-acid: oklch(0.52 0.15 115);
   --color-dmg-poison: oklch(0.52 0.14 150);
   --color-dmg-necrotic: oklch(0.48 0.09 320);
   --color-dmg-radiant: oklch(0.5 0.14 85);
-  --color-dmg-psychic: oklch(0.56 0.15 330);
   --color-dmg-force: oklch(0.55 0.13 290);
+  --color-dmg-psychic: oklch(0.56 0.15 330);
+  --color-dmg-thunder: oklch(0.5 0.03 250);
 
   /* Fixed dark label for light-ish fills (gold); does not flip. */
   --color-ink: #27241d;
@@ -350,11 +358,14 @@
 
   --color-dmg-fire: oklch(0.79 0.13 35);
   --color-dmg-cold: oklch(0.82 0.1 230);
+  --color-dmg-lightning: oklch(0.8 0.13 265);
+  --color-dmg-acid: oklch(0.8 0.13 115);
   --color-dmg-poison: oklch(0.8 0.12 150);
   --color-dmg-necrotic: oklch(0.78 0.09 320);
   --color-dmg-radiant: oklch(0.85 0.11 90);
-  --color-dmg-psychic: oklch(0.8 0.12 330);
   --color-dmg-force: oklch(0.8 0.11 290);
+  --color-dmg-psychic: oklch(0.8 0.12 330);
+  --color-dmg-thunder: oklch(0.78 0.03 250);
 
   /* Grain screens (lightens) on dark; fainter than light. */
   --texture-blend: screen;
