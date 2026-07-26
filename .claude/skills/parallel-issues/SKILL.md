@@ -196,7 +196,9 @@ Closes #<#>
 <what shipped per issue, measured outcomes, bugs found, follow-ups filed>"
 ```
 
-This is the PR that carries **every** `Closes #` (step 5 explains why the feature PRs can't). Merge it with **squash** — feature → `staging` is always a squash in this repo; merge commits are reserved for the `staging` → `main` promote. The wave lands on `staging` as one commit and the issues close on merge.
+This is the PR that carries **every** `Closes #` (step 5 explains why the feature PRs can't) — they fire on merge, because `staging` is the default branch.
+
+Both merge styles have shipped waves and neither is wrong; **pick deliberately and say which**. `--squash` lands the wave as one commit on `staging` (wave 2 / #1304). `--merge` preserves the per-issue commits and their `(#NNNN)` refs in `staging`'s history (playtest-multiclass / #1205). Squash is the better default — it keeps `staging` readable one-line-per-wave — but reach for `--merge` when the per-issue commits are the audit trail someone will need. (Unrelated: the `staging` → `main` promote is **always** a merge commit; see the `promote` skill.)
 
 > **A green CI on a `staging` PR does not include e2e** — the required checks are `claude-review`, `lint`, `test`, `build`, `fallow`. If the wave touched UI layout, run the e2e suite yourself (`docker compose --profile e2e run --rm e2e`) before merging; auto-merge will otherwise land the PR before e2e ever reports.
 
