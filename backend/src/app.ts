@@ -13,35 +13,7 @@ import { config } from "@/lib/core/config.js";
 import { errorHandler } from "@/lib/core/error-handler.js";
 import { httpLogger } from "@/lib/core/logger.js";
 import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/lib/core/security.js";
-import { abilitiesRouter } from "@/routes/character/abilities.js";
-import { actionsRouter } from "@/routes/character/actions.js";
-import { activityRouter } from "@/routes/character/activity.js";
-import { authRouter } from "@/routes/platform/auth.js";
-import { advancementRouter } from "@/routes/character/advancement.js";
-import { arcsRouter } from "@/routes/campaign/arcs.js";
-import { campaignItemsRouter } from "@/routes/campaign/campaign-items.js";
-import { campaignsRouter } from "@/routes/campaign/campaigns.js";
-import { classRouter } from "@/routes/character/class.js";
-import { charactersRouter } from "@/routes/character/characters.js";
-import { conditionsRouter } from "@/routes/character/conditions.js";
-import { entitiesRouter } from "@/routes/campaign/entities.js";
-import { sessionsRouter } from "@/routes/session/sessions.js";
-import { experienceRouter } from "@/routes/character/experience.js";
-import { featsRouter } from "@/routes/catalog/feats.js";
-import { healthRouter } from "@/routes/platform/health.js";
-import { hitPointsRouter } from "@/routes/character/hitpoints.js";
-import { inventoryRouter } from "@/routes/character/inventory.js";
-import { itemsRouter } from "@/routes/catalog/items.js";
-import { journalRouter } from "@/routes/session/journal.js";
-import { levelUpRouter } from "@/routes/character/level-up.js";
-import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
-import { maneuversRouter } from "@/routes/character/maneuvers.js";
-import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
-import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
-import { referenceRouter } from "@/routes/catalog/reference.js";
-import { resourcesRouter } from "@/routes/character/resources.js";
-import { spellsRouter } from "@/routes/catalog/spells.js";
-import { spellcastingRouter } from "@/routes/character/spellcasting.js";
+import { routeManifest } from "@/routes/manifest.js";
 
 // CORS origins are env-driven so the API can be deployed anywhere without a
 // code change. `CORS_ORIGIN` is a comma-separated allowlist
@@ -79,54 +51,23 @@ export function createApp() {
   app.use(globalRateLimiter);
   app.use(creationRateLimiter);
 
-  // Public allowlist: health + the auth mechanism (OAuth sign-in + session)
-  // are mounted BEFORE requireAuth so they stay reachable without a session.
-  app.use("/api", healthRouter);
-  app.use("/api", authRouter);
+  // Mounted in two passes per RouteMount.scope (see routes/manifest.ts): every
+  // public entry, then the gate, then every authed entry. Array order is
+  // registration order and is preserved within each pass — see the manifest's
+  // ordering comment for why that matters.
+  for (const { router, mount, scope } of routeManifest) {
+    if (scope !== "public") continue;
+    for (const mountPath of Array.isArray(mount) ? mount : [mount]) app.use(mountPath, router);
+  }
 
   // The gate: every router mounted past this point requires a valid session.
   // An unauthenticated request is 401'd here and never reaches them.
   app.use("/api", requireAuth);
 
-  app.use("/api", charactersRouter);
-
-  // Catalog / reference routers own top-level collection paths.
-  app.use("/api", referenceRouter);
-  app.use("/api", itemsRouter);
-  app.use("/api", spellsRouter);
-  app.use("/api", featsRouter);
-
-  // Character-scoped routers own their sub-path under /characters/:id and read
-  // :id via mergeParams (see each Router({ mergeParams: true })).
-  app.use("/api/characters/:id/hp", hitPointsRouter);
-  app.use("/api/characters/:id/inventory", inventoryRouter);
-  app.use("/api/characters/:id/experience", experienceRouter);
-  app.use("/api/characters/:id/spellcasting", spellcastingRouter);
-  app.use("/api/characters/:id/resources", resourcesRouter);
-  app.use("/api/characters/:id/conditions", conditionsRouter);
-  app.use("/api/characters/:id/class", classRouter);
-  app.use("/api/characters/:id/channel-divinity", channelDivinityRouter);
-  app.use("/api/characters/:id/advancement", advancementRouter);
-  app.use("/api/characters/:id/level-up", levelUpRouter);
-  app.use("/api/characters/:id/actions", actionsRouter);
-  // One endpoint for every automated class/subclass ability; the feature is
-  // chosen by URL key out of ABILITY_REGISTRY rather than by its own mount (#1275).
-  app.use("/api/characters/:id/abilities", abilitiesRouter);
-  // activity owns two sub-paths (/activity, /events/:batchId/revert), so it
-  // mounts on the character root rather than a single leaf.
-  app.use("/api/characters/:id", activityRouter);
-
-  // Catalog pickers for abilities whose transactions live on abilitiesRouter (#1275).
-  app.use("/api/maneuvers", maneuversRouter);
-  app.use("/api/shadow-arts", shadowArtsRouter);
-  app.use("/api/subclass-choices", subclassChoicesRouter);
-
-  app.use("/api", sessionsRouter);
-  app.use("/api", journalRouter);
-  app.use("/api", campaignsRouter);
-  app.use("/api", entitiesRouter);
-  app.use("/api", campaignItemsRouter);
-  app.use("/api", arcsRouter);
+  for (const { router, mount, scope } of routeManifest) {
+    if (scope !== "authed") continue;
+    for (const mountPath of Array.isArray(mount) ? mount : [mount]) app.use(mountPath, router);
+  }
 
   // Optional single-origin mode: when SERVE_STATIC_DIR points at a built SPA,
   // serve it from this same server so the frontend and API share one origin

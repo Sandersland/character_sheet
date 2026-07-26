@@ -2,7 +2,7 @@
 
 Read this when you need the cross-cutting data patterns (catalog+snapshot, JSON columns, audit log, transaction pattern) or the auth/ownership model. For inventories of what exists, read the code — it is the source of truth:
 
-- **Routers:** `backend/src/app.ts` mounts. Catalog/plain-REST routers mount at `/api`; character-scoped mutation routers mount on their owned sub-path under `/api/characters/:id` via `Router({ mergeParams: true })`.
+- **Routers:** registered in `backend/src/routes/manifest.ts` (`{ router, mount, scope }`), mounted by `app.ts`. Catalog/plain-REST routers mount at `/api`; character-scoped mutation routers mount on their owned sub-path under `/api/characters/:id` via `Router({ mergeParams: true })`.
 - **Domain logic:** `ls backend/src/lib/` — domain folders (`auth`, `activity`, `srd`, `rules`, `classes`, `leveling`, `spellcasting`, `combat`, `inventory`, `character`, `session`, `campaign`, `core`, `http`).
 - **Frontend routes:** `frontend/src/App.tsx`.
 - **Schema:** `backend/prisma/schema.prisma` — model comments carry the per-model reasoning.
