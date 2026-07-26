@@ -1,17 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 
 import MobileQuickBar from "@/features/character-meta/MobileQuickBar";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
-const character = { initiativeBonus: 2, speed: 30, proficiencyBonus: 3 } as Character;
+const character = { id: "c1", initiativeBonus: 2, speed: 30, proficiencyBonus: 3 } as Character;
 
 function renderBar() {
-  return render(
+  return renderWithCharacter(
     <RollProvider>
-      <MobileQuickBar character={character} />
+      <MobileQuickBar />
     </RollProvider>,
+    character,
   );
 }
 

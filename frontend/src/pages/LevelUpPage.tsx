@@ -7,6 +7,7 @@ import { Navigate, useParams } from "react-router-dom";
 import Spinner from "@/components/ui/Spinner";
 import CharacterLoadError from "@/features/character-meta/CharacterLoadError";
 import LevelUpCeremony from "@/features/level-up/LevelUpCeremony";
+import { CurrentCharacterProvider } from "@/hooks/CurrentCharacterProvider";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { levelUpPageState, type LevelUpPageState } from "@/lib/levelUpPageState";
@@ -25,12 +26,16 @@ const FALLBACK_VIEWS: Record<Exclude<LevelUpPageState["kind"], "ready">, (ctx: F
 
 export default function LevelUpPage() {
   const { id } = useParams();
-  const { character, error, setCharacter } = useCharacter(id);
+  const { character, error } = useCharacter(id);
   const state: LevelUpPageState = error ? { kind: "error" } : levelUpPageState(character);
   const showSpinner = useDelayedFlag(state.kind === "loading");
 
   if (state.kind === "ready") {
-    return <LevelUpCeremony character={state.character} onCharacterChange={setCharacter} />;
+    return (
+      <CurrentCharacterProvider id={state.character.id}>
+        <LevelUpCeremony />
+      </CurrentCharacterProvider>
+    );
   }
   return FALLBACK_VIEWS[state.kind]({ characterId: id, showSpinner });
 }

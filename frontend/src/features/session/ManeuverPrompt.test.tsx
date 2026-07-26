@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import { castManeuverTransaction } from "@/api/client";
 import type { Character } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
@@ -43,15 +44,15 @@ describe("ManeuverPrompt — die folds into the total", () => {
   it("folds the server-rolled die into the attack total for an attackRoll maneuver", async () => {
     const user = userEvent.setup();
     const onRollsUpdated = vi.fn();
-    render(
+    const character = makeCharacter();
+    renderWithCharacter(
       <ManeuverPrompt
-        character={makeCharacter()}
         section="attack"
         lastAttackRoll={roll(14)}
         lastDamageRoll={null}
         onRollsUpdated={onRollsUpdated}
-        onUpdate={vi.fn()}
       />,
+      character,
     );
 
     await user.click(screen.getByRole("button", { name: /Precision Attack/ }));
@@ -68,15 +69,15 @@ describe("ManeuverPrompt — die folds into the total", () => {
   it("folds the server-rolled die into the damage total for a damageRoll maneuver", async () => {
     const user = userEvent.setup();
     const onRollsUpdated = vi.fn();
-    render(
+    const character = makeCharacter();
+    renderWithCharacter(
       <ManeuverPrompt
-        character={makeCharacter()}
         section="damage"
         lastAttackRoll={null}
         lastDamageRoll={roll(9)}
         onRollsUpdated={onRollsUpdated}
-        onUpdate={vi.fn()}
       />,
+      character,
     );
 
     await user.click(screen.getByRole("button", { name: /Trip Attack/ }));
@@ -87,15 +88,15 @@ describe("ManeuverPrompt — die folds into the total", () => {
   });
 
   it("renders nothing before any roll is made", () => {
-    const { container } = render(
+    const character = makeCharacter();
+    const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={makeCharacter()}
         section="attack"
         lastAttackRoll={null}
         lastDamageRoll={null}
         onRollsUpdated={vi.fn()}
-        onUpdate={vi.fn()}
       />,
+      character,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -106,15 +107,15 @@ describe("ManeuverPrompt — die folds into the total", () => {
 // hosts section="damage".
 describe("ManeuverPrompt — per-card section hosting (#809)", () => {
   function renderSection(section: "attack" | "damage") {
-    return render(
+    const character = makeCharacter();
+    return renderWithCharacter(
       <ManeuverPrompt
-        character={makeCharacter()}
         section={section}
         lastAttackRoll={roll(14)}
         lastDamageRoll={roll(9)}
         onRollsUpdated={vi.fn()}
-        onUpdate={vi.fn()}
       />,
+      character,
     );
   }
 
@@ -135,29 +136,29 @@ describe("ManeuverPrompt — per-card section hosting (#809)", () => {
   });
 
   it("section=attack stays empty when only a damage roll exists (no to-hit yet)", () => {
-    const { container } = render(
+    const character = makeCharacter();
+    const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={makeCharacter()}
         section="attack"
         lastAttackRoll={null}
         lastDamageRoll={roll(9)}
         onRollsUpdated={vi.fn()}
-        onUpdate={vi.fn()}
       />,
+      character,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("section=damage stays empty when only an attack roll exists (no damage yet)", () => {
-    const { container } = render(
+    const character = makeCharacter();
+    const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={makeCharacter()}
         section="damage"
         lastAttackRoll={roll(14)}
         lastDamageRoll={null}
         onRollsUpdated={vi.fn()}
-        onUpdate={vi.fn()}
       />,
+      character,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -188,15 +189,14 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
     damage: number | null,
   ) {
     const onRollsUpdated = vi.fn();
-    const { container } = render(
+    const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section={section}
         lastAttackRoll={attack === null ? null : roll(attack)}
         lastDamageRoll={damage === null ? null : roll(damage)}
         onRollsUpdated={onRollsUpdated}
-        onUpdate={vi.fn()}
       />,
+      character,
     );
     return { container, onRollsUpdated };
   }

@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InventoryList from "@/features/inventory/InventoryList";
 import { applyInventoryTransactions, updateCharacter } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Currency, InventoryItem } from "@/types/character";
 
 // useIsBelowMd reads matchMedia; the setup stub reports matches:false (mobile).
@@ -74,29 +77,45 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// InventoryList reads useCurrentCharacter() directly (#1284), so every render
+// seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
+// rerender writes the new character straight into the cache — the same
+// mechanism a mutation's onSuccess uses in production — since the component
+// no longer has a prop to receive a fresh value through.
+function render(character: Character) {
+  const result = renderWithCharacter(<InventoryList />, character);
+  return {
+    ...result,
+    rerender: (next: Character) => {
+      getQueryClient().setQueryData(characterKeys.detail(character.id), next);
+      result.rerender(<InventoryList />);
+    },
+  };
+}
+
 describe("InventoryList carrying capacity", () => {
   it("renders carried weight against capacity (STR × 15)", () => {
     // STR 10 → capacity 150; 65 lb carried.
-    render(<InventoryList character={makeCharacter(10, [makeItem()])} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, [makeItem()]));
     expect(screen.getByText(/65\.0 \/ 150 lb/)).toBeInTheDocument();
   });
 
   it("recomputes capacity from the live STR score", () => {
     // STR 8 → capacity 120.
-    render(<InventoryList character={makeCharacter(8, [makeItem()])} onUpdate={vi.fn()} />);
+    render(makeCharacter(8, [makeItem()]));
     expect(screen.getByText(/65\.0 \/ 120 lb/)).toBeInTheDocument();
   });
 
   it("does not flag over capacity when within the limit", () => {
     // STR 8 → capacity 120; 65 lb carried (under).
-    render(<InventoryList character={makeCharacter(8, [makeItem()])} onUpdate={vi.fn()} />);
+    render(makeCharacter(8, [makeItem()]));
     expect(screen.queryByText(/over capacity/i)).not.toBeInTheDocument();
   });
 
   it("flags over capacity when carried weight exceeds the limit", () => {
     // STR 8 → capacity 120; two 65 lb items = 130 lb carried (over).
     const inventory = [makeItem(), makeItem({ id: "item-2" })];
-    render(<InventoryList character={makeCharacter(8, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(8, inventory));
     expect(screen.getByText(/130\.0 \/ 120 lb/)).toBeInTheDocument();
     expect(screen.getByText(/over capacity/i)).toBeInTheDocument();
   });
@@ -104,29 +123,19 @@ describe("InventoryList carrying capacity", () => {
   it("does not flag when carried weight exactly equals capacity", () => {
     // STR 8 → capacity 120; a single 120 lb item = exactly at the limit.
     // 5e lets you carry UP TO STR × 15, so the boundary must use `>`, not `>=`.
-    render(
-      <InventoryList
-        character={makeCharacter(8, [makeItem({ weight: 120 })])}
-        onUpdate={vi.fn()}
-      />
-    );
+        render(makeCharacter(8, [makeItem({ weight: 120 })]));
     expect(screen.getByText(/120\.0 \/ 120 lb/)).toBeInTheDocument();
     expect(screen.queryByText(/over capacity/i)).not.toBeInTheDocument();
   });
 
   it("renders an encumbrance meter alongside the numeric text", () => {
-    render(<InventoryList character={makeCharacter(10, [makeItem()])} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, [makeItem()]));
     expect(screen.getByRole("meter")).toBeInTheDocument();
   });
 
   it("shows the meter for coin weight alone when over capacity (no items)", () => {
     // STR 10 → capacity 150; 10,000 gp = 200 lb of coins, no items.
-    render(
-      <InventoryList
-        character={makeCharacter(10, [], { cp: 0, sp: 0, gp: 10000, pp: 0 })}
-        onUpdate={vi.fn()}
-      />
-    );
+        render(makeCharacter(10, [], { cp: 0, sp: 0, gp: 10000, pp: 0 }));
     expect(screen.getByRole("meter")).toBeInTheDocument();
     expect(screen.getByText(/200\.0 \/ 150 lb/)).toBeInTheDocument();
     expect(screen.getByText(/over capacity/i)).toBeInTheDocument();
@@ -134,12 +143,7 @@ describe("InventoryList carrying capacity", () => {
 
   it("shows the meter for coin weight alone even when under capacity (no items)", () => {
     // STR 10 → capacity 150; 500 gp = 10 lb of coins, no items.
-    render(
-      <InventoryList
-        character={makeCharacter(10, [], { cp: 0, sp: 0, gp: 500, pp: 0 })}
-        onUpdate={vi.fn()}
-      />
-    );
+        render(makeCharacter(10, [], { cp: 0, sp: 0, gp: 500, pp: 0 }));
     expect(screen.getByRole("meter")).toBeInTheDocument();
     expect(screen.getByText(/10\.0 \/ 150 lb/)).toBeInTheDocument();
   });
@@ -151,7 +155,7 @@ describe("InventoryList sectioning", () => {
       makeItem({ id: "w1", name: "Longsword", category: "weapon", weight: 3 }),
       makeItem({ id: "g1", name: "Torch", category: "gear", weight: 1, quantity: 2 }),
     ];
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     // Mobile headers carry the caps label + a right-aligned count · weight payoff.
     const weapons = screen.getByRole("heading", { level: 4, name: /Weapons/ });
     expect(weapons).toHaveTextContent(/Weapons/);
@@ -167,7 +171,7 @@ describe("InventoryList sectioning", () => {
       makeItem({ id: "w1", name: "Axe", category: "weapon", weight: 4 }),
       makeItem({ id: "a1", name: "Shield", category: "armor", weight: 6 }),
     ];
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     const labels = screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
     expect(labels[0]).toMatch(/^Weapons/);
     expect(labels[1]).toMatch(/^Armor/);
@@ -180,25 +184,20 @@ describe("InventoryList sectioning", () => {
       makeItem({ id: "w1", name: "Club", category: "weapon", equipped: false }),
       makeItem({ id: "w2", name: "Longsword", category: "weapon", equipped: true }),
     ];
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     const names = screen.getAllByRole("listitem").map((li) => li.querySelector("p")?.textContent);
     expect(names).toEqual(["Longsword", "Club"]);
   });
 
   it("renders a decorative icon inside each category header", () => {
     const inventory = [makeItem({ id: "w1", name: "Axe", category: "weapon", weight: 4 })];
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     const header = screen.getByRole("heading", { level: 4 });
     expect(header.querySelector("svg")).toBeInTheDocument();
   });
 
   it("hides categories with no items", () => {
-    render(
-      <InventoryList
-        character={makeCharacter(15, [makeItem({ category: "weapon", name: "Axe" })])}
-        onUpdate={vi.fn()}
-      />
-    );
+        render(makeCharacter(15, [makeItem({ category: "weapon", name: "Axe" })]));
     const labels = screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
     expect(labels).toHaveLength(1);
     expect(labels[0]).toMatch(/^Weapons/);
@@ -208,7 +207,7 @@ describe("InventoryList sectioning", () => {
 describe("InventoryList empty state", () => {
   it("desktop: shows an empty-pack message + add CTA and no sections or meter", () => {
     forceDesktop();
-    render(<InventoryList character={makeCharacter(10, [])} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, []));
     expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
     // Two "+ Add item" affordances when empty: the header button + the empty-state CTA.
     expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(2);
@@ -217,7 +216,7 @@ describe("InventoryList empty state", () => {
   });
 
   it("mobile: shows only the empty-state CTA (no header add, no FAB) and no meter", () => {
-    render(<InventoryList character={makeCharacter(10, [])} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, []));
     expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
     // Header actions and the FAB drop out when empty — only the CTA remains.
     expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(1);
@@ -229,14 +228,11 @@ describe("InventoryList empty state", () => {
   it("falls back to the empty state (not the doll) when the last item is removed on the Worn tab", async () => {
     const user = userEvent.setup();
     const { rerender } = render(
-      <InventoryList
-        character={makeCharacter(10, [makeItem({ id: "w1", name: "Longsword", category: "weapon" })])}
-        onUpdate={vi.fn()}
-      />,
+      makeCharacter(10, [makeItem({ id: "w1", name: "Longsword", category: "weapon" })]),
     );
     await user.click(screen.getByRole("radio", { name: "Worn" }));
     // Remove the last item: parent re-renders with an empty inventory while `view` stays "worn".
-    rerender(<InventoryList character={makeCharacter(10, [])} onUpdate={vi.fn()} />);
+    rerender(makeCharacter(10, []));
     expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "+ Add item" }).length).toBeGreaterThan(0);
   });
@@ -252,7 +248,7 @@ describe("InventoryList search and filter", () => {
 
   it("filters rows by a case-insensitive name substring", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.type(screen.getByRole("searchbox", { name: /search items/i }), "SWORD");
     expect(screen.getByText("Longsword")).toBeInTheDocument();
     expect(screen.queryByText("Dagger")).toBeNull();
@@ -261,7 +257,7 @@ describe("InventoryList search and filter", () => {
 
   it("filters by a category chip", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Armor" }));
     expect(screen.getByText("Shield")).toBeInTheDocument();
     expect(screen.queryByText("Longsword")).toBeNull();
@@ -270,7 +266,7 @@ describe("InventoryList search and filter", () => {
 
   it("filters to equipped items via the Equipped chip", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     // Scope to the filter group — an equipped row's toggle is also named "Equipped".
     const filters = screen.getByRole("group", { name: /filter items/i });
     await user.click(within(filters).getByRole("button", { name: "Equipped" }));
@@ -280,7 +276,7 @@ describe("InventoryList search and filter", () => {
 
   it("composes the search within the active filter", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Weapons" }));
     await user.type(screen.getByRole("searchbox"), "dag");
     expect(screen.getByText("Dagger")).toBeInTheDocument();
@@ -290,7 +286,7 @@ describe("InventoryList search and filter", () => {
 
   it("shows a no-match state when nothing matches", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.type(screen.getByRole("searchbox"), "zzz");
     expect(screen.getByText(/no items match/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
@@ -301,7 +297,7 @@ describe("InventoryList purse", () => {
   it("shows the purse display-first and reveals inputs on Edit purse", async () => {
     const user = userEvent.setup();
     const character = makeCharacter(10, [makeItem()], { cp: 8, sp: 5, gp: 12, pp: 0 });
-    render(<InventoryList character={character} onUpdate={vi.fn()} />);
+    render(character);
     expect(screen.getByText("12 gp 5 sp 8 cp")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Edit purse" }));
@@ -311,7 +307,7 @@ describe("InventoryList purse", () => {
   it("saves the edited currency via updateCharacter", async () => {
     const user = userEvent.setup();
     const character = makeCharacter(10, [makeItem()], { cp: 0, sp: 0, gp: 5, pp: 0 });
-    render(<InventoryList character={character} onUpdate={vi.fn()} />);
+    render(character);
     await user.click(screen.getByRole("button", { name: "Edit purse" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(updateCharacter).toHaveBeenCalledWith("char-1", {
@@ -331,7 +327,7 @@ describe("InventoryList multi-select sell", () => {
 
   it("enters select mode: rows show checkboxes and per-row actions hide", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     expect(screen.getByRole("checkbox", { name: "Select Longsword" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Equip" })).toBeNull();
@@ -343,7 +339,7 @@ describe("InventoryList multi-select sell", () => {
     const stack = [
       makeItem({ id: "w1", name: "Longsword", category: "weapon", quantity: 3, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
     ];
-    render(<InventoryList character={makeCharacter(15, stack)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, stack));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
@@ -361,7 +357,7 @@ describe("InventoryList multi-select sell", () => {
     const stack = [
       makeItem({ id: "w1", name: "Longsword", category: "weapon", quantity: 3, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
     ];
-    render(<InventoryList character={makeCharacter(15, stack)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, stack));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
@@ -375,7 +371,7 @@ describe("InventoryList multi-select sell", () => {
   it("splits an edited total evenly across the selected lines", async () => {
     const user = userEvent.setup();
     // Longsword half = 5 gp, Shield half = 2.5 gp → auto total 7.5 gp.
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
@@ -396,7 +392,7 @@ describe("InventoryList multi-select sell", () => {
 
   it("pins a per-line price and splits the remaining total across the rest", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
@@ -420,7 +416,7 @@ describe("InventoryList multi-select sell", () => {
 
   it("treats a cleared custom price as un-pinned, not a 0 gp sale", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
@@ -443,7 +439,7 @@ describe("InventoryList multi-select sell", () => {
   it("treats a cleared total as auto, not a 0 gp sale", async () => {
     const user = userEvent.setup();
     // Longsword half = 5 gp, Shield half = 2.5 gp → auto total 7.5 gp.
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
@@ -465,7 +461,7 @@ describe("InventoryList multi-select sell", () => {
 
   it("opens pricing help in an overlay (no layout reflow) and closes it", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
@@ -482,7 +478,7 @@ describe("InventoryList multi-select sell", () => {
 
   it("Cancel exits select mode", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(15, inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("button", { name: "Sell items" })).toBeInTheDocument();
@@ -496,13 +492,13 @@ describe("InventoryList mobile (#1029)", () => {
   ];
 
   it("renders the slim encumbrance strip with the Load label", () => {
-    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, inventory));
     expect(screen.getByText("Load")).toBeInTheDocument();
     expect(screen.getByText(/65\.0 \/ 150 lb/)).toBeInTheDocument();
   });
 
   it("drops the header Sell/Add actions in favor of a FAB", () => {
-    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, inventory));
     expect(screen.queryByRole("button", { name: "Sell items" })).toBeNull();
     expect(screen.queryByRole("button", { name: "+ Add item" })).toBeNull();
     expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
@@ -510,14 +506,14 @@ describe("InventoryList mobile (#1029)", () => {
 
   it("the FAB opens the add-item panel", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, inventory));
     await user.click(screen.getByRole("button", { name: "Add item" }));
     expect(screen.getByLabelText("Item")).toBeInTheDocument();
   });
 
   it("tapping a row opens its detail sheet with Equip, Sell, and Drop", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, inventory));
     await user.click(screen.getByRole("button", { name: "Longsword details" }));
     const sheet = screen.getByRole("dialog", { name: "Longsword" });
     expect(within(sheet).getByRole("button", { name: "Equip" })).toBeInTheDocument();
@@ -527,7 +523,7 @@ describe("InventoryList mobile (#1029)", () => {
 
   it("Drop from the sheet is a two-step confirm that submits a remove op", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, inventory));
     await user.click(screen.getByRole("button", { name: "Longsword details" }));
     await user.click(screen.getByRole("button", { name: "Drop" }));
     expect(applyInventoryTransactions).not.toHaveBeenCalled();
@@ -539,7 +535,7 @@ describe("InventoryList mobile (#1029)", () => {
 
   it("Equip from the sheet submits a setEquipped op", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    render(makeCharacter(10, inventory));
     await user.click(screen.getByRole("button", { name: "Longsword details" }));
     await user.click(screen.getByRole("button", { name: "Equip" }));
     expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [

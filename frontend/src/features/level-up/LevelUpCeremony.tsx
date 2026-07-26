@@ -19,9 +19,10 @@ import {
   type LevelUpCeremony as Ceremony,
 } from "@/features/level-up/useLevelUpCeremony";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { stepKey, stepLabel } from "@/lib/levelUpSteps";
-import type { Character, LevelUpStep, LevelUpStepKind, LevelUpTarget } from "@/types/character";
+import type { LevelUpStep, LevelUpStepKind, LevelUpTarget } from "@/types/character";
 
 // Step-body slot: #887–#891 register their real bodies per kind here; anything
 // unregistered renders the placeholder.
@@ -117,18 +118,17 @@ function ceremonyPhase(c: Ceremony): CeremonyPhase {
 }
 
 function ReadyStep({
-  character,
   c,
   plan,
   currentStep,
   target,
 }: {
-  character: Character;
   c: Ceremony;
   plan: NonNullable<Ceremony["plan"]>;
   currentStep: LevelUpStep;
   target: LevelUpTarget;
 }) {
+  const { character } = useCurrentCharacter();
   return (
     <CeremonyCard className="flex min-h-0 flex-1 flex-col px-5 py-7 sm:px-10">
       <div className="shrink-0">
@@ -166,15 +166,9 @@ function ReadyStep({
   );
 }
 
-interface Props {
-  character: Character;
-  /** Refreshes the sheet's character after a "level up again" loop (#1170) — the
-   *  next iteration's steps (HP max, dropped die, etc.) must see the applied level. */
-  onCharacterChange?: (updated: Character) => void;
-}
-
-export default function LevelUpCeremony({ character, onCharacterChange }: Props) {
-  const c = useLevelUpCeremony(character, onCharacterChange);
+export default function LevelUpCeremony() {
+  const { character } = useCurrentCharacter();
+  const c = useLevelUpCeremony(character);
   const showSpinner = useDelayedFlag(c.plan === null && !c.planError);
   const phase = ceremonyPhase(c);
 
@@ -216,7 +210,7 @@ export default function LevelUpCeremony({ character, onCharacterChange }: Props)
       <p className="mb-3 shrink-0 text-center text-[11px] font-bold uppercase tracking-widest text-gold-400">
         Step {c.stepIndex + 1} of {c.steps.length}
       </p>
-      <ReadyStep character={character} c={c} plan={phase.plan} currentStep={phase.currentStep} target={phase.target} />
+      <ReadyStep c={c} plan={phase.plan} currentStep={phase.currentStep} target={phase.target} />
     </CeremonyStage>
   );
 }

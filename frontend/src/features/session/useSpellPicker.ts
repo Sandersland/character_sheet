@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useRoll } from "@/features/dice/RollContext";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { applySpellcastingTransactions } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import {
   buildCastSettle,
   castAnnounceLine,
@@ -88,7 +89,6 @@ export type { CastSettleView } from "@/lib/spellCast";
 export interface UseSpellPickerOptions {
   character: Character;
   sessionId: string;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   slot: EconomySlot;
   slotAvailable: boolean;
@@ -120,7 +120,6 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
   const {
     character,
     sessionId,
-    onUpdate,
     onLogChanged,
     slot,
     slotAvailable,
@@ -135,6 +134,17 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const spellcasting = character.spellcasting!;
   const { slots = [], arcana = [], spells = [], spellSaveDC, spellAttackBonus } = spellcasting;
+
+  // castMutation.error is deliberately never read: a picker casts one of many
+  // rows, so a failure has to land on the row that caused it (via patchRow),
+  // not on a hook-wide field that would blame whichever spell rendered last.
+  const castMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: Parameters<typeof applySpellcastingTransactions>[1]) =>
+      applySpellcastingTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Something went wrong.",
+  });
 
   const [rowStates, setRowStates] = useState<Record<string, SpellRowState>>({});
   const [lastCast, setLastCast] = useState<CastSettleView | null>(null);
@@ -292,12 +302,11 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     const op = castSpellOp(spell, effectiveSlot, rollTotal, apply);
 
     try {
-      const updated = await applySpellcastingTransactions(character.id, [op]);
+      await castMutation.mutateAsync([op]);
       // Attack spells committed the slot on the Attack press; others commit on cast.
       if (spell.attackType !== "attack") {
         onCommitSlot(spell.level);
       }
-      onUpdate(updated);
       patchRow(spell.id, { casting: false, attackRolled: false });
       settleCast(spell, effectiveSlot, castSpec, rollTotal, keptDice);
     } catch (err) {

@@ -11,16 +11,14 @@
  */
 
 import TurnHub from "@/features/session/TurnHub";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { partyHealAllies } from "@/lib/spellMeta";
 import type { TurnStateView } from "@/features/session/useTurnState";
-import type { Character, Session } from "@/types/character";
+import type { Session } from "@/types/character";
 
 interface LiveTurnBodyProps {
-  character: Character;
   session: Session;
   turnState: TurnStateView;
-  /** Character update handler (also bumps the session-log counter). */
-  onUpdate: (c: Character) => void;
   /** Bump the session-log refresh after a combat log event. */
   onLogChanged: () => void;
   /** Gate the turn hub's overlay pickers (#960 mounted-but-hidden). */
@@ -30,20 +28,17 @@ interface LiveTurnBodyProps {
 }
 
 export default function LiveTurnBody({
-  character,
   session,
   turnState,
-  onUpdate,
   onLogChanged,
   overlaysActive,
   onOpenLog,
 }: LiveTurnBodyProps) {
+  const { character } = useCurrentCharacter();
   return (
     <TurnHub
-      character={character}
       sessionId={session.id}
       turnState={turnState}
-      onUpdate={onUpdate}
       onLogChanged={onLogChanged}
       allies={partyHealAllies(session, character.id)}
       overlaysActive={overlaysActive}

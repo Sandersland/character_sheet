@@ -6,7 +6,7 @@ import {
   fetchMe,
   logout,
   setUnauthorizedHandler,
-} from "./client";
+} from "@/api/client";
 
 describe("auth client", () => {
   afterEach(() => {

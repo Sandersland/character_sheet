@@ -123,7 +123,7 @@ async function findDoorwayButton(name: RegExp) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockUseCharacter.mockReturnValue({ character: makeCharacter({}), error: null, setCharacter: vi.fn() } as never);
+  mockUseCharacter.mockReturnValue({ character: makeCharacter({}), error: null } as never);
   mockFetchDoorway.mockResolvedValue(doorwayState({ campaignId: null, canStart: false }));
 });
 
@@ -140,7 +140,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: undefined }),
       error: null,
-      setCharacter: vi.fn(),
     } as never);
     mockFetchDoorway.mockResolvedValue(doorwayState({ campaignId: null, canStart: false }));
 
@@ -159,7 +158,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
-      setCharacter: vi.fn(),
     } as never);
     mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
 
@@ -171,7 +169,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
-      setCharacter: vi.fn(),
     } as never);
     mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "liveJoined", session: liveSession({ joined: true }) }));
 
@@ -188,7 +185,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
-      setCharacter: vi.fn(),
     } as never);
     mockFetchDoorway.mockResolvedValue(
       doorwayState({ kind: "liveNotJoined", session: liveSession({ joined: false }) }),
@@ -206,7 +202,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
-      setCharacter: vi.fn(),
     } as never);
     mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
     mockStart.mockResolvedValue({ session: { id: "s1", campaignId: "camp1", status: "active", startedAt: "x" }, character: makeCharacter({ campaignId: "camp1" }) });
@@ -223,7 +218,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
-      setCharacter: vi.fn(),
     } as never);
     mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
     mockStart.mockRejectedValue(new Error("Character already in a campaign"));
@@ -240,7 +234,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
-      setCharacter: vi.fn(),
     } as never);
     mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "none", canStart: true }));
 

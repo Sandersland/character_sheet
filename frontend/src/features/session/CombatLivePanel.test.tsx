@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CombatLivePanel from "@/features/session/CombatLivePanel";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import { useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { fetchSession } from "@/api/client";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Session } from "@/types/character";
 
 // Mock the turn engine + session log so this targets CombatLivePanel's layout
@@ -89,8 +90,10 @@ afterEach(() => {
 });
 
 function renderPanel(active = true) {
-  return render(
-    <CombatLivePanel character={makeCharacter()} session={session} onUpdate={vi.fn()} active={active} />,
+  const character = makeCharacter();
+  return renderWithCharacter(
+    <CombatLivePanel session={session} active={active} />,
+    character,
   );
 }
 

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 
 import ActivityModal from "@/features/character-meta/ActivityModal";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
-import type { CharacterEvent, Session } from "@/types/character";
+import type { Character, CharacterEvent, Session } from "@/types/character";
 
 // Mock the API client — ActivityModal is an orchestrator over the activity
 // timeline + session list + revert calls.
@@ -38,9 +40,15 @@ beforeEach(() => {
   vi.mocked(client.fetchSessions).mockResolvedValue(SESSIONS);
 });
 
+// ActivityModal reads useCurrentCharacter(), so every render seeds the cache
+// and mounts CurrentCharacterProvider via renderWithCharacter.
+function render(ui: ReactElement) {
+  return renderWithCharacter(ui, { id: "char-1" } as unknown as Character);
+}
+
 describe("ActivityModal filtering", () => {
   it("loads unfiltered on mount (only includeFields)", async () => {
-    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
     expect(client.fetchActivity).toHaveBeenNthCalledWith(
       1,
@@ -52,7 +60,7 @@ describe("ActivityModal filtering", () => {
 
   it("refetches with category + type when Inventory category and a type chip are chosen", async () => {
     const user = userEvent.setup();
-    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Category" }), "inventory");
@@ -71,7 +79,7 @@ describe("ActivityModal filtering", () => {
 
   it("refetches with sessionId when a session is selected", async () => {
     const user = userEvent.setup();
-    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
 
     // Wait for the session picker (populated async) to appear, then select.
@@ -92,7 +100,7 @@ describe("ActivityModal filtering", () => {
       makeEvent({ id: "ev-today", batchId: "b-today", createdAt: new Date().toISOString() }),
       makeEvent({ id: "ev-old", batchId: "b-old", summary: "Bought Longsword", type: "bought", createdAt: "2020-01-15T10:00:00.000Z" }),
     ]);
-    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
 
     expect(await screen.findByText("Today")).toBeInTheDocument();
     expect(screen.getByText(/Jan 15, 2020/)).toBeInTheDocument();
@@ -100,7 +108,7 @@ describe("ActivityModal filtering", () => {
 
   it("passes the entityId prop through to fetchActivity", async () => {
     render(
-      <ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} entityId="item-42" />,
+      <ActivityModal characterId="char-1" onClose={vi.fn()} entityId="item-42" />,
     );
     await screen.findByText("Sold Shortsword ×1");
     expect(client.fetchActivity).toHaveBeenCalledWith(
@@ -112,7 +120,7 @@ describe("ActivityModal filtering", () => {
 
   it("aborts a superseded load when the filter changes again", async () => {
     const user = userEvent.setup();
-    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
 
     // The mount load's AbortSignal (3rd arg of the first call).
@@ -129,14 +137,14 @@ describe("ActivityModal filtering", () => {
 
 describe("ActivityModal undo eligibility", () => {
   it("shows Undo on the most-recent batch when unfiltered", async () => {
-    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
     expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
   });
 
   it("hides Undo while a category filter is active (server LIFO guard would 409)", async () => {
     const user = userEvent.setup();
-    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
     expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
 
@@ -149,7 +157,7 @@ describe("ActivityModal undo eligibility", () => {
 
   it("hides Undo when scoped to a single entity", async () => {
     render(
-      <ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} entityId="item-42" />,
+      <ActivityModal characterId="char-1" onClose={vi.fn()} entityId="item-42" />,
     );
     await screen.findByText("Sold Shortsword ×1");
     expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();

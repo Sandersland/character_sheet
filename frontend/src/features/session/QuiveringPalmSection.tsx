@@ -10,8 +10,8 @@
 
 import { useQuiveringPalmActions } from "@/features/session/useQuiveringPalmActions";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
-import type { Character } from "@/types/character";
 
 // Why Set/Trigger are disabled, in priority order — surfaced as their tooltip
 // (mirrors OpenHandTechniqueSection's riderBlockedReason). Pulled out of the
@@ -27,26 +27,22 @@ function triggerBlockedReason(active: boolean): string | undefined {
 }
 
 interface QuiveringPalmSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The bound hit row Set rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function QuiveringPalmSection({
-  character,
   turnState,
   currentRow,
-  onUpdate,
 }: QuiveringPalmSectionProps) {
+  const { character } = useCurrentCharacter();
   const { quiveringPalm } = character;
   const { setDisabled, triggerDisabled, message, error, handleSet, handleTrigger } = useQuiveringPalmActions(
     character,
     turnState,
     currentRow,
     quiveringPalm?.active ?? false,
-    onUpdate,
   );
 
   // Only a L17+ Warrior of the Open Hand has Quivering Palm.

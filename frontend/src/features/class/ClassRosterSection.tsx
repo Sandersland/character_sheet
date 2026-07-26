@@ -1,15 +1,16 @@
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { isMulticlass } from "@/lib/multiclass";
-import type { Character, ClassEntry } from "@/types/character";
+import type { ClassEntry } from "@/types/character";
 
 interface Props {
-  character: Character;
   rosterEntries: ClassEntry[];
 }
 
 // #1170: adding a class now happens via the level-up ceremony's class-choice
 // step (LevelUpBanner → /level-up), not an inline picker here — this section
 // is now just the roster readout.
-export default function ClassRosterSection({ character, rosterEntries }: Props) {
+export default function ClassRosterSection({ rosterEntries }: Props) {
+  const { character } = useCurrentCharacter();
   const multiclass = isMulticlass(character.classes);
 
   return (

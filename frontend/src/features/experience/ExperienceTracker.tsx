@@ -2,43 +2,40 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { applyExperienceOperations } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character, ExperienceOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
 import MeterBar from "@/components/ui/MeterBar";
-
-interface ExperienceTrackerProps {
-  character: Character;
-  onUpdate: (character: Character) => void;
-}
 
 type ApplyXp = (op: ExperienceOperation) => Promise<Character | null>;
 
 // One XP mutation with shared pending + error state; resolves to the updated
 // character (or null on failure) so callers can resync their input fields.
-function useExperienceActions(character: Character, onUpdate: (c: Character) => void) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
+// `error` stays a boolean here (not the mutation's message) — deliberate,
+// matching this hook's pre-#1283 contract; don't widen it to a string.
+function useExperienceActions(character: Character) {
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (op: ExperienceOperation) => applyExperienceOperations(character.id, [op]),
+    toCharacter: (c) => c,
+    fallbackMessage: "Couldn't save — try again.",
+  });
 
   const apply: ApplyXp = async (op) => {
-    setPending(true);
-    setError(false);
     try {
-      const updated = await applyExperienceOperations(character.id, [op]);
-      onUpdate(updated);
-      return updated;
+      return await mutation.mutateAsync(op);
     } catch {
-      setError(true);
       return null;
-    } finally {
-      setPending(false);
     }
   };
 
-  return { pending, error, apply };
+  return { pending: mutation.isPending, error: Boolean(mutation.error), apply };
 }
 
-export default function ExperienceTracker({ character, onUpdate }: ExperienceTrackerProps) {
-  const { pending, error, apply } = useExperienceActions(character, onUpdate);
+export default function ExperienceTracker() {
+  const { character } = useCurrentCharacter();
+  const { pending, error, apply } = useExperienceActions(character);
 
   return (
     <Card
@@ -50,7 +47,7 @@ export default function ExperienceTracker({ character, onUpdate }: ExperienceTra
       }
     >
       <div className="flex flex-col gap-3 p-4">
-        <ExperienceMeter character={character} />
+        <ExperienceMeter />
         <AwardXpForm pending={pending} apply={apply} />
         <SetExactTotalRow
           pending={pending}
@@ -67,7 +64,8 @@ export default function ExperienceTracker({ character, onUpdate }: ExperienceTra
   );
 }
 
-function ExperienceMeter({ character }: { character: Character }) {
+function ExperienceMeter() {
+  const { character } = useCurrentCharacter();
   const { experiencePoints, currentLevelThreshold, nextLevelThreshold, level } = character;
   const isMaxed = nextLevelThreshold === null;
   const span = isMaxed ? 1 : nextLevelThreshold - currentLevelThreshold;

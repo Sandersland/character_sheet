@@ -8,10 +8,10 @@ import { useState } from "react";
 import AttackOptionRow from "@/features/session/AttackOptionRow";
 import type { UseManeuverDieReturn } from "@/features/session/useManeuverDie";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character, ManeuverEntry } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import type { ManeuverEntry } from "@/types/character";
 
 interface AttackOptionSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   showManeuvers: boolean;
   attacksExhausted: boolean;
@@ -38,12 +38,12 @@ function attackOptionEnabled(
 }
 
 export default function AttackOptionSection({
-  character,
   turnState,
   showManeuvers,
   attacksExhausted,
   die,
 }: AttackOptionSectionProps) {
+  const { character } = useCurrentCharacter();
   const { pool, dieLabel, busy: dieBusy, spend } = die;
   const [messages, setMessages] = useState<Record<string, string>>({});
 

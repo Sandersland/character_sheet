@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import { applySpellcastingTransactions } from "@/api/client";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -23,36 +24,33 @@ beforeEach(() => {
 
 describe("TurnConcentrationBanner (#735)", () => {
   it("renders nothing when not concentrating", () => {
-    const { container } = render(
-      <TurnConcentrationBanner character={makeCharacter(null)} onUpdate={vi.fn()} onLogChanged={vi.fn()} />,
+    const character = makeCharacter(null);
+    const { container } = renderWithCharacter(
+      <TurnConcentrationBanner onLogChanged={vi.fn()} />,
+      character,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the concentrated spell name", () => {
-    render(
-      <TurnConcentrationBanner
-        character={makeCharacter({ entryId: "e1", spellName: "Bless" })}
-        onUpdate={vi.fn()}
-        onLogChanged={vi.fn()}
-      />,
+    const character = makeCharacter({ entryId: "e1", spellName: "Bless" });
+    renderWithCharacter(
+      <TurnConcentrationBanner onLogChanged={vi.fn()} />,
+      character,
     );
     expect(screen.getByText("Bless")).toBeInTheDocument();
   });
 
   it("Drop ends concentration through the spellcasting transaction endpoint", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
     const onLogChanged = vi.fn();
     const updated = makeCharacter(null);
     vi.mocked(applySpellcastingTransactions).mockResolvedValue(updated);
 
-    render(
-      <TurnConcentrationBanner
-        character={makeCharacter({ entryId: "e1", spellName: "Bless" })}
-        onUpdate={onUpdate}
-        onLogChanged={onLogChanged}
-      />,
+    const character = makeCharacter({ entryId: "e1", spellName: "Bless" });
+    renderWithCharacter(
+      <TurnConcentrationBanner onLogChanged={onLogChanged} />,
+      character,
     );
 
     await user.click(screen.getByRole("button", { name: /Drop concentration/i }));
@@ -62,7 +60,7 @@ describe("TurnConcentrationBanner (#735)", () => {
         { type: "dropConcentration" },
       ]),
     );
-    expect(onUpdate).toHaveBeenCalledWith(updated);
+    expect(cachedCharacter("char-1")).toEqual(updated);
     expect(onLogChanged).toHaveBeenCalled();
   });
 });

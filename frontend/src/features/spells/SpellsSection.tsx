@@ -11,9 +11,10 @@
 
 import { useState } from "react";
 
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { deriveSpellList, preparedBudget } from "@/lib/spellList";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
-import type { Character, Spell } from "@/types/character";
+import type { Spell } from "@/types/character";
 import AddSpellPanel from "@/features/spells/AddSpellPanel";
 import CastResultBanner from "@/features/spells/CastResultBanner";
 import SpellbookList from "@/features/spells/SpellbookList";
@@ -21,19 +22,16 @@ import SpellcastingOverview from "@/features/spells/SpellcastingOverview";
 import { useSpellcasting } from "@/features/spells/useSpellcasting";
 
 interface SpellsSectionProps {
-  character: Character;
-  onUpdate: (character: Character) => void;
   /** A live session is active — the Cast door defers to the Combat tab (#1162). */
   isLive?: boolean;
   onGoToCombat?: () => void;
 }
 
 export default function SpellsSection({
-  character,
-  onUpdate,
   isLive = false,
   onGoToCombat = () => {},
 }: SpellsSectionProps) {
+  const { character } = useCurrentCharacter();
   const spellcasting = character.spellcasting!;
   const { slots = [], spells = [] } = spellcasting;
   const concentratingOn = spellcasting.concentratingOn ?? null;
@@ -45,7 +43,7 @@ export default function SpellsSection({
     busy, error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
     handleCast, handlePrepare, handleForget, handleLearn, handleSwap,
-  } = useSpellcasting(character, onUpdate);
+  } = useSpellcasting(character);
 
   // The grimoire (prepare/swap/learn) is a distinct view reached from the record's
   // "Manage spellbook →" — not rendered alongside the record block.
@@ -112,7 +110,6 @@ export default function SpellsSection({
 
   return (
     <SpellcastingOverview
-      character={character}
       derived={derived}
       busy={busy}
       error={error}

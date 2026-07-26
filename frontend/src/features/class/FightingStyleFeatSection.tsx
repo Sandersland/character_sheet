@@ -8,10 +8,10 @@ import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
 import { useFeatCatalog } from "@/features/advancement/useFeatCatalog";
-import type { AdvancementEntry, CatalogFeat, Character, TakeFeatOperation } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import type { AdvancementEntry, CatalogFeat, TakeFeatOperation } from "@/types/character";
 
 interface Props {
-  character: Character;
   takenFeats: AdvancementEntry[];
   busy: boolean;
   onTake: (op: TakeFeatOperation) => void;
@@ -29,16 +29,15 @@ function TakenFeat({ entry }: { entry: AdvancementEntry }) {
 }
 
 function FeatPicker({
-  character,
   takenIds,
   busy,
   onTake,
 }: {
-  character: Character;
   takenIds: Set<string>;
   busy: boolean;
   onTake: (op: TakeFeatOperation) => void;
 }) {
+  const { character } = useCurrentCharacter();
   const [open, setOpen] = useState(false);
   // Fighting Style feats never appear in the ASI picker, so useFeatCatalog.filter
   // (which mirrors that gate) is bypassed — we filter the raw catalog by category.
@@ -112,7 +111,8 @@ function FeatPicker({
   );
 }
 
-export default function FightingStyleFeatSection({ character, takenFeats, busy, onTake }: Props) {
+export default function FightingStyleFeatSection({ takenFeats, busy, onTake }: Props) {
+  const { character } = useCurrentCharacter();
   const { total, used } = character.fightingStyleSlots;
   const canTake = used < total;
   const takenIds = new Set(takenFeats.map((f) => f.featId).filter((id): id is string => id != null));
@@ -132,9 +132,7 @@ export default function FightingStyleFeatSection({ character, takenFeats, busy, 
         <p className="mb-3 text-xs text-parchment-600">Choose a fighting style specialty.</p>
       )}
 
-      {canTake && (
-        <FeatPicker character={character} takenIds={takenIds} busy={busy} onTake={onTake} />
-      )}
+      {canTake && <FeatPicker takenIds={takenIds} busy={busy} onTake={onTake} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import AdvancementSection from "@/features/advancement/AdvancementSection";
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import SpellSlotSummary from "@/features/spells/SpellSlotSummary";
 import Card from "@/components/ui/Card";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { hasAdvancements, hasProficiencies } from "@/lib/characterSections";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
@@ -18,16 +19,17 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
  * characters. Saving throws stay inside AbilityScoresPanel; full slot/spell
  * management is on Magic.
  */
-export default function OverviewPanel({ character, reference, onUpdate }: SheetPanelProps) {
+export default function OverviewPanel({ reference }: SheetPanelProps) {
+  const { character } = useCurrentCharacter();
   return (
     <div className="flex flex-col gap-6">
       {/* Prof/Speed/Init left the compact header (#1026); on phones they sit
           here as a slim quick-bar (#1084). Desktop keeps them in the banner. */}
-      <MobileQuickBar character={character} />
+      <MobileQuickBar />
       {/* One home for active roll-modifying states (#984) — above the rails, so
           the fact is said once, not stamped under every box + skill row. */}
       <ConditionRollBanner modifiers={character.rollModifiers} />
-      <AbilityScoresPanel character={character} />
+      <AbilityScoresPanel />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_2fr] lg:items-start">
         <div className="flex flex-col gap-6">
@@ -40,17 +42,13 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
 
           {hasProficiencies(character) && (
             <Card title="Proficiencies" className="p-4">
-              <ProficienciesCard
-                character={character}
-                artisanTools={reference?.artisanTools ?? []}
-                onUpdate={onUpdate}
-              />
+              <ProficienciesCard artisanTools={reference?.artisanTools ?? []} />
             </Card>
           )}
         </div>
 
         <div className="flex flex-col gap-6">
-          <ExperienceTracker character={character} onUpdate={onUpdate} />
+          <ExperienceTracker />
 
           {character.spellcasting && (
             <Card title="Spell Slots" className="p-4">
@@ -62,7 +60,7 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
             // #advancement-card anchor is load-bearing: HpNotices deep-links here.
             <div id="advancement-card">
               <Card title="Advancements" className="p-4">
-                <AdvancementSection character={character} onUpdate={onUpdate} />
+                <AdvancementSection />
               </Card>
             </div>
           )}

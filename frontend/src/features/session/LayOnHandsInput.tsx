@@ -1,21 +1,20 @@
 import { useState } from "react";
 
 import { QuickBtn } from "@/features/session/TurnControls";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 /** Numeric pool-draw input for Lay on Hands — owns its own amount/busy state. */
 export default function LayOnHandsInput({
-  character,
   onSend,
   onCommit,
   onClose,
 }: {
-  character: Character;
   onSend: (actionKey: string, opts?: { roll?: number }) => Promise<void>;
   /** Commit the action slot when the heal is applied (#765). */
   onCommit: () => void;
   onClose: () => void;
 }) {
+  const { character } = useCurrentCharacter();
   const pool = character.resources?.pools?.find((p) => p.key === "layOnHands");
   const maxPool = pool?.remaining ?? 0;
   const [amount, setAmount] = useState(Math.min(1, maxPool));

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
 import { applyHitPointOperations } from "@/api/client";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -23,12 +24,14 @@ beforeEach(() => {
 
 describe("TurnDeathSaves (#736)", () => {
   it("renders nothing above 0 HP", () => {
-    const { container } = render(<TurnDeathSaves character={makeCharacter(12)} onUpdate={vi.fn()} />);
+    const character = makeCharacter(12);
+    const { container } = renderWithCharacter(<TurnDeathSaves />, character);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the death-save tracker at 0 HP without a redundant wrapper card", () => {
-    render(<TurnDeathSaves character={makeCharacter(0)} onUpdate={vi.fn()} />);
+    const character = makeCharacter(0);
+    renderWithCharacter(<TurnDeathSaves />, character);
     // DeathSaveTracker supplies its own garnet card + heading; the old outer
     // "Dying — death saves" wrapper is gone (single card, #744 review).
     expect(screen.getByText(/Unconscious — Roll Death Saves/i)).toBeInTheDocument();
@@ -39,7 +42,8 @@ describe("TurnDeathSaves (#736)", () => {
     const user = userEvent.setup();
     vi.mocked(applyHitPointOperations).mockRejectedValue(new Error("Death save failed."));
 
-    render(<TurnDeathSaves character={makeCharacter(0)} onUpdate={vi.fn()} />);
+    const character = makeCharacter(0);
+    renderWithCharacter(<TurnDeathSaves />, character);
     await user.click(screen.getByRole("button", { name: /Roll Death Save/i }));
 
     expect(await screen.findByText(/Death save failed\./i)).toBeInTheDocument();
@@ -47,11 +51,11 @@ describe("TurnDeathSaves (#736)", () => {
 
   it("rolls a death save through the HP transaction endpoint", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
     const updated = makeCharacter(0);
     vi.mocked(applyHitPointOperations).mockResolvedValue({ character: updated, concentrationChecks: [] } as never);
 
-    render(<TurnDeathSaves character={makeCharacter(0)} onUpdate={onUpdate} />);
+    const character = makeCharacter(0);
+    renderWithCharacter(<TurnDeathSaves />, character);
     await user.click(screen.getByRole("button", { name: /Roll Death Save/i }));
 
     await waitFor(() =>
@@ -59,6 +63,6 @@ describe("TurnDeathSaves (#736)", () => {
         { type: "deathSave", roll: expect.any(Number) },
       ]),
     );
-    expect(onUpdate).toHaveBeenCalledWith(updated);
+    expect(cachedCharacter("char-1")).toEqual(updated);
   });
 });

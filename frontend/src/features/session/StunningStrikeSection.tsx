@@ -11,6 +11,8 @@
 import { useState } from "react";
 
 import { attemptStunningStrikeTransaction } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character, StunningStrikeAttemptResult } from "@/types/character";
@@ -28,49 +30,47 @@ function useStunningStrikeAttempt(
   character: Character,
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
-  onUpdate: (c: Character) => void,
 ) {
-  const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<StunningStrikeAttemptResult | null>(null);
   const used = turnState.stunningStrikeUsedThisTurn;
-  const canAttempt = !used && !busy && currentRow !== null;
 
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (usedThisTurn: boolean) => attemptStunningStrikeTransaction(character.id, usedThisTurn),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Failed to attempt Stunning Strike",
+  });
+  const canAttempt = !used && !mutation.isPending && currentRow !== null;
+
+  // No try/catch (unchanged from pre-#1283): this hook has never surfaced an
+  // error and never awaits its own promise elsewhere — a rejection propagates
+  // same as before.
   async function handleAttempt() {
     if (!canAttempt) return;
-    setBusy(true);
-    try {
-      const { character: updated, results } = await attemptStunningStrikeTransaction(character.id, used);
-      setResult(results[0] ?? null);
-      turnState.markStunningStrikeUsed();
-      onUpdate(updated);
-    } finally {
-      setBusy(false);
-    }
+    const { results } = await mutation.mutateAsync(used);
+    setResult(results[0] ?? null);
+    turnState.markStunningStrikeUsed();
   }
 
   return { used, canAttempt, result, handleAttempt };
 }
 
 interface StunningStrikeSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The bound hit row this attempt is riding on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function StunningStrikeSection({
-  character,
   turnState,
   currentRow,
-  onUpdate,
 }: StunningStrikeSectionProps) {
+  const { character } = useCurrentCharacter();
   const { stunningStrike } = character;
   const { used, canAttempt, result, handleAttempt } = useStunningStrikeAttempt(
     character,
     turnState,
     currentRow,
-    onUpdate,
   );
 
   // Only monks (L5+) have Stunning Strike; nothing to attempt until a hit lands.

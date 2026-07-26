@@ -1,13 +1,10 @@
 import { Link } from "react-router-dom";
 
-import type { Character } from "@/types/character";
-
-interface LevelUpBannerProps {
-  character: Character;
-}
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 // Mounted outside the tab scroller (#892) so it arms on every tab when a level-up is pending.
-export default function LevelUpBanner({ character }: LevelUpBannerProps) {
+export default function LevelUpBanner() {
+  const { character } = useCurrentCharacter();
   const { pendingLevelUps, level, id } = character;
   if (pendingLevelUps < 1) return null;
 

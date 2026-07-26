@@ -6,16 +6,11 @@ import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
 import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import Tabs from "@/components/ui/Tabs";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { classSummary } from "@/lib/multiclass";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
-import type { Character } from "@/types/character";
 
 interface CharacterSheetHeaderProps {
-  character: Character;
-  /** Propagates HP edits so damage/heal also bumps the session log (#982).
-   *  Used by the mobile header's tappable HP readout; desktop live-play HP
-   *  lives in CombatUtilityStrip (#1085). */
-  onUpdate: (c: Character) => void;
   tabs: SheetTab[];
   activeTab: SheetTabId;
   onTabChange: (id: SheetTabId) => void;
@@ -101,8 +96,6 @@ function withCombatLivePip(tabs: SheetTab[], isLive: boolean): SheetTab[] {
  * #921); mobile navigation is the SheetBottomNav.
  */
 export default function CharacterSheetHeader({
-  character,
-  onUpdate,
   tabs,
   activeTab,
   onTabChange,
@@ -120,13 +113,12 @@ export default function CharacterSheetHeader({
   onOpenDelete,
   onOpenCampaignSettings,
 }: CharacterSheetHeaderProps) {
+  const { character } = useCurrentCharacter();
   const campaignSettings = campaignSettingsHandler(character.campaignId, onOpenCampaignSettings);
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
       <MobileSheetHeader
-        character={character}
-        onUpdate={onUpdate}
         sessionActions={buildSessionActions(
           isLiveJoined,
           sessionActionBusy,
@@ -143,7 +135,6 @@ export default function CharacterSheetHeader({
         onOpenCampaignSettings={campaignSettings}
       />
       <DesktopBanner
-        character={character}
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={onTabChange}
@@ -171,7 +162,6 @@ export default function CharacterSheetHeader({
  * mobile counterpart is MobileSheetHeader.
  */
 function DesktopBanner({
-  character,
   tabs,
   activeTab,
   onTabChange,
@@ -186,7 +176,8 @@ function DesktopBanner({
   onOpenActivity,
   onOpenDelete,
   onOpenCampaignSettings,
-}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat" | "onUpdate">) {
+}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat">) {
+  const { character } = useCurrentCharacter();
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
@@ -230,7 +221,7 @@ function DesktopBanner({
                 <span>
                   {character.background} · {character.alignment}
                 </span>
-                <CampaignIndicator character={character} />
+                <CampaignIndicator />
               </p>
             </div>
           </div>
@@ -262,7 +253,7 @@ function DesktopBanner({
             onChange={(id) => onTabChange(id as SheetTabId)}
             idBase="sheet"
           />
-          <BannerVitals character={character} />
+          <BannerVitals />
         </div>
       </div>
     </header>

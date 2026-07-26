@@ -1,5 +1,5 @@
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { activeResistedDamageTypes } from "@/lib/damageTypes";
-import type { Character } from "@/types/character";
 import Card from "@/components/ui/Card";
 import AutoRollConcentrationToggle from "@/features/hitpoints/AutoRollConcentrationToggle";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
@@ -12,17 +12,13 @@ import { useDeathSaves } from "@/features/hitpoints/useDeathSaves";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
 import { useRestActions } from "@/features/hitpoints/useRestActions";
 
-interface HitPointTrackerProps {
-  character: Character;
-  onUpdate: (character: Character) => void;
-}
-
-export default function HitPointTracker({ character, onUpdate }: HitPointTrackerProps) {
+export default function HitPointTracker() {
+  const { character } = useCurrentCharacter();
   const { hitPoints, hitDice } = character;
 
   // Shared HP-apply engine, death-save controls (#736), and rest actions.
-  const hp = useHitPointApply(character, onUpdate);
-  const deathSaveCtl = useDeathSaves(character, onUpdate);
+  const hp = useHitPointApply(character);
+  const deathSaveCtl = useDeathSaves(character);
   const rest = useRestActions(character, hp.submit);
 
   return (

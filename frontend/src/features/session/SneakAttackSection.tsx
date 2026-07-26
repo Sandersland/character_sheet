@@ -6,6 +6,8 @@
 import { useState } from "react";
 
 import { rollSneakAttackTransaction } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
@@ -29,49 +31,43 @@ function useSneakAttackRoll(
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
   eligible: boolean,
-  onUpdate: (c: Character) => void,
 ) {
-  const [busy, setBusy] = useState(false);
   const [rolled, setRolled] = useState<number | null>(null);
   const used = turnState.sneakAttackUsedThisTurn;
-  const canRoll = eligible && !used && !busy && currentRow !== null;
 
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: () => rollSneakAttackTransaction(character.id, eligible, used),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Failed to roll Sneak Attack",
+  });
+  const canRoll = eligible && !used && !mutation.isPending && currentRow !== null;
+
+  // No try/catch (unchanged from pre-#1283): this hook has never surfaced an
+  // error — a rejection propagates same as before.
   async function handleRoll() {
     if (!canRoll) return;
-    setBusy(true);
-    try {
-      const { character: updated, results } = await rollSneakAttackTransaction(
-        character.id,
-        eligible,
-        used,
-      );
-      const roll = results[0]?.roll ?? 0;
-      setRolled(roll);
-      if (currentRow) turnState.addTallyDamageRider(currentRow.id, roll);
-      turnState.markSneakAttackUsed();
-      onUpdate(updated);
-    } finally {
-      setBusy(false);
-    }
+    const { results } = await mutation.mutateAsync(undefined);
+    const roll = results[0]?.roll ?? 0;
+    setRolled(roll);
+    if (currentRow) turnState.addTallyDamageRider(currentRow.id, roll);
+    turnState.markSneakAttackUsed();
   }
 
   return { used, canRoll, rolled, handleRoll };
 }
 
 interface SneakAttackSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The current hit row the roll folds into; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function SneakAttackSection({
-  character,
   turnState,
   currentRow,
-  onUpdate,
 }: SneakAttackSectionProps) {
+  const { character } = useCurrentCharacter();
   const { sneakAttack } = character;
   const [eligible, setEligible] = useState(false);
   const { used, canRoll, rolled, handleRoll } = useSneakAttackRoll(
@@ -79,7 +75,6 @@ export default function SneakAttackSection({
     turnState,
     currentRow,
     eligible,
-    onUpdate,
   );
 
   // Only rogues have Sneak Attack; nothing to fold into until a hit lands.

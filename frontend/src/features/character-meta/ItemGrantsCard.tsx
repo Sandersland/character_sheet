@@ -1,13 +1,14 @@
 import Card from "@/components/ui/Card";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { advantageGrantSummary } from "@/lib/capabilities";
 import { conditionLabel } from "@/lib/conditions";
 import { damageTypeLabel } from "@/lib/damageTypes";
-import type { Character } from "@/types/character";
 
 // Item-granted traits (#529) derived from active (equipped/attuned) items:
 // resistances, damage/condition immunities, and advantage reminders. Each row
 // carries its item source. Hidden entirely when nothing is active.
-export default function ItemGrantsCard({ character }: { character: Character }) {
+export default function ItemGrantsCard() {
+  const { character } = useCurrentCharacter();
   const resistances = character.resistances ?? [];
   const damageImmunities = character.damageImmunities ?? [];
   const conditionImmunities = character.conditionImmunities ?? [];

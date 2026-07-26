@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineFlurryPicker from "@/features/session/InlineFlurryPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { logRoll } from "@/api/client";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -69,19 +70,18 @@ function renderPicker(
   turnState: TurnState & TurnStateActions,
   handlers: Partial<{ onClose: () => void; onCancel: () => void; onCommitFocusSpend: () => void }> = {},
 ) {
-  return render(
+  return renderWithCharacter(
     <RollProvider>
       <InlineFlurryPicker
-        character={character}
         turnState={turnState}
         sessionId="sess-1"
         onClose={handlers.onClose ?? vi.fn()}
         onCancel={handlers.onCancel ?? vi.fn()}
-        onUpdate={vi.fn()}
         onLogChanged={vi.fn()}
         onCommitFocusSpend={handlers.onCommitFocusSpend ?? vi.fn()}
       />
     </RollProvider>,
+    character,
   );
 }
 

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 
 import ClassPanel from "@/features/character-meta/panels/ClassPanel";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
@@ -13,9 +14,11 @@ function makeCharacter(overrides: Partial<Character>): Character {
   return { id: "c1", class: "Fighter", ...overrides } as unknown as Character;
 }
 
+// ClassPanel reads useCurrentCharacter() directly (#1284), so every render
+// seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderPanel(character: Character) {
-  const props: SheetPanelProps = { character, reference: null, onUpdate: vi.fn() };
-  return render(<ClassPanel {...props} />);
+  const props: SheetPanelProps = { reference: null };
+  return renderWithCharacter(<ClassPanel {...props} />, character);
 }
 
 // #1169: the Class tab's panel — the same ClassFeaturesSection orchestrator that

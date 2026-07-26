@@ -1,23 +1,19 @@
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { activeResistedDamageTypes } from "@/lib/damageTypes";
-import type { Character } from "@/types/character";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
 import AutoRollConcentrationToggle from "@/features/hitpoints/AutoRollConcentrationToggle";
 import ConcentrationNoteBanner from "@/features/hitpoints/ConcentrationNoteBanner";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
 
-interface HpSheetBodyProps {
-  character: Character;
-  onUpdate: (character: Character) => void;
-}
-
 /**
  * The interactive body of the session HP sheet (#768): the shared HpActionControl
  * plus concentration surfacing, both wired through useHitPointApply so damage,
  * heal, temp HP, and concentration checks behave identically to the Rest tab.
  */
-export default function HpSheetBody({ character, onUpdate }: HpSheetBodyProps) {
-  const hp = useHitPointApply(character, onUpdate);
+export default function HpSheetBody() {
+  const { character } = useCurrentCharacter();
+  const hp = useHitPointApply(character);
   const resistedTypes = [...activeResistedDamageTypes(character.activeEffects?.buffs ?? [])];
 
   return (

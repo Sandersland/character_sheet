@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ShadowArtsSection from "@/features/class/ShadowArtsSection";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { CatalogShadowArt, Character } from "@/types/character";
 
@@ -47,9 +48,11 @@ function makeCharacter(focusRemaining: number, concentratingOn: { entryId: strin
   } as unknown as Character;
 }
 
+// ShadowArtsSection reads useCurrentCharacter(), so every render seeds the
+// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderSection(character: Character, props: Partial<React.ComponentProps<typeof ShadowArtsSection>> = {}) {
   const onCast = vi.fn();
-  render(<ShadowArtsSection character={character} busy={false} onCast={onCast} {...props} />);
+  renderWithCharacter(<ShadowArtsSection busy={false} onCast={onCast} {...props} />, character);
   return { onCast };
 }
 

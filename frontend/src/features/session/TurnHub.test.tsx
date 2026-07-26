@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import TurnHub from "@/features/session/TurnHub";
@@ -18,6 +18,7 @@ import {
   rollInitiativeTransaction,
 } from "@/api/client";
 import { axe } from "@/test/axe";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -76,22 +77,18 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 
 function Harness({
   character,
-  onUpdate,
   onLogChanged,
   onOpenLog,
 }: {
   character: Character;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   onOpenLog?: () => void;
 }) {
   const turnState = useTurnState(character, "sess-1");
   return (
     <TurnHub
-      character={character}
       sessionId="sess-1"
       turnState={turnState}
-      onUpdate={onUpdate}
       onLogChanged={onLogChanged}
       allies={[]}
       onOpenLog={onOpenLog}
@@ -100,14 +97,14 @@ function Harness({
 }
 
 function renderHub(character: Character = makeCharacter(), onOpenLog?: () => void) {
-  const onUpdate = vi.fn();
   const onLogChanged = vi.fn();
-  const result = render(
+  const result = renderWithCharacter(
     <RollProvider>
-      <Harness character={character} onUpdate={onUpdate} onLogChanged={onLogChanged} onOpenLog={onOpenLog} />
+      <Harness character={character} onLogChanged={onLogChanged} onOpenLog={onOpenLog} />
     </RollProvider>,
+    character,
   );
-  return { ...result, onUpdate, onLogChanged };
+  return { ...result, onLogChanged };
 }
 
 // Drive the hub from "Not in Combat" through to an active turn.
@@ -116,25 +113,38 @@ async function startTurn(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Start my turn" }));
 }
 
+// TurnHub now reads the character via useCurrentCharacter() (#1284) rather than
+// a frozen prop, so it re-renders off whatever's in the cache after every
+// mutation. A mock that resolved with a hardcoded fresh makeCharacter() would
+// silently stomp a test's specific setup (e.g. downed(), a Battle Master's
+// resources) the instant any mutation landed — echo the currently-cached
+// character by default instead; a test simulating a REAL server-side change
+// overrides with mockResolvedValueOnce for that one call.
+function echoCharacter(): Character {
+  return cachedCharacter("char-1") ?? makeCharacter();
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  const updated = makeCharacter();
-  vi.mocked(applyActionTransactions).mockResolvedValue(updated);
-  vi.mocked(applyResourceTransactions).mockResolvedValue(updated);
-  vi.mocked(castManeuverTransaction).mockResolvedValue({
-    character: updated,
+  vi.mocked(applyActionTransactions).mockImplementation(async () => echoCharacter());
+  vi.mocked(applyResourceTransactions).mockImplementation(async () => echoCharacter());
+  vi.mocked(castManeuverTransaction).mockImplementation(async () => ({
+    character: echoCharacter(),
     results: [{ roll: 5, saveDc: null, summary: "used maneuver" }],
-  });
-  vi.mocked(applyInventoryTransactions).mockResolvedValue(updated);
-  vi.mocked(revertBatch).mockResolvedValue(updated);
+  }));
+  vi.mocked(applyInventoryTransactions).mockImplementation(async () => echoCharacter());
+  vi.mocked(revertBatch).mockImplementation(async () => echoCharacter());
   vi.mocked(startCombat).mockResolvedValue(undefined);
   vi.mocked(endCombat).mockResolvedValue(undefined);
   vi.mocked(advanceCombatRound).mockResolvedValue(undefined);
   vi.mocked(logRoll).mockResolvedValue(undefined);
   // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
   // call would report an empty regen, same as this default (#1239/#1243).
-  vi.mocked(rollInitiativeTransaction).mockResolvedValue({ ...updated, results: [] });
+  vi.mocked(rollInitiativeTransaction).mockImplementation(async () => ({
+    ...echoCharacter(),
+    results: [],
+  }));
 });
 
 describe("TurnHub — combat lifecycle", () => {

@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { fetchLevelUpPlan, submitLevelUp } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { errorMessage } from "@/lib/errorMessage";
 import { stepPosition } from "@/lib/ceremonySteps";
@@ -19,7 +20,13 @@ import {
   type ClassChoiceOption,
 } from "@/lib/levelUpClassChoice";
 import { draftSatisfies, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
-import type { Character, LevelUpPlanResponse, LevelUpStep, LevelUpTarget } from "@/types/character";
+import type {
+  Character,
+  LevelUpPlanResponse,
+  LevelUpStep,
+  LevelUpSubmission,
+  LevelUpTarget,
+} from "@/types/character";
 
 /** The chooser step at ceremony start (#1170) — non-null while awaiting a pick. */
 export interface ClassChoicePhase {
@@ -177,32 +184,29 @@ function useLevelUpSubmit(
   draft: LevelUpDraft,
   onSubmitted: (updated: Character) => void,
 ) {
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const mutation = useCharacterMutation({
+    characterId,
+    mutationFn: (submission: LevelUpSubmission) => submitLevelUp(characterId, submission),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to apply level-up",
+    onCharacterWritten: onSubmitted,
+  });
 
   async function confirm(): Promise<void> {
     if (!target || !draft.hp) return;
-    setSubmitting(true);
-    setSubmitError(null);
     try {
       // #1131: one ceremony advances an existing class OR adds a first level in a
       // new one — the chooser (#1170) resolves target to either shape.
-      const updated = await submitLevelUp(characterId, { ...draft, target, hp: draft.hp });
-      onSubmitted(updated);
-    } catch (e: unknown) {
-      setSubmitError(errorMessage(e, "Failed to apply level-up"));
-    } finally {
-      setSubmitting(false);
+      await mutation.mutateAsync({ ...draft, target, hp: draft.hp });
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 
-  return { confirm, submitting, submitError };
+  return { confirm, submitting: mutation.isPending, submitError: mutation.error };
 }
 
-export function useLevelUpCeremony(
-  character: Character,
-  onCharacterChange?: (updated: Character) => void,
-): LevelUpCeremony {
+export function useLevelUpCeremony(character: Character): LevelUpCeremony {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // #1131/#1170: `?classId=` seeds a NEW class, `?entry=` seeds a specific
@@ -233,11 +237,7 @@ export function useLevelUpCeremony(
   const skipPlan = choice.status !== "resolved" || levelAgain != null;
   const { plan, planError } = useLevelUpPlan(character.id, choice.target, draft.subclassId, skipPlan);
 
-  function handleSubmitted(updated: Character): void {
-    onCharacterChange?.(updated);
-    reportSubmitted(updated);
-  }
-  const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, choice.target, draft, handleSubmitted);
+  const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, choice.target, draft, reportSubmitted);
 
   const steps = plan?.steps ?? [];
   const stepIndex = stepPosition(steps.map(stepKey), currentKey);
