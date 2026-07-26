@@ -26,7 +26,7 @@ describe("TurnConcentrationBanner (#735)", () => {
   it("renders nothing when not concentrating", () => {
     const character = makeCharacter(null);
     const { container } = renderWithCharacter(
-      <TurnConcentrationBanner character={character} onLogChanged={vi.fn()} />,
+      <TurnConcentrationBanner onLogChanged={vi.fn()} />,
       character,
     );
     expect(container).toBeEmptyDOMElement();
@@ -35,7 +35,7 @@ describe("TurnConcentrationBanner (#735)", () => {
   it("shows the concentrated spell name", () => {
     const character = makeCharacter({ entryId: "e1", spellName: "Bless" });
     renderWithCharacter(
-      <TurnConcentrationBanner character={character} onLogChanged={vi.fn()} />,
+      <TurnConcentrationBanner onLogChanged={vi.fn()} />,
       character,
     );
     expect(screen.getByText("Bless")).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe("TurnConcentrationBanner (#735)", () => {
 
     const character = makeCharacter({ entryId: "e1", spellName: "Bless" });
     renderWithCharacter(
-      <TurnConcentrationBanner character={character} onLogChanged={onLogChanged} />,
+      <TurnConcentrationBanner onLogChanged={onLogChanged} />,
       character,
     );
 

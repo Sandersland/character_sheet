@@ -72,7 +72,7 @@ function Harness({
   turnState: TurnState & TurnStateActions;
 }) {
   const loadout = useLoadoutSwap(character, turnState);
-  return <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadout} />;
+  return <InlineLoadoutPicker turnState={turnState} loadout={loadout} />;
 }
 
 function renderPicker(character: Character, turnState: TurnState & TurnStateActions) {
@@ -116,7 +116,7 @@ function makeLiveTurnState(
 function LiveHarness({ turnState }: { turnState: TurnState & TurnStateActions }) {
   const { character } = useCurrentCharacter();
   const loadout = useLoadoutSwap(character, turnState);
-  return <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadout} />;
+  return <InlineLoadoutPicker turnState={turnState} loadout={loadout} />;
 }
 
 /** Scope queries to one hand's card ("Main hand" / "Off hand"). */

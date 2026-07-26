@@ -167,7 +167,6 @@ export function useBonusAttackSheet({
   );
   const maneuversDisclosure = hasSuperiorityDice(character) && (
     <ManeuversDisclosure
-      character={character}
       turnState={turnState}
       view={roll.boundView}
       attacksExhausted={attacksExhausted}

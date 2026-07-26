@@ -16,8 +16,8 @@ import LayOnHandsInput from "@/features/session/LayOnHandsInput";
 import type { ActiveResolution } from "@/features/session/useActiveResolution";
 import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AllyOption } from "@/lib/spellMeta";
-import type { Character } from "@/types/character";
 
 type SpellSlot = "action" | "bonusAction" | "reaction";
 
@@ -41,7 +41,6 @@ function attackKicker(attack: TurnState["attack"]): string {
 }
 
 interface TurnResolutionSheetsProps {
-  character: Character;
   sessionId: string;
   turnState: TurnState & TurnStateActions;
   activeResolution: ActiveResolution | null;
@@ -55,6 +54,7 @@ interface TurnResolutionSheetsProps {
 }
 
 export default function TurnResolutionSheets(props: TurnResolutionSheetsProps) {
+  const { character } = useCurrentCharacter();
   switch (props.activeResolution?.resolver.kind) {
     case "loadout-picker":
       return <LoadoutResolutionSheet {...props} />;
@@ -69,31 +69,29 @@ export default function TurnResolutionSheets(props: TurnResolutionSheetsProps) {
     case "heal-input":
       return <HealResolutionSheet {...props} />;
     case "spell-picker":
-      return props.character.spellcasting ? <SpellResolutionSheet {...props} /> : null;
+      return character.spellcasting ? <SpellResolutionSheet {...props} /> : null;
     default:
       return null;
   }
 }
 
 function LoadoutResolutionSheet({
-  character,
   turnState,
   loadoutSwap,
   closeResolution,
-}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "loadoutSwap" | "closeResolution">) {
+}: Pick<TurnResolutionSheetsProps, "turnState" | "loadoutSwap" | "closeResolution">) {
   return (
     <BottomSheet
       title="Change weapons"
       subtitle="Swapping a held weapon costs your Action — drawing into a free hand or stowing is free."
       onClose={closeResolution}
     >
-      <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadoutSwap} />
+      <InlineLoadoutPicker turnState={turnState} loadout={loadoutSwap} />
     </BottomSheet>
   );
 }
 
 function AttackResolutionSheet({
-  character,
   sessionId,
   turnState,
   closeResolution,
@@ -101,7 +99,6 @@ function AttackResolutionSheet({
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "character"
   | "sessionId"
   | "turnState"
   | "closeResolution"
@@ -120,7 +117,6 @@ function AttackResolutionSheet({
   return (
     <BottomSheet title="Attack" subtitle={attackKicker(turnState.attack)} wide onClose={closeAttackSheet}>
       <InlineAttackPicker
-        character={character}
         turnState={turnState}
         sessionId={sessionId}
         onClose={closeAttackSheet}
@@ -136,7 +132,6 @@ function AttackResolutionSheet({
 }
 
 function TwfResolutionSheet({
-  character,
   sessionId,
   turnState,
   activeResolution,
@@ -145,7 +140,6 @@ function TwfResolutionSheet({
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "character"
   | "sessionId"
   | "turnState"
   | "activeResolution"
@@ -168,7 +162,6 @@ function TwfResolutionSheet({
       }}
     >
       <InlineOffHandPicker
-        character={character}
         turnState={turnState}
         sessionId={sessionId}
         variant={isUnarmed ? "unarmed" : "twf"}
@@ -195,7 +188,6 @@ function TwfResolutionSheet({
 // generic click path uses elsewhere, just wired as InlineFlurryPicker's
 // onCommitFocusSpend so a pre-roll cancel truly costs nothing.
 function FlurryResolutionSheet({
-  character,
   sessionId,
   turnState,
   closeResolution,
@@ -204,7 +196,6 @@ function FlurryResolutionSheet({
   send,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "character"
   | "sessionId"
   | "turnState"
   | "closeResolution"
@@ -212,6 +203,7 @@ function FlurryResolutionSheet({
   | "onLogChanged"
   | "send"
 >) {
+  const { character } = useCurrentCharacter();
   const attack = turnState.bonusAttack;
   const exhausted = attack !== null && attack.used >= attack.total;
   const closeFlurrySheet = () => {
@@ -228,7 +220,6 @@ function FlurryResolutionSheet({
       onClose={closeFlurrySheet}
     >
       <InlineFlurryPicker
-        character={character}
         turnState={turnState}
         sessionId={sessionId}
         onClose={closeFlurrySheet}
@@ -247,14 +238,12 @@ function FlurryResolutionSheet({
 }
 
 function ItemResolutionSheet({
-  character,
   turnState,
   closeResolution,
-}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "closeResolution">) {
+}: Pick<TurnResolutionSheetsProps, "turnState" | "closeResolution">) {
   return (
     <BottomSheet title="Use an item" subtitle="Nothing is spent until you use an item" onClose={closeResolution}>
       <InlineItemPicker
-        character={character}
         onCommit={(batchId) => {
           turnState.consumeAction();
           if (batchId) turnState.attachBatchId(batchId);
@@ -266,15 +255,13 @@ function ItemResolutionSheet({
 }
 
 function HealResolutionSheet({
-  character,
   turnState,
   closeResolution,
   send,
-}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "closeResolution" | "send">) {
+}: Pick<TurnResolutionSheetsProps, "turnState" | "closeResolution" | "send">) {
   return (
     <BottomSheet title="Lay on Hands" subtitle="Nothing is spent until you heal" onClose={closeResolution}>
       <LayOnHandsInput
-        character={character}
         onSend={send}
         onCommit={turnState.consumeAction}
         onClose={closeResolution}
@@ -284,7 +271,6 @@ function HealResolutionSheet({
 }
 
 function SpellResolutionSheet({
-  character,
   sessionId,
   turnState,
   activeResolution,
@@ -293,7 +279,6 @@ function SpellResolutionSheet({
   allies,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "character"
   | "sessionId"
   | "turnState"
   | "activeResolution"
@@ -322,7 +307,6 @@ function SpellResolutionSheet({
   return (
     <BottomSheet title={SPELL_SHEET_TITLE[slot]} subtitle="Only what you can afford now" onClose={closeResolution}>
       <InlineSpellPicker
-        character={character}
         sessionId={sessionId}
         onClose={closeResolution}
         onLogChanged={onLogChanged}

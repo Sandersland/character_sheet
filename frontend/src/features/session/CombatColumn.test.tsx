@@ -27,7 +27,6 @@ describe("CombatColumn", () => {
     const character = makeCharacter();
     renderWithCharacter(
       <CombatColumn
-        character={character}
         turnSlot={<div>turn-content</div>}
         hpSlot={<div>hp-content</div>}
         conditionsSlot={<div>conditions-content</div>}
@@ -52,7 +51,6 @@ describe("CombatColumn", () => {
     const character = makeCharacter();
     renderWithCharacter(
       <CombatColumn
-        character={character}
         turnSlot={<div>turn-content</div>}
         hpSlot={null}
         conditionsSlot={<div>conditions-content</div>}
@@ -68,7 +66,6 @@ describe("CombatColumn", () => {
     const character = makeCharacter({ resistances: [] });
     renderWithCharacter(
       <CombatColumn
-        character={character}
         turnSlot={<div>turn-content</div>}
         hpSlot={<div>hp-content</div>}
         conditionsSlot={<div>conditions-content</div>}

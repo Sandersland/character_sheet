@@ -17,9 +17,7 @@ import { useIsBelowMd } from "@/hooks/useIsBelowMd";
  * last-session log collapses to one line; tapping it opens the log in a right
  * Drawer (desktop) or BottomSheet (mobile). When a session goes live this panel
  * is replaced by CombatLivePanel (CharacterSheetBody gating, untouched). Takes
- * no props (still assignable to the SheetPanelProps-typed panel registry) —
- * CombatColumn is a features/session component (deferred, #1284) so it still
- * gets `character` explicitly, sourced here from the hook rather than a prop.
+ * no props (still assignable to the SheetPanelProps-typed panel registry).
  */
 export default function CombatPanel() {
   const { character } = useCurrentCharacter();
@@ -29,7 +27,6 @@ export default function CombatPanel() {
   return (
     <>
       <CombatColumn
-        character={character}
         turnSlot={<SessionDoorwayCard characterId={character.id} />}
         hpSlot={<HitPointTracker />}
         conditionsSlot={<ConditionsStrip />}

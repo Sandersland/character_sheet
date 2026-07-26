@@ -92,7 +92,7 @@ afterEach(() => {
 function renderPanel(active = true) {
   const character = makeCharacter();
   return renderWithCharacter(
-    <CombatLivePanel character={character} session={session} active={active} />,
+    <CombatLivePanel session={session} active={active} />,
     character,
   );
 }

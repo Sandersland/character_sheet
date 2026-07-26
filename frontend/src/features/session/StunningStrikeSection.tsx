@@ -11,6 +11,7 @@
 import { useState } from "react";
 
 import { attemptStunningStrikeTransaction } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
@@ -55,17 +56,16 @@ function useStunningStrikeAttempt(
 }
 
 interface StunningStrikeSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The bound hit row this attempt is riding on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
 }
 
 export default function StunningStrikeSection({
-  character,
   turnState,
   currentRow,
 }: StunningStrikeSectionProps) {
+  const { character } = useCurrentCharacter();
   const { stunningStrike } = character;
   const { used, canAttempt, result, handleAttempt } = useStunningStrikeAttempt(
     character,

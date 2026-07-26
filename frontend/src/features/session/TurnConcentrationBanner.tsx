@@ -6,16 +6,15 @@
 
 import SpellStatusBanners from "@/features/spells/SpellStatusBanners";
 import { applySpellcastingTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import type { Character } from "@/types/character";
 
 export default function TurnConcentrationBanner({
-  character,
   onLogChanged,
 }: {
-  character: Character;
   onLogChanged: () => void;
 }) {
+  const { character } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: () => applySpellcastingTransactions(character.id, [{ type: "dropConcentration" }]),

@@ -25,13 +25,13 @@ beforeEach(() => {
 describe("TurnDeathSaves (#736)", () => {
   it("renders nothing above 0 HP", () => {
     const character = makeCharacter(12);
-    const { container } = renderWithCharacter(<TurnDeathSaves character={character} />, character);
+    const { container } = renderWithCharacter(<TurnDeathSaves />, character);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the death-save tracker at 0 HP without a redundant wrapper card", () => {
     const character = makeCharacter(0);
-    renderWithCharacter(<TurnDeathSaves character={character} />, character);
+    renderWithCharacter(<TurnDeathSaves />, character);
     // DeathSaveTracker supplies its own garnet card + heading; the old outer
     // "Dying — death saves" wrapper is gone (single card, #744 review).
     expect(screen.getByText(/Unconscious — Roll Death Saves/i)).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe("TurnDeathSaves (#736)", () => {
     vi.mocked(applyHitPointOperations).mockRejectedValue(new Error("Death save failed."));
 
     const character = makeCharacter(0);
-    renderWithCharacter(<TurnDeathSaves character={character} />, character);
+    renderWithCharacter(<TurnDeathSaves />, character);
     await user.click(screen.getByRole("button", { name: /Roll Death Save/i }));
 
     expect(await screen.findByText(/Death save failed\./i)).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("TurnDeathSaves (#736)", () => {
     vi.mocked(applyHitPointOperations).mockResolvedValue({ character: updated, concentrationChecks: [] } as never);
 
     const character = makeCharacter(0);
-    renderWithCharacter(<TurnDeathSaves character={character} />, character);
+    renderWithCharacter(<TurnDeathSaves />, character);
     await user.click(screen.getByRole("button", { name: /Roll Death Save/i }));
 
     await waitFor(() =>

@@ -3,6 +3,8 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CombatUtilityStrip from "@/features/session/CombatUtilityStrip";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character, ConditionsState } from "@/types/character";
@@ -31,10 +33,13 @@ beforeEach(() => {
 // useCurrentCharacter(), so every render seeds the cache and mounts
 // CurrentCharacterProvider via renderWithCharacter.
 function renderStrip(character: Character) {
-  const result = renderWithCharacter(<CombatUtilityStrip character={character} />, character);
+  const result = renderWithCharacter(<CombatUtilityStrip />, character);
   return {
     ...result,
-    rerender: (next: Character) => result.rerender(<CombatUtilityStrip character={next} />),
+    rerender: (next: Character) => {
+      getQueryClient().setQueryData(characterKeys.detail(character.id), next);
+      result.rerender(<CombatUtilityStrip />);
+    },
   };
 }
 

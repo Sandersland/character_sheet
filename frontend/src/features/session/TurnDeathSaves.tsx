@@ -6,9 +6,10 @@
 
 import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
 import { useDeathSaves } from "@/features/hitpoints/useDeathSaves";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
-export default function TurnDeathSaves({ character }: { character: Character }) {
+export default function TurnDeathSaves() {
+  const { character } = useCurrentCharacter();
   const { isDying, deathSaves, pending, error, onRollDeathSave, onStabilize } =
     useDeathSaves(character);
   if (!isDying) return null;

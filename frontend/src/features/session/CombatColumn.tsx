@@ -2,10 +2,9 @@ import type { ReactNode } from "react";
 
 import ConditionRollBanner from "@/features/conditions/ConditionRollBanner";
 import ItemGrantsCard from "@/features/character-meta/ItemGrantsCard";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface CombatColumnProps {
-  character: Character;
   /** Idle: the session doorway card. Live: the turn tracker. */
   turnSlot: ReactNode;
   /** Idle: the full HitPointTracker. Live: the compact HP card (desktop only). */
@@ -25,12 +24,12 @@ interface CombatColumnProps {
  * idle↔live parity contract can assert the layout stays fixed.
  */
 export default function CombatColumn({
-  character,
   turnSlot,
   hpSlot,
   conditionsSlot,
   logRow,
 }: CombatColumnProps) {
+  const { character } = useCurrentCharacter();
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 md:gap-6">
       <ConditionRollBanner modifiers={character.rollModifiers} />

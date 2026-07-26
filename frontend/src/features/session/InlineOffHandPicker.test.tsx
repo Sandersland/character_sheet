@@ -83,7 +83,6 @@ function renderPicker(
   return renderWithCharacter(
     <RollProvider>
       <InlineOffHandPicker
-        character={character}
         turnState={turnState}
         sessionId="sess-1"
         variant={handlers.variant}

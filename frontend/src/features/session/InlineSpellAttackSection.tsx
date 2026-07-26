@@ -22,11 +22,11 @@ import { isAttackCantrip } from "@/lib/spellMeta";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import SpellAttackRow from "@/features/session/SpellAttackRow";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character, Spell } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
 interface InlineSpellAttackSectionProps {
-  character: Character;
   sessionId: string;
   turnState: TurnState & TurnStateActions;
   onLogChanged: () => void;
@@ -40,11 +40,11 @@ function damageLabelFor(spell: Spell, character: Character): string {
 }
 
 export default function InlineSpellAttackSection({
-  character,
   sessionId,
   turnState,
   onLogChanged,
 }: InlineSpellAttackSectionProps) {
+  const { character } = useCurrentCharacter();
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
 

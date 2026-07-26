@@ -73,7 +73,6 @@ function renderPicker(
   return renderWithCharacter(
     <RollProvider>
       <InlineFlurryPicker
-        character={character}
         turnState={turnState}
         sessionId="sess-1"
         onClose={handlers.onClose ?? vi.fn()}

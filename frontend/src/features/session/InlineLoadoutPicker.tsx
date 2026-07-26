@@ -20,7 +20,8 @@ import {
 } from "@/lib/loadoutPicker";
 import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character, EquipSlot, InventoryItem } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import type { EquipSlot, InventoryItem } from "@/types/character";
 
 const HANDS: EquipSlot[] = ["MAIN_HAND", "OFF_HAND"];
 
@@ -103,12 +104,12 @@ function HandCard({ slot, current, ctx, inventory, busy, expanded, onToggle, onC
 }
 
 interface InlineLoadoutPickerProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   loadout: LoadoutSwapControls;
 }
 
-export default function InlineLoadoutPicker({ character, turnState, loadout }: InlineLoadoutPickerProps) {
+export default function InlineLoadoutPicker({ turnState, loadout }: InlineLoadoutPickerProps) {
+  const { character } = useCurrentCharacter();
   const [expandedHand, setExpandedHand] = useState<EquipSlot | null>(null);
   const { busy, error, lastSwap, swap, stow, refund } = loadout;
 

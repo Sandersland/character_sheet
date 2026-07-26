@@ -18,17 +18,14 @@ import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { applyConditionTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import BottomSheet from "@/components/ui/BottomSheet";
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";
 import RestButton from "@/features/hitpoints/RestButton";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { conditionLabel, EXHAUSTION_MAX } from "@/lib/conditions";
-import type { Character, ConditionsState } from "@/types/character";
-
-interface Props {
-  character: Character;
-}
+import type { ConditionsState } from "@/types/character";
 
 const STEP =
   "flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-parchment-700 transition-colors hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40";
@@ -50,7 +47,8 @@ interface UtilityViewProps {
   onStep: (next: number) => void;
 }
 
-export default function CombatUtilityStrip({ character }: Props) {
+export default function CombatUtilityStrip() {
+  const { character } = useCurrentCharacter();
   // null = closed; "manage" opens the sheet as-is; "add" opens it with the
   // condition picker already expanded (the "+ Add" affordance).
   const [sheet, setSheet] = useState<null | "manage" | "add">(null);

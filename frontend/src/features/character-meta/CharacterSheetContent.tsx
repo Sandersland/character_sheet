@@ -93,7 +93,7 @@ function CharacterSheetWorkspace({
   // header — a sibling of the panel region — can drive it (there is no separate
   // in-panel controls strip anymore). Handlers no-op until a session is joined.
   const life = useCombatLifecycle({ character, session: live.session, live });
-  const livePanel = renderLivePanel(character, live.session, Boolean(turnState), activeTab === "combat");
+  const livePanel = renderLivePanel(live.session, Boolean(turnState), activeTab === "combat");
 
   return (
     <RollProvider
@@ -251,13 +251,12 @@ function WorkspaceSessionModals({
  * static Combat panel. Extracted so the workspace render stays under the ceiling.
  */
 function renderLivePanel(
-  character: Character,
   session: Session | null,
   hasTurnState: boolean,
   combatActive: boolean,
 ): ReactNode {
   if (!hasTurnState || !session) return null;
-  return <CombatLivePanel character={character} session={session} active={combatActive} />;
+  return <CombatLivePanel session={session} active={combatActive} />;
 }
 
 /**

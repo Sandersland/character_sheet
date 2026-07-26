@@ -38,7 +38,7 @@ describe("QuiveringPalmSection (#1245)", () => {
   it("renders nothing when the character has no Quivering Palm (null)", () => {
     const character = makeCharacter({ quiveringPalm: null });
     const { container } = renderWithCharacter(
-      <QuiveringPalmSection character={character} turnState={makeTurnState()} currentRow={hitRow} />,
+      <QuiveringPalmSection turnState={makeTurnState()} currentRow={hitRow} />,
       character,
     );
     expect(container).toBeEmptyDOMElement();
@@ -47,7 +47,7 @@ describe("QuiveringPalmSection (#1245)", () => {
   it("Set is disabled without a hit; Trigger is disabled while inactive", () => {
     const character = makeCharacter();
     renderWithCharacter(
-      <QuiveringPalmSection character={character} turnState={makeTurnState()} currentRow={null} />,
+      <QuiveringPalmSection turnState={makeTurnState()} currentRow={null} />,
       character,
     );
     expect(screen.getByText(/DC 17/)).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe("QuiveringPalmSection (#1245)", () => {
   it("Set is enabled once a hit lands and not yet active", () => {
     const character = makeCharacter();
     renderWithCharacter(
-      <QuiveringPalmSection character={character} turnState={makeTurnState()} currentRow={hitRow} />,
+      <QuiveringPalmSection turnState={makeTurnState()} currentRow={hitRow} />,
       character,
     );
     expect(screen.getByRole("button", { name: /Set/ })).toBeEnabled();
@@ -72,7 +72,7 @@ describe("QuiveringPalmSection (#1245)", () => {
     });
     const character = makeCharacter();
     renderWithCharacter(
-      <QuiveringPalmSection character={character} turnState={makeTurnState()} currentRow={hitRow} />,
+      <QuiveringPalmSection turnState={makeTurnState()} currentRow={hitRow} />,
       character,
     );
 
@@ -92,7 +92,7 @@ describe("QuiveringPalmSection (#1245)", () => {
     const turnState = makeTurnState();
     const character = makeCharacter({ quiveringPalm: { dc: 17, active: true } });
     renderWithCharacter(
-      <QuiveringPalmSection character={character} turnState={turnState} currentRow={null} />,
+      <QuiveringPalmSection turnState={turnState} currentRow={null} />,
       character,
     );
 
