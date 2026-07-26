@@ -66,6 +66,26 @@ function xpForLevel(level: number): number {
   return 0;
 }
 
+// A single-class monk whose classEntries[0].level COLUMN lags the XP-derived
+// level (a "pending level-up" — the character gained XP but hasn't run the
+// /hp levelUp op yet, mirrors hitDice.total vs progress.level in
+// character-serialize.ts). Distinct from createMonk, which keeps both in sync.
+async function createMonkStaleLevelColumn(entryLevelColumn: number, xpLevel: number, subclass?: string) {
+  const cls = await prisma.characterClass.upsert({
+    where: { name: CLASS_NAME },
+    create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
+    update: {},
+  });
+  await prisma.character.create({
+    data: {
+      ...FIXTURE_BASE,
+      experiencePoints: xpForLevel(xpLevel),
+      ownerId: OWNER_ID,
+      classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level: entryLevelColumn, subclass }] },
+    },
+  });
+}
+
 async function activeBuffs(): Promise<{ key: string; duration?: string }[]> {
   const row = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { activeEffects: true } });
   return (row!.activeEffects as { buffs: { key: string; duration?: string }[] }).buffs;
@@ -217,6 +237,20 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     // Elemental Strikes cost no Focus (only the attunement's 1 was spent).
     const focus = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focus.remaining).toBe(16);
+  });
+
+  // #1315: assertWarriorOfElements now resolves through deriveEntryScopedActions
+  // (the same shared function shadow-arts.ts's guards use) instead of comparing
+  // XP-derived level against the classEntries[].level COLUMN directly. That
+  // column can lag XP (a pending level-up not yet applied via /hp levelUp,
+  // mirrored by progress.level vs hitDice.total in character-serialize.ts) — the
+  // OLD hand-rolled check trusted the stale column and would reject a
+  // genuinely-eligible L3 character; the new shared-function check resolves
+  // against the XP-derived effective level for single-class characters instead.
+  it("gates off the XP-derived level, not a stale classEntries[].level column (single-class pending level-up)", async () => {
+    await createMonkStaleLevelColumn(2, 3, "Warrior of the Elements");
+    const res = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
+    expect(res.status).toBe(200);
   });
 
   it("rejects Elemental Attunement from a non-elements monk", async () => {

@@ -22,6 +22,7 @@ import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/exp
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
+import { actionGrantLevel, deriveEntryScopedActions } from "./actions.js";
 import { focusSaveDC } from "./monk.js";
 import type {
   CastElementalBurstOperation,
@@ -72,16 +73,22 @@ function monkEntry(row: WarriorOfElementsRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-function isWarriorOfTheElements(row: WarriorOfElementsRow): boolean {
-  return (monkEntry(row)?.subclass ?? "").toLowerCase().includes("elements");
-}
-
-/** Throws unless this is a Warrior of the Elements monk of at least `minLevel`; returns the monk level. */
-function assertWarriorOfElements(row: WarriorOfElementsRow, minLevel: number, feature: string): number {
+/**
+ * Throws unless `actionKey`'s DERIVED_ACTIONS gate (actions.ts) is granted to
+ * this row's monk entry; returns the monk entry's own level. Resolved through
+ * the SAME deriveEntryScopedActions the wire's availableActions[] and
+ * shadow-arts.ts's cast guards use (#1315) — not a hand-rolled level/subclass
+ * comparison, and not the classEntries[].level COLUMN directly (that column
+ * can lag the XP-derived level for a pending level-up; deriveEntryScopedActions
+ * resolves the effective level instead, same as every other entry-scoped gate).
+ */
+function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, feature: string): number {
   const monk = monkEntry(row);
-  if (!monk || monk.level < minLevel || !isWarriorOfTheElements(row)) {
+  const totalLevel = levelForExperience(row.experiencePoints);
+  const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true).some((a) => a.key === actionKey);
+  if (!monk || !granted) {
     throw new InvalidWarriorOfElementsOperationError(
-      `Only a Warrior of the Elements monk (level ${minLevel}+) has ${feature}`,
+      `Only a Warrior of the Elements monk (level ${actionGrantLevel(actionKey) ?? "?"}+) has ${feature}`,
     );
   }
   return monk.level;
@@ -107,7 +114,7 @@ async function toggleElementalAttunement(
   batchId: string,
   sessionId: string | null,
 ): Promise<ToggleAttunementResult> {
-  assertWarriorOfElements(row, 3, "Elemental Attunement");
+  assertWarriorOfElements(row, "elementalAttunement", "Elemental Attunement");
 
   if (op.active) {
     if (attunementActive(row)) {
@@ -173,7 +180,7 @@ async function castElementalBurst(
   batchId: string,
   sessionId: string | null,
 ): Promise<ElementalBurstResult> {
-  assertWarriorOfElements(row, 6, "Elemental Burst");
+  assertWarriorOfElements(row, "elementalBurst", "Elemental Burst");
   if (!Number.isFinite(op.roll) || op.roll <= 0) {
     throw new InvalidWarriorOfElementsOperationError("castElementalBurst requires a positive damage roll");
   }
@@ -221,7 +228,7 @@ async function elementalStrike(
   batchId: string,
   sessionId: string | null,
 ): Promise<ElementalStrikeResult> {
-  assertWarriorOfElements(row, 3, "Elemental Attunement");
+  assertWarriorOfElements(row, "elementalAttunement", "Elemental Attunement");
   if (!attunementActive(row)) {
     throw new InvalidWarriorOfElementsOperationError(
       "Elemental Strikes require an active Elemental Attunement",
