@@ -33,6 +33,9 @@ import type {
   LevelUpStepKind,
   TargetClassEntry,
 } from "./level-up-plan.js";
+import { editionOf } from "@/lib/rules/edition.js";
+import { subclassGateLevel } from "./effective-levels.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 // A validated step, mapped to the seam that applies it. Each domain re-reads its
 // own state via `tx`, so a later op sees the earlier op's write (e.g. the maneuver
@@ -62,16 +65,17 @@ const TARGET_ENTRY_SELECT = {
   classId: true,
 } satisfies Prisma.CharacterClassEntrySelect;
 
-// Fetch the target class's catalog subclassLevel; default 3 (mirrors reconcileSubclass
-// / subclassStep) when the class row or column is absent.
-async function subclassLevelFor(classId: string | null, className: string): Promise<number> {
+// Fetch the target class's catalog subclassLevel and resolve it through the
+// edition seam (#1308) — the column is 2014-only (subclassGateLevel hardcodes 3
+// under 2024), so subclassStep must never compare against the raw column.
+async function subclassLevelFor(classId: string | null, className: string, edition: RulesEdition): Promise<number> {
   const row = classId
     ? await prisma.characterClass.findUnique({ where: { id: classId }, select: { subclassLevel: true } })
     : await prisma.characterClass.findFirst({
         where: { name: { equals: className, mode: "insensitive" } },
         select: { subclassLevel: true },
       });
-  return row?.subclassLevel ?? 3;
+  return subclassGateLevel(row?.subclassLevel, edition);
 }
 
 // Reads the character + resolves a level-up target into the validator inputs
@@ -90,10 +94,12 @@ export async function resolveLevelUpContext(
       abilityScores: true,
       hitDice: true,
       spellcasting: true,
+      rulesEdition: true,
       classEntries: { orderBy: { position: "asc" }, select: TARGET_ENTRY_SELECT },
     },
   });
   if (!character) throw new InvalidLevelUpError(`Character not found: ${characterId}`);
+  const edition = editionOf(character);
 
   const isMulticlass = character.classEntries.length > 1;
   let targetClassName: string;
@@ -123,7 +129,7 @@ export async function resolveLevelUpContext(
     targetIsPrimary = false; // a new multiclass entry is never the primary
   }
 
-  const subclassLevel = await subclassLevelFor(classId, targetClassName);
+  const subclassLevel = await subclassLevelFor(classId, targetClassName, edition);
 
   let chosenSubclassName: string | null = null;
   if (subclassId) {

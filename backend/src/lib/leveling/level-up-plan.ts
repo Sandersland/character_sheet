@@ -40,8 +40,12 @@ export interface LevelUpPlanCharacter {
   spellEntries?: { id: string; level: number; source?: string | null }[];
 }
 
-// The class entry AFTER this level-up. subclassLevel is passed in (a pure fn
-// can't fetch the catalog Class row); defaults to 3, mirroring reconcileSubclass.
+// The class entry AFTER this level-up. subclassLevel is passed in ALREADY
+// edition-resolved (a pure fn can't fetch the catalog Class row or the
+// character's edition) — the caller must route the raw catalog column through
+// subclassGateLevel(..., edition) first (#1308); this field is never the raw
+// 2014-only column. Defaults to 3 when absent, matching subclassGateLevel's own
+// default.
 export interface TargetClassEntry {
   name: string;
   subclass?: string | null;

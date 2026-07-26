@@ -51,7 +51,7 @@ async function makeFighter(opts: { id: string; xp: number; hitDiceTotal: number;
   return entry.id;
 }
 
-async function makeCleric(opts: { id: string; xp: number; entryLevel: number }): Promise<void> {
+async function makeCleric(opts: { id: string; xp: number; entryLevel: number; rulesEdition?: "EDITION_2014" | "EDITION_2024" }): Promise<void> {
   const cleric = await prisma.characterClass.findFirstOrThrow({ where: { name: "Cleric" } });
   await prisma.character.create({
     data: {
@@ -60,6 +60,7 @@ async function makeCleric(opts: { id: string; xp: number; entryLevel: number }):
       id: opts.id,
       name: `LevelUpPlan ${opts.id}`,
       experiencePoints: opts.xp,
+      rulesEdition: opts.rulesEdition ?? "EDITION_2024",
       hitPoints: { current: 20, max: 20, temp: 0, deathSaves: { successes: 0, failures: 0 } },
       hitDice: { total: opts.entryLevel, die: "d8", spent: 0 },
       abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 8 },
@@ -147,6 +148,25 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(atTwo.status).toBe(200);
     expect(atTwo.body.target.newLevel).toBe(2);
     expect(atTwo.body.steps.map((s: { kind: string }) => s.kind)).not.toContain("subclass");
+  });
+
+  // #1308: subclassStep reads an already edition-resolved subclassLevel — the
+  // catalog column is 2014-only, so a 2014 Cleric's plan must offer the
+  // subclass step reaching level 1 (its real gate), while a 2024 Cleric reaching
+  // the same level 1 must not (its gate stays 3, hardcoded, regardless of the
+  // catalog column now holding the 2014 value).
+  it("offers the cleric subclass step at level 1 for a 2014 Cleric, not for a 2024 Cleric (#1308)", async () => {
+    await makeCleric({ id: "lvplan-cleric-2014-l1", xp: 0, entryLevel: 0, rulesEdition: "EDITION_2014" });
+    const atOne2014 = await getPlan("lvplan-cleric-2014-l1");
+    expect(atOne2014.status).toBe(200);
+    expect(atOne2014.body.target.newLevel).toBe(1);
+    expect(atOne2014.body.steps.map((s: { kind: string }) => s.kind)).toContain("subclass");
+
+    await makeCleric({ id: "lvplan-cleric-2024-l1", xp: 0, entryLevel: 0, rulesEdition: "EDITION_2024" });
+    const atOne2024 = await getPlan("lvplan-cleric-2024-l1");
+    expect(atOne2024.status).toBe(200);
+    expect(atOne2024.body.target.newLevel).toBe(1);
+    expect(atOne2024.body.steps.map((s: { kind: string }) => s.kind)).not.toContain("subclass");
   });
 
   it("kind:new (?classId) plans a fresh multiclass entry: newLevel 1, not primary", async () => {

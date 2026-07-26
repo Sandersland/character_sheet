@@ -82,4 +82,21 @@ describe("GET /api/reference", () => {
     expect(byName("Wizard").primaryAbility).toEqual(["intelligence"]);
     expect(byName("Fighter").primaryAbility).toEqual(["strength", "dexterity"]);
   });
+
+  // #1308: this endpoint has no character, so no `rulesEdition` — the catalog
+  // `subclassLevel` column is 2014-only (subclassGateLevel ignores it under
+  // 2024). No frontend surface resolves the edition seam yet (that's the
+  // deferred per-edition frontend work), so serving the raw 2014 value would
+  // make the client originate a 2014 rule against a 2024-default creation flow.
+  // This endpoint must report the 2024-resolved gate (always 3) for every class.
+  it("reports subclassLevel resolved for 2024 (3 for every class, never the raw 2014 column)", async () => {
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
+    expect(byName("Cleric").subclassLevel).toBe(3);
+    expect(byName("Sorcerer").subclassLevel).toBe(3);
+    expect(byName("Warlock").subclassLevel).toBe(3);
+    expect(byName("Druid").subclassLevel).toBe(3);
+    expect(byName("Wizard").subclassLevel).toBe(3);
+    expect(byName("Fighter").subclassLevel).toBe(3);
+  });
 });
