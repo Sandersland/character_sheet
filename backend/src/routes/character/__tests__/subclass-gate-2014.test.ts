@@ -180,11 +180,13 @@ describe("2014 subclass gate — seeded Cleric (gate 1) and Wizard (gate 2), #13
   });
 });
 
-// #1308: character-create.ts's resolveSubclass has its OWN edition-blind gate
+// #1308: character-create.ts's resolveSubclass HAD its OWN edition-blind gate
 // check (characterClass.subclassLevel <= 1 / > 1) — a fourth call site the
 // issue didn't name, found because it broke the instant the catalog column
-// stopped being uniformly 3. A brand-new character is always level 1, so this
-// governs whether a subclassId may be supplied AT CREATION.
+// stopped being uniformly 3, and fixed in the same PR to resolve through
+// subclassGateLevel(..., edition) like the rest. A brand-new character is
+// always level 1, so this governs whether a subclassId may be supplied AT
+// CREATION.
 describe("character creation subclass gate (#1308)", () => {
   it("rejects a Life Domain subclassId at creation for a 2024 Cleric (gate 3, not creation)", async () => {
     const res = await supertest(app)
