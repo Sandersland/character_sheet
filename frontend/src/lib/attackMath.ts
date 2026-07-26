@@ -5,6 +5,7 @@ import { formatRollSpec } from "@/lib/dice";
 import type { RollSpec } from "@/lib/dice";
 import { hasFeatImprovement } from "@/lib/featDisplay";
 import type { Character, InventoryItem, WeaponDetail } from "@/types/character";
+import type { RollEventAttackComponents, RollEventDamageComponents } from "@character-sheet/shared-types";
 
 export interface RollSpecTriple {
   count: number;
@@ -44,6 +45,13 @@ export interface AttackEntry {
   logSource: string;
   /** Dice-valued on-hit riders from THIS item's active capabilities (Flame Tongue +2d6). */
   damageRiders: DamageRider[];
+  /**
+   * Decomposed to-hit/damage math forwarded from the weapon's server-derived
+   * `attackBonusComponents`/`damage` (#1235 combat-log drill-in) — undefined
+   * for unarmed/improvised entries, which the backend doesn't decompose.
+   */
+  attackComponents?: RollEventAttackComponents;
+  damageComponents?: RollEventDamageComponents;
 }
 
 // A weapon's capabilities are live when equipped/attuned; an attunement-required
@@ -162,6 +170,11 @@ function buildWeaponEntry(item: InventoryItem): AttackEntry {
     damageRollLabel: `${item.name} damage (${damageType})`,
     logSource: item.name,
     damageRiders: weaponDamageRiders(item),
+    attackComponents: w.attackBonusComponents,
+    damageComponents:
+      w.damage?.abilityModifier !== undefined && w.damage?.meleeDamageBonus !== undefined
+        ? { abilityMod: w.damage.abilityModifier, meleeDamageBonus: w.damage.meleeDamageBonus }
+        : undefined,
   };
 }
 
@@ -194,12 +207,21 @@ export function buildOffHandEntry(character: Character): AttackEntry | null {
   // component) — skip the subtraction and show the full modifier, matching the
   // pre-#732 behavior rather than silently dropping the wrong amount.
   const abilityMod = offHand.weapon!.damage?.abilityModifier;
-  const modifier =
-    hasStyle || abilityMod === undefined
-      ? entry.damageSpec.modifier
-      : entry.damageSpec.modifier - Math.max(0, abilityMod);
+  const dropAbilityMod = !hasStyle && abilityMod !== undefined;
+  const modifier = dropAbilityMod
+    ? entry.damageSpec.modifier - Math.max(0, abilityMod)
+    : entry.damageSpec.modifier;
   const damageSpec = { ...entry.damageSpec, modifier };
   const gripLabel = weaponGripLabel(offHand.weapon!);
+  // Mirror the same subtraction onto damageComponents (#1235) so a logged
+  // off-hand damage roll's components still sum to what was actually rolled —
+  // the same `abilityMod + meleeDamageBonus === damageSpec.modifier` invariant
+  // deriveWeaponDamage guarantees on the server, kept intact through this
+  // client-side TWF adjustment.
+  const damageComponents =
+    dropAbilityMod && entry.damageComponents
+      ? { ...entry.damageComponents, abilityMod: entry.damageComponents.abilityMod - Math.max(0, abilityMod) }
+      : entry.damageComponents;
 
   return {
     ...entry,
@@ -207,6 +229,7 @@ export function buildOffHandEntry(character: Character): AttackEntry | null {
     // so a two-weapon swing reads distinctly from a main-hand attack (#813).
     name: `${entry.name} (off-hand)`,
     damageSpec,
+    damageComponents,
     damageLabel: `${formatRollSpec(damageSpec)} ${entry.damageType}${gripLabel}`,
   };
 }

@@ -1,3 +1,5 @@
+import type { RollEventAttackComponents } from "@character-sheet/shared-types";
+
 import { abilityModifier } from "@/lib/srd/math.js";
 
 /** Armor categories that a character can be proficient with. */
@@ -103,6 +105,40 @@ export function weaponAbilityMod(
   return strMod;
 }
 
+/**
+ * Same inputs/rule as `deriveWeaponAttackBonus`, decomposed into its four
+ * addends instead of summed. `deriveWeaponAttackBonus` delegates here so the
+ * sum can never drift from the components — one rule, two views (#1235).
+ *
+ * Returns the shared-types wire shape rather than a backend-local twin: the
+ * serialized value crosses to the client as `attackBonusComponents`, and a
+ * second structurally-identical declaration would let a field added there go
+ * silently unreturned here (the boundary is JSON, so nothing type-checks it).
+ */
+export function deriveWeaponAttackComponents(
+  weapon: {
+    name: string;
+    finesse: boolean;
+    weaponClass?: string | null;
+    weaponRange?: string | null;
+  },
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  weaponGrants: ReadonlyArray<{ name: string }>,
+  rangedAttackRollBonus = 0,
+  attackRollBonus = 0,
+): RollEventAttackComponents {
+  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
+  const proficient = isProficientWithWeapon(weapon, weaponGrants);
+  const rangedBonus = weapon.weaponRange === "ranged" ? rangedAttackRollBonus : 0;
+  return {
+    abilityMod,
+    proficiencyBonus: proficient ? proficiencyBonus : 0,
+    rangedBonus,
+    attackRollBonus,
+  };
+}
+
 export function deriveWeaponAttackBonus(
   weapon: {
     name: string;
@@ -121,8 +157,13 @@ export function deriveWeaponAttackBonus(
   /** Flat bonus from active "attackRoll" buffs (e.g. Sacred Weapon); #419. */
   attackRollBonus = 0,
 ): number {
-  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
-  const proficient = isProficientWithWeapon(weapon, weaponGrants);
-  const rangedBonus = weapon.weaponRange === "ranged" ? rangedAttackRollBonus : 0;
-  return abilityMod + (proficient ? proficiencyBonus : 0) + rangedBonus + attackRollBonus;
+  const c = deriveWeaponAttackComponents(
+    weapon,
+    effectiveScores,
+    proficiencyBonus,
+    weaponGrants,
+    rangedAttackRollBonus,
+    attackRollBonus,
+  );
+  return c.abilityMod + c.proficiencyBonus + c.rangedBonus + c.attackRollBonus;
 }

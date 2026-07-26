@@ -7,10 +7,10 @@
 // source — nat-20 auto-verdicts at record time, "Crit!" sets it manually. The
 // old `manualCrit` checkbox state is gone; damage doubling reads the verdict.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
-import { isCritRow } from "@/lib/attackTallySummary";
+import { autoVerdict, isCritRow } from "@/lib/attackTallySummary";
 import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
 import { resolveRollMode, rollModeChip } from "@/lib/rollMode";
 import { useRoll } from "@/features/dice/RollContext";
@@ -82,6 +82,14 @@ export function useAttackRolls({
   const [attackTotals, setAttackTotals] = useState<Record<string, number | null>>({});
   const [damageTotals, setDamageTotals] = useState<Record<string, number | null>>({});
 
+  // swingId correlates an entry's attack roll event with its damage roll event
+  // as one swing (#1235) — client-generated because the route's own `batchId`
+  // is minted fresh per HTTP request and can't span two separate logRoll
+  // calls. A ref (not state) because it must survive from handleAttack to a
+  // LATER handleDamage click without forcing a re-render in between; it is
+  // regenerated per attack so a second swing never reuses the stale id.
+  const swingIdRef = useRef<Record<string, string>>({});
+
   // A row rolls crit damage when it IS the current tally row and that row's
   // verdict is crit (nat-20 auto or manual "Crit!"). The direct nat-20 check
   // covers tally-less surfaces (the off-hand sheet passes currentRow: null
@@ -102,19 +110,39 @@ export function useAttackRolls({
       mode: resolvedAttack.mode,
     };
     const result = roll(attackSpec, entry.attackRollLabel);
-    logRollSafe("attack", entry.logSource, result, attackSpec);
+    const attack = {
+      total: result.total,
+      keptFace: keptD20(result)?.value ?? null,
+      nat20: isNaturalTwenty(result),
+      nat1: isNaturalOne(result),
+    };
+    // Fresh id per attack (#1235) — the damage roll below reads it back via entry.id.
+    const swingId = crypto.randomUUID();
+    swingIdRef.current[entry.id] = swingId;
+    logRollSafe("attack", entry.logSource, result, attackSpec, undefined, {
+      swingId,
+      // Only the die-forced verdict is known synchronously — nat20/nat1 auto-
+      // verdict (attackTallySummary's own rule). A middling roll stays
+      // unresolved here; it's the tally's "Call it" step, not a re-log, that
+      // later decides it (rolls are logged once and never mutated).
+      verdict: autoVerdict(attack),
+      nat20: attack.nat20,
+      nat1: attack.nat1,
+      crit: attack.nat20,
+      // Both, deliberately: `sources` lists what applied, but the NET mode after
+      // advantage/disadvantage cancellation is a rule (resolveRollMode). Logging
+      // only the sources would force every reader to re-derive it (#1235).
+      rollMode: resolvedAttack.mode,
+      modeSources: resolvedAttack.sources,
+      attackComponents: entry.attackComponents,
+    });
     setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
     setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
     recordAttack({
       formId: entry.id,
       formName: entry.name,
       source,
-      attack: {
-        total: result.total,
-        keptFace: keptD20(result)?.value ?? null,
-        nat20: isNaturalTwenty(result),
-        nat1: isNaturalOne(result),
-      },
+      attack,
     });
   }
 
@@ -122,9 +150,22 @@ export function useAttackRolls({
   // replaces the current tally row's damage slot (never appends) — which also
   // resolves an unset verdict to hit (#811, implicit hit).
   function handleDamage(entry: AttackEntry) {
-    const spec = isRowCrit(entry.id) ? critDamageSpec(entry.damageSpec) : entry.damageSpec;
+    const rowCrit = isRowCrit(entry.id);
+    const spec = rowCrit ? critDamageSpec(entry.damageSpec) : entry.damageSpec;
     const result = roll(spec, entry.damageRollLabel);
-    logRollSafe("damage", entry.logSource, result, spec, entry.damageType);
+    logRollSafe("damage", entry.logSource, result, spec, entry.damageType, {
+      // Shares the attack's swingId (#1235) — same swing, two roll events.
+      swingId: swingIdRef.current[entry.id],
+      // withAutoHit's rule ("rolling damage is an implicit hit call", #811)
+      // reproduced here synchronously so the damage event carries a verdict
+      // even when the attack roll didn't auto-resolve one (#1235).
+      verdict: currentRow?.verdict ?? "hit",
+      // The row's actual crit state at damage time (nat20 or a manual "Crit!"
+      // call) — see RollEventData's `crit` doc for why this differs from the
+      // attack event's nat20-only value.
+      crit: rowCrit,
+      damageComponents: entry.damageComponents,
+    });
     setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
     setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
     if (currentRow) setTallyDamage(currentRow.id, result.total);
