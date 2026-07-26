@@ -33,6 +33,7 @@ import { journalRouter } from "@/routes/session/journal.js";
 import { levelUpRouter } from "@/routes/character/level-up.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
+import { preferencesRouter } from "@/routes/platform/preferences.js";
 import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
@@ -43,7 +44,7 @@ import { spellcastingRouter } from "@/routes/character/spellcasting.js";
 const FAKE_ID = "manifest-auth-boundary-fixture-id";
 
 interface Probe {
-  method: "get" | "post";
+  method: "get" | "post" | "patch";
   path: string;
 }
 
@@ -68,6 +69,12 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   // (it IS the session-check endpoint), so it would false-positive as public.
   { name: "authRouter", router: authRouter, probe: { method: "get", path: "/api/auth/providers" } },
   { name: "charactersRouter", router: charactersRouter, probe: { method: "get", path: "/api/characters" } },
+  // No GET on preferencesRouter — only PATCH "/" (#1178).
+  {
+    name: "preferencesRouter",
+    router: preferencesRouter,
+    probe: { method: "patch", path: "/api/preferences" },
+  },
   { name: "referenceRouter", router: referenceRouter, probe: { method: "get", path: "/api/reference" } },
   { name: "itemsRouter", router: itemsRouter, probe: { method: "get", path: "/api/items" } },
   { name: "spellsRouter", router: spellsRouter, probe: { method: "get", path: "/api/spells" } },

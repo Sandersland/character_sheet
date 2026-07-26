@@ -437,6 +437,30 @@ describe("auth router", () => {
       const after = await agent.get("/api/auth/me");
       expect(after.status).toBe(401);
     });
+
+    it("includes preferences: null until stored, then the defaulted-merged value (#1178)", async () => {
+      TEST_SUBS.add("sub-me-prefs");
+      mockGoogleFetch({ profile: googleProfile("sub-me-prefs") });
+
+      const agent = supertest.agent(buildApp());
+      const { state } = await beginFlow(agent);
+      await agent.get(`/api/auth/google/callback?code=c&state=${state}`);
+
+      const before = await agent.get("/api/auth/me");
+      expect(before.body.user.preferences).toBeNull();
+
+      await prisma.user.update({
+        where: { id: before.body.user.id },
+        data: { preferences: { theme: "dark" } },
+      });
+
+      const after = await agent.get("/api/auth/me");
+      expect(after.body.user.preferences).toEqual({
+        theme: "dark",
+        diceRollStyle: "animated",
+        autoRollConcentration: true,
+      });
+    });
   });
 });
 

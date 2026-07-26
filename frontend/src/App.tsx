@@ -7,6 +7,7 @@ import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import AppHeader from "@/features/auth/AppHeader";
 import AuthGate from "@/features/auth/AuthGate";
 import { AuthProvider } from "@/features/auth/AuthProvider";
+import { PreferencesProvider } from "@/features/preferences/PreferencesProvider";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
@@ -55,61 +56,67 @@ export default function App() {
         {/* Catches any render-time crash in a route so one bad screen can't
             blank the whole app mid-session. */}
         <ErrorBoundary>
-          {/* Theme wraps everything so data-theme is applied app-wide. */}
-          <ThemeProvider>
-            {/* Dice-roll presentation preference (Animated vs Quick, #945). */}
-            <DiceRollStyleProvider>
-              {/* Auth wraps the route tree: AuthGate shows the login screen for an
-                  anonymous user (incl. after a 401), the app otherwise. */}
-              <AuthProvider>
-                {/* Flex-column shell: header + routes share one dvh column (#1171). */}
-                <div className="flex min-h-dvh flex-col">
-                  <AuthGate>
-                    <AppHeader />
-                    <div className="flex min-h-0 flex-1 flex-col">
-                      {/* Suspense catches the lazy route chunks while they load. */}
-                      <Suspense fallback={null}>
-                        <Routes>
-                          <Route path="/" element={<CharacterListPage />} />
-                          {/* Static path registered before the :id param route so "new"
-                              can never be swallowed by it. */}
-                          <Route path="/characters/new" element={<CharacterCreatePage />} />
-                          <Route path="/characters/:id" element={<CharacterSheetPage />} />
-                          {/* Field-chronicle journal page (#864) */}
-                          <Route path="/characters/:id/journal" element={<JournalPage />} />
-                          {/* Level-up ceremony (#886) */}
-                          <Route path="/characters/:id/level-up" element={<LevelUpPage />} />
-                          {/* Live-play now lives on the sheet's Combat tab (#960/#962);
-                              the old session route redirects there. */}
-                          <Route
-                            path="/characters/:id/session"
-                            element={<LegacySessionRedirect />}
-                          />
-                          {/* Shared campaigns (#246) */}
-                          <Route path="/campaigns" element={<CampaignsPage />} />
-                          <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
-                          {/* Codex tab (#367) — explicit route, not an optional :tab param,
-                              so it can't swallow the /entities/:entityId path below. */}
-                          <Route path="/campaigns/:id/codex" element={<CampaignDetailPage />} />
-                          {/* Owner-only Manage tab (#379) — route access is guarded inside
-                              the page, which redirects a non-owner back to Overview. */}
-                          <Route path="/campaigns/:id/manage" element={<CampaignDetailPage />} />
-                          {/* Entity registry detail + backlinks (#248) */}
-                          <Route
-                            path="/campaigns/:id/entities/:entityId"
-                            element={<EntityDetailPage />}
-                          />
-                          <Route path="/join/:code" element={<JoinCampaignRoute />} />
-                          {/* About / third-party asset credits (#566) */}
-                          <Route path="/about" element={<AboutPage />} />
-                        </Routes>
-                      </Suspense>
-                    </div>
-                  </AuthGate>
-                </div>
-              </AuthProvider>
-            </DiceRollStyleProvider>
-          </ThemeProvider>
+          {/* Auth wraps everything below it (incl. Theme/DiceRollStyle) so
+              PreferencesProvider can read useAuth()'s user/status to reconcile
+              the account-synced cs:pref:* values (#1178); AuthProvider itself
+              renders no themed UI, so this nesting doesn't delay paint. */}
+          <AuthProvider>
+            <PreferencesProvider>
+              {/* Theme wraps everything visible so data-theme is applied app-wide. */}
+              <ThemeProvider>
+                {/* Dice-roll presentation preference (Animated vs Quick, #945). */}
+                <DiceRollStyleProvider>
+                  {/* Flex-column shell: header + routes share one dvh column (#1171). */}
+                  <div className="flex min-h-dvh flex-col">
+                    {/* AuthGate shows the login screen for an anonymous user
+                        (incl. after a 401), the app otherwise. */}
+                    <AuthGate>
+                      <AppHeader />
+                      <div className="flex min-h-0 flex-1 flex-col">
+                        {/* Suspense catches the lazy route chunks while they load. */}
+                        <Suspense fallback={null}>
+                          <Routes>
+                            <Route path="/" element={<CharacterListPage />} />
+                            {/* Static path registered before the :id param route so "new"
+                                can never be swallowed by it. */}
+                            <Route path="/characters/new" element={<CharacterCreatePage />} />
+                            <Route path="/characters/:id" element={<CharacterSheetPage />} />
+                            {/* Field-chronicle journal page (#864) */}
+                            <Route path="/characters/:id/journal" element={<JournalPage />} />
+                            {/* Level-up ceremony (#886) */}
+                            <Route path="/characters/:id/level-up" element={<LevelUpPage />} />
+                            {/* Live-play now lives on the sheet's Combat tab (#960/#962);
+                                the old session route redirects there. */}
+                            <Route
+                              path="/characters/:id/session"
+                              element={<LegacySessionRedirect />}
+                            />
+                            {/* Shared campaigns (#246) */}
+                            <Route path="/campaigns" element={<CampaignsPage />} />
+                            <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
+                            {/* Codex tab (#367) — explicit route, not an optional :tab param,
+                                so it can't swallow the /entities/:entityId path below. */}
+                            <Route path="/campaigns/:id/codex" element={<CampaignDetailPage />} />
+                            {/* Owner-only Manage tab (#379) — route access is guarded inside
+                                the page, which redirects a non-owner back to Overview. */}
+                            <Route path="/campaigns/:id/manage" element={<CampaignDetailPage />} />
+                            {/* Entity registry detail + backlinks (#248) */}
+                            <Route
+                              path="/campaigns/:id/entities/:entityId"
+                              element={<EntityDetailPage />}
+                            />
+                            <Route path="/join/:code" element={<JoinCampaignRoute />} />
+                            {/* About / third-party asset credits (#566) */}
+                            <Route path="/about" element={<AboutPage />} />
+                          </Routes>
+                        </Suspense>
+                      </div>
+                    </AuthGate>
+                  </div>
+                </DiceRollStyleProvider>
+              </ThemeProvider>
+            </PreferencesProvider>
+          </AuthProvider>
         </ErrorBoundary>
       </BrowserRouter>
       {ReactQueryDevtools && (

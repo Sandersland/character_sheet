@@ -23,6 +23,7 @@ import { journalRouter } from "@/routes/session/journal.js";
 import { levelUpRouter } from "@/routes/character/level-up.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
+import { preferencesRouter } from "@/routes/platform/preferences.js";
 import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
@@ -51,6 +52,7 @@ export const routeManifest: RouteMount[] = [
   { router: authRouter, mount: "/api", scope: "public" },
 
   { router: charactersRouter, mount: "/api", scope: "authed" },
+  { router: preferencesRouter, mount: "/api", scope: "authed" },
 
   // Catalog / reference routers own top-level collection paths.
   { router: referenceRouter, mount: "/api", scope: "authed" },
