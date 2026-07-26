@@ -7,7 +7,7 @@ import {
   deriveWeaponAttackComponents,
   deriveWeaponDamage,
 } from "@/lib/srd/srd.js";
-import type { WeaponAttackBonusComponents } from "@/lib/srd/srd.js";
+import type { RollEventAttackComponents } from "@character-sheet/shared-types";
 import {
   activatedMaxUses,
   chargePoolOf,
@@ -84,7 +84,7 @@ function buildInventoryWeaponView(
   | (ReturnType<typeof serializeWeaponDetail> & {
       attackBonus: number;
       /** Decomposed addends of `attackBonus` — surfaced for the combat-log drill-in (#1235); sums to it by construction. */
-      attackBonusComponents: WeaponAttackBonusComponents;
+      attackBonusComponents: RollEventAttackComponents;
       damage: ReturnType<typeof deriveWeaponDamage>;
     })
   | undefined {

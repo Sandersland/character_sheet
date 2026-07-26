@@ -1,3 +1,5 @@
+import type { RollEventAttackComponents } from "@character-sheet/shared-types";
+
 import { abilityModifier } from "@/lib/srd/math.js";
 
 /** Armor categories that a character can be proficient with. */
@@ -103,19 +105,15 @@ export function weaponAbilityMod(
   return strMod;
 }
 
-/** The four addends that sum to `deriveWeaponAttackBonus`'s return value (#1235 combat-log decomposition). */
-export interface WeaponAttackBonusComponents {
-  abilityMod: number;
-  /** The proficiency bonus actually applied — 0 (not omitted) when not proficient, so callers can sum unconditionally. */
-  proficiencyBonus: number;
-  rangedBonus: number;
-  attackRollBonus: number;
-}
-
 /**
  * Same inputs/rule as `deriveWeaponAttackBonus`, decomposed into its four
  * addends instead of summed. `deriveWeaponAttackBonus` delegates here so the
  * sum can never drift from the components — one rule, two views (#1235).
+ *
+ * Returns the shared-types wire shape rather than a backend-local twin: the
+ * serialized value crosses to the client as `attackBonusComponents`, and a
+ * second structurally-identical declaration would let a field added there go
+ * silently unreturned here (the boundary is JSON, so nothing type-checks it).
  */
 export function deriveWeaponAttackComponents(
   weapon: {
@@ -129,7 +127,7 @@ export function deriveWeaponAttackComponents(
   weaponGrants: ReadonlyArray<{ name: string }>,
   rangedAttackRollBonus = 0,
   attackRollBonus = 0,
-): WeaponAttackBonusComponents {
+): RollEventAttackComponents {
   const abilityMod = weaponAbilityMod(weapon, effectiveScores);
   const proficient = isProficientWithWeapon(weapon, weaponGrants);
   const rangedBonus = weapon.weaponRange === "ranged" ? rangedAttackRollBonus : 0;
