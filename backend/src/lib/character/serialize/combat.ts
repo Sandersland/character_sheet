@@ -1,3 +1,5 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import {
   abilityModifier,
   deriveArmorClass,
@@ -126,8 +128,9 @@ function classEntryLevel(row: CharacterWithRelations, className: string): number
 // into each other): feat speed bonuses, Monk Unarmored Movement (monk class
 // level, unarmored & unshielded), Barbarian Fast Movement (barbarian class
 // level 5+, not in heavy armor), and any active "speed"-targeted buff
-// (e.g. Boots of Speed, #543), then reduced by exhaustion (−5 ft×level, floored
-// at 0 — SRD 5.2).
+// (e.g. Boots of Speed, #543), then reduced by exhaustion — 2024: −5 ft×level
+// (SRD 5.2); 2014: halved at levels 2-4, floored to 0 at level 5+ (PHB'14
+// p. 291) — either way floored at 0 here as a final non-negative clamp.
 export function buildSpeedView(
   row: CharacterWithRelations,
   bestArmor: BestBodyArmor,
@@ -135,6 +138,7 @@ export function buildSpeedView(
   featBonuses: ReturnType<typeof deriveFeatBonuses>,
   buffTargets: TargetModifierMap,
   exhaustionLevel: number,
+  edition: RulesEdition,
 ): number {
   const unarmoredMovementBonus = deriveUnarmoredMovement({
     monkLevel: classEntryLevel(row, "monk"),
@@ -151,7 +155,7 @@ export function buildSpeedView(
     unarmoredMovementBonus +
     fastMovementBonus +
     (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0);
-  return Math.max(0, sum - exhaustionSpeedPenalty(exhaustionLevel));
+  return Math.max(0, sum - exhaustionSpeedPenalty(exhaustionLevel, sum, edition));
 }
 
 // Unarmed strike + improvised weapon rows. Derived from the same clamped
