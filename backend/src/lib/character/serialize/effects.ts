@@ -1,3 +1,5 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import {
   buffsByTarget,
   normalizeActiveEffectsMutable,
@@ -59,6 +61,7 @@ export function buildTargetModifiers(
 export function buildRollModifiers(
   conditions: ConditionsMutableState,
   activeEffects: ActiveEffectsMutableState,
+  edition: RulesEdition,
 ): RollModifier[] {
   const out: RollModifier[] = [];
   for (const entry of conditions.active) {
@@ -66,7 +69,7 @@ export function buildRollModifiers(
     if (!def) continue;
     for (const effect of def.rollEffects ?? []) out.push({ ...effect, source: def.label });
   }
-  for (const effect of exhaustionRollEffects(conditions.exhaustion)) {
+  for (const effect of exhaustionRollEffects(conditions.exhaustion, edition)) {
     out.push({ ...effect, source: "Exhaustion" });
   }
   for (const buff of activeEffects.buffs) {

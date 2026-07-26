@@ -22,6 +22,8 @@ export type ConditionKey =
   | "stunned"
   | "unconscious";
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { RollEffect, RollModeKind } from "./roll-effects.js";
 
 export interface ConditionDefinition {
@@ -157,22 +159,55 @@ export function isKnownCondition(key: string): key is ConditionKey {
 // a Dex check, so it's an explicit entry (SRD 5.2 "d20 Tests" cover it).
 const EXHAUSTION_ROLL_KINDS: RollModeKind[] = ["attack", "check", "save", "initiative"];
 
+// PHB'14 p. 291 (Appendix A): cumulative disadvantage tiers, not a flat
+// modifier. Tier 1's "disadvantage on ability checks" must also cover
+// Initiative here — RollModeKind splits `initiative` out as its own kind (it
+// isn't folded into `check`), but under 2014 Initiative *is* a Dexterity
+// check (PHB'14 p. 189), so a `check`-only effect would silently miss it.
+// Tier 4 (HP max halved) and tier 5 (Speed 0) have no roll-effect shape and
+// are handled elsewhere (tier 5 in exhaustionSpeedPenalty; tier 4 is out of
+// scope for #1307 — it touches derived max HP, not rolls).
+function exhaustionRollEffects2014(level: number): RollEffect[] {
+  const effects: RollEffect[] = [];
+  if (level >= 1) {
+    effects.push({ mode: "disadvantage", kind: "check" }, { mode: "disadvantage", kind: "initiative" });
+  }
+  if (level >= 3) {
+    effects.push({ mode: "disadvantage", kind: "attack" }, { mode: "disadvantage", kind: "save" });
+  }
+  return effects;
+}
+
 /**
- * Synthetic roll-effect grants for a given exhaustion level (#1136), mirroring
- * the standard conditions' `rollEffects` shape without a `ConditionDefinition`
- * entry of its own (exhaustion is a numeric level, not a boolean condition —
- * see the module comment above). SRD 5.2: each exhaustion level applies a flat
- * −2 to every d20 Test (attack rolls, ability checks, saving throws, Initiative),
- * so the penalty is −2×level. The Speed reduction (−5 ft×level, see
+ * Synthetic roll-effect grants for a given exhaustion level (#1136/#1307),
+ * mirroring the standard conditions' `rollEffects` shape without a
+ * `ConditionDefinition` entry of its own (exhaustion is a numeric level, not a
+ * boolean condition — see the module comment above). 2024 (SRD 5.2): each
+ * exhaustion level applies a flat −2 to every d20 Test (attack rolls, ability
+ * checks, saving throws, Initiative), so the penalty is −2×level. 2014
+ * (PHB'14): tiered disadvantage instead of a flat number — see
+ * exhaustionRollEffects2014. Either way, the Speed reduction (see
  * exhaustionSpeedPenalty) and death at level 6 are handled elsewhere.
  */
-export function exhaustionRollEffects(level: number): RollEffect[] {
+export function exhaustionRollEffects(level: number, edition: RulesEdition): RollEffect[] {
+  if (edition === "EDITION_2014") return exhaustionRollEffects2014(level);
   if (level < 1) return [];
   const modifier = -2 * level;
   return EXHAUSTION_ROLL_KINDS.map((kind) => ({ mode: "flat", modifier, kind }));
 }
 
-/** Speed reduction (feet) from exhaustion: −5 ft per level (SRD 5.2). */
-export function exhaustionSpeedPenalty(level: number): number {
+/**
+ * Speed reduction (feet) from exhaustion. 2024 (SRD 5.2): −5 ft per level.
+ * 2014 (PHB'14 p. 291): tiered — no penalty below level 2, current Speed
+ * (base + all bonuses, i.e. the value the caller has already summed) halved
+ * rounded down at levels 2-4, and a floor to exactly 0 at level 5+ (not a
+ * further −5 ft cut, which could theoretically overshoot into negative).
+ */
+export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edition: RulesEdition): number {
+  if (edition === "EDITION_2014") {
+    if (level < 2) return 0;
+    if (level < 5) return Math.floor(currentSpeed / 2);
+    return currentSpeed;
+  }
   return 5 * Math.max(0, level);
 }

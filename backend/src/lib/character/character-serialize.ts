@@ -6,6 +6,7 @@ import { focusSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
@@ -247,7 +248,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featBonuses,
     buffTargets,
   );
-  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion);
+  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion, editionOf(row));
   const { unarmedStrike, improvisedWeapon } = buildUnarmedAttacksView(
     row,
     effectiveScores,
@@ -336,7 +337,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     activeEffects,
     // State-driven advantage/disadvantage grants (#486), derived from active
     // conditions + buffs. The frontend resolves the effective mode per roll.
-    rollModifiers: buildRollModifiers(conditions, activeEffects),
+    rollModifiers: buildRollModifiers(conditions, activeEffects, editionOf(row)),
 
     // Item-granted traits (#529), derived from active items — no persisted
     // columns. resistances also feed the #456 auto-halve at damage-apply time;
