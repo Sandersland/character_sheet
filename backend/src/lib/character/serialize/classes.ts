@@ -20,13 +20,13 @@ export type PrimaryClass = CharacterWithRelations["classEntries"][number] | unde
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
 // layer stored `used` counts and known lists (clamped to caps). Returns the
 // resources view (undefined for classes with no pools) plus the raw
-// maneuverSaveDC (folded into the top-level rider contract by
-// serializeCharacter, #1316 — not part of the resources payload). Fighting
-// Style is a feat now (#1137) — surfaced via top-level fightingStyleSlots +
-// advancements, not here. The choice-cap fields are entry-scoped (#1177) via
-// deriveEntryScopedResources — mirrors loadResourcesReconcileState
-// (level-reconciliation.ts) so both sides compute the legal limit through the
-// one shared rule function.
+// maneuverSaveDC number — serializeCharacter folds it into the top-level
+// `maneuvers` rider (#1316), so it isn't part of the resources payload.
+// Fighting Style is a feat now (#1137) — surfaced via top-level
+// fightingStyleSlots + advancements, not here. The choice-cap fields are
+// entry-scoped (#1177) via deriveEntryScopedResources — mirrors
+// loadResourcesReconcileState (level-reconciliation.ts) so both sides compute
+// the legal limit through the one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
   level: number,

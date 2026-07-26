@@ -5,7 +5,7 @@ import ManeuverRow from "@/features/class/ManeuverRow";
 interface Props {
   characterId: string;
   resources: CharacterResources;
-  /** Top-level rider field (#1316) — folded out of `resources`, not part of it. */
+  /** The `maneuvers` rider's saveDC (#1316) — a top-level Character field, not part of `resources`. */
   maneuverSaveDC?: number;
   maneuverKnownIds: string[];
   busy: boolean;

@@ -708,7 +708,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "inventory": [],
   "journal": [],
   "level": 5,
-  "maneuverSaveDC": {
+  "maneuvers": {
     "saveDC": 14,
   },
   "name": "Snapshot Simple Fighter",

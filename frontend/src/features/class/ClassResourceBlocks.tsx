@@ -57,7 +57,7 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
         <ManeuversSection
           characterId={character.id}
           resources={resources!}
-          maneuverSaveDC={character.maneuverSaveDC?.saveDC}
+          maneuverSaveDC={character.maneuvers?.saveDC}
           maneuverKnownIds={view.maneuverKnownIds}
           busy={busy}
           onLearn={(op) => resourceOp(op)}

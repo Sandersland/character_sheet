@@ -7,7 +7,7 @@ import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { editionOf } from "@/lib/rules/edition.js";
-import type { Rider } from "@character-sheet/shared-types";
+import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
@@ -37,14 +37,14 @@ import { buildSpellcastingView } from "./serialize/spellcasting.js";
 export { buildRollModifiers };
 
 // Riders (#1316): bolt-on effects that piggyback on an attack or a hit and
-// cost no action economy of their own (actions.ts's DERIVED_ACTIONS header
-// explains why they never live there). Each returns undefined off-class/
-// subclass/level so serializeCharacter can spread it in only when present —
-// absent keys, never null ones.
+// cost no action economy of their own (see `DERIVED_ACTIONS` for why they
+// never live there). Each returns undefined off-class/subclass/level so
+// serializeCharacter can spread it in only when present — absent keys, never
+// null ones.
 
 // Sneak Attack: the Nd6 dice spec, undefined for a non-rogue. Scales with
 // rogue class levels, matching applySneakAttackOperations.
-function sneakAttackRider(classEntries: { name: string; level: number }[]): Rider | undefined {
+function sneakAttackRider(classEntries: { name: string; level: number }[]): DiceRider | undefined {
   const spec = sneakAttackSpec(classEntries.find((c) => c.name.toLowerCase() === "rogue")?.level ?? 0);
   return spec ? { dice: { count: spec.count, faces: spec.faces } } : undefined;
 }
@@ -55,7 +55,7 @@ function stunningStrikeRider(
   classEntries: { name: string; level: number }[],
   abilityScores: Record<string, number>,
   profBonus: number,
-): Rider | undefined {
+): SaveRider | undefined {
   const monkLevel = classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
   return monkLevel >= 5 ? { saveDC: focusSaveDC(abilityScores, profBonus) } : undefined;
 }
@@ -63,7 +63,7 @@ function stunningStrikeRider(
 // Warrior of the Open Hand's monk class entry, or undefined off-subclass —
 // shared by openHandTechniqueRider/quiveringPalmRider so both gate on the
 // same (freeform, substring-matched) subclass string, mirroring
-// DERIVED_ACTIONS' grantSubclass convention in lib/classes/actions.ts.
+// DERIVED_ACTIONS' grantSubclass convention.
 function openHandMonkEntry(
   classEntries: { name: string; level: number; subclass?: string | null }[],
 ): { name: string; level: number; subclass?: string | null } | undefined {
@@ -79,7 +79,7 @@ function openHandTechniqueRider(
   classEntries: { name: string; level: number; subclass?: string | null }[],
   abilityScores: Record<string, number>,
   profBonus: number,
-): Rider | undefined {
+): SaveRider | undefined {
   const monk = openHandMonkEntry(classEntries);
   return monk && monk.level >= 3 ? { saveDC: focusSaveDC(abilityScores, profBonus) } : undefined;
 }
@@ -93,7 +93,7 @@ function quiveringPalmRider(
   abilityScores: Record<string, number>,
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
-): Rider | undefined {
+): SaveRider | undefined {
   const monk = openHandMonkEntry(classEntries);
   if (!monk || monk.level < 17) return undefined;
   return {
@@ -112,11 +112,11 @@ function buildRiderView(
   activeEffects: ActiveEffectsMutableState,
   maneuverSaveDC: number | undefined,
 ): {
-  sneakAttack?: Rider;
-  stunningStrike?: Rider;
-  openHandTechnique?: Rider;
-  quiveringPalm?: Rider;
-  maneuverSaveDC?: Rider;
+  sneakAttack?: DiceRider;
+  stunningStrike?: SaveRider;
+  openHandTechnique?: SaveRider;
+  quiveringPalm?: SaveRider;
+  maneuvers?: SaveRider;
 } {
   const sneakAttack = sneakAttackRider(classEntries);
   const stunningStrike = stunningStrikeRider(classEntries, abilityScores, profBonus);
@@ -131,8 +131,9 @@ function buildRiderView(
     // structurally the same shape as stunningStrike, just sourced from
     // deriveEntryScopedResources via buildResourcesView. maneuverChoiceCount/
     // toolProfChoiceCount stay in `resources` — they're choice counts,
-    // load-bearing for the clamp-on-read in serialize/classes.ts.
-    ...(maneuverSaveDC !== undefined ? { maneuverSaveDC: { saveDC: maneuverSaveDC } } : {}),
+    // load-bearing for the clamp-on-read in serialize/classes.ts. Named for
+    // the feature (`maneuvers`), like every other rider, not the field.
+    ...(maneuverSaveDC !== undefined ? { maneuvers: { saveDC: maneuverSaveDC } } : {}),
   };
 }
 
@@ -416,7 +417,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.
     attacksPerAction: deriveAttacksPerAction(row.classEntries),
     // Riders (#1316): sneakAttack/stunningStrike/openHandTechnique/
-    // quiveringPalm/maneuverSaveDC, each present only when the character has it.
+    // quiveringPalm/maneuvers, each present only when the character has it.
     ...riders,
 
     journal: buildJournalView(row),
