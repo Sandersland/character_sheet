@@ -62,6 +62,13 @@ describe("conditionDefinition — 2014 divergent conditions (#1309, PHB'14 pp. 2
     expect(c2024.rollEffects).toEqual([{ mode: "disadvantage", kind: "initiative" }]);
   });
 
+  it("petrified: 2014 description includes the auto-failed saves and advantage-to-hit clauses (PHB'14 p. 291) that a prior transcription dropped", () => {
+    const c2014 = conditionDefinition("petrified", "EDITION_2014");
+    expect(c2014.description).toBe(
+      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance. Incapacitated, can't move or speak, and is unaware of its surroundings. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage. Resistant to all damage; immune to poison and disease.",
+    );
+  });
+
   it("prone: description differs, but rollEffects (disadvantage on attack) stay identical", () => {
     const c2014 = conditionDefinition("prone", "EDITION_2014");
     const c2024 = conditionDefinition("prone", "EDITION_2024");

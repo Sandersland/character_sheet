@@ -185,6 +185,10 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
   invisible: {
     description:
       "Impossible to see without the aid of magic or a special sense. The creature is heavily obscured. Attack rolls against it have disadvantage, and its attack rolls have advantage.",
+    // The pre-cutover row had no rollEffects at all, despite its own description
+    // promising advantage on its attacks — a transcription gap, not a 2014 rule.
+    // This is a deliberate fix, not a restore: don't drop it chasing byte-parity
+    // with history.
     rollEffects: [{ mode: "advantage", kind: "attack" }],
   },
   paralyzed: {
@@ -193,8 +197,12 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
     rollEffects: undefined,
   },
   petrified: {
+    // PHB'14 p. 291: the auto-failed saves and advantage-to-hit clauses are
+    // real Appendix A text a prior transcription dropped — restored here, not
+    // added. "Attack rolls against it" targets another creature, so per the
+    // self-or-announce rule it's description text only, not a rollEffects entry.
     description:
-      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance. Incapacitated, can't move or speak, and is unaware of its surroundings. Resistant to all damage; immune to poison and disease.",
+      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance. Incapacitated, can't move or speak, and is unaware of its surroundings. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage. Resistant to all damage; immune to poison and disease.",
     rollEffects: undefined,
   },
   prone: {
