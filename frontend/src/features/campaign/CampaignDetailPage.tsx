@@ -7,6 +7,7 @@ import CampaignTabPanels from "@/features/campaign/CampaignTabPanels";
 import CampaignTabs from "@/features/campaign/CampaignTabs";
 import { fetchCampaign } from "@/api/client";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { EDITION_LABELS } from "@/lib/editionCopy";
 import type { Campaign } from "@/types/character";
 
 // The campaign hub: routed tabs — Overview (invite/add-character/roster) at
@@ -74,6 +75,8 @@ export default function CampaignDetailPage() {
                 {campaign.role === "OWNER" ? "Owner" : "Player"}
               </Badge>
             )}
+            {/* Campaign header + sheet header only (#1286) — not the character-list card. */}
+            <Badge tone="neutral">{EDITION_LABELS[campaign.rulesEdition]}</Badge>
           </h1>
         </div>
       </div>

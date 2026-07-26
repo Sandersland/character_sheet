@@ -218,3 +218,17 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
     expect(within(desktopHeader).queryByText(/Round/)).not.toBeInTheDocument();
   });
 });
+
+describe("CharacterSheetHeader rules edition (#1286)", () => {
+  it("shows the character's 2024 rules edition in the desktop banner", () => {
+    renderHeader({ activeTab: "overview" }, makeCharacter({ rulesEdition: "EDITION_2024" }));
+    const desktopHeader = screen.getAllByRole("banner").find((h) => h.className.includes("md:block"))!;
+    expect(within(desktopHeader).getByText("2024 rules")).toBeInTheDocument();
+  });
+
+  it("shows the character's 2014 rules edition in the desktop banner", () => {
+    renderHeader({ activeTab: "overview" }, makeCharacter({ rulesEdition: "EDITION_2014" }));
+    const desktopHeader = screen.getAllByRole("banner").find((h) => h.className.includes("md:block"))!;
+    expect(within(desktopHeader).getByText("2014 rules")).toBeInTheDocument();
+  });
+});

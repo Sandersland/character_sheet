@@ -109,6 +109,31 @@ describe("CampaignDetailPage (#246)", () => {
     await waitFor(() => expect(vi.mocked(client.fetchCampaign)).toHaveBeenCalledTimes(2));
   });
 
+  // #1286: the blocked-join error (naming both editions, stating the fix) is
+  // the backend's exact message, surfaced verbatim — no client-side rewrite.
+  it("surfaces the edition-mismatch error verbatim when the join is blocked", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
+    vi.mocked(client.fetchCharacters).mockResolvedValue(CHARACTERS);
+    vi.mocked(client.addCharacterToCampaign).mockRejectedValue(
+      new Error(
+        "Can't join: this character uses the 2014 rules, but this campaign runs the 2024 rules. A character's rules edition is set at creation and can't be changed.",
+      ),
+    );
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    const select = await screen.findByLabelText(/your characters/i);
+    await screen.findByRole("option", { name: "Thordak" });
+    await user.selectOptions(select, "char-1");
+    await user.click(screen.getByRole("button", { name: /add character/i }));
+
+    expect(
+      await screen.findByText(/this character uses the 2014 rules, but this campaign runs the 2024 rules/i),
+    ).toBeInTheDocument();
+  });
+
   it("shows the invite link and the caller's role", async () => {
     vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
     vi.mocked(client.fetchCharacters).mockResolvedValue([]);
@@ -119,6 +144,17 @@ describe("CampaignDetailPage (#246)", () => {
     expect(await screen.findByDisplayValue(/\/join\/abc123$/)).toBeInTheDocument();
     // "Owner" appears in both the header role badge and the roster.
     expect(screen.getAllByText("Owner").length).toBeGreaterThan(0);
+  });
+
+  // #1286: displayed on the campaign header (not the character-list card).
+  it("shows the campaign's rules edition in the header", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ rulesEdition: "EDITION_2014" }));
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.getByText("2014 rules")).toBeInTheDocument();
   });
 
   it("excludes a character already in a different campaign from the dropdown", async () => {
