@@ -118,8 +118,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
       setSynced((prev) => ({ ...(prev ?? localSnapshot()), [key]: value }));
       patchPreferences({ [key]: value } as Partial<UserPreferences>).catch(() => {
-        // Best-effort sync — the local write already landed above, so the
-        // player's change isn't lost, just not yet reflected on other devices.
+        // Best-effort: the optimistic local write above keeps the change
+        // visible now, but a silent failure is not durable — once the account
+        // has any stored value, the next reconcile adopts the server's older
+        // one and reverts this. Deliberately no error UX for a background sync.
       });
     },
     [],
