@@ -99,12 +99,16 @@ describe("LiveSessionProvider refresh", () => {
     );
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("liveJoined"));
 
-    // The DM ended it: next doorway read has no active session.
-    mockDoorway.mockResolvedValueOnce(doorway({ kind: "none", session: null }));
+    // The DM ended it: every subsequent doorway read has no active session.
+    // Not mockResolvedValueOnce — #1299 gave this query staleTime 0 +
+    // refetchOnWindowFocus, so an incidental refetch could consume a one-shot
+    // mock before refresh() does and the flip would silently never happen
+    // (#1349).
+    mockDoorway.mockResolvedValue(doorway({ kind: "none", session: null }));
     await act(async () => {
       await refreshFn();
     });
-    expect(screen.getByTestId("status")).toHaveTextContent("none");
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("none"));
   });
 
   // #1299: the manual seq-ref race guard is gone — TanStack Query's own request
