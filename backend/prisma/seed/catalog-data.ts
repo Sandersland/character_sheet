@@ -55,7 +55,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "history", "insight", "investigation", "medicine", "religion"],
     isSpellcaster: true,
-    subclassLevel: 3,
+    subclassLevel: 2, // PHB'14 p. 114: Arcane Tradition at 2nd level.
   },
   {
     name: "Fighter",
@@ -104,7 +104,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["history", "insight", "medicine", "persuasion", "religion"],
     isSpellcaster: true,
-    subclassLevel: 3,
+    subclassLevel: 1, // PHB'14 p. 57: Divine Domain at 1st level.
   },
   {
     name: "Barbarian",
@@ -156,7 +156,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "animalHandling", "insight", "medicine", "nature", "perception", "religion", "survival"],
     isSpellcaster: true,
-    subclassLevel: 3,
+    subclassLevel: 2, // PHB'14 p. 66: Druid Circle at 2nd level.
   },
   {
     name: "Monk",
@@ -204,7 +204,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"],
     isSpellcaster: true,
-    subclassLevel: 3,
+    subclassLevel: 1, // PHB'14 p. 99: Sorcerous Origin at 1st level.
   },
   {
     name: "Warlock",
@@ -213,7 +213,7 @@ export const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "deception", "history", "intimidation", "investigation", "nature", "religion"],
     isSpellcaster: true,
-    subclassLevel: 3,
+    subclassLevel: 1, // PHB'14 p. 105: Otherworldly Patron at 1st level.
   },
 ];
 
