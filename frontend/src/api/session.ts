@@ -1,5 +1,6 @@
 import type { Character, CharacterEvent, Session, SessionDoorwayState } from "@/types/character";
 import { jsonBody, request, send } from "@/api/http";
+import type { RollEventData } from "@character-sheet/shared-types";
 
 /** Start a shared campaign session with the given character as first participant. */
 export async function startCampaignSession(
@@ -178,27 +179,16 @@ export async function advanceCombatRound(
   );
 }
 
-/** Log a single roll from the session UI. Best-effort — callers catch and console.error. */
+/**
+ * Log a single roll from the session UI. Best-effort — callers catch and
+ * console.error. `payload` is `RollEventData` (packages/shared-types) — the
+ * single cross-tier shape for this route's request body AND the persisted
+ * event `data` (#1235); see that type for the field-by-field contract.
+ */
 export async function logRoll(
   characterId: string,
   sessionId: string,
-  payload: {
-    kind: "attack" | "damage" | "check" | "save" | "initiative";
-    source: string;
-    total: number;
-    specLabel?: string;
-    damageType?: string;
-    /** Raw kept die faces (non-dropped) so the Session Log can show the breakdown. */
-    faces?: number[];
-    /** Ability key for check/save rolls — source carries the display text. */
-    ability?: string;
-    /** Skill key for check rolls. */
-    skill?: string;
-    /** Target difficulty class, when the roll is made against one. */
-    dc?: number;
-    /** Advantage state the d20 was rolled with. */
-    rollMode?: "normal" | "advantage" | "disadvantage";
-  },
+  payload: RollEventData,
 ): Promise<void> {
   await send(
     `/characters/${characterId}/sessions/${sessionId}/roll`,

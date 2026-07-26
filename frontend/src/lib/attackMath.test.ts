@@ -188,6 +188,54 @@ describe("buildEquippedWeaponEntries", () => {
     });
     expect(buildEquippedWeaponEntries(character)).toEqual([]);
   });
+
+  // #1235: the entry forwards the weapon's server-derived decomposition so
+  // useAttackRolls can log it without recomputing any rule client-side.
+  it("forwards attackBonusComponents and a damage-derived meleeDamageBonus/abilityModifier pair as attackComponents/damageComponents", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem(
+          {
+            attackBonus: 5,
+            attackBonusComponents: { abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 },
+            damageDiceCount: 1,
+            damageDiceFaces: 8,
+            damageModifier: 5,
+            damageType: "slashing",
+            damage: {
+              damageDiceCount: 1,
+              damageDiceFaces: 8,
+              damageModifier: 5,
+              abilityModifier: 3,
+              meleeDamageBonus: 2,
+              damageType: "slashing",
+              grip: "one-handed",
+            },
+          },
+          "Longsword",
+          "inv-1",
+        ),
+      ] as unknown as Character["inventory"],
+    });
+    const [entry] = buildEquippedWeaponEntries(character);
+    expect(entry.attackComponents).toEqual({ abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 });
+    expect(entry.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 2 });
+  });
+
+  it("leaves attackComponents/damageComponents undefined for a legacy weapon serialized before #1235/#732", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem(
+          { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" },
+          "Longsword",
+          "inv-1",
+        ),
+      ] as unknown as Character["inventory"],
+    });
+    const [entry] = buildEquippedWeaponEntries(character);
+    expect(entry.attackComponents).toBeUndefined();
+    expect(entry.damageComponents).toBeUndefined();
+  });
 });
 
 describe("buildAttackEntries", () => {
