@@ -65,6 +65,9 @@ export function buildRollModifiers(
 ): RollModifier[] {
   const out: RollModifier[] = [];
   for (const entry of conditions.active) {
+    // conditionDefinition asserts its lookup always succeeds — safe here only
+    // because normalizeConditionsMutable already dropped any entry.key that
+    // fails isKnownCondition, so every key reaching this loop is a real one.
     const def = conditionDefinition(entry.key, edition);
     for (const effect of def.rollEffects ?? []) out.push({ ...effect, source: def.label });
   }

@@ -162,11 +162,14 @@ export function isKnownCondition(key: string): key is ConditionKey {
  * 2014 half of what #1135's SRD-5.2 retranscription replaced). Sparse on
  * purpose — the other 5 conditions (blinded, deafened, frightened, poisoned,
  * restrained) are byte-identical across editions and must resolve through
- * the single CONDITIONS row below, not a duplicated one. An explicit
- * `rollEffects: undefined` clears a 2024-only grant that #1135 flattened onto
- * this condition (Incapacitated's initiative disadvantage on
- * paralyzed/petrified/stunned; see the comment on 2024's `paralyzed` above) —
- * 2014 has no Incapacitated-inheritance rule.
+ * the single CONDITIONS row below, not a duplicated one. Both editions'
+ * Incapacitated is inherited by paralyzed/petrified/stunned/unconscious
+ * (PHB'14 p. 291 says so explicitly, same as SRD 5.2) — the difference is
+ * that PHB'14's Incapacitated carries no d20-roll effect to inherit (it's
+ * just "can't take actions or reactions"), while SRD 5.2's adds disadvantage
+ * on Initiative. So the inheritance is real in both editions; it just
+ * produces nothing in 2014. An explicit `rollEffects: undefined` below
+ * clears that 2024-only initiative grant.
  */
 const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: string; rollEffects?: RollEffect[] }>> = {
   charmed: {
@@ -184,7 +187,7 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
   },
   invisible: {
     description:
-      "Impossible to see without the aid of magic or a special sense. The creature is heavily obscured. Attack rolls against it have disadvantage, and its attack rolls have advantage.",
+      "Impossible to see without the aid of magic or a special sense. For the purpose of hiding, the creature is heavily obscured. Attack rolls against it have disadvantage, and its attack rolls have advantage.",
     // The pre-cutover row had no rollEffects at all, despite its own description
     // promising advantage on its attacks — a transcription gap, not a 2014 rule.
     // This is a deliberate fix, not a restore: don't drop it chasing byte-parity
@@ -202,7 +205,7 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
     // added. "Attack rolls against it" targets another creature, so per the
     // self-or-announce rule it's description text only, not a rollEffects entry.
     description:
-      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance. Incapacitated, can't move or speak, and is unaware of its surroundings. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage. Resistant to all damage; immune to poison and disease.",
+      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance; its weight increases by a factor of ten, and it ceases aging. Incapacitated, can't move or speak, and is unaware of its surroundings. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage. Resistant to all damage; immune to poison and disease.",
     rollEffects: undefined,
   },
   prone: {
@@ -217,7 +220,13 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
   unconscious: {
     description:
       "Incapacitated, can't move or speak, and is unaware of its surroundings. Drops whatever it's holding and falls prone. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits from within 5 feet is a critical hit.",
-    rollEffects: undefined,
+    // Both editions' Unconscious inherits Prone (falls prone) as well as
+    // Incapacitated. 2014 Prone still grants disadvantage on attack (see
+    // `prone` above, unchanged from 2024), so that flattens through here too —
+    // only the Incapacitated-sourced initiative grant is 2024-only. Mechanically
+    // moot (an unconscious creature can't attack) but keeps both editions
+    // modeling the same inheritance instead of one silently dropping it.
+    rollEffects: [{ mode: "disadvantage", kind: "attack" }],
   },
 };
 
@@ -227,6 +236,10 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
  * future edition fork only has to touch this function.
  * `key` is guaranteed present in CONDITIONS by the ConditionKey type, so the
  * lookup below always succeeds.
+ * `label` never forks: CONDITIONS_2014_OVERRIDES' value type has no `label`
+ * field, so `tsc` itself rejects an attempt to override it — a caller that
+ * only needs a condition's label (e.g. `conditionLabel`) can stay edition-free
+ * by construction, not by convention.
  */
 export function conditionDefinition(key: ConditionKey, edition: RulesEdition): ConditionDefinition {
   const base = CONDITIONS.find((c) => c.key === key)!;

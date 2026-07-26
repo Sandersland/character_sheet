@@ -182,8 +182,10 @@ describe("buildRollModifiers — 2014 divergent conditions (#1309, PHB'14 pp. 29
     expect(buildRollModifiers(condition("stunned"), noEffects, "EDITION_2014")).toEqual([]);
   });
 
-  it("unconscious: no roll effects (2024 flattens Incapacitated + Prone's disadvantage onto it)", () => {
-    expect(buildRollModifiers(condition("unconscious"), noEffects, "EDITION_2014")).toEqual([]);
+  it("unconscious: disadvantage on attack from Prone (2014 Incapacitated has no initiative grant to flatten, unlike 2024)", () => {
+    expect(buildRollModifiers(condition("unconscious"), noEffects, "EDITION_2014")).toEqual([
+      { mode: "disadvantage", kind: "attack", source: "Unconscious" },
+    ]);
   });
 });
 

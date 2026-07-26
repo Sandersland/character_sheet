@@ -46,6 +46,13 @@ describe("conditionDefinition — 2014 divergent conditions (#1309, PHB'14 pp. 2
     ]);
   });
 
+  it("invisible: 2014 description keeps the load-bearing 'for the purpose of hiding' qualifier a prior transcription dropped", () => {
+    const c2014 = conditionDefinition("invisible", "EDITION_2014");
+    expect(c2014.description).toBe(
+      "Impossible to see without the aid of magic or a special sense. For the purpose of hiding, the creature is heavily obscured. Attack rolls against it have disadvantage, and its attack rolls have advantage.",
+    );
+  });
+
   it("paralyzed: 2014 has no rollEffects; 2024 grants disadvantage on initiative (Incapacitated inheritance)", () => {
     const c2014 = conditionDefinition("paralyzed", "EDITION_2014");
     const c2024 = conditionDefinition("paralyzed", "EDITION_2024");
@@ -62,10 +69,10 @@ describe("conditionDefinition — 2014 divergent conditions (#1309, PHB'14 pp. 2
     expect(c2024.rollEffects).toEqual([{ mode: "disadvantage", kind: "initiative" }]);
   });
 
-  it("petrified: 2014 description includes the auto-failed saves and advantage-to-hit clauses (PHB'14 p. 291) that a prior transcription dropped", () => {
+  it("petrified: 2014 description includes the weight/aging, auto-failed-saves, and advantage-to-hit clauses (PHB'14 p. 291) that a prior transcription dropped", () => {
     const c2014 = conditionDefinition("petrified", "EDITION_2014");
     expect(c2014.description).toBe(
-      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance. Incapacitated, can't move or speak, and is unaware of its surroundings. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage. Resistant to all damage; immune to poison and disease.",
+      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance; its weight increases by a factor of ten, and it ceases aging. Incapacitated, can't move or speak, and is unaware of its surroundings. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage. Resistant to all damage; immune to poison and disease.",
     );
   });
 
@@ -85,11 +92,11 @@ describe("conditionDefinition — 2014 divergent conditions (#1309, PHB'14 pp. 2
     expect(c2024.rollEffects).toEqual([{ mode: "disadvantage", kind: "initiative" }]);
   });
 
-  it("unconscious: 2014 has no rollEffects; 2024 grants disadvantage on initiative + attack", () => {
+  it("unconscious: 2014 flattens Prone's disadvantage on attack (both editions inherit Prone; 2014 Incapacitated just has no initiative grant to add)", () => {
     const c2014 = conditionDefinition("unconscious", "EDITION_2014");
     const c2024 = conditionDefinition("unconscious", "EDITION_2024");
     expect(c2014.description).not.toBe(c2024.description);
-    expect(c2014.rollEffects).toBeUndefined();
+    expect(c2014.rollEffects).toEqual([{ mode: "disadvantage", kind: "attack" }]);
     expect(c2024.rollEffects).toEqual([
       { mode: "disadvantage", kind: "initiative" },
       { mode: "disadvantage", kind: "attack" },
