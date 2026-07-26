@@ -1,4 +1,6 @@
-// The 14 standard 5e status conditions (SRD 5.2). This is the single
+// The 14 standard 5e status conditions, for both editions: CONDITIONS is the
+// SRD 5.2 baseline and CONDITIONS_2014_OVERRIDES varies the nine that differ,
+// resolved by conditionDefinition. This is the single
 // source of truth for condition rules data — the frontend resolves display text
 // through a label map derived from these keys, never by rendering raw keys.
 // Exhaustion is intentionally NOT in this list: it is a single 0–6 level handled
@@ -232,8 +234,9 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
 
 /**
  * The one lookup for a condition's rules text/effects (#1309) — every call
- * site resolves through here instead of reading CONDITIONS directly, so a
- * future edition fork only has to touch this function.
+ * site that needs edition-sensitive data resolves through here, so a future
+ * edition fork only has to touch this function. Reading CONDITIONS directly
+ * stays correct for the edition-invariant fields (keys, labels).
  * `key` is guaranteed present in CONDITIONS by the ConditionKey type, so the
  * lookup below always succeeds.
  * `label` never forks: CONDITIONS_2014_OVERRIDES' value type has no `label`
