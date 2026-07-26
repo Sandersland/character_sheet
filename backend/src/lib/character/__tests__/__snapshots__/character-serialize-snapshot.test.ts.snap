@@ -182,6 +182,12 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "weapon": {
         "ammunition": false,
         "attackBonus": 0,
+        "attackBonusComponents": {
+          "abilityMod": 0,
+          "attackRollBonus": 0,
+          "proficiencyBonus": 0,
+          "rangedBonus": 0,
+        },
         "damage": {
           "abilityModifier": 0,
           "damageDiceCount": 1,
@@ -189,6 +195,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
           "damageModifier": 0,
           "damageType": "slashing",
           "grip": "one-handed",
+          "meleeDamageBonus": 0,
         },
         "damageDiceCount": 1,
         "damageDiceFaces": 8,

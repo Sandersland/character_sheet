@@ -30,7 +30,14 @@ async function pinFonts(page: Page): Promise<void> {
 }
 
 // Pin the theme before the SPA boots so the pre-paint script in index.html reads
-// it (addInitScript runs before page scripts on the next navigation).
+// it (addInitScript runs before page scripts on the next navigation). Also pins
+// it server-side: every spec shares one backend user (dev-user-local), and
+// PreferencesProvider adopts the server's stored preferences as authoritative
+// on every load — so an earlier spec's write otherwise survives into this one
+// and overrides this local pin the moment a later navigation re-fetches
+// /auth/me. diceRollStyle/autoRollConcentration are reset to their defaults
+// here too, even though only theme is pinned today, so neither becomes the
+// same kind of cross-spec leak later.
 async function setTheme(page: Page, theme: "light" | "dark"): Promise<void> {
   await page.addInitScript((t) => {
     try {
@@ -39,6 +46,14 @@ async function setTheme(page: Page, theme: "light" | "dark"): Promise<void> {
       // private-mode restriction — fall through to the default theme
     }
   }, theme);
+  // Asserted, not fire-and-forget: a silently-failing PATCH (expired cookie,
+  // route moved) would leave the stale server value winning and quietly restore
+  // the cross-spec bleed this exists to prevent — as a wrong-theme screenshot
+  // diff, which reads as a UI regression rather than a broken fixture.
+  const res = await page.request.patch("/api/preferences", {
+    data: { theme, diceRollStyle: "animated", autoRollConcentration: true },
+  });
+  expect(res.ok(), `pinning server preferences failed: ${res.status()}`).toBe(true);
 }
 
 // A Card renders as a <section> carrying its title heading — a stable, name-free

@@ -16,7 +16,7 @@ import AuthGate from "@/features/auth/AuthGate";
 import AppHeader from "@/features/auth/AppHeader";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
 
-const USER = { id: "u1", email: "ada@x.dev", name: "Ada", imageUrl: null };
+const USER = { id: "u1", email: "ada@x.dev", name: "Ada", imageUrl: null, preferences: null };
 
 function renderGate() {
   return render(

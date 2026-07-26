@@ -11,7 +11,7 @@ vi.mock("@/api/client", () => ({
 import { fetchMe, logout as clientLogout, setUnauthorizedHandler } from "@/api/client";
 import { AuthProvider, useAuth } from "@/features/auth/AuthProvider";
 
-const USER = { id: "u1", email: "ada@x.dev", name: "Ada", imageUrl: null };
+const USER = { id: "u1", email: "ada@x.dev", name: "Ada", imageUrl: null, preferences: null };
 
 function Probe() {
   const { status, user, logout } = useAuth();

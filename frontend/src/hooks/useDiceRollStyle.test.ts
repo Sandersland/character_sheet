@@ -1,13 +1,26 @@
+import { createElement, type ReactNode } from "react";
 import { renderHook, act } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   loadDiceRollStyle,
   saveDiceRollStyle,
   useDiceRollStylePreference,
 } from "@/hooks/useDiceRollStyle";
+import { PreferencesContext } from "@/hooks/usePreferencesSync";
+import type { UserPreferences } from "@/types/auth";
 
 const KEY = "cs:pref:diceRoll";
+
+const SYNCED: UserPreferences = { theme: "system", diceRollStyle: "quick", autoRollConcentration: true };
+
+// Stands in for PreferencesProvider (#1178) so these stay unit tests of the
+// hook alone — PreferencesProvider's own tests cover the reconcile-on-login logic.
+function withSynced(synced: UserPreferences | undefined, setPreference = vi.fn()) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(PreferencesContext.Provider, { value: { synced, setPreference } }, children);
+  };
+}
 
 describe("useDiceRollStyle", () => {
   afterEach(() => {
@@ -37,5 +50,34 @@ describe("useDiceRollStyle", () => {
     act(() => result.current[1]("animated"));
     expect(result.current[0]).toBe("animated");
     expect(localStorage.getItem(KEY)).toBe("animated");
+  });
+
+  describe("sync (#1178)", () => {
+    it("falls back to localStorage when no synced value exists", () => {
+      localStorage.setItem(KEY, "quick");
+      const { result } = renderHook(() => useDiceRollStylePreference());
+      expect(result.current[0]).toBe("quick");
+    });
+
+    it("prefers the synced value over a differing localStorage value once loaded", () => {
+      localStorage.setItem(KEY, "animated");
+      const { result } = renderHook(() => useDiceRollStylePreference(), {
+        wrapper: withSynced(SYNCED),
+      });
+      expect(result.current[0]).toBe("quick");
+    });
+
+    it("writing mirrors into localStorage and pushes through setPreference", () => {
+      const setPreference = vi.fn();
+      const { result } = renderHook(() => useDiceRollStylePreference(), {
+        wrapper: withSynced(undefined, setPreference),
+      });
+
+      act(() => result.current[1]("quick"));
+
+      expect(result.current[0]).toBe("quick");
+      expect(localStorage.getItem(KEY)).toBe("quick");
+      expect(setPreference).toHaveBeenCalledWith("diceRollStyle", "quick");
+    });
   });
 });

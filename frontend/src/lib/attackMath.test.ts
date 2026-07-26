@@ -188,6 +188,54 @@ describe("buildEquippedWeaponEntries", () => {
     });
     expect(buildEquippedWeaponEntries(character)).toEqual([]);
   });
+
+  // #1235: the entry forwards the weapon's server-derived decomposition so
+  // useAttackRolls can log it without recomputing any rule client-side.
+  it("forwards attackBonusComponents and a damage-derived meleeDamageBonus/abilityModifier pair as attackComponents/damageComponents", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem(
+          {
+            attackBonus: 5,
+            attackBonusComponents: { abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 },
+            damageDiceCount: 1,
+            damageDiceFaces: 8,
+            damageModifier: 5,
+            damageType: "slashing",
+            damage: {
+              damageDiceCount: 1,
+              damageDiceFaces: 8,
+              damageModifier: 5,
+              abilityModifier: 3,
+              meleeDamageBonus: 2,
+              damageType: "slashing",
+              grip: "one-handed",
+            },
+          },
+          "Longsword",
+          "inv-1",
+        ),
+      ] as unknown as Character["inventory"],
+    });
+    const [entry] = buildEquippedWeaponEntries(character);
+    expect(entry.attackComponents).toEqual({ abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 });
+    expect(entry.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 2 });
+  });
+
+  it("leaves attackComponents/damageComponents undefined for a legacy weapon serialized before #1235/#732", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem(
+          { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" },
+          "Longsword",
+          "inv-1",
+        ),
+      ] as unknown as Character["inventory"],
+    });
+    const [entry] = buildEquippedWeaponEntries(character);
+    expect(entry.attackComponents).toBeUndefined();
+    expect(entry.damageComponents).toBeUndefined();
+  });
 });
 
 describe("buildAttackEntries", () => {
@@ -473,6 +521,37 @@ describe("buildOffHandEntry (#732)", () => {
     });
     // 5 − max(0,3) = 2 (the Rage buff survives).
     expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(2);
+  });
+
+  // #1235: the logged damageComponents must sum to damageSpec.modifier — if the
+  // off-hand omission zeroes the ability mod in the modifier but a stale
+  // component object still shows the full mod, the combat log would show math
+  // that doesn't add up to the number actually rolled.
+  it("mirrors the ability-mod omission onto damageComponents so it still sums to damageSpec.modifier", () => {
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, meleeDamageBonus: 2, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, meleeDamageBonus: 2, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    const entry = buildOffHandEntry(character)!;
+    expect(entry.damageSpec.modifier).toBe(2); // 5 − max(0,3)
+    expect(entry.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 2 });
+    expect(entry.damageComponents!.abilityMod + entry.damageComponents!.meleeDamageBonus).toBe(entry.damageSpec.modifier);
+  });
+
+  it("keeps damageComponents' full ability mod WITH the Two-Weapon Fighting style", () => {
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, meleeDamageBonus: 0, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, meleeDamageBonus: 0, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+      advancements: [
+        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
+      ] as unknown as Character["advancements"],
+    });
+    const entry = buildOffHandEntry(character)!;
+    expect(entry.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0 });
   });
 });
 

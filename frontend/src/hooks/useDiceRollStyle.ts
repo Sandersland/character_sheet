@@ -1,14 +1,20 @@
 /**
- * localStorage persistence for the dice-roll presentation preference (#945). A
- * single global per-browser choice, shaped exactly like the theme preference
- * (useThemePreference): `animated` plays the 3D DiceRollModal, `quick` skips it
- * for a compact result chip. All access is try/catch-guarded so a missing or
- * corrupted entry degrades gracefully to the default.
+ * The dice-roll presentation preference (#945): `animated` plays the 3D
+ * DiceRollModal, `quick` skips it for a compact result chip. Account-synced
+ * through PreferencesProvider (#1178) with localStorage as the first-paint
+ * cache, shaped exactly like the theme preference (useThemePreference). All
+ * localStorage access is try/catch-guarded so a missing or corrupted entry
+ * degrades gracefully to the default.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-export type DiceRollStyle = "animated" | "quick";
+import { usePreferencesSync, type DiceRollStyle } from "@/hooks/usePreferencesSync";
+
+// Re-exported (not defined here) so usePreferencesSync stays the single owner
+// of the type — see its own banner for why (avoids an import cycle now that
+// dice-roll style is account-synced, #1178).
+export type { DiceRollStyle };
 
 const STORAGE_KEY = "cs:pref:diceRoll";
 
@@ -33,12 +39,28 @@ export function saveDiceRollStyle(value: DiceRollStyle): void {
   }
 }
 
-/** React hook over the preference: reads once on mount and persists on change. */
+/**
+ * React hook over the preference: paints from localStorage first, then adopts
+ * the account-synced value once PreferencesProvider resolves one (#1178) —
+ * which wins over a differing local value and gets mirrored back into
+ * localStorage for the next cold start.
+ */
 export function useDiceRollStylePreference(): [DiceRollStyle, (value: DiceRollStyle) => void] {
+  const { synced, setPreference } = usePreferencesSync();
   const [value, setValue] = useState<DiceRollStyle>(loadDiceRollStyle);
-  const set = useCallback((next: DiceRollStyle) => {
-    setValue(next);
-    saveDiceRollStyle(next);
-  }, []);
+
+  useEffect(() => {
+    if (synced === undefined) return;
+    setValue(synced.diceRollStyle);
+  }, [synced]);
+
+  const set = useCallback(
+    (next: DiceRollStyle) => {
+      setValue(next);
+      saveDiceRollStyle(next);
+      setPreference("diceRollStyle", next);
+    },
+    [setPreference],
+  );
   return [value, set];
 }

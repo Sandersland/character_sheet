@@ -1,15 +1,21 @@
 /**
- * localStorage persistence for the dark-mode theme preference. A single global
- * per-browser choice (not per-character), shaped like the concentration
- * preference (issue #76). All access is try/catch-guarded so a missing/corrupted
- * entry or a private-browsing restriction degrades gracefully to the default.
+ * The dark-mode theme preference. Account-synced through PreferencesProvider
+ * (#1178) with localStorage as the first-paint cache, so it follows the signed-in
+ * player across browsers rather than being a per-browser choice. All localStorage
+ * access is try/catch-guarded so a missing/corrupted entry or a private-browsing
+ * restriction degrades gracefully to the default.
  *
  * `system` follows the OS `prefers-color-scheme`; `light`/`dark` pin a theme.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-export type ThemePreference = "light" | "dark" | "system";
+import { usePreferencesSync, type ThemePreference } from "@/hooks/usePreferencesSync";
+
+// Re-exported (not defined here) so usePreferencesSync stays the single owner
+// of the type — see its own banner for why (avoids an import cycle now that
+// theme is account-synced, #1178).
+export type { ThemePreference };
 export type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "cs:pref:theme";
@@ -48,12 +54,28 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
   return preference === "system" ? getSystemTheme() : preference;
 }
 
-/** React hook over the preference: reads once on mount and persists on change. */
+/**
+ * React hook over the preference: paints from localStorage first (works
+ * before auth resolves / offline), then adopts the account-synced value once
+ * PreferencesProvider resolves one (#1178) — which wins over a differing local
+ * value and gets mirrored back into localStorage for the next cold start.
+ */
 export function useThemePreference(): [ThemePreference, (value: ThemePreference) => void] {
+  const { synced, setPreference } = usePreferencesSync();
   const [value, setValue] = useState<ThemePreference>(loadThemePreference);
-  const set = useCallback((next: ThemePreference) => {
-    setValue(next);
-    saveThemePreference(next);
-  }, []);
+
+  useEffect(() => {
+    if (synced === undefined) return;
+    setValue(synced.theme);
+  }, [synced]);
+
+  const set = useCallback(
+    (next: ThemePreference) => {
+      setValue(next);
+      saveThemePreference(next);
+      setPreference("theme", next);
+    },
+    [setPreference],
+  );
   return [value, set];
 }

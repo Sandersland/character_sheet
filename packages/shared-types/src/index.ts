@@ -8,6 +8,7 @@ export type * from "./class-resources.js";
 export type * from "./edition.js";
 export type * from "./item-detail-inputs.js";
 export type * from "./riders.js";
+export type * from "./roll-event.js";
 export type * from "./session.js";
 export type * from "./spellcasting.js";
 export type * from "./starting-equipment.js";

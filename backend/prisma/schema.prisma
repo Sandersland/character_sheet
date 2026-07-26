@@ -120,6 +120,13 @@ model User {
   email    String? @unique
   name     String?
   imageUrl String?
+  // Account-synced player preferences (#1178: theme, dice-roll style,
+  // auto-roll concentration) — typed JSON (see UserPreferences) so new keys
+  // need no migration. NULL means "never stored" (distinct from a stored
+  // object that happens to equal the defaults) — that marker is what lets
+  // first-login migration push local values up without a later device's
+  // untouched defaults clobbering real synced values.
+  preferences Json?
 
   accounts   AuthAccount[]
   sessions   AuthSession[]
