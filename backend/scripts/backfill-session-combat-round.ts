@@ -1,27 +1,27 @@
 // One-time migration (#1030): Session.round/combatActive are new authoritative
-// columns (see schema.prisma's why-comment on Session). Sessions created
-// before the migration have round=0 by column default regardless of how far
-// combat actually got, so this seeds `round` from each session's latest
-// combatRoundAdvanced event via the existing latestCombatRound() rule
-// (backend/src/lib/session/doorway.ts) — reused, not re-derived.
+// columns (see the Session model's why-comment). Sessions created before the
+// migration have round=0/combatActive=false by column default regardless of
+// how far combat actually got, so this seeds both from each session's combat
+// event history via latestCombatRound/latestCombatActive — reused, not
+// re-derived, so the backfill has one source for "what combat looked like
+// last" rather than two divergent queries.
 //
-// Deliberately does NOT infer `combatActive`: the event log has no reliable
-// way to tell "combat is still running" from "combat ended" for an old
-// session (combatEnded events aren't always logged, e.g. a session left
-// active across a server restart pre-#1030). A session that was genuinely
-// mid-combat at migration time comes back with combatActive=false and its
-// last-known round; a participant must press Start Combat again, which is an
-// acceptable one-time reset for a pre-production app (#1030 report).
+// A session whose events say it's still mid-combat but never logged a
+// combatRoundAdvanced (started, never advanced past round 1) backfills to
+// round 1 — combatActive=true always implies round>=1 in the live model
+// (startCombat sets both together), so this keeps the backfilled state
+// internally consistent with a normally-started encounter.
 //
 // Idempotent: only touches sessions whose round is still the column default
-// (0) and that have at least one combatRoundAdvanced event; a second run is a
-// no-op over already-backfilled sessions.
+// (0), and only writes when the event history resolves to something other
+// than the defaults (round 0, inactive); a second run is a no-op over
+// already-backfilled sessions.
 //
 // Imports only lib/ rule functions + prisma (no route/serialize code), per
 // the migration-script pattern the sibling scripts in this directory follow.
 import type { PrismaClient } from "@/generated/prisma/client.js";
 import { prisma as defaultPrisma } from "@/lib/core/prisma.js";
-import { latestCombatRound } from "@/lib/session/doorway.js";
+import { latestCombatRound, latestCombatActive } from "@/lib/session/doorway.js";
 
 export async function backfillSessionCombatRound(
   prisma: PrismaClient = defaultPrisma,
@@ -33,9 +33,10 @@ export async function backfillSessionCombatRound(
 
   const changedSessions: string[] = [];
   for (const { id } of candidates) {
-    const round = await latestCombatRound(id);
-    if (round === null || round === 0) continue;
-    await prisma.session.update({ where: { id }, data: { round } });
+    const [round, active] = await Promise.all([latestCombatRound(id), latestCombatActive(id)]);
+    const resolvedRound = round ?? (active ? 1 : 0);
+    if (resolvedRound === 0 && !active) continue;
+    await prisma.session.update({ where: { id }, data: { round: resolvedRound, combatActive: active } });
     changedSessions.push(id);
   }
 

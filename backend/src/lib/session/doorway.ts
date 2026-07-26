@@ -13,11 +13,12 @@ export type { SessionDoorwayState };
 /**
  * Latest combat round for a session per the OLD event-derived rule, or null
  * when combat never advanced a round. Superseded by `Session.round`/
- * `combatActive` (#1030) for every live read below — this is kept solely for
- * `backend/scripts/backfill-session-combat-round.ts` to seed those columns on
- * sessions that predate the migration. Do not add a new call site: any live
- * read of "what round is it" belongs on the authoritative columns.
+ * `combatActive` (#1030) for every live read below — kept solely so
+ * `backfillSessionCombatRound` can seed those columns on sessions that predate
+ * the migration. Do not add a new call site: any live read of "what round is
+ * it" belongs on the authoritative columns.
  */
+// fallow-ignore-next-line unused-export -- sole consumer is backfillSessionCombatRound, under the ignored backend/scripts/**
 export async function latestCombatRound(sessionId: string): Promise<number | null> {
   const event = await prisma.characterEvent.findFirst({
     where: { sessionId, type: "combatRoundAdvanced" },
@@ -26,6 +27,26 @@ export async function latestCombatRound(sessionId: string): Promise<number | nul
   });
   const round = (event?.data as { round?: unknown } | null)?.round;
   return typeof round === "number" ? round : null;
+}
+
+/**
+ * Whether a session was still mid-combat per the OLD event-derived rule: true
+ * iff the LATEST of the three combat-lifecycle events is combatStarted or
+ * combatRoundAdvanced (i.e. no later combatEnded), false otherwise — including
+ * "never fought". Same event-reading shape as `latestCombatRound` (one
+ * findFirst ordered by createdAt desc), widened to every combat event type
+ * since "still active" depends on which KIND was logged last, not a round
+ * number. Kept solely for `backfillSessionCombatRound`, for the same reason as
+ * `latestCombatRound` — do not add a new call site.
+ */
+// fallow-ignore-next-line unused-export -- sole consumer is backfillSessionCombatRound, under the ignored backend/scripts/**
+export async function latestCombatActive(sessionId: string): Promise<boolean> {
+  const event = await prisma.characterEvent.findFirst({
+    where: { sessionId, type: { in: ["combatStarted", "combatEnded", "combatRoundAdvanced"] } },
+    orderBy: { createdAt: "desc" },
+    select: { type: true },
+  });
+  return event?.type === "combatStarted" || event?.type === "combatRoundAdvanced";
 }
 
 /**

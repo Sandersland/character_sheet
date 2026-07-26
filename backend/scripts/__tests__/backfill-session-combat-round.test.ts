@@ -1,6 +1,6 @@
-// backfill-session-combat-round (#1030): seeds Session.round from the legacy
-// combatRoundAdvanced event trail for sessions created before the migration.
-// Requires DATABASE_URL.
+// backfill-session-combat-round (#1030): seeds Session.round AND combatActive
+// from the legacy combat-event trail for sessions created before the
+// migration. Requires DATABASE_URL.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -48,6 +48,23 @@ async function logRoundEvent(sessionId: string, round: number, at: Date): Promis
   });
 }
 
+async function logLifecycleEvent(
+  sessionId: string,
+  type: "combatStarted" | "combatEnded",
+  at: Date,
+): Promise<void> {
+  await prisma.characterEvent.create({
+    data: {
+      characterId: CHAR_ID,
+      category: "combat",
+      type,
+      summary: type === "combatStarted" ? "Combat started" : "Combat ended",
+      sessionId,
+      createdAt: at,
+    },
+  });
+}
+
 beforeEach(async () => {
   await ensureTestOwner(OWNER_ID);
   await prisma.character.create({
@@ -60,7 +77,7 @@ afterEach(async () => {
 });
 
 describe("backfillSessionCombatRound (#1030)", () => {
-  it("seeds round from the latest combatRoundAdvanced event", async () => {
+  it("seeds round from the latest combatRoundAdvanced event, and infers combatActive:true (no later combatEnded)", async () => {
     const sessionId = await makeSession(0);
     await logRoundEvent(sessionId, 2, new Date("2026-01-01T00:00:00Z"));
     await logRoundEvent(sessionId, 3, new Date("2026-01-01T00:05:00Z"));
@@ -70,8 +87,39 @@ describe("backfillSessionCombatRound (#1030)", () => {
     expect(result.changedSessions).toContain(sessionId);
     const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
     expect(session.round).toBe(3);
-    // combatActive is deliberately left untouched — see the script's header comment.
+    // #1030 finding #4: the latest combat event is combatRoundAdvanced with no
+    // later combatEnded — still mid-fight, so combatActive must surface too,
+    // or round:3 can never reach the doorway (it gates on combatActive).
+    expect(session.combatActive).toBe(true);
+  });
+
+  it("infers combatActive:false when the latest combat event is combatEnded", async () => {
+    const sessionId = await makeSession(0);
+    await logRoundEvent(sessionId, 7, new Date("2026-01-01T00:00:00Z"));
+    await logLifecycleEvent(sessionId, "combatEnded", new Date("2026-01-01T00:05:00Z"));
+
+    const result = await backfillSessionCombatRound(prisma);
+
+    expect(result.changedSessions).toContain(sessionId);
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    // round stays at its last-known value (historical fact); combatActive
+    // reflects that the fight had already ended before the migration.
+    expect(session.round).toBe(7);
     expect(session.combatActive).toBe(false);
+  });
+
+  it("backfills round to 1 when combat started but never advanced past round 1", async () => {
+    const sessionId = await makeSession(0);
+    await logLifecycleEvent(sessionId, "combatStarted", new Date("2026-01-01T00:00:00Z"));
+
+    const result = await backfillSessionCombatRound(prisma);
+
+    expect(result.changedSessions).toContain(sessionId);
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    // No combatRoundAdvanced event exists, but combatActive:true always
+    // implies round>=1 in the live model (startCombat sets both together).
+    expect(session.round).toBe(1);
+    expect(session.combatActive).toBe(true);
   });
 
   it("is a no-op for a session with no combat event", async () => {
