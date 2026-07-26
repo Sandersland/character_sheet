@@ -1,16 +1,14 @@
 import { useCallback, useRef, type KeyboardEvent, type RefCallback } from "react";
 
 interface UseRovingRadioGroupResult {
-  /** Ref callback for the card button at `index`. */
   itemRef: (index: number) => RefCallback<HTMLButtonElement>;
-  /** tabIndex for the card at `index`. */
   tabIndexFor: (index: number) => 0 | -1;
   /**
-   * Keydown handler for the card button at `index`. Bound per-button (not on
-   * the container) to match Tabs.tsx/Segmented.tsx -- jsx-a11y's
-   * interactive-supports-focus rule rejects a keydown on a non-focusable
-   * role="radiogroup" wrapper, and roving tabindex means only one button is
-   * ever focused, so the two attachment points are behaviorally identical.
+   * Bound per-button (not on the container) to match `Tabs`/`Segmented` --
+   * jsx-a11y's interactive-supports-focus rule rejects a keydown on a
+   * non-focusable role="radiogroup" wrapper, and roving tabindex means only
+   * one button is ever focused, so the two attachment points are
+   * behaviorally identical.
    */
   keyDownFor: (index: number) => (e: KeyboardEvent<HTMLButtonElement>) => void;
 }
