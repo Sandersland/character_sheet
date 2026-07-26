@@ -7,7 +7,7 @@ import InventoryPanel from "@/features/character-meta/panels/InventoryPanel";
 import MagicPanel from "@/features/character-meta/panels/MagicPanel";
 import StoryPanel from "@/features/character-meta/panels/StoryPanel";
 import type { SheetPanelProps, SheetTabId } from "@/features/character-meta/sheetTabs";
-import type { Character, ReferenceData } from "@/types/character";
+import type { ReferenceData } from "@/types/character";
 
 // Combat is excluded: it has extra live-session conditions handled inline below,
 // not a plain tab→panel mapping. Keyed lookup (vs. a chain of `&&` branches)
@@ -21,7 +21,6 @@ const STATIC_PANELS: Partial<Record<SheetTabId, (props: SheetPanelProps) => Reac
 };
 
 interface CharacterSheetBodyProps {
-  character: Character;
   reference: ReferenceData | null;
   activeTab: SheetTabId;
   /**
@@ -44,7 +43,6 @@ interface CharacterSheetBodyProps {
  * bar and always-on vitals; this is only the workspace region below it.
  */
 export default function CharacterSheetBody({
-  character,
   reference,
   activeTab,
   livePanel,
@@ -52,7 +50,7 @@ export default function CharacterSheetBody({
   isLive = false,
   onGoToCombat = () => {},
 }: CharacterSheetBodyProps) {
-  const panelProps = { character, reference, isLive, onGoToCombat };
+  const panelProps = { reference, isLive, onGoToCombat };
   const StaticPanel = STATIC_PANELS[activeTab];
   return (
     // <main> keeps the page's main landmark; the inner tabpanel carries the
@@ -67,7 +65,7 @@ export default function CharacterSheetBody({
         {StaticPanel && <StaticPanel {...panelProps} />}
         {/* Combat: the live tracker supersedes the static panel; while the
             live-session status is still loading, render neither (no flash). */}
-        {activeTab === "combat" && !livePanel && !sessionLoading && <CombatPanel {...panelProps} />}
+        {activeTab === "combat" && !livePanel && !sessionLoading && <CombatPanel />}
         {/* Mounted-but-hidden off Combat so an in-progress picker + economy
             survive a swipe round-trip (the turn state itself lives in the
             provider; this preserves the open-picker UI state). */}

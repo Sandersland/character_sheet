@@ -92,7 +92,7 @@ function endedSession(overrides: Partial<Session> = {}): Session {
 function renderPanel(character: Character) {
   return renderWithCharacter(
     <RollProvider characterId="char-1">
-      <CombatPanel character={character} reference={null} />
+      <CombatPanel />
     </RollProvider>,
     character,
   );

@@ -3,10 +3,10 @@ import DeleteCharacterModal from "@/features/character-meta/DeleteCharacterModal
 import SessionsModal from "@/features/session/SessionsModal";
 import CampaignSettingsSheet from "@/features/campaign/CampaignSettingsSheet";
 import CapturePalette from "@/features/journal/CapturePalette";
-import type { Character, Session } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import type { Session } from "@/types/character";
 
 interface CharacterSheetModalsProps {
-  character: Character;
   captureSessionId?: string;
   captureSession?: Session | null;
   deleteOpen: boolean;
@@ -22,7 +22,6 @@ interface CharacterSheetModalsProps {
 }
 
 export default function CharacterSheetModals({
-  character,
   captureSessionId,
   captureSession,
   deleteOpen,
@@ -36,6 +35,7 @@ export default function CharacterSheetModals({
   onCloseCampaignSettings,
   onCloseCapture,
 }: CharacterSheetModalsProps) {
+  const { character } = useCurrentCharacter();
   return (
     <>
       {deleteOpen && (

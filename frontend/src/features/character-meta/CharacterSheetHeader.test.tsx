@@ -39,16 +39,17 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
-// CampaignIndicator (rendered inside the header) reads useCurrentCharacter(),
-// so every render seeds the cache and mounts CurrentCharacterProvider via
-// renderWithCharacter — keyed on the same character passed as the prop.
-function renderHeader(props: Partial<Parameters<typeof CharacterSheetHeader>[0]> = {}) {
-  const character = props.character ?? makeCharacter();
+// CharacterSheetHeader (and its nested MobileSheetHeader/CampaignIndicator)
+// reads useCurrentCharacter(), so every render seeds the cache and mounts
+// CurrentCharacterProvider via renderWithCharacter.
+function renderHeader(
+  props: Partial<Parameters<typeof CharacterSheetHeader>[0]> = {},
+  character: Character = makeCharacter(),
+) {
   return renderWithCharacter(
     <MemoryRouter>
       <RollProvider>
         <CharacterSheetHeader
-          character={character}
           tabs={TABS}
           activeTab="combat"
           onTabChange={vi.fn()}
@@ -133,11 +134,13 @@ describe("CharacterSheetHeader campaign settings (#1087)", () => {
   });
 
   it("omits 'Campaign settings…' for a campaign-less character", () => {
-    renderHeader({
-      activeTab: "overview",
-      character: makeCharacter({ campaignId: undefined }),
-      onOpenCampaignSettings: vi.fn(),
-    });
+    renderHeader(
+      {
+        activeTab: "overview",
+        onOpenCampaignSettings: vi.fn(),
+      },
+      makeCharacter({ campaignId: undefined }),
+    );
     fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
     expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
   });

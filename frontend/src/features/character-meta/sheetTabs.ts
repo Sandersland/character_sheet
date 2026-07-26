@@ -12,11 +12,11 @@ export interface SheetTab {
   badge?: ReactNode;
 }
 
-/** Props every tab panel receives — the character and loaded reference data.
+/** Props every tab panel receives — the loaded reference data. Panels read the
+ *  character itself via useCurrentCharacter() (#1284) rather than a prop.
  *  isLive/onGoToCombat are unused by most panels; Magic's Cast door reads them
  *  to defer casting to the Combat tab during a live session (#1162). */
 export interface SheetPanelProps {
-  character: Character;
   reference: ReferenceData | null;
   isLive?: boolean;
   onGoToCombat?: () => void;

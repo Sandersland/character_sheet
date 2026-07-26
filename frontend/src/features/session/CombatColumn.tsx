@@ -37,7 +37,7 @@ export default function CombatColumn({
       <div data-testid="combat-turn">{turnSlot}</div>
       {hpSlot && <div data-testid="combat-hp">{hpSlot}</div>}
       <div data-testid="combat-conditions">{conditionsSlot}</div>
-      <ItemGrantsCard character={character} />
+      <ItemGrantsCard />
       {logRow && <div data-testid="combat-log">{logRow}</div>}
     </div>
   );

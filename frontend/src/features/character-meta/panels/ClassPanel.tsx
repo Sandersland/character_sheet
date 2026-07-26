@@ -10,7 +10,7 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
  * `character.class` so a stray `?tab=class` mid-creation renders nothing, same
  * pattern as MagicPanel's spellcasting guard.
  */
-export default function ClassPanel({ reference }: Omit<SheetPanelProps, "character">) {
+export default function ClassPanel({ reference }: SheetPanelProps) {
   const { character } = useCurrentCharacter();
   if (!character.class) return null;
   return (

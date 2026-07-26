@@ -17,7 +17,7 @@ function makeCharacter(overrides: Partial<Character>): Character {
 // ClassPanel reads useCurrentCharacter() directly (#1284), so every render
 // seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderPanel(character: Character) {
-  const props: SheetPanelProps = { character, reference: null };
+  const props: SheetPanelProps = { reference: null };
   return renderWithCharacter(<ClassPanel {...props} />, character);
 }
 

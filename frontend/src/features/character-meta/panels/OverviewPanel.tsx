@@ -7,6 +7,7 @@ import AdvancementSection from "@/features/advancement/AdvancementSection";
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import SpellSlotSummary from "@/features/spells/SpellSlotSummary";
 import Card from "@/components/ui/Card";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { hasAdvancements, hasProficiencies } from "@/lib/characterSections";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
@@ -18,7 +19,8 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
  * characters. Saving throws stay inside AbilityScoresPanel; full slot/spell
  * management is on Magic.
  */
-export default function OverviewPanel({ character, reference }: SheetPanelProps) {
+export default function OverviewPanel({ reference }: SheetPanelProps) {
+  const { character } = useCurrentCharacter();
   return (
     <div className="flex flex-col gap-6">
       {/* Prof/Speed/Init left the compact header (#1026); on phones they sit

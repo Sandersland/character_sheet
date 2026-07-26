@@ -109,7 +109,6 @@ function CharacterSheetWorkspace({
           md:hidden, #1171). */}
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:flex-1 md:overflow-visible">
         <CharacterSheetHeader
-          character={character}
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
@@ -139,7 +138,6 @@ function CharacterSheetWorkspace({
         <SessionCue placement="desktop" {...cueProps} />
 
         <CharacterSheetModals
-          character={character}
           captureSessionId={session.activeSessionId}
           captureSession={session.inActiveSession ? session.activeSession : null}
           deleteOpen={modals.deleteOpen}
@@ -169,7 +167,6 @@ function CharacterSheetWorkspace({
               must not gain the 1px this adds to the flow. */}
           <div ref={collapse.sentinelRef} aria-hidden className="h-px w-full md:hidden" />
           <CharacterSheetBody
-            character={character}
             reference={reference}
             activeTab={activeTab}
             livePanel={livePanel}
