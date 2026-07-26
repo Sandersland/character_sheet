@@ -24,7 +24,7 @@ import { useSessionLogBumpOnCharacterWrite } from "@/features/session/useSession
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
-import type { Character, ReferenceData, Session } from "@/types/character";
+import type { ReferenceData, Session } from "@/types/character";
 
 /**
  * The loaded-sheet view. Takes NO props (#1284 C17) — reads the character via
@@ -42,7 +42,7 @@ export default function CharacterSheetContent() {
   return (
     <LiveSessionProvider characterId={character.id}>
       <TurnStateProvider>
-        <CharacterSheetWorkspace character={character} reference={reference} />
+        <CharacterSheetWorkspace reference={reference} />
       </TurnStateProvider>
     </LiveSessionProvider>
   );
@@ -52,15 +52,11 @@ export default function CharacterSheetContent() {
  * The sheet body: banner + tab panels + the roll/modal chrome. Split from
  * CharacterSheetContent so the providers above stay uncluttered and this owns
  * the per-character interaction state (tabs, modals, capture dock, doorway).
+ * Reads the character itself (#1284) — CharacterSheetContent only needed it
+ * for LiveSessionProvider's characterId, not to forward it here.
  */
-function CharacterSheetWorkspace({
-  character,
-  reference,
-}: {
-  character: Character;
-  reference: ReferenceData | null;
-}) {
-  const { tabs, activeTab, onTabChange } = useSheetTabs(character);
+function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | null }) {
+  const { character, tabs, activeTab, onTabChange } = useCharacterTabs();
   const modals = useSheetModals();
   // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
@@ -288,6 +284,16 @@ function SessionCue({
       onAction={session.onAction}
     />
   );
+}
+
+/** The character plus its derived tab list — grouped into one hook so the
+ *  workspace calls it once instead of two (fallow scores a hook's cognitive
+ *  load by its delegating closures, so keeping the workspace's own hook count
+ *  down matters more than branch-level extraction). */
+function useCharacterTabs() {
+  const { character } = useCurrentCharacter();
+  const { tabs, activeTab, onTabChange } = useSheetTabs(character);
+  return { character, tabs, activeTab, onTabChange };
 }
 
 /** The panel region's two mobile-only scroll affordances — horizontal swipe
