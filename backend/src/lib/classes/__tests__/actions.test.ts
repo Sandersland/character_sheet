@@ -745,3 +745,102 @@ describe("ACTION_EFFECT_FN — useObject", () => {
     expect(ACTION_EFFECT_FN.useObject({})).toEqual([]);
   });
 });
+
+// #1315: migrates shadowArtsAvailable/cloakOfShadowsAvailable off DerivedClassInfo
+// booleans and onto DERIVED_ACTIONS rows, like shadowStep/fleetStep above. Both
+// endpoints (shadow-arts.ts) still own the actual cast/activate — these rows only
+// express the level gate as data.
+describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#1315)", () => {
+  const SHADOW = "Warrior of Shadow";
+
+  it("Shadow monk gets shadowArts at L3, not L2", () => {
+    expect(keys(deriveActions("monk", SHADOW, 2, []))).not.toContain("shadowArts");
+    const l3 = deriveActions("monk", SHADOW, 3, [pool("focus", 1)]);
+    const shadowArts = l3.find((a) => a.key === "shadowArts");
+    expect(shadowArts).toBeDefined();
+    expect(shadowArts?.cost).toBe("action");
+  });
+
+  it("shadowArts is gated on 1 focus like any other resource-gated action", () => {
+    const noFocus = deriveActions("monk", SHADOW, 3, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "shadowArts")?.enabled).toBe(false);
+    const withFocus = deriveActions("monk", SHADOW, 3, [pool("focus", 1)]);
+    expect(withFocus.find((a) => a.key === "shadowArts")?.enabled).toBe(true);
+  });
+
+  it("Shadow monk gets cloakOfShadows at L17, not L16", () => {
+    expect(keys(deriveActions("monk", SHADOW, 16, []))).not.toContain("cloakOfShadows");
+    const l17 = deriveActions("monk", SHADOW, 17, [pool("focus", 3)]);
+    const cloak = l17.find((a) => a.key === "cloakOfShadows");
+    expect(cloak).toBeDefined();
+    expect(cloak?.cost).toBe("action");
+  });
+
+  it("cloakOfShadows costs 3 focus", () => {
+    const short = deriveActions("monk", SHADOW, 17, [pool("focus", 2)]);
+    expect(short.find((a) => a.key === "cloakOfShadows")?.enabled).toBe(false);
+    const enough = deriveActions("monk", SHADOW, 17, [pool("focus", 3)]);
+    expect(enough.find((a) => a.key === "cloakOfShadows")?.enabled).toBe(true);
+  });
+
+  it("subclass gate: a non-Shadow monk gets neither at any level", () => {
+    const openHand = keys(deriveActions("monk", "Warrior of the Open Hand", 20, [pool("focus", 5)]));
+    expect(openHand).not.toContain("shadowArts");
+    expect(openHand).not.toContain("cloakOfShadows");
+    const noSub = keys(deriveActions("monk", undefined, 20, [pool("focus", 5)]));
+    expect(noSub).not.toContain("shadowArts");
+    expect(noSub).not.toContain("cloakOfShadows");
+  });
+
+  it("both cast through the dedicated /abilities/shadow-arts endpoint — no ACTION_EFFECT_FN/ACTION_CAST_FN entry", () => {
+    expect(ACTION_EFFECT_FN.shadowArts).toBeUndefined();
+    expect(ACTION_CAST_FN.shadowArts).toBeUndefined();
+    expect(ACTION_EFFECT_FN.cloakOfShadows).toBeUndefined();
+    expect(ACTION_CAST_FN.cloakOfShadows).toBeUndefined();
+  });
+});
+
+describe("Warrior of the Elements — Elemental Attunement / Elemental Burst catalog rows (#1315)", () => {
+  const ELEMENTS = "Warrior of the Elements";
+
+  it("gets elementalAttunement at L3, not L2, as a no-action (free) toggle", () => {
+    expect(keys(deriveActions("monk", ELEMENTS, 2, []))).not.toContain("elementalAttunement");
+    const l3 = deriveActions("monk", ELEMENTS, 3, [pool("focus", 1)]);
+    const attune = l3.find((a) => a.key === "elementalAttunement");
+    expect(attune).toBeDefined();
+    expect(attune?.cost).toBe("free");
+  });
+
+  it("gets elementalBurst at L6, not L5, as a Magic action", () => {
+    expect(keys(deriveActions("monk", ELEMENTS, 5, []))).not.toContain("elementalBurst");
+    const l6 = deriveActions("monk", ELEMENTS, 6, [pool("focus", 2)]);
+    const burst = l6.find((a) => a.key === "elementalBurst");
+    expect(burst).toBeDefined();
+    expect(burst?.cost).toBe("action");
+  });
+
+  it("elementalAttunement costs 1 focus, elementalBurst costs 2", () => {
+    const noFocus = deriveActions("monk", ELEMENTS, 6, [pool("focus", 0)]);
+    expect(noFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(false);
+    expect(noFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+    const oneFocus = deriveActions("monk", ELEMENTS, 6, [pool("focus", 1)]);
+    expect(oneFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(true);
+    expect(oneFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+  });
+
+  it("subclass gate: a non-Elements monk gets neither at any level", () => {
+    const shadow = keys(deriveActions("monk", "Warrior of Shadow", 20, [pool("focus", 5)]));
+    expect(shadow).not.toContain("elementalAttunement");
+    expect(shadow).not.toContain("elementalBurst");
+    const noSub = keys(deriveActions("monk", undefined, 20, [pool("focus", 5)]));
+    expect(noSub).not.toContain("elementalAttunement");
+    expect(noSub).not.toContain("elementalBurst");
+  });
+
+  it("both cast through the dedicated /abilities/warrior-of-elements endpoint — no ACTION_EFFECT_FN/ACTION_CAST_FN entry", () => {
+    expect(ACTION_EFFECT_FN.elementalAttunement).toBeUndefined();
+    expect(ACTION_CAST_FN.elementalAttunement).toBeUndefined();
+    expect(ACTION_EFFECT_FN.elementalBurst).toBeUndefined();
+    expect(ACTION_CAST_FN.elementalBurst).toBeUndefined();
+  });
+});
