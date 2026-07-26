@@ -57,7 +57,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.maneuverKnownIds).toEqual(["trip"]);
   });
 
-  it("derives entitlement flags from resources, and Fighting Style from slots + advancements", () => {
+  it("derives entitlement flags from resources + availableActions, and Fighting Style from slots + advancements", () => {
     const view = deriveClassFeatureView(
       makeChar(
         {
@@ -65,12 +65,16 @@ describe("deriveClassFeatureView", () => {
           advancements: [
             { id: "fs1", slot: "fightingStyle", featId: "archery", featName: "Archery" },
           ] as unknown as Character["advancements"],
+          // shadowArts/cloakOfShadows entitlement is availableActions[] presence (#1315),
+          // not a resources boolean.
+          availableActions: [
+            { key: "shadowArts", name: "Shadow Arts (Darkness)", cost: "action", enabled: true },
+            { key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true },
+          ],
         },
         {
           pools: [{ key: "channelDivinity" }] as unknown as CharacterResources["pools"],
           maneuverChoiceCount: 3,
-          shadowArtsAvailable: true,
-          cloakOfShadowsAvailable: true,
           features: [{ source: "class", name: "F", description: "d" }] as unknown as CharacterResources["features"],
         },
       ),
@@ -85,6 +89,16 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasFeatures).toBe(true);
     expect(view.fightingStyleFeats.map((f) => f.featName)).toEqual(["Archery"]);
     expect(view.isEmpty).toBe(false);
+  });
+
+  it("hasShadowArts/hasCloakOfShadows/hasElementsWarrior are false when availableActions lacks the matching key", () => {
+    const view = deriveClassFeatureView(
+      makeChar({ availableActions: [{ key: "shadowArts", name: "Shadow Arts (Darkness)", cost: "action", enabled: true }] }),
+      [fighterDef],
+    );
+    expect(view.hasShadowArts).toBe(true);
+    expect(view.hasCloakOfShadows).toBe(false);
+    expect(view.hasElementsWarrior).toBe(false);
   });
 
   it("reports all flags false and isEmpty true when no resources", () => {
