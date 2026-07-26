@@ -30,8 +30,6 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   return response;
 }
 
-// New endpoint? return request<T>(path, init, "Failed to …") for a JSON reply, or send(path, init, "Failed to …") for a void/204 one.
-
 // Shared non-ok handling: surface the server's { error } message, else a labeled fallback.
 async function throwIfNotOk(response: Response, errorLabel: string): Promise<void> {
   if (response.ok) return;
