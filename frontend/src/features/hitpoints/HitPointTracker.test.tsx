@@ -232,8 +232,21 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
   });
 });
 
-describe("HitPointTracker interactive concentration save (issue #76)", () => {
-  it("auto-roll on (default) shows the banner and no save modal", async () => {
+// #1166: the checkbox is retired — the standing preference now lives only in
+// the Preferences surface (#1167) and is read here via the synced store
+// (concentrationPreference.ts), seeded through localStorage since these tests
+// render outside a PreferencesProvider (falls back to pure localStorage, same
+// as the hook's own doc comment).
+describe("HitPointTracker interactive concentration save (issue #76, retired #1166)", () => {
+  it("renders no auto-roll-concentration checkbox in the HP card", () => {
+    mockResolve([]);
+    render(makeCharacter());
+    expect(
+      screen.queryByRole("checkbox", { name: /auto-roll concentration saves/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("auto-roll on (default, no stored preference) shows the banner and no save modal", async () => {
     mockResolve([check({ held: true, roll: 12, saveBonus: 2, total: 14, dc: 12 })]);
     render(makeCharacter());
 
@@ -246,14 +259,13 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
     expect(ops[0]).toMatchObject({ type: "damage", autoRollConcentration: true });
   });
 
-  it("turning off auto-roll defers the save and opens the roll modal", async () => {
-    const user = userEvent.setup();
+  it("with the standing preference off, defers the save and opens the roll modal", async () => {
+    localStorage.setItem("cs:pref:autoRollConcentration", "false");
     mockResolve([
       check({ status: "pending", entryId: "entry-1", dc: 15, saveBonus: 2, held: null, damage: 30 }),
     ]);
     render(makeCharacter());
 
-    await user.click(screen.getByRole("checkbox", { name: /auto-roll concentration saves/i }));
     await applyDamage();
 
     // A modal opens (no inline banner / UI shift in the HP card).
@@ -266,6 +278,7 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
 
   it("rolling in the modal submits a concentrationSave op and shows the result", async () => {
     const user = userEvent.setup();
+    localStorage.setItem("cs:pref:autoRollConcentration", "false");
     // First the damage op returns a pending check; then the save op resolves.
     vi.mocked(client.applyHitPointOperations)
       .mockResolvedValueOnce({
@@ -280,7 +293,6 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
       });
     render(makeCharacter());
 
-    await user.click(screen.getByRole("checkbox", { name: /auto-roll concentration saves/i }));
     await applyDamage();
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /roll save/i }));

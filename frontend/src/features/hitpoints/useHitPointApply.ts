@@ -35,9 +35,9 @@ export function useHitPointApply(character: Character) {
   const [concentrationNote, setConcentrationNote] = useState<ConcentrationNote | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingConcentrationSave | null>(null);
 
-  // Only spellcasters can concentrate, so the toggle is only shown for them.
-  const isSpellcaster = character.spellcasting !== undefined;
-  const [autoRollConcentration, setAutoRollConcentration] = useAutoRollConcentrationPref();
+  // Standing player preference (#1166) — no per-roll UI here anymore; the
+  // control lives in PreferencesSheet (#1167) and applies to the next damage op.
+  const [autoRollConcentration] = useAutoRollConcentrationPref();
 
   const mutation = useCharacterMutation({
     characterId: character.id,
@@ -105,9 +105,6 @@ export function useHitPointApply(character: Character) {
     concentrationNote,
     pendingSave,
     setPendingSave,
-    isSpellcaster,
-    autoRollConcentration,
-    setAutoRollConcentration,
     submit,
     handleApply,
     resolveConcentrationSave,
