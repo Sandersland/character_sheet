@@ -4,21 +4,27 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchActiveSession, fetchSessionDoorway } from "@/api/client";
+import { fetchActiveSession, fetchCombatState, fetchSessionDoorway } from "@/api/client";
 import { LiveSessionProvider } from "@/features/session/LiveSessionProvider";
 import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useLiveRound } from "@/features/session/useLiveRound";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Session, SessionDoorwayState } from "@/types/character";
 
+// fetchCombatState must be mocked even where a test ignores it: TurnStateProvider
+// mounts useCombatPoll, so leaving it off the factory makes the poll call
+// undefined and the outcome timing-dependent — green under one worker sharding,
+// red under another (#1030).
 vi.mock("@/api/client", () => ({
   fetchSessionDoorway: vi.fn(),
   fetchActiveSession: vi.fn(),
   fetchCharacter: vi.fn(),
+  fetchCombatState: vi.fn(),
 }));
 
 const mockDoorway = vi.mocked(fetchSessionDoorway);
 const mockActive = vi.mocked(fetchActiveSession);
+const mockCombat = vi.mocked(fetchCombatState);
 
 const character = { id: "c1", attacksPerAction: 1, inventory: [] } as unknown as Character;
 const fullSession: Session = { id: "s1", campaignId: "camp1", status: "active", startedAt: "x", participants: [] };
@@ -62,6 +68,8 @@ describe("TurnStateProvider single instance + useLiveRound", () => {
     localStorage.clear();
     mockDoorway.mockReset();
     mockActive.mockReset();
+    mockCombat.mockReset();
+    mockCombat.mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-07-26T00:00:00.000Z" });
   });
 
   it("has a null turn context and a null round when not joined (server round shows only in preview)", async () => {
@@ -84,10 +92,15 @@ describe("TurnStateProvider single instance + useLiveRound", () => {
       doorway({ kind: "liveJoined", session: { id: "s1", status: "active", startedAt: "x", scheduledAt: null, title: null, joined: true, round: 99 } }),
     );
     mockActive.mockResolvedValue(fullSession);
+    // The poll agrees with the seeded local round, so this pins what the test is
+    // named for — the doorway's stale 99 losing — rather than the poll racing it.
+    mockCombat.mockResolvedValue({ round: 3, combatActive: true, updatedAt: "2026-07-26T00:00:01.000Z" });
     renderStack();
     await waitFor(() => expect(screen.getByTestId("turn")).toHaveTextContent("present"));
-    // Local tracker wins over the (stale) doorway round of 99.
-    expect(screen.getByTestId("round")).toHaveTextContent("3");
+    // Own waitFor, same reason as the not-joined case above: "present" can land
+    // before the tracker's round does, so a bare assertion here fails only under
+    // full-suite CPU contention — green alone, red in CI.
+    await waitFor(() => expect(screen.getByTestId("round")).toHaveTextContent("3"));
   });
 
   it("returns a null round when joined but not in combat", async () => {
