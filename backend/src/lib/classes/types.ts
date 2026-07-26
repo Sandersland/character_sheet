@@ -76,19 +76,22 @@ export interface DerivedFeature {
 
 /**
  * The bespoke, non-generic level-gated choice-cap fields a subclass may
- * contribute (#1317): a "choose N" count plus, for maneuvers, an announced
- * save DC — extra scalar mechanics the generic SubclassChoice count (#899)
- * doesn't model, which is why these stay hand-rolled instead of migrating
- * onto it. This is the ONLY shape ExtrasFn may return — adding a fourth
- * bespoke field is a deliberate edit here, not a silent addition to the wider
- * DerivedClassInfo wire shape (the #1276 escape-hatch this type closes).
+ * contribute (#1317): a "choose N" count plus an announced save DC — extra
+ * scalar mechanics the generic SubclassChoice count (#899) doesn't model,
+ * which is why these stay hand-rolled instead of migrating onto it. Adding a
+ * fourth bespoke field is a deliberate edit here, not a silent addition to the
+ * wider DerivedClassInfo wire shape (the #1276 escape hatch this type closes).
  */
 export interface ClassExtras {
-  /** Number of options available from a level-gated "choose N" cap this level. */
+  /** How many picks the character may hold from a level-gated "choose N" cap at this level. */
   maneuverChoiceCount?: number;
-  /** Save DC for an announced effect gated by the same cap (8 + prof + ability mod). */
+  /** DC an announced effect from that cap is rolled against: 8 + proficiency + max(Str, Dex) mod. */
   maneuverSaveDC?: number;
-  /** Number of tool-proficiency choices available from a subclass feature at this level. */
+  /**
+   * Tool-proficiency choices granted by a subclass feature at this level.
+   * Undefined when no subclass feature grants a tool choice — assignDefined
+   * and entryContributesExtras both branch on exactly that.
+   */
   toolProfChoiceCount?: number;
 }
 
@@ -139,12 +142,23 @@ export type ResourceFn = (
   subclassKey?: string,
 ) => DerivedResource[];
 
+/**
+ * ClassExtras, plus an explicit `never` for every other DerivedClassInfo key.
+ * The `never` half is what actually closes the #1276 hatch: TypeScript's
+ * excess-property check fires only on a fresh object literal, so on
+ * `Partial<ClassExtras>` alone a `const out = {…}; return out` — or a spread,
+ * or a DerivedClassInfo-typed variable — still smuggles arbitrary fields
+ * through the Object.assign overlay in deriveResources.
+ */
+type ClassExtrasOnly = Partial<ClassExtras> &
+  Partial<Record<Exclude<keyof DerivedClassInfo, keyof ClassExtras>, never>>;
+
 /** A subclass's bespoke level-gated choice-cap fields beyond its resources/features layer — see ClassExtras. */
 export type ExtrasFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
-) => Partial<ClassExtras>;
+) => ClassExtrasOnly;
 
 export interface SubclassDefinition {
   /**
