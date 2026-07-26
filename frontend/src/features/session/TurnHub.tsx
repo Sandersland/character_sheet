@@ -29,12 +29,11 @@ import TurnSummaryBanner from "@/features/session/TurnSummaryBanner";
 import { useTallyResolve } from "@/features/session/useTallyResolve";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AllyOption } from "@/lib/spellMeta";
 import type { TurnStateView } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
 
 interface TurnHubProps {
-  character: Character;
   sessionId: string;
   turnState: TurnStateView;
   /** Called after a combat log event so the Log tab refreshes. */
@@ -59,16 +58,15 @@ interface TurnHubProps {
 // which fires on other creatures' turns — and Start-my-turn). Takes the whole
 // hook bags rather than ~18 loose props; TurnHub stays the orchestrator.
 function TurnHubIdle({
-  character,
   onLogChanged,
   turnState,
   turn,
 }: {
-  character: Character;
   onLogChanged: () => void;
   turnState: TurnStateView;
   turn: ReturnType<typeof useTurnActions>;
 }) {
+  const { character } = useCurrentCharacter();
   const { inCombat, round, reactionUsed, consumeReaction } = turnState;
   const {
     busy, error, reactionMessage, effectMessage,
@@ -148,9 +146,9 @@ function TurnHubIdle({
           </p>
         )}
 
-        <TurnDeathSaves character={character} />
+        <TurnDeathSaves />
 
-        <TurnConcentrationBanner character={character} onLogChanged={onLogChanged} />
+        <TurnConcentrationBanner onLogChanged={onLogChanged} />
 
         {/* Reaction is available between turns — render it in idle mode. */}
         <ReactionSlot
@@ -389,7 +387,8 @@ function TurnMessages({
 }
 
 // fallow-ignore-next-line complexity -- composing the #1241 useDeflectAttacksReaction sibling hook (same pattern as the pre-existing useTallyResolve below) pushed cognitive from 15 to 16; the added surface is one hook call + a 6-line dispatch wrapper, not new branchy logic
-export default function TurnHub({ character, sessionId, turnState, onLogChanged, allies, overlaysActive = true, onOpenLog }: TurnHubProps) {
+export default function TurnHub({ sessionId, turnState, onLogChanged, allies, overlaysActive = true, onOpenLog }: TurnHubProps) {
+  const { character } = useCurrentCharacter();
   const isBelowMd = useIsBelowMd();
   const {
     inCombat,
@@ -464,7 +463,6 @@ export default function TurnHub({ character, sessionId, turnState, onLogChanged,
   if (phase === "idle") {
     return (
       <TurnHubIdle
-        character={character}
         onLogChanged={onLogChanged}
         turnState={turnState}
         turn={turn}
@@ -474,8 +472,8 @@ export default function TurnHub({ character, sessionId, turnState, onLogChanged,
 
   // Shared surfaces — identical on both breakpoints; only the slot rows and the
   // wrapper/header differ (TurnSlotCard self-adapts to a full-bleed mobile row).
-  const deathSaves = <TurnDeathSaves character={character} />;
-  const concentration = <TurnConcentrationBanner character={character} onLogChanged={onLogChanged} />;
+  const deathSaves = <TurnDeathSaves />;
+  const concentration = <TurnConcentrationBanner onLogChanged={onLogChanged} />;
   const actionSlot = (
     <ActionSlot
       actionsRemaining={actionsRemaining}
@@ -547,7 +545,6 @@ export default function TurnHub({ character, sessionId, turnState, onLogChanged,
   // is mounted-but-hidden. `activeResolution` survives, so the sheet reopens.
   const resolutionSheets = overlaysActive && (
     <TurnResolutionSheets
-      character={character}
       sessionId={sessionId}
       turnState={turnState}
       activeResolution={activeResolution}

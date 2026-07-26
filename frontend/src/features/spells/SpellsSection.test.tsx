@@ -18,7 +18,7 @@ vi.mock("@/api/client", () => ({
 // SpellsSection reads useCurrentCharacter(), so every render seeds the cache
 // and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
-  return renderWithCharacter(<SpellsSection character={character} />, character);
+  return renderWithCharacter(<SpellsSection />, character);
 }
 
 const BLESS: Spell = {

@@ -27,7 +27,7 @@ describe("CampaignPreferencesFields", () => {
     });
     vi.mocked(updateCampaignPreferences).mockResolvedValue(updated);
 
-    renderWithCharacter(<CampaignPreferencesFields character={makeCharacter()} />, makeCharacter());
+    renderWithCharacter(<CampaignPreferencesFields />, makeCharacter());
 
     screen.getByLabelText(/share sheet with dm/i).click();
 

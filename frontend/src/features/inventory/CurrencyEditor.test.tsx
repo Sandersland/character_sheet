@@ -25,7 +25,7 @@ describe("CurrencyEditor", () => {
     const updated = makeCharacter({ currency: makeCurrency({ gp: 42 }) });
     vi.mocked(updateCharacter).mockResolvedValue(updated);
 
-    renderWithCharacter(<CurrencyEditor character={makeCharacter()} />, makeCharacter());
+    renderWithCharacter(<CurrencyEditor />, makeCharacter());
 
     fireEvent.click(screen.getByRole("button", { name: /edit purse/i }));
     fireEvent.click(screen.getByRole("button", { name: /save/i }));

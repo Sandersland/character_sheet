@@ -3,7 +3,7 @@
 // and composes per-feature subcomponents. Mirrors SpellsSection's orchestrator/row split.
 
 import { applyAdvancementTransactions, applyClassTransactions } from "@/api/client";
-import type { Character, ClassOption } from "@/types/character";
+import type { ClassOption } from "@/types/character";
 import { deriveClassFeatureView } from "@/lib/classFeatures";
 import { useClassTransactions } from "@/features/class/useClassTransactions";
 import ClassFeaturesList from "@/features/class/ClassFeaturesList";
@@ -11,13 +11,14 @@ import ClassResourceBlocks from "@/features/class/ClassResourceBlocks";
 import ClassRosterSection from "@/features/class/ClassRosterSection";
 import FightingStyleFeatSection from "@/features/class/FightingStyleFeatSection";
 import SubclassSection from "@/features/class/SubclassSection";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface Props {
-  character: Character;
   referenceClasses: ClassOption[];
 }
 
-export default function ClassFeaturesSection({ character, referenceClasses }: Props) {
+export default function ClassFeaturesSection({ referenceClasses }: Props) {
+  const { character } = useCurrentCharacter();
   const { busy, error, run } = useClassTransactions(character.id);
   const view = deriveClassFeatureView(character, referenceClasses);
 
@@ -29,21 +30,19 @@ export default function ClassFeaturesSection({ character, referenceClasses }: Pr
         </p>
       )}
 
-      <ClassRosterSection character={character} rosterEntries={view.rosterEntries} />
+      <ClassRosterSection rosterEntries={view.rosterEntries} />
 
       <SubclassSection
-        character={character}
         classDef={view.classDef}
         needsSubclass={view.needsSubclass}
         busy={busy}
         onChoose={(subclassId) => run(() => applyClassTransactions(character.id, [{ type: "setSubclass", subclassId }]))}
       />
 
-      <ClassResourceBlocks character={character} view={view} busy={busy} run={run} />
+      <ClassResourceBlocks view={view} busy={busy} run={run} />
 
       {view.hasFightingStyle && (
         <FightingStyleFeatSection
-          character={character}
           takenFeats={view.fightingStyleFeats}
           busy={busy}
           onTake={(op) => run(() => applyAdvancementTransactions(character.id, [op]))}

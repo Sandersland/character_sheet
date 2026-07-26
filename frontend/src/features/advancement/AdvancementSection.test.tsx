@@ -13,7 +13,7 @@ vi.mock("@/api/client", () => ({
 // AdvancementSection reads useCurrentCharacter(), so every render seeds the
 // cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
-  return renderWithCharacter(<AdvancementSection character={character} />, character);
+  return renderWithCharacter(<AdvancementSection />, character);
 }
 
 function makeCharacter(advancements: AdvancementEntry[]): Character {

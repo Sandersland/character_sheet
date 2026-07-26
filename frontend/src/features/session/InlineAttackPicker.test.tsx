@@ -7,6 +7,8 @@ import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { useTurnState } from "@/features/session/useTurnState";
 import { logRoll, castManeuverTransaction } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -75,7 +77,6 @@ function renderPicker(
   renderWithCharacter(
     <RollProvider>
       <InlineAttackPicker
-        character={character}
         turnState={opts.turnState ?? turnState}
         sessionId="sess-1"
         onClose={onClose}
@@ -155,7 +156,7 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
     });
     const { rerender } = renderWithCharacter(
       <RollProvider>
-        <InlineAttackPicker character={initialCharacter} {...shared} />
+        <InlineAttackPicker {...shared} />
       </RollProvider>,
       initialCharacter,
     );
@@ -164,14 +165,17 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
 
     // The selected weapon disappears mid-open (live inventory change) — the
     // selector must fall back to a visibly checked option, never nothing-selected.
+    // InlineAttackPicker reads useCurrentCharacter(), so simulating the live
+    // inventory change means writing the cache directly (there's no prop to swap).
+    getQueryClient().setQueryData(
+      characterKeys.detail(initialCharacter.id),
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+      }),
+    );
     rerender(
       <RollProvider>
-        <InlineAttackPicker
-          character={makeCharacter({
-            inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
-          })}
-          {...shared}
-        />
+        <InlineAttackPicker {...shared} />
       </RollProvider>,
     );
     const checked = screen
@@ -529,7 +533,6 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
     return (
       <RollProvider>
         <InlineAttackPicker
-          character={character}
           turnState={liveTurnState}
           sessionId="sess-crit"
           onClose={vi.fn()}
@@ -767,7 +770,6 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
     return (
       <RollProvider>
         <InlineAttackPicker
-          character={character}
           turnState={turnState}
           sessionId="sess-precision"
           onClose={vi.fn()}

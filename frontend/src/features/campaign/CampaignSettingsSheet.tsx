@@ -3,10 +3,9 @@ import { useEffect, useState } from "react";
 import { fetchCampaign } from "@/api/client";
 import BottomSheet from "@/components/ui/BottomSheet";
 import CampaignPreferencesFields from "@/features/campaign/CampaignPreferencesFields";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface CampaignSettingsSheetProps {
-  character: Character;
   onClose: () => void;
 }
 
@@ -18,9 +17,9 @@ interface CampaignSettingsSheetProps {
  * swallowed and the segment omitted (the toggles are the actual settings).
  */
 export default function CampaignSettingsSheet({
-  character,
   onClose,
 }: CampaignSettingsSheetProps) {
+  const { character } = useCurrentCharacter();
   const [campaignName, setCampaignName] = useState<string | null>(null);
   const [dmName, setDmName] = useState<string | null>(null);
 
@@ -51,7 +50,7 @@ export default function CampaignSettingsSheet({
       )}
       {/* Fields carry their own row dividers; the border just groups them. */}
       <div className="overflow-hidden rounded-card border border-parchment-200 bg-parchment-50">
-        <CampaignPreferencesFields character={character} />
+        <CampaignPreferencesFields />
       </div>
     </BottomSheet>
   );

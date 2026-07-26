@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { SheetTab } from "@/features/character-meta/sheetTabs";
 import type { Character } from "@/types/character";
 
@@ -38,12 +39,17 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
-function renderHeader(props: Partial<Parameters<typeof CharacterSheetHeader>[0]> = {}) {
-  return render(
+// CharacterSheetHeader (and its nested MobileSheetHeader/CampaignIndicator)
+// reads useCurrentCharacter(), so every render seeds the cache and mounts
+// CurrentCharacterProvider via renderWithCharacter.
+function renderHeader(
+  props: Partial<Parameters<typeof CharacterSheetHeader>[0]> = {},
+  character: Character = makeCharacter(),
+) {
+  return renderWithCharacter(
     <MemoryRouter>
       <RollProvider>
         <CharacterSheetHeader
-          character={makeCharacter()}
           tabs={TABS}
           activeTab="combat"
           onTabChange={vi.fn()}
@@ -55,6 +61,7 @@ function renderHeader(props: Partial<Parameters<typeof CharacterSheetHeader>[0]>
         />
       </RollProvider>
     </MemoryRouter>,
+    character,
   );
 }
 
@@ -127,11 +134,13 @@ describe("CharacterSheetHeader campaign settings (#1087)", () => {
   });
 
   it("omits 'Campaign settings…' for a campaign-less character", () => {
-    renderHeader({
-      activeTab: "overview",
-      character: makeCharacter({ campaignId: undefined }),
-      onOpenCampaignSettings: vi.fn(),
-    });
+    renderHeader(
+      {
+        activeTab: "overview",
+        onOpenCampaignSettings: vi.fn(),
+      },
+      makeCharacter({ campaignId: undefined }),
+    );
     fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
     expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
   });

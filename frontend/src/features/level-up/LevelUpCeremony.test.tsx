@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { fetchLevelUpPlan, fetchReference, submitLevelUp } from "@/api/client";
 import LevelUpCeremony from "@/features/level-up/LevelUpCeremony";
 import { axe } from "@/test/axe";
-import { cachedCharacter } from "@/test/renderWithCharacter";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, LevelUpPlanResponse, LevelUpStep, ReferenceData } from "@/types/character";
 
 vi.mock("@/api/client", () => ({ fetchLevelUpPlan: vi.fn(), fetchReference: vi.fn(), submitLevelUp: vi.fn() }));
@@ -32,17 +32,17 @@ function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target
   };
 }
 
+// LevelUpCeremony reads useCurrentCharacter(), so every render seeds the
+// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderCeremony(over?: { character?: Character; url?: string }) {
-  return render(
+  return renderWithCharacter(
     <MemoryRouter initialEntries={[over?.url ?? "/characters/c1/level-up"]}>
       <Routes>
-        <Route
-          path="/characters/:id/level-up"
-          element={<LevelUpCeremony character={over?.character ?? character} />}
-        />
+        <Route path="/characters/:id/level-up" element={<LevelUpCeremony />} />
         <Route path="/characters/:id" element={<div>SHEET</div>} />
       </Routes>
     </MemoryRouter>,
+    over?.character ?? character,
   );
 }
 
@@ -284,7 +284,12 @@ describe("LevelUpCeremony — level up again (#1170)", () => {
 
   it("'Level up again' re-enters the ceremony's first step with a clean draft", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
-    submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
+    // Unlike the previous test, this one re-enters the ceremony after the
+    // submit response lands in the cache — LevelUpCeremony now reads the
+    // character via useCurrentCharacter(), so the response must carry the
+    // full fixture (classes/hitDice/etc.), not just the bumped fields, or
+    // the re-mounted HitPointsStep has nothing to render.
+    submitMock.mockResolvedValue({ ...character, pendingLevelUps: 1 } as Character);
     const user = userEvent.setup();
     renderCeremony();
 

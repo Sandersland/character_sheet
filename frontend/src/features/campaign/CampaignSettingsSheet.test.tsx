@@ -34,14 +34,10 @@ beforeEach(() => {
   vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
 });
 
-// CampaignSettingsSheet's nested CampaignPreferencesFields reads
-// useCurrentCharacter(), so every render seeds the cache and mounts
-// CurrentCharacterProvider via renderWithCharacter.
+// CampaignSettingsSheet reads useCurrentCharacter() directly (#1284), so every
+// render seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character, onClose: () => void = vi.fn()) {
-  return renderWithCharacter(
-    <CampaignSettingsSheet character={character} onClose={onClose} />,
-    character,
-  );
+  return renderWithCharacter(<CampaignSettingsSheet onClose={onClose} />, character);
 }
 
 describe("CampaignSettingsSheet (#1087)", () => {

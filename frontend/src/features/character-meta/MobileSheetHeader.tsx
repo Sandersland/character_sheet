@@ -8,25 +8,24 @@ import Popover from "@/components/ui/Popover";
 import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import CharacterSwitcherSheet from "@/features/character-meta/CharacterSwitcherSheet";
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
-import type { Character } from "@/types/character";
 
 type HeaderVariant = "expanded" | "collapsed";
 
 type SheetMenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; separatorBefore?: boolean };
 
 // Shared shape for the two breakpoint sub-headers (CollapsedBar / ExpandedSheetHeader):
-// identity + HP readout + the live pill + the "Sheet actions" ⋯ menu.
+// the live pill + the "Sheet actions" ⋯ menu — both read the character
+// themselves via useCurrentCharacter() rather than taking it as a prop.
 interface SubHeaderProps {
-  character: Character;
   pill: React.ReactNode;
   menuItems: SheetMenuItem[];
   onOpenSwitcher: () => void;
 }
 
 interface MobileSheetHeaderProps {
-  character: Character;
   /** Live-session controls folded into the "Sheet actions" menu while joined
    *  (#979). Non-null ⇒ a session is live and this character is in it. onLeave is
    *  omitted for a solo session (#1082) — Leave is campaign-only, End is not. */
@@ -66,7 +65,8 @@ function LivePill({ round, onGoToCombat }: { round: number | null; onGoToCombat?
 
 /** Compact bordered AC badge (shield glyph + derived AC) that opens the AC
  *  breakdown. Reads `character.armorClass`, so equipping armor updates it live. */
-function AcBadge({ character }: { character: Character }) {
+function AcBadge() {
+  const { character } = useCurrentCharacter();
   return (
     <Popover
       label="Armor Class breakdown"
@@ -79,7 +79,7 @@ function AcBadge({ character }: { character: Character }) {
         </>
       }
     >
-      <ArmorClassBreakdown character={character} />
+      <ArmorClassBreakdown />
     </Popover>
   );
 }
@@ -131,7 +131,6 @@ function buildMenuItems(
  * opening the {@link CharacterSwitcherSheet} — the mobile route back out (#1027).
  */
 export default function MobileSheetHeader({
-  character,
   sessionActions = null,
   liveRound = null,
   onGoToCombat,
@@ -142,6 +141,7 @@ export default function MobileSheetHeader({
   onOpenDelete,
   onOpenCampaignSettings,
 }: MobileSheetHeaderProps) {
+  const { character } = useCurrentCharacter();
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -156,7 +156,7 @@ export default function MobileSheetHeader({
   const openSwitcher = () => setSwitcherOpen(true);
 
   const renderVariant = (variant: HeaderVariant) => {
-    const shared = { character, pill, menuItems, onOpenSwitcher: openSwitcher };
+    const shared = { pill, menuItems, onOpenSwitcher: openSwitcher };
     return variant === "collapsed" ? <CollapsedBar {...shared} /> : <ExpandedSheetHeader {...shared} />;
   };
 
@@ -270,7 +270,8 @@ function CollapseAnimator({
  * · ⋯. The scroll-collapsed default — calm paper chrome so the panel below stays
  * the subject. Tapping the identity region opens the character switcher (#1027).
  */
-function CollapsedBar({ character, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
+function CollapsedBar({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
+  const { character } = useCurrentCharacter();
   const { current, max, temp } = character.hitPoints;
   const hp = (
     <>
@@ -300,7 +301,6 @@ function CollapsedBar({ character, pill, menuItems, onOpenSwitcher }: SubHeaderP
 
       {/* HP — its own tap target (#982): opens the shared "Hit Points" sheet. */}
       <ManageHpButton
-        character={character}
         className="flex flex-none items-center gap-1.5 rounded-control px-1 py-0.5 transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
       >
         {hp}
@@ -317,7 +317,8 @@ function CollapsedBar({ character, pill, menuItems, onOpenSwitcher }: SubHeaderP
  * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. The identity
  * (avatar + name + subtitle) is a button opening the character switcher (#1027).
  */
-function ExpandedSheetHeader({ character, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
+function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
+  const { character } = useCurrentCharacter();
   const { current, max, temp } = character.hitPoints;
 
   // "Race · Class Level" — classSummary carries per-class levels for multiclass;
@@ -366,7 +367,6 @@ function ExpandedSheetHeader({ character, pill, menuItems, onOpenSwitcher }: Sub
           shared "Hit Points" sheet (#982). */}
       <div className="mt-2 flex items-center gap-2.5">
         <ManageHpButton
-          character={character}
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
         >
           <HpNumbers current={current} max={max} temp={temp} />
@@ -374,7 +374,7 @@ function ExpandedSheetHeader({ character, pill, menuItems, onOpenSwitcher }: Sub
             <MeterBar current={current} max={max} tone="vitality" label={`Hit points ${current} of ${max}`} />
           </span>
         </ManageHpButton>
-        <AcBadge character={character} />
+        <AcBadge />
       </div>
     </header>
   );

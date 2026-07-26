@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ChannelDivinitySection from "@/features/class/ChannelDivinitySection";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { CatalogChannelDivinity, Character } from "@/types/character";
 
@@ -43,9 +44,11 @@ function makeCharacter(cdRemaining: number): Character {
   } as unknown as Character;
 }
 
+// ChannelDivinitySection reads useCurrentCharacter(), so every render seeds
+// the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderSection(character: Character) {
   const onCast = vi.fn();
-  render(<ChannelDivinitySection character={character} busy={false} onCast={onCast} />);
+  renderWithCharacter(<ChannelDivinitySection busy={false} onCast={onCast} />, character);
   return { onCast };
 }
 

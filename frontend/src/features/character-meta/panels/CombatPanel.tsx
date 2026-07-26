@@ -8,27 +8,29 @@ import CombatColumn from "@/features/session/CombatColumn";
 import CombatLogRow from "@/features/session/CombatLogRow";
 import SessionDoorwayCard from "@/features/session/SessionDoorwayCard";
 import SessionLog from "@/features/session/SessionLog";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
-import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
 /**
  * Combat tab, idle (#1086) — the same CombatColumn the live panel fills, with the
  * doorway card in the turn slot and the full HitPointTracker in the HP slot. The
  * last-session log collapses to one line; tapping it opens the log in a right
  * Drawer (desktop) or BottomSheet (mobile). When a session goes live this panel
- * is replaced by CombatLivePanel (CharacterSheetBody gating, untouched).
+ * is replaced by CombatLivePanel (CharacterSheetBody gating, untouched). Takes
+ * no props — rendered directly, outside STATIC_PANELS, because its live-session
+ * gating can't be expressed as a keyed lookup.
  */
-export default function CombatPanel({ character }: SheetPanelProps) {
+export default function CombatPanel() {
+  const { character } = useCurrentCharacter();
   const [logSessionId, setLogSessionId] = useState<string | null>(null);
   const isBelowMd = useIsBelowMd();
 
   return (
     <>
       <CombatColumn
-        character={character}
         turnSlot={<SessionDoorwayCard characterId={character.id} />}
-        hpSlot={<HitPointTracker character={character} />}
-        conditionsSlot={<ConditionsStrip character={character} />}
+        hpSlot={<HitPointTracker />}
+        conditionsSlot={<ConditionsStrip />}
         logRow={<CombatLogRow mode="idle" characterId={character.id} onOpen={setLogSessionId} />}
       />
 

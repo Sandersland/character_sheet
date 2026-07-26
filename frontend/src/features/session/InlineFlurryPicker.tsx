@@ -25,10 +25,9 @@ import AttackStepCard, { AttackKickerPips } from "@/features/session/AttackStepC
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import OpenHandTechniqueSection from "@/features/session/OpenHandTechniqueSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface InlineFlurryPickerProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** Active session id — attack/damage rolls are logged against it. */
   sessionId: string;
@@ -43,7 +42,6 @@ interface InlineFlurryPickerProps {
 }
 
 export default function InlineFlurryPicker({
-  character,
   turnState,
   sessionId,
   onClose,
@@ -51,6 +49,7 @@ export default function InlineFlurryPicker({
   onLogChanged,
   onCommitFocusSpend,
 }: InlineFlurryPickerProps) {
+  const { character } = useCurrentCharacter();
   // The sheet's own ADV/DIS choice (#958), same as the main Attack sheet.
   const [attackMode, setAttackMode] = useState<RollMode>("normal");
 
@@ -86,7 +85,7 @@ export default function InlineFlurryPicker({
   const isMobile = useIsBelowMd();
 
   const openHandTechnique = boundView && (
-    <OpenHandTechniqueSection character={character} turnState={turnState} currentRow={currentRow} />
+    <OpenHandTechniqueSection turnState={turnState} currentRow={currentRow} />
   );
 
   const rollModeRow = (

@@ -33,7 +33,7 @@ export default function LevelUpPage() {
   if (state.kind === "ready") {
     return (
       <CurrentCharacterProvider id={state.character.id}>
-        <LevelUpCeremony character={state.character} />
+        <LevelUpCeremony />
       </CurrentCharacterProvider>
     );
   }

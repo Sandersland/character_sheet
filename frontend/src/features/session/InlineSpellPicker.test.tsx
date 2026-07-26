@@ -5,6 +5,8 @@ import userEvent from "@testing-library/user-event";
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions, logRoll } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
 import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Spell } from "@/types/character";
 
@@ -125,10 +127,12 @@ function renderPicker(
     onCommitSlot: vi.fn(),
     onCastSettled: vi.fn(),
   };
-  const view = (c: Character) => (
+  // InlineSpellPicker reads the character live from the cache (#1284), so this
+  // view no longer varies by character — rerenderWithCharacter just forces a
+  // React re-render after a test writes a new value into the cache directly.
+  const view = () => (
     <RollProvider>
       <InlineSpellPicker
-        character={c}
         sessionId="sess-1"
         onClose={spies.onClose}
         onLogChanged={spies.onLogChanged}
@@ -143,8 +147,14 @@ function renderPicker(
       />
     </RollProvider>
   );
-  const { rerender } = renderWithCharacter(view(character), character);
-  return { ...spies, rerenderWithCharacter: (c: Character) => rerender(view(c)) };
+  const { rerender } = renderWithCharacter(view(), character);
+  return {
+    ...spies,
+    rerenderWithCharacter: (c: Character) => {
+      getQueryClient().setQueryData(characterKeys.detail(c.id), c);
+      rerender(view());
+    },
+  };
 }
 
 beforeEach(() => {
@@ -248,6 +258,11 @@ describe("InlineSpellPicker — post-cast feedback (#1164)", () => {
   });
 
   it("casting fills the result well, dims the cast row, and shows the economy strip", async () => {
+    // InlineSpellPicker now reads the character live from the cache (#1284), so
+    // the mutation's resolved value must keep this test's single-cantrip
+    // roster — the shared default `updatedChar` carries ALL_SPELLS and would
+    // introduce extra castable rows once it landed, making "Cast" ambiguous.
+    mockApply.mockResolvedValueOnce(makeCharacter([cantrip]));
     const spies = renderPicker(makeCharacter([cantrip]));
 
     await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));

@@ -11,12 +11,12 @@ import GrowingComposer from "@/features/journal/GrowingComposer";
 import MobileCaptureSheet from "@/features/journal/MobileCaptureSheet";
 import { DockFeed, MobileFeed } from "@/features/journal/NoteFeed";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
-import type { Character, EntryVisibility, Session } from "@/types/character";
+import type { EntryVisibility, Session } from "@/types/character";
 
 interface CapturePaletteProps {
-  character: Character;
   /** Active session to scope the feed to; omitted shows all NOTE rows. */
   sessionId?: string;
   /** Live session, when known: the dock header shows its title + elapsed time. */
@@ -25,11 +25,11 @@ interface CapturePaletteProps {
 }
 
 export default function CapturePalette({
-  character,
   sessionId,
   session,
   onClose,
 }: CapturePaletteProps) {
+  const { character } = useCurrentCharacter();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useIsBelowMd();
   const { byId } = useCampaignEntities(character.campaignId);

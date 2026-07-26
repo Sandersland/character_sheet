@@ -50,7 +50,6 @@ function renderSection(character: Character, turnState = makeTurnState()) {
   renderWithCharacter(
     <RollProvider>
       <InlineSpellAttackSection
-        character={character}
         sessionId="sess-1"
         turnState={turnState}
         onLogChanged={vi.fn()}
@@ -74,7 +73,6 @@ describe("InlineSpellAttackSection (#734)", () => {
     const { container } = renderWithCharacter(
       <RollProvider>
         <InlineSpellAttackSection
-          character={character}
           sessionId="s"
           turnState={makeTurnState()}
           onLogChanged={vi.fn()}

@@ -1,6 +1,6 @@
 import RollButton from "@/features/dice/RollButton";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatModifier } from "@/lib/abilities";
-import type { Character } from "@/types/character";
 
 // Flat quick-bar cell: centered value-over-label column, no tile chrome — the
 // wrapper's divide-x supplies the only separation (#1084).
@@ -14,7 +14,8 @@ const LABEL = "mt-1 text-[9px] font-semibold uppercase tracking-wide text-parchm
  * top of Overview as a slim divided quick-bar. Desktop keeps them in the banner
  * (`md:hidden`).
  */
-export default function MobileQuickBar({ character }: { character: Character }) {
+export default function MobileQuickBar() {
+  const { character } = useCurrentCharacter();
   return (
     <div className="flex divide-x divide-parchment-200 md:hidden">
       <div className={CELL}>

@@ -11,10 +11,8 @@ import ManeuverPrompt from "@/features/session/ManeuverPrompt";
 import type { AttackEntryView } from "@/features/session/useAttackRolls";
 import type { UseManeuverDieReturn } from "@/features/session/useManeuverDie";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
 
 interface ManeuversDisclosureProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The bound (last-rolled) form's view — the prompts read its roll state. */
   view: AttackEntryView | null;
@@ -23,7 +21,6 @@ interface ManeuversDisclosureProps {
 }
 
 export default function ManeuversDisclosure({
-  character,
   turnState,
   view,
   attacksExhausted,
@@ -54,7 +51,6 @@ export default function ManeuversDisclosure({
             <ManeuverPrompt
               key={view.entry.id}
               section="attack"
-              character={character}
               lastAttackRoll={view.lastAttackRoll}
               lastDamageRoll={view.lastDamageRoll}
               onRollsUpdated={view.onRollsUpdated}
@@ -64,14 +60,12 @@ export default function ManeuversDisclosure({
             <ManeuverPrompt
               key={`${view.entry.id}-damage`}
               section="damage"
-              character={character}
               lastAttackRoll={view.lastAttackRoll}
               lastDamageRoll={view.lastDamageRoll}
               onRollsUpdated={view.onRollsUpdated}
             />
           )}
           <AttackOptionSection
-            character={character}
             turnState={turnState}
             showManeuvers
             attacksExhausted={attacksExhausted}

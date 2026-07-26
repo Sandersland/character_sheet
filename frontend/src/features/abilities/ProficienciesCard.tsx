@@ -14,6 +14,7 @@
  */
 
 import { applyResourceTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import {
   ARMOR_CATEGORY_LABELS,
@@ -31,7 +32,6 @@ import type {
 } from "@/types/character";
 
 interface Props {
-  character: Character;
   artisanTools: ToolOption[];
 }
 
@@ -211,9 +211,9 @@ function useToolProficiencyMutations(character: Character) {
 }
 
 export default function ProficienciesCard({
-  character,
   artisanTools,
 }: Props) {
+  const { character } = useCurrentCharacter();
   const { busy, error, learn: handleLearnToolProf, forget: handleForgetToolProf } =
     useToolProficiencyMutations(character);
 

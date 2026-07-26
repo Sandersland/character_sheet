@@ -2,10 +2,9 @@ import { useState, type ReactNode } from "react";
 
 import BottomSheet from "@/components/ui/BottomSheet";
 import HpSheetBody from "@/features/hitpoints/HpSheetBody";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface Props {
-  character: Character;
   /** Styling for the trigger button — the host supplies its own chip/tile shell. */
   className?: string;
   /** The visual readout rendered inside the trigger (HP value, meter, etc.). */
@@ -21,7 +20,8 @@ interface Props {
  * it during play. The sheet stays open after an apply, so a player can chain
  * damage/heal without re-opening it.
  */
-export default function ManageHpButton({ character, className, children }: Props) {
+export default function ManageHpButton({ className, children }: Props) {
+  const { character } = useCurrentCharacter();
   const [open, setOpen] = useState(false);
 
   // Dynamic accessible name so a screen-reader user hears the HP numbers, not
@@ -44,7 +44,7 @@ export default function ManageHpButton({ character, className, children }: Props
 
       {open && (
         <BottomSheet title="Hit Points" onClose={() => setOpen(false)}>
-          <HpSheetBody character={character} />
+          <HpSheetBody />
         </BottomSheet>
       )}
     </>

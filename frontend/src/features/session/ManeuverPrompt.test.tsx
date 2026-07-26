@@ -47,7 +47,6 @@ describe("ManeuverPrompt — die folds into the total", () => {
     const character = makeCharacter();
     renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section="attack"
         lastAttackRoll={roll(14)}
         lastDamageRoll={null}
@@ -73,7 +72,6 @@ describe("ManeuverPrompt — die folds into the total", () => {
     const character = makeCharacter();
     renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section="damage"
         lastAttackRoll={null}
         lastDamageRoll={roll(9)}
@@ -93,7 +91,6 @@ describe("ManeuverPrompt — die folds into the total", () => {
     const character = makeCharacter();
     const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section="attack"
         lastAttackRoll={null}
         lastDamageRoll={null}
@@ -113,7 +110,6 @@ describe("ManeuverPrompt — per-card section hosting (#809)", () => {
     const character = makeCharacter();
     return renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section={section}
         lastAttackRoll={roll(14)}
         lastDamageRoll={roll(9)}
@@ -143,7 +139,6 @@ describe("ManeuverPrompt — per-card section hosting (#809)", () => {
     const character = makeCharacter();
     const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section="attack"
         lastAttackRoll={null}
         lastDamageRoll={roll(9)}
@@ -158,7 +153,6 @@ describe("ManeuverPrompt — per-card section hosting (#809)", () => {
     const character = makeCharacter();
     const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section="damage"
         lastAttackRoll={roll(14)}
         lastDamageRoll={null}
@@ -197,7 +191,6 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
     const onRollsUpdated = vi.fn();
     const { container } = renderWithCharacter(
       <ManeuverPrompt
-        character={character}
         section={section}
         lastAttackRoll={attack === null ? null : roll(attack)}
         lastDamageRoll={damage === null ? null : roll(damage)}

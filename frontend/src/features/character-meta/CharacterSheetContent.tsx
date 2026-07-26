@@ -24,7 +24,7 @@ import { useSessionLogBumpOnCharacterWrite } from "@/features/session/useSession
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
-import type { Character, ReferenceData, Session } from "@/types/character";
+import type { ReferenceData, Session } from "@/types/character";
 
 /**
  * The loaded-sheet view. Takes NO props (#1284 C17) — reads the character via
@@ -42,7 +42,7 @@ export default function CharacterSheetContent() {
   return (
     <LiveSessionProvider characterId={character.id}>
       <TurnStateProvider>
-        <CharacterSheetWorkspace character={character} reference={reference} />
+        <CharacterSheetWorkspace reference={reference} />
       </TurnStateProvider>
     </LiveSessionProvider>
   );
@@ -52,15 +52,11 @@ export default function CharacterSheetContent() {
  * The sheet body: banner + tab panels + the roll/modal chrome. Split from
  * CharacterSheetContent so the providers above stay uncluttered and this owns
  * the per-character interaction state (tabs, modals, capture dock, doorway).
+ * Reads the character itself (#1284) — CharacterSheetContent only needed it
+ * for LiveSessionProvider's characterId, not to forward it here.
  */
-function CharacterSheetWorkspace({
-  character,
-  reference,
-}: {
-  character: Character;
-  reference: ReferenceData | null;
-}) {
-  const { tabs, activeTab, onTabChange } = useSheetTabs(character);
+function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | null }) {
+  const { character, tabs, activeTab, onTabChange } = useCharacterTabs();
   const modals = useSheetModals();
   // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
@@ -93,7 +89,7 @@ function CharacterSheetWorkspace({
   // header — a sibling of the panel region — can drive it (there is no separate
   // in-panel controls strip anymore). Handlers no-op until a session is joined.
   const life = useCombatLifecycle({ character, session: live.session, live });
-  const livePanel = renderLivePanel(character, live.session, Boolean(turnState), activeTab === "combat");
+  const livePanel = renderLivePanel(live.session, Boolean(turnState), activeTab === "combat");
 
   return (
     <RollProvider
@@ -109,7 +105,6 @@ function CharacterSheetWorkspace({
           md:hidden, #1171). */}
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:flex-1 md:overflow-visible">
         <CharacterSheetHeader
-          character={character}
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
@@ -132,14 +127,13 @@ function CharacterSheetWorkspace({
 
         {/* Armed level-up entry (#892): pinned under the header on every tab,
             above the mobile scroller so it can't scroll away. */}
-        <LevelUpBanner character={character} />
+        <LevelUpBanner />
 
         {/* Desktop: session doorway for non-joined states, pinned under the
             header; absent on the Combat tab and while joined (#1085). */}
         <SessionCue placement="desktop" {...cueProps} />
 
         <CharacterSheetModals
-          character={character}
           captureSessionId={session.activeSessionId}
           captureSession={session.inActiveSession ? session.activeSession : null}
           deleteOpen={modals.deleteOpen}
@@ -169,7 +163,6 @@ function CharacterSheetWorkspace({
               must not gain the 1px this adds to the flow. */}
           <div ref={collapse.sentinelRef} aria-hidden className="h-px w-full md:hidden" />
           <CharacterSheetBody
-            character={character}
             reference={reference}
             activeTab={activeTab}
             livePanel={livePanel}
@@ -254,13 +247,12 @@ function WorkspaceSessionModals({
  * static Combat panel. Extracted so the workspace render stays under the ceiling.
  */
 function renderLivePanel(
-  character: Character,
   session: Session | null,
   hasTurnState: boolean,
   combatActive: boolean,
 ): ReactNode {
   if (!hasTurnState || !session) return null;
-  return <CombatLivePanel character={character} session={session} active={combatActive} />;
+  return <CombatLivePanel session={session} active={combatActive} />;
 }
 
 /**
@@ -292,6 +284,16 @@ function SessionCue({
       onAction={session.onAction}
     />
   );
+}
+
+/** The character plus its derived tab list — grouped into one hook so the
+ *  workspace calls it once instead of two (fallow scores a hook's cognitive
+ *  load by its delegating closures, so keeping the workspace's own hook count
+ *  down matters more than branch-level extraction). */
+function useCharacterTabs() {
+  const { character } = useCurrentCharacter();
+  const { tabs, activeTab, onTabChange } = useSheetTabs(character);
+  return { character, tabs, activeTab, onTabChange };
 }
 
 /** The panel region's two mobile-only scroll affordances — horizontal swipe

@@ -1,9 +1,10 @@
 import Card from "@/components/ui/Card";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 // Read-only identity summary (#927): background + alignment name strings off the
 // wire. Pure display, no API. Editable narrative fields land in #930.
-export default function IdentityCard({ character }: { character: Character }) {
+export default function IdentityCard() {
+  const { character } = useCurrentCharacter();
   return (
     <Card title="Identity" className="p-4">
       <dl className="flex flex-col gap-3">

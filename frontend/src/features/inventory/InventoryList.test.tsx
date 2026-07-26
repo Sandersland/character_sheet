@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 
 import InventoryList from "@/features/inventory/InventoryList";
 import { applyInventoryTransactions, updateCharacter } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Currency, InventoryItem } from "@/types/character";
 
@@ -75,15 +77,19 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// InventoryList's nested CurrencyEditor reads useCurrentCharacter(), so every
-// render seeds the cache and mounts CurrentCharacterProvider via
-// renderWithCharacter. rerender takes a character (not a raw element) so
-// existing rerender(nextCharacter) call sites keep working unchanged.
+// InventoryList reads useCurrentCharacter() directly (#1284), so every render
+// seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
+// rerender writes the new character straight into the cache — the same
+// mechanism a mutation's onSuccess uses in production — since the component
+// no longer has a prop to receive a fresh value through.
 function render(character: Character) {
-  const result = renderWithCharacter(<InventoryList character={character} />, character);
+  const result = renderWithCharacter(<InventoryList />, character);
   return {
     ...result,
-    rerender: (next: Character) => result.rerender(<InventoryList character={next} />),
+    rerender: (next: Character) => {
+      getQueryClient().setQueryData(characterKeys.detail(character.id), next);
+      result.rerender(<InventoryList />);
+    },
   };
 }
 

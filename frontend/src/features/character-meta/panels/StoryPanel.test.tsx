@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import StoryPanel from "@/features/character-meta/panels/StoryPanel";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 // JournalDoorway drives useChronicle (arcs + sessions) via @/api/client; stub it.
@@ -21,11 +22,15 @@ function makeCharacter(partial: Partial<Character>): Character {
   } as unknown as Character;
 }
 
+// StoryPanel and its nested JournalDoorway/IdentityCard read
+// useCurrentCharacter(), so every render seeds the cache and mounts
+// CurrentCharacterProvider.
 function renderPanel(character: Character) {
-  return render(
+  return renderWithCharacter(
     <MemoryRouter>
-      <StoryPanel character={character} reference={null} />
+      <StoryPanel />
     </MemoryRouter>,
+    character,
   );
 }
 

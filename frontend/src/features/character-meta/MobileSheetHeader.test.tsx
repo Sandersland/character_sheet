@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 // The switcher sheet fetches the character list on open; keep it inert here.
@@ -34,12 +35,17 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
-function renderHeader(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = {}) {
-  return render(
+// MobileSheetHeader (and its nested ManageHpButton/AcBadge) reads
+// useCurrentCharacter(), so every render seeds the cache and mounts
+// CurrentCharacterProvider via renderWithCharacter.
+function renderHeader(
+  props: Partial<Parameters<typeof MobileSheetHeader>[0]> = {},
+  character: Character = makeCharacter(),
+) {
+  return renderWithCharacter(
     <MemoryRouter>
       <RollProvider>
         <MobileSheetHeader
-          character={props.character ?? makeCharacter()}
           onOpenCapture={vi.fn()}
           onOpenSessions={vi.fn()}
           onOpenActivity={vi.fn()}
@@ -48,6 +54,7 @@ function renderHeader(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = 
         />
       </RollProvider>
     </MemoryRouter>,
+    character,
   );
 }
 
@@ -62,13 +69,14 @@ describe("MobileSheetHeader", () => {
     renderHeader();
     expect(screen.getByText("Champion")).toBeInTheDocument();
 
-    renderHeader({ character: makeCharacter({ subclass: undefined, level: 4 }) });
+    renderHeader({}, makeCharacter({ subclass: undefined, level: 4 }));
     expect(screen.getByText("Lvl 4")).toBeInTheDocument();
   });
 
   it("for a multiclass character, the pill shows the level (subclass rides in the class line)", () => {
-    renderHeader({
-      character: makeCharacter({
+    renderHeader(
+      {},
+      makeCharacter({
         level: 8,
         subclass: "Champion",
         classes: [
@@ -76,7 +84,7 @@ describe("MobileSheetHeader", () => {
           { id: "cls-2", name: "Rogue", level: 3 },
         ],
       }),
-    });
+    );
     expect(screen.getByText("Human · Fighter 5 / Rogue 3")).toBeInTheDocument();
     expect(screen.getByText("Lvl 8")).toBeInTheDocument();
     expect(screen.queryByText("Champion")).not.toBeInTheDocument();
@@ -102,7 +110,7 @@ describe("MobileSheetHeader", () => {
   });
 
   it("does not render a 'Join campaign' affordance even when the character is in no campaign", () => {
-    renderHeader({ character: makeCharacter({ campaignId: undefined }) });
+    renderHeader({}, makeCharacter({ campaignId: undefined }));
     expect(screen.queryByRole("link", { name: /join campaign/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /join campaign/i })).not.toBeInTheDocument();
   });
@@ -285,7 +293,6 @@ describe("MobileSheetHeader animated collapse (#1083)", () => {
       <MemoryRouter>
         <RollProvider>
           <MobileSheetHeader
-            character={makeCharacter()}
             scrolled={s}
             onOpenCapture={vi.fn()}
             onOpenSessions={vi.fn()}
@@ -295,7 +302,7 @@ describe("MobileSheetHeader animated collapse (#1083)", () => {
         </RollProvider>
       </MemoryRouter>
     );
-    const utils = render(tree(scrolled));
+    const utils = renderWithCharacter(tree(scrolled), makeCharacter());
     return { ...utils, toggle: (s: boolean) => act(() => utils.rerender(tree(s))) };
   }
 

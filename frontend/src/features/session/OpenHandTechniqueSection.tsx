@@ -7,10 +7,11 @@
 import { useState } from "react";
 
 import { imposeOpenHandRiderTransaction } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
-import type { Character, OpenHandRider, OpenHandRiderResult } from "@/types/character";
+import type { OpenHandRider, OpenHandRiderResult } from "@/types/character";
 
 const RIDER_LABELS: Record<OpenHandRider, string> = {
   addle: "Addle",
@@ -26,17 +27,16 @@ function riderBlockedReason(currentRow: AttackTallyRow | null, used: boolean): s
 }
 
 interface OpenHandTechniqueSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The bound Flurry hit row this rider rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
 }
 
 export default function OpenHandTechniqueSection({
-  character,
   turnState,
   currentRow,
 }: OpenHandTechniqueSectionProps) {
+  const { character } = useCurrentCharacter();
   const { openHandTechnique } = character;
   const [result, setResult] = useState<OpenHandRiderResult | null>(null);
   const used = turnState.openHandRiderUsedThisTurn;

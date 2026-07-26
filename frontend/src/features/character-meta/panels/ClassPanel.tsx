@@ -1,4 +1,5 @@
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
 /**
@@ -9,13 +10,14 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
  * `character.class` so a stray `?tab=class` mid-creation renders nothing, same
  * pattern as MagicPanel's spellcasting guard.
  */
-export default function ClassPanel({ character, reference }: SheetPanelProps) {
+export default function ClassPanel({ reference }: SheetPanelProps) {
+  const { character } = useCurrentCharacter();
   if (!character.class) return null;
   return (
     // #1208: CharacterSheetBody has zero mobile gutter (px-0, md:px-6 only), so
     // this panel supplies its own 16px inset to match the p-4 cards sibling tabs use.
     <div className="px-4 md:px-0">
-      <ClassFeaturesSection character={character} referenceClasses={reference?.classes ?? []} />
+      <ClassFeaturesSection referenceClasses={reference?.classes ?? []} />
     </div>
   );
 }

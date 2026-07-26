@@ -9,13 +9,8 @@
  */
 
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";
-import type { Character } from "@/types/character";
 
-interface Props {
-  character: Character;
-}
-
-export default function ConditionsStrip({ character }: Props) {
+export default function ConditionsStrip() {
   return (
     <section
       className="rounded-card border border-parchment-200 bg-parchment-50 p-4 shadow-card"
@@ -27,7 +22,7 @@ export default function ConditionsStrip({ character }: Props) {
         </h2>
       </div>
 
-      <ConditionsSheetBody character={character} />
+      <ConditionsSheetBody />
     </section>
   );
 }

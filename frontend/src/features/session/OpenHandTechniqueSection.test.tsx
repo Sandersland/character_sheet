@@ -38,7 +38,7 @@ describe("OpenHandTechniqueSection (#1245)", () => {
   it("renders nothing when the character has no Open Hand Technique (null)", () => {
     const character = makeCharacter({ openHandTechnique: null });
     const { container } = renderWithCharacter(
-      <OpenHandTechniqueSection character={character} turnState={makeTurnState()} currentRow={hitRow} />,
+      <OpenHandTechniqueSection turnState={makeTurnState()} currentRow={hitRow} />,
       character,
     );
     expect(container).toBeEmptyDOMElement();
@@ -47,7 +47,7 @@ describe("OpenHandTechniqueSection (#1245)", () => {
   it("shows the focus DC and all three rider buttons, disabled before a hit lands", () => {
     const character = makeCharacter();
     renderWithCharacter(
-      <OpenHandTechniqueSection character={character} turnState={makeTurnState()} currentRow={null} />,
+      <OpenHandTechniqueSection turnState={makeTurnState()} currentRow={null} />,
       character,
     );
     expect(screen.getByText(/DC 13/)).toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("OpenHandTechniqueSection (#1245)", () => {
     const turnState = makeTurnState();
     const character = makeCharacter();
     renderWithCharacter(
-      <OpenHandTechniqueSection character={character} turnState={turnState} currentRow={hitRow} />,
+      <OpenHandTechniqueSection turnState={turnState} currentRow={hitRow} />,
       character,
     );
 
@@ -80,7 +80,7 @@ describe("OpenHandTechniqueSection (#1245)", () => {
   it("all rider buttons are disabled once used this turn", () => {
     const character = makeCharacter();
     renderWithCharacter(
-      <OpenHandTechniqueSection character={character} turnState={makeTurnState(true)} currentRow={hitRow} />,
+      <OpenHandTechniqueSection turnState={makeTurnState(true)} currentRow={hitRow} />,
       character,
     );
     expect(screen.getByText(/Used this turn/)).toBeInTheDocument();

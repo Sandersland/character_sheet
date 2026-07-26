@@ -32,6 +32,7 @@ import StunningStrikeSection from "@/features/session/StunningStrikeSection";
 import QuiveringPalmSection from "@/features/session/QuiveringPalmSection";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 // Selection state: the chosen form drives the roll button; the last-rolled form
@@ -99,7 +100,6 @@ function WeaponRollModeRow({
 }
 
 interface InlineAttackPickerProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** Active session id — attack/damage rolls are logged against it. */
   sessionId: string;
@@ -114,13 +114,13 @@ interface InlineAttackPickerProps {
 }
 
 export default function InlineAttackPicker({
-  character,
   turnState,
   sessionId,
   onClose,
   onCancel,
   onLogChanged,
 }: InlineAttackPickerProps) {
+  const { character } = useCurrentCharacter();
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const die = useManeuverDie(character);
@@ -188,7 +188,6 @@ export default function InlineAttackPicker({
   );
   const maneuversDisclosure = view.showManeuvers && (
     <ManeuversDisclosure
-      character={character}
       turnState={turnState}
       view={boundView}
       attacksExhausted={view.attacksExhausted}
@@ -196,21 +195,20 @@ export default function InlineAttackPicker({
     />
   );
   const sneakAttack = boundView && (
-    <SneakAttackSection character={character} turnState={turnState} currentRow={currentRow} />
+    <SneakAttackSection turnState={turnState} currentRow={currentRow} />
   );
   const stunningStrike = boundView && (
-    <StunningStrikeSection character={character} turnState={turnState} currentRow={currentRow} />
+    <StunningStrikeSection turnState={turnState} currentRow={currentRow} />
   );
   // Unlike the hit-gated riders above, Quivering Palm's Trigger isn't tied to a
   // hit this turn (it ends a prior Set, any time as a Magic action) — so this
   // mounts unconditionally rather than gating on boundView; the section itself
   // gates Set on currentRow and Trigger on the active flag (#1245).
   const quiveringPalm = (
-    <QuiveringPalmSection character={character} turnState={turnState} currentRow={currentRow} />
+    <QuiveringPalmSection turnState={turnState} currentRow={currentRow} />
   );
   const spellAttacks = (
     <InlineSpellAttackSection
-      character={character}
       sessionId={sessionId}
       turnState={turnState}
       onLogChanged={onLogChanged}

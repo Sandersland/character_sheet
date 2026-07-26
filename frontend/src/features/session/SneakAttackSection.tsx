@@ -6,6 +6,7 @@
 import { useState } from "react";
 
 import { rollSneakAttackTransaction } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
@@ -57,17 +58,16 @@ function useSneakAttackRoll(
 }
 
 interface SneakAttackSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The current hit row the roll folds into; null before a hit lands. */
   currentRow: AttackTallyRow | null;
 }
 
 export default function SneakAttackSection({
-  character,
   turnState,
   currentRow,
 }: SneakAttackSectionProps) {
+  const { character } = useCurrentCharacter();
   const { sneakAttack } = character;
   const [eligible, setEligible] = useState(false);
   const { used, canRoll, rolled, handleRoll } = useSneakAttackRoll(

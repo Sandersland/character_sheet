@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CloakOfShadowsSection from "@/features/class/CloakOfShadowsSection";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, ConditionEntry } from "@/types/character";
 
 function makeCharacter(active: ConditionEntry[] = []): Character {
@@ -14,9 +15,14 @@ function makeCharacter(active: ConditionEntry[] = []): Character {
   } as unknown as Character;
 }
 
+// CloakOfShadowsSection reads useCurrentCharacter(), so every render seeds
+// the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderSection(character: Character, props: Partial<React.ComponentProps<typeof CloakOfShadowsSection>> = {}) {
   const onActivate = vi.fn();
-  render(<CloakOfShadowsSection character={character} focusAvailable={3} busy={false} onActivate={onActivate} {...props} />);
+  renderWithCharacter(
+    <CloakOfShadowsSection focusAvailable={3} busy={false} onActivate={onActivate} {...props} />,
+    character,
+  );
   return { onActivate };
 }
 

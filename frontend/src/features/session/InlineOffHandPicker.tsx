@@ -28,10 +28,9 @@ import { useBonusAttackSheet } from "@/features/session/useBonusAttackSheet";
 import AttackStepCard from "@/features/session/AttackStepCard";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface InlineOffHandPickerProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** Active session id — off-hand rolls are logged against it. */
   sessionId: string;
@@ -47,7 +46,6 @@ interface InlineOffHandPickerProps {
 }
 
 export default function InlineOffHandPicker({
-  character,
   turnState,
   sessionId,
   onClose,
@@ -55,6 +53,7 @@ export default function InlineOffHandPicker({
   onLogChanged,
   variant = "twf",
 }: InlineOffHandPickerProps) {
+  const { character } = useCurrentCharacter();
   // variant-aware entry (#1218): off-hand weapon for "twf", Unarmed Strike for
   // "unarmed"; the useBonusAttackSheet shell (#1217) is otherwise identical.
   const entry = buildBonusSwingEntry(character, variant);

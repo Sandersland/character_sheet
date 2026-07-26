@@ -19,11 +19,11 @@ import { useState } from "react";
 
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { canPromptManeuvers, planManeuverPrompt, resolveDamageSelection } from "@/lib/maneuverPrompt";
-import type { Character, ManeuverEntry } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import type { ManeuverEntry } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
 interface ManeuverPromptProps {
-  character: Character;
   /** Which half to render: attack-roll (Precision) or damage-roll maneuvers. */
   section: "attack" | "damage";
   /** The last attack roll result for this weapon row (null = not yet rolled). */
@@ -38,13 +38,13 @@ interface ManeuverPromptProps {
 }
 
 export default function ManeuverPrompt({
-  character,
   section,
   lastAttackRoll,
   lastDamageRoll,
   onRollsUpdated,
 }: ManeuverPromptProps) {
   // All hooks at the top — no hooks after the early returns below.
+  const { character } = useCurrentCharacter();
   const { pool, dieLabel, busy, spend } = useManeuverDie(character);
   const [spentFor, setSpentFor] = useState<string | null>(null);
   const [selectedDamageManeuver, setSelectedDamageManeuver] = useState("");

@@ -8,6 +8,7 @@ import { RollProvider } from "@/features/dice/RollContext";
 import AllSkillsCard from "@/features/abilities/AllSkillsCard";
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import BannerVitals from "@/features/character-meta/BannerVitals";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { RollResult, RollSpec } from "@/lib/dice";
 import type { AbilityScores, Character, Skill } from "@/types/character";
 
@@ -104,8 +105,16 @@ describe("roll affordances log their category event", () => {
 
   it("initiative logs an initiative roll", async () => {
     const user = userEvent.setup();
-    const character = { initiativeBonus: 2, armorClass: 13, armorClassBreakdown: [], speed: 30, proficiencyBonus: 2, hitPoints: { current: 10, max: 10, temp: 0 } } as unknown as Character;
-    renderInSession(<BannerVitals character={character} />);
+    const character = { id: "char-1", initiativeBonus: 2, armorClass: 13, armorClassBreakdown: [], speed: 30, proficiencyBonus: 2, hitPoints: { current: 10, max: 10, temp: 0 } } as unknown as Character;
+    // BannerVitals reads useCurrentCharacter(), so this render seeds the
+    // cache and mounts CurrentCharacterProvider via renderWithCharacter
+    // (renderInSession only supplies RollProvider).
+    renderWithCharacter(
+      <RollProvider characterId="char-1" sessionId="sess-1">
+        <BannerVitals />
+      </RollProvider>,
+      character,
+    );
 
     await user.click(screen.getByTitle(/Roll Initiative/));
 

@@ -22,10 +22,7 @@ beforeEach(() => {
 // ClassFeaturesSection reads useCurrentCharacter(), so every render seeds the
 // cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
-  return renderWithCharacter(
-    <ClassFeaturesSection character={character} referenceClasses={[]} />,
-    character,
-  );
+  return renderWithCharacter(<ClassFeaturesSection referenceClasses={[]} />, character);
 }
 
 const FS_CATALOG = [

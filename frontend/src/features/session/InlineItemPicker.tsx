@@ -6,22 +6,21 @@
  */
 
 import { applyActionTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { rollSpec } from "@/lib/dice";
-import type { Character } from "@/types/character";
 
 interface InlineItemPickerProps {
-  character: Character;
   /** Commit the action slot once an item is used (#765) — tag the batch for undo. */
   onCommit: (batchId?: string) => void;
   onClose: () => void;
 }
 
 export default function InlineItemPicker({
-  character,
   onCommit,
   onClose,
 }: InlineItemPickerProps) {
+  const { character } = useCurrentCharacter();
   const mutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: Parameters<typeof applyActionTransactions>[1]) => applyActionTransactions(character.id, ops),
