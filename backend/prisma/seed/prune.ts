@@ -1,21 +1,20 @@
 import type { SeedEdition } from "./edition.js";
 
-// Builds a `deleteMany`/`findMany` where-clause matching every Feat row whose
-// (name, edition) pair isn't in the currently-seeded set (#1306's fix for the
-// footgun that used to drop the OTHER edition's row too — the 2014 Mobile feat
-// was deleted outright, not merely superseded, because a bare `notIn` on name
-// treated a 2014-only row sharing a 2024 row's name as stale).
+// Builds a `deleteMany`/`findMany` where-clause matching every catalog row
+// whose (name, edition) pair isn't in the currently-seeded set (#1306): a bare
+// `notIn` on name alone can't distinguish a same-named row under a DIFFERENT
+// edition from a genuinely-retired one, so it would drop or keep both
+// together. Partitions by edition first rather than testing `{name, edition}`
+// pairs in one NOT/OR: `edition = 'x'` is UNKNOWN (not FALSE) for a row whose
+// OWN edition is NULL, which silently poisons a mixed-edition NOT/OR — the
+// exact NULL-comparison trap NULLS NOT DISTINCT exists to guard against.
 //
-// Partitions by edition FIRST rather than testing `{name, edition}` pairs
-// directly in one big NOT/OR: SQL's three-valued logic makes `edition = 'x'`
-// evaluate to UNKNOWN (neither true nor false) for a row whose OWN edition is
-// NULL, which poisons a mixed-edition NOT/OR into never matching that row —
-// exactly the NULL-comparison footgun the NULLS NOT DISTINCT constraint
-// exists to guard against. Comparing each row against ITS OWN edition
-// partition first (`edition IS NULL` / `edition = 'EDITION_2014'` / `edition =
-// 'EDITION_2024'`) is a direct, always-true-or-false self-comparison, so the
-// per-partition `notIn` on name is reachable for every row.
-export function staleFeatWhere(seeded: { name: string; edition: SeedEdition | null }[]) {
+// Model-agnostic by shape (any table with `name`/`edition` columns), so
+// seedFeats and seedShadowArts's GrantedAbility prune share this one function
+// rather than two copies — GrantedAbility.name stays plain @unique today (no
+// divergent row can exist to disambiguate yet), so this is currently a no-op
+// improvement there, ready the day a maneuver/shadow-art forks by edition.
+export function staleCatalogRowsWhere(seeded: { name: string; edition: SeedEdition | null }[]) {
   const editions: (SeedEdition | null)[] = [null, "EDITION_2014", "EDITION_2024"];
   return {
     OR: editions.map((edition) => ({

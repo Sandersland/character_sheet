@@ -19,7 +19,7 @@ import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
 import { editionOrShared, resolveEditionRow, upsertEditionRow } from "../src/lib/rules/catalog-edition.js";
-import { staleFeatWhere } from "./seed/prune.js";
+import { staleCatalogRowsWhere } from "./seed/prune.js";
 import type { SeedEdition } from "./seed/edition.js";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -201,16 +201,17 @@ async function seedShadowArts(prisma: PrismaClient) {
       update: data,
     });
   }
-  // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — mirrors
-  // seedFeats' stale-row cleanup. Scoped to source "shadowArts" so this never
-  // touches maneuvers/channelDivinity rows sharing the same table.
-  const staleNames = SHADOW_ARTS.map((a) => a.name);
-  const stale = await prisma.grantedAbility.findMany({
-    where: { source: "shadowArts", name: { notIn: staleNames } },
-    select: { name: true },
-  });
+  // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — same
+  // edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306), AND'd
+  // with source: "shadowArts" so this never touches maneuvers/channelDivinity
+  // rows sharing the same table.
+  const staleWhere = {
+    source: "shadowArts",
+    ...staleCatalogRowsWhere(SHADOW_ARTS.map((a) => ({ name: a.name, edition: null }))),
+  };
+  const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true } });
   if (stale.length) console.log(`seedShadowArts: dropping stale catalog rows: ${stale.map((a) => a.name).join(", ")}`);
-  await prisma.grantedAbility.deleteMany({ where: { source: "shadowArts", name: { notIn: staleNames } } });
+  await prisma.grantedAbility.deleteMany({ where: staleWhere });
 }
 
 // Seed generic subclass "choose N" options (#899) as GrantedAbility rows keyed
@@ -283,7 +284,7 @@ async function seedFeats(prisma: PrismaClient) {
       },
     );
   }
-  const staleWhere = staleFeatWhere(FEATS.map((f) => ({ name: f.name, edition: f.edition ?? null })));
+  const staleWhere = staleCatalogRowsWhere(FEATS.map((f) => ({ name: f.name, edition: f.edition ?? null })));
   // Log before the destructive drop so the operator sees what's removed (a future
   // homebrew feat row not in FEATS would be dropped here — intentional for a
   // genuinely retired row of either edition).
@@ -298,12 +299,15 @@ async function seedFeats(prisma: PrismaClient) {
 // row exists); throws on an unknown name. Two backgrounds (Acolyte/Sage) share
 // the repeatable Magic Initiate row; the class flavor is a creation-time
 // snapshot, not a column.
-// An Origin feat grant is PHB'24-only (Background model comment: "Empty/null
-// for spec-less 2014 legacy rows"), so this resolves through the SAME
-// exact-then-NULL fallback every other catalog read uses (resolveEditionRow),
-// pinned to EDITION_2024 — not a bare `edition: null` lookup, which broke the
-// moment Alert forked (#1306): Criminal's Origin feat is 2024-tagged Alert,
-// with no shared row left to match a null-only query.
+//
+// Pinned to EDITION_2024 rather than a bare `edition: null` lookup — Origin
+// feat grants are PHB'24-only, and Alert now forks by edition (#1306), so a
+// null-only match would fail the moment a background's origin feat has no
+// shared row left. This FK is a REFERENCE-DISPLAY DEFAULT ONLY (reference.ts's
+// same "no character to resolve against" reasoning) plus a same-edition
+// fallback: a character actually being created re-resolves the origin feat
+// against ITS OWN edition in character-create.ts's buildOriginEntry, so this
+// seed-time pin never reaches a live character's snapshot uncorrected.
 async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS)[number]): Promise<string | null> {
   if (!bg.originFeatName) return null;
   const candidates = await prisma.feat.findMany({
