@@ -77,6 +77,9 @@ export function LiveSessionProvider({ characterId, children }: Props) {
   const loaded = doorwayQuery.isSuccess || doorwayQuery.isError;
   const activeNow = doorway?.session?.status === "active" && doorway.session.joined;
 
+  // Same focus-refetch opt-in as the doorway, for the same reason: while
+  // joined, a stale participant list is exactly the kind of thing a focus
+  // refetch should catch (someone left/joined while backgrounded).
   const activeQuery = useQuery({
     queryKey: sessionKeys.active(characterId),
     queryFn: () => fetchActiveSession(characterId),
@@ -93,18 +96,38 @@ export function LiveSessionProvider({ characterId, children }: Props) {
 
   // Re-resolve both reads now, for callers that just changed session state
   // out-of-band (start/join/leave/end — see useCombatLifecycle, useSessionDoorway)
-  // and can't wait for the next natural refetch. The query cache's own request
-  // coalescing replaces the old seq-ref race guard: two overlapping refresh()
-  // calls for the same key share one in-flight fetch, so a slow response can
-  // never land — and overwrite the cache — after a newer one already has.
-  // Never rejects, matching the old contract: a failed refresh just leaves the
-  // reactive queries above to report it via isError.
+  // and can't wait for the next natural refetch.
+  //
+  // The active-session key CANNOT be handled the same way as the doorway: its
+  // useQuery observer above is still enabled:false at this point (the fresh
+  // doorway data hasn't rendered yet — query-cache notifications and React's
+  // render are both deferred past this synchronous point), so invalidating it
+  // would be a no-op (refetchQueries skips disabled queries). Fetching it
+  // directly means refresh() cannot resolve before the full session exists —
+  // #963's callers need that to route to the live tracker, not a stale static
+  // panel. The not-joined branch drops any previous session's participants so
+  // a later join of a DIFFERENT session can't transiently show the old roster.
+  //
+  // The manual seq-ref race guard is gone; TanStack Query's own machinery
+  // covers both races it protected against: the FIRST fetch for a key is
+  // shared (a second caller gets the same in-flight promise back), and every
+  // fetch after that first success is superseded via cancelRefetch:true
+  // (query-core's default), which cancels the older in-flight request so its
+  // response can never land. Never rejects, matching the old contract: a
+  // failed refresh just leaves the reactive queries above to report it via
+  // isError.
   const refresh = useCallback(async () => {
     try {
       await queryClient.invalidateQueries({ queryKey: sessionKeys.doorway(characterId) });
       const fresh = queryClient.getQueryData<SessionDoorwayState>(sessionKeys.doorway(characterId));
       if (fresh?.session?.status === "active" && fresh.session.joined) {
-        await queryClient.invalidateQueries({ queryKey: sessionKeys.active(characterId) });
+        await queryClient.fetchQuery({
+          queryKey: sessionKeys.active(characterId),
+          queryFn: () => fetchActiveSession(characterId),
+          staleTime: 0,
+        });
+      } else {
+        queryClient.removeQueries({ queryKey: sessionKeys.active(characterId) });
       }
     } catch {
       // Swallowed — see the comment above.
