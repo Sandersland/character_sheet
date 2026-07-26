@@ -27,7 +27,7 @@ function makeTurnState(used = false): TurnState & TurnStateActions {
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
-    openHandTechnique: { dc: 13 },
+    openHandTechnique: { saveDC: 13 },
     ...overrides,
   } as unknown as Character;
 }
@@ -35,8 +35,8 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 const hitRow = { id: "row-1" } as unknown as AttackTallyRow;
 
 describe("OpenHandTechniqueSection (#1245)", () => {
-  it("renders nothing when the character has no Open Hand Technique (null)", () => {
-    const character = makeCharacter({ openHandTechnique: null });
+  it("renders nothing when the character has no Open Hand Technique (absent, #1316)", () => {
+    const character = makeCharacter({ openHandTechnique: undefined });
     const { container } = renderWithCharacter(
       <OpenHandTechniqueSection turnState={makeTurnState()} currentRow={hitRow} />,
       character,

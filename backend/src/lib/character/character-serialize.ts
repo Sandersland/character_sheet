@@ -111,7 +111,13 @@ function buildRiderView(
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
   maneuverSaveDC: number | undefined,
-): Record<string, Rider> {
+): {
+  sneakAttack?: Rider;
+  stunningStrike?: Rider;
+  openHandTechnique?: Rider;
+  quiveringPalm?: Rider;
+  maneuverSaveDC?: Rider;
+} {
   const sneakAttack = sneakAttackRider(classEntries);
   const stunningStrike = stunningStrikeRider(classEntries, abilityScores, profBonus);
   const openHandTechnique = openHandTechniqueRider(classEntries, abilityScores, profBonus);

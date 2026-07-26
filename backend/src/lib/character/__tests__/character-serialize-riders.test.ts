@@ -34,12 +34,12 @@ const BASE = {
   alignment: "Neutral",
   initiativeBonus: 0,
   speed: 30,
-  savingThrowProficiencies: [],
+  savingThrowProficiencies: [] as string[],
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
   hitPoints: { current: 10, max: 10, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-} as const;
+};
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);

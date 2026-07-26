@@ -27,7 +27,7 @@ function makeTurnState(): TurnState & TurnStateActions {
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
-    quiveringPalm: { dc: 17, active: false },
+    quiveringPalm: { saveDC: 17, active: false },
     ...overrides,
   } as unknown as Character;
 }
@@ -35,8 +35,8 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 const hitRow = { id: "row-1" } as unknown as AttackTallyRow;
 
 describe("QuiveringPalmSection (#1245)", () => {
-  it("renders nothing when the character has no Quivering Palm (null)", () => {
-    const character = makeCharacter({ quiveringPalm: null });
+  it("renders nothing when the character has no Quivering Palm (absent, #1316)", () => {
+    const character = makeCharacter({ quiveringPalm: undefined });
     const { container } = renderWithCharacter(
       <QuiveringPalmSection turnState={makeTurnState()} currentRow={hitRow} />,
       character,
@@ -65,7 +65,7 @@ describe("QuiveringPalmSection (#1245)", () => {
   });
 
   it("clicking Set calls the transaction and shows the result", async () => {
-    const updated = makeCharacter({ quiveringPalm: { dc: 17, active: true } });
+    const updated = makeCharacter({ quiveringPalm: { saveDC: 17, active: true } });
     vi.mocked(setQuiveringPalmTransaction).mockResolvedValue({
       character: updated,
       results: [{ active: true, daysRemaining: 17, summary: "Quivering Palm — set imperceptible vibrations (lasts 17 days unless triggered or ended)." }],
@@ -84,13 +84,13 @@ describe("QuiveringPalmSection (#1245)", () => {
   });
 
   it("Trigger is enabled once active, consumes the Action slot, and shows the result", async () => {
-    const updated = makeCharacter({ quiveringPalm: { dc: 17, active: false } });
+    const updated = makeCharacter({ quiveringPalm: { saveDC: 17, active: false } });
     vi.mocked(triggerQuiveringPalmTransaction).mockResolvedValue({
       character: updated,
       results: [{ dc: 17, saveRoll: 10, outcome: "fail", rawDamage: 60, appliedDamage: 60, summary: "Quivering Palm — Constitution save DC 17, target rolled 10: failed — 60 Force damage." }],
     });
     const turnState = makeTurnState();
-    const character = makeCharacter({ quiveringPalm: { dc: 17, active: true } });
+    const character = makeCharacter({ quiveringPalm: { saveDC: 17, active: true } });
     renderWithCharacter(
       <QuiveringPalmSection turnState={turnState} currentRow={null} />,
       character,

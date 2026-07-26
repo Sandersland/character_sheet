@@ -2,7 +2,7 @@
  * The aggregate serialized Character shape and its lean summary view.
  */
 
-import type { RulesEdition } from "@character-sheet/shared-types";
+import type { Rider, RulesEdition } from "@character-sheet/shared-types";
 
 import type { AvailableAction } from "./actions";
 import type { CampaignPreferences } from "./campaign";
@@ -160,18 +160,26 @@ export interface Character {
   /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
   attacksPerAction: number;
 
-  /** Rogue Sneak Attack Nd6 (dice count + faces), or null for a non-rogue. */
-  sneakAttack: { dice: number; faces: number } | null;
+  /** Riders (#1316): bolt-on effects with no action-economy cost of their
+   *  own — present only when the character has them, absent otherwise
+   *  (never `null`). See packages/shared-types/src/riders.ts for the shape. */
 
-  /** Monk Stunning Strike focus save DC, or null below monk L5 (#1242). */
-  stunningStrike: { dc: number } | null;
+  /** Rogue Sneak Attack Nd6, absent for a non-rogue. */
+  sneakAttack?: Rider;
+
+  /** Monk Stunning Strike focus save DC, absent below monk L5 (#1242). */
+  stunningStrike?: Rider;
 
   /** Warrior of the Open Hand Open Hand Technique focus save DC (Push/Topple),
-   *  or null below monk L3 off-subclass (#1245). Addle carries no save. */
-  openHandTechnique: { dc: number } | null;
+   *  absent below monk L3 off-subclass (#1245). Addle carries no save. */
+  openHandTechnique?: Rider;
   /** Warrior of the Open Hand Quivering Palm — focus save DC + whether
-   *  vibrations are currently set, or null below monk L17 off-subclass (#1245). */
-  quiveringPalm: { dc: number; active: boolean } | null;
+   *  vibrations are currently set, absent below monk L17 off-subclass (#1245). */
+  quiveringPalm?: Rider;
+  /** Battle Master maneuver save DC (#1316) — folded into the rider contract;
+   *  absent for non-Battle-Masters. maneuverChoiceCount/toolProfChoiceCount
+   *  stay on `resources` (they're choice counts, not save DCs). */
+  maneuverSaveDC?: Rider;
 
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];

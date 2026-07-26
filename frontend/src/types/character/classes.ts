@@ -223,7 +223,6 @@ export interface ToolProfEntry {
 export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
-  maneuverSaveDC?: number;
   /** Warrior of the Elements: whether the L3+ Elemental Attunement toggle is available. */
   elementalAttunementAvailable?: boolean;
   /** Warrior of the Elements: whether the L6+ Elemental Burst action is available. */

@@ -80,7 +80,7 @@ export default function SneakAttackSection({
   // Only rogues have Sneak Attack; nothing to fold into until a hit lands.
   if (!sneakAttack) return null;
 
-  const label = `${sneakAttack.dice}d${sneakAttack.faces}`;
+  const label = `${sneakAttack.dice?.count}d${sneakAttack.dice?.faces}`;
 
   return (
     <div className="flex flex-col gap-1.5 rounded-control border border-gold-200 bg-gold-50 p-2">
