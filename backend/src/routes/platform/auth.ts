@@ -5,6 +5,7 @@ import { config } from "@/lib/core/config.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { clearCookie, getCookie, setCookie } from "@/lib/auth/cookies.js";
 import { AuthenticationError } from "@/lib/auth/errors.js";
+import { resolvePreferences } from "@/lib/preferences/preferences.js";
 import {
   createSession,
   destroySession,
@@ -103,7 +104,18 @@ authRouter.post("/auth/dev-login", async (_req, res) => {
 
   const token = await createSession(user.id);
   setCookie(res, SESSION_COOKIE, token, SESSION_TTL_SECONDS);
-  res.json({ token, user });
+  // Reshape to the same SessionUser contract /auth/me returns (resolved
+  // preferences, not the raw Json column) rather than the raw Prisma row.
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      imageUrl: user.imageUrl,
+      preferences: resolvePreferences(user.preferences),
+    },
+  });
 });
 
 /**
