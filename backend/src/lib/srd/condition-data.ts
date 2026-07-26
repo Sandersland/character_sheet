@@ -198,15 +198,20 @@ export function exhaustionRollEffects(level: number, edition: RulesEdition): Rol
 
 /**
  * Speed reduction (feet) from exhaustion. 2024 (SRD 5.2): −5 ft per level.
- * 2014 (PHB'14 p. 291): tiered — no penalty below level 2, current Speed
- * (base + all bonuses, i.e. the value the caller has already summed) halved
- * rounded down at levels 2-4, and a floor to exactly 0 at level 5+ (not a
- * further −5 ft cut, which could theoretically overshoot into negative).
+ * 2014 (PHB'14 p. 291): tiered — no penalty below level 2, and levels 2-4
+ * halve current Speed (base + all bonuses, i.e. the value the caller has
+ * already summed), **rounded down** — matching the round-down convention used
+ * elsewhere for half-Speed (e.g. Prone's "spend half its Speed, round down").
+ * This function returns the amount SUBTRACTED, so to land the RESULT on
+ * floor(currentSpeed/2) the subtrahend must be its complement, ceil(currentSpeed/2)
+ * — subtracting floor(currentSpeed/2) instead would round the result UP for an
+ * odd Speed (25 → 13, not the correct 12). Level 5+ is a floor to exactly 0
+ * (not a further −5 ft cut, which could theoretically overshoot negative).
  */
 export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edition: RulesEdition): number {
   if (edition === "EDITION_2014") {
     if (level < 2) return 0;
-    if (level < 5) return Math.floor(currentSpeed / 2);
+    if (level < 5) return Math.ceil(currentSpeed / 2);
     return currentSpeed;
   }
   return 5 * Math.max(0, level);

@@ -28,12 +28,19 @@ describe("exhaustionSpeedPenalty — 2014 (PHB'14 p. 291)", () => {
     expect(exhaustionSpeedPenalty(1, 30, "EDITION_2014")).toBe(0);
   });
 
-  it("levels 2-4: subtracts floor(currentSpeed/2) from the character's current Speed (base + bonuses), not a further flat cut", () => {
-    // Returns the amount SUBTRACTED, not the resulting Speed — floor(25/2)=12
-    // taken off 25 leaves 13, not floor(25/2)=12 itself (#1307 settled formula).
-    expect(exhaustionSpeedPenalty(2, 25, "EDITION_2014")).toBe(12);
-    expect(exhaustionSpeedPenalty(3, 25, "EDITION_2014")).toBe(12);
-    expect(exhaustionSpeedPenalty(4, 25, "EDITION_2014")).toBe(12);
+  it("levels 2-4: subtracts ceil(currentSpeed/2), so the RESULT (currentSpeed − penalty) is floor(currentSpeed/2) — half, rounded down, matching Prone's round-down convention", () => {
+    // Odd current speed (25, Hill Dwarf-shaped): ceil(25/2)=13 subtracted →
+    // result 12 = floor(25/2), not 13 (a floor subtrahend would leave 13, the
+    // wrong direction — PHB'14 p. 291 rounds the RESULT down, not the cut).
+    expect(exhaustionSpeedPenalty(2, 25, "EDITION_2014")).toBe(13);
+    expect(exhaustionSpeedPenalty(3, 25, "EDITION_2014")).toBe(13);
+    expect(exhaustionSpeedPenalty(4, 25, "EDITION_2014")).toBe(13);
+    expect(25 - exhaustionSpeedPenalty(2, 25, "EDITION_2014")).toBe(12);
+
+    // Even current speed (30): ceil and floor agree, pinning the direction
+    // from both sides — the result is still exactly half.
+    expect(exhaustionSpeedPenalty(2, 30, "EDITION_2014")).toBe(15);
+    expect(30 - exhaustionSpeedPenalty(2, 30, "EDITION_2014")).toBe(15);
   });
 
   it("level 5+: Speed reduced to exactly 0 — a floor on currentSpeed, not currentSpeed - 5", () => {

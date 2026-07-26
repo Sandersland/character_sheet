@@ -28,8 +28,11 @@ const BASE = {
   abilityScores: { strength: 15, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
 };
 
-async function createAt(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string) {
-  const res = await supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...BASE, name, rulesEdition });
+async function createAt(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string, race?: string) {
+  const res = await supertest(app)
+    .post("/api/characters")
+    .set("Cookie", COOKIE)
+    .send({ ...BASE, ...(race ? { race } : {}), name, rulesEdition });
   expect(res.status).toBe(201);
   return res.body.id as string;
 }
@@ -67,9 +70,10 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
     const char2014 = (await get(id2014)).body;
     const char2024 = (await get(id2024)).body;
 
-    // exhaustionSpeedPenalty subtracts floor(currentSpeed/2) — for an odd base
-    // like Hill Dwarf's 25, that leaves 13, not floor(25/2)=12 (#1307 settled formula).
-    expect(char2014.speed).toBe(13);
+    // Halved, rounded down (PHB'14 p. 291): Hill Dwarf's 25 → 12, not 13
+    // (exhaustionSpeedPenalty subtracts ceil(currentSpeed/2) so the RESULT
+    // lands on floor(currentSpeed/2), matching Prone's round-down convention).
+    expect(char2014.speed).toBe(12);
     expect(char2014.rollModifiers).toEqual(
       expect.arrayContaining([
         { mode: "disadvantage", kind: "check", source: "Exhaustion" },
@@ -88,6 +92,13 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
         { mode: "flat", modifier: -6, kind: "initiative", source: "Exhaustion" },
       ]),
     );
+  });
+
+  it("2014 exhaustion 2-4: an even base Speed (Human 30) halves cleanly, pinning the round-down direction from both sides", async () => {
+    const id = await createAt("EDITION_2014", "ExhEdition 2014-Human-L2", "Human");
+    await setExhaustion(id, 2);
+    const char = (await get(id)).body;
+    expect(char.speed).toBe(15); // 30 halved exactly — floor and ceil agree here
   });
 
   it("2014 exhaustion 5: Speed is exactly 0 — not negative, not 25 less than base", async () => {
