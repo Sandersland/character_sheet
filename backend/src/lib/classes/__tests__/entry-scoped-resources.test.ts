@@ -78,6 +78,25 @@ describe("deriveEntryScopedResources", () => {
     expect(derived?.maneuverChoiceCount).not.toBe(wrongTotalLevelCount?.maneuverChoiceCount);
   });
 
+  // studentOfWarToolCount is a flat 1 from Battle Master level 3, so the only
+  // level that tells an entry-scoped derivation apart from a total-level one is
+  // below the subclass gate: a fighter-2 entry contributes no cap at all, where
+  // a total-level (10) read would wrongly report 1.
+  it("wizard 8 / fighter 2 SECONDARY: toolProfChoiceCount is absent — the fighter entry is below the Battle Master gate", () => {
+    const totalLevel = 10; // wizard 8 + fighter 2
+    const profBonus = proficiencyBonusForLevel(totalLevel);
+    const entries = [
+      { name: "wizard", subclass: "school of evocation", level: 8 },
+      { name: "fighter", subclass: "battle master", level: 2 },
+    ];
+
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+
+    expect(derived?.toolProfChoiceCount).toBeUndefined();
+    const wrongTotalLevel = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    expect(wrongTotalLevel?.toolProfChoiceCount).toBe(1);
+  });
+
   it("Hunter Ranger SECONDARY: subclassChoices (Hunter's Prey) are present, scoped to the ranger entry's own level", () => {
     const totalLevel = 10; // cleric 7 + ranger 3
     const profBonus = proficiencyBonusForLevel(totalLevel);

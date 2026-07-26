@@ -74,19 +74,30 @@ export interface DerivedFeature {
   source: "class" | "subclass";
 }
 
-export interface DerivedClassInfo {
-  resources: DerivedResource[];
-  features: DerivedFeature[];
-  /** Battle Master only: number of maneuvers the character may know at this level. */
+/**
+ * The bespoke, non-generic level-gated choice-cap fields a subclass may
+ * contribute (#1317): a "choose N" count plus an announced save DC — extra
+ * scalar mechanics the generic SubclassChoice count (#899) doesn't model,
+ * which is why these stay hand-rolled instead of migrating onto it. Adding a
+ * fourth bespoke field is a deliberate edit here, not a silent addition to the
+ * wider DerivedClassInfo wire shape (the #1276 escape hatch this type closes).
+ */
+export interface ClassExtras {
+  /** How many picks the character may hold from a level-gated "choose N" cap at this level. */
   maneuverChoiceCount?: number;
-  /** Battle Master only: save DC for maneuver effects (8 + prof + Str/Dex mod). */
+  /** DC an announced effect from that cap is rolled against: 8 + proficiency + max(Str, Dex) mod. */
   maneuverSaveDC?: number;
   /**
-   * Number of artisan's-tool proficiency choices available from a subclass
-   * feature (currently: Student of War = 1 at Battle Master level 3+).
-   * Undefined when no subclass feature grants a tool choice.
+   * Tool-proficiency choices granted by a subclass feature at this level.
+   * Undefined when no subclass feature grants a tool choice — assignDefined
+   * and entryContributesExtras both branch on exactly that.
    */
   toolProfChoiceCount?: number;
+}
+
+export interface DerivedClassInfo extends ClassExtras {
+  resources: DerivedResource[];
+  features: DerivedFeature[];
   /**
    * Generic subclass "choose N from a catalog" selections active at this level
    * (issue #899). Only choices whose derived count > 0 are listed — so a
@@ -131,12 +142,23 @@ export type ResourceFn = (
   subclassKey?: string,
 ) => DerivedResource[];
 
-/** Extra DerivedClassInfo fields a subclass contributes beyond resources/features (e.g. Battle Master maneuvers). */
+/**
+ * ClassExtras, plus an explicit `never` for every other DerivedClassInfo key.
+ * The `never` half is what actually closes the #1276 hatch: TypeScript's
+ * excess-property check fires only on a fresh object literal, so on
+ * `Partial<ClassExtras>` alone a `const out = {…}; return out` — or a spread,
+ * or a DerivedClassInfo-typed variable — still smuggles arbitrary fields
+ * through the Object.assign overlay in deriveResources.
+ */
+type ClassExtrasOnly = Partial<ClassExtras> &
+  Partial<Record<Exclude<keyof DerivedClassInfo, keyof ClassExtras>, never>>;
+
+/** A subclass's bespoke level-gated choice-cap fields beyond its resources/features layer — see ClassExtras. */
 export type ExtrasFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
-) => Partial<Omit<DerivedClassInfo, "resources" | "features">>;
+) => ClassExtrasOnly;
 
 export interface SubclassDefinition {
   /**

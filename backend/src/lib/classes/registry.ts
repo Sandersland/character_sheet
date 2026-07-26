@@ -17,7 +17,7 @@ import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
 import { rogue } from "./rogue.js";
 import { sorcerer } from "./sorcerer.js";
-import type { ClassDefinition, DerivedClassInfo, DerivedFeature, DerivedResource, SubclassDefinition } from "./types.js";
+import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, SubclassDefinition } from "./types.js";
 import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
 
@@ -153,8 +153,8 @@ export function deriveResources(
 
   const result: DerivedClassInfo = { resources, features };
 
-  // Subclass-specific extra derived fields (e.g. Battle Master maneuvers,
-  // Warrior of the Elements gate flags, Warrior of Shadow focus-cast unlocks).
+  // Subclass-specific bespoke choice-cap fields (ClassExtras) — the only shape
+  // a subclass's deriveExtras may contribute beyond its resources/features layer.
   if (sub.active && sub.def?.deriveExtras) {
     Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus));
   }
@@ -222,22 +222,28 @@ export function deriveEntryScopedResourcesForCharacterRow(row: {
   return { derived, level };
 }
 
-// Every scalar field a class/subclass's deriveExtras can contribute (choice-cap
-// fields like maneuverChoiceCount/maneuverSaveDC/toolProfChoiceCount), overlaid
-// per class entry by deriveEntryScopedResources. Generic over whatever ExtrasFn
-// returns (#1206) — a class appears at most once in classEntries, so listing
-// every such field here needs no per-field cross-entry collision handling.
-// `subclassChoices` is excluded: it concats across entries instead of
-// overlaying (below). The pool `resources` and `features` layers are
-// entry-scoped separately (#1071, #1206). Level-gated action-availability
+// Every ClassExtras field, overlaid per class entry by deriveEntryScopedResources.
+// A class appears at most once in classEntries, so listing every such field
+// here needs no per-field cross-entry collision handling. `subclassChoices`
+// lives on DerivedClassInfo but not ClassExtras: it concats across entries
+// instead of overlaying (below). The pool `resources` and `features` layers
+// are entry-scoped separately (#1071, #1206). Level-gated action-availability
 // gates (Shadow Arts, Elemental Burst, …) no longer live here — they moved to
 // DERIVED_ACTIONS rows (actions.ts, #1315). Kept as a typed list so the overlay
-// loop and its "has anything to contribute" check share one enumeration.
+// loop and its "has anything to contribute" check share one enumeration; the
+// exhaustiveness check below is what keeps this list and ClassExtras in sync (#1317).
 const EXTRAS_FIELDS = [
   "maneuverChoiceCount",
   "maneuverSaveDC",
   "toolProfChoiceCount",
-] as const satisfies readonly (keyof Omit<DerivedClassInfo, "resources" | "features" | "subclassChoices">)[];
+] as const satisfies readonly (keyof ClassExtras)[];
+
+// Compile-time latch: a ClassExtras field missing from EXTRAS_FIELDS makes this
+// assignment a type error (keyof ClassExtras no longer extends the array's
+// element union), so adding a field to one without the other fails typecheck.
+type _ExtrasFieldsCoverClassExtras = keyof ClassExtras extends (typeof EXTRAS_FIELDS)[number] ? true : never;
+const _extrasFieldsCoverClassExtras: _ExtrasFieldsCoverClassExtras = true;
+void _extrasFieldsCoverClassExtras;
 
 // Whether an entry's own-level derivation has any extras field to overlay
 // (a plain class/subclass with only pools/features contributes nothing here).
