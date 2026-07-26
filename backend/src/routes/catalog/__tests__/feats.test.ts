@@ -2,8 +2,9 @@
  * GET /api/feats edition-aware resolution (#1306). Default (no `?edition=`)
  * stays exactly as before — the current frontend caller (useFeatCatalog)
  * fetches once, flat, with no character in view, so the unfiltered shape
- * must not regress. The optional query param proves the route routes through
- * resolveEditionCatalog rather than leaving Alert's two rows indistinguishable.
+ * must not regress. A valid `?edition=` proves the route routes through
+ * resolveEditionCatalog rather than leaving Alert's two rows indistinguishable;
+ * an invalid one 400s rather than silently degrading to unfiltered.
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -54,9 +55,8 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
     expect(grappler2014.id).toBe(grappler2024.id);
   });
 
-  it("an unrecognized ?edition= value is treated the same as omitting it", async () => {
+  it("an unrecognized ?edition= value 400s rather than silently falling back to unfiltered", async () => {
     const res = await supertest(createApp()).get("/api/feats?edition=bogus").set("Cookie", COOKIE);
-    expect(res.status).toBe(200);
-    expect(res.body.filter((f: { name: string }) => f.name === "Alert")).toHaveLength(2);
+    expect(res.status).toBe(400);
   });
 });
