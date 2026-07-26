@@ -162,7 +162,9 @@ function RollRunView({
         </button>
       </li>
       {expanded && item.hidden.map((r) => <FeedRowView key={r.id} row={r} />)}
-      <FeedRowView row={item.visible} />
+      {item.visible.map((r) => (
+        <FeedRowView key={r.id} row={r} />
+      ))}
     </>
   );
 }
@@ -182,11 +184,21 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
       return next;
     });
 
+  // Reset to the loading state only on a genuine session switch — a live
+  // refreshKey bump re-fetches WITHOUT clearing `events` first, or every open
+  // <details> (a drill-in) would unmount and re-collapse on every roll (the
+  // log bumps its refreshKey on every character write).
   useEffect(() => {
     setEvents(null);
     setError(null);
+  }, [characterId, sessionId]);
+
+  useEffect(() => {
     fetchSession(characterId, sessionId)
-      .then((data) => setEvents(data.events as CharacterEvent[]))
+      .then((data) => {
+        setEvents(data.events as CharacterEvent[]);
+        setError(null);
+      })
       .catch(() => setError("Couldn't load session log — try again."));
   }, [characterId, sessionId, refreshKey]);
 

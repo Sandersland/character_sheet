@@ -1,12 +1,13 @@
 /**
  * Pure event → chat-line transform for the Session Log (#1237). No JSX here —
- * SessionLog.tsx maps the FeedItem[] this produces onto `<li>`/`<details>`, and
+ * SessionLog maps the FeedItem[] this produces onto `<li>`/`<details>`, and
  * resolves each segment's `tone`/`damageType` to a Tailwind class via
- * `lib/events.ts` (`logToneClass`/`damageTypeTone`).
+ * `logToneClass`/`damageTypeTone`.
  *
  * Pipeline: filter reverted/revert → tag rounds → merge attack+damage swings
  * (by `swingId`, #1235) → reverse to oldest-first (chat convention: newest at
- * the bottom) → collapse same-kind roll runs (#983) → insert round separators.
+ * the bottom) → collapse same-kind, same-round roll runs (#983) → insert round
+ * separators.
  */
 
 import { formatRollBreakdown } from "@/lib/dice";
@@ -29,7 +30,7 @@ export interface LogSegment {
   italic?: boolean;
   tone?: LogTone;
   /** Colors this segment by damage type instead of `tone` — physical/unknown
-   *  types resolve to neutral ink (see `damageTypeTone` in lib/events.ts). */
+   *  types resolve to neutral ink (see `damageTypeTone`). */
   damageType?: string;
 }
 
@@ -57,12 +58,9 @@ export interface FeedRow {
 
 export type FeedItem =
   | { kind: "row"; row: FeedRow }
-  | { kind: "rollRun"; id: string; label: string; hidden: FeedRow[]; visible: FeedRow }
+  | { kind: "rollRun"; id: string; label: string; hidden: FeedRow[]; visible: FeedRow[] }
   | { kind: "separator"; id: string; round: number };
 
-// CombatLogRow and SessionLog must count/render the exact same "displayable"
-// set or their counts drift (#1237 regression guard) — both filter through
-// `filterActive`/`visibleLogEvents` below rather than repeating the predicate.
 function filterActive(events: CharacterEvent[]): CharacterEvent[] {
   return events.filter((e) => !e.reverted && e.type !== "revert");
 }
@@ -70,6 +68,21 @@ function filterActive(events: CharacterEvent[]): CharacterEvent[] {
 /** Reverted/undo events and round-advance markers are never shown or counted. */
 export function visibleLogEvents(events: CharacterEvent[]): CharacterEvent[] {
   return filterActive(events).filter((e) => e.type !== "combatRoundAdvanced");
+}
+
+/**
+ * The "N events" badge (CombatLogRow) and the rendered feed (SessionLog) both
+ * derive their count from this — merged swings count once (buildRows already
+ * folds an attack+damage pair into one FeedRow), rows hidden inside a
+ * collapsed run still count (they're still log content), round separators
+ * never do (#1237 §4 — the two counts drifted when each rolled its own).
+ */
+export function feedItemRowCount(items: FeedItem[]): number {
+  return items.reduce((n, item) => {
+    if (item.kind === "separator") return n;
+    if (item.kind === "row") return n + 1;
+    return n + item.hidden.length + item.visible.length;
+  }, 0);
 }
 
 /**
@@ -102,8 +115,9 @@ function signedAddend(value: number, label: string): string {
 }
 
 // "Advantage (flanking)" / "Disadvantage (Prone)" — modeSources is only
-// populated for attack rolls (#1235); check/save/initiative fall back to the
-// bare mode word since their wire shape carries no source list.
+// POPULATED for attack rolls (#1235's producer, useAttackRolls); the type
+// itself carries no such restriction, check/save/initiative just never set
+// it, so those fall back to the bare mode word.
 function rollModeNote(
   rollMode: RollEventMode | undefined,
   modeSources: RollEventModeSource[] | undefined,
@@ -119,8 +133,7 @@ function rollModeNote(
 // builders below to keep each a flat, low-branching function (#1237). Only
 // NON-ZERO addends render, per the mockup spec's explicit note — the wire
 // type carries no ability NAME (STR vs DEX) for attack/damage rolls, only the
-// numeric modifier, so addends are labeled generically ("Ability"), never
-// guessed (#1237 mockup/data mismatch — see the session report).
+// numeric modifier, so addends are labeled generically ("Ability"), never guessed.
 const ATTACK_ADDEND_LABELS: [keyof RollEventAttackComponents, string][] = [
   ["abilityMod", "Ability"],
   ["proficiencyBonus", "Proficiency"],
@@ -140,6 +153,18 @@ function labeledAddends<T extends object>(components: T | undefined, labels: [ke
   if (!components) return [];
   const values = components as unknown as Record<keyof T, number>;
   return labels.filter(([key]) => values[key]).map(([key, label]) => signedAddend(values[key], label));
+}
+
+// `RollEventData.total` is typed as required, but old/malformed persisted
+// rows can still lack it at runtime (a JSON column enforces nothing) — every
+// row builder below checks this FIRST and degrades to the stored summary
+// rather than interpolating the literal string "undefined" (#1237 §5).
+function hasNumericTotal(data: RollEventData): boolean {
+  return typeof data.total === "number";
+}
+
+function summaryFallbackRow(e: CharacterEvent, round: number | undefined): FeedRow {
+  return { id: e.id, round, tone: "default", segments: [{ text: e.summary }] };
 }
 
 function buildAttackDrillRow(e: CharacterEvent): DrillInRow {
@@ -182,30 +207,76 @@ function damageWordSegment(damageType: string | undefined, trailingWord: boolean
   return { text, damageType };
 }
 
-// The roll-category row builders below (through buildAbilityRollRow) all set
-// `drillIn`, which is what gives a row its `<details>` chevron in SessionLog.
+// An attackRoll with no damage partner: either a confirmed miss, or a solo
+// attack roll that never gets one (a spell attack, which carries no swingId
+// — #1237 §3). Both branches still render the full sentence + drill-in from
+// whatever RollEventData the event carries; only the total-missing guard above
+// degrades to the raw summary.
 function buildAttackOnlyRow(e: CharacterEvent, round: number | undefined): FeedRow {
   const data = (e.data ?? {}) as RollEventData;
-  if (data.verdict !== "miss") {
-    // Ambiguous/legacy data (no paired damage event and no confirmed miss) —
-    // degrade to the plain summary rather than asserting a result we can't back.
-    return { id: e.id, round, tone: "default", segments: [{ text: e.summary }] };
-  }
+  if (!hasNumericTotal(data)) return summaryFallbackRow(e, round);
+
   const source = data.source || e.summary;
-  const note = rollModeNote(data.rollMode, data.modeSources);
+  if (data.verdict === "miss") {
+    const note = rollModeNote(data.rollMode, data.modeSources);
+    return {
+      id: e.id,
+      round,
+      tone: "muted",
+      italic: true,
+      runKind: "swing",
+      segments: [
+        { text: source, bold: true, italic: false },
+        { text: " — missed." },
+        ...(note ? [{ text: ` ${note}` }] : []),
+      ],
+      drillIn: [buildAttackDrillRow(e), { label: "", note: "Called a miss — no damage rolled." }],
+    };
+  }
+
   return {
     id: e.id,
     round,
-    tone: "muted",
-    italic: true,
+    tone: "default",
     runKind: "swing",
     segments: [
-      { text: source, bold: true, italic: false },
-      { text: " — missed." },
-      ...(note ? [{ text: ` ${note}` }] : []),
+      { text: "Rolled " },
+      { text: source, bold: true },
+      { text: " — " },
+      { text: `${data.total}`, bold: true },
+      { text: "." },
     ],
-    drillIn: [buildAttackDrillRow(e), { label: "", note: "Called a miss — no damage rolled." }],
+    drillIn: [buildAttackDrillRow(e)],
   };
+}
+
+function critSwingSegments(source: string, dmgData: RollEventData): LogSegment[] {
+  return [
+    { text: source, bold: true },
+    { text: " — " },
+    { text: "critical hit!", tone: "harm" },
+    { text: " " },
+    { text: `${dmgData.total}`, bold: true },
+    { text: " " },
+    damageWordSegment(dmgData.damageType, true),
+  ];
+}
+
+function hitSwingSegments(source: string, dmgData: RollEventData): LogSegment[] {
+  return [
+    { text: source, bold: true },
+    { text: " — hit for " },
+    { text: `${dmgData.total}`, bold: true },
+    { text: " " },
+    damageWordSegment(dmgData.damageType, false),
+  ];
+}
+
+// The attack partner's own total can independently be missing (old data) —
+// omit just its drill-in line rather than losing the whole (otherwise-valid) row.
+function attackDrillInFor(attackEvent: CharacterEvent | undefined): DrillInRow[] {
+  if (!attackEvent || !hasNumericTotal((attackEvent.data ?? {}) as RollEventData)) return [];
+  return [buildAttackDrillRow(attackEvent)];
 }
 
 // Forward-compat (#1237): RollEventData.target/outcome are reserved but never
@@ -218,43 +289,26 @@ function buildSwingRow(
   round: number | undefined,
 ): FeedRow {
   const dmgData = (damageEvent.data ?? {}) as RollEventData;
+  if (!hasNumericTotal(dmgData)) return summaryFallbackRow(damageEvent, round);
+
   const atkData = (attackEvent?.data ?? {}) as RollEventData;
   const source = dmgData.source || atkData.source || damageEvent.summary;
   const isCrit = dmgData.crit === true || dmgData.verdict === "crit";
-
-  const segments: LogSegment[] = isCrit
-    ? [
-        { text: source, bold: true },
-        { text: " — " },
-        { text: "critical hit!", tone: "harm" },
-        { text: " " },
-        { text: `${dmgData.total}`, bold: true },
-        { text: " " },
-        damageWordSegment(dmgData.damageType, true),
-      ]
-    : [
-        { text: source, bold: true },
-        { text: " — hit for " },
-        { text: `${dmgData.total}`, bold: true },
-        { text: " " },
-        damageWordSegment(dmgData.damageType, false),
-      ];
 
   return {
     id: damageEvent.id,
     round,
     tone: "default",
     runKind: "swing",
-    segments,
-    drillIn: [
-      ...(attackEvent ? [buildAttackDrillRow(attackEvent)] : []),
-      buildDamageDrillRow(damageEvent),
-    ],
+    segments: isCrit ? critSwingSegments(source, dmgData) : hitSwingSegments(source, dmgData),
+    drillIn: [...attackDrillInFor(attackEvent), buildDamageDrillRow(damageEvent)],
   };
 }
 
 function buildDamageOnlyRow(e: CharacterEvent, round: number | undefined): FeedRow {
   const data = (e.data ?? {}) as RollEventData;
+  if (!hasNumericTotal(data)) return summaryFallbackRow(e, round);
+
   const source = data.source || e.summary;
   return {
     id: e.id,
@@ -272,20 +326,29 @@ function buildDamageOnlyRow(e: CharacterEvent, round: number | undefined): FeedR
   };
 }
 
+// The backend normalizes every unset optional RollEventData field to `null`
+// (a JSON column can't hold `undefined`), not just leaving it absent — a
+// strict `!== undefined` check here rendered a literal "(DC null)" (#1237).
+function dcSuffix(dc: number | undefined | null): string {
+  return dc != null ? ` (DC ${dc})` : "";
+}
+
+function abilityRollFormula(data: RollEventData): string {
+  return data.specLabel && data.faces && data.faces.length > 0
+    ? formatRollBreakdown(data.specLabel, data.faces)
+    : (data.specLabel ?? "");
+}
+
 function buildAbilityRollRow(e: CharacterEvent, round: number | undefined): FeedRow {
   const data = (e.data ?? {}) as RollEventData;
+  if (!hasNumericTotal(data)) return summaryFallbackRow(e, round);
+
   // `source` is always pre-resolved display text (e.g. "Perception check",
   // "Initiative") at every call site — never a raw skill/ability key, so no
   // label lookup is needed here (unlike data.skill/data.ability themselves).
   const label = data.source || e.summary;
-  // The backend normalizes every unset optional RollEventData field to `null`
-  // (a JSON column can't hold `undefined`), not just leaving it absent — a
-  // strict `!== undefined` check here rendered a literal "(DC null)" (#1237).
-  const dc = data.dc != null ? ` (DC ${data.dc})` : "";
-  const formula =
-    data.specLabel && data.faces && data.faces.length > 0
-      ? formatRollBreakdown(data.specLabel, data.faces)
-      : (data.specLabel ?? "");
+  const dc = dcSuffix(data.dc);
+  const formula = abilityRollFormula(data);
   return {
     id: e.id,
     round,
@@ -329,70 +392,142 @@ function lootSummary(e: CharacterEvent): string | null {
   return recipient ? `${e.summary} → ${recipient}` : e.summary;
 }
 
-function healSentence(e: CharacterEvent): string {
-  const data = (e.data ?? {}) as { amount?: number };
-  return data.amount !== undefined ? `Healed ${data.amount} HP.` : e.summary;
+// Backend `applyHealOp`/`applyDamageOp` append "(before → after HP)" to the
+// summary, but the structured event data carries no beforeCurrent/current
+// fields — the transition can only be recovered from the stored summary text,
+// so it's regex-extracted rather than rebuilt.
+function hpTransitionTag(summary: string): string | null {
+  const match = summary.match(/\(\d+\s*→\s*\d+\s*HP\)/);
+  return match ? match[0] : null;
 }
 
-function damageTakenSentence(e: CharacterEvent): string {
-  const data = (e.data ?? {}) as { amount?: number; damageType?: string | null; resisted?: boolean; immune?: boolean };
-  if (data.amount === undefined) return e.summary;
+function healSegments(e: CharacterEvent): LogSegment[] {
+  const data = (e.data ?? {}) as { amount?: number };
+  if (data.amount === undefined) return [{ text: e.summary }];
+  const tag = hpTransitionTag(e.summary);
+  const sentence: LogSegment = { text: `Healed ${data.amount} HP.` };
+  return tag ? [sentence, { text: ` ${tag}`, tone: "muted" }] : [sentence];
+}
+
+interface DamageTakenData {
+  amount?: number;
+  damageType?: string | null;
+  resisted?: boolean;
+  immune?: boolean;
+  rawAmount?: number;
+}
+
+function damageTakenSentence(data: DamageTakenData): string {
   const type = data.damageType ? ` ${data.damageType}` : "";
   const note = data.immune ? " (immune)" : data.resisted ? " (resisted)" : "";
   return `Took ${data.amount}${type} damage${note}.`;
 }
 
-function toned(e: CharacterEvent, round: number | undefined, tone: LogTone, text: string): FeedRow {
-  return { id: e.id, round, tone, segments: [{ text }] };
+// Preserve the pre-resistance amount + HP transition as a muted trailing tag
+// (mockup's `.tag` treatment) rather than dropping them — live-play history
+// the mockup didn't consider (#1237 §7).
+function damageTakenTag(data: DamageTakenData, summary: string): string | null {
+  const rawTag =
+    (data.resisted || data.immune) && data.rawAmount !== undefined
+      ? `(${data.immune ? "immune, from" : "resisted from"} ${data.rawAmount})`
+      : null;
+  const tagText = [rawTag, hpTransitionTag(summary)].filter(Boolean).join(" ");
+  return tagText || null;
+}
+
+function damageTakenSegments(e: CharacterEvent): LogSegment[] {
+  const data = (e.data ?? {}) as DamageTakenData;
+  if (data.amount === undefined) return [{ text: e.summary }];
+  const sentence: LogSegment = { text: damageTakenSentence(data) };
+  const tag = damageTakenTag(data, e.summary);
+  return tag ? [sentence, { text: ` ${tag}`, tone: "muted" }] : [sentence];
 }
 
 const RESOURCE_EVENT_TYPES = new Set(["spendResource", "restoreResource"]);
 const LOOT_EVENT_TYPES = new Set(["awarded", "revoked"]);
 
-// Ordered (predicate, tone, sentence) rules for the mockup's plain-row color
+// Ordered (predicate, tone, segments) rules for the mockup's plain-row color
 // table — a lookup instead of a branch chain keeps the dispatcher flat (#1237).
-const PLAIN_ROW_RULES: { test: (e: CharacterEvent) => boolean; tone: LogTone; text: (e: CharacterEvent) => string }[] = [
-  { test: (e) => e.category === "hitPoints" && e.type === "heal", tone: "heal", text: healSentence },
-  { test: (e) => e.category === "hitPoints" && e.type === "damage", tone: "harm", text: damageTakenSentence },
-  { test: (e) => e.category === "conditions", tone: "harm", text: (e) => e.summary },
-  { test: (e) => e.category === "resources" && RESOURCE_EVENT_TYPES.has(e.type), tone: "resource", text: (e) => e.summary },
-  { test: (e) => LOOT_EVENT_TYPES.has(e.type), tone: "default", text: (e) => lootSummary(e) ?? e.summary },
+const PLAIN_ROW_RULES: {
+  test: (e: CharacterEvent) => boolean;
+  tone: LogTone;
+  segments: (e: CharacterEvent) => LogSegment[];
+}[] = [
+  { test: (e) => e.category === "hitPoints" && e.type === "heal", tone: "heal", segments: healSegments },
+  { test: (e) => e.category === "hitPoints" && e.type === "damage", tone: "harm", segments: damageTakenSegments },
+  { test: (e) => e.category === "conditions", tone: "harm", segments: (e) => [{ text: e.summary }] },
+  {
+    test: (e) => e.category === "resources" && RESOURCE_EVENT_TYPES.has(e.type),
+    tone: "resource",
+    segments: (e) => [{ text: e.summary }],
+  },
+  {
+    test: (e) => LOOT_EVENT_TYPES.has(e.type),
+    tone: "default",
+    segments: (e) => [{ text: lootSummary(e) ?? e.summary }],
+  },
 ];
 
 function buildPlainRow(e: CharacterEvent, round: number | undefined): FeedRow {
   const lifecycle = LIFECYCLE_COPY[e.type];
-  if (lifecycle) return toned(e, round, "muted", lifecycle);
+  if (lifecycle) return { id: e.id, round, tone: "muted", segments: [{ text: lifecycle }] };
 
   const rule = PLAIN_ROW_RULES.find((r) => r.test(e));
-  return toned(e, round, rule?.tone ?? "default", rule ? rule.text(e) : e.summary);
+  return {
+    id: e.id,
+    round,
+    tone: rule?.tone ?? "default",
+    segments: rule ? rule.segments(e) : [{ text: e.summary }],
+  };
 }
 
-// The main dispatch (buildRows, below) walks the newest-first filtered list
-// and merges swing pairs; split into one small handler per event kind rather
-// than one big branch chain so each stays independently low-complexity (#1237).
-function buildSwingPartnerMap(events: CharacterEvent[]): Map<string, CharacterEvent> {
-  const map = new Map<string, CharacterEvent>();
-  for (const e of events) {
-    if (e.type !== "damageRoll") continue;
+interface SwingPairing {
+  /** damage event id → its paired attack event, for swingIds with a partner. */
+  attackForDamage: Map<string, CharacterEvent>;
+  /** Attack event ids consumed as a swing partner — these render nothing on
+   *  their own; they surface inside the paired damage row instead. */
+  consumedAttackIds: Set<string>;
+}
+
+// Pairs at MOST one attack with one damage per swingId (#1237 §6): a bug in
+// useAttackRolls' swingIdRef (never cleared between damage calls) can log two
+// damage events under the same swingId, or — more rarely — two attacks. Every
+// event beyond the first pairing must still render as its own standalone row;
+// none may vanish. Walks oldest-first so "first attack, first damage" wins
+// the pairing regardless of the feed's own (newest-first) order.
+function buildSwingPairing(events: CharacterEvent[]): SwingPairing {
+  const chronological = [...events].reverse();
+  const pendingAttackBySwing = new Map<string, CharacterEvent>();
+  const attackForDamage = new Map<string, CharacterEvent>();
+  const consumedAttackIds = new Set<string>();
+  for (const e of chronological) {
     const data = e.data as RollEventData | undefined;
-    if (data?.swingId) map.set(data.swingId, e);
+    if (!data?.swingId) continue;
+    if (e.type === "attackRoll") {
+      if (!pendingAttackBySwing.has(data.swingId)) pendingAttackBySwing.set(data.swingId, e);
+    } else if (e.type === "damageRoll") {
+      const pendingAttack = pendingAttackBySwing.get(data.swingId);
+      if (pendingAttack) {
+        attackForDamage.set(e.id, pendingAttack);
+        consumedAttackIds.add(pendingAttack.id);
+        pendingAttackBySwing.delete(data.swingId);
+      }
+    }
   }
-  return map;
+  return { attackForDamage, consumedAttackIds };
 }
 
 // Returns null when this attack's damage partner will render the merged swing
 // row instead (rendered at the damage event's position, see handleDamageRollEvent).
 function handleAttackRollEvent(
   e: CharacterEvent,
-  swingPartner: Map<string, CharacterEvent>,
+  pairing: SwingPairing,
   round: number | undefined,
 ): FeedRow | null {
-  const data = (e.data ?? {}) as RollEventData;
-  const partner = data.swingId ? swingPartner.get(data.swingId) : undefined;
-  return partner ? null : buildAttackOnlyRow(e, round);
+  return pairing.consumedAttackIds.has(e.id) ? null : buildAttackOnlyRow(e, round);
 }
 
-function handleDamageRollEvent(e: CharacterEvent, events: CharacterEvent[], round: number | undefined): FeedRow {
+function handleDamageRollEvent(e: CharacterEvent, pairing: SwingPairing, round: number | undefined): FeedRow {
   const data = (e.data ?? {}) as RollEventData;
   if (!data.swingId) {
     // A rider (Flame Tongue +2d6) or a spell damage roll — neither carries
@@ -400,24 +535,21 @@ function handleDamageRollEvent(e: CharacterEvent, events: CharacterEvent[], roun
     // line; render it as its own roll row instead of guessing a correlation.
     return buildDamageOnlyRow(e, round);
   }
-  const attackEvent = events.find(
-    (a) => a.type === "attackRoll" && ((a.data ?? {}) as RollEventData).swingId === data.swingId,
-  );
-  return buildSwingRow(attackEvent, e, round);
+  return buildSwingRow(pairing.attackForDamage.get(e.id), e, round);
 }
 
 const ABILITY_ROLL_TYPES = new Set(["checkRoll", "saveRoll", "initiativeRoll"]);
 
 function buildRows(events: CharacterEvent[], roundById: Map<string, number>): FeedRow[] {
-  const swingPartner = buildSwingPartnerMap(events);
+  const pairing = buildSwingPairing(events);
   const rows: FeedRow[] = [];
   for (const e of events) {
     const round = roundById.get(e.id);
     if (e.type === "attackRoll") {
-      const row = handleAttackRollEvent(e, swingPartner, round);
+      const row = handleAttackRollEvent(e, pairing, round);
       if (row) rows.push(row);
     } else if (e.type === "damageRoll") {
-      rows.push(handleDamageRollEvent(e, events, round));
+      rows.push(handleDamageRollEvent(e, pairing, round));
     } else if (ABILITY_ROLL_TYPES.has(e.type)) {
       rows.push(buildAbilityRollRow(e, round));
     } else {
@@ -435,10 +567,15 @@ const RUN_KIND_LABEL: Record<string, string> = {
   initiativeRoll: "initiative",
 };
 
-// Walk oldest-first and collapse a maximal run (≥2) of adjacent same-`runKind`
-// rows behind a disclosure — a party's worth of initiative rolls otherwise
-// buries everything else (#983). The NEWEST row of the run stays visible in
-// place (chronologically last); everything earlier in the run collapses.
+// A run collapses only at ≥4 consecutive same-`runKind`, same-`round` rows,
+// keeping the most recent 3 visible (#1237 §2) — a normal 2-3 swing round (or
+// a Flurry of Blows) shows every line; a 10-attack barrage still collapses.
+// The `round` check keeps a run from ever spanning a round boundary (#1237
+// §1) — without it, a run's reported round came from its oldest (hidden) row,
+// so the newer round's separator silently never rendered.
+const RUN_COLLAPSE_THRESHOLD = 4;
+const RUN_VISIBLE_COUNT = 3;
+
 function collapseRuns(rows: FeedRow[]): FeedItem[] {
   const items: FeedItem[] = [];
   let i = 0;
@@ -446,13 +583,15 @@ function collapseRuns(rows: FeedRow[]): FeedItem[] {
     const row = rows[i];
     if (row.runKind) {
       let j = i + 1;
-      while (j < rows.length && rows[j].runKind === row.runKind) j += 1;
-      if (j - i >= 2) {
-        const visible = rows[j - 1];
-        const hidden = rows.slice(i, j - 1);
+      while (j < rows.length && rows[j].runKind === row.runKind && rows[j].round === row.round) j += 1;
+      const runLength = j - i;
+      if (runLength >= RUN_COLLAPSE_THRESHOLD) {
+        const splitAt = j - RUN_VISIBLE_COUNT;
+        const hidden = rows.slice(i, splitAt);
+        const visible = rows.slice(splitAt, j);
         const noun = RUN_KIND_LABEL[row.runKind] ?? row.runKind;
         const label = row.runKind === "swing" ? `${hidden.length} earlier ${noun} swings` : `${hidden.length} earlier ${noun} rolls`;
-        items.push({ kind: "rollRun", id: visible.id, label, hidden, visible });
+        items.push({ kind: "rollRun", id: visible[0].id, label, hidden, visible });
         i = j;
         continue;
       }
@@ -465,7 +604,9 @@ function collapseRuns(rows: FeedRow[]): FeedItem[] {
 
 function itemRound(item: FeedItem): number | undefined {
   if (item.kind === "row") return item.row.round;
-  if (item.kind === "rollRun") return (item.hidden[0] ?? item.visible).round;
+  // Every row in a run shares one round (collapseRuns never spans a
+  // boundary), so the first visible/hidden row's round applies to the whole item.
+  if (item.kind === "rollRun") return (item.hidden[0] ?? item.visible[0])?.round;
   return undefined;
 }
 

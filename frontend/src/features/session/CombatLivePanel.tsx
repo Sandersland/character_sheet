@@ -32,6 +32,7 @@ import SessionLog from "@/features/session/SessionLog";
 import HpMeter from "@/features/hitpoints/HpMeter";
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
+import { formatSessionDate } from "@/lib/sessionDate";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import { useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
@@ -56,6 +57,9 @@ export default function CombatLivePanel({ session, active }: CombatLivePanelProp
   if (!turnState) return null;
 
   const openLog = () => setShowLog(true);
+  // Session.title is optional (a DM may not have named the sitting yet) — fall
+  // back to the session's date, mirroring CombatLogRow's own idle-row label.
+  const logSubtitle = session.title ?? formatSessionDate(session.startedAt);
 
   return (
     <div className="px-0 pt-4 md:px-6 md:pt-6">
@@ -88,11 +92,11 @@ export default function CombatLivePanel({ session, active }: CombatLivePanelProp
           drawer must never float over another tab. */}
       {active && showLog &&
         (isBelowMd ? (
-          <BottomSheet title="Session Log" onClose={() => setShowLog(false)}>
+          <BottomSheet title="Session Log" subtitle={logSubtitle} onClose={() => setShowLog(false)}>
             <SessionLog characterId={character.id} sessionId={session.id} refreshKey={live.logRefresh} />
           </BottomSheet>
         ) : (
-          <Drawer title="Session Log" onClose={() => setShowLog(false)}>
+          <Drawer title="Session Log" subtitle={logSubtitle} onClose={() => setShowLog(false)}>
             <SessionLog characterId={character.id} sessionId={session.id} refreshKey={live.logRefresh} />
           </Drawer>
         ))}

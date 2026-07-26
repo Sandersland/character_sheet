@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 
 import SessionLog from "@/features/session/SessionLog";
@@ -10,9 +10,14 @@ vi.mock("@/api/client", () => ({
 }));
 
 const mockFetchSession = vi.mocked(fetchSession);
+const originalScrollIntoView = Element.prototype.scrollIntoView;
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
 });
 
 function makeEvent(overrides: Partial<CharacterEvent>): CharacterEvent {
@@ -157,6 +162,34 @@ describe("SessionLog (#1237 chat feed)", () => {
     await waitFor(() => expect(mockFetchSession).toHaveBeenCalledTimes(2));
   });
 
+  // A refreshKey bump must NOT clear `events` before the refetch resolves — a
+  // naive `setEvents(null)` on every bump unmounts every rendered row (and any
+  // open <details> drill-in) on every character write, since the log's own
+  // refreshKey counter bumps on every one (investigate item, #1237).
+  it("keeps the previously rendered row visible while a refreshKey-triggered refetch is in flight", async () => {
+    const firstEvents = [makeEvent({ id: "a", category: "hitPoints", type: "damage", data: { amount: 3 } })];
+    mockFetchSession.mockResolvedValueOnce({ events: firstEvents } as never);
+    const { rerender } = render(<SessionLog characterId="char-1" sessionId="sess-1" refreshKey={0} />);
+    await screen.findByText("Took 3 damage.");
+
+    let resolveSecond!: (value: { events: CharacterEvent[] }) => void;
+    mockFetchSession.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        }) as never,
+    );
+    rerender(<SessionLog characterId="char-1" sessionId="sess-1" refreshKey={1} />);
+
+    // Still pending — the old row must still be there, not replaced by a spinner.
+    expect(screen.getByText("Took 3 damage.")).toBeInTheDocument();
+
+    resolveSecond({
+      events: [...firstEvents, makeEvent({ id: "b", category: "hitPoints", type: "damage", data: { amount: 5 } })],
+    });
+    await screen.findByText("Took 5 damage.");
+  });
+
   it("filters out reverted events and revert entries", async () => {
     renderWith([
       makeEvent({ id: "a", category: "hitPoints", type: "damage", reverted: true, data: { amount: 99 } }),
@@ -170,7 +203,7 @@ describe("SessionLog (#1237 chat feed)", () => {
 });
 
 describe("SessionLog ordering — newest at the bottom (#1237)", () => {
-  it("renders the newest fetched event as the LAST row and opens scrolled to it", async () => {
+  it("renders the newest fetched event as the LAST row", async () => {
     renderWith([
       makeEvent({ id: "newest", category: "hitPoints", type: "damage", data: { amount: 3 } }),
       makeEvent({ id: "oldest", category: "hitPoints", type: "damage", data: { amount: 9 } }),
@@ -181,10 +214,22 @@ describe("SessionLog ordering — newest at the bottom (#1237)", () => {
     expect(rows[0].textContent).toContain("9");
     expect(rows[rows.length - 1].textContent).toContain("3");
   });
+
+  // jsdom stubs scrollIntoView as a no-op (test/setup.ts) — it can't verify
+  // actual scroll position, only that the component REQUESTS the scroll on load.
+  it("requests a scroll to the bottom sentinel on load", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    renderWith([makeEvent({ id: "a", category: "hitPoints", type: "damage", data: { amount: 3 } })]);
+    await screen.findByText("Took 3 damage.");
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
+  });
 });
 
-describe("SessionLog roll-run collapsing (#983, preserved)", () => {
-  it("collapses 12 consecutive initiative rolls to one row plus an expandable disclosure", async () => {
+describe("SessionLog roll-run collapsing (#983, raised threshold #1237 §2)", () => {
+  it("collapses 12 consecutive initiative rolls to a 3-visible disclosure of the remaining 9", async () => {
     const rolls = Array.from({ length: 12 }, (_, i) =>
       makeEvent({
         id: `init-${i}`,
@@ -195,17 +240,17 @@ describe("SessionLog roll-run collapsing (#983, preserved)", () => {
     );
     renderWith(rolls);
 
-    // Only the newest initiative row is rendered — the hidden 11 are collapsed
-    // behind the disclosure and not in the DOM at all until expanded (unlike
-    // native <details>, whose closed children stay present but hidden).
-    await screen.findByText(/11 earlier initiative rolls/);
-    expect(document.querySelectorAll("details")).toHaveLength(1);
-    const visibleRow = await findRow("Rolled");
+    // The 3 most recent initiative rows stay visible — the hidden 9 are
+    // collapsed behind the disclosure and not in the DOM at all until expanded
+    // (unlike native <details>, whose closed children stay present but hidden).
+    await screen.findByText(/9 earlier initiative rolls/);
+    expect(document.querySelectorAll("details")).toHaveLength(3);
+    const visibleRow = await findRow("Rolled Initiative — 20");
     expect(visibleRow.textContent).toContain("20");
 
-    fireEvent.click(screen.getByText(/11 earlier initiative rolls/));
+    fireEvent.click(screen.getByText(/9 earlier initiative rolls/));
 
-    // Expanding reveals every hidden row.
+    // Expanding reveals every hidden row, on top of the 3 already visible.
     await waitFor(() => expect(document.querySelectorAll("details")).toHaveLength(12));
   });
 });
