@@ -46,7 +46,7 @@ Both containers run `npm install` on start to reconcile the volume with `package
 
 **Commit discipline — non-negotiable.** Commit after **every** green chunk (step 4), and never let more than one chunk sit uncommitted. If your run is interrupted (crash, budget, rate limit), only **committed** work survives — the resume/fail path pushes committed commits, but uncommitted edits are lost. A long stretch of edits with zero commits is a bug: a Worker that ran 100 turns / 6 files / **0 commits** lost everything on its crash (#332). When in doubt, commit — small, green, frequent.
 
-When every requirement is implemented, run the FULL test suites + typecheck + lint for both workspaces one final time — the green suite must include the edge-case tests from step 1, not just happy-path. All green → emit `done`. If you are genuinely stuck (a requirement is impossible, contradicts the code, or tests cannot pass), do NOT force it — emit `blocked` with the exact failing output.
+When every requirement is implemented, run the FULL test suites + typecheck + lint for both workspaces one final time — the green suite must include the edge-case tests from step 1, not just happy-path. The full backend suite needs `--fileParallelism=false` (`npx vitest run --fileParallelism=false`): at default parallelism the workers contend on this stack's Postgres pool and throw cross-domain 500s that read as regressions but aren't. All green → emit `done`. If you are genuinely stuck (a requirement is impossible, contradicts the code, or tests cannot pass), do NOT force it — emit `blocked` with the exact failing output.
 
 ## Payload for `done`
 
