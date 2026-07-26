@@ -30,6 +30,8 @@ import {
   revokeCampaignItem,
   updateCampaignItem,
 } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { campaignKeys } from "@/api/queryKeys";
 import { primeCampaignEntities } from "@/hooks/useCampaignEntities";
 
 const baseItem: CampaignItem = {
@@ -54,6 +56,48 @@ function renderPanel() {
     </MemoryRouter>,
   );
 }
+
+describe("CampaignItemsPanel query cache (#1299)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEntities = [];
+  });
+
+  it("renders items already primed in the query cache without waiting on a fetch", async () => {
+    getQueryClient().setQueryData(campaignKeys.items("camp-1"), [baseItem]);
+    vi.mocked(fetchCampaignItems).mockResolvedValue([baseItem]);
+    renderPanel();
+
+    // Cache is fresh (default staleTime), so the primed data renders on the
+    // very first paint — no network round trip needed.
+    expect(screen.getByText("Flametongue")).toBeInTheDocument();
+    expect(fetchCampaignItems).not.toHaveBeenCalled();
+  });
+
+  it("writes an award's holders directly into the cache (exact write, not a refetch)", async () => {
+    vi.mocked(fetchCampaignItems).mockResolvedValue([baseItem]);
+    vi.mocked(awardCampaignItem).mockResolvedValue({
+      holders: [{ characterId: "c1", characterName: "Bruenor", quantity: 1 }],
+    });
+    renderPanel();
+    await screen.findByText("Flametongue");
+
+    await userEvent.selectOptions(screen.getByLabelText("Award to"), "c1");
+    await userEvent.click(screen.getByRole("button", { name: "Award" }));
+    await screen.findByText(/Held by/);
+
+    // The list read fired once, on mount — awarding never re-fetches it.
+    expect(fetchCampaignItems).toHaveBeenCalledTimes(1);
+    expect(getQueryClient().getQueryData(campaignKeys.items("camp-1"))).toEqual([
+      {
+        ...baseItem,
+        holders: [{ characterId: "c1", characterName: "Bruenor", quantity: 1 }],
+        // Award also reveals the fronting entity.
+        entity: { ...baseItem.entity, visibility: "REVEALED" },
+      },
+    ]);
+  });
+});
 
 describe("CampaignItemsPanel award/revoke (#381)", () => {
   beforeEach(() => {
