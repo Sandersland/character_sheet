@@ -17,6 +17,7 @@ import type {
   ArmorDetailInput,
   ConsumableDetailInput,
 } from "../../src/lib/inventory/item-detail-inputs.js";
+import type { SeedEdition } from "./edition.js";
 
 export const RACES = [
   // Dwarf subraces
@@ -227,6 +228,9 @@ export interface BackgroundSeed {
   toolProficiencies?: string[];
   abilityChoices?: string[];
   originFeatName?: string;
+  // Omitted = shared (NULL column, valid in both editions, #1306). No seeded
+  // background diverges yet — the field exists so a future one can.
+  edition?: SeedEdition;
 }
 
 export const BACKGROUNDS: BackgroundSeed[] = [

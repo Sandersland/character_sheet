@@ -4,6 +4,8 @@
 // Adding a new action = append here + add the effect fn in lib/actions.ts.
 // ActionCost enum values: action | bonusAction | reaction | free | special
 
+import type { SeedEdition } from "./edition.js";
+
 export interface ActionSeed {
   key: string;
   name: string;
@@ -15,6 +17,10 @@ export interface ActionSeed {
   grantLevel?: number;
   resourceKey?: string;
   resourceAmount?: number;
+  // Omitted = shared (NULL column, valid in both editions, #1306). No seeded
+  // action diverges yet, and Action.key stays plain @unique — see the schema
+  // comment on Action.edition.
+  edition?: SeedEdition;
 }
 
 export const ACTIONS: ActionSeed[] = [
