@@ -7,7 +7,7 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character, ConcentrationCheck } from "@/types/character";
 
-// Mirrors HitPointTracker.test.tsx's mock — HpSheetBody shares useHitPointApply.
+// Mirrors HitPointTracker's client mock — HpSheetBody shares useHitPointApply.
 vi.mock("@/api/client", () => ({
   applyHitPointOperations: vi.fn(),
   logRoll: vi.fn().mockResolvedValue(undefined),
@@ -55,7 +55,7 @@ beforeEach(() => {
 });
 
 // #1166: the checkbox is retired from this surface too — the standing
-// preference (concentrationPreference.ts) drives the damage op instead.
+// preference (useAutoRollConcentrationPref) drives the damage op instead.
 describe("HpSheetBody standing concentration preference (#1166)", () => {
   it("renders no auto-roll-concentration checkbox", () => {
     mockResolve([]);

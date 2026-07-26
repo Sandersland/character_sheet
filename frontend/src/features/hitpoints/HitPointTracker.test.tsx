@@ -233,10 +233,10 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
 });
 
 // #1166: the checkbox is retired — the standing preference now lives only in
-// the Preferences surface (#1167) and is read here via the synced store
-// (concentrationPreference.ts), seeded through localStorage since these tests
-// render outside a PreferencesProvider (falls back to pure localStorage, same
-// as the hook's own doc comment).
+// the Preferences surface (#1167) and is read here via useAutoRollConcentrationPref,
+// seeded through localStorage since these tests render outside a
+// PreferencesProvider (falls back to pure localStorage, same as the hook's own
+// doc comment).
 describe("HitPointTracker interactive concentration save (issue #76, retired #1166)", () => {
   it("renders no auto-roll-concentration checkbox in the HP card", () => {
     mockResolve([]);
@@ -296,6 +296,12 @@ describe("HitPointTracker interactive concentration save (issue #76, retired #11
     await applyDamage();
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /roll save/i }));
+
+    // The seeded preference actually reaches the wire: the damage op read it
+    // from useAutoRollConcentrationPref, not a hardcoded default (mutation-tested —
+    // hardcoding autoRollConcentration=true in useHitPointApply turns this red).
+    const firstCall = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(firstCall[1][0]).toMatchObject({ type: "damage", autoRollConcentration: false });
 
     // The mocked DiceRoller fires onResult → a concentrationSave op is submitted
     // with the natural d20 (not the bonus-inclusive total).
