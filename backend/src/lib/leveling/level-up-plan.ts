@@ -2,6 +2,8 @@
 // Every step is DERIVED by diffing the existing rule functions at N vs N-1 —
 // thresholds are never re-encoded here. Consumed by the level-up ceremony (#886)
 // and validated against by the transaction endpoint (#885).
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { advancementSlotsForLevel, fightingStyleFeatSlots } from "@/lib/srd/srd.js";
@@ -38,6 +40,10 @@ export interface LevelUpPlanCharacter {
   // Only id/level/source matter (a legal swap target is a user-learned leveled
   // spell); populated in resolveLevelUpContext, absent in swap-free callers.
   spellEntries?: { id: string; level: number; source?: string | null }[];
+  // deriveResources' subclass gate is edition-aware (#1291) — this pure planner
+  // has no row to read editionOf from, so the caller (resolveLevelUpContext)
+  // resolves it once and carries it alongside abilityScores/classEntries.
+  edition: RulesEdition;
 }
 
 // The class entry AFTER this level-up. subclassLevel is passed in ALREADY
@@ -61,9 +67,14 @@ interface PlanContext {
 }
 
 // deriveResources at a given per-class level, holding the target subclass fixed.
-function derivedAt(target: TargetClassEntry, abilityScores: Record<string, number>, level: number): DerivedClassInfo | null {
+function derivedAt(
+  target: TargetClassEntry,
+  abilityScores: Record<string, number>,
+  level: number,
+  edition: RulesEdition,
+): DerivedClassInfo | null {
   if (level < 1) return null;
-  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level));
+  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), edition);
 }
 
 function advancementStep({ target }: PlanContext): LevelUpStep | null {
@@ -147,8 +158,8 @@ function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
 export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: TargetClassEntry): LevelUpStep[] {
   const ctx: PlanContext = {
     target,
-    now: derivedAt(target, character.abilityScores, target.newLevel),
-    prev: derivedAt(target, character.abilityScores, target.newLevel - 1),
+    now: derivedAt(target, character.abilityScores, target.newLevel, character.edition),
+    prev: derivedAt(target, character.abilityScores, target.newLevel - 1, character.edition),
   };
 
   const candidates: (LevelUpStep | null)[] = [

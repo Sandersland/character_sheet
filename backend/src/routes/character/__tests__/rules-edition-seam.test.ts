@@ -16,8 +16,8 @@ import { authCookie } from "@/test-support/auth.js";
  * too (#1308) — this fixture class predates that and stays useful for a
  * different reason: its name matches no entry in the registry's CLASSES map, so
  * deriveResources returns null and the test exercises only the catalog-driven
- * gate — isSubclassActive's independent (edition-blind) grantLevel table can't
- * interfere.
+ * gate — isSubclassActive's independent grantLevel table (edition-aware since
+ * #1291, but keyed on a class name this fixture never matches) can't interfere.
  */
 const OWNER_ID = "owner-rules-edition-seam";
 const CLASS_NAME = "Rules Edition Seam Wizard";

@@ -1,3 +1,5 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { type GrantItem, type CapabilityColumns } from "@/lib/inventory/capabilities.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
@@ -34,6 +36,7 @@ export interface HpOpContext {
     resources: Prisma.JsonValue;
     activeEffects: Prisma.JsonValue;
     conditions: Prisma.JsonValue;
+    rulesEdition: RulesEdition;
     classEntries: ClassEntryRow[];
     // Union of three shapes over the same rows: castSpell rest-reset (#528: capability
     // id + used), grant derivation (#529: GrantItem name/requiresAttunement), and the
@@ -89,6 +92,7 @@ export async function buildHpOpContext(
       resources: true,
       activeEffects: true,
       conditions: true,
+      rulesEdition: true,
       // Selected fields feed two seams: id + capabilities (with used) for the
       // castSpell rest reset (#528), and name/requiresAttunement + capabilities
       // for item-granted resistances (#529, feeding the #456 halve flow below).

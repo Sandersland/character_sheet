@@ -2,6 +2,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { editionOf } from "@/lib/rules/edition.js";
 // Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
 // now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
 // would close an import cycle back through combat/hitpoints.ts.
@@ -170,6 +171,7 @@ function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
     level,
     row.abilityScores as Record<string, number>,
     proficiencyBonusForLevel(level),
+    editionOf(row),
   );
   return derived;
 }

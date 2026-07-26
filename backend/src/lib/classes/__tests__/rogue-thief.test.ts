@@ -14,7 +14,7 @@ const ABILITIES = {
 };
 
 function thiefFeatureNames(level: number): string[] {
-  const info = deriveResources("rogue", "thief", level, ABILITIES, proficiencyBonusForLevel(level));
+  const info = deriveResources("rogue", "thief", level, ABILITIES, proficiencyBonusForLevel(level), "EDITION_2024");
   return (info?.features ?? []).filter((f) => f.source === "subclass").map((f) => f.name);
 }
 
@@ -49,8 +49,8 @@ describe("Rogue Thief subclass (#909)", () => {
   });
 
   it("adds no trackable resource pool (content-only, no new level-gated axis)", () => {
-    const info = deriveResources("rogue", "thief", 17, ABILITIES, proficiencyBonusForLevel(17));
-    const base = deriveResources("rogue", undefined, 17, ABILITIES, proficiencyBonusForLevel(17));
+    const info = deriveResources("rogue", "thief", 17, ABILITIES, proficiencyBonusForLevel(17), "EDITION_2024");
+    const base = deriveResources("rogue", undefined, 17, ABILITIES, proficiencyBonusForLevel(17), "EDITION_2024");
     expect(info?.resources).toEqual(base?.resources);
   });
 });

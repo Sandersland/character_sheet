@@ -460,14 +460,15 @@ describe("referential integrity", () => {
     expect([...new Set(dangling)], "pack references an item missing from ITEMS").toEqual([]);
   });
 
-  // Cross-source (#1128, revised #1308): the class-definition grantLevel table
-  // (registry.ts isSubclassActive) is edition-blind and drives feature/pool
-  // derivation only for the 2024 gate — CLASSES.subclassLevel is now the 2014
-  // gate (subclassGateLevel-scoped) and legitimately differs from it for
-  // Cleric/Sorcerer/Warlock/Druid/Wizard. Compare grantLevel against the
-  // 2024-resolved gate, not the raw 2014 catalog column, so this test stays a
-  // real drift guard instead of breaking on every intentional 2014/2024 split.
-  it("every class-definition grantLevel matches the 2024-resolved subclass gate", () => {
+  // Cross-source (#1128, briefly rescoped by #1308, restored by #1291): the
+  // class-definition grantLevel table (registry.ts isSubclassActive) and
+  // CLASSES.subclassLevel (the catalog column) are BOTH 2014-scoped now —
+  // isSubclassActive resolves grantLevel through subclassActiveAt, the exact
+  // gate buildClassesView resolves subclassLevel through, so the two values
+  // must mean the same PHB'14 level and can go back to direct equality (the
+  // ORIGINAL #1128 contract, before #1308 had to loosen it to a 2024-resolved
+  // comparison while only the catalog column carried 2014 values).
+  it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
       Barbarian: barbarian, Bard: bard, Cleric: cleric, Druid: druid, Fighter: fighter,
       Monk: monk, Paladin: paladin, Ranger: ranger, Rogue: rogue, Sorcerer: sorcerer,
@@ -475,17 +476,19 @@ describe("referential integrity", () => {
     };
     const drift = CLASSES.flatMap((seedClass) =>
       Object.entries(defByName[seedClass.name]?.subclasses ?? {})
-        .filter(([, sub]) => (sub.grantLevel ?? 3) !== subclassGateLevel(seedClass.subclassLevel, "EDITION_2024"))
+        .filter(([, sub]) => (sub.grantLevel ?? 3) !== seedClass.subclassLevel)
         .map(([key]) => `${seedClass.name}/${key}`),
     );
-    expect(drift, "class-definition grantLevel differs from the 2024-resolved subclass gate").toEqual([]);
+    expect(drift, "class-definition grantLevel differs from seed subclassLevel").toEqual([]);
   });
 
-  // 2024 rules: a subclass grants nothing before its choice level (#1128), so no
-  // granted-spell row may fire below the class's 2024-resolved subclass gate.
-  // These grants are 2024-only content (#1128) — compare against
-  // subclassGateLevel(..., EDITION_2024), never the raw (now 2014-scoped, #1308)
-  // catalog column, the same rescope applied to the grantLevel drift test above.
+  // Unlike the grantLevel drift test above (reverted to direct equality by
+  // #1291, now that both tables are 2014-scoped), THIS check stays resolved
+  // through subclassGateLevel(..., EDITION_2024): these gateLevel values are
+  // 2024-only content (#1128) — e.g. Life Domain's earliest tier is authored
+  // as gateLevel 3 because 2024 doesn't grant the subclass before level 3, so
+  // its two 2014 tiers (1st/3rd) collapsed into one. Comparing against the raw
+  // (now 2014-scoped) subclassLevel column would wrongly flag every such row.
   it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its class's 2024-resolved subclass gate", () => {
     const subclassLevelByClass = new Map(
       CLASSES.map((c) => [c.name, subclassGateLevel(c.subclassLevel, "EDITION_2024")]),

@@ -159,11 +159,12 @@ export const wizard: ClassDefinition = {
         "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
     },
   ],
+  // PHB'14 p.114: Arcane Tradition (Wizard's subclass) is chosen at 2nd level.
   subclasses: {
-    "school of evocation": { grantLevel: 3, features: SCHOOL_OF_EVOCATION_FEATURES },
-    "school of abjuration": { grantLevel: 3, features: SCHOOL_OF_ABJURATION_FEATURES },
+    "school of evocation": { grantLevel: 2, features: SCHOOL_OF_EVOCATION_FEATURES },
+    "school of abjuration": { grantLevel: 2, features: SCHOOL_OF_ABJURATION_FEATURES },
     "school of illusion": {
-      grantLevel: 3,
+      grantLevel: 2,
       features: SCHOOL_OF_ILLUSION_FEATURES,
       resourceFn: (level) => {
         if (level < 10) return [];

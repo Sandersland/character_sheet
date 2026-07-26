@@ -40,7 +40,7 @@ describe("deriveResources snapshot — pins output for every class/subclass acro
           const profBonus = proficiencyBonusForLevel(level);
           return {
             level,
-            info: deriveResources(className, subclass, level, ABILITY_SCORES, profBonus),
+            info: deriveResources(className, subclass, level, ABILITY_SCORES, profBonus, "EDITION_2024"),
           };
         });
         expect(byLevel).toMatchSnapshot();
@@ -49,7 +49,7 @@ describe("deriveResources snapshot — pins output for every class/subclass acro
   }
 
   it("returns null for a wholly unknown class", () => {
-    expect(deriveResources("not-a-class", undefined, 5, ABILITY_SCORES, 3)).toBeNull();
+    expect(deriveResources("not-a-class", undefined, 5, ABILITY_SCORES, 3, "EDITION_2024")).toBeNull();
   });
 });
 
@@ -60,7 +60,7 @@ describe("resolveClassDie snapshot — every class-die pool across all classes/s
         const rows = Array.from({ length: 20 }, (_, i) => {
           const level = i + 1;
           const profBonus = proficiencyBonusForLevel(level);
-          const info = deriveResources(className, subclass, level, ABILITY_SCORES, profBonus);
+          const info = deriveResources(className, subclass, level, ABILITY_SCORES, profBonus, "EDITION_2024");
           if (!info) return { level, dice: {} };
           const dice: Record<string, number | null> = {};
           for (const resource of info.resources) {
@@ -80,6 +80,7 @@ describe("deriveResourcesForCharacterRow", () => {
       experiencePoints: 355000,
       abilityScores: ABILITY_SCORES,
       classEntries: [{ name: "fighter", subclass: "battle master" }],
+      rulesEdition: "EDITION_2024",
     });
     expect(level).toBe(20);
     expect(derived).toMatchSnapshot();
@@ -90,6 +91,7 @@ describe("deriveResourcesForCharacterRow", () => {
       experiencePoints: 0,
       abilityScores: ABILITY_SCORES,
       classEntries: [],
+      rulesEdition: "EDITION_2024",
     });
     expect(level).toBe(1);
     expect(derived).toBeNull();

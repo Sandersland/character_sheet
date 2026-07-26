@@ -1,8 +1,11 @@
 // Flattens the per-class definitions in classes/<class>.ts into the dispatch
 // tables deriveResources() merges from, and exposes the class-features.ts
 // public surface (resolveClassDie / deriveResources / deriveResourcesForCharacterRow).
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
-import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
+import { editionOf } from "@/lib/rules/edition.js";
 
 import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";
@@ -75,18 +78,22 @@ interface SubclassLayer extends ClassLayer {
   def: SubclassDefinition | undefined;
 }
 
-// A subclass contributes only once the character has reached its grant level (defaults to 3).
-//
-// This code-side grantLevel table stays edition-blind for now (#1285) and is
-// pinned to the 2024 gate (3) — the drift test in the seed-data suite checks it
-// against subclassGateLevel(..., "EDITION_2024"), not the raw (now 2014-scoped,
-// #1308) catalog column. Live consequence: a 2014 Cleric/Sorcerer/Warlock (gate
-// 1) or Druid/Wizard (gate 2) shows its subclass *name* below level 3 while this
-// table still withholds its derived *features* until 3 — bounded, and #1291's
-// job to close by making isSubclassActive edition-aware.
-function isSubclassActive(def: SubclassDefinition | undefined, level: number): def is SubclassDefinition {
+// A subclass contributes only once the character has reached its grant level.
+// Resolved through the SAME gate buildClassesView uses (subclassActiveAt):
+// grantLevel is the 2014 (PHB'14) value — Cleric/Sorcerer/Warlock 1,
+// Druid/Wizard 2, everything else 3/absent — and EDITION_2024 always hardcodes
+// 3, ignoring it (#1308's seeded catalog column is this table's DB-side twin;
+// subclassGateLevel is the one function both resolve through). Was
+// edition-blind (#1285's latch, closed by #1291): a 2014 Cleric at level 1
+// used to show its subclass NAME (buildClassesView) with none of its derived
+// FEATURES (deriveResources) because this function ignored edition entirely.
+function isSubclassActive(
+  def: SubclassDefinition | undefined,
+  level: number,
+  edition: RulesEdition,
+): def is SubclassDefinition {
   if (!def) return false;
-  return level >= (def.grantLevel ?? 3);
+  return subclassActiveAt(level, def.grantLevel, edition);
 }
 
 // Scoped to the subclass only, gated by its grant level.
@@ -95,9 +102,10 @@ function deriveSubclassLayer(
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ): SubclassLayer {
   const def = SUBCLASSES[subclassKey];
-  if (!isSubclassActive(def, level)) return { active: false, def, pools: [], features: [] };
+  if (!isSubclassActive(def, level, edition)) return { active: false, def, pools: [], features: [] };
   return {
     active: true,
     def,
@@ -129,11 +137,12 @@ export function deriveResources(
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ): DerivedClassInfo | null {
   const classKey = (className ?? "").toLowerCase();
   const subclassKey = (subclass ?? "").toLowerCase();
 
-  const sub = deriveSubclassLayer(subclassKey, level, abilityScores, profBonus);
+  const sub = deriveSubclassLayer(subclassKey, level, abilityScores, profBonus, edition);
   // Feed the active subclass into the base pool derivation so base-wins pool-key
   // collisions (e.g. druid wildShape) resolve to the subclass's variant (#906).
   const base = deriveBaseLayer(CLASSES[classKey], level, abilityScores, profBonus, sub.active ? subclassKey : undefined);
@@ -175,6 +184,7 @@ export function deriveResourcesForCharacterRow(row: {
   experiencePoints: number;
   abilityScores: unknown;
   classEntries: { name: string; subclass: string | null }[];
+  rulesEdition: RulesEdition;
 }): { derived: DerivedClassInfo | null; level: number } {
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
@@ -186,6 +196,7 @@ export function deriveResourcesForCharacterRow(row: {
     level,
     abilityScores,
     profBonus,
+    editionOf(row),
   );
   return { derived, level };
 }
@@ -202,11 +213,12 @@ export function deriveEntryScopedResourcesForCharacterRow(row: {
   experiencePoints: number;
   abilityScores: unknown;
   classEntries: { name: string; subclass?: string | null; level: number }[];
+  rulesEdition: RulesEdition;
 }): { derived: DerivedClassInfo | null; level: number } {
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  const { derived } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus);
+  const { derived } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus, editionOf(row));
   return { derived, level };
 }
 
@@ -271,9 +283,10 @@ function deriveEntryInfo(
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ): DerivedClassInfo | null {
   const effLevel = effectiveEntryLevel(entry.level, entryCount, totalLevel);
-  return deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus);
+  return deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus, edition);
 }
 
 // Rebuilds the `resources` pool layer (#1071) from EVERY class entry at its own
@@ -286,12 +299,13 @@ function collectEntryScopedPools(
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ): DerivedResource[] {
   // Pool keys are class-scoped (each class appears at most once in classEntries).
   const seenPoolKeys = new Set<string>();
   const pools: DerivedResource[] = [];
   for (const entry of classEntries) {
-    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus);
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, edition);
     for (const pool of info?.resources ?? []) {
       if (seenPoolKeys.has(pool.key)) {
         throw new Error(`collectEntryScopedPools: duplicate pool key "${pool.key}" from entry "${entry.name}"`);
@@ -319,11 +333,12 @@ function collectEntryScopedFeatures(
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ): DerivedFeature[] {
   const seenNames = new Set<string>();
   const features: DerivedFeature[] = [];
   for (const entry of classEntries) {
-    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus);
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, edition);
     for (const feature of info?.features ?? []) {
       if (seenNames.has(feature.name)) continue;
       seenNames.add(feature.name);
@@ -356,18 +371,19 @@ export function deriveEntryScopedResources(
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ): { derived: DerivedClassInfo | null } {
   let derived: DerivedClassInfo | null = null;
 
   for (const entry of classEntries) {
-    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus);
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, edition);
     if (!info || !entryContributesExtras(info)) continue;
 
     derived = overlayExtrasFields(derived, info);
   }
 
-  const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus);
-  const features = collectEntryScopedFeatures(classEntries, totalLevel, abilityScores, profBonus);
+  const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus, edition);
+  const features = collectEntryScopedFeatures(classEntries, totalLevel, abilityScores, profBonus, edition);
 
   if (derived) {
     derived.resources = pools;

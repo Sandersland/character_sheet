@@ -154,9 +154,10 @@ const THE_GREAT_OLD_ONE_FEATURES: DerivedFeature[] = [
 
 export const warlock: ClassDefinition = {
   features: WARLOCK_FEATURES,
+  // PHB'14 p.105: Otherworldly Patron (Warlock's subclass) is chosen at 1st level.
   subclasses: {
     "the fiend": {
-      grantLevel: 3,
+      grantLevel: 1,
       features: THE_FIEND_FEATURES,
       resourceFn: (level) => {
         if (level < 6) return [];
@@ -182,7 +183,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the archfey": {
-      grantLevel: 3,
+      grantLevel: 1,
       features: THE_ARCHFEY_FEATURES,
       resourceFn: (level) => {
         const pools: DerivedResource[] = [
@@ -216,7 +217,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the great old one": {
-      grantLevel: 3,
+      grantLevel: 1,
       features: THE_GREAT_OLD_ONE_FEATURES,
       resourceFn: (level) => {
         if (level < 6) return [];

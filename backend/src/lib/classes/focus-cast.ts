@@ -21,6 +21,7 @@ export const FOCUS_CAST_CHARACTER_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
+  rulesEdition: true,
   // Every entry (not just the primary) + its level, so a non-primary Monk's
   // focus gate still resolves via deriveEntryScopedResources (#1072).
   classEntries: {
