@@ -63,6 +63,6 @@ The repeatable pattern (inventory → HP → XP → spellcasting …):
 
 A class/subclass **ability** skips steps 4–5: add one `ABILITY_REGISTRY` entry (`lib/classes/ability-registry.ts`) keyed by its rules-module basename, and call the existing `applyAbilityTransactions` from the client. No route file, no manifest entry, no new client export (#1275).
 6. **Component(s)** — orchestrator/row pattern (see `docs/frontend.md`).
-7. **Tests** — mirror `routes/__tests__/inventory.test.ts`; lib unit tests for non-trivial pure logic.
+7. **Tests** — mirror `routes/character/__tests__/inventory.test.ts`; lib unit tests for non-trivial pure logic.
 
 **Catalog-table decision:** does the feature need a baseline list players pick from? Yes → catalog table + data-only seed module under `prisma/seed/*.ts` upserted from `prisma/seed.ts`, exposed via `GET /api/<plural>` (like `Spell`, `Item`). No → skip it (like `JournalEntry`). Category-polymorphic content needs detail tables (like `Item*Detail`); flat content doesn't (like `Spell`).

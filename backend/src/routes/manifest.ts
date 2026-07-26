@@ -31,25 +31,14 @@ import { spellsRouter } from "@/routes/catalog/spells.js";
 import { spellcastingRouter } from "@/routes/character/spellcasting.js";
 
 /**
- * One entry per router `app.ts` mounts. `app.ts` walks this array in two
- * passes — every `"public"` entry, then `requireAuth`, then every `"authed"`
- * entry — so `scope` doubles as the mount-order key, not just an access
- * label; making it required blocks a new entry from silently defaulting to
- * public. The public allowlist is deliberately narrow: health + the auth
- * mechanism (OAuth sign-in + session), reachable with no session so a caller
- * can always find out how to sign in. Every other router sits behind the
- * gate — an unauthenticated request 401s there and never reaches them.
- *
- * Array order is registration order, and it is load-bearing: Express matches
- * routes in the order they are mounted, and these paths are NOT all disjoint
- * (`/api` catch-alls sit alongside `/api/characters/:id/...`). Preserve the
- * existing order when adding an entry; do not sort or regroup.
- *
- * Character-scoped routers use `Router({ mergeParams: true })` so a mount
- * under `/api/characters/:id/<leaf>` can read `:id` off `req.params`. A
- * `mount` array is for a router that owns more than one path at the same
- * scope (e.g. a catalog GET at `/api/<name>` alongside a character-scoped
- * leaf) — none exist today, but the type supports the shape either way.
+ * One entry per router `createApp` mounts: every `"public"` entry, then the
+ * `requireAuth` gate — an unauthenticated request 401s there and never
+ * reaches an authed router — then every `"authed"` entry. `scope` is
+ * required so a new entry can't default to public silently. Array order is
+ * registration order and load-bearing (Express matches in mount order over
+ * non-disjoint paths) — preserve it, don't sort. `mount` is an array for a
+ * router owning more than one path at one scope (none exist today);
+ * character-scoped routers read `:id` via `Router({ mergeParams: true })`.
  */
 export interface RouteMount {
   router: Router;

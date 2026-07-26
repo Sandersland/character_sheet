@@ -6,14 +6,25 @@ import path from "node:path";
 import "express-async-errors";
 import cors from "cors";
 import type { CorsOptions } from "cors";
-import express from "express";
+import express, { type Express } from "express";
 
 import { requireAuth } from "@/lib/auth/middleware.js";
 import { config } from "@/lib/core/config.js";
 import { errorHandler } from "@/lib/core/error-handler.js";
 import { httpLogger } from "@/lib/core/logger.js";
 import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/lib/core/security.js";
-import { routeManifest } from "@/routes/manifest.js";
+import { routeManifest, type RouteMount } from "@/routes/manifest.js";
+
+// Mounts every routeManifest entry matching `scope`, in array order — see
+// RouteMount's doc for why that order and the required `scope` matter.
+function mountPass(app: Express, scope: RouteMount["scope"]): void {
+  for (const entry of routeManifest) {
+    if (entry.scope !== scope) continue;
+    for (const mountPath of Array.isArray(entry.mount) ? entry.mount : [entry.mount]) {
+      app.use(mountPath, entry.router);
+    }
+  }
+}
 
 // CORS origins are env-driven so the API can be deployed anywhere without a
 // code change. `CORS_ORIGIN` is a comma-separated allowlist
@@ -51,23 +62,9 @@ export function createApp() {
   app.use(globalRateLimiter);
   app.use(creationRateLimiter);
 
-  // Mounted in two passes per RouteMount.scope (see routes/manifest.ts): every
-  // public entry, then the gate, then every authed entry. Array order is
-  // registration order and is preserved within each pass — see the manifest's
-  // ordering comment for why that matters.
-  for (const { router, mount, scope } of routeManifest) {
-    if (scope !== "public") continue;
-    for (const mountPath of Array.isArray(mount) ? mount : [mount]) app.use(mountPath, router);
-  }
-
-  // The gate: every router mounted past this point requires a valid session.
-  // An unauthenticated request is 401'd here and never reaches them.
+  mountPass(app, "public");
   app.use("/api", requireAuth);
-
-  for (const { router, mount, scope } of routeManifest) {
-    if (scope !== "authed") continue;
-    for (const mountPath of Array.isArray(mount) ? mount : [mount]) app.use(mountPath, router);
-  }
+  mountPass(app, "authed");
 
   // Optional single-origin mode: when SERVE_STATIC_DIR points at a built SPA,
   // serve it from this same server so the frontend and API share one origin
