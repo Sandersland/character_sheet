@@ -222,10 +222,13 @@ describe("campaigns (#246)", () => {
     }
   });
 
-  // Regression pin, not red-first (#1285/#1286): passes today because the
-  // attach handler's updateMany only ever sets campaignId. Its job is to fail
-  // the day a future picker/mapper starts touching rulesEdition on a
-  // same-edition attach (the mismatch guard above only rejects; it never mutates).
+  // End-to-end happy path (#1285/#1286): a same-edition attach succeeds and the
+  // response reflects the edition. NOT a regression pin for the "attach never
+  // converts rulesEdition" invariant — a same-edition write is a no-op even if
+  // a future bug started forwarding rulesEdition on attach, so this test alone
+  // could never catch that. campaign-attach.test.ts's attachCharacterUpdate
+  // pin covers the invariant itself, seeding a DB-level mismatch that bypasses
+  // the guard below (proven red against an injected converting write).
   it("does not convert a character's rulesEdition when it joins a same-edition campaign", async () => {
     const createdChar = await supertest(createApp())
       .post("/api/characters")
@@ -264,6 +267,56 @@ describe("campaigns (#246)", () => {
 
       expect(attach.status).toBe(200);
       expect(attach.body.rulesEdition).toBe("EDITION_2014");
+    } finally {
+      await prisma.character.deleteMany({ where: { id: charId } });
+    }
+  });
+
+  // #1286: a campaign's rulesEdition is the default new characters inherit,
+  // set once at creation and never touched by the attach flow — true today
+  // only because there is no PATCH /campaigns/:id at all. Shaped so a future
+  // PATCH handler that forwards rulesEdition (e.g. a "rename campaign" form
+  // that blindly spreads the whole body) trips it: re-fetch after a join and
+  // assert the CAMPAIGN row, not just the character, is unchanged.
+  it("leaves a campaign's rulesEdition unchanged after a character joins", async () => {
+    const campaign = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "Immutable Edition Campaign", rulesEdition: "EDITION_2014" });
+    const campaignId = campaign.body.id as string;
+
+    const createdChar = await supertest(createApp())
+      .post("/api/characters")
+      .set("Cookie", cookieA)
+      .send({
+        name: "test-campaigns-char-campaign-edition-pin",
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: "Fighter" }],
+        abilityScores: {
+          strength: 15,
+          dexterity: 14,
+          constitution: 14,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 8,
+        },
+        rulesEdition: "EDITION_2014",
+      });
+    const charId = createdChar.body.id as string;
+
+    try {
+      const attach = await supertest(createApp())
+        .post(`/api/campaigns/${campaignId}/characters`)
+        .set("Cookie", cookieA)
+        .send({ characterId: charId });
+      expect(attach.status).toBe(200);
+
+      const after = await supertest(createApp())
+        .get(`/api/campaigns/${campaignId}`)
+        .set("Cookie", cookieA);
+      expect(after.body.rulesEdition).toBe("EDITION_2014");
     } finally {
       await prisma.character.deleteMany({ where: { id: charId } });
     }

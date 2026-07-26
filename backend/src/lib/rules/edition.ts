@@ -36,6 +36,13 @@ export const DEFAULT_RULES_EDITION: RulesEdition = "EDITION_2024";
 
 // Plain-language labels for user-facing text (e.g. the campaign-join mismatch
 // error, #1286) — players say "2014/2024 rules", never "SRD 5.1/5.2".
+//
+// Deliberate-coupling latch: byte-identical to frontend/src/lib/editionCopy.ts's
+// EDITION_LABELS (the join-mismatch error's exact wording is asserted against
+// that copy in CampaignDetailPage.test.tsx). Not single-sourced in
+// @character-sheet/shared-types because that package is pure types only
+// (index.ts: "nothing here reaches either runtime bundle") — a runtime const
+// there would break that invariant for every consumer. Change one, change both.
 export const RULES_EDITION_LABELS: Record<RulesEdition, string> = {
   EDITION_2014: "2014 rules",
   EDITION_2024: "2024 rules",

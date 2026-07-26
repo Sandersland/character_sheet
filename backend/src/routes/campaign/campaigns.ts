@@ -4,6 +4,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
+import { attachCharacterUpdate } from "@/lib/campaign/campaign-attach.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
@@ -207,10 +208,9 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
       // rulesEdition is deliberately not written here: joining a campaign never
       // converts a character's edition (write-once, #1281) — a mismatch is
       // rejected above, before this transaction, never reconciled here.
-      const { count } = await tx.character.updateMany({
-        where: { id: characterId, OR: [{ campaignId: null }, { campaignId }] },
-        data: { campaignId },
-      });
+      // attachCharacterUpdate is extracted so campaign-attach.test.ts can pin
+      // that guarantee directly, bypassing the guard above (see its comment).
+      const { count } = await attachCharacterUpdate(tx, characterId, campaignId);
       if (count === 0) return "alreadyInCampaign";
 
       const existingLink = await tx.campaignCharacterLink.findUnique({
