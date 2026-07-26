@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 
 import RollResultSeal from "@/features/dice/RollResultSeal";
 import { RollProvider } from "@/features/dice/RollContext";
@@ -6,6 +6,7 @@ import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
 import SheetBottomNav from "@/features/character-meta/SheetBottomNav";
 import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals";
+import DelayedSpinner from "@/components/ui/DelayedSpinner";
 import LevelUpBanner from "@/features/level-up/LevelUpBanner";
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
@@ -18,13 +19,18 @@ import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnS
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
 import { useLiveRound } from "@/features/session/useLiveRound";
 import SessionDoorway from "@/features/session/SessionDoorway";
-import CombatLivePanel from "@/features/session/CombatLivePanel";
 import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
 import { useSessionLogBumpOnCharacterWrite } from "@/features/session/useSessionLogBumpOnCharacterWrite";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { ReferenceData, Session } from "@/types/character";
+
+// #1279: the live turn tracker pulls the session domain's heaviest trees
+// (TurnHub/useTurnActions/AttackStepCard) — lazied so a sheet that never goes
+// live never fetches them. Import fires once a live+joined session actually
+// exists (renderLivePanel below), not on every sheet load.
+const CombatLivePanel = lazy(() => import("@/features/session/CombatLivePanel"));
 
 /**
  * The loaded-sheet view. Takes NO props (#1284 C17) — reads the character via
@@ -252,7 +258,11 @@ function renderLivePanel(
   combatActive: boolean,
 ): ReactNode {
   if (!hasTurnState || !session) return null;
-  return <CombatLivePanel session={session} active={combatActive} />;
+  return (
+    <Suspense fallback={<DelayedSpinner />}>
+      <CombatLivePanel session={session} active={combatActive} />
+    </Suspense>
+  );
 }
 
 /**

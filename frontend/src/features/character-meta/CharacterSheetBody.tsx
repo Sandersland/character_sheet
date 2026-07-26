@@ -1,18 +1,29 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 
 import OverviewPanel from "@/features/character-meta/panels/OverviewPanel";
 import ClassPanel from "@/features/character-meta/panels/ClassPanel";
-import CombatPanel from "@/features/character-meta/panels/CombatPanel";
-import InventoryPanel from "@/features/character-meta/panels/InventoryPanel";
-import MagicPanel from "@/features/character-meta/panels/MagicPanel";
-import StoryPanel from "@/features/character-meta/panels/StoryPanel";
+import DelayedSpinner from "@/components/ui/DelayedSpinner";
 import type { SheetPanelProps, SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { ReferenceData } from "@/types/character";
+
+// #1279: these three panels are the sheet's heaviest per-tab trees (spells,
+// inventory, journal) — tab-lazied so their weight loads on first activation
+// of that tab rather than riding along with the sheet's own chunk. Overview and
+// Class stay eager: Overview is the tab shown on first sheet load, and Class
+// isn't one of the heavy trees, so lazying them would only add a request with
+// no bundle-size win.
+const InventoryPanel = lazy(() => import("@/features/character-meta/panels/InventoryPanel"));
+const MagicPanel = lazy(() => import("@/features/character-meta/panels/MagicPanel"));
+const StoryPanel = lazy(() => import("@/features/character-meta/panels/StoryPanel"));
+// Idle Combat pulls the session domain (CombatColumn/HitPointTracker/SessionLog);
+// lazied separately from the live tracker (CharacterSheetContent's CombatLivePanel)
+// so an idle sheet never fetches the live-turn chunk.
+const CombatPanel = lazy(() => import("@/features/character-meta/panels/CombatPanel"));
 
 // Combat is excluded: it has extra live-session conditions handled inline below,
 // not a plain tab→panel mapping. Keyed lookup (vs. a chain of `&&` branches)
 // keeps CharacterSheetBody's complexity down as tabs are added (#1169).
-const STATIC_PANELS: Partial<Record<SheetTabId, (props: SheetPanelProps) => ReactNode>> = {
+const STATIC_PANELS: Partial<Record<SheetTabId, ComponentType<SheetPanelProps>>> = {
   overview: OverviewPanel,
   class: ClassPanel,
   inventory: InventoryPanel,
@@ -62,10 +73,18 @@ export default function CharacterSheetBody({
         role="tabpanel"
         aria-labelledby={`sheet-tab-${activeTab}`}
       >
-        {StaticPanel && <StaticPanel {...panelProps} />}
+        {StaticPanel && (
+          <Suspense fallback={<DelayedSpinner />}>
+            <StaticPanel {...panelProps} />
+          </Suspense>
+        )}
         {/* Combat: the live tracker supersedes the static panel; while the
             live-session status is still loading, render neither (no flash). */}
-        {activeTab === "combat" && !livePanel && !sessionLoading && <CombatPanel />}
+        {activeTab === "combat" && !livePanel && !sessionLoading && (
+          <Suspense fallback={<DelayedSpinner />}>
+            <CombatPanel />
+          </Suspense>
+        )}
         {/* Mounted-but-hidden off Combat so an in-progress picker + economy
             survive a swipe round-trip (the turn state itself lives in the
             provider; this preserves the open-picker UI state). */}
