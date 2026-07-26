@@ -1,5 +1,7 @@
 # 2024 Rules (SRD 5.2) Migration — Execution Plan
 
+> **SUPERSEDED (2026-07-25).** Epic #1126's premise — a hard cutover with no edition toggle — was reversed by epic **#1281**: both editions are supported per campaign, and code encoding 2014 rules is a supported edition's implementation, not legacy to delete. The goal and the REFACTOR step below are therefore no longer the plan. Kept for its still-useful lane/concurrency mechanics; build from #1281 and its sub-issues.
+
 > **For agentic workers:** this is the **orchestration plan** for epic #1126 — build order, method, model policy, and concurrency mechanics. It deliberately contains no code-level steps: each issue is the task spec, and the worker that picks an issue up writes its own bite-sized red/green plan at pickup (superpowers:writing-plans → superpowers:subagent-driven-development or the autodev FSM, per lane). Do not build from this document alone; build from your issue + this document's constraints.
 
 **Goal:** Cut the app over from 2014 rules (SRD 5.1) to 2024 rules (SRD 5.2) — epic #1126, sub-issues #1127–#1140 — with no edition toggle and no regression path back to 2014 text.
@@ -64,7 +66,7 @@ The ~30–40 test files that hardcode 2014 values (`lib/srd/__tests__`, `lib/cla
 3. **REFACTOR** — collapse the dead 2014 seams the change strands (`isKnownCaster` branches, the bespoke `fightingStyle` step, tiered exhaustion plumbing). Run `/fallow` after any removal/extraction refactor; fix or explicitly suppress with reasons.
 4. Frequent commits: one per red/green cycle, not one per issue.
 
-**Verification gates per lane:** backend tests need the lane's own Postgres up, and worktree stacks run `--fileParallelism=false` (parallel file runs flake with cross-domain 500s). Seed the disposable DB (`prisma db seed`) before route/cast suites — migrate-only DBs mask real 500s. `npm run typecheck` always. UI-touching issues additionally run the `/verify-frontend` gate and screenshot the result before claiming done.
+**Verification gates per lane:** backend tests need the lane's own Postgres up, and worktree stacks run a plain `npx vitest run` — never `--fileParallelism=false`, since #1269 gave each worker its own database, so a parallel-only failure is a leaking fixture (use `--maxWorkers=2` if the container OOMs). Seed the disposable DB (`prisma db seed`) before route/cast suites — migrate-only DBs mask real 500s. `npm run typecheck` always. UI-touching issues additionally run the `/verify-frontend` gate and screenshot the result before claiming done.
 
 ## 3. Model & delegation policy
 
