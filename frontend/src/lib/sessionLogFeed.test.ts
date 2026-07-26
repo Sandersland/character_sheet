@@ -309,6 +309,16 @@ describe("buildFeedItems roll-run collapsing (#983, raised threshold #1237 §2)"
     }
   });
 
+  it("labels the minimum collapse in the singular — exactly one row is hidden at the threshold", () => {
+    const swings = [miss("s4", 14), miss("s3", 13), miss("s2", 12), miss("s1", 11)];
+    const runs = buildFeedItems(swings).filter((i) => i.kind === "rollRun");
+    expect(runs).toHaveLength(1);
+    if (runs[0].kind === "rollRun") {
+      expect(runs[0].hidden).toHaveLength(1);
+      expect(runs[0].label).toBe("1 earlier weapon swing");
+    }
+  });
+
   it("collapses 12 consecutive initiative rolls to a 3-visible disclosure of the remaining 9", () => {
     const rolls = Array.from({ length: 12 }, (_, i) =>
       makeEvent({

@@ -136,9 +136,10 @@ function RoundSeparator({ round }: { round: number }) {
   );
 }
 
-// A collapsed run of ≥2 consecutive same-kind roll rows (#983): the newest
-// stays visible in place; the disclosure sits above it and reveals the rest
-// (oldest-first) when expanded.
+// A collapsed run of same-kind roll rows (#983) — the threshold and how many
+// stay visible are RUN_COLLAPSE_THRESHOLD / RUN_VISIBLE_COUNT, not restated
+// here. The newest stay visible in place; the disclosure sits above them and
+// reveals the rest (oldest-first) when expanded.
 function RollRunView({
   item,
   expanded,
@@ -191,6 +192,9 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
   useEffect(() => {
     setEvents(null);
     setError(null);
+    // Run ids are event ids, so stale entries never match the new session's
+    // feed — cleared so the set can't grow unboundedly across switches.
+    setExpandedRuns(new Set());
   }, [characterId, sessionId]);
 
   useEffect(() => {

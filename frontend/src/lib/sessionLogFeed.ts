@@ -175,7 +175,10 @@ function buildAttackDrillRow(e: CharacterEvent): DrillInRow {
   );
   return {
     label: "Attack",
-    formula: parts.join(" "),
+    // Undefined rather than "" when nothing decomposed: DrillInLine keys off
+    // `formula === undefined` to tell a formula row from an aside, so an empty
+    // string would render a bare "= 17".
+    formula: parts.length > 0 ? parts.join(" ") : undefined,
     total: `${data.total}`,
     note: rollModeNote(data.rollMode, data.modeSources) ?? undefined,
   };
@@ -576,6 +579,14 @@ const RUN_KIND_LABEL: Record<string, string> = {
 const RUN_COLLAPSE_THRESHOLD = 4;
 const RUN_VISIBLE_COUNT = 3;
 
+// Singular is reachable, not theoretical: the smallest collapsing run is
+// RUN_COLLAPSE_THRESHOLD rows with RUN_VISIBLE_COUNT shown, hiding one.
+function runLabel(runKind: string, hiddenCount: number): string {
+  const noun = RUN_KIND_LABEL[runKind] ?? runKind;
+  const unit = runKind === "swing" ? "swing" : "roll";
+  return `${hiddenCount} earlier ${noun} ${hiddenCount === 1 ? unit : `${unit}s`}`;
+}
+
 function collapseRuns(rows: FeedRow[]): FeedItem[] {
   const items: FeedItem[] = [];
   let i = 0;
@@ -589,8 +600,7 @@ function collapseRuns(rows: FeedRow[]): FeedItem[] {
         const splitAt = j - RUN_VISIBLE_COUNT;
         const hidden = rows.slice(i, splitAt);
         const visible = rows.slice(splitAt, j);
-        const noun = RUN_KIND_LABEL[row.runKind] ?? row.runKind;
-        const label = row.runKind === "swing" ? `${hidden.length} earlier ${noun} swings` : `${hidden.length} earlier ${noun} rolls`;
+        const label = runLabel(row.runKind, hidden.length);
         items.push({ kind: "rollRun", id: visible[0].id, label, hidden, visible });
         i = j;
         continue;
