@@ -180,8 +180,9 @@ describe("MobileSheetHeader", () => {
     expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
   });
 
-  // #1167: unconditional (unlike Campaign settings) — this is the mobile route
-  // into player preferences, since AppHeader/AccountMenu is hidden here (md:hidden).
+  // #1167: unconditional (unlike Campaign settings) — needed because this
+  // immersive mobile shell hides AppHeader/AccountMenu (`hidden md:flex`); other
+  // mobile routes (/, /campaigns, journal) keep AppHeader's own Preferences entry.
   it("adds an unconditional 'Preferences…' item and opens the surface, even with no campaignId", () => {
     renderHeader({}, makeCharacter({ campaignId: undefined }));
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
@@ -194,13 +195,20 @@ describe("MobileSheetHeader", () => {
 
   it("shows a Campaign settings link inside Preferences when campaign-attached, firing the existing handler and closing Preferences", () => {
     const onOpenCampaignSettings = vi.fn();
-    renderHeader({ onOpenCampaignSettings }, makeCharacter({ campaignId: "camp1" }));
+    const { baseElement } = renderHeader({ onOpenCampaignSettings }, makeCharacter({ campaignId: "camp1" }));
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /preferences/i }));
 
     fireEvent.click(screen.getByRole("button", { name: /campaign settings/i }));
 
     expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
+    // Routes through BottomSheet's requestClose (#782): onClose defers to the
+    // slide-out transitionend rather than unmounting instantly.
+    act(() => {
+      const e = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(e, "propertyName", { value: "transform" });
+      baseElement.querySelector('[role="dialog"]')?.dispatchEvent(e);
+    });
     expect(screen.queryByRole("dialog", { name: /preferences/i })).not.toBeInTheDocument();
   });
 

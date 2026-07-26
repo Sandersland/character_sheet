@@ -101,8 +101,9 @@ function HpNumbers({ current, max, temp }: { current: number; max: number; temp:
 // One menu, not two (#979): while joined, Leave/End Session join Note/Sessions/
 // Activity/All characters (above Delete). "All characters" (#1027) is the ⋮
 // discoverability fallback for the identity-tap switcher. "Preferences…" is
-// unconditional (#1167) — unlike Campaign settings, this is the only mobile
-// route to player preferences since AppHeader/AccountMenu is hidden here.
+// unconditional (#1167): this immersive mobile shell hides AppHeader/AccountMenu
+// (`hidden md:flex`), so without this item mobile would lose that route entirely
+// while the sheet is open — other mobile routes (/, /campaigns, journal) keep it.
 function buildMenuItems(
   handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete" | "onOpenCampaignSettings">,
   onAllCharacters: () => void,
@@ -151,8 +152,9 @@ export default function MobileSheetHeader({
   const { character } = useCurrentCharacter();
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  // Self-contained like switcherOpen (#1027) — this IS the mobile Preferences
-  // entry point (#1167), since AppHeader/AccountMenu is hidden here.
+  // Self-contained like switcherOpen (#1027) — the mobile sheet's own
+  // Preferences entry point (#1167), needed because this route's own chrome
+  // hides AppHeader/AccountMenu on mobile (`hidden md:flex`).
   const [prefsOpen, setPrefsOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
