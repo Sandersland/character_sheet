@@ -10,7 +10,16 @@
 // same-named row under an edition NOT in the current seed run is correctly
 // pruned on its own, without silently taking a same-named different-edition
 // row with it.)
-import { afterEach, describe, expect, it } from "vitest";
+//
+// CI-caught footgun: staleCatalogRowsWhere's `seeded` list here is
+// deliberately tiny (just this file's own fixture names), and its where means
+// "everything NOT in this list" — called with no `extraWhere`, that where
+// matches the REAL seeded catalog too (every one of the ~38 real Feat rows,
+// every real GrantedAbility row), and deleteMany does not ask before dropping
+// them. Every destructive call below MUST pass `extraWhere` scoping to this
+// file's own fixture names, or it prunes the shared catalog out from under
+// every other test in the same vitest worker.
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
 
@@ -19,10 +28,23 @@ import { staleCatalogRowsWhere } from "../prune.js";
 describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
   const NAME = "Zzz Prune Probe (#1306)";
   const UNSEEDED_NAME = "Zzz Prune Probe Unrelated (#1306)";
+  // Passed as staleCatalogRowsWhere's extraWhere on every destructive call in
+  // this file — without it, "everything not in the tiny seeded list" means
+  // the real catalog (see the file-header comment).
+  const ONLY_THIS_FILES_ROWS = { name: { in: [NAME, UNSEEDED_NAME] } };
 
   afterEach(async () => {
-    await prisma.feat.deleteMany({ where: { name: { in: [NAME, UNSEEDED_NAME] } } });
-    await prisma.grantedAbility.deleteMany({ where: { name: { in: [NAME, UNSEEDED_NAME] } } });
+    await prisma.feat.deleteMany({ where: ONLY_THIS_FILES_ROWS });
+    await prisma.grantedAbility.deleteMany({ where: ONLY_THIS_FILES_ROWS });
+  });
+
+  // Proves the scoping fix didn't cost the real catalog: if any test above
+  // leaked past its own fixture names, this is what would go red.
+  afterAll(async () => {
+    const alert = await prisma.feat.findFirst({ where: { name: "Alert" } });
+    expect(alert, "the real seeded Feat catalog must survive this suite").not.toBeNull();
+    const darkness = await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness" } });
+    expect(darkness, "the real seeded GrantedAbility catalog must survive this suite").not.toBeNull();
   });
 
   it("Feat: a same-named 2014/2024 pair — only the seeded edition survives, stably across repeated (idempotent) prune runs; an unrelated unseeded row is pruned too", async () => {
@@ -31,8 +53,8 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
     await prisma.feat.create({ data: { name: UNSEEDED_NAME, description: "stale", edition: "EDITION_2014" } });
 
     const seeded = [{ name: NAME, edition: "EDITION_2014" as const }];
-    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded) });
-    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded) }); // idempotent — no-op the second time
+    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded, ONLY_THIS_FILES_ROWS) });
+    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded, ONLY_THIS_FILES_ROWS) }); // idempotent — no-op the second time
 
     const survivingNames = (await prisma.feat.findMany({ where: { name: { in: [NAME, UNSEEDED_NAME] } } }))
       .map((r) => `${r.name}::${r.edition}`);
@@ -44,7 +66,7 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
     await prisma.feat.create({ data: { name: NAME, description: "2024-only", edition: "EDITION_2024" } });
 
     const seeded = [{ name: NAME, edition: null }];
-    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded) });
+    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded, ONLY_THIS_FILES_ROWS) });
 
     const survivingEditions = (await prisma.feat.findMany({ where: { name: NAME } })).map((r) => r.edition);
     expect(survivingEditions).toEqual([null]);
@@ -63,7 +85,7 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
 
     const seeded = [{ name: NAME, edition: null }];
     await prisma.grantedAbility.deleteMany({
-      where: staleCatalogRowsWhere(seeded, { source: "shadowArts" }),
+      where: staleCatalogRowsWhere(seeded, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
     });
 
     const survivor = await prisma.grantedAbility.findFirst({ where: { name: NAME } });
