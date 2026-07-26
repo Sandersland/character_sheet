@@ -1,4 +1,4 @@
-import type { Character, CharacterEvent, Session, SessionDoorwayState } from "@/types/character";
+import type { Character, CharacterEvent, CombatState, Session, SessionDoorwayState } from "@/types/character";
 import { jsonBody, request, send } from "@/api/http";
 import type { RollEventData } from "@character-sheet/shared-types";
 
@@ -142,40 +142,57 @@ export async function fetchSession(
   );
 }
 
-/** Log a "combat started" event against the active session. */
+/** Start combat: returns the server's authoritative CombatState (#1030). */
 export async function startCombat(
   characterId: string,
   sessionId: string,
-): Promise<void> {
-  await send(
+): Promise<CombatState> {
+  return request<CombatState>(
     `/characters/${characterId}/sessions/${sessionId}/combat/start`,
     { method: "POST" },
     "Failed to start combat",
   );
 }
 
-/** Log a "combat ended" event against the active session. */
+/** End combat: returns the server's authoritative CombatState (#1030). */
 export async function endCombat(
   characterId: string,
   sessionId: string,
-): Promise<void> {
-  await send(
+): Promise<CombatState> {
+  return request<CombatState>(
     `/characters/${characterId}/sessions/${sessionId}/combat/end`,
     { method: "POST" },
     "Failed to end combat",
   );
 }
 
-/** Log a "combat round advanced" event against the active session. */
+/**
+ * Advance the combat round by one. Intent only — no round number is ever
+ * sent: the server decides the next round (#1030), so a stale local guess
+ * can never diverge from what another participant sees. Returns the
+ * resulting CombatState so the caller can sync immediately, without waiting
+ * for the next poll tick.
+ */
 export async function advanceCombatRound(
   characterId: string,
   sessionId: string,
-  round: number,
-): Promise<void> {
-  await send(
+): Promise<CombatState> {
+  return request<CombatState>(
     `/characters/${characterId}/sessions/${sessionId}/combat/round`,
-    jsonBody({ round }),
+    { method: "POST" },
     "Failed to advance combat round",
+  );
+}
+
+/** Cheap poll read of a session's combat state (#1030) — round/combatActive/updatedAt only. */
+export async function fetchCombatState(
+  characterId: string,
+  sessionId: string,
+): Promise<CombatState> {
+  return request<CombatState>(
+    `/characters/${characterId}/sessions/${sessionId}/combat`,
+    undefined,
+    "Failed to fetch combat state",
   );
 }
 

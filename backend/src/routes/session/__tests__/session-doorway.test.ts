@@ -145,18 +145,31 @@ describe("GET /api/characters/:id/sessions/doorway", () => {
     expect(res.body.session.joined).toBe(false);
   });
 
-  it("derives round from the latest combatRoundAdvanced event", async () => {
+  it("reads round from the authoritative Session columns while combat is active (#1030)", async () => {
     const campaignId = await setupCampaign();
     const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
     const sessionId = start.body.session.id as string;
 
+    await agent(cookieOwner).post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/start`).send({});
     const roundUrl = `/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/round`;
-    await agent(cookieOwner).post(roundUrl).send({ round: 2 });
-    await agent(cookieOwner).post(roundUrl).send({ round: 3 });
+    await agent(cookieOwner).post(roundUrl).send({});
+    await agent(cookieOwner).post(roundUrl).send({});
 
     const res = await agent(cookieOwner).get(doorwayUrl(CHAR_OWNER));
     expect(res.body.kind).toBe("liveJoined");
     expect(res.body.session.round).toBe(3);
+  });
+
+  it("shows round: null once combat has ended, even though the session stays active", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+
+    await agent(cookieOwner).post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/start`).send({});
+    await agent(cookieOwner).post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/end`).send({});
+
+    const res = await agent(cookieOwner).get(doorwayUrl(CHAR_OWNER));
+    expect(res.body.session.round).toBeNull();
   });
 
   it("403s for a character the caller does not own", async () => {

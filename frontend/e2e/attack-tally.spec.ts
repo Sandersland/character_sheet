@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { enterLiveCombat, findCharacterByName } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName, startCombatAndTurn } from "./helpers/api";
 
 // Shared setup: deterministic dice (face = 1 + floor(0.5 * faces) → d20 always
 // 11, never nat 20/1, so no auto-verdict steals the manual-call paths under
@@ -25,8 +25,7 @@ async function openAttackSheet(page: import("@playwright/test").Page) {
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();

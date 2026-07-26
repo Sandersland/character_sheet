@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { enterLiveCombat, findCharacterByName, learnManeuver, restoreResourcePool } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName, learnManeuver, restoreResourcePool, startCombatAndTurn } from "./helpers/api";
 
 // #809/#811: Precision Attack (an attackRoll maneuver) lives behind the Battle
 // Master maneuvers disclosure in the attack sheet, showing its attack section
@@ -22,8 +22,7 @@ test("precision attack: the affordance is under the attack card and boosts the t
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   // Open the Attack sheet.
   await page.getByRole("button", { name: /Use Action/ }).click();
