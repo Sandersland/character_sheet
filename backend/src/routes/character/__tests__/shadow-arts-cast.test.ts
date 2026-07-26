@@ -313,6 +313,80 @@ describe("Shadow Arts cast endpoint", () => {
   });
 });
 
+// #1315: availableActions is entry-scoped (mirrors deriveEntryScopedResources,
+// #1206) — a secondary Warrior of Shadow monk's shadowArts/cloakOfShadows key
+// off the MONK entry's own level, not the primary entry's class or the
+// character's total level. Previously buildAvailableActionsView only ever
+// read the PRIMARY entry at total level, so a secondary monk's gated actions
+// never appeared regardless of level.
+describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
+  const MC2_ID = "test-shadow-mc-actions-1";
+  const MC2_CLASS_NAME = "Shadow MC Actions Test Class";
+  let mc2ClassId: string;
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: MC2_CLASS_NAME },
+      create: { name: MC2_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
+      update: {},
+    });
+    mc2ClassId = cls.id;
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: MC2_ID } });
+    await prisma.characterClass.deleteMany({ where: { name: MC2_CLASS_NAME } });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MC2_ID } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+  });
+
+  // Fighter (primary) + Warrior of Shadow monk (secondary) at total level 8.
+  async function createFighterMonkMC(monkLevel: number) {
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MC2_ID,
+        experiencePoints: 34000, // total level 8
+        ownerId: OWNER_ID,
+        resources: Prisma.JsonNull,
+        classEntries: {
+          create: [
+            { name: "fighter", subclass: null, classId: mc2ClassId, level: 8 - monkLevel, position: 0 },
+            { name: "monk", subclass: "warrior of shadow", classId: mc2ClassId, level: monkLevel, position: 1 },
+          ],
+        },
+      },
+    });
+  }
+
+  it("a SECONDARY Warrior of Shadow monk (L3) surfaces shadowArts; the PRIMARY Fighter's own actions still surface too", async () => {
+    await createFighterMonkMC(3);
+    const res = await agent().get(`/api/characters/${MC2_ID}`);
+    expect(res.status).toBe(200);
+    const keys = (res.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(keys).toContain("shadowArts");
+    // cloakOfShadows needs monk entry level 17 — nowhere near reached at 3.
+    expect(keys).not.toContain("cloakOfShadows");
+    expect(keys).toContain("secondWind");
+  });
+
+  it("a SECONDARY monk below L3 does not surface shadowArts, even though total character level is 8", async () => {
+    await createFighterMonkMC(2);
+    const res = await agent().get(`/api/characters/${MC2_ID}`);
+    expect(res.status).toBe(200);
+    const keys = (res.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(keys).not.toContain("shadowArts");
+  });
+});
+
 // Concentration clamp-on-read: the shadow-art: prefix is what keeps a Shadow Art's
 // concentration alive, NOT a blanket "shadowArtsAvailable" pass. A multiclass Warrior
 // of Shadow monk who forgets the spellbook spell they were concentrating on must drop it.
