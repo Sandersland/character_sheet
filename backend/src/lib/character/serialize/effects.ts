@@ -8,8 +8,8 @@ import {
 } from "@/lib/combat/active-effects.js";
 import type { ConditionsMutableState } from "@/lib/combat/conditions.js";
 import { deriveItemPassiveBonuses, type ItemPassiveContribution } from "@/lib/inventory/capabilities.js";
-import { CONDITIONS, type RollModifier } from "@/lib/srd/srd.js";
-import { exhaustionRollEffects } from "@/lib/srd/condition-data.js";
+import type { RollModifier } from "@/lib/srd/srd.js";
+import { conditionDefinition, exhaustionRollEffects } from "@/lib/srd/condition-data.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 
 // The per-target modifier channel both skills and weapon math read: active cast
@@ -65,8 +65,10 @@ export function buildRollModifiers(
 ): RollModifier[] {
   const out: RollModifier[] = [];
   for (const entry of conditions.active) {
-    const def = CONDITIONS.find((c) => c.key === entry.key);
-    if (!def) continue;
+    // conditionDefinition asserts its lookup always succeeds — safe here only
+    // because normalizeConditionsMutable already dropped any entry.key that
+    // fails isKnownCondition, so every key reaching this loop is a real one.
+    const def = conditionDefinition(entry.key, edition);
     for (const effect of def.rollEffects ?? []) out.push({ ...effect, source: def.label });
   }
   for (const effect of exhaustionRollEffects(conditions.exhaustion, edition)) {
