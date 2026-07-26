@@ -132,13 +132,13 @@ describe("request<T> (json flow, via fetchCampaigns / createCampaign)", () => {
       vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: "Name already taken" }) })
     );
 
-    await expect(createCampaign("Dupe")).rejects.toThrow("Name already taken");
+    await expect(createCampaign("Dupe", "EDITION_2024")).rejects.toThrow("Name already taken");
   });
 
   it("falls back to the labeled message on a non-ok write with no { error }", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }));
 
-    await expect(createCampaign("Boom")).rejects.toThrow("Failed to create campaign (500)");
+    await expect(createCampaign("Boom", "EDITION_2024")).rejects.toThrow("Failed to create campaign (500)");
   });
 });
 

@@ -1,3 +1,5 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { Campaign, CampaignItem, CampaignItemHolder, CampaignItemInput, Character } from "@/types/character";
 import { jsonBody, request, send } from "@/api/http";
 
@@ -8,8 +10,10 @@ export async function fetchCampaigns(): Promise<Campaign[]> {
   return request<Campaign[]>("/campaigns", undefined, "Failed to fetch campaigns");
 }
 
-export async function createCampaign(name: string): Promise<Campaign> {
-  return request<Campaign>("/campaigns", jsonBody({ name }), "Failed to create campaign");
+// rulesEdition is the DM's picker at creation (#1286) — the default new
+// characters inherit; never authoritative for an existing sheet afterward.
+export async function createCampaign(name: string, rulesEdition: RulesEdition): Promise<Campaign> {
+  return request<Campaign>("/campaigns", jsonBody({ name, rulesEdition }), "Failed to create campaign");
 }
 
 export async function fetchCampaign(id: string): Promise<Campaign> {

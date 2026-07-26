@@ -70,9 +70,29 @@ describe("CampaignsPage (#246)", () => {
     await user.type(screen.getByLabelText(/campaign name/i), "New Campaign");
     await user.click(screen.getByRole("button", { name: /create campaign/i }));
 
-    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("New Campaign");
+    // Edition defaults to 2024 (schema default) without the DM touching the picker.
+    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("New Campaign", "EDITION_2024");
     await waitFor(() => expect(vi.mocked(client.fetchCampaigns)).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("link", { name: /new campaign/i })).toBeInTheDocument();
+  });
+
+  it("sends the picked edition when the DM chooses 2014 (#1286)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaigns).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    vi.mocked(client.createCampaign).mockResolvedValue(makeCampaign({ rulesEdition: "EDITION_2014" }));
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no campaigns yet/i);
+    await user.type(screen.getByLabelText(/campaign name/i), "Classic Table");
+    await user.click(screen.getByRole("radio", { name: "2014 rules" }));
+    await user.click(screen.getByRole("button", { name: /create campaign/i }));
+
+    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("Classic Table", "EDITION_2014");
   });
 
   it("does not render a join-by-code form", async () => {
