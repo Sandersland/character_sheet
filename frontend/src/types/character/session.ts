@@ -13,6 +13,7 @@ import type { JournalEntry } from "./journal";
 // SessionParticipant below.
 export type { CampaignRecap, ParticipantSummary };
 export type {
+  CombatState,
   SessionDoorwayKind,
   SessionDoorwaySessionState,
   SessionDoorwayState,

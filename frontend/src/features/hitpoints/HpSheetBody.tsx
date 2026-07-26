@@ -1,7 +1,6 @@
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { activeResistedDamageTypes } from "@/lib/damageTypes";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
-import AutoRollConcentrationToggle from "@/features/hitpoints/AutoRollConcentrationToggle";
 import ConcentrationNoteBanner from "@/features/hitpoints/ConcentrationNoteBanner";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
@@ -24,14 +23,6 @@ export default function HpSheetBody() {
         onApply={hp.handleApply}
         resistedTypes={resistedTypes}
       />
-
-      {hp.isSpellcaster && (
-        <AutoRollConcentrationToggle
-          checked={hp.autoRollConcentration}
-          onChange={hp.setAutoRollConcentration}
-          disabled={hp.pending}
-        />
-      )}
 
       {hp.concentrationNote && <ConcentrationNoteBanner note={hp.concentrationNote} />}
 

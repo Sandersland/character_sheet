@@ -14,7 +14,10 @@ import {
   leaveSession,
   getActiveSession,
   autoCloseIfStale,
-  logCombatEvent,
+  startCombat,
+  endCombat,
+  advanceCombatRound,
+  getCombatState,
   logRollEvent,
   SessionError,
 } from "@/lib/session/sessions.js";
@@ -449,16 +452,22 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
 });
 
 /**
- * Combat lifecycle event routes (character-scoped): write-only audit log
- * entries — no character-state mutation. The lib validates the caller is an
- * active participant of an active session.
+ * Combat lifecycle routes (character-scoped): server-authoritative mutations
+ * of `Session.combatActive`/`round` (#1030) — the lib validates the caller is
+ * an active participant of an active session, applies the change atomically,
+ * and still appends the existing combatStarted/combatEnded/combatRoundAdvanced
+ * `CharacterEvent` audit rows. Every response is the resulting `CombatState`
+ * so the caller can sync its own tracker without waiting for the next poll.
+ *
+ * `combat/round` takes NO round number in the request: the client sends
+ * intent only ("my turn ended") and the server decides the next round — any
+ * `round` field in the body is ignored, never trusted (see advanceCombatRound).
  */
 sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/combat/start",
   async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-    await logCombatEvent(req.params.id, req.params.sessionId, "combatStarted");
-    res.status(201).json({ ok: true });
+    res.status(201).json(await startCombat(req.params.id, req.params.sessionId));
   },
 );
 
@@ -466,8 +475,7 @@ sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/combat/end",
   async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-    await logCombatEvent(req.params.id, req.params.sessionId, "combatEnded");
-    res.status(201).json({ ok: true });
+    res.status(201).json(await endCombat(req.params.id, req.params.sessionId));
   },
 );
 
@@ -475,15 +483,44 @@ sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/combat/round",
   async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-    const { round } = req.body as { round?: number };
-    if (typeof round !== "number" || round < 1) {
-      res.status(400).json({ error: "round must be a positive integer" });
-      return;
-    }
-    await logCombatEvent(req.params.id, req.params.sessionId, "combatRoundAdvanced", { round });
-    res.status(201).json({ ok: true });
+    res.status(201).json(await advanceCombatRound(req.params.id, req.params.sessionId));
   },
 );
+
+/**
+ * GET /api/characters/:id/sessions/:sessionId/combat
+ * Cheap combat-state poll (#1030): round/combatActive/updatedAt only, no
+ * participants/events include — this is the endpoint the live client polls
+ * every ~5s while joined. 404 unless the character ever participated in the
+ * session (mirrors the single-session GET's gating); 409 once the session has
+ * ended or this participant has left — mirroring the mutating combat routes'
+ * assertActiveParticipant gate, so an ended session (or a character who left
+ * a still-active one) stops serving live combat state instead of replaying
+ * its last-known round forever (#1030 finding #5).
+ */
+sessionsRouter.get("/characters/:id/sessions/:sessionId/combat", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
+
+  const participant = await prisma.sessionParticipant.findUnique({
+    where: { sessionId_characterId: { sessionId: req.params.sessionId, characterId: req.params.id } },
+    select: { leftAt: true, session: { select: { status: true } } },
+  });
+  if (!participant) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  if (participant.session.status !== "active" || participant.leftAt !== null) {
+    res.status(409).json({ error: "Session is not active" });
+    return;
+  }
+
+  const state = await getCombatState(req.params.sessionId);
+  if (!state) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  res.json(state);
+});
 
 /** POST /api/characters/:id/sessions/:sessionId/roll — logs a roll event (character-scoped). */
 sessionsRouter.post(

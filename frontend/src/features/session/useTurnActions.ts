@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 
-import { startCombat, endCombat, advanceCombatRound } from "@/api/client";
+import { startCombat, endCombat, advanceCombatRound, fetchCombatState } from "@/api/client";
 import { flurryStrikeCount } from "@/lib/attackMath";
 import { rollSpec } from "@/lib/dice";
 import { planActionClick, type ActionClickPlan } from "@/lib/turnActionPlan";
@@ -47,7 +47,6 @@ export function useTurnActions({
 }) {
   const {
     inCombat,
-    round,
     attackedThisTurn,
     tookDamageThisTurn,
     startCombat: startCombatState,
@@ -64,6 +63,8 @@ export function useTurnActions({
     history,
     attachBatchId,
     undo,
+    syncCombat,
+    reconcileCombat,
   } = turnState;
 
   // Active durable (while-active) self-buffs — drive the turn-hook + End-buff UI.
@@ -294,6 +295,25 @@ export function useTurnActions({
     }
   }
 
+  // Recovery path for a failed startCombat/endCombat (#1030 finding #1): the
+  // optimistic local flip already ran but the server was never mutated, so
+  // re-fetch the authoritative state and reconcile onto it via
+  // `reconcileCombat` (bypasses the monotonic guard deliberately — see its
+  // JSDoc). If THIS fetch also fails (the network blip outlasts both calls),
+  // we deliberately leave the optimistic (possibly wrong) local state as-is
+  // rather than force a guessed value — the two remaining recovery paths
+  // (retrying Start/End Combat, or a page reload) already exist for the
+  // ordinary out-of-sync case this issue documents, and forcing a guess here
+  // would just trade one wrong state for a different one.
+  async function reconcileCombatAfterFailure() {
+    try {
+      const state = await fetchCombatState(character.id, sessionId);
+      reconcileCombat(state.round, state.combatActive, state.updatedAt);
+    } catch (e) {
+      console.error("combat reconcile failed after mutation failure", e);
+    }
+  }
+
   // Combat lifecycle — local state first, best-effort audit log after.
   async function handleStartCombat() {
     startCombatState();
@@ -315,10 +335,18 @@ export function useTurnActions({
       console.error("initiative regen failed (startCombat)", e);
     }
     try {
-      await startCombat(character.id, sessionId);
+      // Idempotent server-side (#1030): if combat was already active (another
+      // participant started it first), this reconciles round/combatActive to
+      // the REAL server state rather than trusting this client's optimistic 1.
+      const state = await startCombat(character.id, sessionId);
+      syncCombat(state.round, state.combatActive, state.updatedAt);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (startCombat)", e);
+      // The optimistic startCombatState() above never landed server-side —
+      // reconcile onto the real state instead of leaving this client stuck
+      // showing an encounter the server may not agree exists (#1030 finding #1).
+      await reconcileCombatAfterFailure();
     }
   }
 
@@ -331,10 +359,15 @@ export function useTurnActions({
     resetManeuverError();
     resetErrors();
     try {
-      await endCombat(character.id, sessionId);
+      const state = await endCombat(character.id, sessionId);
+      syncCombat(state.round, state.combatActive, state.updatedAt);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (endCombat)", e);
+      // The optimistic endCombatState() above never landed server-side — in a
+      // solo session there's no other participant to later correct this via a
+      // poll (finding #1), so reconcile onto the real state right away.
+      await reconcileCombatAfterFailure();
     }
   }
 
@@ -359,9 +392,8 @@ export function useTurnActions({
       attacked: attackedThisTurn,
       tookDamage: tookDamageThisTurn,
     });
-    // endTurn() increments round when inCombat — capture the new round number.
-    const nextRound = inCombat ? round + 1 : undefined;
-    endTurn();
+    const wasInCombat = inCombat;
+    endTurn(); // local economy reset only — round no longer moves here (#1030)
     closeResolution();
     // Refund is bounded to the turn of the swap — drop it as the turn ends.
     loadoutSwap.reset();
@@ -369,10 +401,14 @@ export function useTurnActions({
       const actionKey = endActionKeyFor(buffKey);
       if (actionKey) await send(actionKey);
     }
-    // Log the new round beginning (round 1 is logged by combatStarted).
-    if (inCombat && nextRound !== undefined && nextRound >= 2) {
+    // The server decides the next round — never a client-computed guess
+    // (#1030). syncCombat only applies on success: a failed call must NOT
+    // advance the locally-displayed round, or this client would show a round
+    // the server never agreed to.
+    if (wasInCombat) {
       try {
-        await advanceCombatRound(character.id, sessionId, nextRound);
+        const state = await advanceCombatRound(character.id, sessionId);
+        syncCombat(state.round, state.combatActive, state.updatedAt);
         onLogChanged();
       } catch (e) {
         console.error("combat log failed (advanceCombatRound)", e);

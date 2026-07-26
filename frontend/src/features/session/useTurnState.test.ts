@@ -172,7 +172,7 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(false);
   });
 
-  it("endTurn while in combat: phase=idle, actionsRemaining=0, round incremented, reactionUsed NOT reset", () => {
+  it("endTurn while in combat: phase=idle, actionsRemaining=0, round untouched (server-driven, #1030), reactionUsed NOT reset", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -183,9 +183,162 @@ describe("combat lifecycle", () => {
 
     expect(result.current.phase).toBe("idle");
     expect(result.current.actionsRemaining).toBe(0);
-    expect(result.current.round).toBe(2); // round 1 → 2
+    // The reducer no longer guesses the next round — only syncCombat (driven
+    // by the server's response) advances it; see the next test.
+    expect(result.current.round).toBe(1);
     // reactionUsed persists across turns — only resets on the NEXT startTurn.
     expect(result.current.reactionUsed).toBe(true);
+  });
+
+  it("syncCombat (#1030) overwrites round/inCombat only — action-economy state stays local and unaffected", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.consumeReaction(); });
+
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.round).toBe(2);
+    expect(result.current.inCombat).toBe(true);
+    // Untouched by the remote sync — explicit acceptance criterion (#1030).
+    expect(result.current.actionsRemaining).toBe(0);
+    expect(result.current.bonusActionUsed).toBe(true);
+    expect(result.current.reactionUsed).toBe(true);
+    expect(result.current.phase).toBe("active");
+  });
+
+  it("syncCombat reporting combat ended (combatActive:false) still leaves action-economy state untouched", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+
+    act(() => { result.current.syncCombat(0, false, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.inCombat).toBe(false);
+    expect(result.current.round).toBe(0);
+    // Deliberately untouched — see TurnStateActions.syncCombat's why-comment.
+    expect(result.current.phase).toBe("active");
+    expect(result.current.actionsRemaining).toBe(0);
+  });
+
+  it("syncCombat does not push an undo snapshot", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    act(() => { result.current.syncCombat(5, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.history).toEqual([]);
+  });
+
+  it("syncCombat (#1030 finding #2) discards an out-of-order sync — an older updatedAt never rolls round backward", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    // A fresher sync lands first (e.g. End Turn's own confirmation)...
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
+    // ...then a stale in-flight poll answered before it resolves.
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.round).toBe(2); // NOT rolled back to 1
+  });
+
+  it("syncCombat applies an in-order (strictly newer) sync after an earlier one", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
+
+    expect(result.current.round).toBe(2);
+  });
+
+  it("syncCombat treats an equal updatedAt as a no-op, not a fresh apply", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    // Same timestamp again, but claiming a different round — must be ignored:
+    // a real server row can't produce two different snapshots at one instant.
+    act(() => { result.current.syncCombat(3, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.round).toBe(1);
+  });
+
+  it("syncCombat (#1030 finding #3): a false→true transition resets to a fresh idle encounter, not just round/inCombat", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    // Simulate a spent encounter that ended locally (idle, no session sync yet).
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.consumeReaction(); });
+    act(() => { result.current.endCombat(); }); // local reset: inCombat false
+
+    // A remote participant starts a NEW encounter already at round 1.
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:05.000Z"); });
+
+    expect(result.current.inCombat).toBe(true);
+    expect(result.current.round).toBe(1);
+    expect(result.current.phase).toBe("idle");
+    expect(result.current.actionsRemaining).toBe(0);
+    expect(result.current.bonusActionUsed).toBe(false);
+    expect(result.current.reactionUsed).toBe(false);
+  });
+
+  it("reconcileCombat (#1030 finding #1) applies even when updatedAt is NOT newer — unlike syncCombat", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+
+    // A post-failure reconcile reporting the SAME timestamp as the last
+    // applied sync (the server never actually changed) — syncCombat would
+    // reject this as a no-op; reconcileCombat must still apply it.
+    act(() => { result.current.reconcileCombat(1, false, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.inCombat).toBe(false);
+    expect(result.current.round).toBe(1);
+  });
+
+  it("reconcileCombat does not push an undo snapshot", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    act(() => { result.current.reconcileCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.history).toEqual([]);
+  });
+
+  it("reconcileCombat (finding #1): a failed endCombat's optimistic exit reconciles back onto the server's still-active state", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    // Optimistic endCombat() ran locally, but the server call failed — the
+    // server was never actually mutated, so a reconcile fetch reports the
+    // SAME round/updatedAt as before (an ordinary syncCombat would discard this).
+    act(() => { result.current.endCombat(); });
+    expect(result.current.inCombat).toBe(false);
+
+    act(() => { result.current.reconcileCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.inCombat).toBe(true);
+    expect(result.current.round).toBe(1);
+  });
+
+  it("syncCombat's stale-poll guard is untouched by reconcileCombat's existence", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); }); // stale, out-of-order
+
+    expect(result.current.round).toBe(2); // still rejected, as before this fix
   });
 
   it("endCombat → back to initial state (inCombat:false, round:0)", () => {

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { enterLiveCombat, findCharacterByName, restoreResourcePool } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName, restoreResourcePool, startCombatAndTurn } from "./helpers/api";
 
 // The Battle Master roster persona (seeded in global-setup) is Fighter L5 with a
 // subclass + the Evasive Footwork maneuver. Superiority dice are persisted spend
@@ -24,8 +24,7 @@ test("maneuvers: spending an effect maneuver decrements a superiority die", asyn
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   // The gold effect-maneuver strip appears once in-turn with dice remaining.
   const evasive = page.getByRole("button", { name: /Evasive Footwork/ });

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
-import { enterLiveCombat } from "./helpers/api";
+import { enterLiveCombat, startCombatAndTurn } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // The Shadow Monk persona (seeded in global-setup) is Monk L6 / Warrior of Shadow,
@@ -16,8 +16,7 @@ test("session: a Warrior of Shadow monk uses Shadow Step as a bonus action", asy
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   // Open the Bonus Action sheet and confirm Shadow Step is offered with its
   // reminder rule text as the card caption (AC: appears with its reminder).

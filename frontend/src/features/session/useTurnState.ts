@@ -1,11 +1,14 @@
 /**
- * Ephemeral turn-state hook for the action-economy tracker.
+ * Turn-state hook for the action-economy tracker.
  *
- * All state is LOCAL — nothing here is persisted to the server. The *effects*
- * of actions (spending resources, applying HP heals, decrementing inventory)
- * flow through the existing transaction endpoints and land in the audit log.
- * Only the economy bookkeeping (have I used my action? how many attacks remain?)
- * lives here.
+ * `round`/`inCombat` are server-authoritative (#1030, `Session.combatActive`/
+ * `round`): `syncCombat` reconciles them from a poll or a confirmed
+ * combat/start|end|round response; `startCombatState()`'s local `round: 1` on
+ * click is only an optimistic guess, corrected by the first sync. The economy
+ * bookkeeping (have I used my action? how many attacks remain?) stays LOCAL:
+ * its *effects* (spending resources, applying HP heals, decrementing
+ * inventory) flow through the existing transaction endpoints and land in the
+ * audit log, but the slots themselves are never persisted server-side.
  *
  * The state is persisted to localStorage (keyed by sessionId) so it survives
  * page refreshes and brief disconnects. It is cleared on session end.
@@ -13,7 +16,8 @@
  * Combat gating:
  *   - `inCombat` must be true before `startTurn()` can be called (the UI gates
  *     the Start Turn button). This is enforced by the caller in TurnHub.
- *   - `round` starts at 1 when combat begins; it increments when a turn ends.
+ *   - `round` is set by the server: 1 when combat starts, +1 per confirmed
+ *     end-turn (`advanceCombatRound`). The client never increments it locally.
  *
  * Reaction lifecycle note (5e rules):
  *   - A reaction is consumed DURING another creature's turn (opportunity attack,
@@ -91,6 +95,15 @@ export interface TurnState {
   inCombat: boolean;
   /** Current combat round (1-indexed). 0 when not in combat. */
   round: number;
+  /**
+   * `Session.updatedAt` of the last sync applied (#1030 finding #2) — the
+   * monotonicity baseline `syncCombat` compares against so an out-of-order
+   * poll response can't roll `round`/`inCombat` backward. Null until the first
+   * sync ever lands. Survives local lifecycle resets (startCombat/endCombat)
+   * so a response that raced an optimistic click is still judged against the
+   * last CONFIRMED server timestamp, not against the local optimistic reset.
+   */
+  combatUpdatedAt: string | null;
   phase: TurnPhase;
   /** How many actions remain this turn (normally 1; +1 after Action Surge). */
   actionsRemaining: number;
@@ -329,6 +342,39 @@ export interface TurnStateActions {
   markStunningStrikeUsed: () => void;
   /** Mark Open Hand Technique's rider imposed this turn — enforces the once-per-turn guard (#1245). */
   markOpenHandRiderUsed: () => void;
+  /**
+   * Server-event seam (#1030): apply `round`/`inCombat` from a poll or a
+   * just-confirmed combat/start|end|round response. `startCombatState()` also
+   * sets an optimistic local `round: 1` on click — this is what reconciles
+   * that guess to the real value, not the only writer of `round`.
+   *
+   * Ignores a sync whose `updatedAt` is not strictly newer than the last one
+   * applied (`combatUpdatedAt`) — an out-of-order poll answered before a
+   * fresher sync already landed must not roll `round`/`inCombat` backward
+   * (finding #2). Equal timestamps are also a no-op: nothing changed since the
+   * last applied sync, so there's nothing new to apply.
+   *
+   * A `combatActive` false→true transition is treated as a NEW encounter
+   * starting (finding #3), not a round bump on the current one: it resets
+   * phase/economy to a fresh idle encounter so a remote start never arrives
+   * with the previous fight's spent actions/bonus/reaction. A true→true,
+   * false→false, or true→false sync only ever touches round/inCombat —
+   * economy stays local, per this hook's header comment.
+   */
+  syncCombat: (round: number, combatActive: boolean, updatedAt: string) => void;
+  /**
+   * Post-failure reconcile seam (#1030 finding #1): applies an authoritative
+   * refetch even when its `updatedAt` is not newer than `combatUpdatedAt` —
+   * unlike `syncCombat`, never rejected by the monotonic guard. For when a
+   * `startCombat`/`endCombat` call fails: the optimistic local flip never
+   * happened server-side, so the server's `updatedAt` is UNCHANGED from the
+   * last-applied baseline, and every future ordinary poll would report that
+   * same timestamp and be silently discarded by `syncCombat`'s guard, leaving
+   * the client stuck. This bypasses that specific case; it must never be
+   * wired to routine poll results, or the guard it deliberately skips would be
+   * pointless.
+   */
+  reconcileCombat: (round: number, combatActive: boolean, updatedAt: string) => void;
 }
 
 /**
@@ -347,6 +393,7 @@ function initialState(): TurnState {
   return {
     inCombat: false,
     round: 0,
+    combatUpdatedAt: null,
     phase: "idle",
     actionsRemaining: 0,
     bonusActionUsed: false,
@@ -685,12 +732,15 @@ function undoState(s: TurnState): TurnState {
 function endTurnState(s: TurnState): TurnState {
   // Out-of-combat (shouldn't normally happen now, but safe fallback).
   if (!s.inCombat) return initialState();
-  // Stay in combat — return to idle within the same encounter, advancing the
-  // round counter. The round log event is fired by TurnHub. Reset the activity
-  // window HERE (not in startTurn): handleEndTurn has already evaluated the
-  // durable-buff auto-end against these flags, so clearing them now opens a
-  // fresh window that still captures damage/attacks taken before the next
-  // startTurn (out-of-turn / enemy turns).
+  // Stay in combat — return to idle within the same encounter. Round is
+  // deliberately NOT bumped here (#1030): the server decides the next round
+  // (advanceCombatRound), and useTurnActions' handleEndTurn dispatches
+  // syncCombat once that call resolves (see syncCombatState for every other
+  // way round can change: a poll, or a start/end response). Reset the
+  // activity window HERE (not in startTurn): handleEndTurn has already
+  // evaluated the durable-buff auto-end against these flags, so clearing them
+  // now opens a fresh window that still captures damage/attacks taken before
+  // the next startTurn (out-of-turn / enemy turns).
   return {
     ...s,
     phase: "idle",
@@ -701,7 +751,6 @@ function endTurnState(s: TurnState): TurnState {
     attackTally: [],
     castTally: [],
     spellCastThisTurn: {},
-    round: s.round + 1,
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
@@ -713,11 +762,52 @@ function endTurnState(s: TurnState): TurnState {
   };
 }
 
+// The server-event seam (#1030) — see TurnStateActions.syncCombat for the full
+// rationale. `updatedAt` strings are Session's DB @updatedAt column, JSON-
+// serialized via Date#toISOString(): fixed-width UTC, so lexicographic string
+// comparison is chronological comparison — no Date parsing needed.
+function syncCombatState(
+  s: TurnState,
+  round: number,
+  combatActive: boolean,
+  updatedAt: string,
+): TurnState {
+  if (s.combatUpdatedAt !== null && updatedAt <= s.combatUpdatedAt) return s;
+  return applyCombatState(s, round, combatActive, updatedAt);
+}
+
+// Shared by syncCombatState (guarded) and reconcileCombatState (unguarded, see
+// TurnStateActions.reconcileCombat) so the two seams can never drift on what
+// "apply" means — only on whether the monotonic guard runs first.
+function applyCombatState(
+  s: TurnState,
+  round: number,
+  combatActive: boolean,
+  updatedAt: string,
+): TurnState {
+  if (!s.inCombat && combatActive) return freshEncounterState(round, updatedAt);
+  return s.round === round && s.inCombat === combatActive
+    ? { ...s, combatUpdatedAt: updatedAt }
+    : { ...s, round, inCombat: combatActive, combatUpdatedAt: updatedAt };
+}
+
+// Bypasses syncCombatState's monotonic guard entirely — see
+// TurnStateActions.reconcileCombat for when this is safe to call.
+function reconcileCombatState(
+  s: TurnState,
+  round: number,
+  combatActive: boolean,
+  updatedAt: string,
+): TurnState {
+  return applyCombatState(s, round, combatActive, updatedAt);
+}
+
 // Remaining transitions extracted for the reducer (#967).
 function startCombatState(): TurnState {
   return {
     inCombat: true,
     round: 1,
+    combatUpdatedAt: null,
     phase: "idle",
     actionsRemaining: 0,
     bonusActionUsed: false,
@@ -736,6 +826,14 @@ function startCombatState(): TurnState {
     freeInteractionUsed: false,
     history: [],
   };
+}
+
+// A remote false→true transition (#1030 finding #3): reuses startCombatState's
+// fresh-encounter fields but with the SERVER's round (not a hardcoded 1 — a
+// late joiner can observe combat already past round 1) and the sync's
+// updatedAt as the new monotonicity baseline.
+function freshEncounterState(round: number, updatedAt: string): TurnState {
+  return { ...startCombatState(), round, combatUpdatedAt: updatedAt };
 }
 
 // Begin the turn. Deliberately does NOT reset attackedThisTurn/tookDamageThisTurn
@@ -835,7 +933,9 @@ type TurnAction =
   | { type: "markSneakAttackUsed" }
   | { type: "markStunningStrikeUsed" }
   | { type: "markOpenHandRiderUsed" }
-  | { type: "hydrate"; state: TurnState };
+  | { type: "hydrate"; state: TurnState }
+  | { type: "syncCombat"; round: number; combatActive: boolean; updatedAt: string }
+  | { type: "reconcileCombat"; round: number; combatActive: boolean; updatedAt: string };
 
 // The action types whose transition pushes an undo snapshot (the former `mutate`
 // callers). refundAction and commitReactionSpell are facade aliases that dispatch
@@ -870,8 +970,11 @@ type TurnActionHandlers = {
 };
 
 const HANDLERS: TurnActionHandlers = {
-  startCombat: () => startCombatState(),
-  endCombat: () => initialState(),
+  // Preserve combatUpdatedAt across the local optimistic reset (#1030 finding
+  // #2) — a stale in-flight poll that raced this click must still be judged
+  // against the last CONFIRMED server timestamp, not a nulled-out baseline.
+  startCombat: (s) => ({ ...startCombatState(), combatUpdatedAt: s.combatUpdatedAt }),
+  endCombat: (s) => ({ ...initialState(), combatUpdatedAt: s.combatUpdatedAt }),
   startTurn: (s) => startTurnState(s),
   endTurn: (s) => endTurnState(s),
   consumeAction: (s) => consumeActionState(s),
@@ -911,6 +1014,8 @@ const HANDLERS: TurnActionHandlers = {
   markOpenHandRiderUsed: (s) =>
     s.openHandRiderUsedThisTurn ? s : { ...s, openHandRiderUsedThisTurn: true },
   hydrate: (_s, a) => a.state,
+  syncCombat: (s, a) => syncCombatState(s, a.round, a.combatActive, a.updatedAt),
+  reconcileCombat: (s, a) => reconcileCombatState(s, a.round, a.combatActive, a.updatedAt),
 };
 
 function turnReducer(state: TurnState, action: TurnAction): TurnState {
@@ -1035,6 +1140,10 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       markSneakAttackUsed: () => dispatch({ type: "markSneakAttackUsed" }),
       markStunningStrikeUsed: () => dispatch({ type: "markStunningStrikeUsed" }),
       markOpenHandRiderUsed: () => dispatch({ type: "markOpenHandRiderUsed" }),
+      syncCombat: (round, combatActive, updatedAt) =>
+        dispatch({ type: "syncCombat", round, combatActive, updatedAt }),
+      reconcileCombat: (round, combatActive, updatedAt) =>
+        dispatch({ type: "reconcileCombat", round, combatActive, updatedAt }),
     }),
     [],
   );

@@ -153,3 +153,26 @@ describe("CombatLivePanel (#1086)", () => {
     expect(await screen.findByText("session-log refresh:5")).toBeInTheDocument();
   });
 });
+
+// #1237 §10: the mockup's header subtitle under "Session Log" — CombatLivePanel
+// already has `session` in scope, so this needs no extra plumbing.
+describe("CombatLivePanel log overlay subtitle (#1237 §10)", () => {
+  it("shows the session's title as the overlay subtitle", async () => {
+    const user = userEvent.setup();
+    const titled = { ...session, title: "The Sunless Citadel" };
+    renderWithCharacter(<CombatLivePanel session={titled} active />, makeCharacter());
+    await user.click(screen.getByRole("button", { name: "hub-open-log" }));
+    expect(await screen.findByText("The Sunless Citadel")).toBeInTheDocument();
+  });
+
+  it("falls back to the session's date when it has no title", async () => {
+    const user = userEvent.setup();
+    renderPanel(); // `session` fixture has no title
+    await user.click(screen.getByRole("button", { name: "hub-open-log" }));
+    // startedAt "x" isn't a real date, but the fallback still renders SOME subtitle
+    // text distinct from the title, proving the date-fallback path ran.
+    expect(await screen.findByText(/^Session Log$/)).toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: "Session Log" });
+    expect(heading.parentElement?.textContent).not.toBe("Session Log");
+  });
+});

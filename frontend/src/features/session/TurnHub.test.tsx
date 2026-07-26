@@ -13,6 +13,7 @@ import {
   startCombat,
   endCombat,
   advanceCombatRound,
+  fetchCombatState,
   applyInventoryTransactions,
   logRoll,
   rollInitiativeTransaction,
@@ -29,6 +30,7 @@ vi.mock("@/api/client", () => ({
   startCombat: vi.fn(),
   endCombat: vi.fn(),
   advanceCombatRound: vi.fn(),
+  fetchCombatState: vi.fn(),
   applyInventoryTransactions: vi.fn(),
   logRoll: vi.fn(),
   rollInitiativeTransaction: vi.fn(),
@@ -135,9 +137,14 @@ beforeEach(() => {
   }));
   vi.mocked(applyInventoryTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(revertBatch).mockImplementation(async () => echoCharacter());
-  vi.mocked(startCombat).mockResolvedValue(undefined);
-  vi.mocked(endCombat).mockResolvedValue(undefined);
-  vi.mocked(advanceCombatRound).mockResolvedValue(undefined);
+  // #1030: these resolve the server's authoritative CombatState, which
+  // useTurnActions dispatches into the tracker via syncCombat. Distinct,
+  // increasing updatedAt per lifecycle stage — syncCombat drops a sync whose
+  // updatedAt doesn't strictly advance past the last one applied, so a real
+  // start→round-advance→end sequence must never tie.
+  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z" });
+  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z" });
+  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z" });
   vi.mocked(logRoll).mockResolvedValue(undefined);
   // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
   // call would report an empty regen, same as this default (#1239/#1243).
@@ -176,8 +183,76 @@ describe("TurnHub — combat lifecycle", () => {
 
     await user.click(screen.getByRole("button", { name: "End turn" }));
 
-    expect(advanceCombatRound).toHaveBeenCalledWith("char-1", "sess-1", 2);
-    expect(screen.getByText(/Round 2/)).toBeInTheDocument();
+    // No round number is sent — the server decides it (#1030) and the
+    // displayed round comes from its response via syncCombat.
+    expect(advanceCombatRound).toHaveBeenCalledWith("char-1", "sess-1");
+    await waitFor(() => expect(screen.getByText(/Round 2/)).toBeInTheDocument());
+  });
+
+  // #1030 finding #1: a failed startCombat/endCombat must not strand the
+  // client on its optimistic guess — it re-fetches and reconciles onto the
+  // server's real state instead.
+  it("a failed endCombat reconciles onto the server's real (still-active) state instead of sticking on the optimistic 'ended'", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(screen.getByRole("button", { name: /Start combat/ }));
+    expect(screen.getByText(/Round 1/)).toBeInTheDocument();
+
+    // The End Combat call fails — the server never actually left combat.
+    vi.mocked(endCombat).mockRejectedValueOnce(new Error("network blip"));
+    // Re-fetch reports the truth: still active, at the same round/timestamp
+    // as the last confirmed sync (the failed call changed nothing server-side).
+    vi.mocked(fetchCombatState).mockResolvedValueOnce({
+      round: 1,
+      combatActive: true,
+      updatedAt: "2026-01-01T00:00:01.000Z",
+    });
+
+    await user.click(screen.getByRole("button", { name: "End combat" }));
+
+    // Reconciled back to "in combat" — NOT stuck showing the optimistic exit.
+    await waitFor(() => expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1"));
+    await waitFor(() => expect(screen.getByText(/Round 1/)).toBeInTheDocument());
+    expect(screen.queryByText("Not in combat")).not.toBeInTheDocument();
+  });
+
+  it("a failed startCombat reconciles onto the server's real (still-inactive) state instead of sticking on the optimistic 'started'", async () => {
+    const user = userEvent.setup();
+    renderHub();
+
+    vi.mocked(startCombat).mockRejectedValueOnce(new Error("network blip"));
+    // Re-fetch reports the truth: combat never actually started.
+    vi.mocked(fetchCombatState).mockResolvedValueOnce({
+      round: 0,
+      combatActive: false,
+      updatedAt: "2026-01-01T00:00:00.500Z",
+    });
+
+    await user.click(screen.getByRole("button", { name: /Start combat/ }));
+
+    await waitFor(() => expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1"));
+    // Reconciled back to "not in combat" — NOT stuck showing the optimistic Round 1.
+    await waitFor(() => expect(screen.getByText("Not in combat")).toBeInTheDocument());
+  });
+
+  it("reconcile-after-failure itself failing leaves the optimistic state in place (documented double-failure fallback)", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(screen.getByRole("button", { name: /Start combat/ }));
+    expect(screen.getByText(/Round 1/)).toBeInTheDocument();
+
+    vi.mocked(endCombat).mockRejectedValueOnce(new Error("network blip"));
+    vi.mocked(fetchCombatState).mockRejectedValueOnce(new Error("network blip too"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await user.click(screen.getByRole("button", { name: "End combat" }));
+
+    await waitFor(() => expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1"));
+    // Both calls failed: the client is left on its last-applied (optimistic)
+    // value rather than a freshly-guessed one — see reconcileCombatAfterFailure's
+    // why-comment in useTurnActions.ts.
+    expect(screen.getByText("Not in combat")).toBeInTheDocument();
+    consoleError.mockRestore();
   });
 });
 

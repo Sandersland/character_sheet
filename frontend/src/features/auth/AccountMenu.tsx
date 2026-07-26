@@ -1,4 +1,5 @@
-import { Check, Dices, Monitor, Moon, Sun, Zap, type LucideIcon } from "lucide-react";
+import { Check } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import Avatar from "@/components/ui/Avatar";
@@ -6,26 +7,13 @@ import DropdownMenu from "@/components/ui/DropdownMenu";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useTheme } from "@/features/theme/ThemeProvider";
 import { useDiceRollStyle } from "@/features/dice/DiceRollStyleProvider";
-import type { DiceRollStyle } from "@/hooks/useDiceRollStyle";
-import type { ThemePreference } from "@/hooks/useThemePreference";
+import PreferencesSheet from "@/features/preferences/PreferencesSheet";
+import {
+  THEME_OPTIONS,
+  DICE_OPTIONS,
+  type PreferenceOption,
+} from "@/features/preferences/preferenceOptions";
 import type { AuthUser } from "@/types/auth";
-
-const THEME_OPTIONS: { value: ThemePreference; label: string; icon: LucideIcon }[] = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
-];
-
-const DICE_OPTIONS: { value: DiceRollStyle; label: string; icon: LucideIcon }[] = [
-  { value: "animated", label: "Animated", icon: Dices },
-  { value: "quick", label: "Quick", icon: Zap },
-];
-
-interface PreferenceOption<T extends string> {
-  value: T;
-  label: string;
-  icon: LucideIcon;
-}
 
 // A titled radio group of preference options (Appearance, Dice rolls). Each row
 // is a menuitemradio so the dropdown's roving focus and aria state stay correct.
@@ -91,54 +79,77 @@ export default function AccountMenu() {
   const { user, logout } = useAuth();
   const { preference, setPreference } = useTheme();
   const { style: diceStyle, setStyle: setDiceStyle } = useDiceRollStyle();
+  // AppHeader mounts as a sibling of the routed pages, never a descendant of
+  // CurrentCharacterProvider — so AccountMenu has no campaignId to hand
+  // PreferencesSheet even while a character IS on screen (e.g. /characters/:id
+  // at md+). The account-global entry point (#1167) stays reachable with no
+  // character/campaign in view at all; CharacterSheetHeader's own desktop kebab
+  // is the surface that threads campaignId.
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   return (
-    <DropdownMenu
-      label="Account"
-      trigger={
-        <Avatar
-          name={user?.name ?? null}
-          email={user?.email ?? null}
-          imageUrl={user?.imageUrl ?? null}
-        />
-      }
-    >
-      {(close) => (
-        <>
-          <AccountIdentityHeader user={user} />
-          <PreferenceRadioGroup
-            label="Appearance"
-            options={THEME_OPTIONS}
-            value={preference}
-            onSelect={setPreference}
+    <>
+      <DropdownMenu
+        label="Account"
+        trigger={
+          <Avatar
+            name={user?.name ?? null}
+            email={user?.email ?? null}
+            imageUrl={user?.imageUrl ?? null}
           />
-          <PreferenceRadioGroup
-            label="Dice rolls"
-            options={DICE_OPTIONS}
-            value={diceStyle}
-            onSelect={setDiceStyle}
-          />
-          <Link
-            to="/about"
-            role="menuitem"
-            onClick={close}
-            className="block w-full px-3 py-1.5 text-left text-sm text-parchment-700 transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none"
-          >
-            About &amp; credits
-          </Link>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              void logout();
-              close();
-            }}
-            className="block w-full px-3 py-1.5 text-left text-sm text-garnet-700 transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none"
-          >
-            Log out
-          </button>
-        </>
-      )}
-    </DropdownMenu>
+        }
+      >
+        {(close) => (
+          <>
+            <AccountIdentityHeader user={user} />
+            {/* Quick shortcuts — the full surface (Appearance/Dice/Play
+                automation) lives in PreferencesSheet below (#1167). */}
+            <PreferenceRadioGroup
+              label="Appearance"
+              options={THEME_OPTIONS}
+              value={preference}
+              onSelect={setPreference}
+            />
+            <PreferenceRadioGroup
+              label="Dice rolls"
+              options={DICE_OPTIONS}
+              value={diceStyle}
+              onSelect={setDiceStyle}
+            />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setPrefsOpen(true);
+                close();
+              }}
+              className="block w-full px-3 py-1.5 text-left text-sm text-parchment-700 transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none"
+            >
+              Preferences…
+            </button>
+            <Link
+              to="/about"
+              role="menuitem"
+              onClick={close}
+              className="block w-full px-3 py-1.5 text-left text-sm text-parchment-700 transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none"
+            >
+              About &amp; credits
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                void logout();
+                close();
+              }}
+              className="block w-full px-3 py-1.5 text-left text-sm text-garnet-700 transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none"
+            >
+              Log out
+            </button>
+          </>
+        )}
+      </DropdownMenu>
+      {prefsOpen && <PreferencesSheet onClose={() => setPrefsOpen(false)} />}
+    </>
   );
 }

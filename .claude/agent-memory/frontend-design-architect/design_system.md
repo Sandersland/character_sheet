@@ -41,6 +41,29 @@ here: see `frontend/src/index.css` header comment block.
   `gold` can never carry white (`gold-800` passes at ~6:1 but reads muddy), so
   filled gold flips to dark text on a bright fill: `text-parchment-900` on
   `bg-gold-400` (hover `bg-gold-500`), ≈10.5/8.5:1. (See #207.)
+- **Damage-type ink** (`--color-dmg-*`, #1160/#1237): one hue per 5e damage
+  type — `fire cold lightning acid poison necrotic radiant force psychic
+  thunder` — all verified ≥4.5:1 against `parchment-50` (oklch→sRGB contrast
+  check, not eyeballed; see the #1237 session for the conversion script).
+  Physical types (piercing/slashing/bludgeoning) intentionally have **no**
+  token — they stay neutral ink; only the amount is emphasized for them.
+  `fire` anchors the Combat Log mockup's `--ember` (#b8501a light /
+  #e0925a dark) — the existing `oklch(0.55 0.17 35)` already lands in the
+  same burnt-orange family, so it was kept rather than replaced. `cold`'s
+  light-mode `L` moved 0.58→0.48 (#1237) — its old value was 3.94:1, failing
+  AA, undetected while `--color-dmg-*` was only ever a low-opacity (`/15`)
+  pill tint (#1160); it's now full-strength chat-log text, so it had to
+  clear the bar. `lightning`/`acid`/`thunder` are new (#1237) — `spellFlavor.ts`'s
+  `DAMAGE_TOKEN` map (acid→poison, lightning/thunder→force) predates them and
+  is a DELIBERATE, unrelated simplification for that low-opacity pill context;
+  it does not need to change. The full map + physical-stays-neutral rule live
+  in `lib/events.ts` (`damageTypeTone`), not duplicated here.
+- **Chat-log semantic tones** (`lib/events.ts` `logToneClass`, #1237): five
+  roles only — `heal` (`vitality-700`), `resource` (`gold-800`), `harm`
+  (`garnet-700`, covers damage-taken/condition/crit), `muted` (`parchment-500`,
+  session/combat lifecycle + miss lines), `default` (`parchment-800`). Resist
+  the urge to add more roles per event category — the mockup's color table is
+  deliberately narrow ("color only where meaningful").
 - Fonts: `--font-display` = Source Serif 4 (headings only, h1-h3), `--font-sans`
   = Source Sans 3 (body/UI default). Loaded via Google Fonts `<link>` tags in
   `frontend/index.html` (no local font files, no extra build dep).
