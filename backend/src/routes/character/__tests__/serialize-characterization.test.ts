@@ -256,8 +256,9 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
 
     // Battle Master resources view: derived counts + pool remaining + clamped lists.
     expect(a.resources.maneuverChoiceCount).toBe(3);
-    expect(a.resources.maneuverSaveDC).toBe(14);
     expect(a.resources.toolProfChoiceCount).toBe(1);
+    // Folded into the rider contract (#1316) — top-level, not nested in resources.
+    expect(a.maneuverSaveDC).toEqual({ saveDC: 14 });
     expect(a.resources.pools).toEqual([
       expect.objectContaining({ key: "superiorityDice", label: "Superiority Dice", total: 4, die: "d8", recharge: "short-or-long", used: 1, remaining: 3 }),
     ]);
