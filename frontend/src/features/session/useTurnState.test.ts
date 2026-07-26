@@ -199,7 +199,7 @@ describe("combat lifecycle", () => {
     act(() => { result.current.consumeBonusAction(); });
     act(() => { result.current.consumeReaction(); });
 
-    act(() => { result.current.syncCombat(2, true); });
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:01.000Z"); });
 
     expect(result.current.round).toBe(2);
     expect(result.current.inCombat).toBe(true);
@@ -217,7 +217,7 @@ describe("combat lifecycle", () => {
     act(() => { result.current.startTurn(); });
     act(() => { result.current.consumeAction(); });
 
-    act(() => { result.current.syncCombat(0, false); });
+    act(() => { result.current.syncCombat(0, false, "2026-01-01T00:00:01.000Z"); });
 
     expect(result.current.inCombat).toBe(false);
     expect(result.current.round).toBe(0);
@@ -230,9 +230,66 @@ describe("combat lifecycle", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });
 
-    act(() => { result.current.syncCombat(5, true); });
+    act(() => { result.current.syncCombat(5, true, "2026-01-01T00:00:01.000Z"); });
 
     expect(result.current.history).toEqual([]);
+  });
+
+  it("syncCombat (#1030 finding #2) discards an out-of-order sync — an older updatedAt never rolls round backward", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    // A fresher sync lands first (e.g. End Turn's own confirmation)...
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
+    // ...then a stale in-flight poll answered before it resolves.
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.round).toBe(2); // NOT rolled back to 1
+  });
+
+  it("syncCombat applies an in-order (strictly newer) sync after an earlier one", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
+
+    expect(result.current.round).toBe(2);
+  });
+
+  it("syncCombat treats an equal updatedAt as a no-op, not a fresh apply", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    // Same timestamp again, but claiming a different round — must be ignored:
+    // a real server row can't produce two different snapshots at one instant.
+    act(() => { result.current.syncCombat(3, true, "2026-01-01T00:00:01.000Z"); });
+
+    expect(result.current.round).toBe(1);
+  });
+
+  it("syncCombat (#1030 finding #3): a false→true transition resets to a fresh idle encounter, not just round/inCombat", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    // Simulate a spent encounter that ended locally (idle, no session sync yet).
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.consumeReaction(); });
+    act(() => { result.current.endCombat(); }); // local reset: inCombat false
+
+    // A remote participant starts a NEW encounter already at round 1.
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:05.000Z"); });
+
+    expect(result.current.inCombat).toBe(true);
+    expect(result.current.round).toBe(1);
+    expect(result.current.phase).toBe("idle");
+    expect(result.current.actionsRemaining).toBe(0);
+    expect(result.current.bonusActionUsed).toBe(false);
+    expect(result.current.reactionUsed).toBe(false);
   });
 
   it("endCombat → back to initial state (inCombat:false, round:0)", () => {

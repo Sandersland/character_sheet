@@ -319,7 +319,7 @@ export function useTurnActions({
       // participant started it first), this reconciles round/combatActive to
       // the REAL server state rather than trusting this client's optimistic 1.
       const state = await startCombat(character.id, sessionId);
-      syncCombat(state.round, state.combatActive);
+      syncCombat(state.round, state.combatActive, state.updatedAt);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (startCombat)", e);
@@ -336,7 +336,7 @@ export function useTurnActions({
     resetErrors();
     try {
       const state = await endCombat(character.id, sessionId);
-      syncCombat(state.round, state.combatActive);
+      syncCombat(state.round, state.combatActive, state.updatedAt);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (endCombat)", e);
@@ -380,7 +380,7 @@ export function useTurnActions({
     if (wasInCombat) {
       try {
         const state = await advanceCombatRound(character.id, sessionId);
-        syncCombat(state.round, state.combatActive);
+        syncCombat(state.round, state.combatActive, state.updatedAt);
         onLogChanged();
       } catch (e) {
         console.error("combat log failed (advanceCombatRound)", e);

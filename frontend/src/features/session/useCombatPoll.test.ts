@@ -29,7 +29,7 @@ describe("useCombatPoll (#1030)", () => {
 
     await vi.waitFor(() => expect(fetchCombatState).toHaveBeenCalledTimes(1));
     expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1");
-    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true));
+    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true, "x"));
 
     await vi.advanceTimersByTimeAsync(5000);
     expect(fetchCombatState).toHaveBeenCalledTimes(2);
@@ -84,6 +84,31 @@ describe("useCombatPoll (#1030)", () => {
 
     await vi.advanceTimersByTimeAsync(5000);
     await vi.waitFor(() => expect(fetchCombatState).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true));
+    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true, "x"));
+  });
+
+  it("throttles the resume path — rapid hidden→shown toggles fire one request, not N (#1030 finding #7)", async () => {
+    renderHook(() => useCombatPoll("char-1", "sess-1", true, vi.fn()));
+    await vi.waitFor(() => expect(fetchCombatState).toHaveBeenCalledTimes(1));
+
+    // 10 toggles in ~0ms: no time has passed since the mount poll, so every
+    // resulting start() must skip its immediate poll.
+    for (let i = 0; i < 10; i++) {
+      setHidden(true);
+      setHidden(false);
+    }
+
+    expect(fetchCombatState).toHaveBeenCalledTimes(1);
+  });
+
+  it("still polls immediately on resume once a full interval has actually elapsed", async () => {
+    renderHook(() => useCombatPoll("char-1", "sess-1", true, vi.fn()));
+    await vi.waitFor(() => expect(fetchCombatState).toHaveBeenCalledTimes(1));
+
+    setHidden(true);
+    await vi.advanceTimersByTimeAsync(5000); // a full interval passes while hidden
+    setHidden(false);
+
+    await vi.waitFor(() => expect(fetchCombatState).toHaveBeenCalledTimes(2));
   });
 });

@@ -18,7 +18,7 @@ export function useCombatPoll(
   characterId: string,
   sessionId: string | null,
   active: boolean,
-  onSync: (round: number, combatActive: boolean) => void,
+  onSync: (round: number, combatActive: boolean, updatedAt: string) => void,
 ): void {
   const onSyncRef = useRef(onSync);
   onSyncRef.current = onSync;
@@ -29,11 +29,13 @@ export function useCombatPoll(
 
     let cancelled = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let lastPollAt = 0;
 
     async function poll(): Promise<void> {
+      lastPollAt = Date.now();
       try {
         const state = await fetchCombatState(characterId, id);
-        if (!cancelled) onSyncRef.current(state.round, state.combatActive);
+        if (!cancelled) onSyncRef.current(state.round, state.combatActive, state.updatedAt);
       } catch {
         // Best-effort — a failed poll just waits for the next tick.
       }
@@ -41,7 +43,10 @@ export function useCombatPoll(
 
     function start(): void {
       if (intervalId !== null) return;
-      void poll();
+      // Throttle the resume path: rapid hidden→shown toggles (tab-switching)
+      // each call start() — without this, N toggles fire N immediate polls in
+      // ~0ms. Skip the immediate poll if one already ran within POLL_MS.
+      if (Date.now() - lastPollAt >= POLL_MS) void poll();
       intervalId = setInterval(() => void poll(), POLL_MS);
     }
 

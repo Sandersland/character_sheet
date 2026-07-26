@@ -136,10 +136,13 @@ beforeEach(() => {
   vi.mocked(applyInventoryTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(revertBatch).mockImplementation(async () => echoCharacter());
   // #1030: these resolve the server's authoritative CombatState, which
-  // useTurnActions dispatches into the tracker via syncCombat.
-  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:00.000Z" });
-  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:00.000Z" });
-  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:00.000Z" });
+  // useTurnActions dispatches into the tracker via syncCombat. Distinct,
+  // increasing updatedAt per lifecycle stage — syncCombat drops a sync whose
+  // updatedAt doesn't strictly advance past the last one applied, so a real
+  // start→round-advance→end sequence must never tie.
+  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z" });
+  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z" });
+  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z" });
   vi.mocked(logRoll).mockResolvedValue(undefined);
   // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
   // call would report an empty regen, same as this default (#1239/#1243).

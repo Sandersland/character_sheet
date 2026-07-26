@@ -39,7 +39,8 @@ export function TurnStateProvider({ children }: Props) {
   // still detected. `view` is non-null whenever `joined` is true (useTurnState's
   // own contract), so the syncCombat call below is always reachable when it fires.
   const onSync = useCallback(
-    (round: number, combatActive: boolean) => view?.syncCombat(round, combatActive),
+    (round: number, combatActive: boolean, updatedAt: string) =>
+      view?.syncCombat(round, combatActive, updatedAt),
     [view],
   );
   useCombatPoll(character.id, sessionId, joined, onSync);
