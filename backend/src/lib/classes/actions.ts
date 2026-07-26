@@ -203,12 +203,14 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
         ? "Teleport up to 60 ft between areas of dim light or darkness (or, for 1 focus, ignore the dim/dark destination requirement); advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting."
         : "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
   },
-  // Warrior of Shadow's Shadow Arts (L3) / Cloak of Shadows (L17) — migrated off
-  // a pair of DerivedClassInfo availability booleans onto rows here (#1315),
-  // same as shadowStep above: the actual cast/activate stays in the dedicated
-  // shadow-arts.ts vertical (its own transactions endpoint), so neither row
-  // gets an ACTION_EFFECT_FN entry. Darkness's normal casting time is an
-  // action (SRD 5.2); Cloak of Shadows is explicitly a Magic action (also
+  // Warrior of Shadow (PHB'24 p.91 — not in SRD 5.2, which ships only Warrior
+  // of the Open Hand for monk) Shadow Arts (L3) / Cloak of Shadows (L17) —
+  // migrated off a pair of DerivedClassInfo availability booleans onto rows
+  // here (#1315), same as shadowStep above: the actual cast/activate stays in
+  // the dedicated shadow-arts.ts vertical (its own transactions endpoint), so
+  // neither row gets an ACTION_EFFECT_FN entry. Darkness's normal casting
+  // time is an action (SRD 5.2 — Darkness itself IS core-rules content);
+  // Cloak of Shadows (PHB'24 p.91) is explicitly a Magic action (also
   // "action" here — this app doesn't distinguish Magic action from a bare
   // action in the cost enum).
   {
@@ -234,11 +236,12 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
   },
 
-  // Warrior of the Elements' two Focus-spending session actions (#1315,
-  // migrated off a pair of DerivedClassInfo availability booleans) — the
-  // real ops live in warrior-of-elements.ts's own endpoint, so neither row gets
-  // an ACTION_EFFECT_FN entry. Elemental Attunement is explicitly "no action"
-  // (SRD 5.2); Elemental Burst is a Magic action.
+  // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only
+  // Warrior of the Open Hand for monk) two Focus-spending session actions
+  // (#1315, migrated off a pair of DerivedClassInfo availability booleans) —
+  // the real ops live in warrior-of-elements.ts's own endpoint, so neither row
+  // gets an ACTION_EFFECT_FN entry. Elemental Attunement is explicitly "no
+  // action"; Elemental Burst is a Magic action.
   {
     key: "elementalAttunement",
     name: "Elemental Attunement",
@@ -418,6 +421,17 @@ export function deriveEntryScopedActions(
     }
   }
   return actions;
+}
+
+/**
+ * A DERIVED_ACTIONS row's `grantLevel` (undefined if the key doesn't exist or
+ * carries none) — lets a caller building "level N+" error text (e.g.
+ * warrior-of-elements.ts's assertWarriorOfElements) read the single source of
+ * truth instead of hardcoding the number a second time, which is exactly the
+ * kind of drift deriveEntryScopedActions itself exists to prevent (#1315).
+ */
+export function actionGrantLevel(key: string): number | undefined {
+  return DERIVED_ACTIONS.find((a) => a.key === key)?.grantLevel;
 }
 
 // One action row's enabled/disabledReason — pulled out of the `.map()` above to
