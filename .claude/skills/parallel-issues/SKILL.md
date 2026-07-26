@@ -147,7 +147,7 @@ gh pr create --base <integration-branch> --head feat/issue-<#>-<slug> \
 <summary of chunks shipped + test/verify results>"
 ```
 
-> **`Closes #` must NOT go on an integration-targeted PR — it silently never fires.** GitHub only auto-closes from the **default branch** (`staging` here), so a `Closes #` on a PR merged into `integration/*` closes nothing and leaves the wave's issues open after everything has shipped. Say `Refs #<#>` here and carry every `Closes #<#>` on the integration → `staging` PR in step 6, which is where they actually fire.
+> **`Closes #` must NOT go on an integration-targeted PR — it silently never fires.** GitHub only auto-closes from the **default branch** (`staging` here), so a `Closes #` on a PR merged into `integration/*` closes nothing and leaves the wave's issues open after everything has shipped. Say `Refs #<#>` on a PR targeting `integration/*` and carry every `Closes #<#>` on the wave PR in step 6, which is where they actually fire. (If the wave's base **is** `staging`, the reverse holds — each feature PR merges into the default branch, so it keeps its own `Closes #<#>`.)
 
 If the integration branch **is** `staging` (or any protected branch), auto-merge is available — but do not arm it yet. See the gate in step 6: a PR is merged only after CI is green *and* review feedback has been resolved or filed. Arming `--auto` earlier races both.
 
@@ -185,6 +185,8 @@ The build agents open PRs; **merging them is the orchestrator's job**, one at a 
 > **Never `worktree.sh rm` before the PR reads `MERGED`.** A removed worktree takes its branch's local state with it, and a PR that then needs a fix has nowhere to be fixed from.
 
 **When every issue has landed on the integration branch — open one PR into `staging`:**
+
+(Skip this whole sub-step when the integration branch **is** `staging`: the feature PRs already target it, the serial merge above lands them directly, and each one keeps its own `Closes #` because it merges into the default branch. There is no wave PR to open.)
 
 ```bash
 gh pr create --base staging --head <integration-branch> \
