@@ -491,18 +491,26 @@ sessionsRouter.post(
  * GET /api/characters/:id/sessions/:sessionId/combat
  * Cheap combat-state poll (#1030): round/combatActive/updatedAt only, no
  * participants/events include — this is the endpoint the live client polls
- * every ~5s while joined. 404 unless the character participates in the session
- * (mirrors the single-session GET's gating).
+ * every ~5s while joined. 404 unless the character ever participated in the
+ * session (mirrors the single-session GET's gating); 409 once the session has
+ * ended or this participant has left — mirroring the mutating combat routes'
+ * assertActiveParticipant gate, so an ended session (or a character who left
+ * a still-active one) stops serving live combat state instead of replaying
+ * its last-known round forever (#1030 finding #5).
  */
 sessionsRouter.get("/characters/:id/sessions/:sessionId/combat", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
   const participant = await prisma.sessionParticipant.findUnique({
     where: { sessionId_characterId: { sessionId: req.params.sessionId, characterId: req.params.id } },
-    select: { id: true },
+    select: { leftAt: true, session: { select: { status: true } } },
   });
   if (!participant) {
     res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  if (participant.session.status !== "active" || participant.leftAt !== null) {
+    res.status(409).json({ error: "Session is not active" });
     return;
   }
 

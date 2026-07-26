@@ -449,6 +449,46 @@ describe("combat state is server-authoritative", () => {
     const res = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
     expect(res.status).toBe(404);
   });
+
+  it("ending the session clears combatActive and resets round (#1030 finding #5)", async () => {
+    const { campaignId, sessionId } = await activeSession();
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+    await agent(cookieOwner).post(roundUrl(sessionId)).send({});
+
+    await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/end`).send({});
+
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    expect(session.combatActive).toBe(false);
+    expect(session.round).toBe(0);
+  });
+
+  it("GET .../combat 409s once the session has ended — it must not serve live state forever", async () => {
+    const { campaignId, sessionId } = await activeSession();
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+
+    await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/end`).send({});
+
+    const res = await agent(cookieOwner).get(combatStateUrl(CHAR_OWNER, sessionId));
+    expect(res.status).toBe(409);
+  });
+
+  it("GET .../combat 409s for a participant who has left a still-active session", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+    await agent(cookiePlayer).post(startUrl(campaignId) + `/${sessionId}/join`).send({ characterId: CHAR_PLAYER });
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+    await agent(cookiePlayer)
+      .post(`${startUrl(campaignId)}/${sessionId}/leave`)
+      .send({ characterId: CHAR_PLAYER });
+
+    // The session is still active (CHAR_OWNER remains) — only the LEFT
+    // participant's poll must stop, not everyone's.
+    const left = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
+    expect(left.status).toBe(409);
+    const stillIn = await agent(cookieOwner).get(combatStateUrl(CHAR_OWNER, sessionId));
+    expect(stillIn.status).toBe(200);
+  });
 });
 
 // ── Roll kinds under the `roll` category (#128) ───────────────────────────────

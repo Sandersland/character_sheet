@@ -195,10 +195,12 @@ async function closeSession(
   await prisma.$transaction(async (tx) => {
     // Claim the close atomically: a concurrent end/auto-close that already flipped
     // the row to "ended" matches no rows here, so the loser skips the duplicate
-    // summary recompute + sessionEnded logs.
+    // summary recompute + sessionEnded logs. Also clears combat state (#1030
+    // finding #5) — without this an ended session kept serving its last-known
+    // round/combatActive forever (the GET poll has no other gate on staleness).
     const { count } = await tx.session.updateMany({
       where: { id: session.id, status: "active" },
-      data: { status: "ended", endedAt },
+      data: { status: "ended", endedAt, combatActive: false, round: 0 },
     });
     if (count === 0) return;
     await recomputeSummaries(tx, { ...session, endedAt });
@@ -540,7 +542,7 @@ export async function logRollEvent(
 
 // Combat state read out of Session (#1030) — the shape every combat lifecycle
 // mutation returns, and what the cheap poll GET serves. `round`/`combatActive`
-// are the authoritative columns (see schema.prisma's why-comment on Session).
+// are the authoritative columns (see the Session model's why-comment).
 const COMBAT_STATE_SELECT = { round: true, combatActive: true, updatedAt: true } as const;
 export type CombatState = Prisma.SessionGetPayload<{ select: typeof COMBAT_STATE_SELECT }>;
 
