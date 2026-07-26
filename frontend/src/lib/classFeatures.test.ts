@@ -101,6 +101,18 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasElementsWarrior).toBe(false);
   });
 
+  // Positive case for hasElementsWarrior — previously untested: a wrong/renamed
+  // key here would silently delete the whole Warrior of the Elements panel
+  // (ClassResourceBlocks.tsx gates WarriorOfElementsSection on this flag) with
+  // no failing test to catch it.
+  it("hasElementsWarrior is true when availableActions contains elementalAttunement", () => {
+    const view = deriveClassFeatureView(
+      makeChar({ availableActions: [{ key: "elementalAttunement", name: "Elemental Attunement", cost: "free", enabled: true }] }),
+      [fighterDef],
+    );
+    expect(view.hasElementsWarrior).toBe(true);
+  });
+
   it("reports all flags false and isEmpty true when no resources", () => {
     const view = deriveClassFeatureView(makeChar({ subclass: undefined }), []);
     expect(view.hasPools).toBe(false);
