@@ -221,3 +221,77 @@ describe("FeatFlow — detail / confirm (frame D)", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("FeatFlow — ability-score radiogroup keyboard nav (#1111)", () => {
+  async function selectFeat(name: string) {
+    const user = userEvent.setup();
+    render(<Harness onSubmit={vi.fn()} />);
+    await user.click(within(row(name)).getByRole("button", { name: /select/i }));
+    return user;
+  }
+
+  it("falls back to the first card for Tab focus when none is checked yet", async () => {
+    await selectFeat("Resilient");
+    const group = screen.getByRole("radiogroup");
+    const radios = within(group).getAllByRole("radio");
+    expect(radios[0]).toHaveAttribute("tabindex", "0");
+    radios.slice(1).forEach((r) => expect(r).toHaveAttribute("tabindex", "-1"));
+  });
+
+  it("moves the roving tabIndex to the checked card once one is chosen", async () => {
+    const user = await selectFeat("Resilient");
+    const group = screen.getByRole("radiogroup");
+    const conRadio = within(group).getByRole("radio", { name: /constitution/i });
+    await user.click(conRadio);
+    const radios = within(group).getAllByRole("radio");
+    radios.forEach((r) => expect(r).toHaveAttribute("tabindex", r === conRadio ? "0" : "-1"));
+  });
+
+  it("lets Tab enter the group once and leave it on the next Tab", async () => {
+    const user = await selectFeat("Resilient");
+    const backButton = screen.getByRole("button", { name: /back to list/i });
+    const group = screen.getByRole("radiogroup");
+    const radios = within(group).getAllByRole("radio");
+    backButton.focus();
+
+    await user.tab();
+    expect(document.activeElement).toBe(radios[0]);
+
+    await user.tab();
+    expect(radios).not.toContain(document.activeElement);
+  });
+
+  it("ArrowRight/ArrowDown move focus and selection forward, wrapping at the end", async () => {
+    const user = await selectFeat("Resilient");
+    const group = screen.getByRole("radiogroup");
+    const radios = within(group).getAllByRole("radio"); // Strength, Dexterity, Constitution
+    radios[0].focus();
+
+    await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).toBe(radios[1]);
+    expect(radios[1]).toHaveAttribute("aria-checked", "true");
+
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(radios[2]);
+    expect(radios[2]).toHaveAttribute("aria-checked", "true");
+
+    await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).toBe(radios[0]);
+    expect(radios[0]).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("ArrowLeft/ArrowUp move focus and selection backward, wrapping at the start", async () => {
+    const user = await selectFeat("Resilient");
+    const group = screen.getByRole("radiogroup");
+    const radios = within(group).getAllByRole("radio");
+    radios[0].focus();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(document.activeElement).toBe(radios[2]);
+    expect(radios[2]).toHaveAttribute("aria-checked", "true");
+
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(radios[1]);
+    expect(radios[1]).toHaveAttribute("aria-checked", "true");
+  });
+});
