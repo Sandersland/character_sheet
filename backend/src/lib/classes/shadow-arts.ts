@@ -210,7 +210,13 @@ export async function applyShadowArtsOperations(
       // the MONK entry's own level, so a secondary Warrior of Shadow monk gates
       // correctly even when another class is primary. Resolved through the SAME
       // deriveEntryScopedActions the wire's availableActions[] uses (#1315) —
-      // never a second copy of the level gate.
+      // never a second copy of the level gate. Passes pools:[] deliberately:
+      // this guard only reads `.key` presence (the class/subclass/level gate),
+      // never `.enabled` — real focus sufficiency is enforced by castAbilityInTx
+      // below. Passing [] means every resource-gated row here comes back
+      // enabled:false, so a future `.some(a => a.key === X && a.enabled)` check
+      // would wrongly reject every cast; if that's ever needed, pass the real
+      // pools instead of widening this comment.
       const level = levelForExperience(row.experiencePoints);
       const actions = deriveEntryScopedActions(row.classEntries, level, [], true);
 

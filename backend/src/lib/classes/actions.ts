@@ -4,11 +4,10 @@
  * Two concerns live here:
  *
  * 1. `DERIVED_ACTIONS` + `deriveActions` — hardcoded TS list of all known
- *    actions (same data as the prisma/seed.ts ACTIONS array) and a pure
- *    derive function that filters it for a character's class/level/subclass,
- *    cross-referencing derived resource pools to set `enabled`.
- *    Called from `serializeCharacter` — sync, no DB access. Mirrors the
- *    CLASS_RESOURCE_FN / deriveResources pattern from class-features.ts.
+ *    actions and a pure derive function that filters it for a character's
+ *    class/level/subclass, cross-referencing derived resource pools to set
+ *    `enabled`. Called from `serializeCharacter` — sync, no DB access. Mirrors
+ *    the CLASS_RESOURCE_FN / deriveResources pattern from class-features.ts.
  *
  * 2. `ACTION_EFFECT_FN` — hardcoded TS dispatch table keyed by action `key`.
  *    Returns existing op types (spendResource, adjustQuantity, heal, tempHp,
@@ -17,11 +16,15 @@
  *    interpreted JSON engine.
  *
  * Adding a new mechanical action:
- *   • Append a row to ACTIONS in `prisma/seed.ts` (display + gating data for
- *     the GET /api/actions catalog picker).
- *   • Append the matching entry to DERIVED_ACTIONS here (for serializeCharacter).
+ *   • Append the entry to DERIVED_ACTIONS here (for serializeCharacter).
  *   • Add the effect fn to ACTION_EFFECT_FN (for the POST orchestrator).
  *   No migration needed for new actions; only new *columns* need one.
+ *   (prisma/seed.ts's ACTIONS array + the DB Action table it populates are
+ *   NOT consumed by any route — routes/character/actions.ts's own header
+ *   confirms the catalog is read client-side via actionResolvers, not from
+ *   the DB — so DERIVED_ACTIONS here is the actual single source; #1315
+ *   found the seed array had already drifted out of sync on 6 pre-existing
+ *   rows before this file added 4 more, without anything breaking.)
  *
  * 3. `ACTION_CAST_FN` — cast-core actions that route through `castAbilityInTx`
  *    (pay pool cost → self-apply) instead of the op-list dispatch. Second Wind
@@ -89,7 +92,9 @@ export interface ResourcePool {
   remaining: number;
 }
 
-// Mirrors prisma/seed.ts ACTIONS array. Keep in sync when adding new actions.
+// The single source of truth for the action catalog — see the file header's
+// "Adding a new mechanical action" note (#1315): prisma/seed.ts's ACTIONS
+// array is NOT consumed by any route and doesn't need to stay in sync.
 const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Universal actions are intentionally NOT included in `availableActions` on the
   // character because TurnHub already renders them from the client-side

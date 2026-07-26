@@ -81,6 +81,10 @@ function monkEntry(row: WarriorOfElementsRow) {
  * comparison, and not the classEntries[].level COLUMN directly (that column
  * can lag the XP-derived level for a pending level-up; deriveEntryScopedActions
  * resolves the effective level instead, same as every other entry-scoped gate).
+ * Passes pools:[] deliberately — this only reads `.key` presence (the gate
+ * itself), never `.enabled`; the actual focus spend is validated by
+ * applySpendResourceInTx below, so a future `.enabled` check here would
+ * wrongly reject every call.
  */
 function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, feature: string): number {
   const monk = monkEntry(row);
