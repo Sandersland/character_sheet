@@ -62,11 +62,11 @@ git push -u origin <integration-branch>
 
 > **Fork from the branch that already holds the wave's prerequisites — normally `staging`, never `main`.** `staging` is the default branch and runs ahead of `main` between promotes, so forking from `main` silently drops every unpromoted dependency and the wave builds against a tree that no longer exists. If the wave depends on work that hasn't reached `staging` yet, fork from *that* branch and verify the prerequisite is actually present (`git log --oneline <base> | grep <pr>`) before creating any worktree.
 
-> **Critical ordering — do this before step 4.** `.claude/skills/worktree/worktree.sh create` forks each new branch from the **main checkout's current HEAD**. So the main checkout must be sitting on the integration branch *before* you create any worktree, or the issue branches fork from the wrong base and their PRs won't target integration cleanly.
+> **Critical ordering — do this before step 4.** `.claude/skills/worktree/worktree.sh create` forks each new branch from the **primary checkout's current HEAD** (the ordinary clone you're standing in — not the `main` branch). So it must be sitting on the integration branch *before* you create any worktree, or the issue branches fork from the wrong base and their PRs won't target integration cleanly.
 
 ### 4. Spin up an isolated worktree per issue
 
-From the main checkout root, for each issue (reusing the `worktree` skill / its script):
+From the primary checkout root, for each issue (reusing the `worktree` skill / its script):
 
 ```bash
 ./.claude/skills/worktree/worktree.sh create feat/issue-<#>-<slug> --up
@@ -131,7 +131,7 @@ Launch one background subagent per issue (`run_in_background: true`), so they bu
    Both must be clean.
 4. Commit each green chunk with a conventional message: `feat(<domain>): <summary> (#<#>)`.
 
-> **Host git hooks lie in a worktree — replicate their gates in-container before you push.** Lefthook fires on the host, where the worktree has no real `node_modules`: `fallow` is missing entirely, and the `tsc` jobs resolve against the **main checkout**, so they report green for code they never read. CI's `fallow` job is a required check on `staging`, so a bypassed audit surfaces on the PR instead. Run `npx tsc --noEmit` per workspace and `npx fallow audit --base <integration-branch> --no-cache` **inside the containers** before pushing. Likewise, the `post-checkout` prisma-regen hook can write a client for the wrong branch after a rebase — regenerate in-container (false red, ~65 tests) rather than trusting it.
+> **Host git hooks lie in a worktree — replicate their gates in-container before you push.** Lefthook fires on the host, where the worktree has no real `node_modules`: `fallow` is missing entirely, and the `tsc` jobs resolve against the **primary checkout**, so they report green for code they never read. CI's `fallow` job is a required check on `staging`, so a bypassed audit surfaces on the PR instead. Run `npx tsc --noEmit` per workspace and `npx fallow audit --base <integration-branch> --no-cache` **inside the containers** before pushing. Likewise, the `post-checkout` prisma-regen hook can write a client for the wrong branch after a rebase — regenerate in-container (false red, ~65 tests) rather than trusting it.
 
 **After the last chunk — UI gate (if the issue has a UI surface):**
 Run the **verify-frontend** skill, adapted to this worktree — run the frontend unit tests as usual, but point the browser verification at the **worktree's** frontend URL (`http://localhost:<5173+slot*10>`), not the hardcoded 5173. Screenshots go under `/tmp/` only — never the project tree.

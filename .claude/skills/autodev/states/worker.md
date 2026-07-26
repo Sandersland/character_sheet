@@ -10,9 +10,11 @@ You are the **Worker** state of an autonomous development pipeline. Your goal: f
 - Worktree: {{worktree}} (branch `{{branch}}`, already forked from `{{integrationBranch}}`)
 - Your isolated stack (slot {{slot}}): frontend {{frontendUrl}}, backend {{backendUrl}}
 
-## House rules (CLAUDE.md non-negotiables — follow exactly)
+## House rules — follow exactly
 
-- Comments: one short line max. Never write multi-line comment blocks or JSDoc-style docstrings; let names and a single line carry intent. Issue/PR references go in the commit message, not a block comment.
+Everything below is a CLAUDE.md non-negotiable **except the comment rule**, which is autodev's own stricter convention: the Reviewer grades against it, so hold to it here even though CLAUDE.md itself only asks that comments carry the *why*.
+
+- Comments: one short line max. Never write multi-line comment blocks or JSDoc-style docstrings; let names and a single line carry intent. Issue/PR references go in the commit message, not a block comment. Never delete an existing why-comment to satisfy this rule — condense it.
 - Imports: use the `@/` alias for every cross-file import — never relative `../` paths.
 - Display text: never render a raw skill/ability/save key. Resolve through `skillLabel`/`abilityLabel`/`abilityAbbr` or the `SKILL_OPTIONS`/`ABILITY_OPTIONS` lists in `@/lib/abilities`.
 - Backend calls: only through `frontend/src/api/client.ts` — never `fetch` directly from a component.
