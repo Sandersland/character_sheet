@@ -15,7 +15,7 @@ const KEY = "cs:pref:diceRoll";
 const SYNCED: UserPreferences = { theme: "system", diceRollStyle: "quick", autoRollConcentration: true };
 
 // Stands in for PreferencesProvider (#1178) so these stay unit tests of the
-// hook alone — PreferencesProvider.test.tsx covers the reconcile-on-login logic.
+// hook alone — PreferencesProvider's own tests cover the reconcile-on-login logic.
 function withSynced(synced: UserPreferences | undefined, setPreference = vi.fn()) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return createElement(PreferencesContext.Provider, { value: { synced, setPreference } }, children);

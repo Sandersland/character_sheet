@@ -16,7 +16,7 @@ const SYNCED: UserPreferences = { theme: "light", diceRollStyle: "animated", aut
 
 // Wraps the hook in a controlled PreferencesContext value, standing in for
 // PreferencesProvider (#1178) so these stay unit tests of useThemePreference
-// alone (PreferencesProvider.test.tsx covers the reconcile-on-login logic).
+// alone (PreferencesProvider's own tests cover the reconcile-on-login logic).
 function withSynced(synced: UserPreferences | undefined, setPreference = vi.fn()) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return createElement(PreferencesContext.Provider, { value: { synced, setPreference } }, children);

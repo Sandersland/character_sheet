@@ -1,6 +1,6 @@
 /**
  * PATCH /api/preferences (#1178). Real Postgres, supertest against createApp()
- * — mirrors campaign-preferences.test.ts's harness (authCookie + ensureTestOwner).
+ * — same authCookie + ensureTestOwner harness pattern used by other route tests.
  */
 
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -78,6 +78,19 @@ describe("PATCH /api/preferences (#1178)", () => {
   it("rejects an invalid enum value (400)", async () => {
     const res = await agent(cookie).patch("/api/preferences").send({ theme: "purple" });
     expect(res.status).toBe(400);
+  });
+
+  it("a hostile stored base never re-persists its unknown keys", async () => {
+    await prisma.user.update({
+      where: { id: OWNER },
+      data: { preferences: JSON.parse('{"theme":"dark","__proto__":{"x":1},"constructor":{"prototype":{"x":1}}}') },
+    });
+
+    const res = await agent(cookie).patch("/api/preferences").send({ diceRollStyle: "quick" });
+    expect(res.status).toBe(200);
+
+    const row = await prisma.user.findUniqueOrThrow({ where: { id: OWNER } });
+    expect(row.preferences).toEqual({ theme: "dark", diceRollStyle: "quick" });
   });
 
   it("accepts an empty patch as a no-op", async () => {

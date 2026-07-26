@@ -1,13 +1,9 @@
 /**
- * Context boundary between PreferencesProvider (features/preferences — owns
- * the reconcile-on-login + mirror-to-localStorage logic, #1178) and the three
- * preference hooks that consume it (useThemePreference, useDiceRollStyle,
- * useAutoRollConcentrationPref). A true leaf module (React only) — deliberately
- * OWNS the UserPreferences/ThemePreference/DiceRollStyle type definitions
- * rather than importing them from types/auth.ts or the hook files, so nothing
- * that depends on it (including those same hook files) can cycle back.
- * useThemePreference.ts / useDiceRollStyle.ts re-export their type from here
- * for existing consumers; types/auth.ts imports UserPreferences from here too.
+ * Context boundary between PreferencesProvider (owns the reconcile-on-login +
+ * mirror-to-localStorage logic, #1178) and the three preference hooks that
+ * consume it. A dependency-free leaf — owns the UserPreferences/
+ * ThemePreference/DiceRollStyle types itself so nothing that depends on it can
+ * cycle back; the hooks and AuthUser re-export those types from here.
  */
 import { createContext, useContext } from "react";
 

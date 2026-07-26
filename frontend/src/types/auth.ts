@@ -1,7 +1,7 @@
 // Account-synced player preferences (#1178), riding the /auth/me payload.
-// Defined in hooks/usePreferencesSync.ts (a dependency-free leaf) and
-// re-exported here rather than duplicated, so this file can't cycle back
-// into the hook files that also depend on that module.
+// Defined in usePreferencesSync (a dependency-free leaf) and re-exported here
+// rather than duplicated, so this module can't cycle back into the hooks that
+// also depend on it.
 export type { UserPreferences } from "@/hooks/usePreferencesSync";
 import type { UserPreferences } from "@/hooks/usePreferencesSync";
 

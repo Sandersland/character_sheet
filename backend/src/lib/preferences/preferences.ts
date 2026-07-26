@@ -1,13 +1,10 @@
 import { z } from "zod";
 
-// Account-synced player preferences (#1178) — the cs:pref:* family (theme,
-// dice-roll style, auto-roll concentration) lifted off per-browser
-// localStorage onto User.preferences (typed JSON, not scalar columns) so a
-// new key never needs a migration. Kept in sync with each preference's own
-// module (hooks/useThemePreference.ts, hooks/useDiceRollStyle.ts,
-// features/hitpoints/concentrationPreference.ts) on the frontend.
-export const themePreferenceSchema = z.enum(["light", "dark", "system"]);
-export const diceRollStyleSchema = z.enum(["animated", "quick"]);
+// Account-synced player preferences (#1178) — the cs:pref:* family lifted off
+// per-browser localStorage onto User.preferences (typed JSON, not scalar
+// columns) so a new key never needs a migration.
+const themePreferenceSchema = z.enum(["light", "dark", "system"]);
+const diceRollStyleSchema = z.enum(["animated", "quick"]);
 
 // Read-side schema: NOT .strict() — an unknown key (a stale field from a
 // removed preference, or a corrupt write) is silently stripped rather than
@@ -21,22 +18,23 @@ export const preferencesSchema = z.object({
 
 export type UserPreferences = z.infer<typeof preferencesSchema>;
 
-// Write-side schema: deliberately built from the bare field schemas rather
-// than `preferencesSchema.partial()` — zod's `.optional()` wrapped around a
-// field that already has `.default(...)` still fills the default in for an
-// ABSENT key, which would turn a true one-key patch into a full object and
+// Shared by both write-side schemas below — bare field schemas (no
+// `.default()`) so an ABSENT key stays absent through `.partial()` rather than
+// zod filling it in, which would turn a one-key patch into a full object and
 // clobber the other stored keys on merge (caught by a red test: a two-write
-// scenario where the second patch reset earlier keys to defaults). `.strict()`
-// so an unrecognized key in a REQUEST is a 400 — unlike a stored value (see
-// preferencesSchema above), since here it's almost certainly a client bug.
-export const preferencesPatchSchema = z
+// scenario where the second patch reset earlier keys to defaults).
+const partialPreferencesShape = z
   .object({
     theme: themePreferenceSchema,
     diceRollStyle: diceRollStyleSchema,
     autoRollConcentration: z.boolean(),
   })
-  .partial()
-  .strict();
+  .partial();
+
+// The PATCH /api/preferences request body: `.strict()` so an unrecognized key
+// is a 400 — unlike a stored value (see preferencesSchema above), a request is
+// almost certainly a client bug.
+export const preferencesPatchSchema = partialPreferencesShape.strict();
 
 // Single source of truth for "no preference has ever been chosen" — derived
 // from the schema's own per-field defaults rather than duplicated as a literal,
@@ -56,6 +54,19 @@ function parseStoredPreferences(raw: unknown): UserPreferences {
   return result.success ? result.data : DEFAULT_PREFERENCES;
 }
 
+// Write-side base parse: unlike parseStoredPreferences, keeps the result
+// sparse (only keys actually present survive — never defaulted) so merging a
+// patch onto a null/never-stored base still yields just the patch, not a full
+// object. Non-strict, so unknown/hostile keys (a corrupt or tampered stored
+// value) are stripped rather than re-persisted; a recognized key holding an
+// invalid value fails the whole parse, falling back to an empty base — same
+// everything-or-nothing contract as parseStoredPreferences.
+function parseStoredPreferencesBase(raw: unknown): Partial<UserPreferences> {
+  const base = isPlainObject(raw) ? raw : {};
+  const result = partialPreferencesShape.safeParse(base);
+  return result.success ? result.data : {};
+}
+
 // The GET /auth/me read path. `null` is preserved (not defaulted) so the
 // frontend can distinguish "this account has never stored preferences"
 // (migrate local values up) from "a value is stored" (server wins) — see
@@ -65,14 +76,11 @@ export function resolvePreferences(raw: unknown): UserPreferences | null {
   return parseStoredPreferences(raw);
 }
 
-// The PATCH /api/preferences write path: merges a validated partial patch
-// onto whatever is currently stored, so writing one key never clobbers the
-// others. A null/corrupt existing value is treated as an empty base (not
-// propagated) — there is nothing legitimate to preserve from it.
+// The PATCH /api/preferences write path: merges a validated partial patch onto
+// whatever is currently stored, so writing one key never clobbers the others.
 export function mergePreferencesPatch(
   raw: unknown,
   patch: Partial<UserPreferences>,
-): Record<string, unknown> {
-  const base = isPlainObject(raw) ? raw : {};
-  return { ...base, ...patch };
+): Partial<UserPreferences> {
+  return { ...parseStoredPreferencesBase(raw), ...patch };
 }

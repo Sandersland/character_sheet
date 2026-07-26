@@ -11,9 +11,9 @@ import { useCallback, useEffect, useState } from "react";
 
 import { usePreferencesSync, type ThemePreference } from "@/hooks/usePreferencesSync";
 
-// Re-exported (not defined here) so usePreferencesSync.ts stays the single
-// owner of the type — see that file's banner for why (avoids a hooks/types
-// import cycle now that theme is account-synced, #1178).
+// Re-exported (not defined here) so usePreferencesSync stays the single owner
+// of the type — see its own banner for why (avoids an import cycle now that
+// theme is account-synced, #1178).
 export type { ThemePreference };
 export type ResolvedTheme = "light" | "dark";
 

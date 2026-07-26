@@ -82,4 +82,15 @@ describe("mergePreferencesPatch (write path)", () => {
     const merged = mergePreferencesPatch("garbage", { theme: "light" });
     expect(merged).toEqual({ theme: "light" });
   });
+
+  it("strips unknown/hostile keys from the stored base rather than re-persisting them", () => {
+    // Parsed via JSON.parse (not an object literal) so "__proto__" lands as a
+    // real own key — matching how a Json column value actually deserializes.
+    const hostileBase: unknown = JSON.parse(
+      '{"theme":"dark","__proto__":{"polluted":true},"constructor":{"prototype":{"x":1}}}',
+    );
+    const merged = mergePreferencesPatch(hostileBase, { diceRollStyle: "quick" });
+    expect(merged).toEqual({ theme: "dark", diceRollStyle: "quick" });
+    expect(Object.keys(merged as object).sort()).toEqual(["diceRollStyle", "theme"]);
+  });
 });

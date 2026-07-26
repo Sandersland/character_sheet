@@ -10,9 +10,9 @@ import { useCallback, useEffect, useState } from "react";
 
 import { usePreferencesSync, type DiceRollStyle } from "@/hooks/usePreferencesSync";
 
-// Re-exported (not defined here) so usePreferencesSync.ts stays the single
-// owner of the type — see that file's banner for why (avoids a hooks/types
-// import cycle now that dice-roll style is account-synced, #1178).
+// Re-exported (not defined here) so usePreferencesSync stays the single owner
+// of the type — see its own banner for why (avoids an import cycle now that
+// dice-roll style is account-synced, #1178).
 export type { DiceRollStyle };
 
 const STORAGE_KEY = "cs:pref:diceRoll";
