@@ -52,6 +52,22 @@ export async function enterLiveCombat(page: Page): Promise<void> {
   await expect(page).toHaveURL(/[?&]tab=combat/);
 }
 
+// Start combat, then start the turn. A shared roster persona's session may
+// already be mid-encounter from an earlier spec that never ended it — the
+// server-authoritative combat state (#1030) means THIS fresh browser context
+// gets synced into "already in combat" within one poll of mount, racing the
+// click. `{ timeout: 3000 }` treats "Start combat" disappearing/never
+// appearing as "already active" rather than a real failure; "Start my turn"
+// is reachable either way once combat is active.
+export async function startCombatAndTurn(page: Page): Promise<void> {
+  try {
+    await page.getByRole("button", { name: /Start combat/i }).click({ timeout: 3000 });
+  } catch {
+    // Already active — see this function's header comment.
+  }
+  await page.getByRole("button", { name: "Start my turn" }).click();
+}
+
 // The Magic tab is two mutually-exclusive views: the record block (stat bar,
 // slot pips, the Cast door) and the grimoire (full spellbook rows: prepare/
 // swap/forget — view/manage only, #1162). The spellbook rows live only in the

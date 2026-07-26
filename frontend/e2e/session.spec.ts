@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
-import { enterLiveCombat } from "./helpers/api";
+import { enterLiveCombat, startCombatAndTurn } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // #962: the legacy /session route redirects to the sheet's Combat tab (bookmarks).
@@ -28,8 +28,7 @@ test("session: start combat and take an action from the Combat tab", async ({ pa
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   // Action economy shows the action available, then consumed after Dodge.
   await expect(page.getByRole("button", { name: "Use Action" })).toBeVisible();
@@ -62,8 +61,7 @@ test("session: desktop live Combat has no rails; a roll lands in the on-demand l
   await expect(page.getByRole("tab", { name: /Combat \(session live\)/i })).toBeVisible();
 
   // Start combat + roll an attack from the turn tracker.
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();
   const attackSheet = page.getByRole("dialog");
@@ -90,8 +88,7 @@ test("session: opening Use-an-item then closing leaves the action available", as
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Use an item" }).click();
@@ -125,8 +122,7 @@ test("session: the global roll-mode footer is retired (mobile)", async ({ page }
   await expect(page.getByRole("group", { name: "Roll mode" })).toHaveCount(0);
 
   // The turn flow is unaffected by the footer's removal.
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
   await page.getByRole("button", { name: /Use Action/ }).click();
   await expect(page.getByRole("button", { name: "Dodge" })).toBeVisible();
 
@@ -148,8 +144,7 @@ test("session: the result seal shows over the open attack sheet (mobile)", async
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
@@ -180,8 +175,7 @@ test("session: Change weapons in the Action sheet opens the per-hand picker on m
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   // There is no slot-root loadout row anymore.
   await expect(page.getByText(/Equipped ·/)).toHaveCount(0);

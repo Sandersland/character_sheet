@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
-import { enterLiveCombat } from "./helpers/api";
+import { enterLiveCombat, startCombatAndTurn } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // Uses the Monk L6 roster persona: at monk level 6 Empowered Strikes marks
@@ -15,8 +15,7 @@ test("unarmed: Monk L6 shows the Empowered Strikes magical badge", async ({ page
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();

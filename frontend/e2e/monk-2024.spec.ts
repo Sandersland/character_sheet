@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { enterLiveCombat, findCharacterByName, restoreResourcePool } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName, restoreResourcePool, startCombatAndTurn } from "./helpers/api";
 
 // The Open Hand Monk L11 persona (seeded in global-setup, #1249/#1250) is
 // Monk L11 / Warrior of the Open Hand — Heightened Focus (L10) upgrades
@@ -28,8 +28,7 @@ test("2024 monk live play: Flurry, Stunning Strike, Deflect Attacks redirect, an
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  await page.getByRole("button", { name: /Start combat/i }).click();
-  await page.getByRole("button", { name: "Start my turn" }).click();
+  await startCombatAndTurn(page);
 
   const focusStart = await focusRemaining(page.request, id);
 
