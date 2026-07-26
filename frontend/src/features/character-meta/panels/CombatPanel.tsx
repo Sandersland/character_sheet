@@ -17,7 +17,8 @@ import { useIsBelowMd } from "@/hooks/useIsBelowMd";
  * last-session log collapses to one line; tapping it opens the log in a right
  * Drawer (desktop) or BottomSheet (mobile). When a session goes live this panel
  * is replaced by CombatLivePanel (CharacterSheetBody gating, untouched). Takes
- * no props (still assignable to the SheetPanelProps-typed panel registry).
+ * no props — rendered directly, outside STATIC_PANELS, because its live-session
+ * gating can't be expressed as a keyed lookup.
  */
 export default function CombatPanel() {
   const { character } = useCurrentCharacter();
