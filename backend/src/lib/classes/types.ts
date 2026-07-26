@@ -74,19 +74,27 @@ export interface DerivedFeature {
   source: "class" | "subclass";
 }
 
-export interface DerivedClassInfo {
+/**
+ * The bespoke, non-generic level-gated choice-cap fields a subclass may
+ * contribute (#1317): a "choose N" count plus, for maneuvers, an announced
+ * save DC — extra scalar mechanics the generic SubclassChoice count (#899)
+ * doesn't model, which is why these stay hand-rolled instead of migrating
+ * onto it. This is the ONLY shape ExtrasFn may return — adding a fourth
+ * bespoke field is a deliberate edit here, not a silent addition to the wider
+ * DerivedClassInfo wire shape (the #1276 escape-hatch this type closes).
+ */
+export interface ClassExtras {
+  /** Number of options available from a level-gated "choose N" cap this level. */
+  maneuverChoiceCount?: number;
+  /** Save DC for an announced effect gated by the same cap (8 + prof + ability mod). */
+  maneuverSaveDC?: number;
+  /** Number of tool-proficiency choices available from a subclass feature at this level. */
+  toolProfChoiceCount?: number;
+}
+
+export interface DerivedClassInfo extends ClassExtras {
   resources: DerivedResource[];
   features: DerivedFeature[];
-  /** Battle Master only: number of maneuvers the character may know at this level. */
-  maneuverChoiceCount?: number;
-  /** Battle Master only: save DC for maneuver effects (8 + prof + Str/Dex mod). */
-  maneuverSaveDC?: number;
-  /**
-   * Number of artisan's-tool proficiency choices available from a subclass
-   * feature (currently: Student of War = 1 at Battle Master level 3+).
-   * Undefined when no subclass feature grants a tool choice.
-   */
-  toolProfChoiceCount?: number;
   /**
    * Generic subclass "choose N from a catalog" selections active at this level
    * (issue #899). Only choices whose derived count > 0 are listed — so a
@@ -131,12 +139,12 @@ export type ResourceFn = (
   subclassKey?: string,
 ) => DerivedResource[];
 
-/** Extra DerivedClassInfo fields a subclass contributes beyond resources/features (e.g. Battle Master maneuvers). */
+/** A subclass's bespoke level-gated choice-cap fields beyond its resources/features layer — see ClassExtras. */
 export type ExtrasFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
-) => Partial<Omit<DerivedClassInfo, "resources" | "features">>;
+) => Partial<ClassExtras>;
 
 export interface SubclassDefinition {
   /**
