@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import { fetchSession, fetchSessions } from "@/api/client";
 import { ChevronRight } from "@/components/ui/icons";
+import { formatSessionDate } from "@/lib/sessionDate";
+import { buildFeedItems, feedItemRowCount } from "@/lib/sessionLogFeed";
 import type { CharacterEvent, Session } from "@/types/character";
 
 // Idle: surface the most recent ended session, tapping opens its log. Live: a
@@ -23,10 +25,6 @@ export default function CombatLogRow(props: CombatLogRowProps) {
       onOpen={props.onOpen}
     />
   );
-}
-
-function formatSessionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function IdleLogRow({ characterId, onOpen }: { characterId: string; onOpen: (id: string) => void }) {
@@ -78,11 +76,10 @@ function LiveLogRow({
     fetchSession(characterId, sessionId)
       .then((data) => {
         if (!alive) return;
-        // Match the SessionLog feed: drop reverted/undo + the noisy round markers.
-        const events = (data.events as CharacterEvent[]).filter(
-          (e) => !e.reverted && e.type !== "revert" && e.type !== "combatRoundAdvanced",
-        );
-        setCount(events.length);
+        // `feedItemRowCount` over `buildFeedItems` — the SAME pipeline SessionLog
+        // renders from — so this badge counts rendered feed rows, not raw events
+        // (a merged swing is 2 events/1 row).
+        setCount(feedItemRowCount(buildFeedItems(data.events as CharacterEvent[])));
       })
       .catch(() => {
         if (alive) setCount(null);

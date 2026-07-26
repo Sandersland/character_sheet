@@ -5,6 +5,8 @@ import { useDialogChrome } from "@/hooks/useDialogChrome";
 
 interface DrawerProps {
   title: string;
+  /** Optional muted line under the title (e.g. the session name, mirrors BottomSheet). */
+  subtitle?: string;
   onClose: () => void;
   children: ReactNode;
 }
@@ -15,7 +17,7 @@ interface DrawerProps {
  * focus-trap / Escape / scroll-lock via `useDialogChrome`. Below md, callers pick
  * BottomSheet instead (via `useIsBelowMd`), so this stays desktop-only by contract.
  */
-export default function Drawer({ title, onClose, children }: DrawerProps) {
+export default function Drawer({ title, subtitle, onClose, children }: DrawerProps) {
   const panelRef = useDialogChrome(onClose);
   const titleId = useId();
   // Enter transition: mount off-screen right, then slide in on the next frame.
@@ -40,10 +42,13 @@ export default function Drawer({ title, onClose, children }: DrawerProps) {
         tabIndex={-1}
         className={`flex h-full w-full max-w-[24rem] flex-col border-l border-parchment-200 bg-parchment-50 shadow-raised transition-transform duration-200 focus-visible:outline-none ${entered ? "translate-x-0" : "translate-x-full"}`}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-parchment-200 px-4 py-3">
-          <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
-            {title}
-          </h2>
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-parchment-200 px-4 py-3">
+          <div>
+            <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
+              {title}
+            </h2>
+            {subtitle && <p className="mt-0.5 text-xs text-parchment-500">{subtitle}</p>}
+          </div>
           <button
             type="button"
             onClick={onClose}

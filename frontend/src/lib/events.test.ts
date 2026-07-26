@@ -4,6 +4,8 @@ import {
   eventTypeLabel,
   categoryLabel,
   categoryTone,
+  damageTypeTone,
+  logToneClass,
   EVENT_TYPE_LABELS,
   INVENTORY_EVENT_TYPES,
 } from "@/lib/events";
@@ -63,6 +65,41 @@ describe("categoryTone", () => {
   it("falls back to neutral for an unknown category", () => {
     // Exercised with an off-union value to prove the tolerant fallback.
     expect(categoryTone("mystery" as never)).toBe("neutral");
+  });
+});
+
+describe("damageTypeTone (#1237 chat-log color table)", () => {
+  it("resolves every elemental/energy damage type to a distinct tone class", () => {
+    const types = [
+      "fire", "cold", "lightning", "acid", "poison",
+      "necrotic", "radiant", "force", "psychic", "thunder",
+    ];
+    const classes = types.map((t) => damageTypeTone(t));
+    for (const c of classes) expect(c).toMatch(/^text-dmg-/);
+    // Every type gets its OWN hue — no two share a class (a full, non-aliased set).
+    expect(new Set(classes).size).toBe(types.length);
+  });
+
+  it("returns null for a physical damage type (stays neutral ink, mockup spec)", () => {
+    expect(damageTypeTone("piercing")).toBeNull();
+    expect(damageTypeTone("slashing")).toBeNull();
+    expect(damageTypeTone("bludgeoning")).toBeNull();
+  });
+
+  it("returns null for an unknown or absent damage type", () => {
+    expect(damageTypeTone("madeUpType")).toBeNull();
+    expect(damageTypeTone(undefined)).toBeNull();
+    expect(damageTypeTone(null)).toBeNull();
+  });
+});
+
+describe("logToneClass (#1237 chat-log semantic tone table)", () => {
+  it("maps every log tone to a Tailwind text class", () => {
+    expect(logToneClass("heal")).toBe("text-vitality-700");
+    expect(logToneClass("resource")).toBe("text-gold-800");
+    expect(logToneClass("harm")).toBe("text-garnet-700");
+    expect(logToneClass("muted")).toBe("text-parchment-500");
+    expect(logToneClass("default")).toBe("text-parchment-800");
   });
 });
 
