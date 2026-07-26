@@ -2,8 +2,11 @@
 // (formerly PreviewSection) plus the still-needed list + submit error (formerly
 // CreateActions). The confirm button itself lives in the ceremony footer.
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { formatModifier } from "@/lib/abilities";
 import type { CreationPreview } from "@/lib/characterCreation";
+import { EDITION_LABELS } from "@/lib/editionCopy";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -18,10 +21,17 @@ export default function CreationReviewStep({
   preview,
   missing,
   submitError,
+  campaignName,
+  rulesEdition,
 }: {
   preview: CreationPreview;
   missing: string[];
-  submitError: boolean;
+  /** The real error text (create OR campaign-attach failure), or null. */
+  submitError: string | null;
+  /** Resolved by CreationEntryGate; null for a solo build. */
+  campaignName: string | null;
+  /** Resolved by CreationEntryGate — always set by Review; null only defensively. */
+  rulesEdition: RulesEdition | null;
 }) {
   return (
     <div className="flex flex-col gap-4 p-1">
@@ -34,6 +44,18 @@ export default function CreationReviewStep({
           <Stat label="Hit Points" value={preview.maxHp !== undefined ? String(preview.maxHp) : "—"} />
         </div>
       </div>
+
+      {/* #1286: the last screen before an irreversible write echoes the choice —
+          otherwise it's invisible here and only changeable via Start Over. */}
+      <p className="text-sm text-parchment-700">
+        {campaignName ? `Joining ${campaignName}` : "Solo character"}
+        {rulesEdition && (
+          <>
+            {" · "}
+            <span className="font-semibold text-parchment-900">{EDITION_LABELS[rulesEdition]}</span>
+          </>
+        )}
+      </p>
 
       {missing.length > 0 && (
         <div
@@ -51,7 +73,7 @@ export default function CreationReviewStep({
 
       {submitError && (
         <p role="alert" className="text-sm font-semibold text-garnet-700">
-          Couldn't save — check the form and try again.
+          {submitError}
         </p>
       )}
     </div>

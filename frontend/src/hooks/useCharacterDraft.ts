@@ -63,6 +63,9 @@ export interface CharacterDraft {
   /** #1286: the campaign this character is being created for, or null for solo.
    *  Set alongside rulesEdition by the same gate resolution. */
   campaignId: string | null;
+  /** #1286: the chosen campaign's display name, carried alongside campaignId so
+   *  the Review step can echo it without a second fetch. Null for solo. */
+  campaignName: string | null;
 }
 
 const EMPTY_DRAFT: CharacterDraft = {
@@ -89,6 +92,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   step: "identity",
   rulesEdition: null,
   campaignId: null,
+  campaignName: null,
 };
 
 /**

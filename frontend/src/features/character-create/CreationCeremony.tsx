@@ -100,7 +100,15 @@ function EquipmentStepBody({ c }: StepBodyProps) {
 }
 
 function ReviewStepBody({ c }: StepBodyProps) {
-  return <CreationReviewStep preview={c.preview} missing={c.missing} submitError={c.submitError} />;
+  return (
+    <CreationReviewStep
+      preview={c.preview}
+      missing={c.missing}
+      submitError={c.submitError}
+      campaignName={c.draft.campaignName}
+      rulesEdition={c.draft.rulesEdition}
+    />
+  );
 }
 
 // Per-step body registry (mirrors LevelUpCeremony's STEP_BODIES) so the ceremony
@@ -146,14 +154,19 @@ export default function CreationCeremony() {
   const c = useCharacterCreation();
 
   // #1286: the entry gate resolves campaign + rulesEdition before the ceremony's
-  // own step model (creationSteps.ts) is reachable at all — it is impossible to
-  // reach the identity step with rulesEdition unresolved. Checked before the
-  // reference-data wait below: the gate itself doesn't need the catalog.
+  // own step model (creationSteps) is reachable at all — it is impossible to
+  // reach the identity step with rulesEdition unresolved. This early return only
+  // gates the JSX below it: useCharacterCreation() (and its useReferenceData /
+  // fetchItems effects) already ran above, unconditionally, so the reference
+  // fetch is in flight while the gate is still on screen — harmless today
+  // (catalogs are edition-untagged) but not a fetch this gate itself delays.
   if (c.draft.rulesEdition === null) {
     return (
       <CreationEntryGate
         onCancel={c.cancel}
-        onResolved={({ campaignId, rulesEdition }) => c.update({ campaignId, rulesEdition })}
+        onResolved={({ campaignId, campaignName, rulesEdition }) =>
+          c.update({ campaignId, campaignName, rulesEdition })
+        }
       />
     );
   }

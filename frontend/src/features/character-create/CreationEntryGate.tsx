@@ -2,7 +2,7 @@
 // which campaign (if any) a character is being created for, and therefore its
 // rulesEdition, BEFORE the creation ceremony's identity step can be reached.
 // Picking a campaign displays its inherited edition; "Solo" surfaces the
-// picker instead. Deliberately NOT a ceremony step (creationSteps.ts) — a step
+// picker instead. Deliberately NOT a ceremony step (creationSteps) — a step
 // that auto-skips whenever a campaign is picked is a step built and maintained
 // for the uncommon case (settled 2026-07-26, issue #1286 decisions).
 
@@ -19,7 +19,13 @@ import { EDITION_LABELS, RULES_EDITIONS } from "@/lib/editionCopy";
 import type { Campaign } from "@/types/character";
 
 interface CreationEntryGateProps {
-  onResolved: (choice: { campaignId: string | null; rulesEdition: RulesEdition }) => void;
+  onResolved: (choice: {
+    campaignId: string | null;
+    /** The chosen campaign's display name, so Review can echo it without a
+     *  second fetch — null for solo. */
+    campaignName: string | null;
+    rulesEdition: RulesEdition;
+  }) => void;
   /** Leave the page instead of resolving (mirrors the ceremony's own Cancel). */
   onCancel?: () => void;
 }
@@ -110,18 +116,46 @@ function EditionSection({
 
 export default function CreationEntryGate({ onResolved, onCancel }: CreationEntryGateProps) {
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  // Bumped by "Try again" to re-run the fetch effect below.
+  const [retryToken, setRetryToken] = useState(0);
   const [choice, setChoice] = useState<string>(SOLO);
   const [soloEdition, setSoloEdition] = useState<RulesEdition>(RULES_EDITIONS[0]);
 
   useEffect(() => {
     let active = true;
+    setLoadError(false);
     fetchCampaigns()
       .then((list) => active && setCampaigns(list))
-      .catch(() => active && setCampaigns([]));
+      .catch(() => active && setLoadError(true));
     return () => {
       active = false;
     };
-  }, []);
+  }, [retryToken]);
+
+  // #1286: the choice is irreversible, so a fetch failure must never silently
+  // fall through to "no campaigns" — that would steer a player who meant to
+  // join a campaign into picking an edition for a character that can't move.
+  if (loadError) {
+    return (
+      <CeremonyStage layout="page">
+        <CeremonyCard className="px-6 py-10 text-center">
+          <h1 className="font-display text-2xl font-semibold text-parchment-900">Couldn't check your campaigns</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-parchment-600">
+            This choice can't be undone once you continue, so we won't guess — check your connection and try
+            again.
+          </p>
+          <button
+            type="button"
+            onClick={() => setRetryToken((t) => t + 1)}
+            className={`${PRIMARY_BTN} mt-4`}
+          >
+            Try again
+          </button>
+        </CeremonyCard>
+      </CeremonyStage>
+    );
+  }
 
   if (campaigns === null) {
     return (
@@ -138,6 +172,7 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
   function handleContinue() {
     onResolved({
       campaignId: chosenCampaign ? chosenCampaign.id : null,
+      campaignName: chosenCampaign ? chosenCampaign.name : null,
       rulesEdition: chosenCampaign ? chosenCampaign.rulesEdition : soloEdition,
     });
   }

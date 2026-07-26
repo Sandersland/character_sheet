@@ -84,4 +84,17 @@ describe("useCharacterDraft", () => {
     expect(result.current.draft.rulesEdition).toBeNull();
     expect(result.current.draft.campaignId).toBeNull();
   });
+
+  // #1286: the Review step echoes the campaign by name (not just id), so the
+  // gate hands the name straight through rather than making Review re-fetch it.
+  it("carries campaignName alongside campaignId, reset to null on clear()", () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    expect(result.current.draft.campaignName).toBeNull();
+
+    act(() => result.current.update({ campaignId: "camp-1", campaignName: "The Old Rules Table" }));
+    expect(result.current.draft.campaignName).toBe("The Old Rules Table");
+
+    act(() => result.current.clear());
+    expect(result.current.draft.campaignName).toBeNull();
+  });
 });

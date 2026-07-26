@@ -44,6 +44,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     step: "identity",
     rulesEdition: "EDITION_2024",
     campaignId: null,
+    campaignName: null,
     ...overrides,
   };
 }

@@ -44,7 +44,7 @@ describe("CreationEntryGate (#1286)", () => {
     expect(screen.getByText(/can't be changed later/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
-    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, rulesEdition: "EDITION_2024" });
+    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, campaignName: null, rulesEdition: "EDITION_2024" });
   });
 
   it("lets a solo player switch to 2014 before continuing", async () => {
@@ -54,7 +54,7 @@ describe("CreationEntryGate (#1286)", () => {
 
     await userEvent.click(await screen.findByRole("radio", { name: "2014 rules" }));
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
-    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, rulesEdition: "EDITION_2014" });
+    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, campaignName: null, rulesEdition: "EDITION_2014" });
   });
 
   it("with campaigns, asks which campaign first and defaults to Solo", async () => {
@@ -68,7 +68,7 @@ describe("CreationEntryGate (#1286)", () => {
     expect(screen.getByRole("radio", { name: "2024 rules" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
-    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, rulesEdition: "EDITION_2024" });
+    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, campaignName: null, rulesEdition: "EDITION_2024" });
   });
 
   it("picking a campaign displays its inherited edition instead of asking", async () => {
@@ -84,7 +84,11 @@ describe("CreationEntryGate (#1286)", () => {
     expect(screen.getByText(/2014 rules/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
-    expect(onResolved).toHaveBeenCalledWith({ campaignId: "camp-1", rulesEdition: "EDITION_2014" });
+    expect(onResolved).toHaveBeenCalledWith({
+      campaignId: "camp-1",
+      campaignName: "The Sunless Citadel",
+      rulesEdition: "EDITION_2014",
+    });
   });
 
   it("switching back to Solo after picking a campaign re-reveals the edition picker", async () => {
@@ -111,5 +115,31 @@ describe("CreationEntryGate (#1286)", () => {
     await userEvent.keyboard("{ArrowRight}");
     expect(campaign).toHaveFocus();
     expect(campaign).toHaveAttribute("aria-checked", "true");
+  });
+
+  // #1286: the choice is irreversible, so a transient fetch failure must never
+  // silently steer the player into "no campaigns" and a picked-for-them edition.
+  describe("campaign list fails to load", () => {
+    it("shows an error state and blocks Continue rather than defaulting to Solo", async () => {
+      mockFetchCampaigns.mockRejectedValue(new Error("network down"));
+      const onResolved = vi.fn();
+      render(<CreationEntryGate onResolved={onResolved} />);
+
+      expect(await screen.findByText(/couldn't check your campaigns/i)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /continue/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+      expect(onResolved).not.toHaveBeenCalled();
+    });
+
+    it("Try again re-fetches and recovers into the normal picker", async () => {
+      mockFetchCampaigns.mockRejectedValueOnce(new Error("network down")).mockResolvedValueOnce([]);
+      render(<CreationEntryGate onResolved={vi.fn()} />);
+
+      await screen.findByText(/couldn't check your campaigns/i);
+      await userEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+      expect(await screen.findByRole("radio", { name: "2024 rules" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /continue/i })).toBeInTheDocument();
+    });
   });
 });

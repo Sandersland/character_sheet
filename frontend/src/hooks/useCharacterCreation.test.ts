@@ -11,10 +11,12 @@ vi.mock("react-router-dom", () => ({ useNavigate: () => navigate }));
 const fetchReference = vi.fn();
 const fetchItems = vi.fn();
 const createCharacter = vi.fn();
+const addCharacterToCampaign = vi.fn();
 vi.mock("@/api/client", () => ({
   fetchReference: (...args: unknown[]) => fetchReference(...args),
   fetchItems: (...args: unknown[]) => fetchItems(...args),
   createCharacter: (...args: unknown[]) => createCharacter(...args),
+  addCharacterToCampaign: (...args: unknown[]) => addCharacterToCampaign(...args),
 }));
 
 const DRAFT_KEY = "character-draft:new";
@@ -102,6 +104,7 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     // itself is CreationEntryGate.test.tsx's job.
     rulesEdition: "EDITION_2024",
     campaignId: null,
+    campaignName: null,
   };
   localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...base, ...overrides }));
 }
@@ -129,6 +132,7 @@ beforeEach(() => {
   fetchReference.mockReset().mockResolvedValue(reference);
   fetchItems.mockReset().mockResolvedValue([]);
   createCharacter.mockReset().mockResolvedValue({ id: "char-99" });
+  addCharacterToCampaign.mockReset().mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -245,7 +249,8 @@ describe("useCharacterCreation", () => {
       }),
     );
     expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
-    expect(result.current.submitError).toBe(false);
+    expect(result.current.submitError).toBeNull();
+    expect(addCharacterToCampaign).not.toHaveBeenCalled();
   });
 
   it("does not submit an invalid draft", async () => {
@@ -259,7 +264,7 @@ describe("useCharacterCreation", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it("surfaces a submit error and does not navigate when create fails", async () => {
+  it("surfaces the real error message and does not navigate when create fails", async () => {
     createCharacter.mockRejectedValue(new Error("boom"));
     seedDraft(validDraft());
     const { result } = await mount();
@@ -267,9 +272,90 @@ describe("useCharacterCreation", () => {
     await act(async () => {
       await result.current.save();
     });
-    expect(result.current.submitError).toBe(true);
+    expect(result.current.submitError).toBe("boom");
     expect(navigate).not.toHaveBeenCalled();
     expect(result.current.submitting).toBe(false);
+  });
+
+  it("a failed create can be retried — each retry attempts createCharacter again (nothing exists yet)", async () => {
+    createCharacter.mockRejectedValueOnce(new Error("network down")).mockResolvedValueOnce({ id: "char-99" });
+    seedDraft(validDraft());
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(result.current.submitError).toBe("network down");
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(createCharacter).toHaveBeenCalledTimes(2);
+    expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
+  });
+
+  // #1286: the campaign-inherited flow is this issue's primary use case — pin
+  // that a resolved campaignId is actually acted on, not just carried in the draft.
+  it("attaches the created character to the resolved campaign after a successful create", async () => {
+    seedDraft({ ...validDraft(), campaignId: "camp-1" });
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(addCharacterToCampaign).toHaveBeenCalledWith("char-99", "camp-1");
+    expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
+    expect(result.current.submitError).toBeNull();
+  });
+
+  // The create-then-attach split (#1286) is two network calls; a failure on the
+  // second must not orphan-and-duplicate: the character already exists, so a
+  // retry must attach it rather than calling createCharacter again.
+  it("an attach failure after a successful create keeps the character and retries only the attach", async () => {
+    addCharacterToCampaign.mockRejectedValueOnce(new Error("Campaign not found")).mockResolvedValueOnce({});
+    seedDraft({ ...validDraft(), campaignId: "camp-1" });
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+    expect(addCharacterToCampaign).toHaveBeenCalledTimes(1);
+    expect(result.current.submitError).toMatch(/Campaign not found/);
+    expect(navigate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.save();
+    });
+    // Retry: the character from the first attempt is reused — no second create.
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+    expect(addCharacterToCampaign).toHaveBeenCalledTimes(2);
+    expect(addCharacterToCampaign).toHaveBeenLastCalledWith("char-99", "camp-1");
+    expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
+  });
+
+  it("Start Over (clear) drops a pending created-but-unattached id so a later save creates fresh", async () => {
+    addCharacterToCampaign.mockRejectedValue(new Error("Campaign not found"));
+    seedDraft({ ...validDraft(), campaignId: "camp-1" });
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.clear());
+    act(() => result.current.update(validDraft()));
+
+    createCharacter.mockResolvedValue({ id: "char-100" });
+    await act(async () => {
+      await result.current.save();
+    });
+    // A fresh create, not a retry of the abandoned attempt's id.
+    expect(createCharacter).toHaveBeenCalledTimes(2);
+    expect(navigate).toHaveBeenCalledWith("/characters/char-100", { replace: true });
   });
 
   // #1131: a class switch invalidates the chosen spells (different list + counts).
