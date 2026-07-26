@@ -343,6 +343,114 @@ describe("combat/roll require an active participant", () => {
   });
 });
 
+// ── Server-authoritative combat state (#1030) ─────────────────────────────────
+
+describe("combat state is server-authoritative", () => {
+  async function activeSession(): Promise<{ campaignId: string; sessionId: string }> {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    return { campaignId, sessionId: start.body.session.id as string };
+  }
+
+  const startCombatUrl = (sessionId: string) => `/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/start`;
+  const endCombatUrl = (sessionId: string) => `/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/end`;
+  const roundUrl = (sessionId: string) => `/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/round`;
+  const combatStateUrl = (characterId: string, sessionId: string) =>
+    `/api/characters/${characterId}/sessions/${sessionId}/combat`;
+
+  it("combat/start sets round:1, combatActive:true and persists it on Session", async () => {
+    const { sessionId } = await activeSession();
+    const res = await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ round: 1, combatActive: true });
+
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    expect(session.round).toBe(1);
+    expect(session.combatActive).toBe(true);
+  });
+
+  it("combat/start is idempotent — a re-press while combat is live does not reset a running round", async () => {
+    const { sessionId } = await activeSession();
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+    await agent(cookieOwner).post(roundUrl(sessionId)).send({});
+    await agent(cookieOwner).post(roundUrl(sessionId)).send({}); // round 3
+
+    const restart = await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+    expect(restart.body).toMatchObject({ round: 3, combatActive: true });
+
+    // Only the real false→true transition logs — a re-press doesn't spam the audit log.
+    const startedEvents = await prisma.characterEvent.count({
+      where: { sessionId, type: "combatStarted" },
+    });
+    expect(startedEvents).toBe(1);
+  });
+
+  it("combat/round ignores a client-supplied round and advances by exactly 1", async () => {
+    const { sessionId } = await activeSession();
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+
+    const res = await agent(cookieOwner).post(roundUrl(sessionId)).send({ round: 999 });
+    expect(res.status).toBe(201);
+    expect(res.body.round).toBe(2);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { sessionId, type: "combatRoundAdvanced" },
+      orderBy: { createdAt: "desc" },
+    });
+    expect((event?.data as { round?: number } | null)?.round).toBe(2);
+  });
+
+  it("combat/round 409s when combat isn't active", async () => {
+    const { sessionId } = await activeSession();
+    const res = await agent(cookieOwner).post(roundUrl(sessionId)).send({});
+    expect(res.status).toBe(409);
+  });
+
+  it("two concurrent combat/round calls both land — the increment is never lost to a race", async () => {
+    const { sessionId } = await activeSession();
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+
+    // Two "end turn" intents firing at once (two participants, or a retry) —
+    // the atomic `round = round + 1` UPDATE must apply both, going 1 → 3, not
+    // lose one to a read-then-write race and land on 2.
+    await Promise.all([
+      agent(cookieOwner).post(roundUrl(sessionId)).send({}),
+      agent(cookieOwner).post(roundUrl(sessionId)).send({}),
+    ]);
+
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    expect(session.round).toBe(3);
+  });
+
+  it("combat/end clears combatActive and resets round to 0", async () => {
+    const { sessionId } = await activeSession();
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+    await agent(cookieOwner).post(roundUrl(sessionId)).send({});
+
+    const res = await agent(cookieOwner).post(endCombatUrl(sessionId)).send({});
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ round: 0, combatActive: false });
+  });
+
+  it("GET .../combat returns the cheap poll shape for a participant", async () => {
+    const { sessionId } = await activeSession();
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+    await agent(cookieOwner).post(roundUrl(sessionId)).send({});
+
+    const res = await agent(cookieOwner).get(combatStateUrl(CHAR_OWNER, sessionId));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ round: 2, combatActive: true });
+    expect(typeof res.body.updatedAt).toBe("string");
+  });
+
+  it("GET .../combat 404s for a character that never joined the session", async () => {
+    const { sessionId } = await activeSession();
+    // CHAR_PLAYER exists but never joined this session.
+    const res = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
+    expect(res.status).toBe(404);
+  });
+});
+
 // ── Roll kinds under the `roll` category (#128) ───────────────────────────────
 
 describe("roll kinds log under the `roll` category", () => {

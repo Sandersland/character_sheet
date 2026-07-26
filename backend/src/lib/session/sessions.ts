@@ -538,30 +538,96 @@ export async function logRollEvent(
   });
 }
 
-/**
- * Logs a combat lifecycle event (started / ended / round advanced). The caller
- * must be an active participant of an active session. Pure log entry.
- */
-export async function logCombatEvent(
+// Combat state read out of Session (#1030) — the shape every combat lifecycle
+// mutation returns, and what the cheap poll GET serves. `round`/`combatActive`
+// are the authoritative columns (see schema.prisma's why-comment on Session).
+const COMBAT_STATE_SELECT = { round: true, combatActive: true, updatedAt: true } as const;
+export type CombatState = Prisma.SessionGetPayload<{ select: typeof COMBAT_STATE_SELECT }>;
+
+async function logCombatLifecycleEvent(
   characterId: string,
   sessionId: string,
   type: CombatEventType,
-  opts?: { round?: number },
-) {
-  await assertActiveParticipant(sessionId, characterId);
-
-  const batchId = randomUUID();
-  const summary = COMBAT_SUMMARIES[type](opts?.round);
-
-  return prisma.$transaction(async (tx) => {
-    await logEvent(tx, {
-      characterId,
-      category: "combat",
-      type: type as EventType,
-      summary,
-      batchId,
-      sessionId,
-      data: opts?.round !== undefined ? { round: opts.round } : null,
-    });
+  round: number | undefined,
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  await logEvent(tx, {
+    characterId,
+    category: "combat",
+    type: type as EventType,
+    summary: COMBAT_SUMMARIES[type](round),
+    batchId: randomUUID(),
+    sessionId,
+    data: round !== undefined ? { round } : null,
   });
+}
+
+/**
+ * Starts combat: sets combatActive=true and round=1 (a fresh encounter always
+ * begins at round 1). Idempotent — guarded by `updateMany({combatActive:
+ * false})` — so a second participant re-pressing Start Combat while combat is
+ * already live cannot stomp a running round back to 1; there's no initiative
+ * order (#1030 scope) to say only one participant "owns" starting combat, so
+ * any of them may call this concurrently. The audit event only fires on the
+ * real false→true transition, never on a no-op re-press.
+ */
+export async function startCombat(characterId: string, sessionId: string): Promise<CombatState> {
+  await assertActiveParticipant(sessionId, characterId);
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.session.updateMany({
+      where: { id: sessionId, combatActive: false },
+      data: { combatActive: true, round: 1 },
+    });
+    if (count > 0) await logCombatLifecycleEvent(characterId, sessionId, "combatStarted", undefined, tx);
+    return tx.session.findUniqueOrThrow({ where: { id: sessionId }, select: COMBAT_STATE_SELECT });
+  });
+}
+
+/**
+ * Ends combat: sets combatActive=false and resets round=0 (mirrors the local
+ * reducer's endCombat → initialState). Idempotent for the same reason as
+ * startCombat — a stale second "End Combat" click is a no-op, not a re-log.
+ */
+export async function endCombat(characterId: string, sessionId: string): Promise<CombatState> {
+  await assertActiveParticipant(sessionId, characterId);
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.session.updateMany({
+      where: { id: sessionId, combatActive: true },
+      data: { combatActive: false, round: 0 },
+    });
+    if (count > 0) await logCombatLifecycleEvent(characterId, sessionId, "combatEnded", undefined, tx);
+    return tx.session.findUniqueOrThrow({ where: { id: sessionId }, select: COMBAT_STATE_SELECT });
+  });
+}
+
+/**
+ * Advances the round by exactly 1. THE ROUND NUMBER IS NEVER CLIENT INPUT
+ * (#1030): callers send intent only ("my turn ended"), and the server decides
+ * the number via an atomic `round = round + 1` UPDATE — Postgres serializes
+ * concurrent UPDATEs to the same row, so two participants ending their turns
+ * at the same instant both land (round advances by 2, not lost to a
+ * read-then-write race). There is no initiative order yet, so every genuine
+ * end-turn call is its own +1; this function has no way to distinguish "two
+ * real turns ended" from "one call fired twice" and doesn't try to — that
+ * would need whose-turn-is-it tracking, an explicit non-goal for this phase.
+ * 409s if combat isn't active — advancing a round with no encounter running
+ * is meaningless, and the client only ever calls this while `inCombat`.
+ */
+export async function advanceCombatRound(characterId: string, sessionId: string): Promise<CombatState> {
+  await assertActiveParticipant(sessionId, characterId);
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.session.updateMany({
+      where: { id: sessionId, combatActive: true },
+      data: { round: { increment: 1 } },
+    });
+    if (count === 0) throw new CombatError(`Session ${sessionId} is not in combat`);
+    const state = await tx.session.findUniqueOrThrow({ where: { id: sessionId }, select: COMBAT_STATE_SELECT });
+    await logCombatLifecycleEvent(characterId, sessionId, "combatRoundAdvanced", state.round, tx);
+    return state;
+  });
+}
+
+/** Cheap read for the combat-state poll: no participant gate here — the route checks the caller is a session participant. */
+export async function getCombatState(sessionId: string): Promise<CombatState | null> {
+  return prisma.session.findUnique({ where: { id: sessionId }, select: COMBAT_STATE_SELECT });
 }

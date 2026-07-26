@@ -107,7 +107,7 @@ export interface SessionDoorwaySessionState {
   title: string | null;
   /** This character is a present participant (joined, !leftAt). */
   joined: boolean;
-  /** DERIVED from the latest combatRoundAdvanced event — never persisted. */
+  /** Session.round while combat is active, else null (#1030 — persisted, see CombatState). */
   round: number | null;
 }
 
@@ -119,4 +119,18 @@ export interface SessionDoorwayState {
   canStart: boolean;
   kind: SessionDoorwayKind;
   session: SessionDoorwaySessionState | null;
+}
+
+/**
+ * Server-authoritative combat state for a session (#1030): `Session.round`/
+ * `combatActive` are a deliberate derive-don't-persist exception (shared
+ * mutable session state no client can compute alone). This is the shape both
+ * the combat/start|end|round mutation responses and the cheap poll GET
+ * (`.../sessions/:sessionId/combat`) return — clients dispatch it verbatim
+ * into their local turn tracker; they never compute round themselves.
+ */
+export interface CombatState {
+  round: number;
+  combatActive: boolean;
+  updatedAt: string; // ISO 8601
 }

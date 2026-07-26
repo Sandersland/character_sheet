@@ -1613,6 +1613,14 @@ model Session {
   arc         CampaignArc?  @relation(fields: [arcId], references: [id], onDelete: SetNull)
   // Campaign recap aggregate computed at session-end (#245). Null while active.
   summary     Json?
+  // Combat round state (#1030) — a deliberate DERIVE-DON'T-PERSIST EXCEPTION:
+  // the round is shared mutable state every participant's client must observe
+  // identically, which is impossible to derive per-client. This is now the
+  // authoritative read model; combatStarted/combatEnded/combatRoundAdvanced
+  // CharacterEvent rows remain the audit trail, not the source of truth.
+  combatActive Boolean  @default(false)
+  round        Int      @default(0)
+  updatedAt    DateTime @updatedAt
 
   events         CharacterEvent[]
   journalEntries JournalEntry[]

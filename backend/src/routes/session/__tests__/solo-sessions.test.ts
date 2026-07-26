@@ -266,11 +266,14 @@ describe("solo session combat + rolls (existing participant-gated routes)", () =
       .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/combat/start`)
       .send({});
     expect(start.status).toBe(201);
+    expect(start.body).toMatchObject({ round: 1, combatActive: true });
 
+    // The server decides the round — a client-supplied value is ignored (#1030).
     const round = await agent()
       .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/combat/round`)
-      .send({ round: 2 });
+      .send({ round: 999 });
     expect(round.status).toBe(201);
+    expect(round.body).toMatchObject({ round: 2, combatActive: true });
 
     const roll = await agent()
       .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/roll`)

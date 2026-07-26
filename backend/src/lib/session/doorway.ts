@@ -10,8 +10,15 @@ import type { SessionDoorwayRole, SessionDoorwayState } from "@character-sheet/s
 // SessionDoorwayState is re-exported so importers keep resolving it here.
 export type { SessionDoorwayState };
 
-/** Latest combat round for a session, or null when combat never advanced a round. */
-async function latestCombatRound(sessionId: string): Promise<number | null> {
+/**
+ * Latest combat round for a session per the OLD event-derived rule, or null
+ * when combat never advanced a round. Superseded by `Session.round`/
+ * `combatActive` (#1030) for every live read below — this is kept solely for
+ * `backend/scripts/backfill-session-combat-round.ts` to seed those columns on
+ * sessions that predate the migration. Do not add a new call site: any live
+ * read of "what round is it" belongs on the authoritative columns.
+ */
+export async function latestCombatRound(sessionId: string): Promise<number | null> {
   const event = await prisma.characterEvent.findFirst({
     where: { sessionId, type: "combatRoundAdvanced" },
     orderBy: { createdAt: "desc" },
@@ -71,7 +78,9 @@ export async function getSessionDoorway(
       scheduledAt: null,
       title: active.title,
       joined,
-      round: await latestCombatRound(active.id),
+      // Session.round/combatActive are authoritative (#1030); round only
+      // means something while combat is active, else the doorway shows none.
+      round: active.combatActive ? active.round : null,
     },
   };
 }
