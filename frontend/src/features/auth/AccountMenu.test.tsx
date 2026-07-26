@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { axe } from "@/test/axe";
@@ -151,5 +151,60 @@ describe("AccountMenu", () => {
     const { container } = renderMenu();
     await user.click(screen.getByRole("button", { name: "Account" }));
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+// #1167: the account-global entry point into the full Preferences surface —
+// this test harness has NO character/campaign context at all, so a passing
+// suite here IS the proof that a solo player can reach every player-scoped
+// preference (the issue's core complaint: previously nothing existed outside
+// a campaign's kebab menu).
+describe("AccountMenu Preferences entry (#1167)", () => {
+  it("opens the Preferences sheet from a 'Preferences…' item, with no campaign/character in view", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+
+    await user.click(screen.getByRole("menuitem", { name: /preferences/i }));
+
+    const dialog = screen.getByRole("dialog", { name: /preferences/i });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByText("Appearance")).toBeInTheDocument();
+    expect(screen.getByText("Dice")).toBeInTheDocument();
+    expect(screen.getByText("Play automation")).toBeInTheDocument();
+    // Solo/no-campaign entry point: no character in view ⇒ no campaign link.
+    expect(screen.queryByRole("button", { name: /campaign settings/i })).not.toBeInTheDocument();
+  });
+
+  it("changing a preference inside the sheet takes effect immediately", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(screen.getByRole("menuitem", { name: /preferences/i }));
+
+    await user.click(screen.getByRole("radio", { name: /dark/i }));
+
+    expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("closes the Preferences sheet", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderMenu();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(screen.getByRole("menuitem", { name: /preferences/i }));
+
+    const [closeButton] = screen.getAllByRole("button", { name: /close/i });
+    await user.click(closeButton);
+    // Mobile grabber: onClose fires only after the slide-out transition ends
+    // (matches BottomSheet.test.tsx's own convention for this close path).
+    // act() flushes the resulting setState — the listener runs off a raw
+    // dispatchEvent, outside React's own event batching.
+    act(() => {
+      const e = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(e, "propertyName", { value: "transform" });
+      baseElement.querySelector('[role="dialog"]')?.dispatchEvent(e);
+    });
+    expect(screen.queryByRole("dialog", { name: /preferences/i })).not.toBeInTheDocument();
   });
 });
