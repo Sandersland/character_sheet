@@ -15,6 +15,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-shadow-cast";
 let COOKIE: string;
@@ -102,11 +103,12 @@ describe("Shadow Arts cast endpoint", () => {
     // Warrior of Shadow grants Minor Illusion at L3 as data (#898) — this is what gives
     // a pure (non-caster) Shadow monk a serialized spellcasting view at all, so the
     // cast Shadow Art's concentration can surface on it.
-    const shadow = await prisma.subclass.upsert({
-      where: { classId_name: { classId, name: "Warrior of Shadow" } },
-      create: { classId, name: "Warrior of Shadow", description: "Test subclass" },
-      update: {},
-    });
+    const shadow = await upsertEditionRow(
+      prisma.subclass,
+      { classId, name: "Warrior of Shadow", edition: null },
+      { classId, name: "Warrior of Shadow", description: "Test subclass" },
+      {},
+    );
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
     await prisma.subclassGrantedSpell.upsert({

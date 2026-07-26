@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-experience";
 let COOKIE: string;
@@ -89,11 +90,12 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     });
     fighterClassId = fighterClass.id;
 
-    const bm = await prisma.subclass.upsert({
-      where: { classId_name: { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME } },
-      create: { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, description: "Maneuvers." },
-      update: {},
-    });
+    const bm = await upsertEditionRow(
+      prisma.subclass,
+      { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, edition: null },
+      { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, description: "Maneuvers." },
+      {},
+    );
     battleMasterSubclassId = bm.id;
 
     const clericClass = await prisma.characterClass.upsert({
@@ -111,11 +113,12 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     });
     clericClassId = clericClass.id;
 
-    const life = await prisma.subclass.upsert({
-      where: { classId_name: { classId: clericClass.id, name: LIFE_DOMAIN_SUBCLASS_NAME } },
-      create: { classId: clericClass.id, name: LIFE_DOMAIN_SUBCLASS_NAME, description: "Healing." },
-      update: {},
-    });
+    const life = await upsertEditionRow(
+      prisma.subclass,
+      { classId: clericClass.id, name: LIFE_DOMAIN_SUBCLASS_NAME, edition: null },
+      { classId: clericClass.id, name: LIFE_DOMAIN_SUBCLASS_NAME, description: "Healing." },
+      {},
+    );
     lifeSubclassId = life.id;
   });
 
@@ -389,11 +392,12 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     });
     fighterClassId2 = fc.id;
 
-    const bm = await prisma.subclass.upsert({
-      where: { classId_name: { classId: fc.id, name: BM_SUBCLASS_NAME2 } },
-      create: { classId: fc.id, name: BM_SUBCLASS_NAME2, description: "Maneuvers." },
-      update: {},
-    });
+    const bm = await upsertEditionRow(
+      prisma.subclass,
+      { classId: fc.id, name: BM_SUBCLASS_NAME2, edition: null },
+      { classId: fc.id, name: BM_SUBCLASS_NAME2, description: "Maneuvers." },
+      {},
+    );
     battleMasterSubclassId2 = bm.id;
   });
 

@@ -14,6 +14,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-fs-feats";
 let COOKIE: string;
@@ -41,25 +42,27 @@ function findWeapon(body: { inventory: Array<{ name: string; weapon?: { attackBo
 const leather = { name: "Test Leather", category: "armor", armor: { armorCategory: "light", baseArmorClass: 11 } };
 
 beforeAll(async () => {
-  const archery = await prisma.feat.upsert({
-    where: { name: "Archery (FS Feat Test)" },
-    create: {
+  const archery = await upsertEditionRow(
+    prisma.feat,
+    { name: "Archery (FS Feat Test)", edition: null },
+    {
       name: "Archery (FS Feat Test)", description: "+2 ranged attack.", category: "fighting_style",
       prerequisite: "Fighting Style feature",
       improvements: [{ target: "rangedAttackRoll", amount: 2 }] as unknown as Prisma.InputJsonValue,
     },
-    update: { category: "fighting_style", improvements: [{ target: "rangedAttackRoll", amount: 2 }] as unknown as Prisma.InputJsonValue },
-  });
+    { category: "fighting_style", improvements: [{ target: "rangedAttackRoll", amount: 2 }] as unknown as Prisma.InputJsonValue },
+  );
   archeryFeatId = archery.id;
-  const defense = await prisma.feat.upsert({
-    where: { name: "Defense (FS Feat Test)" },
-    create: {
+  const defense = await upsertEditionRow(
+    prisma.feat,
+    { name: "Defense (FS Feat Test)", edition: null },
+    {
       name: "Defense (FS Feat Test)", description: "+1 AC while armored.", category: "fighting_style",
       prerequisite: "Fighting Style feature",
       improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue,
     },
-    update: { category: "fighting_style", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue },
-  });
+    { category: "fighting_style", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue },
+  );
   defenseFeatId = defense.id;
 });
 

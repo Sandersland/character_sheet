@@ -35,8 +35,10 @@ beforeAll(async () => {
 
   const cleric = await prisma.characterClass.findUnique({ where: { name: "Cleric" }, select: { id: true } });
   if (!cleric) throw new Error("Cleric class not seeded — run `prisma db seed` before tests");
-  const life = await prisma.subclass.findUnique({
-    where: { classId_name: { classId: cleric.id, name: "Life Domain" } },
+  // findFirst, not findUnique: the classId_name compound-key shorthand can't
+  // express a null edition (#1306).
+  const life = await prisma.subclass.findFirst({
+    where: { classId: cleric.id, name: "Life Domain", edition: null },
     select: { id: true },
   });
   if (!life) throw new Error("Life Domain subclass not seeded — run `prisma db seed` before tests");

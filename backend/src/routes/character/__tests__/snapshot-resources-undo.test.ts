@@ -19,6 +19,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-snapshot-undo";
 let COOKIE: string;
@@ -75,11 +76,12 @@ beforeAll(async () => {
     update: { subclassLevel: 3 },
   });
   fighterClassId = fighter.id;
-  const bm = await prisma.subclass.upsert({
-    where: { classId_name: { classId: fighter.id, name: BM_SUBCLASS_NAME } },
-    create: { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers + Student of War." },
-    update: {},
-  });
+  const bm = await upsertEditionRow(
+    prisma.subclass,
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers + Student of War." },
+    {},
+  );
   bmSubclassId = bm.id;
 });
 

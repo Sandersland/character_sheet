@@ -28,6 +28,7 @@ import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
+import { resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -142,10 +143,11 @@ async function resolveSubclassName(
   edition: RulesEdition,
 ): Promise<{ subclassId: string | null; subclassName: string }> {
   if (subclassGateLevel(characterClass.subclassLevel, edition) <= 1) {
-    const match = await prisma.subclass.findUnique({
-      where: { classId_name: { classId: characterClass.id, name } },
-      select: { id: true, name: true },
+    const candidates = await prisma.subclass.findMany({
+      where: withEditionOrShared({ classId: characterClass.id, name }, edition),
+      select: { id: true, name: true, edition: true },
     });
+    const match = resolveEditionRow(candidates, edition);
     if (match) return { subclassId: match.id, subclassName: match.name };
   }
   return { subclassId: null, subclassName: name };
@@ -295,14 +297,22 @@ async function resolveSelections(
   // warn/queue when the same PrismaClient fires concurrent queries, and
   // these are cheap point-lookups, so there's no real cost to awaiting
   // each in turn.
+  // Write-once column (#1285): the row doesn't exist yet, so there's no
+  // `rulesEdition` to read via editionOf — DEFAULT_RULES_EDITION (lib/rules/edition.ts)
+  // names the same default the create call below lets the column apply, so the
+  // two can't drift apart. Resolved before the background lookup below, which
+  // needs it to pick the right edition-tagged row (#1306).
+  const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
+
   const race = await prisma.race.findUnique({ where: { name: input.race } });
   const characterClass = await prisma.characterClass.findUnique({
     where: { name: primaryClassChoice.name },
   });
-  const background = await prisma.background.findUnique({
-    where: { name: input.background },
+  const backgroundCandidates = await prisma.background.findMany({
+    where: withEditionOrShared({ name: input.background }, edition),
     include: { originFeat: true },
   });
+  const background = resolveEditionRow(backgroundCandidates, edition) ?? null;
 
   // Mechanical derivation needs a catalog anchor for race + class. The
   // background only grants skill-proficiency choices (no mechanical
@@ -316,11 +326,6 @@ async function resolveSelections(
     return { ok: false, status: 400, error: `Unknown class: ${primaryClassChoice.name}` };
   }
 
-  // Write-once column (#1285): the row doesn't exist yet, so there's no
-  // `rulesEdition` to read via editionOf — DEFAULT_RULES_EDITION (lib/rules/edition.ts)
-  // names the same default the create call below lets the column apply, so the
-  // two can't drift apart.
-  const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
   const subclass = await resolveSubclass(primaryClassChoice, characterClass, edition);
   if (!subclass.ok) return subclass;
 
@@ -384,8 +389,25 @@ function applyBackgroundSpread(
 
 // Snapshots the background's Origin feat into a slot-exempt AdvancementEntry
 // (#1130). Magic Initiate's granted class is folded into the description snapshot.
-function buildOriginEntry(background: ResolvedBackground): AdvancementEntry | null {
-  const feat = background?.originFeat;
+//
+// Background.originFeatId is a single FK, fixed once at seed time to a
+// representative row (the reference-display default — same "no character to
+// resolve against" reasoning as reference.ts's subclassLevel hardcode). A
+// character actually being CREATED has an edition, so re-resolve the feat by
+// NAME against THIS character's edition (#1306) rather than trust whichever
+// row got baked — Alert forks by edition, so a 2014 character creating with a
+// background whose baked FK happens to point at the 2024 row must still land
+// on the 2014 row. No fallback to the baked row on a miss: silently snapshotting
+// the OTHER edition's mechanics into a permanent AdvancementEntry is exactly the
+// contamination this function exists to prevent, so grant nothing rather than
+// grant the wrong thing (unreachable today — every seeded origin feat has a
+// null/shared row every edition can fall back to — but a knowingly-wrong write
+// is still the wrong shape to leave in).
+async function buildOriginEntry(background: ResolvedBackground, edition: RulesEdition): Promise<AdvancementEntry | null> {
+  if (!background?.originFeat) return null;
+  const baked = background.originFeat;
+  const candidates = await prisma.feat.findMany({ where: withEditionOrShared({ name: baked.name }, edition) });
+  const feat = resolveEditionRow(candidates, edition);
   if (!feat) return null;
   const flavor = feat.name === "Magic Initiate" ? MAGIC_INITIATE_CLASS_BY_BACKGROUND[background.name] : undefined;
   const featDescription = flavor ? `${feat.description}\n\nBackground grant: ${flavor} spell list.` : feat.description;
@@ -408,10 +430,11 @@ function buildOriginEntry(background: ResolvedBackground): AdvancementEntry | nu
 // effective scores (baked BEFORE deriveCreatedCharacter so HP/init are correct)
 // and snapshot the Origin feat. A spec-less/custom background rejects any spread
 // but still grants its (absent) feat; omitting the spread applies no bump.
-function resolveBackgroundGrants(
+async function resolveBackgroundGrants(
   input: CreateCharacterBody,
   background: ResolvedBackground,
-): PhaseResult<BackgroundGrants> {
+  edition: RulesEdition,
+): Promise<PhaseResult<BackgroundGrants>> {
   const spread = input.backgroundAbilities;
   const choices = background?.abilityChoices ?? [];
 
@@ -426,7 +449,7 @@ function resolveBackgroundGrants(
   return {
     ok: true,
     effectiveScores: applyBackgroundSpread(input.abilityScores, spread),
-    originEntry: buildOriginEntry(background),
+    originEntry: await buildOriginEntry(background, edition),
   };
 }
 
@@ -812,7 +835,10 @@ export async function createCharacter(
   const selections = await resolveSelections(input);
   if (!selections.ok) return selections;
 
-  const grants = resolveBackgroundGrants(input, selections.background);
+  // Re-derives the same edition resolveSelections used (DEFAULT_RULES_EDITION
+  // is the shared constant that keeps the two independent resolutions from
+  // drifting — same pattern as the rulesEdition write further down).
+  const grants = await resolveBackgroundGrants(input, selections.background, input.rulesEdition ?? DEFAULT_RULES_EDITION);
   if (!grants.ok) return grants;
 
   const equipment = await materializeStartingEquipment(input, selections.primaryClassChoice.name);

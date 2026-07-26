@@ -4,6 +4,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { InvalidClassOperationError, setSubclassInTx } from "@/lib/classes/class.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-subclass-in-tx";
 const BATCH = "batch-subclass-in-tx";
@@ -46,16 +47,18 @@ describe("setSubclassInTx (#895 seam)", () => {
     });
     fighterId = fighter.id;
     wizardId = wizard.id;
-    const bm = await prisma.subclass.upsert({
-      where: { classId_name: { classId: fighterId, name: "Battle Master InTx" } },
-      create: { classId: fighterId, name: "Battle Master InTx", description: "Test subclass." },
-      update: {},
-    });
-    const evo = await prisma.subclass.upsert({
-      where: { classId_name: { classId: wizardId, name: "Evocation InTx" } },
-      create: { classId: wizardId, name: "Evocation InTx", description: "Test subclass." },
-      update: {},
-    });
+    const bm = await upsertEditionRow(
+      prisma.subclass,
+      { classId: fighterId, name: "Battle Master InTx", edition: null },
+      { classId: fighterId, name: "Battle Master InTx", description: "Test subclass." },
+      {},
+    );
+    const evo = await upsertEditionRow(
+      prisma.subclass,
+      { classId: wizardId, name: "Evocation InTx", edition: null },
+      { classId: wizardId, name: "Evocation InTx", description: "Test subclass." },
+      {},
+    );
     battleMasterId = bm.id;
     evocationId = evo.id;
   });
