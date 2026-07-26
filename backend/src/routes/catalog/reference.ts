@@ -90,6 +90,16 @@ referenceRouter.get("/reference", async (_req, res) => {
     toolProficiencies: b.toolProficiencies,
     // PHB'24 ability spread + Origin feat; empty/null for spec-less legacy rows (#1130).
     abilityChoices: b.abilityChoices,
+    // Same gap as subclassLevel above: this endpoint has no character, so no
+    // rulesEdition to resolve the origin feat against — b.originFeat is
+    // whatever seed-time resolveOriginFeatId baked onto the FK (EDITION_2024
+    // today), served as-is rather than through resolveEditionRow. Deliberately
+    // NOT DEFAULT_RULES_EDITION for the same reason named above. A 2014
+    // character's actual origin feat is still correct — character-create.ts's
+    // buildOriginEntry re-resolves it per the CREATING character's edition at
+    // creation time rather than trusting this preview — but the creation-form
+    // preview itself shows 2024 text to every edition until #1336 (per-edition
+    // /api/reference resolution) lands.
     originFeat: b.originFeat,
   }));
 
