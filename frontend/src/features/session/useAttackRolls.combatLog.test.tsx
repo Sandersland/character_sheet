@@ -93,6 +93,18 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
     expect(extra.verdict).toBeUndefined();
   });
 
+  // Both are logged: the net mode is resolveRollMode's output (advantage and
+  // disadvantage cancel), which a reader cannot recover from `sources` without
+  // re-deriving that rule — so the log carries the answer, not just the inputs.
+  it("logs the resolved net rollMode alongside the mode sources on the attack roll", () => {
+    const { result, logRollSafe } = setup(rollReturning(10));
+    result.current.viewFor(longsword).onAttack();
+
+    const [, , , , , extra] = logRollSafe.mock.calls[0];
+    expect(extra.rollMode).toBe("normal");
+    expect(extra.modeSources).toEqual([]);
+  });
+
   it("forwards the entry's decomposed attackComponents on the attack roll", () => {
     const { result, logRollSafe } = setup(rollReturning(10));
     result.current.viewFor(longsword).onAttack();

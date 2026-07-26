@@ -16,6 +16,7 @@ import type { RollResult, RollSpec } from "@/lib/dice";
 import type {
   RollEventAttackComponents,
   RollEventDamageComponents,
+  RollEventMode,
   RollEventModeSource,
   RollEventVerdict,
 } from "@character-sheet/shared-types";
@@ -33,6 +34,7 @@ interface RollLogExtra {
   nat20?: boolean;
   nat1?: boolean;
   crit?: boolean;
+  rollMode?: RollEventMode;
   modeSources?: RollEventModeSource[];
   attackComponents?: RollEventAttackComponents;
   damageComponents?: RollEventDamageComponents;

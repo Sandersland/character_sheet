@@ -129,6 +129,10 @@ export function useAttackRolls({
       nat20: attack.nat20,
       nat1: attack.nat1,
       crit: attack.nat20,
+      // Both, deliberately: `sources` lists what applied, but the NET mode after
+      // advantage/disadvantage cancellation is a rule (resolveRollMode). Logging
+      // only the sources would force every reader to re-derive it (#1235).
+      rollMode: resolvedAttack.mode,
       modeSources: resolvedAttack.sources,
       attackComponents: entry.attackComponents,
     });

@@ -74,6 +74,13 @@ const damageComponentsSchema = z
   })
   .strict();
 
+// An absent optional field is valid and stays absent; a present one must parse.
+// Returning undefined for BOTH "absent" and "invalid" is safe only because
+// ROLL_CHECKS rejects the invalid case with a 400 before this ever runs.
+function optionalParse<T>(schema: z.ZodType<T>, value: unknown): T | undefined {
+  return value === undefined ? undefined : schema.safeParse(value).data;
+}
+
 interface RollBody {
   kind?: unknown;
   source?: unknown;
@@ -168,6 +175,12 @@ export function parseRollInput(req: Request, res: Response): RollInput | null {
     res.status(400).json({ error: failed.error });
     return null;
   }
+  // Parse each nested field ONCE and persist the parsed output, never the raw
+  // body — this is what strips unknown/oversized keys before they reach the
+  // durable event log; ROLL_CHECKS' boolean gate alone would not (#1235).
+  const modeSources = optionalParse(modeSourcesSchema, b.modeSources);
+  const attackComponents = optionalParse(attackComponentsSchema, b.attackComponents);
+  const damageComponents = optionalParse(damageComponentsSchema, b.damageComponents);
   return {
     kind: b.kind as RollKind,
     source: (b.source as string).trim(),
@@ -184,15 +197,9 @@ export function parseRollInput(req: Request, res: Response): RollInput | null {
     nat20: typeof b.nat20 === "boolean" ? b.nat20 : undefined,
     nat1: typeof b.nat1 === "boolean" ? b.nat1 : undefined,
     crit: typeof b.crit === "boolean" ? b.crit : undefined,
-    // Persist the SAFEPARSE'd values, never the raw body — ROLL_CHECKS already
-    // proved these parse (we're past the `failed` check above), so `.data` is
-    // defined; this is what actually strips unknown/oversized keys before
-    // they reach the durable event log, not just the boolean gate.
-    modeSources: b.modeSources === undefined ? undefined : modeSourcesSchema.safeParse(b.modeSources).data,
-    attackComponents:
-      b.attackComponents === undefined ? undefined : attackComponentsSchema.safeParse(b.attackComponents).data,
-    damageComponents:
-      b.damageComponents === undefined ? undefined : damageComponentsSchema.safeParse(b.damageComponents).data,
+    modeSources,
+    attackComponents,
+    damageComponents,
     // target/outcome: never read from `b` — see RollInput's comment (#1235).
   };
 }
