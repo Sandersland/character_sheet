@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 
-import { startCombat, endCombat, advanceCombatRound } from "@/api/client";
+import { startCombat, endCombat, advanceCombatRound, fetchCombatState } from "@/api/client";
 import { flurryStrikeCount } from "@/lib/attackMath";
 import { rollSpec } from "@/lib/dice";
 import { planActionClick, type ActionClickPlan } from "@/lib/turnActionPlan";
@@ -64,6 +64,7 @@ export function useTurnActions({
     attachBatchId,
     undo,
     syncCombat,
+    reconcileCombat,
   } = turnState;
 
   // Active durable (while-active) self-buffs — drive the turn-hook + End-buff UI.
@@ -294,6 +295,25 @@ export function useTurnActions({
     }
   }
 
+  // Recovery path for a failed startCombat/endCombat (#1030 finding #1): the
+  // optimistic local flip already ran but the server was never mutated, so
+  // re-fetch the authoritative state and reconcile onto it via
+  // `reconcileCombat` (bypasses the monotonic guard deliberately — see its
+  // JSDoc). If THIS fetch also fails (the network blip outlasts both calls),
+  // we deliberately leave the optimistic (possibly wrong) local state as-is
+  // rather than force a guessed value — the two remaining recovery paths
+  // (retrying Start/End Combat, or a page reload) already exist for the
+  // ordinary out-of-sync case this issue documents, and forcing a guess here
+  // would just trade one wrong state for a different one.
+  async function reconcileCombatAfterFailure() {
+    try {
+      const state = await fetchCombatState(character.id, sessionId);
+      reconcileCombat(state.round, state.combatActive, state.updatedAt);
+    } catch (e) {
+      console.error("combat reconcile failed after mutation failure", e);
+    }
+  }
+
   // Combat lifecycle — local state first, best-effort audit log after.
   async function handleStartCombat() {
     startCombatState();
@@ -323,6 +343,10 @@ export function useTurnActions({
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (startCombat)", e);
+      // The optimistic startCombatState() above never landed server-side —
+      // reconcile onto the real state instead of leaving this client stuck
+      // showing an encounter the server may not agree exists (#1030 finding #1).
+      await reconcileCombatAfterFailure();
     }
   }
 
@@ -340,6 +364,10 @@ export function useTurnActions({
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (endCombat)", e);
+      // The optimistic endCombatState() above never landed server-side — in a
+      // solo session there's no other participant to later correct this via a
+      // poll (finding #1), so reconcile onto the real state right away.
+      await reconcileCombatAfterFailure();
     }
   }
 

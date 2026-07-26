@@ -14,7 +14,7 @@
  * live and joined; callers branch on that.
  */
 
-import { createContext, useContext, useCallback, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 
 import { useCombatPoll } from "@/features/session/useCombatPoll";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
@@ -38,11 +38,12 @@ export function TurnStateProvider({ children }: Props) {
   // why-comment) — not on `view.inCombat` — so a remote combat START is
   // still detected. `view` is non-null whenever `joined` is true (useTurnState's
   // own contract), so the syncCombat call below is always reachable when it fires.
-  const onSync = useCallback(
-    (round: number, combatActive: boolean, updatedAt: string) =>
-      view?.syncCombat(round, combatActive, updatedAt),
-    [view],
-  );
+  // Plain arrow, not useCallback: `view` is a fresh `{ ...state, ... }` object
+  // every render, so the memo never stayed stable anyway — useCombatPoll
+  // already reads this through a ref on every tick, so nothing is gained by
+  // memoizing it here.
+  const onSync = (round: number, combatActive: boolean, updatedAt: string) =>
+    view?.syncCombat(round, combatActive, updatedAt);
   useCombatPoll(character.id, sessionId, joined, onSync);
 
   return <TurnStateContext.Provider value={view}>{children}</TurnStateContext.Provider>;

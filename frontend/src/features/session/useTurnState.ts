@@ -362,6 +362,19 @@ export interface TurnStateActions {
    * economy stays local, per this hook's header comment.
    */
   syncCombat: (round: number, combatActive: boolean, updatedAt: string) => void;
+  /**
+   * Post-failure reconcile seam (#1030 finding #1): applies an authoritative
+   * refetch even when its `updatedAt` is not newer than `combatUpdatedAt` —
+   * unlike `syncCombat`, never rejected by the monotonic guard. For when a
+   * `startCombat`/`endCombat` call fails: the optimistic local flip never
+   * happened server-side, so the server's `updatedAt` is UNCHANGED from the
+   * last-applied baseline, and every future ordinary poll would report that
+   * same timestamp and be silently discarded by `syncCombat`'s guard, leaving
+   * the client stuck. This bypasses that specific case; it must never be
+   * wired to routine poll results, or the guard it deliberately skips would be
+   * pointless.
+   */
+  reconcileCombat: (round: number, combatActive: boolean, updatedAt: string) => void;
 }
 
 /**
@@ -760,10 +773,33 @@ function syncCombatState(
   updatedAt: string,
 ): TurnState {
   if (s.combatUpdatedAt !== null && updatedAt <= s.combatUpdatedAt) return s;
+  return applyCombatState(s, round, combatActive, updatedAt);
+}
+
+// Shared by syncCombatState (guarded) and reconcileCombatState (unguarded, see
+// TurnStateActions.reconcileCombat) so the two seams can never drift on what
+// "apply" means — only on whether the monotonic guard runs first.
+function applyCombatState(
+  s: TurnState,
+  round: number,
+  combatActive: boolean,
+  updatedAt: string,
+): TurnState {
   if (!s.inCombat && combatActive) return freshEncounterState(round, updatedAt);
   return s.round === round && s.inCombat === combatActive
     ? { ...s, combatUpdatedAt: updatedAt }
     : { ...s, round, inCombat: combatActive, combatUpdatedAt: updatedAt };
+}
+
+// Bypasses syncCombatState's monotonic guard entirely — see
+// TurnStateActions.reconcileCombat for when this is safe to call.
+function reconcileCombatState(
+  s: TurnState,
+  round: number,
+  combatActive: boolean,
+  updatedAt: string,
+): TurnState {
+  return applyCombatState(s, round, combatActive, updatedAt);
 }
 
 // Remaining transitions extracted for the reducer (#967).
@@ -898,7 +934,8 @@ type TurnAction =
   | { type: "markStunningStrikeUsed" }
   | { type: "markOpenHandRiderUsed" }
   | { type: "hydrate"; state: TurnState }
-  | { type: "syncCombat"; round: number; combatActive: boolean; updatedAt: string };
+  | { type: "syncCombat"; round: number; combatActive: boolean; updatedAt: string }
+  | { type: "reconcileCombat"; round: number; combatActive: boolean; updatedAt: string };
 
 // The action types whose transition pushes an undo snapshot (the former `mutate`
 // callers). refundAction and commitReactionSpell are facade aliases that dispatch
@@ -978,6 +1015,7 @@ const HANDLERS: TurnActionHandlers = {
     s.openHandRiderUsedThisTurn ? s : { ...s, openHandRiderUsedThisTurn: true },
   hydrate: (_s, a) => a.state,
   syncCombat: (s, a) => syncCombatState(s, a.round, a.combatActive, a.updatedAt),
+  reconcileCombat: (s, a) => reconcileCombatState(s, a.round, a.combatActive, a.updatedAt),
 };
 
 function turnReducer(state: TurnState, action: TurnAction): TurnState {
@@ -1104,6 +1142,8 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       markOpenHandRiderUsed: () => dispatch({ type: "markOpenHandRiderUsed" }),
       syncCombat: (round, combatActive, updatedAt) =>
         dispatch({ type: "syncCombat", round, combatActive, updatedAt }),
+      reconcileCombat: (round, combatActive, updatedAt) =>
+        dispatch({ type: "reconcileCombat", round, combatActive, updatedAt }),
     }),
     [],
   );
