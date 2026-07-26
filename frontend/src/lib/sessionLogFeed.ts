@@ -208,6 +208,10 @@ function buildAttackOnlyRow(e: CharacterEvent, round: number | undefined): FeedR
   };
 }
 
+// Forward-compat (#1237): RollEventData.target/outcome are reserved but never
+// populated (no enemy/target model — self-or-announce, CLAUDE.md). A future
+// "→ Goblin hit" continuation just appends one more LogSegment to `segments`
+// below — no restructuring needed when that data eventually exists.
 function buildSwingRow(
   attackEvent: CharacterEvent | undefined,
   damageEvent: CharacterEvent,
