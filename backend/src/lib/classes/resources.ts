@@ -16,6 +16,7 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "./class-features.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { toolsByCategory } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
 // Cross-domain HP heal for Uncanny Metabolism's bonusHeal (#1243) — precedented
@@ -595,6 +596,7 @@ const RESOURCES_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, subclass: true, level: true },
@@ -632,6 +634,7 @@ export async function applyResourceOpInTx(
     level,
     abilityScores,
     profBonus,
+    editionOf(row),
   );
 
   const state = normalizeResourcesMutable(row.resources);

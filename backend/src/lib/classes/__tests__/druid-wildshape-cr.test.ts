@@ -14,7 +14,7 @@ const ABILITIES = {
 };
 
 function wildShapeDescription(subclass: string | undefined, level: number): string | undefined {
-  const info = deriveResources("druid", subclass, level, ABILITIES, proficiencyBonusForLevel(level));
+  const info = deriveResources("druid", subclass, level, ABILITIES, proficiencyBonusForLevel(level), "EDITION_2024");
   return info?.resources.find((r) => r.key === "wildShape")?.description;
 }
 

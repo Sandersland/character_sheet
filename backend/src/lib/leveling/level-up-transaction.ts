@@ -146,6 +146,7 @@ export async function resolveLevelUpContext(
       classEntries: character.classEntries.map((e) => ({ name: e.name, subclass: e.subclass, level: e.level })),
       // #1101: the known-spell list the validator checks a swap forget against.
       spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
+      edition,
     },
     targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel },
     chosenSubclassName,

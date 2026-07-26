@@ -20,7 +20,7 @@ function char(
   subclass: string | null = null,
   spellEntries?: LevelUpPlanCharacter["spellEntries"],
 ): LevelUpPlanCharacter {
-  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], spellEntries };
+  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], spellEntries, edition: "EDITION_2024" };
 }
 
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {

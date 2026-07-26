@@ -330,7 +330,7 @@ interface KnownListConfig {
 async function loadResourcesReconcileState(
   ctx: ReconcileContext,
 ): Promise<{ state: ResourcesMutableState; derived: DerivedClassInfo | null } | null> {
-  const { tx, characterId, newDerivedLevel } = ctx;
+  const { tx, characterId, newDerivedLevel, edition } = ctx;
 
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -348,7 +348,8 @@ async function loadResourcesReconcileState(
   const state = normalizeResourcesMutable(row.resources);
   const abilityScores = row.abilityScores as Record<string, number>;
   const profBonus = proficiencyBonusForLevel(newDerivedLevel);
-  const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus);
+  // ctx.edition (not a fresh row read) — write-once (#1285), constant for the whole pass.
+  const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus, edition);
   return { state, derived };
 }
 

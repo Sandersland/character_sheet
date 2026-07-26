@@ -147,7 +147,14 @@ export type ExtrasFn = (
 ) => Partial<Omit<DerivedClassInfo, "resources" | "features">>;
 
 export interface SubclassDefinition {
-  /** Character level at which this subclass's features/resources/extras first apply. Defaults to 3. */
+  /**
+   * The PHB'14 (2014) level at which this subclass's features/resources/extras
+   * first apply — Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, everything else
+   * (or absent) 3. Resolved through subclassActiveAt (registry.ts's
+   * isSubclassActive), which hardcodes 3 for EDITION_2024 regardless of this
+   * value — mirrors CharacterClass.subclassLevel, the catalog-column half of
+   * the same 2014 gate (#1308/#1291).
+   */
   grantLevel?: number;
   features: DerivedFeature[];
   resourceFn?: ResourceFn;

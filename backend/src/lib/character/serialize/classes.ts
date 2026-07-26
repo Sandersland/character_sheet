@@ -30,7 +30,7 @@ export function buildResourcesView(
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
 ): { resources: object | undefined } {
-  const { derived: derivedRes } = deriveEntryScopedResources(row.classEntries, level, abilityScores, proficiencyBonus);
+  const { derived: derivedRes } = deriveEntryScopedResources(row.classEntries, level, abilityScores, proficiencyBonus, editionOf(row));
 
   const resources = derivedRes
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
