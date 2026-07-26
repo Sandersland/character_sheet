@@ -1,10 +1,7 @@
-/*
-  Warnings:
-
-  - Added the required column `updatedAt` to the `Session` table without a default value. This is not possible if the table is not empty.
-
-*/
--- AlterTable
+-- AlterTable: backfill existing rows' updatedAt via a transient default, then
+-- drop it so @updatedAt stays application-managed (mirrors the Campaign/
+-- CampaignMembership updatedAt migration).
 ALTER TABLE "Session" ADD COLUMN     "combatActive" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN     "round" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL;
+ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Session" ALTER COLUMN "updatedAt" DROP DEFAULT;
