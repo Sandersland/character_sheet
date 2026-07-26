@@ -95,6 +95,23 @@ describe("CampaignsPage (#246)", () => {
     expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("Classic Table", "EDITION_2014");
   });
 
+  // #1286: there is no PATCH /campaigns/:id — the edition is immutable from the
+  // moment of creation, not just "until the first character joins" (that copy
+  // implied an editing window that doesn't exist).
+  it("states the edition is fixed at creation, not editable-until-first-join", async () => {
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no campaigns yet/i);
+    expect(screen.getByText(/can't be changed after the campaign is created/i)).toBeInTheDocument();
+    expect(screen.queryByText(/once the first character joins/i)).not.toBeInTheDocument();
+  });
+
   it("does not render a join-by-code form", async () => {
     vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
 

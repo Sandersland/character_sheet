@@ -100,8 +100,8 @@ export default function CampaignsPage() {
               <span className={labelCls}>Rules edition</span>
               <EditionPicker value={rulesEdition} onChange={setRulesEdition} label="Rules edition" />
               <p className="text-xs text-parchment-500">
-                Sets the default every new character joining this campaign starts with. Locked in once the
-                first character joins.
+                Sets the rules every character joining this campaign must use. Can't be changed after the
+                campaign is created.
               </p>
             </div>
             <button type="submit" className={primaryBtn} disabled={pending || !name.trim()}>
