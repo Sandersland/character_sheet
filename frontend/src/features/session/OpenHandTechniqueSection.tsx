@@ -64,7 +64,7 @@ export default function OpenHandTechniqueSection({
     <div className="flex flex-col gap-1.5 rounded-control border border-gold-200 bg-gold-50 p-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-gold-800">
-          Open Hand Technique · DC {openHandTechnique.dc}
+          Open Hand Technique · DC {openHandTechnique.saveDC}
         </span>
         {used && (
           <span className="text-[10px] font-semibold uppercase tracking-wide text-parchment-500">

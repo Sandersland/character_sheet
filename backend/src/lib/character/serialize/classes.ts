@@ -19,24 +19,27 @@ export type PrimaryClass = CharacterWithRelations["classEntries"][number] | unde
 
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
 // layer stored `used` counts and known lists (clamped to caps). Returns the
-// resources view (undefined for classes with no pools). Fighting Style is a feat
-// now (#1137) — surfaced via top-level fightingStyleSlots + advancements, not here.
-// The choice-cap fields are entry-scoped (#1177) via deriveEntryScopedResources —
-// mirrors loadResourcesReconcileState (level-reconciliation.ts) so both sides
-// compute the legal limit through the one shared rule function.
+// resources view (undefined for classes with no pools) plus the raw
+// maneuverSaveDC number — serializeCharacter folds it into the top-level
+// `maneuvers` rider (#1316), so it isn't part of the resources payload.
+// Fighting Style is a feat now (#1137) — surfaced via top-level
+// fightingStyleSlots + advancements, not here. The choice-cap fields are
+// entry-scoped (#1177) via deriveEntryScopedResources — mirrors
+// loadResourcesReconcileState (level-reconciliation.ts) so both sides compute
+// the legal limit through the one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined } {
+): { resources: object | undefined; maneuverSaveDC: number | undefined } {
   const { derived: derivedRes } = deriveEntryScopedResources(row.classEntries, level, abilityScores, proficiencyBonus, editionOf(row));
 
   const resources = derivedRes
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
     : undefined;
 
-  return { resources };
+  return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC };
 }
 
 // Assemble the wire `resources` payload from the derived caps + stored mutable
@@ -63,7 +66,6 @@ function buildResourcesPayload(
   return {
     features: derivedRes.features,
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
-    maneuverSaveDC: derivedRes.maneuverSaveDC,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
     elementalAttunementAvailable: derivedRes.elementalAttunementAvailable,
     elementalBurstAvailable: derivedRes.elementalBurstAvailable,

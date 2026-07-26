@@ -154,8 +154,10 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(res.body.resources.pools.find((p: Pool & { die?: string }) => p.key === "superiorityDice").die).toBe("d8");
     expect(res.body.resources.maneuverChoiceCount).toBe(3);
     expect(res.body.resources.toolProfChoiceCount).toBe(1);
-    // Str 16 (+3), prof +2 → maneuver save DC 13.
-    expect(res.body.resources.maneuverSaveDC).toBe(13);
+    // Str 16 (+3), prof +2 → maneuver save DC 13. Folded into the rider
+    // contract (#1316) — top-level, not nested in resources; named for the
+    // feature (`maneuvers`), like every other rider.
+    expect(res.body.maneuvers).toEqual({ saveDC: 13 });
   });
 
   // ── spendResource ─────────────────────────────────────────────────────────

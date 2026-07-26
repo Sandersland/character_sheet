@@ -5,6 +5,8 @@ import ManeuverRow from "@/features/class/ManeuverRow";
 interface Props {
   characterId: string;
   resources: CharacterResources;
+  /** The `maneuvers` rider's saveDC (#1316) — a top-level Character field, not part of `resources`. */
+  maneuverSaveDC?: number;
   maneuverKnownIds: string[];
   busy: boolean;
   onLearn: (op: LearnManeuverOperation) => void;
@@ -14,6 +16,7 @@ interface Props {
 export default function ManeuversSection({
   characterId,
   resources,
+  maneuverSaveDC,
   maneuverKnownIds,
   busy,
   onLearn,
@@ -28,10 +31,10 @@ export default function ManeuversSection({
         {busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
       </div>
 
-      {resources.maneuverSaveDC !== undefined && (
+      {maneuverSaveDC !== undefined && (
         <p className="mb-3 text-xs text-parchment-600">
           Maneuver Save DC:{" "}
-          <span className="font-semibold text-parchment-900">{resources.maneuverSaveDC}</span>
+          <span className="font-semibold text-parchment-900">{maneuverSaveDC}</span>
         </p>
       )}
 
