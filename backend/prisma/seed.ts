@@ -18,6 +18,9 @@ import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
+import { editionOrShared, resolveEditionRow, upsertEditionRow } from "../src/lib/rules/catalog-edition.js";
+import { staleFeatWhere } from "./seed/prune.js";
+import type { SeedEdition } from "./seed/edition.js";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -70,16 +73,21 @@ async function seedClasses(prisma: PrismaClient) {
   return classIds;
 }
 
-// Upsert by (classId, name) unique constraint.
+// Upsert by (classId, name, edition) unique constraint — edition defaults to
+// null (shared) when a SubclassSeed row doesn't set one (#1306). Prisma's
+// compound-key `where: { classId_name: {...} }` shorthand can't express a null
+// edition (see upsertEditionRow), so this finds-then-writes instead.
 async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string>) {
   for (const sub of SUBCLASSES) {
     const classId = classIds.get(sub.className);
     if (!classId) throw new Error(`Seed error: unknown class "${sub.className}" in SUBCLASSES`);
-    await prisma.subclass.upsert({
-      where: { classId_name: { classId, name: sub.name } },
-      create: { classId, name: sub.name, description: sub.description },
-      update: { description: sub.description },
-    });
+    const edition = sub.edition ?? null;
+    await upsertEditionRow(
+      prisma.subclass,
+      { classId, name: sub.name, edition },
+      { classId, name: sub.name, description: sub.description, edition },
+      { description: sub.description },
+    );
   }
 }
 
@@ -93,8 +101,11 @@ async function upsertGrantedSpell(
 ) {
   const classId = classIds.get(g.className);
   if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
-  const subclass = await prisma.subclass.findUnique({
-    where: { classId_name: { classId, name: g.subclassName } },
+  // Every seeded subclass is edition: null (shared) today (#1306) — no granted
+  // spell yet targets an edition-forked subclass. findFirst, not findUnique:
+  // the compound-key shorthand can't express a null edition (upsertEditionRow).
+  const subclass = await prisma.subclass.findFirst({
+    where: { classId, name: g.subclassName, edition: null },
     select: { id: true },
   });
   if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
@@ -125,6 +136,9 @@ async function seedActions(prisma: PrismaClient) {
       grantLevel: orNull(action.grantLevel),
       resourceKey: orNull(action.resourceKey),
       resourceAmount: orNull(action.resourceAmount),
+      // NULL = shared (#1306). Action.key stays plain @unique (no divergent
+      // action exists yet), so this is data-only — not part of the where key.
+      edition: orNull(action.edition),
     };
     await prisma.action.upsert({
       where: { key: action.key },
@@ -245,15 +259,19 @@ async function seedChannelDivinities(prisma: PrismaClient) {
   }
 }
 
-// Seed feat catalog — upsert by unique name, then drop stale (2014) rows. Taken
+// Seed feat catalog — upsert by (name, edition), then drop stale rows. Taken
 // feats snapshot their improvements into the character, so a deleted catalog row
 // leaves existing advancements intact (no FK).
 async function seedFeats(prisma: PrismaClient) {
   for (const feat of FEATS) {
-    await prisma.feat.upsert({
-      where: { name: feat.name },
-      create: feat,
-      update: {
+    const edition = feat.edition ?? null;
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't
+    // express a null edition.
+    await upsertEditionRow(
+      prisma.feat,
+      { name: feat.name, edition },
+      { ...feat, edition },
+      {
         description: feat.description,
         category: feat.category,
         levelPrerequisite: orNull(feat.levelPrerequisite),
@@ -263,39 +281,62 @@ async function seedFeats(prisma: PrismaClient) {
         abilityIncrease: orElse(feat.abilityIncrease, 0),
         improvements: orElse(feat.improvements, []),
       },
-    });
+    );
   }
+  const staleWhere = staleFeatWhere(FEATS.map((f) => ({ name: f.name, edition: f.edition ?? null })));
   // Log before the destructive drop so the operator sees what's removed (a future
-  // homebrew feat row not in FEATS would be dropped here — intentional for 2014 rows).
-  const stale = await prisma.feat.findMany({
-    where: { name: { notIn: FEATS.map((f) => f.name) } },
-    select: { name: true },
-  });
-  if (stale.length) console.log(`seedFeats: dropping stale catalog rows: ${stale.map((f) => f.name).join(", ")}`);
-  await prisma.feat.deleteMany({ where: { name: { notIn: FEATS.map((f) => f.name) } } });
+  // homebrew feat row not in FEATS would be dropped here — intentional for a
+  // genuinely retired row of either edition).
+  const stale = await prisma.feat.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedFeats: dropping stale catalog rows: ${stale.map((f) => `${f.name} (${f.edition ?? "shared"})`).join(", ")}`);
+  }
+  await prisma.feat.deleteMany({ where: staleWhere });
 }
 
 // Resolves a background's originFeatName to a Feat id (feats seed first, so the
 // row exists); throws on an unknown name. Two backgrounds (Acolyte/Sage) share
 // the repeatable Magic Initiate row; the class flavor is a creation-time
 // snapshot, not a column.
+// An Origin feat grant is PHB'24-only (Background model comment: "Empty/null
+// for spec-less 2014 legacy rows"), so this resolves through the SAME
+// exact-then-NULL fallback every other catalog read uses (resolveEditionRow),
+// pinned to EDITION_2024 — not a bare `edition: null` lookup, which broke the
+// moment Alert forked (#1306): Criminal's Origin feat is 2024-tagged Alert,
+// with no shared row left to match a null-only query.
 async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS)[number]): Promise<string | null> {
   if (!bg.originFeatName) return null;
-  const feat = await prisma.feat.findUnique({ where: { name: bg.originFeatName }, select: { id: true } });
+  const candidates = await prisma.feat.findMany({
+    where: { name: bg.originFeatName, ...editionOrShared("EDITION_2024") },
+    select: { id: true, edition: true },
+  });
+  const feat = resolveEditionRow(candidates, "EDITION_2024");
   if (!feat) throw new Error(`seedBackgrounds: unknown origin feat "${bg.originFeatName}" for background "${bg.name}"`);
   return feat.id;
 }
 
+// Split out of seedBackgrounds to keep that loop's own complexity low — pure
+// field defaulting plus the one async origin-feat lookup.
+async function backgroundSeedData(
+  prisma: PrismaClient,
+  background: (typeof BACKGROUNDS)[number],
+  edition: SeedEdition | null,
+) {
+  return {
+    name: background.name,
+    skillProficiencies: background.skillProficiencies,
+    toolProficiencies: background.toolProficiencies ?? [],
+    abilityChoices: background.abilityChoices ?? [],
+    originFeatId: await resolveOriginFeatId(prisma, background),
+    edition,
+  };
+}
+
 async function seedBackgrounds(prisma: PrismaClient) {
   for (const background of BACKGROUNDS) {
-    const data = {
-      name: background.name,
-      skillProficiencies: background.skillProficiencies,
-      toolProficiencies: background.toolProficiencies ?? [],
-      abilityChoices: background.abilityChoices ?? [],
-      originFeatId: await resolveOriginFeatId(prisma, background),
-    };
-    await prisma.background.upsert({ where: { name: background.name }, create: data, update: data });
+    const edition = background.edition ?? null;
+    const data = await backgroundSeedData(prisma, background, edition);
+    await upsertEditionRow(prisma.background, { name: background.name, edition }, data, data);
   }
 }
 

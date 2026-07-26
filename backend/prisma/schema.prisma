@@ -618,11 +618,19 @@ model Subclass {
   class       CharacterClass @relation(fields: [classId], references: [id], onDelete: Cascade)
   name        String
   description String
+  // NULL = valid in both editions; a diverging subclass (gate level, grants)
+  // forks into one row per edition sharing this name (#1306). Kept named
+  // "classId_name" (not classId_name_edition) so the compound-key literal at
+  // every existing call site only grows an `edition` field, not a rename.
+  // NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow
+  // in lib/rules/catalog-edition.ts, the single place the exact/NULL fallback
+  // ordering is expressed.
+  edition     RulesEdition?
 
   selections    CharacterClassEntry[]
   grantedSpells SubclassGrantedSpell[]
 
-  @@unique([classId, name])
+  @@unique([classId, name, edition], name: "classId_name")
 }
 
 // A spell a subclass grants for free (always-prepared), keyed to the shared Spell
@@ -649,17 +657,25 @@ model SubclassGrantedSpell {
 }
 
 model Background {
-  id                 String   @id @default(uuid())
-  name               String   @unique
+  id                 String        @id @default(uuid())
+  name               String
   skillProficiencies String[]
-  toolProficiencies  String[] @default([])
+  toolProficiencies  String[]      @default([])
   // PHB'24: each background grants +3 ability points across these three abilities
   // (2+1 or 1+1+1) plus one Origin feat. Empty/null for spec-less 2014 legacy rows.
-  abilityChoices     String[] @default([])
+  abilityChoices     String[]      @default([])
   originFeatId       String?
-  originFeat         Feat?    @relation(fields: [originFeatId], references: [id], onDelete: SetNull)
+  originFeat         Feat?         @relation(fields: [originFeatId], references: [id], onDelete: SetNull)
+  // NULL = valid in both editions; only a genuinely diverging background forks
+  // into one row per edition sharing this name (#1306). The migration's unique
+  // index on (name, edition) uses NULLS NOT DISTINCT so two NULL-edition rows
+  // sharing a name are still rejected — see resolveEditionRow in
+  // lib/rules/catalog-edition.ts, the single place the fallback ordering lives.
+  edition            RulesEdition?
 
   selections CharacterBackground[]
+
+  @@unique([name, edition])
 }
 
 // --- Per-character selections -----------------------------------------------
@@ -914,6 +930,12 @@ model Action {
   // just two columns that let deriveActions check remaining > amount.
   resourceKey    String? // matches DerivedResource.key, e.g. "rage"
   resourceAmount Int?    // units required; null means no resource check needed
+
+  // NULL = valid in both editions (#1306). `key` stays plainly @unique for now
+  // — no divergent Action content exists yet, so widening it to an
+  // edition-aware compound (like Feat/Subclass/Background) is deferred to
+  // whichever future issue actually forks an action by edition.
+  edition RulesEdition?
 }
 
 enum ActionCost {
@@ -968,6 +990,12 @@ model GrantedAbility {
   // target while the granting concentration holds. null = not a buff.
   buffTarget         String?
   buffModifier       Int?
+
+  // NULL = valid in both editions (#1306). `name` stays plainly @unique for now
+  // — no divergent maneuver/shadow-art/channel-divinity content exists yet, so
+  // widening it to an edition-aware compound (like Feat/Subclass/Background) is
+  // deferred to whichever future issue actually forks one of these by edition.
+  edition RulesEdition?
 }
 
 // Feat catalog — seeded from a curated SRD subset. Provenance pointer in
@@ -984,19 +1012,27 @@ enum FeatCategory {
 }
 
 model Feat {
-  id                String       @id @default(uuid())
-  name              String       @unique
+  id                String        @id @default(uuid())
+  name              String
   description       String
   prerequisite      String?
-  category          FeatCategory @default(general)
-  levelPrerequisite Int?         // General ⇒ 4, Epic Boon ⇒ 19 (PHB'24)
-  repeatable        Boolean      @default(false)
-  abilityOptions    String[]     @default([]) // abilities the player may raise by abilityIncrease
-  abilityIncrease   Int          @default(0)  // usually 1 for half-feats
-  improvements      Json         @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
+  category          FeatCategory  @default(general)
+  levelPrerequisite Int?          // General ⇒ 4, Epic Boon ⇒ 19 (PHB'24)
+  repeatable        Boolean       @default(false)
+  abilityOptions    String[]      @default([]) // abilities the player may raise by abilityIncrease
+  abilityIncrease   Int           @default(0)  // usually 1 for half-feats
+  improvements      Json          @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
+  // NULL = valid in both editions; a diverging feat (e.g. Alert) forks into one
+  // row per edition sharing this name (#1306). The migration's unique index on
+  // (name, edition) uses NULLS NOT DISTINCT so two NULL-edition rows sharing a
+  // name are still rejected — see resolveEditionRow in lib/rules/catalog-edition.ts,
+  // the single place the exact/NULL fallback ordering is expressed.
+  edition           RulesEdition?
 
   // Backgrounds that grant this feat as their Origin feat (PHB'24).
   originForBackgrounds Background[]
+
+  @@unique([name, edition])
 }
 
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from
