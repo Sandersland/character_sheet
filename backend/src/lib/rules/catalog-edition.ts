@@ -26,42 +26,53 @@ export function resolveEditionRow<T extends EditionTagged>(
 }
 
 /**
- * Prisma `where` fragment selecting only the rows a character's edition can
- * ever resolve to (its own edition, or the shared NULL row) — narrows a
- * `findMany` before handing the (at most two) candidates to
- * `resolveEditionRow`, rather than fetching every edition's rows.
+ * Composes a Prisma `where` with the edition-or-shared constraint (narrows a
+ * `findMany` before handing the at-most-two candidates to `resolveEditionRow`,
+ * rather than fetching every edition's rows). Takes the caller's `where` as
+ * an argument and nests it inside an outer `AND` — a spreadable fragment
+ * (`{ ...where, ...editionOrShared(edition) }`) was tried first and rejected:
+ * whichever top-level key the fragment used (`OR` or `AND`), spreading it
+ * silently clobbered a sibling use of THAT SAME key at the call site — proven
+ * empirically for both shapes, not assumed. Passing `where` in as a value
+ * (never spread) makes clobbering structurally impossible regardless of what
+ * keys the caller's own filter uses.
  *
- * Wrapped in `AND` (not a bare `{ OR: [...] }`) so `{ ...someWhere,
- * ...editionOrShared(edition) }` can never silently clobber a sibling `OR` at
- * the same call site — a real risk once a caller's own filter needs an `OR`
- * too, and the wrong answer would be a silently-too-broad query, not a type
- * error. (A nullable-enum `{ in: [edition, null] }` looks like the obvious
+ * (A nullable-enum `{ in: [edition, null] }` looks like an even simpler
  * alternative but Prisma rejects `null` inside `in` outright — verified
  * directly against this schema, not assumed.)
  */
-export function editionOrShared(edition: RulesEdition): { AND: [{ OR: [{ edition: RulesEdition }, { edition: null }] }] } {
-  return { AND: [{ OR: [{ edition }, { edition: null }] }] };
+export function withEditionOrShared<Where extends object>(
+  where: Where,
+  edition: RulesEdition,
+): { AND: [Where, { OR: [{ edition: RulesEdition }, { edition: null }] }] } {
+  return { AND: [where, { OR: [{ edition }, { edition: null }] }] };
 }
 
 /**
  * Resolve a full catalog LIST for a character's edition — groups candidates
- * by `name` (their business key) and applies `resolveEditionRow` per group,
+ * by `keyOf` (their business key) and applies `resolveEditionRow` per group,
  * so a caller serving a picker (e.g. `GET /api/feats`) returns exactly one
- * row per name instead of every edition's rows. Order of the input is
- * preserved for each group's first occurrence.
+ * row per key instead of every edition's rows. `keyOf` is required rather
+ * than defaulting to `row.name`: Feat/GrantedAbility/Action/Background key on
+ * name alone, but Subclass's business key is `(classId, name)` — a bare
+ * name-default would silently collapse two same-named subclasses under
+ * different classes. Order of the input is preserved for each group's first
+ * occurrence.
  */
-export function resolveEditionCatalog<T extends EditionTagged & { name: string }>(
+export function resolveEditionCatalog<T extends EditionTagged>(
   rows: T[],
   edition: RulesEdition,
+  keyOf: (row: T) => string,
 ): T[] {
-  const byName = new Map<string, T[]>();
+  const byKey = new Map<string, T[]>();
   for (const row of rows) {
-    const group = byName.get(row.name);
+    const key = keyOf(row);
+    const group = byKey.get(key);
     if (group) group.push(row);
-    else byName.set(row.name, [row]);
+    else byKey.set(key, [row]);
   }
   const resolved: T[] = [];
-  for (const group of byName.values()) {
+  for (const group of byKey.values()) {
     const row = resolveEditionRow(group, edition);
     if (row) resolved.push(row);
   }

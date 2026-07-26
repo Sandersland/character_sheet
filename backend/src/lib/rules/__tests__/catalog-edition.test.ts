@@ -3,7 +3,7 @@
 // edition-tagged catalogs (Feat, Subclass, GrantedAbility, Action, Background).
 import { describe, expect, it } from "vitest";
 
-import { editionOrShared, resolveEditionCatalog, resolveEditionRow } from "@/lib/rules/catalog-edition.js";
+import { resolveEditionCatalog, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 
 interface Row {
   id: string;
@@ -64,30 +64,68 @@ describe("resolveEditionCatalog", () => {
       { name: "Alert", id: "alert-2024", edition: "EDITION_2024" },
       { name: "Grappler", id: "grappler-shared", edition: null },
     ];
-    const for2014 = resolveEditionCatalog(rows, "EDITION_2014");
-    const for2024 = resolveEditionCatalog(rows, "EDITION_2024");
+    const keyOf = (r: NamedRow) => r.name;
+    const for2014 = resolveEditionCatalog(rows, "EDITION_2014", keyOf);
+    const for2024 = resolveEditionCatalog(rows, "EDITION_2024", keyOf);
 
     expect(for2014.map((r) => r.id).sort()).toEqual(["alert-2014", "grappler-shared"]);
     expect(for2024.map((r) => r.id).sort()).toEqual(["alert-2024", "grappler-shared"]);
   });
 
-  it("drops a name entirely when no row matches the given edition", () => {
+  it("drops a key entirely when no row matches the given edition", () => {
     const rows: NamedRow[] = [{ name: "Only2024", id: "x", edition: "EDITION_2024" }];
-    expect(resolveEditionCatalog(rows, "EDITION_2014")).toEqual([]);
+    expect(resolveEditionCatalog(rows, "EDITION_2014", (r) => r.name)).toEqual([]);
+  });
+
+  it("keys on more than name when keyOf says so (Subclass's real key is classId+name)", () => {
+    interface SubclassLikeRow {
+      classId: string;
+      name: string;
+      id: string;
+      edition: "EDITION_2014" | "EDITION_2024" | null;
+    }
+    // Same name, different classes — a name-only key would wrongly collapse these.
+    const rows: SubclassLikeRow[] = [
+      { classId: "fighter", name: "Champion", id: "fighter-champion", edition: null },
+      { classId: "monk", name: "Champion", id: "monk-champion", edition: null },
+    ];
+    const resolved = resolveEditionCatalog(rows, "EDITION_2024", (r) => `${r.classId}::${r.name}`);
+    expect(resolved.map((r) => r.id).sort()).toEqual(["fighter-champion", "monk-champion"]);
   });
 });
 
-describe("editionOrShared", () => {
+describe("withEditionOrShared", () => {
   it("builds an AND-wrapped OR fragment matching the exact edition or the NULL row", () => {
-    expect(editionOrShared("EDITION_2014")).toEqual({
-      AND: [{ OR: [{ edition: "EDITION_2014" }, { edition: null }] }],
+    expect(withEditionOrShared({ name: "Alert" }, "EDITION_2014")).toEqual({
+      AND: [{ name: "Alert" }, { OR: [{ edition: "EDITION_2014" }, { edition: null }] }],
     });
   });
 
-  it("spreading it alongside a sibling `where.OR` does not clobber that sibling", () => {
-    const siblingOr = [{ name: "a" }, { name: "b" }];
-    const where = { OR: siblingOr, ...editionOrShared("EDITION_2024") };
-    expect(where.OR).toBe(siblingOr);
-    expect(where.AND).toEqual([{ OR: [{ edition: "EDITION_2024" }, { edition: null }] }]);
+  it("composing it does not clobber a sibling `OR` on the caller's where", () => {
+    const callerWhere = { name: "Alert", OR: [{ category: "origin" }, { category: "general" }] };
+    const composed = withEditionOrShared(callerWhere, "EDITION_2024");
+    expect(composed).toEqual({
+      AND: [
+        { name: "Alert", OR: [{ category: "origin" }, { category: "general" }] },
+        { OR: [{ edition: "EDITION_2024" }, { edition: null }] },
+      ],
+    });
+    // The caller's own OR survives intact, nested inside the outer AND.
+    expect(composed.AND[0]).toBe(callerWhere);
+  });
+
+  it("composing it does not clobber a sibling `AND` on the caller's where — the exact regression a spreadable fragment hit", () => {
+    const callerWhere = { name: "Alert", AND: [{ category: "general" }] };
+    const composed = withEditionOrShared(callerWhere, "EDITION_2014");
+    expect(composed).toEqual({
+      AND: [
+        { name: "Alert", AND: [{ category: "general" }] },
+        { OR: [{ edition: "EDITION_2014" }, { edition: null }] },
+      ],
+    });
+    // The caller's own AND survives intact, nested inside the outer AND —
+    // a spreadable `{...where, ...fragment}` shape would have overwritten
+    // this key with the fragment's own AND instead.
+    expect(composed.AND[0]).toBe(callerWhere);
   });
 });

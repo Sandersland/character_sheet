@@ -9,17 +9,32 @@ import type { SeedEdition } from "./edition.js";
 // OWN edition is NULL, which silently poisons a mixed-edition NOT/OR — the
 // exact NULL-comparison trap NULLS NOT DISTINCT exists to guard against.
 //
+// `extraWhere` (e.g. `{ source: "shadowArts" }`) is ANDed in as a value, never
+// spread — the same clobber the caller could hit spreading a bare `{OR:...}`
+// fragment (see withEditionOrShared) applies here too, so this composes the
+// caller's filter in rather than exposing one.
+//
 // Model-agnostic by shape (any table with `name`/`edition` columns), so
 // seedFeats and seedShadowArts's GrantedAbility prune share this one function
-// rather than two copies — GrantedAbility.name stays plain @unique today (no
-// divergent row can exist to disambiguate yet), so this is currently a no-op
-// improvement there, ready the day a maneuver/shadow-art forks by edition.
-export function staleCatalogRowsWhere(seeded: { name: string; edition: SeedEdition | null }[]) {
+// rather than two copies. GrantedAbility.name stays plain @unique today (no
+// divergent row CAN exist to disambiguate — that needs a migration widening
+// the constraint first, not just a code change), so partitioning changes no
+// observable behavior there yet; it only stops being a no-op once that
+// migration lands and a row actually forks.
+export function staleCatalogRowsWhere(
+  seeded: { name: string; edition: SeedEdition | null }[],
+  extraWhere: object = {},
+) {
   const editions: (SeedEdition | null)[] = [null, "EDITION_2014", "EDITION_2024"];
   return {
-    OR: editions.map((edition) => ({
-      edition,
-      name: { notIn: seeded.filter((f) => f.edition === edition).map((f) => f.name) },
-    })),
+    AND: [
+      extraWhere,
+      {
+        OR: editions.map((edition) => ({
+          edition,
+          name: { notIn: seeded.filter((f) => f.edition === edition).map((f) => f.name) },
+        })),
+      },
+    ],
   };
 }

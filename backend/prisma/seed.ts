@@ -18,7 +18,7 @@ import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
-import { editionOrShared, resolveEditionRow, upsertEditionRow } from "../src/lib/rules/catalog-edition.js";
+import { resolveEditionRow, upsertEditionRow, withEditionOrShared } from "../src/lib/rules/catalog-edition.js";
 import { staleCatalogRowsWhere } from "./seed/prune.js";
 import type { SeedEdition } from "./seed/edition.js";
 
@@ -202,13 +202,13 @@ async function seedShadowArts(prisma: PrismaClient) {
     });
   }
   // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — same
-  // edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306), AND'd
-  // with source: "shadowArts" so this never touches maneuvers/channelDivinity
-  // rows sharing the same table.
-  const staleWhere = {
-    source: "shadowArts",
-    ...staleCatalogRowsWhere(SHADOW_ARTS.map((a) => ({ name: a.name, edition: null }))),
-  };
+  // edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306); source:
+  // "shadowArts" passed in as extraWhere so this never touches
+  // maneuvers/channelDivinity rows sharing the same table.
+  const staleWhere = staleCatalogRowsWhere(
+    SHADOW_ARTS.map((a) => ({ name: a.name, edition: null })),
+    { source: "shadowArts" },
+  );
   const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true } });
   if (stale.length) console.log(`seedShadowArts: dropping stale catalog rows: ${stale.map((a) => a.name).join(", ")}`);
   await prisma.grantedAbility.deleteMany({ where: staleWhere });
@@ -311,7 +311,7 @@ async function seedFeats(prisma: PrismaClient) {
 async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS)[number]): Promise<string | null> {
   if (!bg.originFeatName) return null;
   const candidates = await prisma.feat.findMany({
-    where: { name: bg.originFeatName, ...editionOrShared("EDITION_2024") },
+    where: withEditionOrShared({ name: bg.originFeatName }, "EDITION_2024"),
     select: { id: true, edition: true },
   });
   const feat = resolveEditionRow(candidates, "EDITION_2024");

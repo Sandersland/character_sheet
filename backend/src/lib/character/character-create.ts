@@ -28,7 +28,7 @@ import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
-import { editionOrShared, resolveEditionRow } from "@/lib/rules/catalog-edition.js";
+import { resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -144,7 +144,7 @@ async function resolveSubclassName(
 ): Promise<{ subclassId: string | null; subclassName: string }> {
   if (subclassGateLevel(characterClass.subclassLevel, edition) <= 1) {
     const candidates = await prisma.subclass.findMany({
-      where: { classId: characterClass.id, name, ...editionOrShared(edition) },
+      where: withEditionOrShared({ classId: characterClass.id, name }, edition),
       select: { id: true, name: true, edition: true },
     });
     const match = resolveEditionRow(candidates, edition);
@@ -309,7 +309,7 @@ async function resolveSelections(
     where: { name: primaryClassChoice.name },
   });
   const backgroundCandidates = await prisma.background.findMany({
-    where: { name: input.background, ...editionOrShared(edition) },
+    where: withEditionOrShared({ name: input.background }, edition),
     include: { originFeat: true },
   });
   const background = resolveEditionRow(backgroundCandidates, edition) ?? null;
@@ -397,12 +397,18 @@ function applyBackgroundSpread(
 // NAME against THIS character's edition (#1306) rather than trust whichever
 // row got baked — Alert forks by edition, so a 2014 character creating with a
 // background whose baked FK happens to point at the 2024 row must still land
-// on the 2014 row. Falls back to the baked row when no closer match exists.
+// on the 2014 row. No fallback to the baked row on a miss: silently snapshotting
+// the OTHER edition's mechanics into a permanent AdvancementEntry is exactly the
+// contamination this function exists to prevent, so grant nothing rather than
+// grant the wrong thing (unreachable today — every seeded origin feat has a
+// null/shared row every edition can fall back to — but a knowingly-wrong write
+// is still the wrong shape to leave in).
 async function buildOriginEntry(background: ResolvedBackground, edition: RulesEdition): Promise<AdvancementEntry | null> {
   if (!background?.originFeat) return null;
   const baked = background.originFeat;
-  const candidates = await prisma.feat.findMany({ where: { name: baked.name, ...editionOrShared(edition) } });
-  const feat = resolveEditionRow(candidates, edition) ?? baked;
+  const candidates = await prisma.feat.findMany({ where: withEditionOrShared({ name: baked.name }, edition) });
+  const feat = resolveEditionRow(candidates, edition);
+  if (!feat) return null;
   const flavor = feat.name === "Magic Initiate" ? MAGIC_INITIATE_CLASS_BY_BACKGROUND[background.name] : undefined;
   const featDescription = flavor ? `${feat.description}\n\nBackground grant: ${flavor} spell list.` : feat.description;
   return {
