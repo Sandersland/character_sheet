@@ -329,6 +329,15 @@ export interface TurnStateActions {
   markStunningStrikeUsed: () => void;
   /** Mark Open Hand Technique's rider imposed this turn — enforces the once-per-turn guard (#1245). */
   markOpenHandRiderUsed: () => void;
+  /**
+   * Server-event seam (#1030): overwrite `round`/`inCombat` from a poll or a
+   * just-confirmed combat/start|end|round response — the ONLY way `round`
+   * ever changes now (the client never guesses it, see endTurnState). Touches
+   * nothing else: action-economy fields (actionsRemaining/bonusActionUsed/
+   * reactionUsed/attack/…) stay local and unaffected even if this reports
+   * combat ending remotely — an explicit acceptance criterion, not an oversight.
+   */
+  syncCombat: (round: number, combatActive: boolean) => void;
 }
 
 /**
@@ -685,12 +694,14 @@ function undoState(s: TurnState): TurnState {
 function endTurnState(s: TurnState): TurnState {
   // Out-of-combat (shouldn't normally happen now, but safe fallback).
   if (!s.inCombat) return initialState();
-  // Stay in combat — return to idle within the same encounter, advancing the
-  // round counter. The round log event is fired by TurnHub. Reset the activity
-  // window HERE (not in startTurn): handleEndTurn has already evaluated the
-  // durable-buff auto-end against these flags, so clearing them now opens a
-  // fresh window that still captures damage/attacks taken before the next
-  // startTurn (out-of-turn / enemy turns).
+  // Stay in combat — return to idle within the same encounter. Round is
+  // deliberately NOT bumped here (#1030): the server decides the next round
+  // (advanceCombatRound), and useTurnActions' handleEndTurn dispatches
+  // syncCombat once that call resolves — round only ever changes there. Reset
+  // the activity window HERE (not in startTurn): handleEndTurn has already
+  // evaluated the durable-buff auto-end against these flags, so clearing them
+  // now opens a fresh window that still captures damage/attacks taken before
+  // the next startTurn (out-of-turn / enemy turns).
   return {
     ...s,
     phase: "idle",
@@ -701,7 +712,6 @@ function endTurnState(s: TurnState): TurnState {
     attackTally: [],
     castTally: [],
     spellCastThisTurn: {},
-    round: s.round + 1,
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
@@ -712,6 +722,11 @@ function endTurnState(s: TurnState): TurnState {
     history: [],
   };
 }
+
+// The server-event seam (#1030): overwrite ONLY round/inCombat, never the
+// economy fields — see TurnStateActions.syncCombat for why that's absolute.
+const syncCombatState = (s: TurnState, round: number, combatActive: boolean): TurnState =>
+  s.round === round && s.inCombat === combatActive ? s : { ...s, round, inCombat: combatActive };
 
 // Remaining transitions extracted for the reducer (#967).
 function startCombatState(): TurnState {
@@ -835,7 +850,8 @@ type TurnAction =
   | { type: "markSneakAttackUsed" }
   | { type: "markStunningStrikeUsed" }
   | { type: "markOpenHandRiderUsed" }
-  | { type: "hydrate"; state: TurnState };
+  | { type: "hydrate"; state: TurnState }
+  | { type: "syncCombat"; round: number; combatActive: boolean };
 
 // The action types whose transition pushes an undo snapshot (the former `mutate`
 // callers). refundAction and commitReactionSpell are facade aliases that dispatch
@@ -911,6 +927,7 @@ const HANDLERS: TurnActionHandlers = {
   markOpenHandRiderUsed: (s) =>
     s.openHandRiderUsedThisTurn ? s : { ...s, openHandRiderUsedThisTurn: true },
   hydrate: (_s, a) => a.state,
+  syncCombat: (s, a) => syncCombatState(s, a.round, a.combatActive),
 };
 
 function turnReducer(state: TurnState, action: TurnAction): TurnState {
@@ -1035,6 +1052,7 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       markSneakAttackUsed: () => dispatch({ type: "markSneakAttackUsed" }),
       markStunningStrikeUsed: () => dispatch({ type: "markStunningStrikeUsed" }),
       markOpenHandRiderUsed: () => dispatch({ type: "markOpenHandRiderUsed" }),
+      syncCombat: (round, combatActive) => dispatch({ type: "syncCombat", round, combatActive }),
     }),
     [],
   );

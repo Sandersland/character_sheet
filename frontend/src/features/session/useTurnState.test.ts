@@ -172,7 +172,7 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(false);
   });
 
-  it("endTurn while in combat: phase=idle, actionsRemaining=0, round incremented, reactionUsed NOT reset", () => {
+  it("endTurn while in combat: phase=idle, actionsRemaining=0, round untouched (server-driven, #1030), reactionUsed NOT reset", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -183,9 +183,56 @@ describe("combat lifecycle", () => {
 
     expect(result.current.phase).toBe("idle");
     expect(result.current.actionsRemaining).toBe(0);
-    expect(result.current.round).toBe(2); // round 1 → 2
+    // The reducer no longer guesses the next round — only syncCombat (driven
+    // by the server's response) advances it; see the next test.
+    expect(result.current.round).toBe(1);
     // reactionUsed persists across turns — only resets on the NEXT startTurn.
     expect(result.current.reactionUsed).toBe(true);
+  });
+
+  it("syncCombat (#1030) overwrites round/inCombat only — action-economy state stays local and unaffected", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.consumeReaction(); });
+
+    act(() => { result.current.syncCombat(2, true); });
+
+    expect(result.current.round).toBe(2);
+    expect(result.current.inCombat).toBe(true);
+    // Untouched by the remote sync — explicit acceptance criterion (#1030).
+    expect(result.current.actionsRemaining).toBe(0);
+    expect(result.current.bonusActionUsed).toBe(true);
+    expect(result.current.reactionUsed).toBe(true);
+    expect(result.current.phase).toBe("active");
+  });
+
+  it("syncCombat reporting combat ended (combatActive:false) still leaves action-economy state untouched", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.consumeAction(); });
+
+    act(() => { result.current.syncCombat(0, false); });
+
+    expect(result.current.inCombat).toBe(false);
+    expect(result.current.round).toBe(0);
+    // Deliberately untouched — see TurnStateActions.syncCombat's why-comment.
+    expect(result.current.phase).toBe("active");
+    expect(result.current.actionsRemaining).toBe(0);
+  });
+
+  it("syncCombat does not push an undo snapshot", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+
+    act(() => { result.current.syncCombat(5, true); });
+
+    expect(result.current.history).toEqual([]);
   });
 
   it("endCombat → back to initial state (inCombat:false, round:0)", () => {

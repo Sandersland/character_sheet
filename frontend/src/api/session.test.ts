@@ -7,6 +7,7 @@ import {
   endSoloSession,
   fetchActiveSession,
   fetchCampaignSessions,
+  fetchCombatState,
   fetchSession,
   fetchSessionDoorway,
   fetchSessions,
@@ -252,16 +253,23 @@ describe("fetchSession", () => {
   });
 });
 
+const combatStateBody = (over: Partial<{ round: number; combatActive: boolean }> = {}) => ({
+  round: 1,
+  combatActive: true,
+  updatedAt: "2026-07-26T00:00:00.000Z",
+  ...over,
+});
+
 describe("startCombat", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("POSTs to /combat/start", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+  it("POSTs to /combat/start and resolves the server's CombatState (#1030)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => combatStateBody() });
     vi.stubGlobal("fetch", fetchMock);
 
-    await startCombat("char-1", "s1");
+    await expect(startCombat("char-1", "s1")).resolves.toEqual(combatStateBody());
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/characters/char-1/sessions/s1/combat/start"),
@@ -275,11 +283,12 @@ describe("endCombat", () => {
     vi.unstubAllGlobals();
   });
 
-  it("POSTs to /combat/end", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+  it("POSTs to /combat/end and resolves the server's CombatState (#1030)", async () => {
+    const body = combatStateBody({ round: 0, combatActive: false });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => body });
     vi.stubGlobal("fetch", fetchMock);
 
-    await endCombat("char-1", "s1");
+    await expect(endCombat("char-1", "s1")).resolves.toEqual(body);
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/characters/char-1/sessions/s1/combat/end"),
@@ -293,15 +302,34 @@ describe("advanceCombatRound", () => {
     vi.unstubAllGlobals();
   });
 
-  it("POSTs { round } to /combat/round", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+  it("POSTs to /combat/round with NO round in the body — the server decides it (#1030)", async () => {
+    const body = combatStateBody({ round: 3 });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => body });
     vi.stubGlobal("fetch", fetchMock);
 
-    await advanceCombatRound("char-1", "s1", 3);
+    await expect(advanceCombatRound("char-1", "s1")).resolves.toEqual(body);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeUndefined();
+  });
+});
+
+describe("fetchCombatState", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("GETs .../combat and resolves the CombatState (#1030)", async () => {
+    const body = combatStateBody({ round: 2 });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => body });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchCombatState("char-1", "s1")).resolves.toEqual(body);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/characters/char-1/sessions/s1/combat/round"),
-      expect.objectContaining({ body: JSON.stringify({ round: 3 }) })
+      expect.stringContaining("/characters/char-1/sessions/s1/combat"),
+      expect.anything(),
     );
   });
 });

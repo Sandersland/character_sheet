@@ -47,7 +47,6 @@ export function useTurnActions({
 }) {
   const {
     inCombat,
-    round,
     attackedThisTurn,
     tookDamageThisTurn,
     startCombat: startCombatState,
@@ -64,6 +63,7 @@ export function useTurnActions({
     history,
     attachBatchId,
     undo,
+    syncCombat,
   } = turnState;
 
   // Active durable (while-active) self-buffs — drive the turn-hook + End-buff UI.
@@ -315,7 +315,11 @@ export function useTurnActions({
       console.error("initiative regen failed (startCombat)", e);
     }
     try {
-      await startCombat(character.id, sessionId);
+      // Idempotent server-side (#1030): if combat was already active (another
+      // participant started it first), this reconciles round/combatActive to
+      // the REAL server state rather than trusting this client's optimistic 1.
+      const state = await startCombat(character.id, sessionId);
+      syncCombat(state.round, state.combatActive);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (startCombat)", e);
@@ -331,7 +335,8 @@ export function useTurnActions({
     resetManeuverError();
     resetErrors();
     try {
-      await endCombat(character.id, sessionId);
+      const state = await endCombat(character.id, sessionId);
+      syncCombat(state.round, state.combatActive);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (endCombat)", e);
@@ -359,9 +364,8 @@ export function useTurnActions({
       attacked: attackedThisTurn,
       tookDamage: tookDamageThisTurn,
     });
-    // endTurn() increments round when inCombat — capture the new round number.
-    const nextRound = inCombat ? round + 1 : undefined;
-    endTurn();
+    const wasInCombat = inCombat;
+    endTurn(); // local economy reset only — round no longer moves here (#1030)
     closeResolution();
     // Refund is bounded to the turn of the swap — drop it as the turn ends.
     loadoutSwap.reset();
@@ -369,10 +373,14 @@ export function useTurnActions({
       const actionKey = endActionKeyFor(buffKey);
       if (actionKey) await send(actionKey);
     }
-    // Log the new round beginning (round 1 is logged by combatStarted).
-    if (inCombat && nextRound !== undefined && nextRound >= 2) {
+    // The server decides the next round — never a client-computed guess
+    // (#1030). syncCombat only applies on success: a failed call must NOT
+    // advance the locally-displayed round, or this client would show a round
+    // the server never agreed to.
+    if (wasInCombat) {
       try {
-        await advanceCombatRound(character.id, sessionId, nextRound);
+        const state = await advanceCombatRound(character.id, sessionId);
+        syncCombat(state.round, state.combatActive);
         onLogChanged();
       } catch (e) {
         console.error("combat log failed (advanceCombatRound)", e);

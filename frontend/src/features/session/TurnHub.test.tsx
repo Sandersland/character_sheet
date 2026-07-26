@@ -135,9 +135,11 @@ beforeEach(() => {
   }));
   vi.mocked(applyInventoryTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(revertBatch).mockImplementation(async () => echoCharacter());
-  vi.mocked(startCombat).mockResolvedValue(undefined);
-  vi.mocked(endCombat).mockResolvedValue(undefined);
-  vi.mocked(advanceCombatRound).mockResolvedValue(undefined);
+  // #1030: these resolve the server's authoritative CombatState, which
+  // useTurnActions dispatches into the tracker via syncCombat.
+  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:00.000Z" });
+  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:00.000Z" });
+  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:00.000Z" });
   vi.mocked(logRoll).mockResolvedValue(undefined);
   // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
   // call would report an empty regen, same as this default (#1239/#1243).
@@ -176,8 +178,10 @@ describe("TurnHub — combat lifecycle", () => {
 
     await user.click(screen.getByRole("button", { name: "End turn" }));
 
-    expect(advanceCombatRound).toHaveBeenCalledWith("char-1", "sess-1", 2);
-    expect(screen.getByText(/Round 2/)).toBeInTheDocument();
+    // No round number is sent — the server decides it (#1030) and the
+    // displayed round comes from its response via syncCombat.
+    expect(advanceCombatRound).toHaveBeenCalledWith("char-1", "sess-1");
+    await waitFor(() => expect(screen.getByText(/Round 2/)).toBeInTheDocument());
   });
 });
 
