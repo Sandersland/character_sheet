@@ -11,6 +11,7 @@ import {
 } from "@/lib/srd/srd.js";
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 
 export const referenceRouter = Router();
 
@@ -40,7 +41,13 @@ referenceRouter.get("/reference", async (_req, res) => {
     skillChoiceCount: c.skillChoiceCount,
     skillChoices: c.skillChoices,
     isSpellcaster: c.isSpellcaster,
-    subclassLevel: c.subclassLevel,
+    // This endpoint has no character, so no rulesEdition to resolve against —
+    // the catalog column is 2014-only (#1308), and no frontend surface resolves
+    // the edition seam yet (deferred per-edition frontend work, follow-up
+    // filed). Serving it resolved for 2024 (always 3) is the only value this
+    // endpoint can honestly give today; serving it raw would make the
+    // 2024-default creation flow originate a 2014 rule and get rejected.
+    subclassLevel: subclassGateLevel(c.subclassLevel, "EDITION_2024"),
     // Tool proficiency fields — parallel to skillChoices/skillChoiceCount.
     toolProficiencies: c.toolProficiencies,
     toolChoices: c.toolChoices,

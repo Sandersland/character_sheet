@@ -482,12 +482,17 @@ describe("referential integrity", () => {
   });
 
   // 2024 rules: a subclass grants nothing before its choice level (#1128), so no
-  // granted-spell row may fire below the class's subclassLevel.
-  it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its class's subclassLevel", () => {
-    const subclassLevelByClass = new Map(CLASSES.map((c) => [c.name, c.subclassLevel]));
+  // granted-spell row may fire below the class's 2024-resolved subclass gate.
+  // These grants are 2024-only content (#1128) — compare against
+  // subclassGateLevel(..., EDITION_2024), never the raw (now 2014-scoped, #1308)
+  // catalog column, the same rescope applied to the grantLevel drift test above.
+  it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its class's 2024-resolved subclass gate", () => {
+    const subclassLevelByClass = new Map(
+      CLASSES.map((c) => [c.name, subclassGateLevel(c.subclassLevel, "EDITION_2024")]),
+    );
     const early = SUBCLASS_GRANTED_SPELLS.filter(
       (row) => row.gateLevel < (subclassLevelByClass.get(row.className) ?? 0),
     ).map((row) => `${row.className}/${row.subclassName}/${row.spellName}@${row.gateLevel}`);
-    expect(early, "granted spell gated below its subclass grant level").toEqual([]);
+    expect(early, "granted spell gated below its 2024-resolved subclass gate").toEqual([]);
   });
 });

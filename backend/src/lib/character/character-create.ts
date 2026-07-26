@@ -27,6 +27,7 @@ import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
+import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -129,12 +130,12 @@ async function resolveFixedItems(
   return { inventoryCreates };
 }
 
-// Resolve a plain subclass name: link this class's catalog id when the name matches
-// AND the class grants a subclass at creation (level 1) UNDER THIS EDITION —
-// the catalog column is 2014-only (#1308), so this must gate through
-// subclassGateLevel, never the raw column — so FK-keyed derivations (granted
-// spells #898) resolve; otherwise keep it a legacy/homebrew string with no id
-// (served once homebrew subclasses own catalog rows, #911).
+// Resolve a plain subclass name: link this class's catalog id when the name
+// matches AND the class's edition-resolved gate is creation level (1), so
+// FK-keyed derivations (granted spells #898) resolve. The catalog column is
+// 2014-only (#1308) — gate through subclassGateLevel(edition), never the raw
+// column. Otherwise keep it a legacy/homebrew string with no id (served once
+// homebrew subclasses own catalog rows, #911).
 async function resolveSubclassName(
   characterClass: ResolvedClass,
   name: string,
@@ -315,9 +316,11 @@ async function resolveSelections(
     return { ok: false, status: 400, error: `Unknown class: ${primaryClassChoice.name}` };
   }
 
-  // Write-once column (#1285): omitted input takes the schema default, the same
-  // default Prisma applies to the row this transaction is about to create.
-  const edition: RulesEdition = input.rulesEdition ?? "EDITION_2024";
+  // Write-once column (#1285): the row doesn't exist yet, so there's no
+  // `rulesEdition` to read via editionOf — DEFAULT_RULES_EDITION (lib/rules/edition.ts)
+  // names the same default the create call below lets the column apply, so the
+  // two can't drift apart.
+  const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
   const subclass = await resolveSubclass(primaryClassChoice, characterClass, edition);
   if (!subclass.ok) return subclass;
 
@@ -756,9 +759,13 @@ async function persistCreatedCharacter(
       name: input.name,
       alignment: input.alignment,
       portraitUrl: input.portraitUrl ?? null,
-      // Omitted when absent so the column default stays the single source of
-      // the default edition (#1285). This is the only write of rulesEdition.
-      ...(input.rulesEdition !== undefined ? { rulesEdition: input.rulesEdition } : {}),
+      // The only write of rulesEdition (write-once, #1285). Not the same
+      // `edition` value resolveSelections computed for the creation-time
+      // subclass gate check (input isn't threaded that far) but the same
+      // formula via DEFAULT_RULES_EDITION, so the two independent resolutions
+      // can't drift apart; written explicitly rather than left to the Prisma
+      // column default so both sites name one literal.
+      rulesEdition: input.rulesEdition ?? DEFAULT_RULES_EDITION,
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: effectiveScores,
       ...derived,
