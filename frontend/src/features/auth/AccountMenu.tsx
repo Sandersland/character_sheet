@@ -79,9 +79,12 @@ export default function AccountMenu() {
   const { user, logout } = useAuth();
   const { preference, setPreference } = useTheme();
   const { style: diceStyle, setStyle: setDiceStyle } = useDiceRollStyle();
-  // AccountMenu sits in the app-wide header (outside any character route), so
-  // it has no campaignId to hand PreferencesSheet — the account-global entry
-  // point (#1167), reachable with no character/campaign in view at all.
+  // AppHeader mounts as a sibling of the routed pages, never a descendant of
+  // CurrentCharacterProvider — so AccountMenu has no campaignId to hand
+  // PreferencesSheet even while a character IS on screen (e.g. /characters/:id
+  // at md+). The account-global entry point (#1167) stays reachable with no
+  // character/campaign in view at all; CharacterSheetHeader's own desktop kebab
+  // is the surface that threads campaignId.
   const [prefsOpen, setPrefsOpen] = useState(false);
 
   return (

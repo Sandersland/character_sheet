@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import { RollProvider } from "@/features/dice/RollContext";
+import { ThemeProvider } from "@/features/theme/ThemeProvider";
+import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { SheetTab } from "@/features/character-meta/sheetTabs";
 import type { Character } from "@/types/character";
@@ -41,25 +43,31 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 
 // CharacterSheetHeader (and its nested MobileSheetHeader/CampaignIndicator)
 // reads useCurrentCharacter(), so every render seeds the cache and mounts
-// CurrentCharacterProvider via renderWithCharacter.
+// CurrentCharacterProvider via renderWithCharacter. Theme/DiceRollStyle
+// providers wrap it too — both breakpoints' "Preferences…" overflow item
+// (#1167) mounts PreferencesSheet, which reads both via useTheme()/useDiceRollStyle().
 function renderHeader(
   props: Partial<Parameters<typeof CharacterSheetHeader>[0]> = {},
   character: Character = makeCharacter(),
 ) {
   return renderWithCharacter(
     <MemoryRouter>
-      <RollProvider>
-        <CharacterSheetHeader
-          tabs={TABS}
-          activeTab="combat"
-          onTabChange={vi.fn()}
-          onOpenCapture={vi.fn()}
-          onOpenSessions={vi.fn()}
-          onOpenActivity={vi.fn()}
-          onOpenDelete={vi.fn()}
-          {...props}
-        />
-      </RollProvider>
+      <ThemeProvider>
+        <DiceRollStyleProvider>
+          <RollProvider>
+            <CharacterSheetHeader
+              tabs={TABS}
+              activeTab="combat"
+              onTabChange={vi.fn()}
+              onOpenCapture={vi.fn()}
+              onOpenSessions={vi.fn()}
+              onOpenActivity={vi.fn()}
+              onOpenDelete={vi.fn()}
+              {...props}
+            />
+          </RollProvider>
+        </DiceRollStyleProvider>
+      </ThemeProvider>
     </MemoryRouter>,
     character,
   );
@@ -143,6 +151,33 @@ describe("CharacterSheetHeader campaign settings (#1087)", () => {
     );
     fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
     expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("CharacterSheetHeader desktop Preferences entry (#1167)", () => {
+  it("adds a 'Preferences…' item to the desktop ⋮, and its sheet shows the Campaign settings cross-link for a campaign-attached character", () => {
+    const onOpenCampaignSettings = vi.fn();
+    renderHeader({ activeTab: "overview", onOpenCampaignSettings });
+
+    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    fireEvent.click(screen.getByRole("menuitem", { name: /preferences/i }));
+
+    expect(screen.getByRole("dialog", { name: /preferences/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /campaign settings/i }));
+    expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the Campaign settings cross-link inside desktop Preferences for a campaign-less character", () => {
+    renderHeader(
+      { activeTab: "overview", onOpenCampaignSettings: vi.fn() },
+      makeCharacter({ campaignId: undefined }),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    fireEvent.click(screen.getByRole("menuitem", { name: /preferences/i }));
+
+    expect(screen.getByRole("dialog", { name: /preferences/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /campaign settings/i })).not.toBeInTheDocument();
   });
 });
 
