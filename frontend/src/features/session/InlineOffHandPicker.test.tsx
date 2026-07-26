@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineOffHandPicker from "@/features/session/InlineOffHandPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { logRoll } from "@/api/client";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -79,19 +80,18 @@ function renderPicker(
   turnState: TurnState & TurnStateActions,
   handlers: Partial<{ onClose: () => void; onCancel: () => void; variant: "twf" | "unarmed" }> = {},
 ) {
-  return render(
+  return renderWithCharacter(
     <RollProvider>
       <InlineOffHandPicker
-        character={character}
         turnState={turnState}
         sessionId="sess-1"
         variant={handlers.variant}
         onClose={handlers.onClose ?? vi.fn()}
         onCancel={handlers.onCancel ?? vi.fn()}
-        onUpdate={vi.fn()}
         onLogChanged={vi.fn()}
       />
     </RollProvider>,
+    character,
   );
 }
 

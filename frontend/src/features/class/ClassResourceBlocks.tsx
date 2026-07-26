@@ -20,9 +20,9 @@ import ManeuversSection from "@/features/class/ManeuversSection";
 import ResourcePoolsSection from "@/features/class/ResourcePoolsSection";
 import ShadowArtsSection from "@/features/class/ShadowArtsSection";
 import WarriorOfElementsSection from "@/features/class/WarriorOfElementsSection";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface Props {
-  character: Character;
   view: ClassFeatureView;
   busy: boolean;
   run: (send: () => Promise<Character>) => void;
@@ -36,7 +36,8 @@ function focusRemaining(character: Character): number {
 
 // The entitlement-gated resource/subclass feature blocks, split out of the
 // orchestrator to keep each render function under the complexity budget.
-export default function ClassResourceBlocks({ character, view, busy, run }: Props) {
+export default function ClassResourceBlocks({ view, busy, run }: Props) {
+  const { character } = useCurrentCharacter();
   const resources = character.resources;
 
   const resourceOp = (op: LearnManeuverOperation) => run(() => applyResourceTransactions(character.id, [op]));
@@ -65,7 +66,6 @@ export default function ClassResourceBlocks({ character, view, busy, run }: Prop
 
       {view.hasElementsWarrior && (
         <WarriorOfElementsSection
-          character={character}
           busy={busy}
           onOperations={(ops: WarriorOfElementsOperation[]) =>
             run(() => applyWarriorOfElementsTransactions(character.id, ops).then((r) => r.character))
@@ -75,7 +75,6 @@ export default function ClassResourceBlocks({ character, view, busy, run }: Prop
 
       {view.hasShadowArts && (
         <ShadowArtsSection
-          character={character}
           busy={busy}
           onCast={(op: CastShadowArtOperation) => run(() => applyShadowArtsTransactions(character.id, [op]))}
         />
@@ -83,7 +82,6 @@ export default function ClassResourceBlocks({ character, view, busy, run }: Prop
 
       {view.hasChannelDivinity && (
         <ChannelDivinitySection
-          character={character}
           busy={busy}
           onCast={(op: CastChannelDivinityOperation) => run(() => applyChannelDivinityTransactions(character.id, [op]))}
         />
@@ -91,7 +89,6 @@ export default function ClassResourceBlocks({ character, view, busy, run }: Prop
 
       {view.hasCloakOfShadows && (
         <CloakOfShadowsSection
-          character={character}
           focusAvailable={focusRemaining(character)}
           busy={busy}
           onActivate={() =>

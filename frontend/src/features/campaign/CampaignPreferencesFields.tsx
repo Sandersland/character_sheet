@@ -1,12 +1,7 @@
-import { useState } from "react";
-
 import { updateCampaignPreferences } from "@/api/client";
-import type { CampaignPreferences, Character } from "@/types/character";
-
-interface CampaignPreferencesFieldsProps {
-  character: Character;
-  onUpdate: (c: Character) => void;
-}
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import type { CampaignPreferences } from "@/types/character";
 
 // One labeled toggle row. Container + read/write wiring only — the underlying
 // behaviors (DM sharing #116; party-target healing consent #462) live elsewhere.
@@ -41,27 +36,27 @@ function ToggleRow({ label, hint, checked, disabled, onChange }: ToggleRowProps)
 // (#537). Extracted from the Story tab into a standalone field block so the
 // header Campaign-settings sheet (#1087) owns the surface. Reads the serialized
 // prefs and writes each flag through the API client helper.
-export default function CampaignPreferencesFields({
-  character,
-  onUpdate,
-}: CampaignPreferencesFieldsProps) {
+export default function CampaignPreferencesFields() {
+  const { character } = useCurrentCharacter();
   const prefs: CampaignPreferences = character.campaignPreferences ?? {
     shareWithDm: false,
     autoFriendlyHealing: false,
   };
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (patch: Partial<CampaignPreferences>) => updateCampaignPreferences(character.id, patch),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to update preferences",
+  });
+  const saving = mutation.isPending;
+  const error = mutation.error;
 
   async function save(patch: Partial<CampaignPreferences>) {
-    setSaving(true);
-    setError(null);
     try {
-      const updated = await updateCampaignPreferences(character.id, patch);
-      onUpdate(updated);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update preferences");
-    } finally {
-      setSaving(false);
+      await mutation.mutateAsync(patch);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 

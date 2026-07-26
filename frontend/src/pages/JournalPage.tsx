@@ -23,6 +23,7 @@ import {
 import { useChronicle } from "@/features/journal/useChronicle";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
+import { CurrentCharacterProvider, useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
@@ -30,14 +31,18 @@ import type { Character } from "@/types/character";
 
 export default function JournalPage() {
   const { id } = useParams();
-  const { character, error, setCharacter } = useCharacter(id);
+  const { character, error } = useCharacter(id);
   const showSpinner = useDelayedFlag(character === undefined && !error);
 
   if (error) return <CharacterLoadError variant="error" />;
   if (character === undefined) return showSpinner ? <Spinner variant="page" /> : null;
   if (character === null) return <CharacterLoadError variant="not-found" characterId={id} />;
 
-  return <JournalPageBody character={character} onUpdate={setCharacter} />;
+  return (
+    <CurrentCharacterProvider id={character.id}>
+      <JournalPageBody />
+    </CurrentCharacterProvider>
+  );
 }
 
 // Per-chapter note counts from the live journal, so the spine stays current as
@@ -52,13 +57,8 @@ function deriveNoteCounts(journal: Character["journal"]) {
   return { bySession, between };
 }
 
-function JournalPageBody({
-  character,
-  onUpdate,
-}: {
-  character: Character;
-  onUpdate: (character: Character) => void;
-}) {
+function JournalPageBody() {
+  const { character } = useCurrentCharacter();
   const isMobile = useIsBelowMd();
   const { arcs, sessions, error, setSessions } = useChronicle(character);
   const { byId } = useCampaignEntities(character.campaignId);
@@ -99,10 +99,8 @@ function JournalPageBody({
 
   const manuscript = selectedChapter ? (
     <ManuscriptPage
-      character={character}
       chapter={selectedChapter}
       entities={byId}
-      onUpdate={onUpdate}
       canRename={selectedChapter.sessionId != null && selectedChapter.participantIds.includes(character.id)}
       onRename={handleRename}
     />
@@ -113,8 +111,6 @@ function JournalPageBody({
   );
 
   const shared = {
-    character,
-    onUpdate,
     spine,
     effectiveId,
     filter,
@@ -132,8 +128,6 @@ function JournalPageBody({
 }
 
 interface JournalViewProps {
-  character: Character;
-  onUpdate: (character: Character) => void;
   spine: Spine;
   effectiveId: string | null;
   filter: string;
@@ -144,7 +138,8 @@ interface JournalViewProps {
   selectedSessionId?: string;
 }
 
-function BackLink({ character }: { character: Character }) {
+function BackLink() {
+  const { character } = useCurrentCharacter();
   return (
     <Link
       to={`/characters/${character.id}`}
@@ -157,7 +152,7 @@ function BackLink({ character }: { character: Character }) {
 
 // Desktop: fixed spine + manuscript, side by side.
 function JournalDesktopView(props: JournalViewProps) {
-  const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
+  const { spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   // useCaptureDock (not a bare useState) so ⌘J/Ctrl+J toggles the dock here too,
   // matching the sheet and session surfaces.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
@@ -166,7 +161,7 @@ function JournalDesktopView(props: JournalViewProps) {
     <div className="flex-1 bg-parchment-100">
       <div className="mx-auto max-w-6xl px-6 py-6">
         <div className="mb-4 flex items-center justify-between">
-          <BackLink character={character} />
+          <BackLink />
           <button
             type="button"
             onClick={openCapture}
@@ -189,10 +184,8 @@ function JournalDesktopView(props: JournalViewProps) {
       </div>
       {captureOpen && (
         <CapturePalette
-          character={character}
           sessionId={props.selectedSessionId}
           onClose={closeCapture}
-          onUpdate={onUpdate}
         />
       )}
     </div>
@@ -201,7 +194,7 @@ function JournalDesktopView(props: JournalViewProps) {
 
 // Mobile: a chapters list that pushes to the manuscript page.
 function JournalMobileView(props: JournalViewProps) {
-  const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
+  const { spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   const [pageOpen, setPageOpen] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
 
@@ -233,7 +226,7 @@ function JournalMobileView(props: JournalViewProps) {
       ) : (
         <>
           <div className="mb-4">
-            <BackLink character={character} />
+            <BackLink />
           </div>
           <h1 className="mb-3 font-display text-2xl font-semibold text-parchment-900">Chronicle</h1>
           {error && <p className="mb-3 text-xs font-semibold text-garnet-700">{error}</p>}
@@ -248,10 +241,8 @@ function JournalMobileView(props: JournalViewProps) {
       )}
       {captureOpen && (
         <CapturePalette
-          character={character}
           sessionId={props.selectedSessionId}
           onClose={() => setCaptureOpen(false)}
-          onUpdate={onUpdate}
         />
       )}
     </div>

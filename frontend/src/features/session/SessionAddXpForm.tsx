@@ -1,7 +1,8 @@
 import { useState } from "react";
 
 import { applyExperienceOperations, fetchSession } from "@/api/client";
-import type { Character, Session } from "@/types/character";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
+import type { Session } from "@/types/character";
 
 // "Add XP to this session" — awards XP tagged to this (already-ended) session
 // via the explicit-sessionId override, then refreshes the session so the
@@ -10,41 +11,43 @@ export default function SessionAddXpForm({
   characterId,
   sessionId,
   onAwarded,
-  onCharacterUpdate,
 }: {
   characterId: string;
   sessionId: string;
   onAwarded: (session: Session) => void;
-  onCharacterUpdate?: (character: Character) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [xp, setXp] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Session-refresh failures (fetchSession, after a successful award) keep
+  // their own slot — mutation.error only covers the award call itself.
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  const mutation = useCharacterMutation({
+    characterId,
+    mutationFn: (amount: number) => applyExperienceOperations(characterId, [{ type: "award", amount }], sessionId),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to award XP.",
+  });
 
   const parsed = Number(xp);
   const valid = xp.trim() !== "" && Number.isInteger(parsed) && parsed > 0;
+  const busy = mutation.isPending;
+  const error = mutation.error ?? refreshError;
 
   async function handleSubmit() {
     if (!valid || busy) return;
-    setBusy(true);
-    setError(null);
+    setRefreshError(null);
     try {
-      const updated = await applyExperienceOperations(
-        characterId,
-        [{ type: "award", amount: parsed }],
-        sessionId,
-      );
-      onCharacterUpdate?.(updated);
+      await mutation.mutateAsync(parsed);
       // Re-fetch the session to pick up its freshly recomputed summaries.
       const refreshed = await fetchSession(characterId, sessionId);
       onAwarded(refreshed);
       setXp("");
       setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to award XP.");
-    } finally {
-      setBusy(false);
+      // A failed award surfaces via mutation.error already; this only catches
+      // a failed post-award fetchSession refresh.
+      if (mutation.error === null) setRefreshError(err instanceof Error ? err.message : "Failed to award XP.");
     }
   }
 
@@ -96,7 +99,8 @@ export default function SessionAddXpForm({
           type="button"
           onClick={() => {
             setOpen(false);
-            setError(null);
+            setRefreshError(null);
+            mutation.reset();
           }}
           disabled={busy}
           className="rounded-control px-3 py-1.5 text-xs font-semibold text-parchment-600 hover:text-parchment-900 disabled:opacity-40"

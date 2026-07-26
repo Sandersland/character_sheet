@@ -1,25 +1,25 @@
 /**
  * useManeuverDie — shared Battle Master superiority-die spend hook.
  *
- * Encapsulates the "cast a known maneuver, let the server roll the die, call
- * onUpdate" pattern so it isn't duplicated in ManeuverPrompt, InlineAttackPicker,
- * and TurnHub. The server owns the roll (#418): spend posts the castManeuver op
- * and returns the die value it rolled, which the caller folds into the relevant
- * attack/damage total (or shows in reminder text).
+ * Encapsulates the "cast a known maneuver, let the server roll the die, write
+ * the result to the character cache" pattern so it isn't duplicated in
+ * ManeuverPrompt, InlineAttackPicker, and TurnHub. The server owns the roll
+ * (#418): spend posts the castManeuver op and returns the die value it
+ * rolled, which the caller folds into the relevant attack/damage total (or
+ * shows in reminder text).
  *
  * Returns:
  *   pool       — the superiorityDice ResourcePool (undefined if character has none).
  *   diceFaces  — the numeric face count parsed from pool.die (defaults to 8).
  *   dieLabel   — e.g. "d8", "d10".
  *   busy       — true while a spend is in flight.
- *   spend(entryId) — casts the maneuver by its known-entry id, calls onUpdate with
- *                    the updated character, and returns the server-rolled die
- *                    result. Throws (or rejects) on API error.
+ *   spend(entryId) — casts the maneuver by its known-entry id, writes the
+ *                    updated character into the cache, and returns the
+ *                    server-rolled die result. Throws (or rejects) on API error.
  */
 
-import { useState, useCallback } from "react";
-
 import { castManeuverTransaction } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character } from "@/types/character";
 
 export interface UseManeuverDieReturn {
@@ -30,31 +30,25 @@ export interface UseManeuverDieReturn {
   spend: (entryId: string) => Promise<number>;
 }
 
-export function useManeuverDie(
-  character: Character,
-  onUpdate: (c: Character) => void,
-): UseManeuverDieReturn {
-  const [busy, setBusy] = useState(false);
-
+export function useManeuverDie(character: Character): UseManeuverDieReturn {
   const pool = character.resources?.pools?.find((p) => p.key === "superiorityDice");
   const diceFaces = pool?.die ? parseInt(pool.die.replace("d", ""), 10) : 8;
   const dieLabel = pool?.die ?? "d8";
 
-  const spend = useCallback(
-    async (entryId: string): Promise<number> => {
-      setBusy(true);
-      try {
-        const { character: updated, results } = await castManeuverTransaction(character.id, [
-          { type: "castManeuver", entryId },
-        ]);
-        onUpdate(updated);
-        return results[0]?.roll ?? 0;
-      } finally {
-        setBusy(false);
-      }
-    },
-    [character.id, onUpdate],
-  );
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (entryId: string) => castManeuverTransaction(character.id, [{ type: "castManeuver", entryId }]),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Failed to cast maneuver",
+  });
 
-  return { pool, diceFaces, dieLabel, busy, spend };
+  // No try/catch here (unchanged from pre-#1283): a spend failure propagates to
+  // the caller (useManeuverActions' handleReactionManeuver/handleEffectManeuver),
+  // which is what surfaces it — this hook itself has never exposed `error`.
+  async function spend(entryId: string): Promise<number> {
+    const { results } = await mutation.mutateAsync(entryId);
+    return results[0]?.roll ?? 0;
+  }
+
+  return { pool, diceFaces, dieLabel, busy: mutation.isPending, spend };
 }

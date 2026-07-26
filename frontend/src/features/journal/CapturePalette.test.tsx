@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 
 import CapturePalette from "@/features/journal/CapturePalette";
 import * as client from "@/api/client";
 import { axe } from "@/test/axe";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 // The default setup stub reports matches:false → below md → BottomSheet. Flip to
@@ -54,6 +56,14 @@ function makeCharacterWithNote(): Character {
   } as unknown as Character;
 }
 
+// CapturePalette reads useCurrentCharacter(), so every render mounts
+// CurrentCharacterProvider via renderWithCharacter. Every character fixture in
+// this file shares id "char-1", so any of them seeds the same cache entry —
+// the cache write keys off the provider's id, not this exact reference.
+function render(ui: ReactElement, character: Character = makeCharacter()) {
+  return renderWithCharacter(ui, character);
+}
+
 const defaultMatchMedia = window.matchMedia;
 
 beforeEach(() => {
@@ -70,7 +80,7 @@ afterEach(() => {
 
 describe("CapturePalette (#247)", () => {
   it("auto-focuses the composer when opened", async () => {
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: /quick note/i })).toHaveFocus(),
     );
@@ -78,7 +88,7 @@ describe("CapturePalette (#247)", () => {
 
   it("focuses the composer with preventScroll to stop iOS reveal-scroll (#784)", async () => {
     const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
     await waitFor(() => expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true }));
     focusSpy.mockRestore();
   });
@@ -86,7 +96,7 @@ describe("CapturePalette (#247)", () => {
   it("pins the page back to the top if a reveal-scroll leaked through (#784)", async () => {
     const scrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     Object.defineProperty(window, "scrollY", { value: 120, configurable: true });
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
     await waitFor(() => expect(scrollToSpy).toHaveBeenCalledWith(0, 0));
     Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
     scrollToSpy.mockRestore();
@@ -95,7 +105,7 @@ describe("CapturePalette (#247)", () => {
   it("does not force-scroll when the page is already at the top (#784)", async () => {
     const scrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: /quick note/i })).toHaveFocus(),
     );
@@ -104,7 +114,7 @@ describe("CapturePalette (#247)", () => {
   });
 
   it("floors the composer font-size at text-base on mobile to kill iOS auto-zoom", () => {
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
     const composer = screen.getByRole("textbox", { name: /quick note/i });
     expect(composer.className).toContain("text-base");
     expect(composer.className).toContain("md:text-[15px]");
@@ -112,14 +122,8 @@ describe("CapturePalette (#247)", () => {
 
   it("Enter saves a NOTE via createJournalEntry and propagates the update", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
     render(
-      <CapturePalette
-        character={makeCharacter()}
-        sessionId="sess-1"
-        onClose={vi.fn()}
-        onUpdate={onUpdate}
-      />,
+      <CapturePalette sessionId="sess-1" onClose={vi.fn()} />,
     );
 
     const composer = screen.getByRole("textbox", { name: /quick note/i });
@@ -130,12 +134,14 @@ describe("CapturePalette (#247)", () => {
     const [charId, entry] = vi.mocked(client.createJournalEntry).mock.calls[0];
     expect(charId).toBe("char-1");
     expect(entry).toEqual({ kind: "NOTE", body: "The bridge collapsed", sessionId: "sess-1" });
-    expect(onUpdate).toHaveBeenCalledTimes(1);
+    // The returned character reaches the cache — useJournalMutations writes it
+    // through useCharacterMutation, with no callback in between.
+    expect(cachedCharacter("char-1")).toEqual(makeCharacter());
   });
 
   it("Shift+Enter does NOT submit", async () => {
     const user = userEvent.setup();
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
 
     const composer = screen.getByRole("textbox", { name: /quick note/i });
     await user.type(composer, "line one");
@@ -148,7 +154,7 @@ describe("CapturePalette (#247)", () => {
 
   it("does not save an empty (whitespace-only) note", async () => {
     const user = userEvent.setup();
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
 
     const composer = screen.getByRole("textbox", { name: /quick note/i });
     await user.type(composer, "   ");
@@ -158,7 +164,7 @@ describe("CapturePalette (#247)", () => {
   });
 
   it("Enter during IME composition does NOT submit", () => {
-    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />);
 
     const composer = screen.getByRole("textbox", { name: /quick note/i });
     composer.textContent = "日本語";
@@ -170,7 +176,7 @@ describe("CapturePalette (#247)", () => {
 
   it("deleting a note takes two clicks — first reveals confirm, second deletes", async () => {
     const user = userEvent.setup();
-    render(<CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />, makeCharacterWithNote());
 
     await user.click(screen.getByRole("button", { name: /^delete$/i }));
     expect(client.deleteJournalEntry).not.toHaveBeenCalled();
@@ -182,7 +188,7 @@ describe("CapturePalette (#247)", () => {
 
   it("Cancel in the delete confirm does not delete", async () => {
     const user = userEvent.setup();
-    render(<CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    render(<CapturePalette onClose={vi.fn()} />, makeCharacterWithNote());
 
     await user.click(screen.getByRole("button", { name: /^delete$/i }));
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
@@ -195,7 +201,8 @@ describe("CapturePalette (#247)", () => {
     it("omits visibility on a default save (shared) for a campaign character", async () => {
       const user = userEvent.setup();
       render(
-        <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
+        makeCampaignCharacter(),
       );
 
       // Mobile lock is a compact icon toggle (aria-pressed), not a checkbox (#866).
@@ -213,7 +220,8 @@ describe("CapturePalette (#247)", () => {
     it("sends visibility PRIVATE when the Private lock is on", async () => {
       const user = userEvent.setup();
       render(
-        <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
+        makeCampaignCharacter(),
       );
 
       await user.click(screen.getByRole("button", { name: /private/i }));
@@ -226,8 +234,13 @@ describe("CapturePalette (#247)", () => {
 
     it("resets the lock to shared after a successful save (privacy never leaks forward)", async () => {
       const user = userEvent.setup();
+      // Both saves' mutation responses must keep campaignId — the component now
+      // re-reads the character from the cache (not its own prop) after each
+      // write, so a response that dropped it would hide the Private lock.
+      vi.mocked(client.createJournalEntry).mockResolvedValue(makeCampaignCharacter());
       render(
-        <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
+        makeCampaignCharacter(),
       );
 
       await user.click(screen.getByRole("button", { name: /private/i }));
@@ -263,7 +276,7 @@ describe("CapturePalette (#247)", () => {
           visibility: "CAMPAIGN",
         },
       ]);
-      render(<CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />);
+      render(<CapturePalette onClose={vi.fn()} />, character);
 
       await user.click(screen.getByRole("button", { name: /^edit$/i }));
       // Scope to the editor row (its nearest wrapping div) — the composer's own
@@ -282,7 +295,7 @@ describe("CapturePalette (#247)", () => {
     });
 
     it("hides the Private lock for a campaign-less character", () => {
-      render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+      render(<CapturePalette onClose={vi.fn()} />);
       expect(screen.queryByRole("button", { name: /private/i })).toBeNull();
     });
 
@@ -305,7 +318,7 @@ describe("CapturePalette (#247)", () => {
           visibility: "CAMPAIGN",
         },
       ]);
-      render(<CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />);
+      render(<CapturePalette onClose={vi.fn()} />, character);
 
       const locks = screen.getAllByRole("img", { name: /private note/i });
       expect(locks).toHaveLength(1);
@@ -323,7 +336,8 @@ describe("CapturePalette (#247)", () => {
         },
       ]);
       const { baseElement } = render(
-        <CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
+        character,
       );
       expect(await axe(baseElement)).toHaveNoViolations();
     });
@@ -332,7 +346,7 @@ describe("CapturePalette (#247)", () => {
   describe("per-breakpoint presentation (#771, #866)", () => {
     it("mobile: renders the full-height chat surface — Done, placeholder, no keyboard hint, no grabber", () => {
       const { baseElement } = render(
-        <CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
       );
       // The keyboard-pinned capture is a modal dialog with a "Done" close button —
       // the old BottomSheet grabber (aria-label="Close") is gone (#866).
@@ -363,7 +377,7 @@ describe("CapturePalette (#247)", () => {
           visibility: "CAMPAIGN",
         },
       ]);
-      render(<CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />);
+      render(<CapturePalette onClose={vi.fn()} />, character);
       const older = screen.getByText("older note");
       const newer = screen.getByText("newer note");
       // Ascending order downward: the older note precedes the newer one in the DOM.
@@ -373,7 +387,7 @@ describe("CapturePalette (#247)", () => {
     it("mobile: the Done button closes the surface", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
-      render(<CapturePalette character={makeCharacter()} onClose={onClose} onUpdate={vi.fn()} />);
+      render(<CapturePalette onClose={onClose} />);
       await user.click(screen.getByRole("button", { name: /^done$/i }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -381,7 +395,7 @@ describe("CapturePalette (#247)", () => {
     it("md+: renders the non-modal margin dock with the ↵/shift hint and no grabber", () => {
       useDesktopViewport();
       const { baseElement } = render(
-        <CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
       );
       const dock = screen.getByRole("dialog", { name: /quick capture/i });
       expect(dock).toBeInTheDocument();
@@ -396,7 +410,8 @@ describe("CapturePalette (#247)", () => {
     it("md+: dock feed shows the day divider and the Close · ⌘J affordance", () => {
       useDesktopViewport();
       render(
-        <CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
+        makeCharacterWithNote(),
       );
       expect(screen.getByText("Ambushed by goblins")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /close · ⌘j/i })).toBeInTheDocument();
@@ -404,7 +419,8 @@ describe("CapturePalette (#247)", () => {
 
     it("has no axe violations on mobile", async () => {
       const { baseElement } = render(
-        <CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
+        makeCharacterWithNote(),
       );
       expect(await axe(baseElement)).toHaveNoViolations();
     });
@@ -412,7 +428,8 @@ describe("CapturePalette (#247)", () => {
     it("has no axe violations at md+", async () => {
       useDesktopViewport();
       const { baseElement } = render(
-        <CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+        <CapturePalette onClose={vi.fn()} />,
+        makeCharacterWithNote(),
       );
       expect(await axe(baseElement)).toHaveNoViolations();
     });

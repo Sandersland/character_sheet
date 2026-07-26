@@ -5,6 +5,12 @@
  * underneath with no navigation, and the recap survives the panel unmounting
  * because `endedSession` lives in the provider, not here (#960 decision 5 /
  * addendum D). Built from the shared `sessionLifecycleHelpers` primitives.
+ *
+ * No longer forwards character updates (#1284) — every session component now
+ * reads the character via useCurrentCharacter() directly and writes it through
+ * useCharacterMutation's own cache write, and the session-log bump moved to
+ * useSessionLogBumpOnCharacterWrite (mounted once in CharacterSheetWorkspace),
+ * which fires for every character-cache write.
  */
 
 import {
@@ -18,7 +24,6 @@ import type { Character, Session } from "@/types/character";
 export function useCombatLifecycle({
   character,
   session,
-  onUpdate,
   live,
 }: {
   character: Character;
@@ -26,17 +31,11 @@ export function useCombatLifecycle({
   // (#979): the Leave/End affordances only surface while live+joined, so the
   // handlers below never fire with a null session.
   session: Session | null;
-  onUpdate: (c: Character) => void;
-  live: Pick<LiveSessionValue, "refresh" | "setEndedSession" | "bumpLog">;
+  live: Pick<LiveSessionValue, "refresh" | "setEndedSession">;
 }) {
   const end = usePendingAction();
   const leave = usePendingAction();
   const endFlow = useEndSessionFlow(character.id, session, end);
-
-  function handleCharacterUpdate(updated: Character) {
-    onUpdate(updated);
-    live.bumpLog();
-  }
 
   const handleConfirmEnd = (xpAmount: number) =>
     endFlow.confirmEnd(xpAmount, async (ended) => {
@@ -66,7 +65,6 @@ export function useCombatLifecycle({
     canLeave: session !== null && session.campaignId !== null,
     openEndPrompt: endFlow.openEndPrompt,
     closeEndPrompt: endFlow.closeEndPrompt,
-    handleCharacterUpdate,
     handleConfirmEnd,
     handleLeave,
   };

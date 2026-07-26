@@ -18,17 +18,14 @@ import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { applyConditionTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import BottomSheet from "@/components/ui/BottomSheet";
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";
 import RestButton from "@/features/hitpoints/RestButton";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { conditionLabel, EXHAUSTION_MAX } from "@/lib/conditions";
-import type { Character, ConditionsState } from "@/types/character";
-
-interface Props {
-  character: Character;
-  onUpdate: (character: Character) => void;
-}
+import type { ConditionsState } from "@/types/character";
 
 const STEP =
   "flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-parchment-700 transition-colors hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40";
@@ -41,8 +38,6 @@ const STEP_DISC =
 // Shared props both breakpoint layouts consume — state + handlers live in the
 // orchestrator so the client calls stay single-sourced.
 interface UtilityViewProps {
-  character: Character;
-  onUpdate: (character: Character) => void;
   active: ConditionsState["active"];
   exhaustion: number;
   exhaustionBusy: boolean;
@@ -52,11 +47,11 @@ interface UtilityViewProps {
   onStep: (next: number) => void;
 }
 
-export default function CombatUtilityStrip({ character, onUpdate }: Props) {
+export default function CombatUtilityStrip() {
+  const { character } = useCurrentCharacter();
   // null = closed; "manage" opens the sheet as-is; "add" opens it with the
   // condition picker already expanded (the "+ Add" affordance).
   const [sheet, setSheet] = useState<null | "manage" | "add">(null);
-  const [exhaustionBusy, setExhaustionBusy] = useState(false);
   const isBelowMd = useIsBelowMd();
   const { active, exhaustion } = character.conditions;
 
@@ -69,23 +64,25 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
 
   // Inline exhaustion step — the same setExhaustion transaction op the conditions
   // sheet fires, so exhaustion stays single-sourced through the client.
+  const exhaustionMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (level: number) => applyConditionTransactions(character.id, [{ type: "setExhaustion", level }]),
+    toCharacter: (c) => c,
+    fallbackMessage: "Failed to update exhaustion.",
+  });
+  const exhaustionBusy = exhaustionMutation.isPending;
+
   async function stepExhaustion(next: number) {
     const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, next));
     if (clamped === exhaustion) return;
-    setExhaustionBusy(true);
     try {
-      const updated = await applyConditionTransactions(character.id, [
-        { type: "setExhaustion", level: clamped },
-      ]);
-      onUpdate(updated);
-    } finally {
-      setExhaustionBusy(false);
+      await exhaustionMutation.mutateAsync(clamped);
+    } catch {
+      // best-effort, no UI surface here — mirrors pre-#1283 behaviour.
     }
   }
 
   const viewProps: UtilityViewProps = {
-    character,
-    onUpdate,
     active,
     exhaustion,
     exhaustionBusy,
@@ -102,12 +99,7 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
         <BottomSheet title="Conditions" onClose={() => setSheet(null)}>
           {/* key={sheet} remounts on a mode switch so `defaultAddOpen` (read only
               at mount by AddConditionPanel) always reflects the current mode. */}
-          <ConditionsSheetBody
-            key={sheet}
-            character={character}
-            onUpdate={onUpdate}
-            defaultAddOpen={sheet === "add"}
-          />
+          <ConditionsSheetBody key={sheet} defaultAddOpen={sheet === "add"} />
         </BottomSheet>
       )}
     </>
@@ -117,8 +109,6 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
 // Mobile (#1028): full-bleed utility rows — Conditions header + Add, wrapping
 // chips beside a big-hit exhaustion stepper, then a Rest row with hit dice.
 function MobileUtilityRows({
-  character,
-  onUpdate,
   active,
   exhaustion,
   exhaustionBusy,
@@ -199,15 +189,13 @@ function MobileUtilityRows({
         </div>
       </div>
 
-      <RestButton character={character} onUpdate={onUpdate} variant="row" />
+      <RestButton variant="row" />
     </div>
   );
 }
 
 // Desktop (#982): the one-line summary — conditions + Add + exhaustion + Rest.
 function DesktopUtilityLine({
-  character,
-  onUpdate,
   active,
   exhaustion,
   exhaustionBusy,
@@ -289,7 +277,7 @@ function DesktopUtilityLine({
 
       {/* Rest — reuses the session rest control + its short/long-rest handlers. */}
       <div className="ml-auto shrink-0">
-        <RestButton character={character} onUpdate={onUpdate} />
+        <RestButton />
       </div>
     </div>
   );

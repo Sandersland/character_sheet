@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useEffect } from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { useTurnState } from "@/features/session/useTurnState";
 import { logRoll, castManeuverTransaction } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -66,24 +69,22 @@ interface RenderOpts {
 
 function renderPicker(
   character: Character,
-  onUpdate = vi.fn(),
   onLogChanged = vi.fn(),
   opts: RenderOpts = {},
 ) {
   const onCancel = opts.onCancel ?? vi.fn();
   const onClose = opts.onClose ?? vi.fn();
-  render(
+  renderWithCharacter(
     <RollProvider>
       <InlineAttackPicker
-        character={character}
         turnState={opts.turnState ?? turnState}
         sessionId="sess-1"
         onClose={onClose}
         onCancel={onCancel}
-        onUpdate={onUpdate}
         onLogChanged={onLogChanged}
       />
     </RollProvider>,
+    character,
   );
   return { onCancel, onClose };
 }
@@ -148,32 +149,33 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
       sessionId: "sess-1",
       onClose: vi.fn(),
       onCancel: vi.fn(),
-      onUpdate: vi.fn(),
       onLogChanged: vi.fn(),
     };
-    const { rerender } = render(
+    const initialCharacter = makeCharacter({
+      inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+    });
+    const { rerender } = renderWithCharacter(
       <RollProvider>
-        <InlineAttackPicker
-          character={makeCharacter({
-            inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
-          })}
-          {...shared}
-        />
+        <InlineAttackPicker {...shared} />
       </RollProvider>,
+      initialCharacter,
     );
     await user.click(screen.getByRole("radio", { name: "Dagger" }));
     expect(screen.getByRole("radio", { name: "Dagger" })).toHaveAttribute("aria-checked", "true");
 
     // The selected weapon disappears mid-open (live inventory change) — the
     // selector must fall back to a visibly checked option, never nothing-selected.
+    // InlineAttackPicker reads useCurrentCharacter(), so simulating the live
+    // inventory change means writing the cache directly (there's no prop to swap).
+    getQueryClient().setQueryData(
+      characterKeys.detail(initialCharacter.id),
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+      }),
+    );
     rerender(
       <RollProvider>
-        <InlineAttackPicker
-          character={makeCharacter({
-            inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
-          })}
-          {...shared}
-        />
+        <InlineAttackPicker {...shared} />
       </RollProvider>,
     );
     const checked = screen
@@ -272,18 +274,18 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
   }
 
   it("renders the live pip counter for a multi-attack action (2 of 2 remaining)", () => {
-    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 0) });
+    renderPicker(withWeapon(2), vi.fn(), { turnState: attackState(2, 0) });
     expect(screen.getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
   });
 
   it("shows the counter decremented after one recorded attack (1 of 2 remaining)", () => {
-    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 1) });
+    renderPicker(withWeapon(2), vi.fn(), { turnState: attackState(2, 1) });
     expect(screen.getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
   });
 
   it("disables the single Roll-to-hit button when attacks are exhausted", () => {
-    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 2) });
+    renderPicker(withWeapon(2), vi.fn(), { turnState: attackState(2, 2) });
     expect(screen.getByText(/Attacks · 0 of 2 remaining/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
     // The standalone Critical buttons were removed (#766) — crit is auto/verdict now.
@@ -291,12 +293,12 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
   });
 
   it("hides the pip counter for a single-attack action", () => {
-    renderPicker(withWeapon(1), vi.fn(), vi.fn(), { turnState: attackState(1, 0) });
+    renderPicker(withWeapon(1), vi.fn(), { turnState: attackState(1, 0) });
     expect(screen.queryByText(/of 1 remaining/)).not.toBeInTheDocument();
   });
 
   it("carries no kicker copy of its own — the sheet header owns it (TurnResolutionSheets)", () => {
-    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 0) });
+    renderPicker(withWeapon(2), vi.fn(), { turnState: attackState(2, 0) });
     expect(screen.queryByText(/no target AC tracked/)).not.toBeInTheDocument();
   });
 });
@@ -335,7 +337,7 @@ describe("InlineAttackPicker — footer", () => {
       ...turnState,
       attack: { total: 1, used: 1 },
     } as unknown as TurnState & TurnStateActions;
-    renderPicker(makeCharacter({ inventory: [] }), vi.fn(), vi.fn(), { turnState: rolledTurnState });
+    renderPicker(makeCharacter({ inventory: [] }), vi.fn(), { turnState: rolledTurnState });
     expect(screen.getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
   });
@@ -362,7 +364,6 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
     const onLogChanged = vi.fn();
     renderPicker(
       makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
-      vi.fn(),
       onLogChanged,
     );
 
@@ -532,12 +533,10 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
     return (
       <RollProvider>
         <InlineAttackPicker
-          character={character}
           turnState={liveTurnState}
           sessionId="sess-crit"
           onClose={vi.fn()}
           onCancel={vi.fn()}
-          onUpdate={vi.fn()}
           onLogChanged={vi.fn()}
         />
       </RollProvider>
@@ -546,11 +545,10 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
 
   it("calling Crit! flips the damage roll to doubled dice (verdict is the crit authority)", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit to-hit
-    render(
-      <LiveHarness
-        character={makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] })}
-      />,
-    );
+    const character = makeCharacter({
+      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+    });
+    renderWithCharacter(<LiveHarness character={character} />, character);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     await userEvent.click(screen.getByRole("button", { name: /^Crit!$/ }));
@@ -563,14 +561,11 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
 
   it("'it Missed' re-arms the next attack; skip leaves the row unresolved", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    render(
-      <LiveHarness
-        character={makeCharacter({
-          attacksPerAction: 3,
-          inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
-        })}
-      />,
-    );
+    const character = makeCharacter({
+      attacksPerAction: 3,
+      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+    });
+    renderWithCharacter(<LiveHarness character={character} />, character);
 
     // Attack 1 → call it a miss: the row dims into the tally (Miss chip) and
     // the card resets with the next attack armed.
@@ -588,14 +583,11 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
 
   it("a resolved attack's continue button reads 'Next' and re-arms step 1 for a two-tap next roll (#834)", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    render(
-      <LiveHarness
-        character={makeCharacter({
-          attacksPerAction: 2,
-          inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
-        })}
-      />,
-    );
+    const character = makeCharacter({
+      attacksPerAction: 2,
+      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+    });
+    renderWithCharacter(<LiveHarness character={character} />, character);
 
     // Resolve attack 1 (damage = implicit hit).
     await userEvent.click(screen.getByRole("button", { name: "Roll to hit" }));
@@ -618,11 +610,10 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
 
   it("rolling damage marks the current row hit (implicit hit) with Crit! still offered", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    render(
-      <LiveHarness
-        character={makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] })}
-      />,
-    );
+    const character = makeCharacter({
+      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+    });
+    renderWithCharacter(<LiveHarness character={character} />, character);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.getByText(/Ask your DM/)).toBeInTheDocument();
@@ -779,12 +770,10 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
     return (
       <RollProvider>
         <InlineAttackPicker
-          character={character}
           turnState={turnState}
           sessionId="sess-precision"
           onClose={vi.fn()}
           onCancel={vi.fn()}
-          onUpdate={vi.fn()}
           onLogChanged={vi.fn()}
         />
       </RollProvider>
@@ -799,7 +788,8 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
       results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Precision Attack" }],
     } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
 
-    render(<Harness character={battleMaster()} />);
+    const character = battleMaster();
+    renderWithCharacter(<Harness character={character} />, character);
 
     // 11 (d20) + 5 (attackBonus) = 16 to hit. The tally row and result line agree.
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));

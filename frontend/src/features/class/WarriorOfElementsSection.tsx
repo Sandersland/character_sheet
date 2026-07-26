@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character, ElementalDamageType, WarriorOfElementsOperation } from "@/types/character";
 import { rollSpec } from "@/lib/dice";
 
@@ -21,7 +22,6 @@ const BURST_FOCUS_COST = 2;
 const DAMAGE_TYPES: ElementalDamageType[] = ["acid", "cold", "fire", "lightning", "thunder"];
 
 interface Props {
-  character: Character;
   busy: boolean;
   onOperations: (ops: WarriorOfElementsOperation[]) => void;
 }
@@ -102,7 +102,8 @@ function BurstRow({
   );
 }
 
-export default function WarriorOfElementsSection({ character, busy, onOperations }: Props) {
+export default function WarriorOfElementsSection({ busy, onOperations }: Props) {
+  const { character } = useCurrentCharacter();
   const focusAvailable = focusRemaining(character);
   const attuned = character.activeEffects.buffs.some((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY);
   const burstAvailable = character.resources?.elementalBurstAvailable === true;

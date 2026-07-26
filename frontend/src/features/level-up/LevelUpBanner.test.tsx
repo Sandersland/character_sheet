@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import LevelUpBanner from "@/features/level-up/LevelUpBanner";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
@@ -14,11 +15,14 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
+// LevelUpBanner reads useCurrentCharacter(), so every render seeds the cache
+// and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderBanner(character: Character) {
-  return render(
+  return renderWithCharacter(
     <MemoryRouter>
-      <LevelUpBanner character={character} />
+      <LevelUpBanner />
     </MemoryRouter>,
+    character,
   );
 }
 

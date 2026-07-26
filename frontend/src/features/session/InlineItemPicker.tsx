@@ -2,40 +2,40 @@
  * InlineItemPicker — inline consumable-item list for the TurnHub's item resolution.
  *
  * Lists consumable inventory items. On Use: rolls heal dice if present, sends
- * applyActionTransactions with the roll total, and calls onUpdate + onClose.
+ * applyActionTransactions with the roll total, and calls onCommit + onClose.
  */
 
-import { useState } from "react";
-
 import { applyActionTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { rollSpec } from "@/lib/dice";
-import type { Character } from "@/types/character";
 
 interface InlineItemPickerProps {
-  character: Character;
-  onUpdate: (c: Character) => void;
   /** Commit the action slot once an item is used (#765) — tag the batch for undo. */
   onCommit: (batchId?: string) => void;
   onClose: () => void;
 }
 
 export default function InlineItemPicker({
-  character,
-  onUpdate,
   onCommit,
   onClose,
 }: InlineItemPickerProps) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { character } = useCurrentCharacter();
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: Parameters<typeof applyActionTransactions>[1]) => applyActionTransactions(character.id, ops),
+    toCharacter: ({ batchId, ...c }) => {
+      void batchId;
+      return c;
+    },
+    fallbackMessage: "Failed to use item.",
+  });
 
   const consumables = character.inventory.filter((i) => i.category === "consumable");
 
   async function handleUse(itemId: string) {
     const item = consumables.find((i) => i.id === itemId);
-    if (!item || busy) return;
-
-    setBusy(true);
-    setError(null);
+    if (!item || mutation.isPending) return;
 
     try {
       const c = item.consumable;
@@ -51,17 +51,14 @@ export default function InlineItemPicker({
         roll = result.total;
       }
 
-      const updated = await applyActionTransactions(character.id, [
+      const updated = await mutation.mutateAsync([
         { type: "executeAction", actionKey: "useObject", inventoryItemId: itemId, ...(roll !== undefined ? { roll } : {}) },
       ]);
 
-      onUpdate(updated);
       onCommit(updated.batchId);
       onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to use item.");
-    } finally {
-      setBusy(false);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 
@@ -91,7 +88,7 @@ export default function InlineItemPicker({
                 </div>
                 <button
                   type="button"
-                  disabled={busy || item.quantity <= 0}
+                  disabled={mutation.isPending || item.quantity <= 0}
                   onClick={() => handleUse(item.id)}
                   className="rounded-control border border-vitality-200 bg-vitality-50 px-2.5 py-1 text-xs font-semibold text-vitality-700 transition-colors hover:bg-vitality-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -103,8 +100,8 @@ export default function InlineItemPicker({
         </div>
       )}
 
-      {error && (
-        <p className="mt-1.5 text-xs font-semibold text-garnet-700">{error}</p>
+      {mutation.error && (
+        <p className="mt-1.5 text-xs font-semibold text-garnet-700">{mutation.error}</p>
       )}
     </div>
   );

@@ -9,20 +9,20 @@
 import { useEffect, useState } from "react";
 
 import { fetchChannelDivinity } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { abilityLabel } from "@/lib/abilities";
 import type {
   CastChannelDivinityOperation,
   CatalogChannelDivinity,
-  Character,
 } from "@/types/character";
 
 interface Props {
-  character: Character;
   busy: boolean;
   onCast: (op: CastChannelDivinityOperation) => void;
 }
 
-export default function ChannelDivinitySection({ character, busy, onCast }: Props) {
+export default function ChannelDivinitySection({ busy, onCast }: Props) {
+  const { character } = useCurrentCharacter();
   const [catalog, setCatalog] = useState<CatalogChannelDivinity[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 

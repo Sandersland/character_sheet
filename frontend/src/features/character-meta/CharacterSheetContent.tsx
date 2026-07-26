@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 
 import RollResultSeal from "@/features/dice/RollResultSeal";
 import { RollProvider } from "@/features/dice/RollContext";
@@ -6,41 +6,49 @@ import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
 import SheetBottomNav from "@/features/character-meta/SheetBottomNav";
 import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals";
+import DelayedSpinner from "@/components/ui/DelayedSpinner";
 import LevelUpBanner from "@/features/level-up/LevelUpBanner";
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
 import { useScrollCollapse } from "@/features/character-meta/useScrollCollapse";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useReferenceData } from "@/hooks/useReferenceData";
 import { LiveSessionProvider, useLiveSession } from "@/features/session/LiveSessionProvider";
 import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
 import { useLiveRound } from "@/features/session/useLiveRound";
 import SessionDoorway from "@/features/session/SessionDoorway";
-import CombatLivePanel from "@/features/session/CombatLivePanel";
 import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
+import { useSessionLogBumpOnCharacterWrite } from "@/features/session/useSessionLogBumpOnCharacterWrite";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
-import type { SheetTabId } from "@/features/character-meta/sheetTabs";
-import type { Character, ReferenceData, Session } from "@/types/character";
+import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
+import type { ReferenceData, Session } from "@/types/character";
 
-interface CharacterSheetContentProps {
-  id: string | undefined;
-  character: Character;
-  reference: ReferenceData | null;
-  onUpdate: (c: Character) => void;
-}
+// #1279: the live turn tracker pulls the session domain's heaviest trees
+// (TurnHub/useTurnActions/AttackStepCard) — lazied so a sheet that never goes
+// live never fetches them. Import fires once a live+joined session actually
+// exists (renderLivePanel below), not on every sheet load.
+const CombatLivePanel = lazy(() => import("@/features/session/CombatLivePanel"));
 
 /**
- * The loaded-sheet view. Wraps the workspace in the shared session providers
- * (#959) — `LiveSessionProvider` (is a session live + am I in it) above
- * `TurnStateProvider` (the single turn-state instance) — so the Combat tab, the
- * live strip, the nav pip, and the doorway all read one server-derived source.
+ * The loaded-sheet view. Takes NO props (#1284 C17) — reads the character via
+ * useCurrentCharacter() (the page's CurrentCharacterProvider is already
+ * mounted above this) and the catalog via useReferenceData(), instead of
+ * receiving either threaded down from CharacterSheetPage. Wraps the workspace
+ * in the shared session providers (#959) — `LiveSessionProvider` (is a
+ * session live + am I in it) above `TurnStateProvider` (the single turn-state
+ * instance) — so the Combat tab, the live strip, the nav pip, and the doorway
+ * all read one server-derived source.
  */
-export default function CharacterSheetContent(props: CharacterSheetContentProps) {
+export default function CharacterSheetContent() {
+  const { character } = useCurrentCharacter();
+  const { reference } = useReferenceData();
   return (
-    <LiveSessionProvider characterId={props.character.id}>
-      <TurnStateProvider character={props.character}>
-        <CharacterSheetWorkspace {...props} />
+    <LiveSessionProvider characterId={character.id}>
+      <TurnStateProvider>
+        <CharacterSheetWorkspace reference={reference} />
       </TurnStateProvider>
     </LiveSessionProvider>
   );
@@ -48,30 +56,27 @@ export default function CharacterSheetContent(props: CharacterSheetContentProps)
 
 /**
  * The sheet body: banner + tab panels + the roll/modal chrome. Split from
- * CharacterSheetPage so the page holds only load/error/guard states and this
- * owns the per-character interaction state (tabs, modals, capture dock, doorway).
+ * CharacterSheetContent so the providers above stay uncluttered and this owns
+ * the per-character interaction state (tabs, modals, capture dock, doorway).
+ * Reads the character itself (#1284) — CharacterSheetContent only needed it
+ * for LiveSessionProvider's characterId, not to forward it here.
  */
-function CharacterSheetWorkspace({
-  id,
-  character,
-  reference,
-  onUpdate,
-}: CharacterSheetContentProps) {
-  const { tabs, activeTab, onTabChange } = useSheetTabs(character);
+function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | null }) {
+  const { character, tabs, activeTab, onTabChange } = useCharacterTabs();
   const modals = useSheetModals();
   // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
   // Session-log invalidation is shared with RollProvider so a logged roll and
   // the log view use one counter (#959).
   const live = useLiveSession();
+  // Bumps the log for EVERY character-cache write (#1284) — a strict superset
+  // of the old combat-only bump (see useCombatLifecycle's docblock).
+  useSessionLogBumpOnCharacterWrite(live.bumpLog);
   const turnState = useTurnStateContext();
   const liveRound = useLiveRound();
   // Start/Join from the doorway jumps to the Combat tab in-workspace (#963).
-  const session = useSessionDoorway(id, () => onTabChange("combat"));
-  // Mobile: horizontal swipe on the panel region walks the tabs (clamped).
-  const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
-  // Mobile: collapse the compact header to a single bar once the panels scroll.
-  const collapse = useScrollCollapse();
+  const session = useSessionDoorway(character.id, () => onTabChange("combat"));
+  const { swipe, collapse } = useMobileSheetGestures(tabs, activeTab, onTabChange);
   const goToCombat = () => onTabChange("combat");
 
   // #1085: while live + joined the header cluster is the sole live indicator —
@@ -89,14 +94,8 @@ function CharacterSheetWorkspace({
   // The End/Leave-session lifecycle lifts here (#979) so the persistent sheet
   // header — a sibling of the panel region — can drive it (there is no separate
   // in-panel controls strip anymore). Handlers no-op until a session is joined.
-  const life = useCombatLifecycle({ character, session: live.session, onUpdate, live });
-  const livePanel = renderLivePanel(
-    character,
-    live.session,
-    Boolean(turnState),
-    activeTab === "combat",
-    life.handleCharacterUpdate,
-  );
+  const life = useCombatLifecycle({ character, session: live.session, live });
+  const livePanel = renderLivePanel(live.session, Boolean(turnState), activeTab === "combat");
 
   return (
     <RollProvider
@@ -112,8 +111,6 @@ function CharacterSheetWorkspace({
           md:hidden, #1171). */}
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:flex-1 md:overflow-visible">
         <CharacterSheetHeader
-          character={character}
-          onUpdate={life.handleCharacterUpdate}
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
@@ -136,15 +133,13 @@ function CharacterSheetWorkspace({
 
         {/* Armed level-up entry (#892): pinned under the header on every tab,
             above the mobile scroller so it can't scroll away. */}
-        <LevelUpBanner character={character} />
+        <LevelUpBanner />
 
         {/* Desktop: session doorway for non-joined states, pinned under the
             header; absent on the Combat tab and while joined (#1085). */}
         <SessionCue placement="desktop" {...cueProps} />
 
         <CharacterSheetModals
-          character={character}
-          onUpdate={onUpdate}
           captureSessionId={session.activeSessionId}
           captureSession={session.inActiveSession ? session.activeSession : null}
           deleteOpen={modals.deleteOpen}
@@ -174,9 +169,7 @@ function CharacterSheetWorkspace({
               must not gain the 1px this adds to the flow. */}
           <div ref={collapse.sentinelRef} aria-hidden className="h-px w-full md:hidden" />
           <CharacterSheetBody
-            character={character}
             reference={reference}
-            onUpdate={onUpdate}
             activeTab={activeTab}
             livePanel={livePanel}
             sessionLoading={live.status === "loading"}
@@ -184,7 +177,7 @@ function CharacterSheetWorkspace({
             onGoToCombat={goToCombat}
           />
         </div>
-        <WorkspaceSessionModals characterId={character.id} live={live} life={life} onUpdate={onUpdate} />
+        <WorkspaceSessionModals characterId={character.id} live={live} life={life} />
         <RollResultSeal />
         {/* Mobile: the session cue (live-strip / doorway), between the panels
             and the bottom nav; absent on the Combat tab (#961). */}
@@ -210,12 +203,10 @@ function WorkspaceSessionModals({
   characterId,
   live,
   life,
-  onUpdate,
 }: {
   characterId: string;
   live: ReturnType<typeof useLiveSession>;
   life: ReturnType<typeof useCombatLifecycle>;
-  onUpdate: (c: Character) => void;
 }) {
   return (
     <>
@@ -224,7 +215,6 @@ function WorkspaceSessionModals({
           characterId={characterId}
           session={live.endedSession}
           onClose={() => live.setEndedSession(null)}
-          onCharacterUpdate={onUpdate}
         />
       )}
       {life.endPromptOpen && (
@@ -263,14 +253,16 @@ function WorkspaceSessionModals({
  * static Combat panel. Extracted so the workspace render stays under the ceiling.
  */
 function renderLivePanel(
-  character: Character,
   session: Session | null,
   hasTurnState: boolean,
   combatActive: boolean,
-  onUpdate: (c: Character) => void,
 ): ReactNode {
   if (!hasTurnState || !session) return null;
-  return <CombatLivePanel character={character} session={session} onUpdate={onUpdate} active={combatActive} />;
+  return (
+    <Suspense fallback={<DelayedSpinner />}>
+      <CombatLivePanel session={session} active={combatActive} />
+    </Suspense>
+  );
 }
 
 /**
@@ -302,6 +294,25 @@ function SessionCue({
       onAction={session.onAction}
     />
   );
+}
+
+/** The character plus its derived tab list — grouped into one hook so the
+ *  workspace calls it once instead of two (fallow scores a hook's cognitive
+ *  load by its delegating closures, so keeping the workspace's own hook count
+ *  down matters more than branch-level extraction). */
+function useCharacterTabs() {
+  const { character } = useCurrentCharacter();
+  const { tabs, activeTab, onTabChange } = useSheetTabs(character);
+  return { character, tabs, activeTab, onTabChange };
+}
+
+/** The panel region's two mobile-only scroll affordances — horizontal swipe
+ *  walks the tabs, vertical scroll collapses the header — grouped into one
+ *  hook so the workspace calls it once instead of two. */
+function useMobileSheetGestures(tabs: SheetTab[], activeTab: SheetTabId, onTabChange: (id: SheetTabId) => void) {
+  const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
+  const collapse = useScrollCollapse();
+  return { swipe, collapse };
 }
 
 /** The sheet's modal open-state + toggles (delete / activity / sessions /

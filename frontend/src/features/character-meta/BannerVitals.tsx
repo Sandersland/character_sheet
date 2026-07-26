@@ -1,8 +1,8 @@
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatModifier } from "@/lib/abilities";
 import Popover from "@/components/ui/Popover";
 import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import RollButton from "@/features/dice/RollButton";
-import type { Character } from "@/types/character";
 
 /**
  * Always-on stat cards for the sheet banner — AC / Initiative / Speed /
@@ -26,7 +26,8 @@ function StatChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function BannerVitals({ character }: { character: Character }) {
+export default function BannerVitals() {
+  const { character } = useCurrentCharacter();
   return (
     <div className="flex flex-wrap gap-2">
       {/* AC — read-only; click discloses the labeled breakdown. */}
@@ -40,7 +41,7 @@ export default function BannerVitals({ character }: { character: Character }) {
           </>
         }
       >
-        <ArmorClassBreakdown character={character} />
+        <ArmorClassBreakdown />
       </Popover>
 
       {/* Initiative — rollable. */}

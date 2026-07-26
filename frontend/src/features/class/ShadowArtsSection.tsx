@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchShadowArts } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type {
   CastShadowArtOperation,
   CatalogShadowArt,
@@ -18,7 +19,6 @@ import type {
 import ShadowArtRow from "@/features/class/ShadowArtRow";
 
 interface Props {
-  character: Character;
   busy: boolean;
   onCast: (op: CastShadowArtOperation) => void;
 }
@@ -28,7 +28,8 @@ function focusRemaining(character: Character): number {
   return character.resources?.pools.find((p) => p.key === "focus")?.remaining ?? 0;
 }
 
-export default function ShadowArtsSection({ character, busy, onCast }: Props) {
+export default function ShadowArtsSection({ busy, onCast }: Props) {
+  const { character } = useCurrentCharacter();
   const [catalog, setCatalog] = useState<CatalogShadowArt[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 

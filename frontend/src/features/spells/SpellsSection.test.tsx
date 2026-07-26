@@ -1,17 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, renderHook, screen } from "@testing-library/react";
+import { renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import SpellsSection from "@/features/spells/SpellsSection";
 import { useSpellcasting } from "@/features/spells/useSpellcasting";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character, Spell } from "@/types/character";
 
 // Mock the API client — SpellsSection is the orchestrator that batches
-// spellcasting ops and swaps the returned Character via onUpdate.
+// spellcasting ops and swaps the returned Character straight into the
+// character query cache.
 vi.mock("@/api/client", () => ({
   applySpellcastingTransactions: vi.fn(),
 }));
+
+// SpellsSection reads useCurrentCharacter(), so every render seeds the cache
+// and mounts CurrentCharacterProvider via renderWithCharacter.
+function render(character: Character) {
+  return renderWithCharacter(<SpellsSection />, character);
+}
 
 const BLESS: Spell = {
   id: "entry-bless",
@@ -61,7 +69,7 @@ async function openGrimoire(user: ReturnType<typeof userEvent.setup>) {
 
 describe("SpellsSection concentration", () => {
   it("does not show the concentration banner when not concentrating", () => {
-    render(<SpellsSection character={makeCharacter(null)} onUpdate={vi.fn()} />);
+    render(makeCharacter(null));
     expect(screen.queryByText(/Concentrating on/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /drop concentration/i }),
@@ -69,12 +77,7 @@ describe("SpellsSection concentration", () => {
   });
 
   it("shows a banner naming the active concentration spell", () => {
-    render(
-      <SpellsSection
-        character={makeCharacter({ entryId: "entry-bless", spellName: "Bless" })}
-        onUpdate={vi.fn()}
-      />,
-    );
+    render(makeCharacter({ entryId: "entry-bless", spellName: "Bless" }));
     const banner = screen.getByRole("status");
     expect(banner).toHaveTextContent(/Concentrating on/i);
     expect(banner).toHaveTextContent("Bless");
@@ -82,16 +85,10 @@ describe("SpellsSection concentration", () => {
 
   it("fires a dropConcentration op when the drop control is clicked", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
     mockApply.mockResolvedValue(makeCharacter(null));
 
-    render(
-      <SpellsSection
-        character={makeCharacter({ entryId: "entry-bless", spellName: "Bless" })}
-        onUpdate={onUpdate}
-      />,
-    );
+    render(makeCharacter({ entryId: "entry-bless", spellName: "Bless" }));
 
     await user.click(screen.getByRole("button", { name: /drop concentration/i }));
 
@@ -100,7 +97,7 @@ describe("SpellsSection concentration", () => {
 
   it("opens the grimoire view (not stacked) when Manage spellbook is clicked", async () => {
     const user = userEvent.setup();
-    render(<SpellsSection character={makeCharacter(null)} onUpdate={vi.fn()} />);
+    render(makeCharacter(null));
     // Record block is showing, grimoire is not.
     expect(screen.queryByRole("button", { name: /^done$/i })).not.toBeInTheDocument();
     await openGrimoire(user);
@@ -112,12 +109,7 @@ describe("SpellsSection concentration", () => {
 
   it("marks the active concentration spell's badge as 'concentrating'", async () => {
     const user = userEvent.setup();
-    render(
-      <SpellsSection
-        character={makeCharacter({ entryId: "entry-bless", spellName: "Bless" })}
-        onUpdate={vi.fn()}
-      />,
-    );
+    render(makeCharacter({ entryId: "entry-bless", spellName: "Bless" }));
     await openGrimoire(user);
     expect(screen.getByText("concentrating")).toBeInTheDocument();
   });
@@ -163,7 +155,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
     mockApply.mockResolvedValue(makeWizard({ prepared: true }));
 
-    render(<SpellsSection character={makeWizard()} onUpdate={vi.fn()} />);
+    render(makeWizard());
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
 
@@ -175,7 +167,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
     mockApply.mockResolvedValue(makeWizard());
 
-    render(<SpellsSection character={makeWizard({ prepared: true, preparedSpellCount: 2 })} onUpdate={vi.fn()} />);
+    render(makeWizard({ prepared: true, preparedSpellCount: 2 }));
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Unprepare Shield/i }));
 
@@ -187,12 +179,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     const user = userEvent.setup();
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
 
-    render(
-      <SpellsSection
-        character={makeWizard({ prepared: false, preparedSpellCount: 8, preparedSpellLimit: 8 })}
-        onUpdate={vi.fn()}
-      />,
-    );
+    render(makeWizard({ prepared: false, preparedSpellCount: 8, preparedSpellLimit: 8 }));
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
 
@@ -205,7 +192,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
     mockApply.mockRejectedValue(new Error("You can prepare at most 8 spells."));
 
-    render(<SpellsSection character={makeWizard()} onUpdate={vi.fn()} />);
+    render(makeWizard());
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
 
@@ -215,11 +202,14 @@ describe("SpellsSection preparation (grimoire runes)", () => {
   it("handleSwap batches unprepare-one + prepare-another in a single client call", async () => {
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
     mockApply.mockResolvedValue(makeWizard());
-    const { result } = renderHook(() => useSpellcasting(makeWizard(), vi.fn()));
+    const { result } = renderHook(() => useSpellcasting(makeWizard()));
 
     result.current.handleSwap("entry-drop", "entry-add");
 
-    expect(mockApply).toHaveBeenCalledTimes(1);
+    // A mutation's mutationFn call is dispatched via TanStack Query's internal
+    // notify batching (a microtask hop), not synchronously like the old raw
+    // fetch call — so this assertion now needs a tick.
+    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
     expect(mockApply).toHaveBeenCalledWith("wiz-1", [
       { type: "unprepareSpell", entryId: "entry-drop" },
       { type: "prepareSpell", entryId: "entry-add" },
@@ -235,7 +225,7 @@ describe("SpellsSection at-cap swap bar (#938)", () => {
     const user = userEvent.setup();
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
 
-    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    render(atCap());
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
 
@@ -251,7 +241,7 @@ describe("SpellsSection at-cap swap bar (#938)", () => {
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
     mockApply.mockResolvedValue(makeWizard({ prepared: true, withBless: false }));
 
-    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    render(atCap());
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
     await user.click(screen.getByRole("button", { name: /Swap out Bless to prepare Shield/i }));
@@ -268,7 +258,7 @@ describe("SpellsSection at-cap swap bar (#938)", () => {
     const user = userEvent.setup();
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
 
-    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    render(atCap());
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
@@ -281,7 +271,7 @@ describe("SpellsSection at-cap swap bar (#938)", () => {
     const user = userEvent.setup();
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
 
-    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    render(atCap());
     await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
     expect(screen.getByRole("status")).toBeInTheDocument();
@@ -372,14 +362,14 @@ describe("SpellsSection slot labelling", () => {
   }
 
   it("labels a single-class warlock's merged slots as Pact Magic", () => {
-    render(<SpellsSection character={warlockOnly()} onUpdate={vi.fn()} />);
+    render(warlockOnly());
     expect(screen.getByRole("heading", { name: /Pact Magic/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /^Spell Slots$/i })).not.toBeInTheDocument();
   });
 
   it("labels a warlock's grimoire slot group Pact Magic with the fixed-level note", async () => {
     const user = userEvent.setup();
-    render(<SpellsSection character={warlockGrimoire()} onUpdate={vi.fn()} />);
+    render(warlockGrimoire());
     await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
     expect(screen.getByText(/Pact Magic — 2\/2 slots/i)).toBeInTheDocument();
     expect(screen.getByText(/All slots are cast at level 3 and return on a short rest\./i)).toBeInTheDocument();
@@ -387,13 +377,13 @@ describe("SpellsSection slot labelling", () => {
 
   it("does not label a non-warlock's grimoire slot group as Pact Magic", async () => {
     const user = userEvent.setup();
-    render(<SpellsSection character={makeCharacter(null)} onUpdate={vi.fn()} />);
+    render(makeCharacter(null));
     await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
     expect(screen.queryByText(/Pact Magic/i)).not.toBeInTheDocument();
   });
 
   it("labels a multiclass warlock's merged pool 'Spell Slots' with one dedicated Pact Magic block", () => {
-    render(<SpellsSection character={warlockSorcerer()} onUpdate={vi.fn()} />);
+    render(warlockSorcerer());
     // Merged pool is neutral "Spell Slots"…
     expect(screen.getByRole("heading", { name: /^Spell Slots$/i })).toBeInTheDocument();
     // …and Pact Magic appears exactly once (the dedicated pact block, level 1).

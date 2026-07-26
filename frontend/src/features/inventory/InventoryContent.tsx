@@ -1,10 +1,9 @@
-import type { Character, InventoryOperation } from "@/types/character";
+import type { InventoryOperation } from "@/types/character";
 import LoadoutList from "@/features/inventory/LoadoutList";
 import InventorySections from "@/features/inventory/InventorySections";
 import { type InventorySection } from "@/lib/inventorySections";
 
 interface InventoryContentProps {
-  character: Character;
   view: "bag" | "worn";
   pending: boolean;
   sections: InventorySection[];
@@ -20,7 +19,6 @@ interface InventoryContentProps {
 
 // The non-empty pack view: the Worn paper-doll or the Bag's sectioned rows.
 export default function InventoryContent({
-  character,
   view,
   pending,
   sections,
@@ -34,7 +32,7 @@ export default function InventoryContent({
   onToggleSelect,
 }: InventoryContentProps) {
   if (view === "worn") {
-    return <LoadoutList character={character} pending={pending} onSubmit={onSubmit} />;
+    return <LoadoutList pending={pending} onSubmit={onSubmit} />;
   }
   return (
     <InventorySections

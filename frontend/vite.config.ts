@@ -31,11 +31,15 @@ export default defineConfig({
     proxy: apiProxy,
   },
   build: {
-    // The only remaining >500 kB chunk is `dice-vendor` (the three.js 3D stack),
-    // and it is deliberately async-only — the lazy dice seams keep it out of the
-    // initial load, so its size never gates first paint. Raised past that chunk
-    // so the warning stays meaningful for the initial bundle we do care about.
-    chunkSizeWarningLimit: 1400,
+    // #1279: Vite's default (500 kB) — every eager/route/tab chunk sits well
+    // under it (largest is react-vendor at ~187 kB). `dice-vendor` (the
+    // three.js 3D stack, ~1.1 MB) is deliberately async-only — the lazy dice
+    // seams keep it out of the initial load — and is the one EXPECTED warning
+    // this limit produces; Vite has no per-chunk override, so raising the
+    // limit past it (as before, to 1400) would have silenced a real regression
+    // too, which is exactly how the eager `index` chunk grew 680→722 kB
+    // unnoticed. Keep the limit low and accept dice-vendor's one warning.
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
         // Isolate the heavy 3D dice stack (three/@react-three/cannon-es/troika)

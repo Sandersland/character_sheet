@@ -7,19 +7,19 @@
  * the condition from the Conditions section.
  */
 
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 const FOCUS_COST = 3;
 
 interface Props {
-  character: Character;
   /** Focus remaining on hand — gates the activation button, mirrors ShadowArtRow. */
   focusAvailable: number;
   busy: boolean;
   onActivate: () => void;
 }
 
-export default function CloakOfShadowsSection({ character, focusAvailable, busy, onActivate }: Props) {
+export default function CloakOfShadowsSection({ focusAvailable, busy, onActivate }: Props) {
+  const { character } = useCurrentCharacter();
   const isInvisible = (character.conditions?.active ?? []).some((c) => c.key === "invisible");
   const canAfford = focusAvailable >= FOCUS_COST;
 

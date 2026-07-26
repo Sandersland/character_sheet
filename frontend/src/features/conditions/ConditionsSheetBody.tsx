@@ -8,9 +8,10 @@
  */
 
 import { Minus, Plus, X } from "lucide-react";
-import { useState } from "react";
 
 import { applyConditionTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiHealthNormal } from "@/components/ui/icons";
 import {
@@ -19,34 +20,34 @@ import {
   EXHAUSTION_MAX,
   exhaustionEffect,
 } from "@/lib/conditions";
-import type { Character, ConditionKey, ConditionOperation } from "@/types/character";
+import type { ConditionKey, ConditionOperation } from "@/types/character";
 import AddConditionPanel from "@/features/conditions/AddConditionPanel";
 
 interface Props {
-  character: Character;
-  onUpdate: (updated: Character) => void;
   /** Open the add-condition picker expanded — set when a host launches this body
    *  straight into "add" mode (the live-Combat "+ Add" trigger, #982). */
   defaultAddOpen?: boolean;
 }
 
-export default function ConditionsSheetBody({ character, onUpdate, defaultAddOpen }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function ConditionsSheetBody({ defaultAddOpen }: Props) {
+  const { character } = useCurrentCharacter();
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: ConditionOperation[]) => applyConditionTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Something went wrong.",
+  });
+  const busy = mutation.isPending;
+  const error = mutation.error;
 
   const { active, exhaustion } = character.conditions;
   const activeKeys = active.map((c) => c.key);
 
   async function send(ops: ConditionOperation[]) {
-    setBusy(true);
-    setError(null);
     try {
-      const updated = await applyConditionTransactions(character.id, ops);
-      onUpdate(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
+      await mutation.mutateAsync(ops);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 

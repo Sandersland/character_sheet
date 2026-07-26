@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CastSpellDoor from "@/features/spells/CastSpellDoor";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Spell } from "@/types/character";
 
 function spell(partial: Partial<Spell>): Spell {
@@ -35,10 +36,6 @@ const DERIVED = { availableSlotLevels: [1, 2], availableArcanaLevels: [] };
 
 function baseProps(over: Partial<Parameters<typeof CastSpellDoor>[0]> = {}) {
   return {
-    character: makeCharacter([
-      spell({ name: "Fire Bolt", level: 0 }),
-      spell({ name: "Burning Hands", level: 1, prepared: true }),
-    ]),
     derived: DERIVED,
     busy: false,
     isLive: false,
@@ -48,15 +45,30 @@ function baseProps(over: Partial<Parameters<typeof CastSpellDoor>[0]> = {}) {
   };
 }
 
+const defaultCharacter = () =>
+  makeCharacter([
+    spell({ name: "Fire Bolt", level: 0 }),
+    spell({ name: "Burning Hands", level: 1, prepared: true }),
+  ]);
+
+// CastSpellDoor reads useCurrentCharacter(), so every render seeds the cache
+// and mounts CurrentCharacterProvider via renderWithCharacter.
+function renderDoor(
+  propsOver: Partial<Parameters<typeof CastSpellDoor>[0]> = {},
+  character: Character = defaultCharacter(),
+) {
+  return renderWithCharacter(<CastSpellDoor {...baseProps(propsOver)} />, character);
+}
+
 describe("CastSpellDoor", () => {
   it("renders the Cast a spell door", () => {
-    render(<CastSpellDoor {...baseProps()} />);
+    renderDoor();
     expect(screen.getByRole("button", { name: "Cast a spell" })).toBeInTheDocument();
   });
 
   it("opens a picker listing castable spells when not live", async () => {
     const user = userEvent.setup();
-    render(<CastSpellDoor {...baseProps()} />);
+    renderDoor();
     await user.click(screen.getByRole("button", { name: "Cast a spell" }));
     expect(screen.getByRole("button", { name: /Fire Bolt/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Burning Hands/ })).toBeInTheDocument();
@@ -64,13 +76,9 @@ describe("CastSpellDoor", () => {
 
   it("excludes a prepared leveled spell with no available slot", async () => {
     const user = userEvent.setup();
-    render(
-      <CastSpellDoor
-        {...baseProps({
-          character: makeCharacter([spell({ name: "Burning Hands", level: 1, prepared: true })]),
-          derived: { availableSlotLevels: [], availableArcanaLevels: [] },
-        })}
-      />,
+    renderDoor(
+      { derived: { availableSlotLevels: [], availableArcanaLevels: [] } },
+      makeCharacter([spell({ name: "Burning Hands", level: 1, prepared: true })]),
     );
     await user.click(screen.getByRole("button", { name: "Cast a spell" }));
     expect(screen.queryByRole("button", { name: /Burning Hands/ })).not.toBeInTheDocument();
@@ -78,7 +86,7 @@ describe("CastSpellDoor", () => {
 
   it("opens the shared spell detail card when a picker row is tapped", async () => {
     const user = userEvent.setup();
-    render(<CastSpellDoor {...baseProps()} />);
+    renderDoor();
     await user.click(screen.getByRole("button", { name: "Cast a spell" }));
     await user.click(screen.getByRole("button", { name: /Fire Bolt/ }));
     expect(screen.getByRole("heading", { name: "Fire Bolt" })).toBeInTheDocument();
@@ -87,7 +95,7 @@ describe("CastSpellDoor", () => {
   it("casts a cantrip with no slot arg and closes the door", async () => {
     const user = userEvent.setup();
     const onCast = vi.fn();
-    render(<CastSpellDoor {...baseProps({ onCast })} />);
+    renderDoor({ onCast });
     await user.click(screen.getByRole("button", { name: "Cast a spell" }));
     await user.click(screen.getByRole("button", { name: /Fire Bolt/ }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Cast Fire Bolt/ }));
@@ -99,7 +107,7 @@ describe("CastSpellDoor", () => {
   it("shows an upcast slot selector for a multi-slot leveled spell and casts at the chosen level", async () => {
     const user = userEvent.setup();
     const onCast = vi.fn();
-    render(<CastSpellDoor {...baseProps({ onCast })} />);
+    renderDoor({ onCast });
     await user.click(screen.getByRole("button", { name: "Cast a spell" }));
     await user.click(screen.getByRole("button", { name: /Burning Hands/ }));
     const dialog = screen.getByRole("dialog");
@@ -111,7 +119,7 @@ describe("CastSpellDoor", () => {
   it("routes to Combat instead of opening the picker when a session is live", async () => {
     const user = userEvent.setup();
     const onGoToCombat = vi.fn();
-    render(<CastSpellDoor {...baseProps({ isLive: true, onGoToCombat })} />);
+    renderDoor({ isLive: true, onGoToCombat });
     await user.click(screen.getByRole("button", { name: "Cast a spell" }));
     expect(onGoToCombat).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: /Fire Bolt/ })).not.toBeInTheDocument();
@@ -122,7 +130,7 @@ describe("CastSpellDoor", () => {
     // paragraph's full text content rather than a single text node.
     const notice = () =>
       screen.queryByText((_, el) => el?.tagName === "P" && /casting happens on the .*Combat.* tab/i.test(el.textContent ?? ""));
-    const { rerender } = render(<CastSpellDoor {...baseProps({ isLive: false })} />);
+    const { rerender } = renderDoor({ isLive: false });
     expect(notice()).not.toBeInTheDocument();
     rerender(<CastSpellDoor {...baseProps({ isLive: true })} />);
     expect(notice()).toBeInTheDocument();

@@ -7,9 +7,11 @@
 import { useState } from "react";
 
 import { imposeOpenHandRiderTransaction } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
-import type { Character, OpenHandRider, OpenHandRiderResult } from "@/types/character";
+import type { OpenHandRider, OpenHandRiderResult } from "@/types/character";
 
 const RIDER_LABELS: Record<OpenHandRider, string> = {
   addle: "Addle",
@@ -25,39 +27,37 @@ function riderBlockedReason(currentRow: AttackTallyRow | null, used: boolean): s
 }
 
 interface OpenHandTechniqueSectionProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** The bound Flurry hit row this rider rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
 }
 
 export default function OpenHandTechniqueSection({
-  character,
   turnState,
   currentRow,
-  onUpdate,
 }: OpenHandTechniqueSectionProps) {
+  const { character } = useCurrentCharacter();
   const { openHandTechnique } = character;
-  const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<OpenHandRiderResult | null>(null);
   const used = turnState.openHandRiderUsedThisTurn;
-  const canImpose = !used && !busy && currentRow !== null;
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (rider: OpenHandRider) => imposeOpenHandRiderTransaction(character.id, rider, used),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Failed to impose Open Hand Technique rider",
+  });
+  const canImpose = !used && !mutation.isPending && currentRow !== null;
 
   // Only a L3+ Warrior of the Open Hand has Open Hand Technique.
   if (!openHandTechnique) return null;
 
+  // No try/catch (unchanged from pre-#1283): this component has never
+  // surfaced an error — a rejection propagates same as before.
   async function handleImpose(rider: OpenHandRider) {
     if (!canImpose) return;
-    setBusy(true);
-    try {
-      const { character: updated, results } = await imposeOpenHandRiderTransaction(character.id, rider, used);
-      setResult(results[0] ?? null);
-      turnState.markOpenHandRiderUsed();
-      onUpdate(updated);
-    } finally {
-      setBusy(false);
-    }
+    const { results } = await mutation.mutateAsync(rider);
+    setResult(results[0] ?? null);
+    turnState.markOpenHandRiderUsed();
   }
 
   return (

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 // Level-7 Battle Master fixture matching the 0719 playtest bug report
@@ -35,9 +36,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 }
 
 function renderCard(character: Character = makeCharacter()) {
-  return render(
-    <ProficienciesCard character={character} artisanTools={[]} onUpdate={() => {}} />,
-  );
+  return renderWithCharacter(<ProficienciesCard artisanTools={[]} />, character);
 }
 
 describe("ProficienciesCard", () => {

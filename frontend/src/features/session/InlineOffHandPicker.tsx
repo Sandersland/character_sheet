@@ -28,10 +28,9 @@ import { useBonusAttackSheet } from "@/features/session/useBonusAttackSheet";
 import AttackStepCard from "@/features/session/AttackStepCard";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface InlineOffHandPickerProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** Active session id — off-hand rolls are logged against it. */
   sessionId: string;
@@ -39,7 +38,6 @@ interface InlineOffHandPickerProps {
   onClose: () => void;
   /** Back out before rolling — refunds the bonus action and reopens the menu. */
   onCancel: () => void;
-  onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   /** "twf" (default): the off-hand weapon swing. "unarmed": Martial Arts'
    *  Bonus Unarmed Strike (#1218) — same shell, locked to the Unarmed Strike
@@ -48,15 +46,14 @@ interface InlineOffHandPickerProps {
 }
 
 export default function InlineOffHandPicker({
-  character,
   turnState,
   sessionId,
   onClose,
   onCancel,
-  onUpdate,
   onLogChanged,
   variant = "twf",
 }: InlineOffHandPickerProps) {
+  const { character } = useCurrentCharacter();
   // variant-aware entry (#1218): off-hand weapon for "twf", Unarmed Strike for
   // "unarmed"; the useBonusAttackSheet shell (#1217) is otherwise identical.
   const entry = buildBonusSwingEntry(character, variant);
@@ -83,7 +80,6 @@ export default function InlineOffHandPicker({
     entry,
     recordAttack: turnState.recordTwfAttack,
     attacksExhausted: rolled,
-    onUpdate,
     onLogChanged,
   });
 

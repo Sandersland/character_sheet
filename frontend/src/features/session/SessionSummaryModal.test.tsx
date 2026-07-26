@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import { applyExperienceOperations, fetchEntities, fetchSession } from "@/api/client";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type {
   CampaignRecap,
   Character,
@@ -12,6 +13,10 @@ import type {
   Session,
   SessionParticipant,
 } from "@/types/character";
+
+// SessionAddXpForm reads/writes the character via useCurrentCharacter() (#1284);
+// every fixture below uses characterId "c1", so one seed covers all of them.
+const seedCharacter = { id: "c1" } as Character;
 
 // A well-formed entity uuid for @[<uuid>] mention-token tests. Inlined in the
 // (hoisted) vi.mock factory below to avoid a temporal-dead-zone reference.
@@ -118,7 +123,7 @@ const baseSession: Session = {
 
 describe("SessionSummaryModal", () => {
   it("renders the campaign recap aggregates, party size, and item list", () => {
-    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />, seedCharacter);
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/Session Recap — The Sunless Citadel/)).toBeInTheDocument();
@@ -139,7 +144,7 @@ describe("SessionSummaryModal", () => {
   });
 
   it("lists each participant with their name and present time", () => {
-    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />, seedCharacter);
     expect(screen.getByText("Participants")).toBeInTheDocument();
     expect(screen.getByText("Aldric")).toBeInTheDocument();
     expect(screen.getByText("Bromm")).toBeInTheDocument();
@@ -149,13 +154,13 @@ describe("SessionSummaryModal", () => {
 
   it("shows an empty-state for no acquired items", () => {
     const session: Session = { ...baseSession, summary: { ...recap, itemsAcquired: [] } };
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
     expect(screen.getByText("No items gained this session.")).toBeInTheDocument();
   });
 
   it("falls back gracefully when summary is null", () => {
     const session: Session = { ...baseSession, summary: null };
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
     expect(screen.getByText(/No summary is available/)).toBeInTheDocument();
   });
 
@@ -173,10 +178,11 @@ describe("SessionSummaryModal", () => {
         },
       ],
     };
-    render(
+    renderWithCharacter(
       <MemoryRouter>
         <SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />
       </MemoryRouter>,
+      seedCharacter,
     );
 
     // The note body is visible immediately — no title, no collapse (#278 regression).
@@ -197,7 +203,7 @@ describe("SessionSummaryModal", () => {
         itemsSold: [{ name: "Alms Box", qty: 2 }],
       },
     };
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
 
     expect(screen.getByText("Items sold")).toBeInTheDocument();
     expect(screen.getByText("Alms Box")).toBeInTheDocument();
@@ -211,7 +217,7 @@ describe("SessionSummaryModal", () => {
       ...baseSession,
       summary: { ...recap, loot: [{ name: "Flametongue", qty: 1 }] },
     };
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
 
     expect(screen.getByText("Loot")).toBeInTheDocument();
     expect(screen.getByText("Flametongue")).toBeInTheDocument();
@@ -226,7 +232,7 @@ describe("SessionSummaryModal", () => {
       summary: { ...recap, participantCount: 1 },
       participants: solo,
     };
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
 
     // Aggregate is still shown…
     expect(screen.getByText("XP gained")).toBeInTheDocument();
@@ -243,7 +249,7 @@ describe("SessionSummaryModal", () => {
         featsOrAsis: [{ type: "featTaken", label: "Feat: Lucky" }],
       },
     };
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
 
     expect(screen.getByText("Slots spent")).toBeInTheDocument();
     expect(screen.getByText("L1 ×2")).toBeInTheDocument();
@@ -271,7 +277,7 @@ describe("SessionSummaryModal", () => {
     } as unknown as CampaignRecap; // intentionally omits itemsSold/slotsSpent/featsOrAsis
     const session: Session = { ...baseSession, summary: legacyRecap };
 
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
 
     // The aggregate still renders; the missing-field sections are simply absent.
     expect(screen.getByText("XP gained")).toBeInTheDocument();
@@ -281,7 +287,7 @@ describe("SessionSummaryModal", () => {
   });
 
   it("shows a journal empty-state when there are no entries", () => {
-    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />, seedCharacter);
     expect(screen.getByText("No journal entries for this session.")).toBeInTheDocument();
   });
 
@@ -294,7 +300,7 @@ describe("SessionSummaryModal", () => {
       events: [],
     });
 
-    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />, seedCharacter);
 
     await user.click(screen.getByRole("button", { name: /add xp to this session/i }));
     await user.type(screen.getByLabelText(/^award xp$/i), "500");
@@ -306,23 +312,22 @@ describe("SessionSummaryModal", () => {
 
   it("hides the retroactive-XP affordance when the session is still active", () => {
     const session: Session = { ...baseSession, status: "active" };
-    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
     expect(
       screen.queryByRole("button", { name: /add xp to this session/i }),
     ).not.toBeInTheDocument();
   });
 
   it("shows the retroactive-XP affordance when the session is ended", () => {
-    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />, seedCharacter);
     expect(
       screen.getByRole("button", { name: /add xp to this session/i }),
     ).toBeInTheDocument();
   });
 
-  it("calls onCharacterUpdate with the updated character after a successful award", async () => {
+  it("writes the updated character to the cache after a successful award", async () => {
     const user = userEvent.setup();
     const updatedCharacter = { id: "c1", experiencePoints: 950 } as Character;
-    const onCharacterUpdate = vi.fn();
     mockApplyXp.mockResolvedValue(updatedCharacter);
     mockFetchSession.mockResolvedValue({
       ...baseSession,
@@ -330,13 +335,9 @@ describe("SessionSummaryModal", () => {
       events: [],
     });
 
-    render(
-      <SessionSummaryModal
-        characterId="c1"
-        session={baseSession}
-        onClose={() => {}}
-        onCharacterUpdate={onCharacterUpdate}
-      />,
+    renderWithCharacter(
+      <SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />,
+      seedCharacter,
     );
 
     await user.click(screen.getByRole("button", { name: /add xp to this session/i }));
@@ -344,12 +345,12 @@ describe("SessionSummaryModal", () => {
     await user.click(screen.getByRole("button", { name: /^award$/i }));
 
     expect(await screen.findByText("950")).toBeInTheDocument();
-    expect(onCharacterUpdate).toHaveBeenCalledWith(updatedCharacter);
+    expect(cachedCharacter("c1")).toEqual(updatedCharacter);
   });
 
   it("renders a solo session's recap without fetching campaign entities (#1082)", () => {
     const solo: Session = { ...baseSession, campaignId: null };
-    render(<SessionSummaryModal characterId="c1" session={solo} onClose={() => {}} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={solo} onClose={() => {}} />, seedCharacter);
 
     // The recap still renders off the session's own summary…
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -361,7 +362,7 @@ describe("SessionSummaryModal", () => {
   it("calls onClose when the Close control is used", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={onClose} />);
+    renderWithCharacter(<SessionSummaryModal characterId="c1" session={baseSession} onClose={onClose} />, seedCharacter);
     await user.click(screen.getByRole("button", { name: /close/i }));
     expect(onClose).toHaveBeenCalled();
   });

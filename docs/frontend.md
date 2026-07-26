@@ -38,12 +38,18 @@ WCAG AA rules that have shipped broken before (full rationale in `design_system.
 - **Loading is delay-gated:** wrap loading indicators in `useDelayedFlag` so fast fetches render nothing (no flashing spinner); pair with the `Spinner` primitive. Never bare "Loading…" text.
 - **Icons resolve through `components/ui/icons.ts`** — lucide for chrome, game-icons for D&D flavor, per-icon subpath imports, monochrome `currentColor` (no `fill`/hex), `aria-hidden` when decorative. No colorful emoji in the UI.
 - **Never render a raw skill/ability/enum key** — resolve display text through the label helpers (`lib/abilities.ts`, `lib/mentions.ts`, `lib/items.ts`, …). See the CLAUDE.md non-negotiable.
-- **Orchestrator/row split** for large interactive sections: one orchestrator owns state + API batching + `onUpdate`; rows are presentational with callbacks. Reference: `features/inventory/InventoryList` / `InventoryRow`.
+- **Orchestrator/row split** for large interactive sections: one orchestrator owns state + API batching, reading/writing the character via `useCurrentCharacter()`; rows are presentational with callbacks. Reference: `features/inventory/InventoryList` / `InventoryRow`.
 - **Full-screen wizard/stepper:** a multi-step guided flow is its own route rendering a full-screen ceremony, not a modal. Reference: `features/level-up/` (`useLevelUpCeremony` state machine + `StepRail`).
 
 ## API calls
 
-All `fetch` goes through `frontend/src/api/client.ts` (`apiFetch`: credentials + a single registered 401 handler). New endpoints delegate to `request<T>`/`send`; intent-bearing transactions go through `postTransactions`. Never call `fetch` from a component.
+All `fetch` goes through `frontend/src/api/http.ts` (`apiFetch`: credentials + a single registered 401 handler), imported by the domain modules under `frontend/src/api/` (`characters.ts`, `campaign.ts`, `session.ts`, …). `frontend/src/api/client.ts` is the barrel every component imports from — never a domain module directly. New endpoints delegate to `request<T>`/`send`; intent-bearing transactions go through `postTransactions`. Never call `fetch` from a component.
+
+## Server state
+
+Fetched data goes through TanStack Query (`@/api/queryClient`), never ad-hoc `useEffect`/`useState`. Keys come from the factories in `@/api/queryKeys` — no call site ever string-literals one.
+
+Inside a loaded character route, `useCurrentCharacter()` (`hooks/CurrentCharacterProvider.tsx`) is the only sanctioned read of the character cache — it subscribes via `useQuery` so a write from anywhere re-renders every consumer. A bare `queryClient.getQueryData()` in a render body reads once and then silently freezes (no observer).
 
 ## Dice engine
 

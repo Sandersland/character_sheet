@@ -1,26 +1,15 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { fetchCharacters } from "@/api/client";
-import type { CharacterSummary } from "@/types/character";
+import { characterKeys } from "@/api/queryKeys";
 
 export function useCharacterList() {
-  const [characters, setCharacters] = useState<CharacterSummary[] | null>(null);
-  const [error, setError] = useState(false);
+  const { data, isError } = useQuery({
+    queryKey: characterKeys.list(),
+    queryFn: fetchCharacters,
+  });
 
-  useEffect(() => {
-    let mounted = true;
-    setError(false);
-    fetchCharacters()
-      .then((data) => {
-        if (mounted) setCharacters(data);
-      })
-      .catch(() => {
-        if (mounted) setError(true);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return { characters, error };
+  // `error` means "nothing to show" — a failed background refetch must not
+  // discard a loaded list. See useCharacter for the same guard.
+  return { characters: data ?? null, error: isError && data === undefined };
 }

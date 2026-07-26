@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import JournalDoorway from "@/features/journal/JournalDoorway";
 import * as client from "@/api/client";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, ChronicleSession, JournalEntry } from "@/types/character";
 
 // useChronicle fetches arcs + sessions; stub both. Campaign-less characters skip
@@ -39,10 +40,11 @@ function session(overrides: Partial<ChronicleSession>): ChronicleSession {
 }
 
 function renderDoorway(character: Character) {
-  return render(
+  return renderWithCharacter(
     <MemoryRouter>
-      <JournalDoorway character={character} />
+      <JournalDoorway />
     </MemoryRouter>,
+    character,
   );
 }
 

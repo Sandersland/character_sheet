@@ -98,9 +98,11 @@ Post the verdict for **every** finding (address *and* decline), matched to the c
 Work in the PR's worktree (reuse it if live, else create it — see the worktree note below). Run **all** tooling inside the containers:
 
 ```bash
-docker compose exec -T backend  sh -c 'cd /app && npx vitest run <test-file>'
-docker compose exec -T frontend sh -c 'cd /app && npx vitest run <test-file>'
+docker compose exec -T backend  sh -c 'cd /app/backend  && npx vitest run <test-file>'
+docker compose exec -T frontend sh -c 'cd /app/frontend && npx vitest run <test-file>'
 ```
+
+> `/app` is the repo **root** — `cd` to the workspace or the `@/` alias won't resolve and every test file fails to collect (a false red, not a breakage).
 
 Per chunk:
 1. **Write the failing regression test first** — capture the exact finding so it can't regress.
@@ -108,12 +110,12 @@ Per chunk:
 3. Implement the fix until **green**.
 4. **Lint** both workspaces as touched, in-container like the tests above — CI fails on a lint miss even when tests pass:
    ```bash
-   docker compose exec -T backend  sh -c 'cd /app && npm run lint'
-   docker compose exec -T frontend sh -c 'cd /app && npm run lint'
+   docker compose exec -T backend  sh -c 'cd /app/backend  && npm run lint'
+   docker compose exec -T frontend sh -c 'cd /app/frontend && npm run lint'
    ```
 5. Commit: `fix(<domain>): <finding> (#<issue>)`. The issue/PR reference goes in the **commit message**, never in a code comment.
 
-> **House rules for any delegated agent.** A subagent does not inherit CLAUDE.md. If you fan out in step 3, paste the non-negotiables preamble (see `parallel-issues`' "house-rules preamble") into each brief, tailored to the chunk's surface — keep the one-line-comment and `@/`-import rules in every brief.
+> **House rules for any delegated agent.** A subagent does not inherit CLAUDE.md. If you fan out in step 3, paste the non-negotiables preamble (see `parallel-issues`' "house-rules preamble") into each brief, tailored to the chunk's surface — keep the comment-policy and `@/`-import rules in every brief.
 
 ### 6. Reply / resolve per finding as fixes land
 

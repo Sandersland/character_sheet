@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { AdvancementEntry, CatalogFeat, Character } from "@/types/character";
 
@@ -17,6 +18,12 @@ vi.mock("@/api/client", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+// ClassFeaturesSection reads useCurrentCharacter(), so every render seeds the
+// cache and mounts CurrentCharacterProvider via renderWithCharacter.
+function render(character: Character) {
+  return renderWithCharacter(<ClassFeaturesSection referenceClasses={[]} />, character);
+}
 
 const FS_CATALOG = [
   { id: "archery", name: "Archery", description: "+2 bonus to attack rolls with ranged weapons.", category: "fighting_style" },
@@ -40,17 +47,13 @@ function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Chara
 
 describe("ClassFeaturesSection — Fighting Style", () => {
   it("renders the picker when a fighting-style slot is open and none taken", () => {
-    render(
-      <ClassFeaturesSection character={makeFighter({ total: 1 })} referenceClasses={[]} onUpdate={vi.fn()} />,
-    );
+    render(makeFighter({ total: 1 }));
     expect(screen.getByText("Fighting Style")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /choose a fighting style/i })).toBeInTheDocument();
   });
 
   it("does NOT render the Fighting Style section when total slots is 0", () => {
-    render(
-      <ClassFeaturesSection character={makeFighter({ total: 0 })} referenceClasses={[]} onUpdate={vi.fn()} />,
-    );
+    render(makeFighter({ total: 0 }));
     expect(screen.queryByText("Fighting Style")).not.toBeInTheDocument();
   });
 
@@ -58,9 +61,7 @@ describe("ClassFeaturesSection — Fighting Style", () => {
     const taken = [
       { id: "fs1", level: 1, kind: "feat", slot: "fightingStyle", featId: "archery", featName: "Archery", featDescription: "+2 bonus to attack rolls with ranged weapons.", abilityDeltas: {}, hpDelta: 0, initDelta: 0 },
     ] as unknown as AdvancementEntry[];
-    render(
-      <ClassFeaturesSection character={makeFighter({ total: 1, taken })} referenceClasses={[]} onUpdate={vi.fn()} />,
-    );
+    render(makeFighter({ total: 1, taken }));
     expect(screen.getByText("Archery")).toBeInTheDocument();
     expect(screen.getByText(/\+2 bonus to attack rolls/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /choose a fighting style/i })).not.toBeInTheDocument();
@@ -68,14 +69,11 @@ describe("ClassFeaturesSection — Fighting Style", () => {
 
   it("choosing a style takes a slot:fightingStyle feat via applyAdvancementTransactions, excluding non-styles", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
     vi.mocked(client.fetchFeats).mockResolvedValue(FS_CATALOG);
     const mockApply = vi.mocked(client.applyAdvancementTransactions);
     mockApply.mockResolvedValue(makeFighter({ total: 1 }));
 
-    render(
-      <ClassFeaturesSection character={makeFighter({ total: 1 })} referenceClasses={[]} onUpdate={onUpdate} />,
-    );
+    render(makeFighter({ total: 1 }));
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
     // A general-category feat must not leak into the fighting-style picker.
@@ -113,9 +111,7 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
     const user = userEvent.setup();
     vi.mocked(client.applyShadowArtsTransactions).mockResolvedValue(makeShadowMonk(true));
 
-    render(
-      <ClassFeaturesSection character={makeShadowMonk(true)} referenceClasses={[]} onUpdate={vi.fn()} />,
-    );
+    render(makeShadowMonk(true));
 
     expect(screen.getByText("Cloak of Shadows")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Become Invisible" }));
@@ -126,9 +122,7 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
   });
 
   it("does NOT offer Cloak of Shadows below L17 (flag absent — L11 is Improved Shadow Step instead)", () => {
-    render(
-      <ClassFeaturesSection character={makeShadowMonk(false)} referenceClasses={[]} onUpdate={vi.fn()} />,
-    );
+    render(makeShadowMonk(false));
     expect(screen.queryByText("Cloak of Shadows")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Become Invisible" })).not.toBeInTheDocument();
   });

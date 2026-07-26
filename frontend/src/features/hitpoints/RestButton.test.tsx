@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import RestButton from "@/features/hitpoints/RestButton";
 import { axe } from "@/test/axe";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character } from "@/types/character";
 
@@ -33,16 +34,22 @@ beforeEach(() => {
   });
 });
 
+// RestButton reads useCurrentCharacter(), so every render seeds the cache and
+// mounts CurrentCharacterProvider via renderWithCharacter.
+function render(character: Character) {
+  return renderWithCharacter(<RestButton />, character);
+}
+
 describe("RestButton (#814)", () => {
   it("renders a compact Rest button with no sheet until tapped", () => {
-    render(<RestButton character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
     expect(screen.getByRole("button", { name: "Rest" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("tapping opens the Rest sheet with the hit-dice readout", async () => {
     const user = userEvent.setup();
-    render(<RestButton character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("button", { name: "Rest" }));
 
@@ -54,8 +61,7 @@ describe("RestButton (#814)", () => {
 
   it("a short rest spends a hit die with client-side rolls", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(<RestButton character={makeCharacter()} onUpdate={onUpdate} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("button", { name: "Rest" }));
     const dialog = await screen.findByRole("dialog");
@@ -65,12 +71,11 @@ describe("RestButton (#814)", () => {
     expect(id).toBe("char-1");
     expect(ops[0]).toMatchObject({ type: "shortRest" });
     expect((ops[0] as { rolls: number[] }).rolls).toHaveLength(1);
-    expect(onUpdate).toHaveBeenCalled();
   });
 
   it("a long rest submits a longRest op", async () => {
     const user = userEvent.setup();
-    render(<RestButton character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
 
     await user.click(screen.getByRole("button", { name: "Rest" }));
     const dialog = await screen.findByRole("dialog");
@@ -82,14 +87,14 @@ describe("RestButton (#814)", () => {
 
   it("has no axe violations with the sheet open", async () => {
     const user = userEvent.setup();
-    const { container } = render(<RestButton character={makeCharacter()} onUpdate={vi.fn()} />);
+    const { container } = render(makeCharacter());
     await user.click(screen.getByRole("button", { name: "Rest" }));
     await screen.findByRole("dialog");
     expect(await axe(container)).toHaveNoViolations();
   });
 
   it("stays compact on mobile yet keeps its accessible label (#827)", () => {
-    render(<RestButton character={makeCharacter()} onUpdate={vi.fn()} />);
+    render(makeCharacter());
     const btn = screen.getByRole("button", { name: "Rest" });
     expect(btn).toHaveAttribute("aria-label", "Rest");
     // Tighter padding under sm, full padding restored at sm+.

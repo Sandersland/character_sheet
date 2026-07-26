@@ -41,15 +41,14 @@ import {
   slotPipsForLevel,
 } from "@/lib/spellPicker";
 import { economySpentLine } from "@/lib/spellPickerView";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AllyOption } from "@/lib/spellMeta";
 import type { Character, Spell, SpellSlots } from "@/types/character";
 import type { RecordedSpellCast, SpellCastKind } from "@/features/session/useTurnState";
 
 interface InlineSpellPickerProps {
-  character: Character;
   /** Active session id — spell attack rolls are logged against it. */
   sessionId: string;
-  onUpdate: (c: Character) => void;
   onClose: () => void;
   /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
@@ -265,9 +264,7 @@ function PickerContent({
 }
 
 export default function InlineSpellPicker({
-  character,
   sessionId,
-  onUpdate,
   onClose,
   onLogChanged,
   slot,
@@ -279,10 +276,10 @@ export default function InlineSpellPicker({
   allies,
   onCastSettled,
 }: InlineSpellPickerProps) {
+  const { character } = useCurrentCharacter();
   const picker = useSpellPicker({
     character,
     sessionId,
-    onUpdate,
     onLogChanged,
     slot,
     slotAvailable,

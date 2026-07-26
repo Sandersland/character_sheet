@@ -25,10 +25,9 @@ import AttackStepCard, { AttackKickerPips } from "@/features/session/AttackStepC
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import OpenHandTechniqueSection from "@/features/session/OpenHandTechniqueSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface InlineFlurryPickerProps {
-  character: Character;
   turnState: TurnState & TurnStateActions;
   /** Active session id — attack/damage rolls are logged against it. */
   sessionId: string;
@@ -36,8 +35,6 @@ interface InlineFlurryPickerProps {
   onClose: () => void;
   /** Back out before rolling any strike — refunds the bonus action. No Focus is spent yet, so there's nothing to refund there. */
   onCancel: () => void;
-  /** Required for ManeuversDisclosure to push resource spend results back up. */
-  onUpdate: (c: Character) => void;
   /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
   /** Spends the 1 Focus Point — fired once, on the first strike roll (#1217). */
@@ -45,15 +42,14 @@ interface InlineFlurryPickerProps {
 }
 
 export default function InlineFlurryPicker({
-  character,
   turnState,
   sessionId,
   onClose,
   onCancel,
-  onUpdate,
   onLogChanged,
   onCommitFocusSpend,
 }: InlineFlurryPickerProps) {
+  const { character } = useCurrentCharacter();
   // The sheet's own ADV/DIS choice (#958), same as the main Attack sheet.
   const [attackMode, setAttackMode] = useState<RollMode>("normal");
 
@@ -82,7 +78,6 @@ export default function InlineFlurryPicker({
     recordAttack: turnState.recordFlurryAttack,
     attacksExhausted,
     onFirstStrike: onCommitFocusSpend,
-    onUpdate,
     onLogChanged,
     manualMode: attackMode,
   });
@@ -90,12 +85,7 @@ export default function InlineFlurryPicker({
   const isMobile = useIsBelowMd();
 
   const openHandTechnique = boundView && (
-    <OpenHandTechniqueSection
-      character={character}
-      turnState={turnState}
-      currentRow={currentRow}
-      onUpdate={onUpdate}
-    />
+    <OpenHandTechniqueSection turnState={turnState} currentRow={currentRow} />
   );
 
   const rollModeRow = (

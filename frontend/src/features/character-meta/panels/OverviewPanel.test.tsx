@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 
 import OverviewPanel from "@/features/character-meta/panels/OverviewPanel";
 import { RollProvider } from "@/features/dice/RollContext";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
@@ -34,11 +35,12 @@ function makeCharacter(overrides: Partial<Character>): Character {
 }
 
 function renderPanel(character: Character) {
-  const props: SheetPanelProps = { character, reference: null, onUpdate: vi.fn() };
-  return render(
+  const props: SheetPanelProps = { reference: null };
+  return renderWithCharacter(
     <RollProvider>
       <OverviewPanel {...props} />
     </RollProvider>,
+    character,
   );
 }
 

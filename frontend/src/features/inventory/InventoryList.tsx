@@ -1,4 +1,4 @@
-import type { Character, Currency } from "@/types/character";
+import type { Currency } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
 import Segmented from "@/components/ui/Segmented";
 import Card from "@/components/ui/Card";
@@ -8,6 +8,7 @@ import InventoryHeaderActions from "@/features/inventory/InventoryHeaderActions"
 import InventoryListMobile from "@/features/inventory/InventoryListMobile";
 import InventoryMeters from "@/features/inventory/InventoryMeters";
 import InventoryToolbar from "@/features/inventory/InventoryToolbar";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { useInventoryTransactions } from "@/features/inventory/useInventoryTransactions";
 import { useItemCatalog } from "@/features/inventory/useItemCatalog";
@@ -17,17 +18,13 @@ import { carryingCapacity, coinWeight } from "@/lib/encumbrance";
 import { buildSections, filterInventory, itemsWeight, selectionGp, type FilterKey } from "@/lib/inventorySections";
 import { useState } from "react";
 
-interface InventoryListProps {
-  character: Character;
-  onUpdate: (character: Character) => void;
-}
-
 // The sheet's inventory editor: category-sectioned rows + add/sell panels, all funneling through one submitOperations that calls POST .../inventory/transactions and swaps in the returned character.
-export default function InventoryList({ character, onUpdate }: InventoryListProps) {
+export default function InventoryList() {
+  const { character } = useCurrentCharacter();
   const catalog = useItemCatalog();
   const isMobile = useIsBelowMd();
   const { pending, error, addOpen, editingId, setAddOpen, setEditingId, applyOps, submitOperations } =
-    useInventoryTransactions(character, onUpdate);
+    useInventoryTransactions(character);
   const sell = useSellSelection();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -78,7 +75,6 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
 
   const body = (
     <InventoryBody
-      character={character}
       configuringSell={sell.configuringSell}
       selectedItems={selectedItems}
       pending={pending}
@@ -116,7 +112,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         addPanel={addPanel}
         error={error}
         body={body}
-        currency={<CurrencyEditor character={character} onUpdate={onUpdate} />}
+        currency={<CurrencyEditor />}
         onAdd={() => {
           setEditingId(null);
           setAddOpen(true);
@@ -175,7 +171,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
 
         {body}
 
-        <CurrencyEditor character={character} onUpdate={onUpdate} />
+        <CurrencyEditor />
       </div>
     </Card>
   );

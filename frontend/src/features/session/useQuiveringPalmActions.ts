@@ -7,6 +7,7 @@
 import { useState } from "react";
 
 import { setQuiveringPalmTransaction, triggerQuiveringPalmTransaction } from "@/api/client";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { rollSpec } from "@/lib/dice";
 import { quiveringPalmDamageRoll } from "@/lib/quiveringPalm";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -18,44 +19,49 @@ export function useQuiveringPalmActions(
   turnState: TurnState & TurnStateActions,
   currentRow: AttackTallyRow | null,
   active: boolean,
-  onUpdate: (c: Character) => void,
 ) {
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+
+  // Two mutations (not one) — set/trigger keep distinct fallback copy; both
+  // share one `character-${id}` scope so they (and every other character
+  // mutation) can never race each other.
+  const setMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: () => setQuiveringPalmTransaction(character.id),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Set failed.",
+  });
+  const triggerMutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (roll: number) => triggerQuiveringPalmTransaction(character.id, roll),
+    toCharacter: (r) => r.character,
+    fallbackMessage: "Trigger failed.",
+  });
+  const busy = setMutation.isPending || triggerMutation.isPending;
+  const error = setMutation.error ?? triggerMutation.error;
 
   const setDisabled = busy || currentRow === null || active;
   const triggerDisabled = busy || !active;
 
   async function handleSet() {
     if (setDisabled) return;
-    setBusy(true);
-    setError(null);
     try {
-      const { character: updated, results } = await setQuiveringPalmTransaction(character.id);
-      onUpdate(updated);
+      const { results } = await setMutation.mutateAsync(undefined);
       setMessage(results[0]?.summary ?? null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Set failed.");
-    } finally {
-      setBusy(false);
+    } catch {
+      // setMutation.error already carries the message.
     }
   }
 
   async function handleTrigger() {
     if (triggerDisabled) return;
-    setBusy(true);
-    setError(null);
     try {
       turnState.consumeAction();
       const roll = rollSpec(quiveringPalmDamageRoll());
-      const { character: updated, results } = await triggerQuiveringPalmTransaction(character.id, roll.total);
-      onUpdate(updated);
+      const { results } = await triggerMutation.mutateAsync(roll.total);
       setMessage(results[0]?.summary ?? null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Trigger failed.");
-    } finally {
-      setBusy(false);
+    } catch {
+      // triggerMutation.error already carries the message.
     }
   }
 

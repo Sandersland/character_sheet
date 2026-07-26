@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import OpenHandTechniqueSection from "@/features/session/OpenHandTechniqueSection";
 import { imposeOpenHandRiderTransaction } from "@/api/client";
+import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
@@ -35,25 +36,19 @@ const hitRow = { id: "row-1" } as unknown as AttackTallyRow;
 
 describe("OpenHandTechniqueSection (#1245)", () => {
   it("renders nothing when the character has no Open Hand Technique (null)", () => {
-    const { container } = render(
-      <OpenHandTechniqueSection
-        character={makeCharacter({ openHandTechnique: null })}
-        turnState={makeTurnState()}
-        currentRow={hitRow}
-        onUpdate={vi.fn()}
-      />,
+    const character = makeCharacter({ openHandTechnique: null });
+    const { container } = renderWithCharacter(
+      <OpenHandTechniqueSection turnState={makeTurnState()} currentRow={hitRow} />,
+      character,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the focus DC and all three rider buttons, disabled before a hit lands", () => {
-    render(
-      <OpenHandTechniqueSection
-        character={makeCharacter()}
-        turnState={makeTurnState()}
-        currentRow={null}
-        onUpdate={vi.fn()}
-      />,
+    const character = makeCharacter();
+    renderWithCharacter(
+      <OpenHandTechniqueSection turnState={makeTurnState()} currentRow={null} />,
+      character,
     );
     expect(screen.getByText(/DC 13/)).toBeInTheDocument();
     for (const label of ["Addle", "Push", "Topple"]) {
@@ -62,27 +57,31 @@ describe("OpenHandTechniqueSection (#1245)", () => {
   });
 
   it("imposing a rider calls the transaction, shows the result, and marks used-this-turn", async () => {
+    const updated = makeCharacter();
     vi.mocked(imposeOpenHandRiderTransaction).mockResolvedValue({
-      character: makeCharacter(),
+      character: updated,
       results: [{ rider: "push", dc: 13, roll: 8, outcome: "applied", summary: "Open Hand Technique — Push: failed — pushed 15 ft." }],
     });
     const turnState = makeTurnState();
-    const onUpdate = vi.fn();
-    render(
-      <OpenHandTechniqueSection character={makeCharacter()} turnState={turnState} currentRow={hitRow} onUpdate={onUpdate} />,
+    const character = makeCharacter();
+    renderWithCharacter(
+      <OpenHandTechniqueSection turnState={turnState} currentRow={hitRow} />,
+      character,
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Push" }));
 
     expect(imposeOpenHandRiderTransaction).toHaveBeenCalledWith("char-1", "push", false);
     expect(turnState.markOpenHandRiderUsed).toHaveBeenCalledOnce();
-    expect(onUpdate).toHaveBeenCalledOnce();
     expect(await screen.findByText(/pushed 15 ft/)).toBeInTheDocument();
+    expect(cachedCharacter("char-1")).toEqual(updated);
   });
 
   it("all rider buttons are disabled once used this turn", () => {
-    render(
-      <OpenHandTechniqueSection character={makeCharacter()} turnState={makeTurnState(true)} currentRow={hitRow} onUpdate={vi.fn()} />,
+    const character = makeCharacter();
+    renderWithCharacter(
+      <OpenHandTechniqueSection turnState={makeTurnState(true)} currentRow={hitRow} />,
+      character,
     );
     expect(screen.getByText(/Used this turn/)).toBeInTheDocument();
     for (const label of ["Addle", "Push", "Topple"]) {

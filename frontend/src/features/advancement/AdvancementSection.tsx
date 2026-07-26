@@ -2,7 +2,7 @@
  * AdvancementSection — orchestrator for Ability Score Improvements and Feats.
  *
  * Owns busy + error state, fires API calls through the client module, and
- * propagates the updated Character via onUpdate. Renders:
+ * writes the updated Character into the character query cache. Renders:
  *   - Summary header showing slots used/total
  *   - List of taken advancements (each with a Remove button)
  *   - AdvancementPanel inline picker when slots remain
@@ -10,18 +10,13 @@
  * Mirrors ClassFeaturesSection / SpellsSection in structure.
  */
 
-import { useState } from "react";
-
 import { applyAdvancementTransactions } from "@/api/client";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { abilityAbbr } from "@/lib/abilities";
 import { entryDetail } from "@/lib/advancement";
-import type { AdvancementEntry, AdvancementOperation, Character } from "@/types/character";
+import type { AdvancementEntry, AdvancementOperation } from "@/types/character";
 import AdvancementPanel from "@/features/advancement/AdvancementPanel";
-
-interface Props {
-  character: Character;
-  onUpdate: (updated: Character) => void;
-}
 
 /** Pretty-print a single AdvancementEntry for the list view. */
 function entryLabel(entry: AdvancementEntry): string {
@@ -34,9 +29,16 @@ function entryLabel(entry: AdvancementEntry): string {
     .join(", ");
 }
 
-export default function AdvancementSection({ character, onUpdate }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function AdvancementSection() {
+  const { character } = useCurrentCharacter();
+  const mutation = useCharacterMutation({
+    characterId: character.id,
+    mutationFn: (ops: AdvancementOperation[]) => applyAdvancementTransactions(character.id, ops),
+    toCharacter: (c) => c,
+    fallbackMessage: "Something went wrong.",
+  });
+  const busy = mutation.isPending;
+  const error = mutation.error;
 
   const { advancementSlots } = character;
   // Fighting Style feats (#1137) occupy their own slot partition and render in the
@@ -45,15 +47,10 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
   const slotsRemaining = advancementSlots.total - advancementSlots.used;
 
   async function send(ops: AdvancementOperation[]) {
-    setBusy(true);
-    setError(null);
     try {
-      const updated = await applyAdvancementTransactions(character.id, ops);
-      onUpdate(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
+      await mutation.mutateAsync(ops);
+    } catch {
+      // mutation.error already carries the message.
     }
   }
 
