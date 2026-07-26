@@ -142,6 +142,51 @@ describe("buildRollModifiers (#486)", () => {
   });
 });
 
+// #1309: the 2014 half of what #1135 replaced. Only the 9 conditions with a
+// real PHB'14 delta are asserted here — the other 5 are byte-identical and
+// already covered by the EDITION_2024 tests above (same shared row).
+describe("buildRollModifiers — 2014 divergent conditions (#1309, PHB'14 pp. 290-292 Appendix A)", () => {
+  it("charmed: no roll effects (description-only divergence, same as 2024)", () => {
+    expect(buildRollModifiers(condition("charmed"), noEffects, "EDITION_2014")).toEqual([]);
+  });
+
+  it("grappled: no roll effects (2024 grants disadvantage on attack, 2014 does not)", () => {
+    expect(buildRollModifiers(condition("grappled"), noEffects, "EDITION_2014")).toEqual([]);
+  });
+
+  it("incapacitated: no roll effects (2024 grants disadvantage on initiative, 2014 does not)", () => {
+    expect(buildRollModifiers(condition("incapacitated"), noEffects, "EDITION_2014")).toEqual([]);
+  });
+
+  it("invisible: advantage on attack only — no initiative grant (2024 adds initiative too)", () => {
+    expect(buildRollModifiers(condition("invisible"), noEffects, "EDITION_2014")).toEqual([
+      { mode: "advantage", kind: "attack", source: "Invisible" },
+    ]);
+  });
+
+  it("paralyzed: no roll effects (2024 flattens Incapacitated's initiative disadvantage onto it)", () => {
+    expect(buildRollModifiers(condition("paralyzed"), noEffects, "EDITION_2014")).toEqual([]);
+  });
+
+  it("petrified: no roll effects (2024 flattens Incapacitated's initiative disadvantage onto it)", () => {
+    expect(buildRollModifiers(condition("petrified"), noEffects, "EDITION_2014")).toEqual([]);
+  });
+
+  it("prone: disadvantage on attack, same as 2024 (description-only divergence)", () => {
+    expect(buildRollModifiers(condition("prone"), noEffects, "EDITION_2014")).toEqual([
+      { mode: "disadvantage", kind: "attack", source: "Prone" },
+    ]);
+  });
+
+  it("stunned: no roll effects (2024 flattens Incapacitated's initiative disadvantage onto it)", () => {
+    expect(buildRollModifiers(condition("stunned"), noEffects, "EDITION_2014")).toEqual([]);
+  });
+
+  it("unconscious: no roll effects (2024 flattens Incapacitated + Prone's disadvantage onto it)", () => {
+    expect(buildRollModifiers(condition("unconscious"), noEffects, "EDITION_2014")).toEqual([]);
+  });
+});
+
 describe("buildRollModifiers exhaustion — 2024 flat penalty (#1136)", () => {
   function exhaustion(level: number): ConditionsMutableState {
     return { active: [], exhaustion: level };

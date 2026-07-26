@@ -155,6 +155,78 @@ export function isKnownCondition(key: string): key is ConditionKey {
   return CONDITIONS.some((c) => c.key === key);
 }
 
+/**
+ * PHB'14 pp. 290-292 (Appendix A) overrides for the 9 conditions that diverge
+ * from SRD 5.2's text: charmed, grappled, incapacitated, invisible,
+ * paralyzed, petrified, prone, stunned, unconscious (#1309, restoring the
+ * 2014 half of what #1135's SRD-5.2 retranscription replaced). Sparse on
+ * purpose — the other 5 conditions (blinded, deafened, frightened, poisoned,
+ * restrained) are byte-identical across editions and must resolve through
+ * the single CONDITIONS row below, not a duplicated one. An explicit
+ * `rollEffects: undefined` clears a 2024-only grant that #1135 flattened onto
+ * this condition (Incapacitated's initiative disadvantage on
+ * paralyzed/petrified/stunned; see the comment on 2024's `paralyzed` above) —
+ * 2014 has no Incapacitated-inheritance rule.
+ */
+const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: string; rollEffects?: RollEffect[] }>> = {
+  charmed: {
+    description:
+      "Can't attack the charmer or target it with harmful abilities or magical effects. The charmer has advantage on ability checks to interact socially with the creature.",
+  },
+  grappled: {
+    description:
+      "Speed becomes 0, and it can't benefit from any bonus to its speed. The condition ends if the grappler is incapacitated or if the creature is moved out of reach.",
+    rollEffects: undefined,
+  },
+  incapacitated: {
+    description: "Can't take actions or reactions.",
+    rollEffects: undefined,
+  },
+  invisible: {
+    description:
+      "Impossible to see without the aid of magic or a special sense. The creature is heavily obscured. Attack rolls against it have disadvantage, and its attack rolls have advantage.",
+    rollEffects: [{ mode: "advantage", kind: "attack" }],
+  },
+  paralyzed: {
+    description:
+      "Incapacitated and can't move or speak. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits from within 5 feet is a critical hit.",
+    rollEffects: undefined,
+  },
+  petrified: {
+    description:
+      "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance. Incapacitated, can't move or speak, and is unaware of its surroundings. Resistant to all damage; immune to poison and disease.",
+    rollEffects: undefined,
+  },
+  prone: {
+    description:
+      "Can only crawl unless it stands up. Has disadvantage on attack rolls. An attack roll against it has advantage if the attacker is within 5 feet; otherwise the attack roll has disadvantage.",
+  },
+  stunned: {
+    description:
+      "Incapacitated, can't move, and can speak only falteringly. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage.",
+    rollEffects: undefined,
+  },
+  unconscious: {
+    description:
+      "Incapacitated, can't move or speak, and is unaware of its surroundings. Drops whatever it's holding and falls prone. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits from within 5 feet is a critical hit.",
+    rollEffects: undefined,
+  },
+};
+
+/**
+ * The one lookup for a condition's rules text/effects (#1309) — every call
+ * site resolves through here instead of reading CONDITIONS directly, so a
+ * future edition fork only has to touch this function.
+ * `key` is guaranteed present in CONDITIONS by the ConditionKey type, so the
+ * lookup below always succeeds.
+ */
+export function conditionDefinition(key: ConditionKey, edition: RulesEdition): ConditionDefinition {
+  const base = CONDITIONS.find((c) => c.key === key)!;
+  if (edition !== "EDITION_2014") return base;
+  const override = CONDITIONS_2014_OVERRIDES[key];
+  return override ? { ...base, ...override } : base;
+}
+
 // The four d20 Test categories a flat exhaustion penalty binds to. Initiative is
 // a Dex check, so it's an explicit entry (SRD 5.2 "d20 Tests" cover it).
 const EXHAUSTION_ROLL_KINDS: RollModeKind[] = ["attack", "check", "save", "initiative"];
