@@ -200,7 +200,9 @@ function buildDamageDrillRow(e: CharacterEvent, label = "Damage"): DrillInRow {
   );
   return {
     label,
-    formula: parts.join(" "),
+    // Undefined rather than "", same contract as buildAttackDrillRow: DrillInLine
+    // keys off `formula === undefined` to tell a formula row from an aside.
+    formula: parts.length > 0 ? parts.join(" ") : undefined,
     total: data.damageType ? `${data.total} ${data.damageType}` : `${data.total}`,
   };
 }
