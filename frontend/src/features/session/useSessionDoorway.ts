@@ -102,6 +102,12 @@ export function useSessionDoorway(
   const activeSession = session ?? (doorway ? toCaptureSession(doorway) : null);
 
   const doorwayMutation = useMutation({
+    // Same scope key as useCharacterMutation: this mutation also writes
+    // characterKeys.detail(id) (via dispatchDoorwayAction's returned
+    // character), so it must serialize with every other character mutation —
+    // without it, a Start/Join response could land between two HP responses
+    // (or after a slower one) and drag the cached character backward.
+    scope: { id: `character-${id}` },
     mutationFn: async (action: DoorwayAction) => {
       // `onAction`'s guard below never calls mutate without id + doorway set,
       // so the non-null assertions here are can't-happen, not a real risk.
