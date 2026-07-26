@@ -4,11 +4,10 @@
  * Two concerns live here:
  *
  * 1. `DERIVED_ACTIONS` + `deriveActions` — hardcoded TS list of all known
- *    actions (same data as the prisma/seed.ts ACTIONS array) and a pure
- *    derive function that filters it for a character's class/level/subclass,
- *    cross-referencing derived resource pools to set `enabled`.
- *    Called from `serializeCharacter` — sync, no DB access. Mirrors the
- *    CLASS_RESOURCE_FN / deriveResources pattern from class-features.ts.
+ *    actions and a pure derive function that filters it for a character's
+ *    class/level/subclass, cross-referencing derived resource pools to set
+ *    `enabled`. Called from `serializeCharacter` — sync, no DB access. Mirrors
+ *    the CLASS_RESOURCE_FN / deriveResources pattern from class-features.ts.
  *
  * 2. `ACTION_EFFECT_FN` — hardcoded TS dispatch table keyed by action `key`.
  *    Returns existing op types (spendResource, adjustQuantity, heal, tempHp,
@@ -17,11 +16,15 @@
  *    interpreted JSON engine.
  *
  * Adding a new mechanical action:
- *   • Append a row to ACTIONS in `prisma/seed.ts` (display + gating data for
- *     the GET /api/actions catalog picker).
- *   • Append the matching entry to DERIVED_ACTIONS here (for serializeCharacter).
+ *   • Append the entry to DERIVED_ACTIONS here (for serializeCharacter).
  *   • Add the effect fn to ACTION_EFFECT_FN (for the POST orchestrator).
  *   No migration needed for new actions; only new *columns* need one.
+ *   (prisma/seed.ts's ACTIONS array + the DB Action table it populates are
+ *   NOT consumed by any route — routes/character/actions.ts's own header
+ *   confirms the catalog is read client-side via actionResolvers, not from
+ *   the DB — so DERIVED_ACTIONS here is the actual single source; #1315
+ *   found the seed array had already drifted out of sync on 6 pre-existing
+ *   rows before this file added 4 more, without anything breaking.)
  *
  * 3. `ACTION_CAST_FN` — cast-core actions that route through `castAbilityInTx`
  *    (pay pool cost → self-apply) instead of the op-list dispatch. Second Wind
@@ -34,6 +37,7 @@
 import type { ActiveBuff } from "@/lib/combat/active-effects.js";
 import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
+import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -83,12 +87,14 @@ export interface AvailableAction {
 }
 
 /** Resource pool shape — typed subset of what serializeCharacter builds. */
-interface ResourcePool {
+export interface ResourcePool {
   key: string;
   remaining: number;
 }
 
-// Mirrors prisma/seed.ts ACTIONS array. Keep in sync when adding new actions.
+// The single source of truth for the action catalog — see the file header's
+// "Adding a new mechanical action" note (#1315): prisma/seed.ts's ACTIONS
+// array is NOT consumed by any route and doesn't need to stay in sync.
 const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Universal actions are intentionally NOT included in `availableActions` on the
   // character because TurnHub already renders them from the client-side
@@ -202,6 +208,68 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
         ? "Teleport up to 60 ft between areas of dim light or darkness (or, for 1 focus, ignore the dim/dark destination requirement); advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting."
         : "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
   },
+  // Warrior of Shadow (PHB'24 p.91 — not in SRD 5.2, which ships only Warrior
+  // of the Open Hand for monk) Shadow Arts (L3) / Cloak of Shadows (L17) —
+  // migrated off a pair of DerivedClassInfo availability booleans onto rows
+  // here (#1315), same as shadowStep above: the actual cast/activate stays in
+  // the dedicated shadow-arts.ts vertical (its own transactions endpoint), so
+  // neither row gets an ACTION_EFFECT_FN entry. Darkness's normal casting
+  // time is an action (SRD 5.2 — Darkness itself IS core-rules content);
+  // Cloak of Shadows (PHB'24 p.91) is explicitly a Magic action (also
+  // "action" here — this app doesn't distinguish Magic action from a bare
+  // action in the cost enum).
+  {
+    key: "shadowArts",
+    name: "Shadow Arts (Darkness)",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclass: "Shadow",
+    grantLevel: 3,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.",
+  },
+  {
+    key: "cloakOfShadows",
+    name: "Cloak of Shadows",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclass: "Shadow",
+    grantLevel: 17,
+    resourceKey: "focus",
+    resourceAmount: 3,
+    reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
+  },
+
+  // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only
+  // Warrior of the Open Hand for monk) two Focus-spending session actions
+  // (#1315, migrated off a pair of DerivedClassInfo availability booleans) —
+  // the real ops live in warrior-of-elements.ts's own endpoint, so neither row
+  // gets an ACTION_EFFECT_FN entry. Elemental Attunement is explicitly "no
+  // action"; Elemental Burst is a Magic action.
+  {
+    key: "elementalAttunement",
+    name: "Elemental Attunement",
+    cost: "free",
+    grantClass: "monk",
+    grantSubclass: "Elements",
+    grantLevel: 3,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    reminder: "No action, start of your turn: spend 1 focus to imbue yourself with elemental energy for 10 minutes (or until incapacitated). Unarmed Strike reach +10 ft; once per hit, deal Acid/Cold/Fire/Lightning/Thunder damage instead of the normal type, forcing a Strength save (focus DC) to move the target up to 10 ft on a failure.",
+  },
+  {
+    key: "elementalBurst",
+    name: "Elemental Burst",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclass: "Elements",
+    grantLevel: 6,
+    resourceKey: "focus",
+    resourceAmount: 2,
+    reminder: "Magic action, 2 focus: 20-ft-radius sphere within 120 ft, chosen damage type. Each creature makes a Dexterity save (focus DC) — 3 Martial Arts dice on a failure, half as much on a success.",
+  },
+
   // Warrior of the Open Hand (#1245): Open Hand Technique (Flurry-hit rider)
   // and Quivering Palm (set/trigger) are post-hit riders with their own
   // dedicated verticals (open-hand-technique.ts / quivering-palm.ts), exactly
@@ -269,6 +337,27 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 3, resourceKey: "sorceryPoints", resourceAmount: 1 },
 ];
 
+// Class/subclass/level gate for one DERIVED_ACTIONS row — no pool/enabled state.
+// The ONE predicate both deriveActions' filter and deriveEntryScopedActions
+// (below, which both `availableActions[]` and shadow-arts.ts's cast guards
+// resolve through) key off, so a level gate can never drift into two
+// independent copies (#1315 — CLAUDE.md's level-gated-registry rule).
+function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, level: number): boolean {
+  // Only include class-specific actions here (universal handled client-side).
+  if (a.universal) return false;
+
+  // Class gate.
+  if (a.grantClass && a.grantClass.toLowerCase() !== cls) return false;
+
+  // Subclass gate (substring match, case-insensitive).
+  if (a.grantSubclass && !sub.includes(a.grantSubclass.toLowerCase())) return false;
+
+  // Level gate.
+  if (a.grantLevel && level < a.grantLevel) return false;
+
+  return true;
+}
+
 /**
  * Filter DERIVED_ACTIONS for a character's class/subclass/level and annotate
  * each with `enabled` based on current resource pool `remaining` values.
@@ -294,21 +383,7 @@ export function deriveActions(
   const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
 
   return DERIVED_ACTIONS
-    .filter((a) => {
-      // Only include class-specific actions here (universal handled client-side).
-      if (a.universal) return false;
-
-      // Class gate.
-      if (a.grantClass && a.grantClass.toLowerCase() !== cls) return false;
-
-      // Subclass gate (substring match, case-insensitive).
-      if (a.grantSubclass && !sub.includes(a.grantSubclass.toLowerCase())) return false;
-
-      // Level gate.
-      if (a.grantLevel && level < a.grantLevel) return false;
-
-      return true;
-    })
+    .filter((a) => matchesActionGate(a, cls, sub, level))
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
@@ -321,6 +396,47 @@ export function deriveActions(
         ...(reminder ? { reminder } : {}),
       };
     });
+}
+
+/**
+ * Entry-scoped `availableActions` derivation (#1206/#1315): each class entry's
+ * own DERIVED_ACTIONS rows at THAT entry's own effective level, deduped by
+ * `key` with the PRIMARY entry winning ties (mirrors mergeLayers/
+ * collectEntryScopedFeatures' base-wins policy) — so a secondary Warrior of
+ * Shadow monk's shadowArts/cloakOfShadows (or any other class's gated action)
+ * surface even when that class isn't the primary entry, instead of only ever
+ * reading the primary entry at total character level. This is the SAME
+ * function shadow-arts.ts's cast guards call, so the wire value and the guard
+ * can never independently drift on the gate.
+ */
+export function deriveEntryScopedActions(
+  classEntries: { name: string; subclass?: string | null; level: number }[],
+  totalLevel: number,
+  pools: ResourcePool[],
+  unarmoredUnshielded = true,
+): AvailableAction[] {
+  const seenKeys = new Set<string>();
+  const actions: AvailableAction[] = [];
+  for (const entry of classEntries) {
+    const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
+    for (const action of deriveActions(entry.name, entry.subclass ?? undefined, effLevel, pools, unarmoredUnshielded)) {
+      if (seenKeys.has(action.key)) continue;
+      seenKeys.add(action.key);
+      actions.push(action);
+    }
+  }
+  return actions;
+}
+
+/**
+ * A DERIVED_ACTIONS row's `grantLevel` (undefined if the key doesn't exist or
+ * carries none) — lets a caller building "level N+" error text (e.g.
+ * warrior-of-elements.ts's assertWarriorOfElements) read the single source of
+ * truth instead of hardcoding the number a second time, which is exactly the
+ * kind of drift deriveEntryScopedActions itself exists to prevent (#1315).
+ */
+export function actionGrantLevel(key: string): number | undefined {
+  return DERIVED_ACTIONS.find((a) => a.key === key)?.grantLevel;
 }
 
 // One action row's enabled/disabledReason — pulled out of the `.map()` above to

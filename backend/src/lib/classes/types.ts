@@ -87,14 +87,6 @@ export interface DerivedClassInfo {
    * Undefined when no subclass feature grants a tool choice.
    */
   toolProfChoiceCount?: number;
-  /** Warrior of the Elements only: whether the L3+ Elemental Attunement toggle is available. */
-  elementalAttunementAvailable?: boolean;
-  /** Warrior of the Elements only: whether the L6+ Elemental Burst action is available. */
-  elementalBurstAvailable?: boolean;
-  /** Warrior of Shadow only: whether the L3+ 1-focus Darkness cast is available. */
-  shadowArtsAvailable?: boolean;
-  /** Warrior of Shadow only: whether the L17+ Cloak of Shadows self-invisible toggle is available (moved from L11 in the 2024 rewrite, #1246). */
-  cloakOfShadowsAvailable?: boolean;
   /**
    * Generic subclass "choose N from a catalog" selections active at this level
    * (issue #899). Only choices whose derived count > 0 are listed — so a

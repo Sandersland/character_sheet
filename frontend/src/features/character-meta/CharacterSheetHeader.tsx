@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import Badge from "@/components/ui/Badge";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import BannerVitals from "@/features/character-meta/BannerVitals";
 import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
@@ -7,6 +8,7 @@ import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import Tabs from "@/components/ui/Tabs";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { EDITION_LABELS } from "@/lib/editionCopy";
 import { classSummary } from "@/lib/multiclass";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
 
@@ -221,6 +223,8 @@ function DesktopBanner({
                 <span>
                   {character.background} · {character.alignment}
                 </span>
+                {/* Sheet header + campaign header only (#1286) — not the character-list card. */}
+                <Badge tone="neutral">{EDITION_LABELS[character.rulesEdition]}</Badge>
                 <CampaignIndicator />
               </p>
             </div>

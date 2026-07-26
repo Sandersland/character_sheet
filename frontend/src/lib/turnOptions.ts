@@ -22,7 +22,7 @@ import {
   type SpellCastThisTurn,
 } from "@/lib/spellPicker";
 import { canTwoWeaponFight, type TurnActionOption } from "@/lib/turnRules";
-import type { ActionResolver } from "@/features/session/actionResolvers";
+import { resolverFor, type ActionResolver } from "@/features/session/actionResolvers";
 import type { AvailableAction, Character, ResourcePool } from "@/types/character";
 
 /** "Longsword · +7 to hit · 1d8 + 4 slashing" for the first attack row
@@ -120,6 +120,38 @@ export function classActionOption(
     ...(subtitle ? { subtitle } : {}),
     ...(badge ? { badge } : {}),
     heal,
+  };
+}
+
+/** The three turn-hub menu partitions of `character.availableActions`. */
+export interface ClassActionPartitions {
+  classActions: AvailableAction[];
+  classBonusActions: AvailableAction[];
+  classReactions: AvailableAction[];
+}
+
+/**
+ * Partitions `availableActions` by action-economy cost for the three TurnHub
+ * menus. Only actions with a registered ACTION_RESOLVERS entry are included —
+ * a DERIVED_ACTIONS row with no resolver (e.g. Shadow Arts/Cloak of
+ * Shadows/Elemental Burst, #1315: cast through their own dedicated
+ * /abilities/* endpoints + Class-tab sections, not this generic dispatch)
+ * would otherwise render a clickable card whose click just consumes the slot
+ * and does nothing (planActionClick's no-resolver fallback is
+ * `{consumeSlot:true, send:"none"}`).
+ */
+export function partitionClassActions(
+  availableActions: AvailableAction[],
+  raging: boolean,
+): ClassActionPartitions {
+  const withResolver = availableActions.filter((a) => resolverFor(a.key) !== undefined);
+  return {
+    classActions: withResolver.filter((a) => a.cost === "action"),
+    // While raging, swap the Rage affordance for End Rage (both are bonus actions).
+    classBonusActions: withResolver.filter(
+      (a) => a.cost === "bonusAction" && a.key !== (raging ? "rage" : "endRage"),
+    ),
+    classReactions: withResolver.filter((a) => a.cost === "reaction"),
   };
 }
 

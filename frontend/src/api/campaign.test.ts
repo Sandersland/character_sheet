@@ -38,15 +38,18 @@ describe("createCampaign", () => {
     vi.unstubAllGlobals();
   });
 
-  it("POSTs { name }", async () => {
+  it("POSTs { name, rulesEdition }", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "c1" }) });
     vi.stubGlobal("fetch", fetchMock);
 
-    await createCampaign("Curse of Strahd");
+    await createCampaign("Curse of Strahd", "EDITION_2024");
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/campaigns"),
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ name: "Curse of Strahd" }) })
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ name: "Curse of Strahd", rulesEdition: "EDITION_2024" }),
+      })
     );
   });
 });

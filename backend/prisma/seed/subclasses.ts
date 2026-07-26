@@ -3,10 +3,15 @@
 // post-creation setSubclass transaction. Classes/subclasses with full
 // mechanics support in srd.ts drive automation; others are included for
 // creation UX completeness.
+import type { SeedEdition } from "./edition.js";
+
 export interface SubclassSeed {
   className: string;    // must match an entry in CLASSES
   name: string;
   description: string;
+  // Omitted = shared (NULL column, valid in both editions, #1306). No seeded
+  // subclass diverges yet — the field exists so a future one can.
+  edition?: SeedEdition;
 }
 
 export const SUBCLASSES: SubclassSeed[] = [

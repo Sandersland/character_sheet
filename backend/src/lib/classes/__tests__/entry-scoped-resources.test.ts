@@ -164,29 +164,8 @@ describe("deriveEntryScopedResources", () => {
     expect(monkLevel6PlusNames.every((name) => !derivedNames.has(name))).toBe(true);
   });
 
-  // #1206: gate booleans (shadowArtsAvailable/cloakOfShadowsAvailable, and any
-  // other deriveExtras scalar field) must key off the OWNING entry's own
-  // level, not the primary entry at total level — previously a secondary
-  // Warrior of Shadow monk got no gate at all (deriveExtras only ran on the
-  // primary). Deliberately does NOT assert against a hardcoded total level —
-  // only that the gate tracks the monk entry's own level, so this test stays
-  // valid across any future edition change to the gate's level.
-  it("Fighter 5 (primary) / Warrior of Shadow monk 3 (secondary): shadowArtsAvailable is set, keyed off the monk entry's own level", () => {
-    const totalLevel = 8; // fighter 5 + monk 3
-    const profBonus = proficiencyBonusForLevel(totalLevel);
-    const entries = [
-      { name: "fighter", subclass: undefined, level: 5 },
-      { name: "monk", subclass: "warrior of shadow", level: 3 },
-    ];
-
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
-
-    const bareMonkAtEntryLevel = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, profBonus, "EDITION_2024");
-    expect(derived?.shadowArtsAvailable).toBe(bareMonkAtEntryLevel?.shadowArtsAvailable);
-    expect(derived?.shadowArtsAvailable).toBe(true);
-    // The primary (fighter) never sets this field — proves the value came
-    // from overlaying the SECONDARY entry's own derivation, not the primary's.
-    const bareFighterPrimary = deriveResources("fighter", undefined, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
-    expect(bareFighterPrimary?.shadowArtsAvailable).toBeUndefined();
-  });
+  // The Warrior of Shadow feature-availability gate booleans that used to live
+  // here moved off DerivedClassInfo onto DERIVED_ACTIONS rows (#1315) — see
+  // entry-scoped-actions.test.ts for the equivalent entry-scoped-gate coverage
+  // (deriveEntryScopedActions, keyed off the monk entry's own level).
 });

@@ -7,6 +7,7 @@ import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 let COOKIE: string;
@@ -84,11 +85,12 @@ describe("characters routes", () => {
       create: TEST_CLASS,
       update: TEST_CLASS,
     });
-    const background = await prisma.background.upsert({
-      where: { name: TEST_BACKGROUND.name },
-      create: TEST_BACKGROUND,
-      update: TEST_BACKGROUND,
-    });
+    const background = await upsertEditionRow(
+      prisma.background,
+      { name: TEST_BACKGROUND.name, edition: null },
+      TEST_BACKGROUND,
+      TEST_BACKGROUND,
+    );
     const item = await prisma.item.upsert({
       where: { name: TEST_ITEM.name },
       create: { ...TEST_ITEM, weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL } },

@@ -29,10 +29,7 @@ const mockCharacter: Character = {
   initiativeBonus: 3,
   speed: 35,
   proficiencyBonus: 2,
-  sneakAttack: null,
-  stunningStrike: null,
-  openHandTechnique: null,
-  quiveringPalm: null,
+  // Riders (#1316) are absent for a Ranger with none of these — no key at all.
   hitPoints: { current: 28, max: 36, temp: 0, deathSaves: { successes: 0, failures: 0 } },
   hitDice: { total: 4, die: "d10", spent: 0 },
   abilityScores: {

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { CreationStepKey } from "@/lib/creationSteps";
 import type { EquipmentDraft } from "@/lib/startingEquipment";
 import type { AbilityName, AbilityScores, SkillName } from "@/types/character";
@@ -55,6 +57,20 @@ export interface CharacterDraft {
   equipmentDraft: EquipmentDraft | null;
   /** #1176: the creation-ceremony step the player is on, so a reload resumes there. */
   step: CreationStepKey;
+  /** #1286: resolved by CreationEntryGate before the identity step is reachable —
+   *  null means the gate hasn't run yet (never a silently-applied default). */
+  rulesEdition: RulesEdition | null;
+  /** #1286: the campaign this character is being created for, or null for solo.
+   *  Set alongside rulesEdition by the same gate resolution. */
+  campaignId: string | null;
+  /** #1286: the chosen campaign's display name, carried alongside campaignId so
+   *  the Review step can echo it without a second fetch. Null for solo. */
+  campaignName: string | null;
+  /** #1286: set once createCharacter succeeds, so a retry (even after a page
+   *  refresh) resumes the campaign attach instead of calling createCharacter
+   *  again — createCharacter is not idempotent, and this field (unlike a
+   *  useState) survives the refresh because the whole draft is persisted. */
+  createdId: string | null;
 }
 
 const EMPTY_DRAFT: CharacterDraft = {
@@ -79,6 +95,10 @@ const EMPTY_DRAFT: CharacterDraft = {
   spellIds: [],
   equipmentDraft: null,
   step: "identity",
+  rulesEdition: null,
+  campaignId: null,
+  campaignName: null,
+  createdId: null,
 };
 
 /**

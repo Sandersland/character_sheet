@@ -111,8 +111,12 @@ describe("per-domain business-key uniqueness", () => {
     expect(duplicates(CHANNEL_DIVINITIES.map((c) => c.name))).toEqual([]);
   });
 
-  it("FEATS have unique names", () => {
-    expect(duplicates(FEATS.map((f) => f.name))).toEqual([]);
+  // Keyed on (name, edition) rather than name alone: a feat that genuinely
+  // diverges by edition (Alert, #1306) legitimately repeats its name once per
+  // edition — only a same-name/same-edition collision (including two `undefined`
+  // = shared rows) would collapse in the DB's upsert.
+  it("FEATS have unique (name, edition) pairs", () => {
+    expect(duplicates(FEATS.map((f) => `${f.name}::${f.edition ?? "shared"}`))).toEqual([]);
   });
 
   it("SPELLS have unique names", () => {
@@ -175,6 +179,23 @@ describe("FEATS — PHB'24 category invariants", () => {
       { target: "offhandAbilityDamage", amount: 1 },
     ]);
     expect(byName.get("Great Weapon Fighting")?.improvements ?? []).toEqual([]);
+  });
+
+  // #1306 worked example: the epic's own illustration (Alert forks, Grappler
+  // stays shared) — pins the actual seeded data, not just resolveEditionRow's
+  // pure logic.
+  it("Alert forks by edition (SRD 5.2 vs PHB'14 p.165); Grappler stays one shared row", () => {
+    const alerts = FEATS.filter((f) => f.name === "Alert");
+    expect(alerts).toHaveLength(2);
+    expect(alerts.map((f) => f.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
+    const alert2014 = alerts.find((f) => f.edition === "EDITION_2014")!;
+    const alert2024 = alerts.find((f) => f.edition === "EDITION_2024")!;
+    expect(alert2014.improvements).toEqual([{ target: "initiative", amount: 5 }]);
+    expect(alert2024.improvements).toEqual([{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]);
+
+    const grapplers = FEATS.filter((f) => f.name === "Grappler");
+    expect(grapplers).toHaveLength(1);
+    expect(grapplers[0].edition).toBeUndefined();
   });
 
   it("only Magic Initiate and Skilled are repeatable", () => {

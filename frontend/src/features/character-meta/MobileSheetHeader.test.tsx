@@ -245,6 +245,16 @@ describe("MobileSheetHeader collapse-on-scroll (#1026)", () => {
   });
 });
 
+// #1286: the acceptance criterion is unqualified ("visible on its sheet
+// header") — the desktop banner alone isn't enough, since mobile is the only
+// header shown below the md breakpoint.
+describe("MobileSheetHeader rules edition (#1286)", () => {
+  it("shows the character's rules edition in the expanded header", () => {
+    renderHeader({}, makeCharacter({ rulesEdition: "EDITION_2014" }));
+    expect(screen.getByText("2014 rules")).toBeInTheDocument();
+  });
+});
+
 // #1027: the identity block is the mobile route back out — tapping it opens the
 // character switcher sheet in both the expanded and collapsed header states.
 describe("MobileSheetHeader character switcher (#1027)", () => {

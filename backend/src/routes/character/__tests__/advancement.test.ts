@@ -13,6 +13,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-advancement";
 let COOKIE: string;
@@ -104,64 +105,64 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
 
     // Upsert the three feats with improvements (mirrors seed.ts).
-    const alertFeat = await prisma.feat.upsert({
-      where: { name: "Alert (Advancement Suite)" },
-      create: {
+    const alertFeat = await upsertEditionRow(
+      prisma.feat,
+      { name: "Alert (Advancement Suite)", edition: null },
+      {
         name: "Alert (Advancement Suite)",
         description: "You gain +5 to initiative rolls.",
         improvements: [{ target: "initiative", amount: 5 }] as unknown as Prisma.InputJsonValue,
       },
-      update: {
-        improvements: [{ target: "initiative", amount: 5 }] as unknown as Prisma.InputJsonValue,
-      },
-    });
+      { improvements: [{ target: "initiative", amount: 5 }] as unknown as Prisma.InputJsonValue },
+    );
     alertFeatId = alertFeat.id;
 
-    const mobileFeat = await prisma.feat.upsert({
-      where: { name: "Mobile (Advancement Suite)" },
-      create: {
+    const mobileFeat = await upsertEditionRow(
+      prisma.feat,
+      { name: "Mobile (Advancement Suite)", edition: null },
+      {
         name: "Mobile (Advancement Suite)",
         description: "Your speed increases by 10 feet.",
         improvements: [{ target: "speed", amount: 10 }] as unknown as Prisma.InputJsonValue,
       },
-      update: {
-        improvements: [{ target: "speed", amount: 10 }] as unknown as Prisma.InputJsonValue,
-      },
-    });
+      { improvements: [{ target: "speed", amount: 10 }] as unknown as Prisma.InputJsonValue },
+    );
     mobileFeatId = mobileFeat.id;
 
-    const toughFeat = await prisma.feat.upsert({
-      where: { name: "Tough (Advancement Suite)" },
-      create: {
+    const toughFeat = await upsertEditionRow(
+      prisma.feat,
+      { name: "Tough (Advancement Suite)", edition: null },
+      {
         name: "Tough (Advancement Suite)",
         description: "+2 max HP per level.",
         improvements: [{ target: "maxHp", amount: 2, perLevel: true }] as unknown as Prisma.InputJsonValue,
       },
-      update: {
-        improvements: [{ target: "maxHp", amount: 2, perLevel: true }] as unknown as Prisma.InputJsonValue,
-      },
-    });
+      { improvements: [{ target: "maxHp", amount: 2, perLevel: true }] as unknown as Prisma.InputJsonValue },
+    );
     toughFeatId = toughFeat.id;
 
     // Category-gating fixtures (PHB'24): Origin/Fighting Style never offered as an
     // ASI slot; Epic Boon only at level 19+ with a +1 cap of 30.
-    const originFeat = await prisma.feat.upsert({
-      where: { name: "Origin Test Feat (Advancement Suite)" },
-      create: { name: "Origin Test Feat (Advancement Suite)", description: "Origin.", category: "origin" },
-      update: { category: "origin" },
-    });
+    const originFeat = await upsertEditionRow(
+      prisma.feat,
+      { name: "Origin Test Feat (Advancement Suite)", edition: null },
+      { name: "Origin Test Feat (Advancement Suite)", description: "Origin.", category: "origin" },
+      { category: "origin" },
+    );
     originFeatId = originFeat.id;
 
-    const fightingStyleFeat = await prisma.feat.upsert({
-      where: { name: "Fighting Style Test Feat (Advancement Suite)" },
-      create: { name: "Fighting Style Test Feat (Advancement Suite)", description: "FS.", category: "fighting_style", prerequisite: "Fighting Style feature" },
-      update: { category: "fighting_style" },
-    });
+    const fightingStyleFeat = await upsertEditionRow(
+      prisma.feat,
+      { name: "Fighting Style Test Feat (Advancement Suite)", edition: null },
+      { name: "Fighting Style Test Feat (Advancement Suite)", description: "FS.", category: "fighting_style", prerequisite: "Fighting Style feature" },
+      { category: "fighting_style" },
+    );
     fightingStyleFeatId = fightingStyleFeat.id;
 
-    const epicBoonFeat = await prisma.feat.upsert({
-      where: { name: "Boon Test Feat (Advancement Suite)" },
-      create: {
+    const epicBoonFeat = await upsertEditionRow(
+      prisma.feat,
+      { name: "Boon Test Feat (Advancement Suite)", edition: null },
+      {
         name: "Boon Test Feat (Advancement Suite)",
         description: "Epic Boon.",
         category: "epic_boon",
@@ -169,23 +170,24 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
         abilityOptions: ["strength"],
         abilityIncrease: 1,
       },
-      update: { category: "epic_boon", levelPrerequisite: 19, abilityOptions: ["strength"], abilityIncrease: 1 },
-    });
+      { category: "epic_boon", levelPrerequisite: 19, abilityOptions: ["strength"], abilityIncrease: 1 },
+    );
     epicBoonFeatId = epicBoonFeat.id;
 
     // PHB'24 Alert models initiative as +PB via scaling: "proficiencyBonus" — assert
     // the improvements JSON (incl. scaling) round-trips through GET /api/feats.
     const scalingImprovements = [{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }];
-    await prisma.feat.upsert({
-      where: { name: "Scaling Test Feat (Advancement Suite)" },
-      create: {
+    await upsertEditionRow(
+      prisma.feat,
+      { name: "Scaling Test Feat (Advancement Suite)", edition: null },
+      {
         name: "Scaling Test Feat (Advancement Suite)",
         description: "Initiative scales with PB.",
         category: "origin",
         improvements: scalingImprovements as unknown as Prisma.InputJsonValue,
       },
-      update: { improvements: scalingImprovements as unknown as Prisma.InputJsonValue },
-    });
+      { improvements: scalingImprovements as unknown as Prisma.InputJsonValue },
+    );
   });
 
   afterAll(async () => {
@@ -582,23 +584,25 @@ describe("Advancement — Fighting Style feat slot (#1137)", () => {
   let generalId: string;
 
   beforeAll(async () => {
-    const defense = await prisma.feat.upsert({
-      where: { name: "Defense (FS Suite)" },
-      create: {
+    const defense = await upsertEditionRow(
+      prisma.feat,
+      { name: "Defense (FS Suite)", edition: null },
+      {
         name: "Defense (FS Suite)",
         description: "+1 AC while armored.",
         category: "fighting_style",
         prerequisite: "Fighting Style feature",
         improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue,
       },
-      update: { category: "fighting_style", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue },
-    });
+      { category: "fighting_style", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue },
+    );
     fsDefenseId = defense.id;
-    const general = await prisma.feat.upsert({
-      where: { name: "General (FS Suite)" },
-      create: { name: "General (FS Suite)", description: "General feat.", category: "general", levelPrerequisite: 4 },
-      update: { category: "general", levelPrerequisite: 4, abilityOptions: [], abilityIncrease: 0 },
-    });
+    const general = await upsertEditionRow(
+      prisma.feat,
+      { name: "General (FS Suite)", edition: null },
+      { name: "General (FS Suite)", description: "General feat.", category: "general", levelPrerequisite: 4 },
+      { category: "general", levelPrerequisite: 4, abilityOptions: [], abilityIncrease: 0 },
+    );
     generalId = general.id;
   });
 

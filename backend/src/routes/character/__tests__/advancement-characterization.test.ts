@@ -29,6 +29,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-adv-char";
 let COOKIE: string;
@@ -71,29 +72,31 @@ beforeAll(async () => {
   fighterClassId = fighter.id;
 
   // Half-feat: choosable +1 CON or WIS (Resilient-style), no improvements.
-  const halfFeat = await prisma.feat.upsert({
-    where: { name: HALF_FEAT_NAME },
-    create: {
+  const halfFeat = await upsertEditionRow(
+    prisma.feat,
+    { name: HALF_FEAT_NAME, edition: null },
+    {
       name: HALF_FEAT_NAME,
       description: "You gain +1 to a chosen ability.",
       abilityOptions: ["constitution", "wisdom"],
       abilityIncrease: 1,
     },
-    update: {},
-  });
+    {},
+  );
   halfFeatId = halfFeat.id;
 
   // Plain feat (no ability bump) with a structured improvement to pin the
   // improvements snapshot inside the AdvancementEntry.
-  const plainFeat = await prisma.feat.upsert({
-    where: { name: PLAIN_FEAT_NAME },
-    create: {
+  const plainFeat = await upsertEditionRow(
+    prisma.feat,
+    { name: PLAIN_FEAT_NAME, edition: null },
+    {
       name: PLAIN_FEAT_NAME,
       description: "You gain +5 to initiative rolls.",
       improvements: [{ target: "initiative", amount: 5 }] as unknown as Prisma.InputJsonValue,
     },
-    update: {},
-  });
+    {},
+  );
   plainFeatId = plainFeat.id;
 });
 afterAll(async () => {

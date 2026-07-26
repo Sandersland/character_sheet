@@ -2,6 +2,7 @@ import { ChevronDown, Shield } from "lucide-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import Badge from "@/components/ui/Badge";
 import MeterBar from "@/components/ui/MeterBar";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import Popover from "@/components/ui/Popover";
@@ -10,6 +11,7 @@ import CharacterSwitcherSheet from "@/features/character-meta/CharacterSwitcherS
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { EDITION_LABELS } from "@/lib/editionCopy";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
 
 type HeaderVariant = "expanded" | "collapsed";
@@ -354,6 +356,11 @@ function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps
             <span className="block truncate text-xs text-parchment-600">
               {character.race} · {classLine}
             </span>
+            {/* Same Badge as the desktop banner (#1286) — kept out of the race/class
+                text node above so existing exact-text assertions don't need touching. */}
+            <Badge tone="neutral" className="mt-0.5">
+              {EDITION_LABELS[character.rulesEdition]}
+            </Badge>
           </span>
         </button>
         <span className="flex-none rounded-full bg-garnet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-garnet-700">

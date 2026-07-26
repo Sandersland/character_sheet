@@ -190,5 +190,8 @@ export function buildCreatePayload(
     ...(selections.class?.level1SpellPicks
       ? { spells: { cantripIds: draft.cantripIds, spellIds: draft.spellIds } }
       : {}),
+    // #1286: resolved by CreationEntryGate before the ceremony is reachable, so
+    // this is always set by the time a real submit happens (never a silent default).
+    rulesEdition: draft.rulesEdition ?? undefined,
   };
 }

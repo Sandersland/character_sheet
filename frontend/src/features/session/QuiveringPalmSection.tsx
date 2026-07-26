@@ -38,11 +38,13 @@ export default function QuiveringPalmSection({
 }: QuiveringPalmSectionProps) {
   const { character } = useCurrentCharacter();
   const { quiveringPalm } = character;
+  // Rider.active is optional (#1316) — false, not absent, when vibrations aren't set.
+  const active = quiveringPalm?.active ?? false;
   const { setDisabled, triggerDisabled, message, error, handleSet, handleTrigger } = useQuiveringPalmActions(
     character,
     turnState,
     currentRow,
-    quiveringPalm?.active ?? false,
+    active,
   );
 
   // Only a L17+ Warrior of the Open Hand has Quivering Palm.
@@ -51,8 +53,8 @@ export default function QuiveringPalmSection({
   return (
     <div className="flex flex-col gap-1.5 rounded-control border border-gold-200 bg-gold-50 p-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-gold-800">Quivering Palm · DC {quiveringPalm.dc}</span>
-        {quiveringPalm.active && (
+        <span className="text-xs font-semibold text-gold-800">Quivering Palm · DC {quiveringPalm.saveDC}</span>
+        {active && (
           <span className="text-[10px] font-semibold uppercase tracking-wide text-parchment-500">
             Vibrations active
           </span>
@@ -66,7 +68,7 @@ export default function QuiveringPalmSection({
           type="button"
           disabled={setDisabled}
           onClick={handleSet}
-          title={setBlockedReason(quiveringPalm.active, currentRow)}
+          title={setBlockedReason(active, currentRow)}
           className="rounded-control border border-gold-300 bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Set (4 focus)
@@ -75,7 +77,7 @@ export default function QuiveringPalmSection({
           type="button"
           disabled={triggerDisabled}
           onClick={handleTrigger}
-          title={triggerBlockedReason(quiveringPalm.active)}
+          title={triggerBlockedReason(active)}
           className="rounded-control border border-gold-300 bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Trigger (Magic action)

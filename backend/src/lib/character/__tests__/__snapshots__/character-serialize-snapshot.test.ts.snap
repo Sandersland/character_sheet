@@ -381,19 +381,14 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "level": 6,
   "name": "Snapshot Multiclass Caster",
   "nextLevelThreshold": 23000,
-  "openHandTechnique": null,
   "ownerId": "owner-serialize-snapshot",
   "pendingLevelUps": 1,
   "portraitUrl": undefined,
   "proficiencyBonus": 3,
-  "quiveringPalm": null,
   "race": "Elf",
   "resistances": [],
   "resources": {
     "choicesKnown": {},
-    "cloakOfShadowsAvailable": undefined,
-    "elementalAttunementAvailable": undefined,
-    "elementalBurstAvailable": undefined,
     "features": [
       {
         "description": "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
@@ -409,7 +404,6 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       },
     ],
     "maneuverChoiceCount": undefined,
-    "maneuverSaveDC": undefined,
     "maneuversKnown": [],
     "pools": [
       {
@@ -423,7 +417,6 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "used": 0,
       },
     ],
-    "shadowArtsAvailable": undefined,
     "subclassChoices": [],
     "toolProfChoiceCount": undefined,
     "toolProficienciesKnown": [],
@@ -503,7 +496,6 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "proficient": false,
     },
   ],
-  "sneakAttack": null,
   "speed": 30,
   "spellcasting": {
     "ability": "intelligence",
@@ -569,7 +561,6 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       },
     ],
   },
-  "stunningStrike": null,
   "subclass": undefined,
   "subclassId": undefined,
   "toolProficiencies": [
@@ -713,21 +704,19 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "inventory": [],
   "journal": [],
   "level": 5,
+  "maneuvers": {
+    "saveDC": 14,
+  },
   "name": "Snapshot Simple Fighter",
   "nextLevelThreshold": 14000,
-  "openHandTechnique": null,
   "ownerId": "owner-serialize-snapshot",
   "pendingLevelUps": 0,
   "portraitUrl": undefined,
   "proficiencyBonus": 3,
-  "quiveringPalm": null,
   "race": "",
   "resistances": [],
   "resources": {
     "choicesKnown": {},
-    "cloakOfShadowsAvailable": undefined,
-    "elementalAttunementAvailable": undefined,
-    "elementalBurstAvailable": undefined,
     "features": [
       {
         "description": "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
@@ -767,7 +756,6 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
       },
     ],
     "maneuverChoiceCount": 3,
-    "maneuverSaveDC": 14,
     "maneuversKnown": [
       {
         "description": "Counter.",
@@ -817,7 +805,6 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
         "used": 4,
       },
     ],
-    "shadowArtsAvailable": undefined,
     "subclassChoices": [],
     "toolProfChoiceCount": 1,
     "toolProficienciesKnown": [
@@ -845,10 +832,8 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
       "proficient": false,
     },
   ],
-  "sneakAttack": null,
   "speed": 30,
   "spellcasting": undefined,
-  "stunningStrike": null,
   "subclass": "battle master",
   "subclassId": undefined,
   "toolProficiencies": [

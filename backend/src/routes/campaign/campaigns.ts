@@ -4,9 +4,11 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
+import { attachCharacterUpdate } from "@/lib/campaign/campaign-attach.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
 import { getActiveSession } from "@/lib/session/sessions.js";
 
 // Shared-campaign backbone (#246). Plain-REST (like journal.ts): no audit log,
@@ -15,7 +17,13 @@ import { getActiveSession } from "@/lib/session/sessions.js";
 
 export const campaignsRouter = Router();
 
-const createCampaignSchema = z.object({ name: z.string().min(1) }).strict();
+// rulesEdition is optional (the Prisma column default applies when omitted) —
+// the picker at campaign creation is #1286; the column has carried it since
+// #1285. Never patchable after creation: there is no PATCH /campaigns/:id
+// route, so "frozen once set" holds by simple absence of a mutation path.
+const createCampaignSchema = z
+  .object({ name: z.string().min(1), rulesEdition: z.enum(["EDITION_2014", "EDITION_2024"]).optional() })
+  .strict();
 const joinCampaignSchema = z.object({ inviteCode: z.string().min(1) }).strict();
 const attachCharacterSchema = z.object({ characterId: z.string().min(1) }).strict();
 
@@ -50,6 +58,9 @@ campaignsRouter.post("/campaigns", async (req, res) => {
   const campaign = await prisma.campaign.create({
     data: {
       name: parseResult.data.name,
+      // Omitted when absent so the column's own @default(EDITION_2024) applies
+      // (one literal, not duplicated here).
+      ...(parseResult.data.rulesEdition ? { rulesEdition: parseResult.data.rulesEdition } : {}),
       ownerId: userId,
       inviteCode: generateInviteCode(),
       members: { create: { userId, role: "OWNER" } },
@@ -159,6 +170,22 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   await assertCharacterAccess(prisma, userId, characterId, "edit");
   await assertCampaignMembership(prisma, userId, campaignId, "view");
 
+  // Blocked join on edition mismatch (#1286): a character's rulesEdition is
+  // write-once, so a mismatched campaign can never be joined, only refused —
+  // there is no conversion path to offer. Checked before the solo-session
+  // auto-close below so a doomed join doesn't have that side effect.
+  const [character, campaign] = await Promise.all([
+    prisma.character.findUniqueOrThrow({ where: { id: characterId }, select: { rulesEdition: true } }),
+    prisma.campaign.findUniqueOrThrow({ where: { id: campaignId }, select: { rulesEdition: true } }),
+  ]);
+  if (character.rulesEdition !== campaign.rulesEdition) {
+    res.status(409).json({
+      error:
+        `Can't join: this character uses the ${RULES_EDITION_LABELS[character.rulesEdition]}, but this campaign runs the ${RULES_EDITION_LABELS[campaign.rulesEdition]}. A character's rules edition is set at creation and can't be changed.`,
+    });
+    return;
+  }
+
   // Settle a stale solo session (auto-close) before the guard read below (#1081).
   await getActiveSession(characterId);
 
@@ -179,12 +206,11 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
       if (soloActive) return "soloSessionActive";
 
       // rulesEdition is deliberately not written here: joining a campaign never
-      // converts a character's edition (write-once, #1281). A character whose
-      // edition differs from the campaign's is a warning surface owned by #1286.
-      const { count } = await tx.character.updateMany({
-        where: { id: characterId, OR: [{ campaignId: null }, { campaignId }] },
-        data: { campaignId },
-      });
+      // converts a character's edition (write-once, #1281) — a mismatch is
+      // rejected above, before this transaction, never reconciled here.
+      // attachCharacterUpdate is extracted so campaign-attach.test.ts can pin
+      // that guarantee directly, bypassing the guard above (see its comment).
+      const { count } = await attachCharacterUpdate(tx, characterId, campaignId);
       if (count === 0) return "alreadyInCampaign";
 
       const existingLink = await tx.campaignCharacterLink.findUnique({

@@ -90,11 +90,11 @@ describe("ClassFeaturesSection — Fighting Style", () => {
 });
 
 describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 -> L17)", () => {
-  function makeShadowMonk(cloakOfShadowsAvailable: boolean): Character {
+  function makeShadowMonk(cloakAvailable: boolean): Character {
     return {
       id: "char-1",
       class: "Monk",
-      level: cloakOfShadowsAvailable ? 17 : 11,
+      level: cloakAvailable ? 17 : 11,
       subclass: "Warrior of Shadow",
       conditions: { active: [], exhaustion: 0 },
       resources: {
@@ -102,8 +102,11 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
         pools: [{ key: "focus", label: "Focus", total: 17, recharge: "shortRest", used: 0, remaining: 17 }],
         maneuversKnown: [],
         toolProficienciesKnown: [],
-        cloakOfShadowsAvailable: cloakOfShadowsAvailable || undefined,
       },
+      // cloakOfShadows entitlement is availableActions[] presence (#1315), not a resources boolean.
+      availableActions: cloakAvailable
+        ? [{ key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true }]
+        : [],
     } as unknown as Character;
   }
 

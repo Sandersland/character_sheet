@@ -78,7 +78,7 @@ describe("POST /api/characters/:id/abilities/quivering-palm/transactions", () =>
 
     const focusPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focusPool.remaining).toBe(13); // 17 total − 4 spent
-    expect(res.body.character.quiveringPalm).toEqual({ dc: 17, active: true });
+    expect(res.body.character.quiveringPalm).toEqual({ saveDC: 17, active: true });
   });
 
   // #1275 byte-identity oracle: captured on the per-feature URL before the move to
@@ -155,7 +155,7 @@ describe("POST /api/characters/:id/abilities/quivering-palm/transactions", () =>
     } else {
       expect(result.appliedDamage).toBe(60);
     }
-    expect(res.body.character.quiveringPalm).toEqual({ dc: 17, active: false });
+    expect(res.body.character.quiveringPalm).toEqual({ saveDC: 17, active: false });
   });
 
   it("triggering does not spend additional focus (only the Set spent 4)", async () => {

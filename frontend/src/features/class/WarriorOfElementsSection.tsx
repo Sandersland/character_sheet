@@ -106,7 +106,8 @@ export default function WarriorOfElementsSection({ busy, onOperations }: Props) 
   const { character } = useCurrentCharacter();
   const focusAvailable = focusRemaining(character);
   const attuned = character.activeEffects.buffs.some((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY);
-  const burstAvailable = character.resources?.elementalBurstAvailable === true;
+  // Level gate is availableActions[] presence (#1315), not a resources boolean.
+  const burstAvailable = (character.availableActions ?? []).some((a) => a.key === "elementalBurst");
 
   return (
     <div>

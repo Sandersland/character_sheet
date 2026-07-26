@@ -12,6 +12,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-spellcasting";
 let COOKIE: string;
@@ -706,16 +707,18 @@ describe("subclass-granted spells", () => {
     // Warrior of Shadow grants Minor Illusion at L3 as data (#898): a catalog Subclass
     // row under this test class + a SubclassGrantedSpell → the seeded Minor Illusion.
     // Warrior of the Open Hand exists as a catalog row but grants nothing.
-    const shadow = await prisma.subclass.upsert({
-      where: { classId_name: { classId: monkClassId, name: "Warrior of Shadow" } },
-      create: { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
-      update: {},
-    });
-    await prisma.subclass.upsert({
-      where: { classId_name: { classId: monkClassId, name: "Warrior of the Open Hand" } },
-      create: { classId: monkClassId, name: "Warrior of the Open Hand", description: "Test subclass" },
-      update: {},
-    });
+    const shadow = await upsertEditionRow(
+      prisma.subclass,
+      { classId: monkClassId, name: "Warrior of Shadow", edition: null },
+      { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
+      {},
+    );
+    await upsertEditionRow(
+      prisma.subclass,
+      { classId: monkClassId, name: "Warrior of the Open Hand", edition: null },
+      { classId: monkClassId, name: "Warrior of the Open Hand", description: "Test subclass" },
+      {},
+    );
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
     await prisma.subclassGrantedSpell.upsert({
@@ -734,8 +737,8 @@ describe("subclass-granted spells", () => {
     // what setSubclass / creation write in production.
     const subclassId = opts.subclass
       ? (
-          await prisma.subclass.findUnique({
-            where: { classId_name: { classId: monkClassId, name: opts.subclass } },
+          await prisma.subclass.findFirst({
+            where: { classId: monkClassId, name: opts.subclass, edition: null },
             select: { id: true },
           })
         )?.id

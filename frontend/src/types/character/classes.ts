@@ -223,15 +223,6 @@ export interface ToolProfEntry {
 export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
-  maneuverSaveDC?: number;
-  /** Warrior of the Elements: whether the L3+ Elemental Attunement toggle is available. */
-  elementalAttunementAvailable?: boolean;
-  /** Warrior of the Elements: whether the L6+ Elemental Burst action is available. */
-  elementalBurstAvailable?: boolean;
-  /** Warrior of Shadow: whether the L3+ 1-focus Darkness cast is available. */
-  shadowArtsAvailable?: boolean;
-  /** Warrior of Shadow: whether the L17+ Cloak of Shadows self-invisible toggle is available (moved from L11 in the 2024 rewrite). */
-  cloakOfShadowsAvailable?: boolean;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];

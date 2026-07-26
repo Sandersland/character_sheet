@@ -15,6 +15,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-shadow-cast";
 let COOKIE: string;
@@ -102,11 +103,12 @@ describe("Shadow Arts cast endpoint", () => {
     // Warrior of Shadow grants Minor Illusion at L3 as data (#898) — this is what gives
     // a pure (non-caster) Shadow monk a serialized spellcasting view at all, so the
     // cast Shadow Art's concentration can surface on it.
-    const shadow = await prisma.subclass.upsert({
-      where: { classId_name: { classId, name: "Warrior of Shadow" } },
-      create: { classId, name: "Warrior of Shadow", description: "Test subclass" },
-      update: {},
-    });
+    const shadow = await upsertEditionRow(
+      prisma.subclass,
+      { classId, name: "Warrior of Shadow", edition: null },
+      { classId, name: "Warrior of Shadow", description: "Test subclass" },
+      {},
+    );
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
     await prisma.subclassGrantedSpell.upsert({
@@ -135,8 +137,8 @@ describe("Shadow Arts cast endpoint", () => {
     await createMonk(XP_L3, "warrior of shadow");
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
     expect(res.status).toBe(200);
-    // The serialized character surfaces the Shadow Arts gate flag for the FE panel.
-    expect(res.body.resources.shadowArtsAvailable).toBe(true);
+    // The serialized character surfaces the Shadow Arts gate via availableActions (#1315).
+    expect((res.body.availableActions as { key: string }[]).some((a) => a.key === "shadowArts")).toBe(true);
     const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focus.used).toBe(1);
 
@@ -265,15 +267,37 @@ describe("Shadow Arts cast endpoint", () => {
     expect(res.body.error).toMatch(/level 3/i);
   });
 
-  it("surfaces cloakOfShadowsAvailable only for an L17+ Warrior of Shadow monk (moved from L11, #1246)", async () => {
-    await createMonk(XP_L17, "warrior of shadow");
-    const l17 = await agent().get(`/api/characters/${FIXTURE_ID}`);
-    expect(l17.body.resources.cloakOfShadowsAvailable).toBe(true);
+  // #1315 shared-gate proof: the cast guard (shadow-arts.ts) and the wire
+  // availableActions[] value both resolve through deriveEntryScopedActions —
+  // never two independent copies of the level gate (CLAUDE.md's
+  // level-gated-registry rule). If a future edit duplicated the gate (e.g. a
+  // guard hardcoding a different threshold than the DERIVED_ACTIONS row), this
+  // test would catch the resulting divergence at the exact boundary levels:
+  // availableActions would say "available" while the guard still rejected, or
+  // vice versa.
+  it("shadowArts (L3) / cloakOfShadows (L17): availableActions[] presence and guard accept/reject move together at the boundary", async () => {
+    await createMonk(XP_L2, "warrior of shadow");
+    const l2 = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect((l2.body.availableActions as { key: string }[]).some((a) => a.key === "shadowArts")).toBe(false);
+    const l2Cast = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    expect(l2Cast.status).toBe(400);
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 
     await createMonk(XP_L3, "warrior of shadow");
     const l3 = await agent().get(`/api/characters/${FIXTURE_ID}`);
-    expect(l3.body.resources.cloakOfShadowsAvailable).toBeUndefined();
+    expect((l3.body.availableActions as { key: string }[]).some((a) => a.key === "shadowArts")).toBe(true);
+    expect((l3.body.availableActions as { key: string }[]).some((a) => a.key === "cloakOfShadows")).toBe(false);
+    const l3Cast = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    expect(l3Cast.status).toBe(200);
+    const l3CloakCast = await cast([{ type: "activateCloakOfShadows" }]);
+    expect(l3CloakCast.status).toBe(400);
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+
+    await createMonk(XP_L17, "warrior of shadow");
+    const l17 = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect((l17.body.availableActions as { key: string }[]).some((a) => a.key === "cloakOfShadows")).toBe(true);
+    const l17Cast = await cast([{ type: "activateCloakOfShadows" }]);
+    expect(l17Cast.status).toBe(200);
   });
 
   describe("activateCloakOfShadows (L17)", () => {
@@ -313,8 +337,82 @@ describe("Shadow Arts cast endpoint", () => {
   });
 });
 
+// #1315: availableActions is entry-scoped (mirrors deriveEntryScopedResources,
+// #1206) — a secondary Warrior of Shadow monk's shadowArts/cloakOfShadows key
+// off the MONK entry's own level, not the primary entry's class or the
+// character's total level. Previously buildAvailableActionsView only ever
+// read the PRIMARY entry at total level, so a secondary monk's gated actions
+// never appeared regardless of level.
+describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
+  const MC2_ID = "test-shadow-mc-actions-1";
+  const MC2_CLASS_NAME = "Shadow MC Actions Test Class";
+  let mc2ClassId: string;
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: MC2_CLASS_NAME },
+      create: { name: MC2_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
+      update: {},
+    });
+    mc2ClassId = cls.id;
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: MC2_ID } });
+    await prisma.characterClass.deleteMany({ where: { name: MC2_CLASS_NAME } });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MC2_ID } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+  });
+
+  // Fighter (primary) + Warrior of Shadow monk (secondary) at total level 8.
+  async function createFighterMonkMC(monkLevel: number) {
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MC2_ID,
+        experiencePoints: 34000, // total level 8
+        ownerId: OWNER_ID,
+        resources: Prisma.JsonNull,
+        classEntries: {
+          create: [
+            { name: "fighter", subclass: null, classId: mc2ClassId, level: 8 - monkLevel, position: 0 },
+            { name: "monk", subclass: "warrior of shadow", classId: mc2ClassId, level: monkLevel, position: 1 },
+          ],
+        },
+      },
+    });
+  }
+
+  it("a SECONDARY Warrior of Shadow monk (L3) surfaces shadowArts; the PRIMARY Fighter's own actions still surface too", async () => {
+    await createFighterMonkMC(3);
+    const res = await agent().get(`/api/characters/${MC2_ID}`);
+    expect(res.status).toBe(200);
+    const keys = (res.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(keys).toContain("shadowArts");
+    // cloakOfShadows needs monk entry level 17 — nowhere near reached at 3.
+    expect(keys).not.toContain("cloakOfShadows");
+    expect(keys).toContain("secondWind");
+  });
+
+  it("a SECONDARY monk below L3 does not surface shadowArts, even though total character level is 8", async () => {
+    await createFighterMonkMC(2);
+    const res = await agent().get(`/api/characters/${MC2_ID}`);
+    expect(res.status).toBe(200);
+    const keys = (res.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(keys).not.toContain("shadowArts");
+  });
+});
+
 // Concentration clamp-on-read: the shadow-art: prefix is what keeps a Shadow Art's
-// concentration alive, NOT a blanket "shadowArtsAvailable" pass. A multiclass Warrior
+// concentration alive, NOT a blanket subclass-availability pass. A multiclass Warrior
 // of Shadow monk who forgets the spellbook spell they were concentrating on must drop it.
 describe("resolveConcentration clamp for multiclass Warrior of Shadow", () => {
   const MC_ID = "test-shadow-mc-stale-1";

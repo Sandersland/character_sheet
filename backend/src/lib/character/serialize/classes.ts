@@ -7,7 +7,7 @@ import {
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
-import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
+import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -19,24 +19,27 @@ export type PrimaryClass = CharacterWithRelations["classEntries"][number] | unde
 
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
 // layer stored `used` counts and known lists (clamped to caps). Returns the
-// resources view (undefined for classes with no pools). Fighting Style is a feat
-// now (#1137) — surfaced via top-level fightingStyleSlots + advancements, not here.
-// The choice-cap fields are entry-scoped (#1177) via deriveEntryScopedResources —
-// mirrors loadResourcesReconcileState (level-reconciliation.ts) so both sides
-// compute the legal limit through the one shared rule function.
+// resources view (undefined for classes with no pools) plus the raw
+// maneuverSaveDC number — serializeCharacter folds it into the top-level
+// `maneuvers` rider (#1316), so it isn't part of the resources payload.
+// Fighting Style is a feat now (#1137) — surfaced via top-level
+// fightingStyleSlots + advancements, not here. The choice-cap fields are
+// entry-scoped (#1177) via deriveEntryScopedResources — mirrors
+// loadResourcesReconcileState (level-reconciliation.ts) so both sides compute
+// the legal limit through the one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined } {
+): { resources: object | undefined; maneuverSaveDC: number | undefined } {
   const { derived: derivedRes } = deriveEntryScopedResources(row.classEntries, level, abilityScores, proficiencyBonus, editionOf(row));
 
   const resources = derivedRes
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
     : undefined;
 
-  return { resources };
+  return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC };
 }
 
 // Assemble the wire `resources` payload from the derived caps + stored mutable
@@ -63,12 +66,7 @@ function buildResourcesPayload(
   return {
     features: derivedRes.features,
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
-    maneuverSaveDC: derivedRes.maneuverSaveDC,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
-    elementalAttunementAvailable: derivedRes.elementalAttunementAvailable,
-    elementalBurstAvailable: derivedRes.elementalBurstAvailable,
-    shadowArtsAvailable: derivedRes.shadowArtsAvailable,
-    cloakOfShadowsAvailable: derivedRes.cloakOfShadowsAvailable,
     pools: derivedRes.resources.map((pool) => ({
       key: pool.key,
       label: pool.label,
@@ -162,12 +160,14 @@ export function applyFeatLayer(
   return { featBonuses, effectiveMaxHp, featProficiencies };
 }
 
-// Class-specific available actions for the turn tracker — derived from
-// class/subclass/level + current resource pools. Universal actions are
-// rendered client-side from UNIVERSAL_ACTIONS;
+// Class-specific available actions for the turn tracker — derived from EVERY
+// class entry at its own effective level (#1206/#1315), not just the primary
+// entry at total level, so a secondary class's gated actions (e.g. a Warrior
+// of Shadow monk's shadowArts/cloakOfShadows) surface even when it isn't
+// primary. Universal actions are rendered client-side from UNIVERSAL_ACTIONS;
 // only class-specific ones live here to avoid double-rendering.
 export function buildAvailableActionsView(
-  primaryClass: PrimaryClass,
+  classEntries: CharacterWithRelations["classEntries"],
   level: number,
   resources: object | undefined,
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218) —
@@ -178,13 +178,7 @@ export function buildAvailableActionsView(
     resources && "pools" in resources
       ? (resources as { pools: { key: string; remaining: number }[] }).pools
       : [];
-  return deriveActions(
-    primaryClass?.name ?? "",
-    primaryClass?.subclass ?? undefined,
-    level,
-    pools,
-    unarmoredUnshielded,
-  );
+  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded);
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

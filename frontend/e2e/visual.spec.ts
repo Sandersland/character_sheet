@@ -9,6 +9,7 @@ import {
   learnSpells,
   uniqueName,
 } from "./helpers/api";
+import { passEntryGate } from "./helpers/creation";
 
 // Visual regression baselines for the key screens. Baselines live in
 // e2e/__screenshots__/ (checked in) and are regenerated with
@@ -189,6 +190,9 @@ test("visual: creation ceremony — steps", async ({ page }) => {
 
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
+  // #1286: the entry gate (campaign/edition) sits ahead of the ceremony now —
+  // accept its Solo + 2024 defaults before the Identity step ever renders.
+  await passEntryGate(page);
   // The ceremony (#1176) opens on the Identity step behind the dark stage.
   await expect(page.getByLabel(/^Name/)).toBeVisible();
   await ready(page);

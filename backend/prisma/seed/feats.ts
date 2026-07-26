@@ -5,6 +5,8 @@
 // Improvement is NOT seeded — it stays the takeAsi advancement branch.
 // Deeper per-feat mechanics are surfaced as description text, not automated.
 
+import type { SeedEdition } from "./edition.js";
+
 // Local (unexported) mirror of the backend FeatCategory (lib/srd/feats.ts) and
 // frontend FeatCategory (types/character/leveling.ts) — three copies because the
 // seed can't import from @/lib/ (tsx alias) or the frontend; update all three together.
@@ -28,18 +30,34 @@ export interface FeatSeed {
   abilityOptions?: string[];
   abilityIncrease?: number;
   improvements?: FeatImprovement[];
+  // Omitted = shared (NULL column, valid in both editions, #1306). Only a feat
+  // that mechanically diverges between editions sets this.
+  edition?: SeedEdition;
 }
 
 const ALL_ABILITIES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"];
 
 export const FEATS: FeatSeed[] = [
   // ── Origin feats (SRD 5.2.1 + PHB'24) — no level prerequisite ──────────────
+  // Alert forks by edition (#1306 worked example — SRD 5.2 vs PHB'14 p.165):
+  // 2024 scales the initiative bonus with Proficiency Bonus and adds the
+  // initiative-swap option; 2014 is a flat +5 with no swap. Two rows sharing
+  // the name "Alert", resolved by resolveEditionRow.
   {
     name: "Alert",
     description:
       "You gain a bonus to Initiative rolls equal to your Proficiency Bonus. Immediately after rolling Initiative you can swap your Initiative with a willing ally in the same combat (not if either of you is Incapacitated).",
     category: "origin",
     improvements: [{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }],
+    edition: "EDITION_2024",
+  },
+  {
+    name: "Alert",
+    description:
+      "You gain a +5 bonus to initiative. You can't be surprised while you are conscious. Other creatures don't gain advantage on attack rolls against you as a result of being unseen by you.",
+    category: "origin",
+    improvements: [{ target: "initiative", amount: 5 }],
+    edition: "EDITION_2014",
   },
   {
     name: "Magic Initiate",

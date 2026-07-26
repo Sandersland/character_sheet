@@ -5,6 +5,7 @@ import { createApp } from "@/app.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 /**
  * The #1285 acceptance test: one rule (`subclassGateLevel`) resolved through the
@@ -77,11 +78,12 @@ beforeAll(async () => {
   });
   classId = cls.id;
 
-  const sub = await prisma.subclass.upsert({
-    where: { classId_name: { classId, name: SUBCLASS_NAME } },
-    update: {},
-    create: { classId, name: SUBCLASS_NAME, description: "Seam fixture." },
-  });
+  const sub = await upsertEditionRow(
+    prisma.subclass,
+    { classId, name: SUBCLASS_NAME, edition: null },
+    { classId, name: SUBCLASS_NAME, description: "Seam fixture." },
+    {},
+  );
   subclassId = sub.id;
 });
 

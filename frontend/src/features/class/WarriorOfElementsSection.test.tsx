@@ -12,6 +12,7 @@ function makeCharacter(over?: {
   burstAvailable?: boolean;
 }): Character {
   const focusRemaining = over?.focusRemaining ?? 6;
+  const burstAvailable = over?.burstAvailable ?? true;
   return {
     id: "char-1",
     unarmedStrike: { damage: { count: 1, faces: 8 } },
@@ -21,9 +22,11 @@ function makeCharacter(over?: {
       pools: [{ key: "focus", label: "Focus", total: 6, recharge: "shortRest", used: 6 - focusRemaining, remaining: focusRemaining }],
       maneuversKnown: [],
       toolProficienciesKnown: [],
-      elementalAttunementAvailable: true,
-      elementalBurstAvailable: over?.burstAvailable ?? true,
     },
+    // elementalBurst entitlement is availableActions[] presence (#1315), not a resources boolean.
+    availableActions: burstAvailable
+      ? [{ key: "elementalBurst", name: "Elemental Burst", cost: "action", enabled: true }]
+      : [],
   } as unknown as Character;
 }
 
@@ -74,7 +77,7 @@ describe("WarriorOfElementsSection", () => {
     expect(roll).toBeLessThanOrEqual(24);
   });
 
-  it("hides Elemental Burst below level 6 (elementalBurstAvailable falsey)", () => {
+  it("hides Elemental Burst below level 6 (absent from availableActions)", () => {
     const onOperations = vi.fn();
     render(makeCharacter({ burstAvailable: false }), onOperations);
     expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();

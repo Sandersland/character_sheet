@@ -70,9 +70,46 @@ describe("CampaignsPage (#246)", () => {
     await user.type(screen.getByLabelText(/campaign name/i), "New Campaign");
     await user.click(screen.getByRole("button", { name: /create campaign/i }));
 
-    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("New Campaign");
+    // Edition defaults to 2024 (schema default) without the DM touching the picker.
+    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("New Campaign", "EDITION_2024");
     await waitFor(() => expect(vi.mocked(client.fetchCampaigns)).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("link", { name: /new campaign/i })).toBeInTheDocument();
+  });
+
+  it("sends the picked edition when the DM chooses 2014 (#1286)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaigns).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    vi.mocked(client.createCampaign).mockResolvedValue(makeCampaign({ rulesEdition: "EDITION_2014" }));
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no campaigns yet/i);
+    await user.type(screen.getByLabelText(/campaign name/i), "Classic Table");
+    await user.click(screen.getByRole("radio", { name: "2014 rules" }));
+    await user.click(screen.getByRole("button", { name: /create campaign/i }));
+
+    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("Classic Table", "EDITION_2014");
+  });
+
+  // #1286: there is no PATCH /campaigns/:id — the edition is immutable from the
+  // moment of creation, not just "until the first character joins" (that copy
+  // implied an editing window that doesn't exist).
+  it("states the edition is fixed at creation, not editable-until-first-join", async () => {
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no campaigns yet/i);
+    expect(screen.getByText(/can't be changed after the campaign is created/i)).toBeInTheDocument();
+    expect(screen.queryByText(/once the first character joins/i)).not.toBeInTheDocument();
   });
 
   it("does not render a join-by-code form", async () => {
