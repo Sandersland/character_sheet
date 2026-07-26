@@ -1,13 +1,10 @@
 // Roll-event wire type (#1235) — the single cross-tier shape for the `data`
 // JSON persisted on a roll-category CharacterEvent (POST .../sessions/:id/roll).
-// Frontend's useRollLogger/api/session.ts and backend's parseRollInput/
-// logRollEvent both read/write this same shape instead of hand-mirroring it
-// (epic #820) — it is BOTH the request payload and the persisted `data` column,
-// since the column is free-form JSON with no schema of its own.
-//
-// Additive-only: every field beyond the original five (kind/source/total) is
-// optional, so pre-#1235 events (and rolls that don't carry the new data, e.g.
-// a bare check/save) still parse under this type.
+// useRollLogger/logRoll and parseRollInput/logRollEvent all read/write this
+// shape instead of hand-mirroring it (epic #820); it doubles as the request
+// payload AND the persisted `data` column (free-form JSON, no schema of its
+// own). Additive-only: every field beyond the original five is optional, so
+// pre-#1235 events still parse under this type.
 
 /** The five roll-log categories over the session-roll route. */
 export type RollEventKind = "attack" | "damage" | "check" | "save" | "initiative";
@@ -16,20 +13,18 @@ export type RollEventMode = "normal" | "advantage" | "disadvantage";
 
 /**
  * Hit/miss/crit call for an attack roll, threaded from the turn-state tally
- * (attackTallySummary.ts's TallyVerdict): nat-20/nat-1 auto-verdict, otherwise
- * player-called via "Call it". Never computed against a target's AC — the
- * engine has no enemy/target model (self-or-announce, CLAUDE.md).
+ * (mirrors `TallyVerdict`): nat-20/nat-1 auto-verdict, otherwise player-called
+ * via "Call it". Never computed against a target's AC — the engine has no
+ * enemy/target model (self-or-announce, CLAUDE.md).
  */
 export type RollEventVerdict = "hit" | "miss" | "crit";
 
 /**
  * One provenance-labeled source contributing advantage/disadvantage or a flat
  * modifier to a d20 roll (mirrors frontend's `RollModifier` / backend's
- * `lib/srd/roll-effects.ts` `RollEffect & { source }`, kept structural here
- * rather than imported so this package stays free of that pre-existing,
- * out-of-scope mirror). Persisted as structure, NOT the formatted "why" chip
- * string (`rollModeChip`) — wording can change; a durable log entry shouldn't
- * freeze it.
+ * `RollEffect & { source }`, kept structural here rather than imported so this
+ * package stays free of that mirror). Persisted as structure, not the
+ * formatted "why" chip string — wording can change; a log entry shouldn't freeze it.
  */
 export interface RollEventModeSource {
   mode: "advantage" | "disadvantage" | "flat";
@@ -64,12 +59,9 @@ export interface RollEventDamageComponents {
 
 /**
  * `data` on a roll-category `CharacterEvent` (`POST .../sessions/:sessionId/roll`).
- *
- * `target`/`outcome` are RESERVED for a future per-swing "Goblin hit / dropped"
- * annotation (#1235) — infra only. No producer populates them today, and none
- * should until an actual target/outcome feature is built: the engine has no
- * enemy/target model, and building one is an explicit product non-goal
- * (self-or-announce, CLAUDE.md). Leave them unset.
+ * `target`/`outcome` are RESERVED for a future per-swing "Goblin hit/dropped"
+ * annotation — no producer populates them; the engine has no enemy/target
+ * model and building one is an explicit non-goal (self-or-announce, CLAUDE.md).
  */
 export interface RollEventData {
   kind: RollEventKind;
@@ -96,13 +88,21 @@ export interface RollEventData {
    * or "dedupe" the two ids; they answer different questions.
    */
   swingId?: string;
-  /** Attack rolls only — see `RollEventVerdict`. */
+  /**
+   * Set on attack rolls (auto nat-20/nat-1, else player-called) and on damage
+   * rolls (an unset verdict resolves to "hit" the moment damage lands) — see
+   * `RollEventVerdict`.
+   */
   verdict?: RollEventVerdict;
   /** True natural 20 kept on the d20 (attack rolls only). */
   nat20?: boolean;
   /** True natural 1 kept on the d20 (attack rolls only). */
   nat1?: boolean;
-  /** Effective crit (nat20 OR a manual "Crit!" call) — drives damage-dice doubling. */
+  /**
+   * Attack rolls: the nat-20 fact only — a manual "Crit!" call hasn't happened
+   * yet at attack-roll time. Damage rolls: the EFFECTIVE crit (nat20 OR a
+   * manual call) that decided whether this roll's dice were doubled.
+   */
   crit?: boolean;
   /** Structured advantage/disadvantage/flat-modifier sources (attack rolls only). */
   modeSources?: RollEventModeSource[];

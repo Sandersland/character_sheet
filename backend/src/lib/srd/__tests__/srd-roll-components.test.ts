@@ -42,43 +42,72 @@ const rapier = {
 const martialGrant = [{ name: "Martial Weapons" }];
 const noGrants: { name: string }[] = [];
 
-// The single most important property in #1235: decomposing the to-hit math into
-// components must NEVER change the sum deriveWeaponAttackBonus already returns —
-// that sum is what the sheet shows today, and this refactor's whole risk is
-// silently drifting it. Every case below re-derives the same total two ways.
-describe("deriveWeaponAttackComponents — sums to the existing deriveWeaponAttackBonus value", () => {
+// Expected values below are hand-derived from the 5e rule (STR +3 / DEX +2 /
+// proficiencyBonus 3), NOT computed by calling either function under test —
+// deriveWeaponAttackBonus delegates to deriveWeaponAttackComponents, so
+// comparing the components' sum against deriveWeaponAttackBonus's own return
+// is a tautology (proven by mutation: zeroing the Archery bonus rule left a
+// prior version of this suite fully green). Each case is checked against
+// literal numbers so a rule regression actually fails the test.
+describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => {
   const cases: Array<{
     label: string;
     weapon: typeof longsword | typeof longbow | typeof rapier;
     grants: { name: string }[];
     rangedBonus?: number;
     attackRollBonus?: number;
+    expected: { abilityMod: number; proficiencyBonus: number; rangedBonus: number; attackRollBonus: number };
   }> = [
-    { label: "proficient melee", weapon: longsword, grants: martialGrant },
-    { label: "non-proficient melee", weapon: longsword, grants: noGrants },
-    { label: "ranged with Archery fighting-style bonus", weapon: longbow, grants: martialGrant, rangedBonus: 2 },
-    { label: "ranged without the bonus", weapon: longbow, grants: martialGrant },
-    { label: "finesse weapon (uses higher of STR/DEX)", weapon: rapier, grants: martialGrant },
-    { label: "attack-roll buff active (Sacred Weapon)", weapon: longsword, grants: martialGrant, attackRollBonus: 3 },
+    {
+      label: "proficient melee",
+      weapon: longsword,
+      grants: martialGrant,
+      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+    },
+    {
+      label: "non-proficient melee",
+      weapon: longsword,
+      grants: noGrants,
+      expected: { abilityMod: 3, proficiencyBonus: 0, rangedBonus: 0, attackRollBonus: 0 },
+    },
+    {
+      label: "ranged with Archery fighting-style bonus",
+      weapon: longbow,
+      grants: martialGrant,
+      rangedBonus: 2,
+      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 2, attackRollBonus: 0 },
+    },
+    {
+      label: "ranged without the bonus",
+      weapon: longbow,
+      grants: martialGrant,
+      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+    },
+    {
+      label: "finesse weapon (uses higher of STR/DEX)",
+      weapon: rapier,
+      grants: martialGrant,
+      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+    },
+    {
+      label: "attack-roll buff active (Sacred Weapon)",
+      weapon: longsword,
+      grants: martialGrant,
+      attackRollBonus: 3,
+      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 3 },
+    },
     {
       label: "proficient + ranged bonus + attack-roll buff stacked",
       weapon: longbow,
       grants: martialGrant,
       rangedBonus: 2,
       attackRollBonus: 1,
+      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 2, attackRollBonus: 1 },
     },
   ];
 
-  it.each(cases)("$label", ({ weapon, grants, rangedBonus, attackRollBonus }) => {
+  it.each(cases)("$label", ({ weapon, grants, rangedBonus, attackRollBonus, expected }) => {
     const proficiencyBonus = 3;
-    const expectedTotal = deriveWeaponAttackBonus(
-      weapon,
-      scores,
-      proficiencyBonus,
-      grants,
-      rangedBonus,
-      attackRollBonus,
-    );
     const components = deriveWeaponAttackComponents(
       weapon,
       scores,
@@ -87,9 +116,15 @@ describe("deriveWeaponAttackComponents — sums to the existing deriveWeaponAtta
       rangedBonus,
       attackRollBonus,
     );
-    expect(components.abilityMod + components.proficiencyBonus + components.rangedBonus + components.attackRollBonus).toBe(
-      expectedTotal,
-    );
+    expect(components).toEqual(expected);
+
+    // Also confirm the sum still matches deriveWeaponAttackBonus's own return —
+    // this alone is the tautological check the mutation defeated, so it stays
+    // as a NO-DRIFT regression guard alongside (never instead of) the literals above.
+    const expectedTotal = expected.abilityMod + expected.proficiencyBonus + expected.rangedBonus + expected.attackRollBonus;
+    expect(
+      deriveWeaponAttackBonus(weapon, scores, proficiencyBonus, grants, rangedBonus, attackRollBonus),
+    ).toBe(expectedTotal);
   });
 
   it("zeroes proficiencyBonus (not just omits it) when not proficient", () => {
@@ -121,7 +156,7 @@ describe("deriveWeaponDamage — meleeDamageBonus component sums to damageModifi
     expect(d.abilityModifier + d.meleeDamageBonus).toBe(d.damageModifier);
   });
 
-  it("finesse melee weapon, versatile two-handed grip, no buff", () => {
+  it("melee weapon, versatile two-handed grip, no buff", () => {
     const d = deriveWeaponDamage(longsword, false, scores);
     expect(d.grip).toBe("versatile-two-handed");
     expect(d.meleeDamageBonus).toBe(0);

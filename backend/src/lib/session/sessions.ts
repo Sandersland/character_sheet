@@ -429,9 +429,8 @@ const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
   combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
 };
 
-// Aliased (not redeclared) from the shared wire type (#1235/#820) — RollInput/
-// LogRollParams keep these short local names since they're used throughout
-// this file and session-route-helpers.ts.
+// Aliased (not redeclared) from the shared wire type (#1235/#820) — kept as
+// short local names because both RollInput and LogRollParams use them.
 export type RollKind = RollEventKind;
 export type RollMode = RollEventMode;
 
@@ -499,6 +498,33 @@ export async function logRollEvent(
   } = params;
   const batchId = randomUUID();
 
+  // Hoisted out of the transaction call so the `??` chain (one per optional
+  // wire field) doesn't count toward $transaction's callback's cyclomatic
+  // complexity — the backend CI health step ratchets that ceiling (#1235).
+  // target/outcome are NEVER written here — see LogRollParams' comment
+  // (#1235 reserves them on the wire type for a future target/outcome
+  // feature; the engine has no enemy/target model to populate them from).
+  const rollData = {
+    kind,
+    source,
+    total,
+    specLabel: specLabel ?? null,
+    damageType: damageType ?? null,
+    faces: faces ?? null,
+    ability: ability ?? null,
+    skill: skill ?? null,
+    dc: dc ?? null,
+    rollMode: rollMode ?? null,
+    swingId: swingId ?? null,
+    verdict: verdict ?? null,
+    nat20: nat20 ?? null,
+    nat1: nat1 ?? null,
+    crit: crit ?? null,
+    modeSources: modeSources ?? null,
+    attackComponents: attackComponents ?? null,
+    damageComponents: damageComponents ?? null,
+  };
+
   return prisma.$transaction(async (tx) => {
     await logEvent(tx, {
       characterId,
@@ -507,29 +533,7 @@ export async function logRollEvent(
       summary: buildRollSummary(params),
       batchId,
       sessionId,
-      // target/outcome are NEVER written here — see LogRollParams' comment
-      // (#1235 reserves them on the wire type for a future target/outcome
-      // feature; the engine has no enemy/target model to populate them from).
-      data: {
-        kind,
-        source,
-        total,
-        specLabel: specLabel ?? null,
-        damageType: damageType ?? null,
-        faces: faces ?? null,
-        ability: ability ?? null,
-        skill: skill ?? null,
-        dc: dc ?? null,
-        rollMode: rollMode ?? null,
-        swingId: swingId ?? null,
-        verdict: verdict ?? null,
-        nat20: nat20 ?? null,
-        nat1: nat1 ?? null,
-        crit: crit ?? null,
-        modeSources: modeSources ?? null,
-        attackComponents: attackComponents ?? null,
-        damageComponents: damageComponents ?? null,
-      },
+      data: rollData,
     });
   });
 }

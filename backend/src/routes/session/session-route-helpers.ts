@@ -40,25 +40,39 @@ const VALID_VERDICTS: RollEventVerdict[] = ["hit", "miss", "crit"];
 
 // Nested #1235 objects validated via zod (permitted for new nested fields only —
 // see CLAUDE.md/#1235: the existing flat-field ROLL_CHECKS style stays hand-rolled).
-const modeSourceSchema = z.object({
-  mode: z.enum(["advantage", "disadvantage", "flat"]),
-  kind: z.enum(["attack", "check", "save", "initiative"]),
-  ability: z.string().optional(),
-  modifier: z.number().finite().optional(),
-  source: z.string(),
-});
+// `.strict()` rejects unknown keys — these persist verbatim into a durable,
+// write-once, non-undoable event log, so an attacker-supplied extra key (or
+// script payload) must 400, not ride along. `source`'s .max(200) bounds the
+// free-text "why" label (e.g. "Poisoned", "Bless") well above any real one.
+const modeSourceSchema = z
+  .object({
+    mode: z.enum(["advantage", "disadvantage", "flat"]),
+    kind: z.enum(["attack", "check", "save", "initiative"]),
+    ability: z.string().optional(),
+    modifier: z.number().finite().optional(),
+    source: z.string().max(200),
+  })
+  .strict();
 
-const attackComponentsSchema = z.object({
-  abilityMod: z.number().finite(),
-  proficiencyBonus: z.number().finite(),
-  rangedBonus: z.number().finite(),
-  attackRollBonus: z.number().finite(),
-});
+// A swing rarely stacks more than a couple of advantage/disadvantage/flat
+// sources; 20 is generous headroom while still bounding event-log size.
+const modeSourcesSchema = z.array(modeSourceSchema).max(20);
 
-const damageComponentsSchema = z.object({
-  abilityMod: z.number().finite(),
-  meleeDamageBonus: z.number().finite(),
-});
+const attackComponentsSchema = z
+  .object({
+    abilityMod: z.number().finite(),
+    proficiencyBonus: z.number().finite(),
+    rangedBonus: z.number().finite(),
+    attackRollBonus: z.number().finite(),
+  })
+  .strict();
+
+const damageComponentsSchema = z
+  .object({
+    abilityMod: z.number().finite(),
+    meleeDamageBonus: z.number().finite(),
+  })
+  .strict();
 
 interface RollBody {
   kind?: unknown;
@@ -106,8 +120,12 @@ const ROLL_CHECKS: { ok: (b: RollBody) => boolean; error: string }[] = [
     error: `rollMode must be one of ${VALID_MODES.join(", ")}`,
   },
   {
-    ok: (b) => b.swingId === undefined || (typeof b.swingId === "string" && b.swingId.trim() !== ""),
-    error: "swingId must be a non-empty string",
+    // Client-generated (crypto.randomUUID, ~36 chars) — 100 is generous
+    // headroom while still bounding what an attacker can stuff into the log.
+    ok: (b) =>
+      b.swingId === undefined ||
+      (typeof b.swingId === "string" && b.swingId.trim() !== "" && b.swingId.length <= 100),
+    error: "swingId must be a non-empty string of at most 100 characters",
   },
   {
     ok: (b) => b.verdict === undefined || VALID_VERDICTS.includes(b.verdict as RollEventVerdict),
@@ -117,10 +135,8 @@ const ROLL_CHECKS: { ok: (b: RollBody) => boolean; error: string }[] = [
   { ok: (b) => b.nat1 === undefined || typeof b.nat1 === "boolean", error: "nat1 must be a boolean" },
   { ok: (b) => b.crit === undefined || typeof b.crit === "boolean", error: "crit must be a boolean" },
   {
-    ok: (b) =>
-      b.modeSources === undefined ||
-      (Array.isArray(b.modeSources) && b.modeSources.every((m) => modeSourceSchema.safeParse(m).success)),
-    error: "modeSources must be an array of valid roll-mode source objects",
+    ok: (b) => b.modeSources === undefined || modeSourcesSchema.safeParse(b.modeSources).success,
+    error: "modeSources must be an array of at most 20 valid roll-mode source objects",
   },
   {
     ok: (b) => b.attackComponents === undefined || attackComponentsSchema.safeParse(b.attackComponents).success,
@@ -168,9 +184,15 @@ export function parseRollInput(req: Request, res: Response): RollInput | null {
     nat20: typeof b.nat20 === "boolean" ? b.nat20 : undefined,
     nat1: typeof b.nat1 === "boolean" ? b.nat1 : undefined,
     crit: typeof b.crit === "boolean" ? b.crit : undefined,
-    modeSources: Array.isArray(b.modeSources) ? (b.modeSources as RollEventModeSource[]) : undefined,
-    attackComponents: b.attackComponents as RollEventAttackComponents | undefined,
-    damageComponents: b.damageComponents as RollEventDamageComponents | undefined,
+    // Persist the SAFEPARSE'd values, never the raw body — ROLL_CHECKS already
+    // proved these parse (we're past the `failed` check above), so `.data` is
+    // defined; this is what actually strips unknown/oversized keys before
+    // they reach the durable event log, not just the boolean gate.
+    modeSources: b.modeSources === undefined ? undefined : modeSourcesSchema.safeParse(b.modeSources).data,
+    attackComponents:
+      b.attackComponents === undefined ? undefined : attackComponentsSchema.safeParse(b.attackComponents).data,
+    damageComponents:
+      b.damageComponents === undefined ? undefined : damageComponentsSchema.safeParse(b.damageComponents).data,
     // target/outcome: never read from `b` — see RollInput's comment (#1235).
   };
 }

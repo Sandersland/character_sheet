@@ -181,9 +181,9 @@ export async function advanceCombatRound(
 
 /**
  * Log a single roll from the session UI. Best-effort — callers catch and
- * console.error. `payload` is `RollEventData` (packages/shared-types) — the
- * single cross-tier shape for this route's request body AND the persisted
- * event `data` (#1235); see that type for the field-by-field contract.
+ * console.error. `payload` is `RollEventData`, the single cross-tier shape for
+ * this route's request body AND the persisted event `data` (#1235); see that
+ * type for the field-by-field contract.
  */
 export async function logRoll(
   characterId: string,

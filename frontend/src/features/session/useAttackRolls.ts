@@ -146,11 +146,20 @@ export function useAttackRolls({
   // replaces the current tally row's damage slot (never appends) — which also
   // resolves an unset verdict to hit (#811, implicit hit).
   function handleDamage(entry: AttackEntry) {
-    const spec = isRowCrit(entry.id) ? critDamageSpec(entry.damageSpec) : entry.damageSpec;
+    const rowCrit = isRowCrit(entry.id);
+    const spec = rowCrit ? critDamageSpec(entry.damageSpec) : entry.damageSpec;
     const result = roll(spec, entry.damageRollLabel);
     logRollSafe("damage", entry.logSource, result, spec, entry.damageType, {
       // Shares the attack's swingId (#1235) — same swing, two roll events.
       swingId: swingIdRef.current[entry.id],
+      // withAutoHit's rule ("rolling damage is an implicit hit call", #811)
+      // reproduced here synchronously so the damage event carries a verdict
+      // even when the attack roll didn't auto-resolve one (#1235).
+      verdict: currentRow?.verdict ?? "hit",
+      // The row's actual crit state at damage time (nat20 or a manual "Crit!"
+      // call) — see RollEventData's `crit` doc for why this differs from the
+      // attack event's nat20-only value.
+      crit: rowCrit,
       damageComponents: entry.damageComponents,
     });
     setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));

@@ -250,4 +250,99 @@ describe("parseRollInput — #1235 combat-log fields", () => {
     expect(roll).not.toHaveProperty("target");
     expect(roll).not.toHaveProperty("outcome");
   });
+
+  // Nested #1235 objects persist verbatim into a durable, write-once,
+  // non-undoable event log — an unknown/oversized key must 400, never ride along.
+  it("400s on a modeSources entry carrying an unknown key (e.g. an injected script payload)", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(
+        reqWith({
+          ...valid,
+          modeSources: [{ ...modeSource, evil: "<script>alert(1)</script>" }],
+        }),
+        res as unknown as Response,
+      ),
+    ).toBeNull();
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("400s on an unknown key in attackComponents", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(
+        reqWith({ ...valid, attackComponents: { ...attackComponents, extra: "nope" } }),
+        res as unknown as Response,
+      ),
+    ).toBeNull();
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("400s on an unknown key in damageComponents", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(
+        reqWith({ ...valid, damageComponents: { ...damageComponents, extra: "nope" } }),
+        res as unknown as Response,
+      ),
+    ).toBeNull();
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("400s on a swingId over 100 characters", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(reqWith({ ...valid, swingId: "s".repeat(101) }), res as unknown as Response),
+    ).toBeNull();
+    expect(res.body).toEqual({ error: "swingId must be a non-empty string of at most 100 characters" });
+  });
+
+  it("accepts a swingId at exactly the 100-character bound", () => {
+    const res = mockRes();
+    const roll = parseRollInput(reqWith({ ...valid, swingId: "s".repeat(100) }), res as unknown as Response);
+    expect(res.statusCode).toBeUndefined();
+    expect(roll?.swingId).toHaveLength(100);
+  });
+
+  it("400s on a modeSources array over 20 entries", () => {
+    const res = mockRes();
+    const tooMany = Array.from({ length: 21 }, () => modeSource);
+    expect(
+      parseRollInput(reqWith({ ...valid, modeSources: tooMany }), res as unknown as Response),
+    ).toBeNull();
+    expect(res.body).toEqual({ error: "modeSources must be an array of at most 20 valid roll-mode source objects" });
+  });
+
+  it("accepts a modeSources array at exactly the 20-entry bound", () => {
+    const res = mockRes();
+    const exactlyTwenty = Array.from({ length: 20 }, () => modeSource);
+    const roll = parseRollInput(reqWith({ ...valid, modeSources: exactlyTwenty }), res as unknown as Response);
+    expect(res.statusCode).toBeUndefined();
+    expect(roll?.modeSources).toHaveLength(20);
+  });
+
+  it("400s on a modeSources entry's source string over 200 characters", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(
+        reqWith({ ...valid, modeSources: [{ ...modeSource, source: "x".repeat(201) }] }),
+        res as unknown as Response,
+      ),
+    ).toBeNull();
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("persists the SAFEPARSE'd object, not the raw body — unknown keys never survive even on an otherwise-valid nested object", () => {
+    const res = mockRes();
+    const roll = parseRollInput(
+      reqWith({ ...valid, attackComponents, damageComponents, modeSources: [modeSource] }),
+      res as unknown as Response,
+    );
+    expect(res.statusCode).toBeUndefined();
+    expect(Object.keys(roll?.attackComponents ?? {}).sort()).toEqual(
+      ["abilityMod", "attackRollBonus", "proficiencyBonus", "rangedBonus"],
+    );
+    expect(Object.keys(roll?.damageComponents ?? {}).sort()).toEqual(["abilityMod", "meleeDamageBonus"]);
+    expect(Object.keys(roll?.modeSources?.[0] ?? {}).sort()).toEqual(["kind", "mode", "source"]);
+  });
 });

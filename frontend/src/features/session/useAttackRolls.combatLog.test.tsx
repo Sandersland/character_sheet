@@ -8,6 +8,7 @@ import { renderHook } from "@testing-library/react";
 
 import { RollProvider } from "@/features/dice/RollContext";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
+import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { AttackEntry } from "@/lib/attackMath";
 import type { RollResult } from "@/lib/dice";
 
@@ -37,7 +38,11 @@ function rollReturning(die: number) {
   return vi.fn((spec): RollResult => ({ dice: [{ value: die, dropped: false }], modifier: spec.modifier ?? 0, total: die + (spec.modifier ?? 0), spec }));
 }
 
-function setup(roll: ReturnType<typeof rollReturning>, logRollSafe = vi.fn()) {
+function setup(
+  roll: ReturnType<typeof rollReturning>,
+  logRollSafe = vi.fn(),
+  currentRow: AttackTallyRow | null = null,
+) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <RollProvider characterId="c1" sessionId="s1" rollModifiers={[]}>
       {children}
@@ -52,7 +57,7 @@ function setup(roll: ReturnType<typeof rollReturning>, logRollSafe = vi.fn()) {
         setTallyDamage: vi.fn(),
         setTallyAttackTotal: vi.fn(),
         addTallyDamageRider: vi.fn(),
-        currentRow: null,
+        currentRow,
       }),
     { wrapper },
   );
@@ -123,6 +128,38 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
 
     const damageExtra = logRollSafe.mock.calls[1][5];
     expect(damageExtra.damageComponents).toEqual(longsword.damageComponents);
+  });
+
+  it("carries verdict='hit' on the damage roll when the tally row's verdict is unset (#1235 implicit hit)", () => {
+    const row: AttackTallyRow = {
+      id: "row-1",
+      source: "action",
+      formId: longsword.id,
+      formName: longsword.name,
+      attack: { total: 15, keptFace: 12, nat20: false, nat1: false },
+    };
+    const { result, logRollSafe } = setup(rollReturning(10), vi.fn(), row);
+    result.current.viewFor(longsword).onDamage();
+
+    const damageExtra = logRollSafe.mock.calls[0][5];
+    expect(damageExtra.verdict).toBe("hit");
+  });
+
+  it("carries the tally row's own verdict on the damage roll when one was already set", () => {
+    const row: AttackTallyRow = {
+      id: "row-1",
+      source: "action",
+      formId: longsword.id,
+      formName: longsword.name,
+      attack: { total: 20, keptFace: 20, nat20: true, nat1: false },
+      verdict: "crit",
+    };
+    const { result, logRollSafe } = setup(rollReturning(10), vi.fn(), row);
+    result.current.viewFor(longsword).onDamage();
+
+    const damageExtra = logRollSafe.mock.calls[0][5];
+    expect(damageExtra.verdict).toBe("crit");
+    expect(damageExtra.crit).toBe(true);
   });
 
   it("gives two different entries' swings distinct swingIds", () => {

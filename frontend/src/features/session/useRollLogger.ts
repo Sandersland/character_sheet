@@ -27,7 +27,7 @@ type RollLogKind = "attack" | "damage";
  * caller (spells, tally-resolve maneuvers) can keep calling logRollSafe with
  * just the original five args. Only useAttackRolls populates this today.
  */
-export interface RollLogExtra {
+interface RollLogExtra {
   swingId?: string;
   verdict?: RollEventVerdict;
   nat20?: boolean;
