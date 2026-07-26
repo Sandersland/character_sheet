@@ -29,9 +29,6 @@ describe("exhaustionSpeedPenalty — 2014 (PHB'14 p. 291)", () => {
   });
 
   it("levels 2-4: subtracts ceil(currentSpeed/2), so the RESULT (currentSpeed − penalty) is floor(currentSpeed/2) — half, rounded down, matching Prone's round-down convention", () => {
-    // Odd current speed (25, Hill Dwarf-shaped): ceil(25/2)=13 subtracted →
-    // result 12 = floor(25/2), not 13 (a floor subtrahend would leave 13, the
-    // wrong direction — PHB'14 p. 291 rounds the RESULT down, not the cut).
     expect(exhaustionSpeedPenalty(2, 25, "EDITION_2014")).toBe(13);
     expect(exhaustionSpeedPenalty(3, 25, "EDITION_2014")).toBe(13);
     expect(exhaustionSpeedPenalty(4, 25, "EDITION_2014")).toBe(13);

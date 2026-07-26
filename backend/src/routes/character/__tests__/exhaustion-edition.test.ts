@@ -70,10 +70,7 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
     const char2014 = (await get(id2014)).body;
     const char2024 = (await get(id2024)).body;
 
-    // Halved, rounded down (PHB'14 p. 291): Hill Dwarf's 25 → 12, not 13
-    // (exhaustionSpeedPenalty subtracts ceil(currentSpeed/2) so the RESULT
-    // lands on floor(currentSpeed/2), matching Prone's round-down convention).
-    expect(char2014.speed).toBe(12);
+    expect(char2014.speed).toBe(12); // Hill Dwarf 25, halved rounded down (PHB'14 p. 291)
     expect(char2014.rollModifiers).toEqual(
       expect.arrayContaining([
         { mode: "disadvantage", kind: "check", source: "Exhaustion" },
