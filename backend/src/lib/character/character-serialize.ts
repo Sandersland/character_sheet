@@ -7,6 +7,7 @@ import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { editionOf } from "@/lib/rules/edition.js";
+import type { Rider } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
@@ -35,30 +36,33 @@ import { buildSpellcastingView } from "./serialize/spellcasting.js";
 
 export { buildRollModifiers };
 
-// Sneak Attack wire shape: the Nd6 dice count + faces, or null for a non-rogue.
-// Scales with rogue class levels, matching applySneakAttackOperations.
-function serializeSneakAttack(
-  classEntries: { name: string; level: number }[],
-): { dice: number; faces: number } | null {
+// Riders (#1316): bolt-on effects that piggyback on an attack or a hit and
+// cost no action economy of their own (actions.ts's DERIVED_ACTIONS header
+// explains why they never live there). Each returns undefined off-class/
+// subclass/level so serializeCharacter can spread it in only when present —
+// absent keys, never null ones.
+
+// Sneak Attack: the Nd6 dice spec, undefined for a non-rogue. Scales with
+// rogue class levels, matching applySneakAttackOperations.
+function sneakAttackRider(classEntries: { name: string; level: number }[]): Rider | undefined {
   const spec = sneakAttackSpec(classEntries.find((c) => c.name.toLowerCase() === "rogue")?.level ?? 0);
-  return spec ? { dice: spec.count, faces: spec.faces } : null;
+  return spec ? { dice: { count: spec.count, faces: spec.faces } } : undefined;
 }
 
-// Stunning Strike wire shape: the focus save DC, or null below monk L5. Mirrors
-// serializeSneakAttack's gate-by-class-level shape; scales with the monk class
-// entry's own level, matching monkLevel() in stunning-strike.ts.
-function serializeStunningStrike(
+// Stunning Strike: the focus save DC, undefined below monk L5. Scales with
+// the monk class entry's own level, matching monkLevel() in stunning-strike.ts.
+function stunningStrikeRider(
   classEntries: { name: string; level: number }[],
   abilityScores: Record<string, number>,
   profBonus: number,
-): { dc: number } | null {
+): Rider | undefined {
   const monkLevel = classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
-  return monkLevel >= 5 ? { dc: focusSaveDC(abilityScores, profBonus) } : null;
+  return monkLevel >= 5 ? { saveDC: focusSaveDC(abilityScores, profBonus) } : undefined;
 }
 
 // Warrior of the Open Hand's monk class entry, or undefined off-subclass —
-// shared by serializeOpenHandTechnique/serializeQuiveringPalm so both gate on
-// the same (freeform, substring-matched) subclass string, mirroring
+// shared by openHandTechniqueRider/quiveringPalmRider so both gate on the
+// same (freeform, substring-matched) subclass string, mirroring
 // DERIVED_ACTIONS' grantSubclass convention in lib/classes/actions.ts.
 function openHandMonkEntry(
   classEntries: { name: string; level: number; subclass?: string | null }[],
@@ -67,34 +71,62 @@ function openHandMonkEntry(
   return monk && (monk.subclass ?? "").toLowerCase().includes("open hand") ? monk : undefined;
 }
 
-// Open Hand Technique wire shape (Warrior of the Open Hand L3, #1245): the
-// focus save DC for the Push/Topple riders, or null below monk L3 off-subclass.
-// Addle carries no save, but the shape stays uniform (dc is always present once
+// Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC
+// for the Push/Topple riders, undefined below monk L3 off-subclass. Addle
+// carries no save, but the shape stays uniform (saveDC is always present once
 // unlocked) — live-play automation lives in open-hand-technique.ts.
-function serializeOpenHandTechnique(
+function openHandTechniqueRider(
   classEntries: { name: string; level: number; subclass?: string | null }[],
   abilityScores: Record<string, number>,
   profBonus: number,
-): { dc: number } | null {
+): Rider | undefined {
   const monk = openHandMonkEntry(classEntries);
-  return monk && monk.level >= 3 ? { dc: focusSaveDC(abilityScores, profBonus) } : null;
+  return monk && monk.level >= 3 ? { saveDC: focusSaveDC(abilityScores, profBonus) } : undefined;
 }
 
-// Quivering Palm wire shape (Warrior of the Open Hand L17, #1245): the focus
-// save DC for the Con-save trigger, plus whether vibrations are currently set
-// (the activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
+// Quivering Palm (Warrior of the Open Hand L17, #1245): the focus save DC for
+// the Con-save trigger, plus whether vibrations are currently set (the
+// activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
 // quivering-palm.ts's header for why a buff, not new persisted state).
-function serializeQuiveringPalm(
+function quiveringPalmRider(
   classEntries: { name: string; level: number; subclass?: string | null }[],
   abilityScores: Record<string, number>,
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
-): { dc: number; active: boolean } | null {
+): Rider | undefined {
   const monk = openHandMonkEntry(classEntries);
-  if (!monk || monk.level < 17) return null;
+  if (!monk || monk.level < 17) return undefined;
   return {
-    dc: focusSaveDC(abilityScores, profBonus),
+    saveDC: focusSaveDC(abilityScores, profBonus),
     active: activeEffects.buffs.some((b) => b.key === QUIVERING_PALM_BUFF_KEY),
+  };
+}
+
+// Assembles the rider view (#1316): each key spread in only when present.
+// Kept as its own function (not inlined in serializeCharacter's return) so
+// adding a rider's gate doesn't grow serializeCharacter's own branching.
+function buildRiderView(
+  classEntries: { name: string; level: number; subclass?: string | null }[],
+  abilityScores: Record<string, number>,
+  profBonus: number,
+  activeEffects: ActiveEffectsMutableState,
+  maneuverSaveDC: number | undefined,
+): Record<string, Rider> {
+  const sneakAttack = sneakAttackRider(classEntries);
+  const stunningStrike = stunningStrikeRider(classEntries, abilityScores, profBonus);
+  const openHandTechnique = openHandTechniqueRider(classEntries, abilityScores, profBonus);
+  const quiveringPalm = quiveringPalmRider(classEntries, abilityScores, profBonus, activeEffects);
+  return {
+    ...(sneakAttack ? { sneakAttack } : {}),
+    ...(stunningStrike ? { stunningStrike } : {}),
+    ...(openHandTechnique ? { openHandTechnique } : {}),
+    ...(quiveringPalm ? { quiveringPalm } : {}),
+    // Battle Master maneuver save DC, folded into the rider contract (#1316) —
+    // structurally the same shape as stunningStrike, just sourced from
+    // deriveEntryScopedResources via buildResourcesView. maneuverChoiceCount/
+    // toolProfChoiceCount stay in `resources` — they're choice counts,
+    // load-bearing for the clamp-on-read in serialize/classes.ts.
+    ...(maneuverSaveDC !== undefined ? { maneuverSaveDC: { saveDC: maneuverSaveDC } } : {}),
   };
 }
 
@@ -190,7 +222,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     abilityScoresMap,
     progress.proficiencyBonus,
   );
-  const { resources } = buildResourcesView(
+  const { resources, maneuverSaveDC } = buildResourcesView(
     row,
     progress.level,
     abilityScoresMap,
@@ -258,6 +290,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     bestArmor,
     hasShield,
   );
+
+  // Riders (#1316) — each key present only when the character has it.
+  const riders = buildRiderView(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects, maneuverSaveDC);
 
   // 6. Final assembly — one field per line, each fed by a builder above.
   return {
@@ -374,17 +409,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     improvisedWeapon,
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.
     attacksPerAction: deriveAttacksPerAction(row.classEntries),
-    // Rogue Sneak Attack Nd6 (derived from rogue class levels); null otherwise.
-    // The count drives the session card's toggle + the roll shown in results.
-    sneakAttack: serializeSneakAttack(row.classEntries),
-    // Monk Stunning Strike focus save DC (derived from monk class level + Wis);
-    // null below monk L5. Drives the session card's DC display (#1242).
-    stunningStrike: serializeStunningStrike(row.classEntries, effectiveScores, progress.proficiencyBonus),
-    // Warrior of the Open Hand riders (#1245): focus save DC once unlocked, or
-    // null off-subclass/below the gate level. See open-hand-technique.ts /
-    // quivering-palm.ts for the live-play automation.
-    openHandTechnique: serializeOpenHandTechnique(row.classEntries, effectiveScores, progress.proficiencyBonus),
-    quiveringPalm: serializeQuiveringPalm(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects),
+    // Riders (#1316): sneakAttack/stunningStrike/openHandTechnique/
+    // quiveringPalm/maneuverSaveDC, each present only when the character has it.
+    ...riders,
 
     journal: buildJournalView(row),
 
