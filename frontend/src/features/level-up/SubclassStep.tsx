@@ -5,6 +5,7 @@
 import Spinner from "@/components/ui/Spinner";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useReferenceData } from "@/hooks/useReferenceData";
+import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
 
 const CARD_BASE =
   "flex flex-col gap-1 rounded border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-garnet-400";
@@ -15,10 +16,9 @@ export default function SubclassStep() {
   const { draft, setDraft, plan } = useLevelUpStepContext();
   const { reference } = useReferenceData();
 
-  if (!reference) return <Spinner variant="inline" />;
-
-  const classDef = reference.classes.find((c) => c.name === plan.target.className);
+  const classDef = reference?.classes.find((c) => c.name === plan.target.className);
   const subclasses = classDef?.subclasses ?? [];
+  const checkedIndex = subclasses.findIndex((sub) => sub.id === draft.subclassId);
 
   // Changing to a different subclass invalidates any dependent picks made under
   // the old one — clear them in the same update so a stale sibling can't survive
@@ -37,6 +37,15 @@ export default function SubclassStep() {
     );
   }
 
+  // Called unconditionally (before the `!reference` early return below) so the
+  // hook order stays stable across renders -- subclasses is [] until reference
+  // loads, which is a valid (inert) input.
+  const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(subclasses.length, checkedIndex, (index) =>
+    pick(subclasses[index].id),
+  );
+
+  if (!reference) return <Spinner variant="inline" />;
+
   return (
     <div>
       <h2 className="font-display text-2xl font-semibold text-parchment-900">Choose your subclass</h2>
@@ -49,7 +58,7 @@ export default function SubclassStep() {
         <p className="mt-5 text-sm text-parchment-500">No subclasses available for {plan.target.className}.</p>
       ) : (
         <div role="radiogroup" aria-label="Subclass" className="mt-5 grid gap-3 sm:grid-cols-2">
-          {subclasses.map((sub) => {
+          {subclasses.map((sub, i) => {
             const selected = draft.subclassId === sub.id;
             return (
               <button
@@ -58,7 +67,10 @@ export default function SubclassStep() {
                 role="radio"
                 aria-checked={selected}
                 aria-label={sub.name}
+                tabIndex={tabIndexFor(i)}
+                ref={itemRef(i)}
                 onClick={() => pick(sub.id)}
+                onKeyDown={keyDownFor(i)}
                 className={`${CARD_BASE} ${selected ? CARD_SELECTED : CARD_IDLE}`}
               >
                 <span className="flex items-center justify-between gap-2">
