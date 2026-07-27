@@ -83,3 +83,72 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
     expect(wire[0]).toEqual({ name: "Domain Spells", level: 1, description: "tagged text", source: "subclass" });
   });
 });
+
+// Ledger: every (class, subclass, feature name) that legitimately carries an
+// edition tag. Set-equality catches all four failure modes at once — a fork
+// lost, a fork leaked to the wrong edition, a blanket tagging pass, and an
+// accidental extra tag — none of which the name-set-equality sweep above can
+// tell apart on its own (forks share a name by construction, so that sweep
+// stays green even when a fork mistags).
+const EXPECTED_EDITION_TAGGED_FEATURES = [
+  ["cleric", "life domain", "Domain Spells"],
+  ["cleric", "trickery domain", "Domain Spells"],
+] as const;
+
+// Every tagged (class, subclass, name) key at one class/subclass, both
+// editions — split out of collectTaggedFeatureKeys so neither function nests
+// past two loops (keeps both under the repo's cognitive-complexity gate).
+function taggedFeatureKeysFor(className: string, subclass: string | undefined, level: number, profBonus: number): string[] {
+  const keys: string[] = [];
+  for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+    const info = deriveResources(className, subclass, level, ABILITY_SCORES, profBonus, edition);
+    for (const f of info?.features ?? []) {
+      if (f.edition !== undefined) keys.push(`${className}|${subclass}|${f.name}`);
+    }
+  }
+  return keys;
+}
+
+function collectTaggedFeatureKeys(level: number): Set<string> {
+  const profBonus = proficiencyBonusForLevel(level);
+  const tagged = new Set<string>();
+  for (const [className, subclasses] of Object.entries(CLASS_SUBCLASSES)) {
+    for (const subclass of subclasses) {
+      for (const key of taggedFeatureKeysFor(className, subclass, level, profBonus)) tagged.add(key);
+    }
+  }
+  return tagged;
+}
+
+describe("edition-tagged feature ledger (#1374)", () => {
+  it("only the ledgered (class, subclass, name) triples ever carry an edition tag", () => {
+    const tagged = collectTaggedFeatureKeys(20);
+    const expected = new Set(EXPECTED_EDITION_TAGGED_FEATURES.map(([c, s, n]) => `${c}|${s}|${n}`));
+    expect(tagged).toEqual(expected);
+  });
+});
+
+// Risk 2: if a future author tags a fork's two rows with the SAME edition
+// instead of one each, mergeLayers would emit both under that edition while
+// collectEntryScopedFeatures' name-dedup silently drops one — the two
+// derivation paths would then disagree and the client would log a
+// duplicate-key warning (ClassFeaturesList keys on `${source}-${name}`).
+describe("per-edition duplicate-name invariant (#1374 risk 2)", () => {
+  it("no class × subclass × edition derives two features sharing a name", () => {
+    const profBonus = proficiencyBonusForLevel(20);
+    let subclassesVisited = 0;
+    for (const [className, subclasses] of Object.entries(CLASS_SUBCLASSES)) {
+      for (const subclass of subclasses) {
+        if (subclass === undefined) continue;
+        subclassesVisited++;
+        for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+          const info = deriveResources(className, subclass, 20, ABILITY_SCORES, profBonus, edition);
+          const names = (info?.features ?? []).map((f) => f.name);
+          expect(new Set(names).size).toBe(names.length);
+        }
+      }
+    }
+    // Anti-vacuity floor: the fixture's actual subclass-definition count.
+    expect(subclassesVisited).toBeGreaterThanOrEqual(31);
+  });
+});

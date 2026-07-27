@@ -9516,6 +9516,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9568,6 +9569,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9620,6 +9622,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9678,6 +9681,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9742,6 +9746,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9806,6 +9811,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9876,6 +9882,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9946,6 +9953,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10022,6 +10030,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10098,6 +10107,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10174,6 +10184,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10250,6 +10261,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10326,6 +10338,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10402,6 +10415,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10478,6 +10492,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10560,6 +10575,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10642,6 +10658,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10724,6 +10741,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10853,6 +10871,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10899,6 +10918,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10945,6 +10965,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10997,6 +11018,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11055,6 +11077,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11113,6 +11136,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11177,6 +11201,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11241,6 +11266,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11311,6 +11337,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11381,6 +11408,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11451,6 +11479,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11521,6 +11550,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11591,6 +11621,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11661,6 +11692,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11731,6 +11763,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11807,6 +11840,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11883,6 +11917,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11959,6 +11994,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
