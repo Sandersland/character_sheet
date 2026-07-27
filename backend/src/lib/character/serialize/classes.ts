@@ -7,6 +7,7 @@ import {
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import type { DerivedFeature } from "@/lib/classes/types.js";
 import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
@@ -42,6 +43,16 @@ export function buildResourcesView(
   return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC };
 }
 
+// #1272/#1374: DerivedFeature.edition is a server-side selector (which of a
+// fork's two rows survived featureAppliesToEdition) — never a client-trusted
+// rule input, so it must not cross the wire. Every other buildResourcesPayload
+// field is already explicitly projected; `features` was the one passthrough.
+export function toWireFeatures(
+  features: DerivedFeature[],
+): { name: string; level: number; description: string; source: "class" | "subclass" }[] {
+  return features.map(({ name, level, description, source }) => ({ name, level, description, source }));
+}
+
 // Assemble the wire `resources` payload from the derived caps + stored mutable
 // state, clamping each level-gated list to its derived count (defense-in-depth
 // for characters who haven't had a reconciling XP op since their level dropped).
@@ -64,7 +75,7 @@ function buildResourcesPayload(
   const choiceCaps = new Map(subclassChoices.map((c) => [c.key, c.count]));
   const { clamped: clampedChoicesKnown } = clampChoicesToCaps(stored.choicesKnown, choiceCaps);
   return {
-    features: derivedRes.features,
+    features: toWireFeatures(derivedRes.features),
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
     pools: derivedRes.resources.map((pool) => ({
