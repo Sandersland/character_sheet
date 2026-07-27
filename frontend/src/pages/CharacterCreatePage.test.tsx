@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import CharacterCreatePage from "@/pages/CharacterCreatePage";
 import { createCharacter, fetchCampaigns, fetchItems, fetchReference, fetchSpells } from "@/api/client";
-import type { ReferenceData } from "@/types/character";
+import type { Campaign, ReferenceData } from "@/types/character";
 
 // Real: useCharacterDraft, useReferenceData, the ability/skill/tool DOM. Mock the
 // router navigate and the API client.
@@ -131,11 +131,14 @@ async function passEntryGate(u: ReturnType<typeof userEvent.setup>) {
   await u.click(screen.getByRole("button", { name: /continue/i }));
 }
 
-// #1325: the 2014 half of the entry gate — picks "2014 rules" before
-// Continue, so the ceremony's reference fetch (skipToken-gated on
-// draft.rulesEdition) resolves for 2014 instead of the 2024 default.
-async function passEntryGate2014(u: ReturnType<typeof userEvent.setup>) {
-  await u.click(await screen.findByRole("radio", { name: "2014 rules" }));
+// #1325's 2014 half of the entry gate, reached via campaign inheritance rather
+// than the picker: #1371 gates the "2014 rules" radio (aria-disabled), so
+// direct selection can no longer drive draft.rulesEdition to 2014 in the real
+// UI — the caller must mock fetchCampaigns to return a 2014 campaign and this
+// helper picks it, mirroring how e2e/helpers/creation.ts reaches 2014 (#1372
+// restores direct selection).
+async function passEntryGate2014(u: ReturnType<typeof userEvent.setup>, campaignName: string) {
+  await u.click(await screen.findByRole("radio", { name: campaignName }));
   await u.click(screen.getByRole("button", { name: /continue/i }));
 }
 
@@ -331,9 +334,21 @@ describe("CharacterCreatePage — subclass gate per edition (#1325)", () => {
   });
 
   it("offers a 2014 Cleric a subclass at creation", async () => {
+    const campaign: Campaign = {
+      id: "camp-2014",
+      name: "Old Ways Table",
+      ownerId: "u1",
+      rulesEdition: "EDITION_2014",
+      inviteCode: "abc123",
+      createdAt: new Date().toISOString(),
+      role: "OWNER",
+      members: [],
+    };
+    mockFetchCampaigns.mockResolvedValueOnce([campaign]);
+
     const u = user();
     renderPage();
-    await passEntryGate2014(u);
+    await passEntryGate2014(u, campaign.name);
     await u.selectOptions(await screen.findByLabelText(/class/i), "Cleric");
 
     expect(screen.getByRole("combobox", { name: /subclass/i })).toBeInTheDocument();
