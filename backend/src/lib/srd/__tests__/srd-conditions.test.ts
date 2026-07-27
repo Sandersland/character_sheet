@@ -157,12 +157,25 @@ describe("conditionDefinition — 2024 (SRD 5.2) text pins migrated from the del
 // rollEffects is deliberately dropped — the client receives resolved
 // rollModifiers already, so shipping raw per-condition grants would ship the rule.
 describe("conditionRulesText", () => {
-  it("returns all 14 conditions, in CONDITIONS' order, for both editions", () => {
-    expect(conditionRulesText("EDITION_2024")).toHaveLength(14);
-    expect(conditionRulesText("EDITION_2014")).toHaveLength(14);
-    expect(conditionRulesText("EDITION_2024").map((r) => r.key)).toEqual(
-      CONDITIONS.map((c) => c.key),
-    );
+  // Asserts ALPHABETICAL LABEL order — what the sort guarantees — not
+  // CONDITIONS' declaration order, which only coincides with it today. Pinning
+  // the declaration order would re-create the implicit dependency the sort
+  // exists to break, and would fail with a message pointing at CONDITIONS
+  // rather than at the out-of-order entry a reader actually needs to fix.
+  //
+  // Honest limit: this cannot currently detect the sort being REMOVED, because
+  // CONDITIONS is alphabetical as authored, so sorted and unsorted output are
+  // identical. It pins the observable contract, and it goes red the moment a
+  // condition is added out of alphabetical order while the sort is missing —
+  // which is the failure this exists for. conditionRulesText reads the module
+  // constant, so there is no seam to inject unsorted input through.
+  it("returns all 14 conditions in alphabetical label order, for both editions", () => {
+    for (const edition of ["EDITION_2024", "EDITION_2014"] as const) {
+      const rows = conditionRulesText(edition);
+      expect(rows).toHaveLength(14);
+      expect(rows.map((r) => r.label)).toEqual([...rows.map((r) => r.label)].sort((a, b) => a.localeCompare(b)));
+      expect([...rows.map((r) => r.key)].sort()).toEqual([...CONDITIONS.map((c) => c.key)].sort());
+    }
   });
 
   it("each row is exactly {key,label,description} — no rollEffects on the wire", () => {
