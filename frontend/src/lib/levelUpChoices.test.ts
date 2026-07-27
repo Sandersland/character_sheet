@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { fetchReference } from "@/api/client";
 import {
   CHOICE_KIND_CONFIGS,
   filterChoiceOptions,
@@ -101,6 +102,14 @@ describe("CHOICE_KIND_CONFIGS", () => {
 
     it("uses the tool name as id", async () => {
       expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024" })).toEqual([{ id: "Smith's Tools", name: "Smith's Tools" }]);
+    });
+
+    // Without this the test passes even if the edition never reaches the wire —
+    // artisanTools is edition-invariant, so the returned options look right
+    // either way. This is the only caller outside useReferenceData (#1325).
+    it("passes the context edition through to fetchReference", async () => {
+      await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014" });
+      expect(vi.mocked(fetchReference)).toHaveBeenCalledWith("EDITION_2014");
     });
 
     it("round-trips select → selected as learnToolProficiency ops", () => {

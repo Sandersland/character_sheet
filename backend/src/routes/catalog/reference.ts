@@ -71,8 +71,15 @@ referenceRouter.get("/reference", async (req, res) => {
         select: { id: true, name: true, description: true, category: true, edition: true },
       })
     : [];
+  // Projected back to OriginFeatOption's four fields: `edition` is selected only
+  // so resolveEditionCatalog can do the exact-then-shared resolution, and must
+  // not reach the wire — the pre-#1325 include didn't select it, and a resolved
+  // row is an implementation detail of the resolution, not part of the contract.
   const originFeatByName = new Map(
-    resolveEditionCatalog(originFeatRows, edition, (f) => f.name).map((f) => [f.name, f]),
+    resolveEditionCatalog(originFeatRows, edition, (f) => f.name).map((f) => [
+      f.name,
+      { id: f.id, name: f.name, description: f.description, category: f.category },
+    ]),
   );
 
   const classes = rawClasses.map((c) => ({

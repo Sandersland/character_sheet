@@ -158,6 +158,11 @@ describe("GET /api/reference", () => {
     expect(alert2014.description).toMatch(/\+5 bonus to initiative/);
     expect(alert2024.description).toMatch(/Proficiency Bonus/);
 
+    // The resolved row must be projected back to OriginFeatOption's four fields:
+    // `edition` is selected only to drive resolveEditionCatalog and would
+    // otherwise ride along on the wire, widening the contract silently.
+    expect(Object.keys(alert2014).sort()).toEqual(["category", "description", "id", "name"]);
+
     // Folk Hero: no origin feat in either edition (spec-less legacy row, #1130).
     expect(byName(criminal2014.body, "Folk Hero").originFeat).toBeNull();
     expect(byName(criminal2024.body, "Folk Hero").originFeat).toBeNull();
