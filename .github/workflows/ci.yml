@@ -46,6 +46,13 @@ jobs:
       - name: seed data modules contain no upsert logic
         run: sh scripts/check-seed-data-modules.sh
 
+      # Every client-supplied catalog id (Feat/Subclass/GrantedAbility/
+      # Background/Action) must resolve through crossEditionRejection or be on
+      # the declared exemption list (#1345). Needs no node, so it runs
+      # alongside the other grep gates above. Twin of the lefthook pre-commit job.
+      - name: catalog ids resolved with the cross-edition guard
+        run: sh scripts/check-catalog-id-edition-guard.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc

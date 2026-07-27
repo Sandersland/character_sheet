@@ -88,6 +88,13 @@ async function loadManeuver(tx: Prisma.TransactionClient, row: ManeuverRow, entr
   if (!entry) {
     throw new InvalidManeuverOperationError(`Maneuver not known: ${entryId}`);
   }
+  // Deliberately NOT guarded by crossEditionRejection (#1345): entry.maneuverId
+  // is a PERSISTED id from an already-learned maneuver, not a client-supplied
+  // one being admitted — the guard belongs at the write path that snapshotted
+  // it (applyLearnManeuverOp, resources.ts), not here. Guarding this read
+  // would brick an already-learned maneuver the moment its catalog row were
+  // ever forked by edition, which is a false rejection on legitimate data,
+  // worse than the hole #1345 closes.
   const catalog = entry.maneuverId
     ? await tx.grantedAbility.findUnique({ where: { id: entry.maneuverId } })
     : null;

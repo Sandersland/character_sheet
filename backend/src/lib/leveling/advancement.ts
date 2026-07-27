@@ -36,6 +36,9 @@ import {
 import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots } from "@/lib/srd/srd.js";
 import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
 import { normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
+import { editionOf } from "@/lib/rules/edition.js";
+import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 export class InvalidAdvancementOperationError extends Error {}
 
@@ -168,6 +171,8 @@ interface AdvancementOpContext {
   totalSlots: number;
   /** Fighting Style feat cap across all class entries (#1137). */
   fightingStyleSlotTotal: number;
+  /** This character's edition — gates a client-supplied featId (#1345). */
+  edition: RulesEdition;
 }
 
 /**
@@ -349,6 +354,7 @@ async function resolveCatalogFeat(
   scores: Record<string, number>,
   level: number,
   isFightingStyleSlot: boolean,
+  edition: RulesEdition,
 ): Promise<ResolvedFeat> {
   const catalogFeat = await tx.feat.findUnique({ where: { id: op.featId } });
   if (!catalogFeat) {
@@ -356,6 +362,13 @@ async function resolveCatalogFeat(
       `Feat not found in catalog: ${op.featId}`,
     );
   }
+  // Before the category/level gates below: a cross-edition row should report
+  // its edition mismatch, not whichever gate it also happens to trip (#1345).
+  // This snapshot is baked verbatim into AdvancementEntry (below) and never
+  // re-validated, so this is prevention, not just admission — the only
+  // defense against a wrong-edition rule getting permanently persisted.
+  const mismatch = crossEditionRejection(catalogFeat, `Feat "${catalogFeat.name}"`, edition);
+  if (mismatch) throw new InvalidAdvancementOperationError(`takeFeat: ${mismatch}`);
   const category = catalogFeat.category as FeatCategory;
   if (isFightingStyleSlot) {
     // The fightingStyle slot (#1137) takes only fighting_style feats — never a
@@ -428,7 +441,9 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
   }
 
   const { featName, featDescription, featId: resolvedFeatId, improvements: featImprovements, abilityDeltas } =
-    op.featId ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot) : resolveCustomFeat(op, scores);
+    op.featId
+      ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot, ctx.edition)
+      : resolveCustomFeat(op, scores);
 
   // A character can't hold the same Fighting Style twice (#1137) — dedup by
   // catalog id, else by snapshot name (custom / migrated styles carry no featId).
@@ -542,6 +557,7 @@ const ADVANCEMENT_SELECT = {
   hitDice: true,
   initiativeBonus: true,
   experiencePoints: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     // All entries (name + level) — both the fs-slot cap (#1137) and the ASI/feat
@@ -585,6 +601,7 @@ export async function applyAdvancementOpInTx(
     level,
     totalSlots: characterAdvancementSlots(character.classEntries, level),
     fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level),
+    edition: editionOf(character),
   };
 
   const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);

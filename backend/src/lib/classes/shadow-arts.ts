@@ -25,6 +25,9 @@ import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type AbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
+import { editionOf } from "@/lib/rules/edition.js";
+import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveEntryScopedActions } from "./actions.js";
 import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
@@ -87,12 +90,18 @@ async function applyCastShadowArt(
   op: CastShadowArtOperation,
   batchId: string,
   sessionId: string | null,
-  row: { spellcasting: Prisma.JsonValue },
+  row: { spellcasting: Prisma.JsonValue; rulesEdition: RulesEdition },
 ): Promise<void> {
   const catalog = await tx.grantedAbility.findUnique({ where: { id: op.shadowArtId } });
   if (!catalog || catalog.source !== "shadowArts") {
     throw new InvalidShadowArtOperationError(`Shadow Art not found in catalog: ${op.shadowArtId}`);
   }
+
+  // Transient cast, not a permanent snapshot — still a wrong-edition rule
+  // applied to one cast and recorded in the audit event (#1345, found by
+  // this plan's audit, not named in the issue).
+  const mismatch = crossEditionRejection(catalog, `Shadow Art "${catalog.name}"`, editionOf(row));
+  if (mismatch) throw new InvalidShadowArtOperationError(mismatch);
 
   const cost = readAbilityCost(catalog);
   if (cost.kind !== "pool") {
