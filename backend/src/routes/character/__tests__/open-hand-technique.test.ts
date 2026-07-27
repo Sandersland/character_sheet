@@ -171,4 +171,57 @@ describe("Open Hand Technique for an under-level or off-subclass monk", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/warrior of the open hand/i);
   });
+
+  // #1277: isWarriorOfTheOpenHand used to substring-match ("open hand"), so a
+  // homebrew name merely CONTAINING "Open Hand" inherited real Warrior of the
+  // Open Hand mechanics — the same failure class #1339 fixed at the
+  // DERIVED_ACTIONS gate (actions.test.ts's "Warrior of the Open Handbook"
+  // fixture, not reachable through this route until this gate is fixed too).
+  it("rejects a homebrew name containing \"Open Hand\" that isn't the real subclass", async () => {
+    await createMonk(5, "Warrior of the Open Handbook");
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/warrior of the open hand/i);
+  });
+});
+
+// #1277: resolveSubclassSlug prefers the catalog FK over the freeform display
+// name. FK-fixture twin of the same test in hand-of-harm.test.ts, which
+// asserts the opposite outcome for the SAME character shape.
+describe("Open Hand Technique prefers the subclass catalog FK over a misleading display name (#1277)", () => {
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+  });
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+  });
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  it("rejects Open Hand Technique when subclassId points at the real Warrior of Mercy row, even though the display name says Open Hand", async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
+      update: {},
+    });
+    const mercy = await prisma.subclass.findFirstOrThrow({ where: { slug: "monk-warrior-of-mercy" } });
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        ownerId: OWNER_ID,
+        classEntries: {
+          create: [{ name: "monk", classId: cls.id, position: 0, level: 5, subclass: "Warrior of the Open Handbook", subclassId: mercy.id }],
+        },
+      },
+    });
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/warrior of the open hand/i);
+  });
 });

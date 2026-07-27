@@ -193,4 +193,14 @@ describe("Quivering Palm for an under-level or off-subclass monk", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/warrior of the open hand/i);
   });
+
+  // #1277: isWarriorOfTheOpenHand used to substring-match ("open hand"), so a
+  // homebrew name merely CONTAINING "Open Hand" inherited real Warrior of the
+  // Open Hand mechanics.
+  it("rejects a homebrew name containing \"Open Hand\" that isn't the real subclass", async () => {
+    await createMonk(20, "Warrior of the Open Handbook");
+    const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/warrior of the open hand/i);
+  });
 });

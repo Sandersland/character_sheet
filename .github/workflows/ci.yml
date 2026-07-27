@@ -29,6 +29,13 @@ jobs:
       - name: enum-narrowing migrations guarded
         run: sh scripts/check-enum-narrowing.sh
 
+      # Subclass identity must resolve via resolveSubclassSlug, never a
+      # substring match on the freeform display name (#1277). Needs no node,
+      # so it runs before `npm ci` alongside the enum-narrowing gate. Twin of
+      # the lefthook pre-commit job.
+      - name: subclass identity resolved via slug, not substring
+        run: sh scripts/check-subclass-substring.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc

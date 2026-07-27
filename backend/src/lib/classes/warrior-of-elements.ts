@@ -61,9 +61,13 @@ const WARRIOR_OF_ELEMENTS_SELECT = {
   experiencePoints: true,
   abilityScores: true,
   activeEffects: true,
+  // subclassRef.slug (#1277) is what deriveEntryScopedActions' assertWarriorOfElements
+  // gate resolves the subclass identity through — see resolveSubclassSlug.
+  // NOT in #1339's handover (measured 2026-07-26): this select was missed
+  // entirely by that issue's site table.
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, level: true, subclass: true },
+    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 

@@ -38,6 +38,7 @@ import type { ActiveBuff } from "@/lib/combat/active-effects.js";
 import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -76,20 +77,19 @@ interface DerivedActionRecord {
    */
   grantClasses?: ActionClassGate[];
   /**
-   * Accepted subclass display names, matched EXACTLY (normalized: lowercased +
-   * trimmed) against the character's subclass — never as a substring. A list so
-   * one row can serve two names when the mechanics genuinely are shared. The
-   * vocabulary is the subclass-registry keys (see the `subclasses` maps on each
-   * ClassDefinition), the same keys deriveResources looks up, so the action gate
-   * and the resource/feature gate agree on identity. Substring matching let a
-   * 2014 "Way of Shadow" monk inherit the 2024 "Warrior of Shadow" mechanics —
-   * the edition bleed of #1322/#1331 (#1339). Both normalize through
-   * matchesSubclassGate so matchesActionGate keeps ONE code path per axis. #1277
-   * revisits this field to swap the names for a stable slug — it counts this as
-   * the seventh of its substring sites; the other six (isWarriorOfTheOpenHand,
-   * isWarriorOfMercy, openHandMonkEntry, attacksForClass) still substring-match.
+   * Accepted subclass slugs (#1277) — resolved via resolveSubclassSlug (FK
+   * preferred, exact normalized name as fallback), never a substring. A list
+   * so one row can serve two slugs when the mechanics genuinely are shared.
+   * Was `grantSubclasses?: string[]` matched by exact display name (#1339,
+   * which fixed this ONE gate's substring bleed — a 2014 "Way of Shadow" monk
+   * inheriting 2024 "Warrior of Shadow" mechanics, #1322/#1331); #1277
+   * generalizes the same discipline to the other six substring sites
+   * (isWarriorOfTheOpenHand, isWarriorOfMercy, openHandMonkEntry,
+   * attacksForClass) via the shared slug vocabulary instead of a second
+   * exact-name table. matchesSubclassGate is still the one normalization
+   * matchesActionGate goes through per axis.
    */
-  grantSubclasses?: string[];
+  grantSubclassSlugs?: SubclassSlug[];
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
   // In-play rule text for no-server-effect reminder actions. A function form
@@ -114,19 +114,13 @@ function matchesClassGate(gate: ActionClassGate, cls: string, level: number): bo
   return level >= gate.minLevel;
 }
 
-// Row-side and character-side subclass names compare through this one
-// normalizer, so a display name that drifts in case or picks up stray
-// whitespace still matches (#1339).
-function normalizeSubclassName(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-// Exact (normalized) name equality against the row's accepted names; an
-// ungated row matches every subclass. `sub` arrives normalized from
-// deriveActions.
-function matchesSubclassGate(a: DerivedActionRecord, sub: string): boolean {
-  if (!a.grantSubclasses) return true;
-  return a.grantSubclasses.some((name) => normalizeSubclassName(name) === sub);
+// Slug equality against the row's accepted slugs; an ungated row matches
+// every subclass (including `undefined` — a homebrew/off-catalog subclass).
+// `slug` arrives already resolved (FK-or-name, never substring) from
+// deriveActions via resolveSubclassSlug.
+function matchesSubclassGate(a: DerivedActionRecord, slug: SubclassSlug | undefined): boolean {
+  if (!a.grantSubclassSlugs) return true;
+  return slug !== undefined && a.grantSubclassSlugs.includes(slug);
 }
 
 /** Available action shape serialized onto the character. */
@@ -274,7 +268,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Step",
     cost: "bonusAction",
     grantClass: "monk",
-    grantSubclasses: ["warrior of shadow"],
+    grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 6,
     reminder: (level) =>
       level >= 11
@@ -296,7 +290,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Arts (Darkness)",
     cost: "action",
     grantClass: "monk",
-    grantSubclasses: ["warrior of shadow"],
+    grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -307,7 +301,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Cloak of Shadows",
     cost: "action",
     grantClass: "monk",
-    grantSubclasses: ["warrior of shadow"],
+    grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 17,
     resourceKey: "focus",
     resourceAmount: 3,
@@ -325,7 +319,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Elemental Attunement",
     cost: "free",
     grantClass: "monk",
-    grantSubclasses: ["warrior of the elements"],
+    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -336,7 +330,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Elemental Burst",
     cost: "action",
     grantClass: "monk",
-    grantSubclasses: ["warrior of the elements"],
+    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
     grantLevel: 6,
     resourceKey: "focus",
     resourceAmount: 2,
@@ -349,7 +343,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // like Stunning Strike bypasses this catalog — neither is a selectable action.
   // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
   // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
-  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclasses: ["warrior of the open hand"], grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
+  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclassSlugs: ["monk-warrior-of-the-open-hand"], grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
   // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
   // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
   // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
@@ -361,7 +355,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Fleet Step",
     cost: "free",
     grantClass: "monk",
-    grantSubclasses: ["warrior of the open hand"],
+    grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
     grantLevel: 11,
     reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
   },
@@ -376,7 +370,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Hand of Healing",
     cost: "action",
     grantClass: "monk",
-    grantSubclasses: ["warrior of mercy"],
+    grantSubclassSlugs: ["monk-warrior-of-mercy"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -393,7 +387,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Hand of Healing (Flurry replacement)",
     cost: "bonusAction",
     grantClass: "monk",
-    grantSubclasses: ["warrior of mercy"],
+    grantSubclassSlugs: ["monk-warrior-of-mercy"],
     grantLevel: 3,
     reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
   },
@@ -415,7 +409,12 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
 // (below, which both `availableActions[]` and shadow-arts.ts's cast guards
 // resolve through) key off, so a level gate can never drift into two
 // independent copies (#1315 — CLAUDE.md's level-gated-registry rule).
-function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, level: number): boolean {
+function matchesActionGate(
+  a: DerivedActionRecord,
+  cls: string,
+  slug: SubclassSlug | undefined,
+  level: number,
+): boolean {
   // Only include class-specific actions here (universal handled client-side).
   if (a.universal) return false;
 
@@ -423,8 +422,8 @@ function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, lev
   // grantClasses list — matched when ANY gate matches; see classGatesOf).
   if (!classGatesOf(a).some((g) => matchesClassGate(g, cls, level))) return false;
 
-  // Subclass gate (exact normalized name, ANY accepted name; see grantSubclasses).
-  if (!matchesSubclassGate(a, sub)) return false;
+  // Subclass gate (slug equality, ANY accepted slug; see grantSubclassSlugs).
+  if (!matchesSubclassGate(a, slug)) return false;
 
   return true;
 }
@@ -441,7 +440,7 @@ function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, lev
  */
 export function deriveActions(
   className: string,
-  subclass: string | undefined,
+  subclassSlug: SubclassSlug | undefined,
   level: number,
   pools: ResourcePool[],
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218).
@@ -449,12 +448,11 @@ export function deriveActions(
   unarmoredUnshielded = true,
 ): AvailableAction[] {
   const cls = (className ?? "").toLowerCase();
-  const sub = normalizeSubclassName(subclass ?? "");
 
   const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
 
   return DERIVED_ACTIONS
-    .filter((a) => matchesActionGate(a, cls, sub, level))
+    .filter((a) => matchesActionGate(a, cls, subclassSlug, level))
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
@@ -481,7 +479,7 @@ export function deriveActions(
  * can never independently drift on the gate.
  */
 export function deriveEntryScopedActions(
-  classEntries: { name: string; subclass?: string | null; level: number }[],
+  classEntries: (SubclassIdentityInput & { name: string; level: number })[],
   totalLevel: number,
   pools: ResourcePool[],
   unarmoredUnshielded = true,
@@ -490,7 +488,8 @@ export function deriveEntryScopedActions(
   const actions: AvailableAction[] = [];
   for (const entry of classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
-    for (const action of deriveActions(entry.name, entry.subclass ?? undefined, effLevel, pools, unarmoredUnshielded)) {
+    const slug = resolveSubclassSlug(entry.name, entry);
+    for (const action of deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded)) {
       if (seenKeys.has(action.key)) continue;
       seenKeys.add(action.key);
       actions.push(action);

@@ -83,4 +83,11 @@ describe("deriveAttacksPerAction — College of Valor bard", () => {
   it("other bard colleges never get Extra Attack", () => {
     expect(single("bard", 10, "College of Lore")).toBe(1);
   });
+
+  // #1277: attacksForClass's Valor check used to substring-match ("valor"), so
+  // a homebrew name merely CONTAINING "Valor" got Extra Attack it never
+  // earned — the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
+  it('a homebrew name containing "Valor" that isn\'t the real subclass gets no Extra Attack', () => {
+    expect(single("bard", 10, "College of Valorous Deeds")).toBe(1);
+  });
 });

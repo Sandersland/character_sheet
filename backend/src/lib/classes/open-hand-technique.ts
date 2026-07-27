@@ -25,6 +25,7 @@ import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { focusSaveDC } from "./monk.js";
+import { resolveSubclassSlug } from "./subclass-slug.js";
 
 export class InvalidOpenHandTechniqueOperationError extends Error {}
 
@@ -82,27 +83,25 @@ const OPEN_HAND_TECHNIQUE_SELECT = {
   abilityScores: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, level: true, subclass: true },
+    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
 type OpenHandTechniqueRow = Prisma.CharacterGetPayload<{ select: typeof OPEN_HAND_TECHNIQUE_SELECT }>;
 
 // Open Hand Technique is a subclass feature (Warrior of the Open Hand), unlike
-// Stunning Strike's base-class monkLevel() gate — so it checks the monk entry's
-// own subclass string too (freeform display name; substring-matched, not
-// exact). isWarriorOfTheOpenHand (this function and Quivering Palm's own
-// copy), isWarriorOfMercy (Hand of Harm and Hand of Ultimate Mercy),
-// openHandMonkEntry, and attacksForClass's Valor-bard check are the six sites
-// still on substring matching — matchesActionGate no longer is, since #1339
-// made that one gate's subclass axis exact-name. #1277 retires all six onto a
-// stable slug together.
+// Stunning Strike's base-class monkLevel() gate — so it checks the monk
+// entry's own subclass identity too, resolved via resolveSubclassSlug (#1277:
+// FK preferred, exact normalized name as fallback). Was substring-matched on
+// the words "open hand" — the same failure class #1339 fixed at the
+// DERIVED_ACTIONS gate.
 function monkEntry(row: OpenHandTechniqueRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
 function isWarriorOfTheOpenHand(row: OpenHandTechniqueRow): boolean {
-  return (monkEntry(row)?.subclass ?? "").toLowerCase().includes("open hand");
+  const monk = monkEntry(row);
+  return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand";
 }
 
 async function imposeOpenHandRider(

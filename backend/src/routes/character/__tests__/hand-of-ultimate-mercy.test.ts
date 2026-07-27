@@ -188,4 +188,15 @@ describe("Hand of Ultimate Mercy for an under-level or off-subclass monk", () =>
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/warrior of mercy/i);
   });
+
+  // #1277: isWarriorOfMercy used to substring-match ("mercy"), so a homebrew
+  // name merely CONTAINING "Mercy" inherited real Warrior of Mercy mechanics.
+  it("rejects a homebrew name containing \"Mercy\" that isn't the real subclass", async () => {
+    await createMonk(225000, 17, "Way of Mercy Reborn");
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "useHandOfUltimateMercy", roll: 27 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/warrior of mercy/i);
+  });
 });

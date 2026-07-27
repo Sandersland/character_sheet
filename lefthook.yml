@@ -63,6 +63,11 @@ pre-commit:
     # aborts on populated rows can be caught before it lands. Also a CI step.
     enum-narrowing:
       run: sh scripts/check-enum-narrowing.sh
+    # Subclass identity must resolve via resolveSubclassSlug, never a
+    # substring match on the freeform display name (#1277 — generalizes
+    # #1339's fix from one gate to the other six). Also a CI step.
+    subclass-substring:
+      run: sh scripts/check-subclass-substring.sh
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"

@@ -244,4 +244,55 @@ describe("Hand of Harm for an under-level or off-subclass monk", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/warrior of mercy/i);
   });
+
+  // #1277: isWarriorOfMercy used to substring-match ("mercy"), so a homebrew
+  // name merely CONTAINING "Mercy" inherited real Warrior of Mercy mechanics —
+  // the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
+  it("rejects a homebrew name containing \"Mercy\" that isn't the real subclass", async () => {
+    await createMonk(6500, 5, "Way of Mercy Reborn");
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "dealHandOfHarm", usedThisTurn: false, roll: 5 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/warrior of mercy/i);
+  });
+});
+
+// #1277: resolveSubclassSlug prefers the catalog FK over the freeform display
+// name. A misleading display name must not override a real subclassId — the
+// FK-fixture twin of the same test in open-hand-technique.test.ts, which
+// asserts the opposite outcome for the SAME character shape.
+describe("Hand of Harm prefers the subclass catalog FK over a misleading display name (#1277)", () => {
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+  });
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+  });
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  it("grants Hand of Harm when subclassId points at the real Warrior of Mercy row, even though the display name says Open Hand", async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
+      update: {},
+    });
+    const mercy = await prisma.subclass.findFirstOrThrow({ where: { slug: "monk-warrior-of-mercy" } });
+    await prisma.character.create({
+      data: {
+        ...fixtureBase(6500),
+        ownerId: OWNER_ID,
+        classEntries: {
+          create: [{ name: "monk", classId: cls.id, position: 0, level: 5, subclass: "Warrior of the Open Handbook", subclassId: mercy.id }],
+        },
+      },
+    });
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "dealHandOfHarm", usedThisTurn: false, roll: 5 }] });
+    expect(res.status).toBe(200);
+  });
 });

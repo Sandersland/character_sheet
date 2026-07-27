@@ -114,7 +114,57 @@ export const SUBCLASS_IDENTITY: Record<SubclassSlug, SubclassIdentity> = {
   "wizard-school-of-illusion": { classKey: "wizard", nameKey: "school of illusion" },
 };
 
-// resolveSubclassSlug (the reverse FK-or-name lookup that retires the
-// substring join at the seven gate sites) lands in a follow-up commit in this
-// same PR, alongside its first real call sites — landing it here with no
-// consumer yet would report as dead code (fallow's zero-dead-code gate, R7).
+// Reverse lookup built once at module load, keyed by "classKey::nameKey" —
+// resolveSubclassSlug's exact-name fallback path.
+const IDENTITY_TO_SLUG = new Map<string, SubclassSlug>(
+  (Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]).map(
+    ([slug, { classKey, nameKey }]) => [`${classKey}::${nameKey}`, slug],
+  ),
+);
+
+/** The two shapes a character's subclass identity can arrive in — a select
+ * widened to include `subclassRef: { select: { slug: true } }` satisfies this
+ * structurally with no extra mapping at the call site. */
+export interface SubclassIdentityInput {
+  subclass?: string | null;
+  subclassRef?: { slug: string } | null;
+}
+
+/**
+ * Resolves a character class entry's subclass onto the stable slug vocabulary
+ * (#1277) — the ONE place a character resolves onto SUBCLASS_SLUGS, mirroring
+ * resolveEditionRow's exact-then-fallback contract (catalog-edition.ts).
+ *
+ * Preference order, expressed here and nowhere else:
+ *   1. `subclassRef.slug` (the catalog FK) — always trusted when present. A
+ *      level-1 Monk created with free-text "Warrior of Mercy" persists the
+ *      NAME with `subclassId: null` (subclassGateLevel gates the FK link),
+ *      so FK-only would silently strip that character's mechanics — the
+ *      exact silent-under-match this function exists to prevent (#1277 R2).
+ *   2. Exact, normalized (lowercased + trimmed) `(classKey, subclass)` match
+ *      against SUBCLASS_IDENTITY — the vocabulary #1339 already established
+ *      at the one gate it fixed, generalized here to all seven.
+ *   3. `undefined` — homebrew, no subclass, or a name matching nothing.
+ *
+ * Never substring-matches: a display name merely CONTAINING an accepted name
+ * (e.g. "Warrior of the Open Handbook") resolves to `undefined`, not the
+ * contained subclass's slug — the bug class #1339 fixed at one of the seven
+ * sites this function now covers uniformly.
+ *
+ * No `edition` parameter — see the module header's SUBCLASS_IDENTITY comment
+ * and CLAUDE.md's edition-as-data rule: no seeded subclass forks under one
+ * name today, so a slug alone separates every existing pair. A future
+ * same-name fork adds `edition` as the GATE's last parameter (mirroring
+ * subclassGateLevel), not this resolver's.
+ */
+export function resolveSubclassSlug(
+  classKey: string,
+  input: SubclassIdentityInput | undefined,
+): SubclassSlug | undefined {
+  const fk = input?.subclassRef?.slug;
+  if (fk && (SUBCLASS_SLUGS as readonly string[]).includes(fk)) return fk as SubclassSlug;
+
+  const name = input?.subclass;
+  if (!name) return undefined;
+  return IDENTITY_TO_SLUG.get(`${classKey.trim().toLowerCase()}::${name.trim().toLowerCase()}`);
+}
