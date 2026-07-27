@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { draftSatisfies, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
+import { applySubclassPick, draftSatisfies, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
 import type { LevelUpStep } from "@/types/character";
 
 describe("stepKey", () => {
@@ -169,5 +169,82 @@ describe("draftSatisfies", () => {
         ],
       }),
     ).toBe(true);
+  });
+});
+
+describe("applySubclassPick (#1323)", () => {
+  const m1 = { type: "learnManeuver" as const, maneuverId: "m1" };
+  const m2 = { type: "learnManeuver" as const, maneuverId: "m2" };
+  const t1 = { type: "learnToolProficiency" as const, name: "Smith's Tools" };
+  const c1 = { type: "learnSubclassChoice" as const, choiceKey: "huntersPrey", optionId: "o1" };
+
+  it("returns the same draft object when the subclass is unchanged", () => {
+    const d: LevelUpDraft = { hp: { method: "average" }, subclassId: "bm" };
+    expect(applySubclassPick(d, "bm")).toBe(d);
+  });
+
+  it("clears dependent picks when moving to a subclass with nothing stashed", () => {
+    const d: LevelUpDraft = {
+      hp: { method: "average" },
+      subclassId: "bm",
+      maneuvers: [m1, m2],
+      toolProficiencies: [t1],
+    };
+    // Vacuity guard (A2 is only meaningful if the seed is non-empty): A3 below
+    // confirms this same seed survives into the stash intact.
+    expect(d.maneuvers).toHaveLength(2);
+
+    const next = applySubclassPick(d, "champ");
+    expect(next.maneuvers).toBeUndefined();
+    expect(next.toolProficiencies).toBeUndefined();
+    expect(next.subclassChoices).toBeUndefined();
+  });
+
+  it("stashes the outgoing subclass's dependent picks under its id", () => {
+    const d: LevelUpDraft = {
+      hp: { method: "average" },
+      subclassId: "bm",
+      maneuvers: [m1, m2],
+      toolProficiencies: [t1],
+    };
+    const next = applySubclassPick(d, "champ");
+    expect(next.dependentPicksBySubclass?.bm?.maneuvers).toEqual([m1, m2]);
+    expect(next.dependentPicksBySubclass?.bm?.toolProficiencies).toEqual([t1]);
+  });
+
+  it("restores the incoming subclass's stashed picks on return, including subclassChoices", () => {
+    const d: LevelUpDraft = {
+      hp: { method: "average" },
+      subclassId: "bm",
+      maneuvers: [m1, m2],
+      toolProficiencies: [t1],
+      subclassChoices: [c1],
+    };
+    const away = applySubclassPick(d, "champ");
+    const back = applySubclassPick(away, "bm");
+    expect(back.maneuvers).toEqual([m1, m2]);
+    expect(back.toolProficiencies).toEqual([t1]);
+    expect(back.subclassChoices).toEqual([c1]);
+  });
+
+  it("keeps each subclass's picks in its own bucket across A→B→A→B", () => {
+    const start: LevelUpDraft = { hp: { method: "average" }, subclassId: "bm", maneuvers: [m1] };
+    const toChamp = applySubclassPick(start, "champ");
+    const withToolProf = { ...toChamp, toolProficiencies: [t1] };
+    const backToBm = applySubclassPick(withToolProf, "bm");
+    expect(backToBm.maneuvers).toEqual([m1]);
+    expect(backToBm.toolProficiencies).toBeUndefined();
+
+    const backToChamp = applySubclassPick(backToBm, "champ");
+    expect(backToChamp.toolProficiencies).toEqual([t1]);
+    expect(backToChamp.maneuvers).toBeUndefined();
+  });
+
+  it("creates no stash bucket for the first subclass pick", () => {
+    const d: LevelUpDraft = { hp: { method: "average" } };
+    // Must be toEqual({}), not toBeUndefined() — a bucket-write condition that
+    // fires unconditionally (even from no prior subclass) would pass a
+    // toBeUndefined() check here just as readily as correct code (M4).
+    expect(applySubclassPick(d, "bm").dependentPicksBySubclass).toEqual({});
   });
 });
