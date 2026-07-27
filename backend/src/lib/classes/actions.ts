@@ -65,7 +65,6 @@ interface DerivedActionRecord {
   cost: ActionCost;
   universal?: boolean;
   grantClass?: string;   // lowercase class name
-  grantSubclass?: string; // substring-matched against the character's subclass
   grantLevel?: number;   // min level for this action
   /**
    * Class/level gates for a row TWO classes grant as ONE feature — matched when
@@ -76,6 +75,21 @@ interface DerivedActionRecord {
    * classGatesOf so matchesActionGate keeps a single class-gate code path.
    */
   grantClasses?: ActionClassGate[];
+  /**
+   * Accepted subclass display names, matched EXACTLY (normalized: lowercased +
+   * trimmed) against the character's subclass — never as a substring. A list so
+   * one row can serve two names when the mechanics genuinely are shared. The
+   * vocabulary is the subclass-registry keys (see the `subclasses` maps on each
+   * ClassDefinition), the same keys deriveResources looks up, so the action gate
+   * and the resource/feature gate agree on identity. Substring matching let a
+   * 2014 "Way of Shadow" monk inherit the 2024 "Warrior of Shadow" mechanics —
+   * the edition bleed of #1322/#1331 (#1339). Both normalize through
+   * matchesSubclassGate so matchesActionGate keeps ONE code path per axis. #1277
+   * revisits this field to swap the names for a stable slug — it counts this as
+   * the seventh of its substring sites; the other six (isWarriorOfTheOpenHand,
+   * isWarriorOfMercy, openHandMonkEntry, attacksForClass) still substring-match.
+   */
+  grantSubclasses?: string[];
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
   // In-play rule text for no-server-effect reminder actions. A function form
@@ -98,6 +112,21 @@ function classGatesOf(a: DerivedActionRecord): ActionClassGate[] {
 function matchesClassGate(gate: ActionClassGate, cls: string, level: number): boolean {
   if (gate.className && gate.className.toLowerCase() !== cls) return false;
   return level >= gate.minLevel;
+}
+
+// Row-side and character-side subclass names compare through this one
+// normalizer, so a display name that drifts in case or picks up stray
+// whitespace still matches (#1339).
+function normalizeSubclassName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+// Exact (normalized) name equality against the row's accepted names; an
+// ungated row matches every subclass. `sub` arrives normalized from
+// deriveActions.
+function matchesSubclassGate(a: DerivedActionRecord, sub: string): boolean {
+  if (!a.grantSubclasses) return true;
+  return a.grantSubclasses.some((name) => normalizeSubclassName(name) === sub);
 }
 
 /** Available action shape serialized onto the character. */
@@ -245,7 +274,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Step",
     cost: "bonusAction",
     grantClass: "monk",
-    grantSubclass: "Shadow",
+    grantSubclasses: ["warrior of shadow"],
     grantLevel: 6,
     reminder: (level) =>
       level >= 11
@@ -267,7 +296,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Arts (Darkness)",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Shadow",
+    grantSubclasses: ["warrior of shadow"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -278,7 +307,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Cloak of Shadows",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Shadow",
+    grantSubclasses: ["warrior of shadow"],
     grantLevel: 17,
     resourceKey: "focus",
     resourceAmount: 3,
@@ -296,7 +325,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Elemental Attunement",
     cost: "free",
     grantClass: "monk",
-    grantSubclass: "Elements",
+    grantSubclasses: ["warrior of the elements"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -307,7 +336,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Elemental Burst",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Elements",
+    grantSubclasses: ["warrior of the elements"],
     grantLevel: 6,
     resourceKey: "focus",
     resourceAmount: 2,
@@ -320,7 +349,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // like Stunning Strike bypasses this catalog — neither is a selectable action.
   // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
   // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
-  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclass: "Open Hand", grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
+  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclasses: ["warrior of the open hand"], grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
   // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
   // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
   // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
@@ -332,7 +361,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Fleet Step",
     cost: "free",
     grantClass: "monk",
-    grantSubclass: "Open Hand",
+    grantSubclasses: ["warrior of the open hand"],
     grantLevel: 11,
     reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
   },
@@ -347,7 +376,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Hand of Healing",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Mercy",
+    grantSubclasses: ["warrior of mercy"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -364,7 +393,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Hand of Healing (Flurry replacement)",
     cost: "bonusAction",
     grantClass: "monk",
-    grantSubclass: "Mercy",
+    grantSubclasses: ["warrior of mercy"],
     grantLevel: 3,
     reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
   },
@@ -394,8 +423,8 @@ function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, lev
   // grantClasses list — matched when ANY gate matches; see classGatesOf).
   if (!classGatesOf(a).some((g) => matchesClassGate(g, cls, level))) return false;
 
-  // Subclass gate (substring match, case-insensitive).
-  if (a.grantSubclass && !sub.includes(a.grantSubclass.toLowerCase())) return false;
+  // Subclass gate (exact normalized name, ANY accepted name; see grantSubclasses).
+  if (!matchesSubclassGate(a, sub)) return false;
 
   return true;
 }
@@ -420,7 +449,7 @@ export function deriveActions(
   unarmoredUnshielded = true,
 ): AvailableAction[] {
   const cls = (className ?? "").toLowerCase();
-  const sub = (subclass ?? "").toLowerCase();
+  const sub = normalizeSubclassName(subclass ?? "");
 
   const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
 

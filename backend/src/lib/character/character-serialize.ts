@@ -62,8 +62,12 @@ function stunningStrikeRider(
 
 // Warrior of the Open Hand's monk class entry, or undefined off-subclass —
 // shared by openHandTechniqueRider/quiveringPalmRider so both gate on the
-// same (freeform, substring-matched) subclass string, mirroring
-// DERIVED_ACTIONS' grantSubclass convention.
+// same freeform, substring-matched subclass string. Still substring-matched
+// here, like isWarriorOfTheOpenHand (Open Hand Technique, Quivering Palm),
+// isWarriorOfMercy (Hand of Harm, Hand of Ultimate Mercy), and
+// attacksForClass's Valor-bard check — matchesActionGate no longer is, since
+// #1339 made that one gate's subclass axis exact-name; #1277 retires all six
+// onto a stable slug.
 function openHandMonkEntry(
   classEntries: { name: string; level: number; subclass?: string | null }[],
 ): { name: string; level: number; subclass?: string | null } | undefined {
