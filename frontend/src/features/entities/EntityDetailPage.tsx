@@ -25,7 +25,7 @@ function NotFound({ backTo }: { backTo: string }) {
       <h1 className="font-display text-2xl font-semibold text-parchment-900">Entity not found</h1>
       <Link
         to={backTo}
-        className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 hover:bg-garnet-800"
+        className="rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface hover:bg-garnet-surface-hover"
       >
         Back to campaign
       </Link>

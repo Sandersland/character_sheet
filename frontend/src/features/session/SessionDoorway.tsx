@@ -19,13 +19,13 @@ interface SessionDoorwayProps {
 // (parchment + gold); `invite` = a DM's quiet dashed empty-state. Color never
 // carries meaning alone — the label always states the action.
 const TONE_INTERACTIVE: Record<SessionDoorwaySummary["tone"], string> = {
-  live: "bg-gradient-to-r from-garnet-700 to-garnet-900 text-parchment-50 hover:from-garnet-800 hover:to-garnet-900",
+  live: "bg-gradient-to-r from-garnet-surface to-garnet-surface-deep text-garnet-on-surface hover:from-garnet-surface-hover hover:to-garnet-surface-deep",
   scheduled: "border border-gold-300 bg-gold-50 text-parchment-800 hover:bg-gold-100",
   invite: "border border-dashed border-parchment-300 bg-parchment-50 text-garnet-700 hover:bg-parchment-100",
 };
 
 const TONE_STATIC: Record<SessionDoorwaySummary["tone"], string> = {
-  live: "bg-gradient-to-r from-garnet-700 to-garnet-900 text-parchment-50",
+  live: "bg-gradient-to-r from-garnet-surface to-garnet-surface-deep text-garnet-on-surface",
   scheduled: "border border-gold-300 bg-gold-50 text-parchment-800",
   invite: "border border-dashed border-parchment-300 bg-parchment-50 text-garnet-700",
 };

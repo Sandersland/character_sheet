@@ -111,7 +111,7 @@ function TurnHubIdle({
           <button
             type="button"
             onClick={handleStartCombat}
-            className="mt-1 w-full rounded-control border border-garnet-300 bg-garnet-700 px-4 py-2.5 text-sm font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
+            className="mt-1 w-full rounded-control border border-garnet-300 bg-garnet-surface px-4 py-2.5 text-sm font-semibold text-garnet-on-surface shadow-sm transition-colors hover:bg-garnet-surface-hover"
           >
             Roll initiative · Start combat
           </button>
@@ -174,7 +174,7 @@ function TurnHubIdle({
         <button
           type="button"
           onClick={handleStartTurn}
-          className="w-full rounded-control border border-garnet-300 bg-garnet-700 px-4 py-2.5 text-sm font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
+          className="w-full rounded-control border border-garnet-300 bg-garnet-surface px-4 py-2.5 text-sm font-semibold text-garnet-on-surface shadow-sm transition-colors hover:bg-garnet-surface-hover"
         >
           Start my turn
         </button>
@@ -283,7 +283,7 @@ function MobileTurnBar({
         type="button"
         disabled={busy}
         onClick={onEndTurn}
-        className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3.5 py-2 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800 disabled:opacity-50"
+        className="shrink-0 rounded-control border border-garnet-300 bg-garnet-surface px-3.5 py-2 text-xs font-semibold text-garnet-on-surface shadow-sm transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
       >
         End turn
       </button>

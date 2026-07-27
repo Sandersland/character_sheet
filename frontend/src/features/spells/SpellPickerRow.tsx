@@ -68,7 +68,7 @@ export default function SpellPickerRow({
             onClick={() => onToggle(spell.id)}
             className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
               state === "selected"
-                ? "border-garnet-700 bg-garnet-700 text-parchment-50"
+                ? "border-garnet-surface bg-garnet-surface text-garnet-on-surface"
                 : "border-garnet-700 bg-parchment-50 text-garnet-700"
             }`}
           >

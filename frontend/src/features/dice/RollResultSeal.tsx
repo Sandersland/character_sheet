@@ -48,10 +48,14 @@ const SLIP_VARIANT: Record<Outcome, string> = {
   normal: "border-parchment-200 shadow-xl",
 };
 
+// Carries its own text color per variant (#994) rather than the shared
+// text-parchment-50 below: fumble/normal sit on the non-inverting
+// garnet-surface pair, so a co-flipping label would go near-black on a
+// saturated dark fill — the exact bug that pair exists to prevent.
 const WAX_VARIANT: Record<Outcome, string> = {
-  critical: "bg-vitality-600",
-  fumble: "bg-garnet-900",
-  normal: "bg-garnet-700",
+  critical: "bg-vitality-600 text-parchment-50",
+  fumble: "bg-garnet-surface-deep text-garnet-on-surface",
+  normal: "bg-garnet-surface text-garnet-on-surface",
 };
 
 export default function RollResultSeal() {
@@ -88,7 +92,7 @@ export default function RollResultSeal() {
         {/* Garnet wax seal pressed into the top of the slip. */}
         <span
           aria-hidden
-          className={`absolute -top-4 flex h-9 w-9 items-center justify-center rounded-full text-parchment-50 shadow-md ${WAX_VARIANT[outcome]}`}
+          className={`absolute -top-4 flex h-9 w-9 items-center justify-center rounded-full shadow-md ${WAX_VARIANT[outcome]}`}
         >
           <span className="font-display text-sm leading-none">d20</span>
         </span>

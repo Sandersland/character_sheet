@@ -283,7 +283,7 @@ export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddI
           type="button"
           disabled={pending}
           onClick={submit}
-          className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+          className="rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
         >
           Add
         </button>

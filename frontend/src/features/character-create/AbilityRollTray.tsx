@@ -38,7 +38,7 @@ export default function AbilityRollTray({ pool, hasAssignments, onRolled }: Abil
         <button
           type="button"
           onClick={handleRoll}
-          className="self-start rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
+          className="self-start rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover"
         >
           {pool ? "Reroll all" : "Roll scores"}
         </button>

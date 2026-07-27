@@ -12,7 +12,7 @@ export default function AddItemFab({ onClick }: AddItemFabProps) {
       type="button"
       onClick={onClick}
       aria-label="Add item"
-      className="fixed right-4 z-40 flex size-[52px] items-center justify-center rounded-full bg-garnet-700 text-parchment-50 shadow-raised transition-colors hover:bg-garnet-800 md:hidden"
+      className="fixed right-4 z-40 flex size-[52px] items-center justify-center rounded-full bg-garnet-surface text-garnet-on-surface shadow-raised transition-colors hover:bg-garnet-surface-hover md:hidden"
       style={{ bottom: "calc(env(safe-area-inset-bottom) + 4.5rem)" }}
     >
       <Plus aria-hidden="true" className="size-6" />

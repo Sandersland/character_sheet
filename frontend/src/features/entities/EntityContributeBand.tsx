@@ -14,7 +14,7 @@ export default function EntityContributeBand({
       <button
         type="button"
         onClick={onEdit}
-        className="rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-800"
+        className="rounded-control bg-garnet-surface px-3 py-1.5 text-xs font-semibold text-garnet-on-surface hover:bg-garnet-surface-hover"
       >
         Add to this entry
       </button>
