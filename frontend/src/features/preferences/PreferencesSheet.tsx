@@ -5,6 +5,7 @@ import BottomSheet from "@/components/ui/BottomSheet";
 import { useTheme } from "@/features/theme/ThemeProvider";
 import { useDiceRollStyle } from "@/features/dice/DiceRollStyleProvider";
 import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentrationPreference";
+import PreferenceSyncNote from "@/features/preferences/PreferenceSyncNote";
 import { THEME_OPTIONS, DICE_OPTIONS, type PreferenceOption } from "@/features/preferences/preferenceOptions";
 
 interface PreferencesSheetProps {
@@ -137,6 +138,7 @@ export default function PreferencesSheet({
                 />
               ))}
             </div>
+            <PreferenceSyncNote preferenceKey="theme" />
           </Section>
 
           <Section title="Dice">
@@ -151,6 +153,7 @@ export default function PreferencesSheet({
                 />
               ))}
             </div>
+            <PreferenceSyncNote preferenceKey="diceRollStyle" />
           </Section>
 
           <Section title="Play automation">
@@ -160,6 +163,7 @@ export default function PreferencesSheet({
               checked={autoRollConcentration}
               onChange={setAutoRollConcentration}
             />
+            <PreferenceSyncNote preferenceKey="autoRollConcentration" />
           </Section>
 
           {campaignId && onOpenCampaignSettings && (

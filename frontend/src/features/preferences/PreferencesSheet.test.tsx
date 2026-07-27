@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "@/test/axe";
 
 import PreferencesSheet from "@/features/preferences/PreferencesSheet";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
+import { PreferencesContext, type PreferenceSyncState } from "@/hooks/usePreferencesSync";
 
 // jsdom's matchMedia stub reports matches:false for every query, so BottomSheet
 // resolves to its mobile drag-to-dismiss close — synthesize the transitionend
@@ -25,6 +27,25 @@ function renderSheet(props: Partial<Parameters<typeof PreferencesSheet>[0]> = {}
         <PreferencesSheet onClose={vi.fn()} {...props} />
       </DiceRollStyleProvider>
     </ThemeProvider>,
+  );
+}
+
+// #1365: a SECOND helper (never modify renderSheet above) that wraps in a
+// real PreferencesContext.Provider — renderSheet's no-provider tree makes
+// setPreference a no-op that can never fail, so a sync-error test built on it
+// would pass for the wrong reason (vacuous — see M-CTRL-B in the PR).
+function renderSheetWithSync(
+  sync: PreferenceSyncState,
+  props: Partial<Parameters<typeof PreferencesSheet>[0]> = {},
+) {
+  return render(
+    <PreferencesContext.Provider value={{ synced: undefined, setPreference: vi.fn(), sync }}>
+      <ThemeProvider>
+        <DiceRollStyleProvider>
+          <PreferencesSheet onClose={vi.fn()} {...props} />
+        </DiceRollStyleProvider>
+      </ThemeProvider>
+    </PreferencesContext.Provider>,
   );
 }
 
@@ -152,5 +173,46 @@ describe("PreferencesSheet (#1167)", () => {
     expect(onClose).not.toHaveBeenCalled();
     fireTransitionEnd(baseElement.querySelector('[role="dialog"]') as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe("sync note (#1365)", () => {
+    it("surfaces a failed theme sync inside the Appearance section", () => {
+      renderSheetWithSync({ saving: {}, errors: { theme: "Not saved — this change stays on this device." } });
+      const appearance = within(screen.getByText("Appearance").closest("fieldset") as HTMLElement);
+      expect(appearance.getByRole("alert")).toBeInTheDocument();
+    });
+
+    it("surfaces a failed dice sync inside the Dice section and nowhere else", () => {
+      renderSheetWithSync({ saving: {}, errors: { diceRollStyle: "Not saved — this change stays on this device." } });
+      const alerts = screen.getAllByRole("alert");
+      expect(alerts).toHaveLength(1);
+      const dice = within(screen.getByText("Dice").closest("fieldset") as HTMLElement);
+      expect(dice.getByRole("alert")).toBeInTheDocument();
+    });
+
+    it("renders no sync note when every preference is idle", () => {
+      renderSheetWithSync({ saving: {}, errors: {} });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("keeps every control enabled while a write is in flight", () => {
+      // The executable form of the F2 decision: unlike CampaignPreferencesFields'
+      // ToggleRow, nothing here goes `disabled` while saving — this write is
+      // optimistic, so disabling would blur a keyboard-focused control and
+      // regress the #1166 click-the-label-text behaviour for no benefit.
+      renderSheetWithSync({ saving: { theme: true, diceRollStyle: true, autoRollConcentration: true }, errors: {} });
+      screen.getAllByRole("radio").forEach((radio) => expect(radio).not.toBeDisabled());
+      expect(
+        screen.getByRole("checkbox", { name: /auto-roll concentration saves/i }),
+      ).not.toBeDisabled();
+    });
+
+    it("has no axe violations while a sync error is showing", async () => {
+      const { container } = renderSheetWithSync({
+        saving: {},
+        errors: { theme: "Not saved — this change stays on this device." },
+      });
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 });
