@@ -57,6 +57,10 @@ export function useRovingRadioGroup(
       e.preventDefault();
       const next = (index + delta + count) % count;
       itemsRef.current[next]?.focus();
+      // UA-default focus scrolling has unspecified alignment (Chrome tends to
+      // centre); a card list capped by an overflow ancestor (#1343) needs to
+      // nudge by one row instead.
+      itemsRef.current[next]?.scrollIntoView({ block: "nearest" });
       onSelect(next);
     },
     [count, onSelect],
