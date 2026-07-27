@@ -18,6 +18,7 @@ import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
+import { assertSeedContentValid } from "./seed/validate.js";
 import { resolveEditionRow, upsertEditionRow, withEditionOrShared } from "../src/lib/rules/catalog-edition.js";
 import { staleCatalogRowsWhere } from "./seed/prune.js";
 import type { SeedEdition } from "./seed/edition.js";
@@ -73,10 +74,14 @@ async function seedClasses(prisma: PrismaClient) {
   return classIds;
 }
 
-// Upsert by (classId, name, edition) unique constraint — edition defaults to
-// null (shared) when a SubclassSeed row doesn't set one (#1306). Prisma's
-// compound-key `where: { classId_name: {...} }` shorthand can't express a null
-// edition (see upsertEditionRow), so this finds-then-writes instead.
+// Upsert by (slug, edition) — the immutable identity key (#1277), not
+// (classId, name, edition): keying on slug is what makes a display-name
+// RENAME a pure content edit (renaming `sub.name` alone under a name-keyed
+// upsert would miss the find, `create` a duplicate row, and hit the new
+// slug_edition index — see R3). `classId`/`name` still flow through as UPDATE
+// fields so a rename actually lands on the existing row. Prisma's compound-key
+// `where: { slug_edition: {...} }` shorthand can't express a null edition (see
+// upsertEditionRow), so this finds-then-writes instead.
 async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string>) {
   for (const sub of SUBCLASSES) {
     const classId = classIds.get(sub.className);
@@ -84,9 +89,9 @@ async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string
     const edition = sub.edition ?? null;
     await upsertEditionRow(
       prisma.subclass,
-      { classId, name: sub.name, edition },
-      { classId, name: sub.name, description: sub.description, edition },
-      { description: sub.description },
+      { slug: sub.slug, edition },
+      { classId, name: sub.name, description: sub.description, slug: sub.slug, edition },
+      { classId, name: sub.name, description: sub.description },
     );
   }
 }
@@ -424,6 +429,10 @@ async function seedPacks(prisma: PrismaClient, itemIdsByName: Map<string, string
 }
 
 async function main() {
+  // Zod-validated seed families (#1277) — fails fast on a malformed row (a
+  // typo'd slug, an empty description, a cross-row duplicate slug) before any
+  // upsert runs, rather than writing a broken catalog row that only 500s later.
+  assertSeedContentValid();
   assertUniqueGrantedAbilityNames([
     ...MANEUVERS,
     ...SHADOW_ARTS,

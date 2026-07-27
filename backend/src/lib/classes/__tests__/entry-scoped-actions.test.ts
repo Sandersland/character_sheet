@@ -14,7 +14,10 @@ describe("deriveEntryScopedActions", () => {
   it("single-class parity: output is identical to a bare deriveActions call", () => {
     const entries = [{ name: "monk", subclass: "warrior of shadow", level: 6 }];
     const entryScoped = deriveEntryScopedActions(entries, 6, [], true);
-    const bare = deriveActions("monk", "warrior of shadow", 6, [], true);
+    // deriveActions is slug-native (#1277) — "warrior of shadow" resolves to
+    // this slug via resolveSubclassSlug, which deriveEntryScopedActions calls
+    // internally; this bare comparison passes the resolved slug directly.
+    const bare = deriveActions("monk", "monk-warrior-of-shadow", 6, [], true);
     expect(entryScoped).toEqual(bare);
   });
 

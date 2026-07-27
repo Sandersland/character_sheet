@@ -10,6 +10,7 @@
 // spells gate at levels 3/5/9/13/17 (CHA), Cleric domain + Warlock expanded
 // lists at 3/3/5/7/9 (Cleric WIS, Warlock CHA) — the 2024 subclass grant is 3
 // (#1128), so the former level-1 rows now fire at 3 pending the content resweep (#1133).
+import { z } from "zod";
 
 export interface SubclassGrantedSpellSeed {
   /** Must match a CLASSES entry name. */
@@ -29,6 +30,20 @@ export interface SubclassGrantedSpellSeed {
     | "wisdom"
     | "charisma";
 }
+
+// Validated at seed time (prisma/seed/validate.ts) — #1247's Elementalism bug
+// (a seeded spell with no grant row) was a REFERENTIAL gap this schema can't
+// catch on its own (that's seed-data.test.ts's job); this schema catches the
+// per-row SHAPE gap (a typo'd castingAbility, an empty name) before either
+// runs. The second family registered in validate.ts's SEED_FAMILIES —
+// demonstrates the registry is genuinely one line per family, not asserted.
+export const subclassGrantedSpellSeedSchema = z.object({
+  className: z.string().min(1),
+  subclassName: z.string().min(1),
+  spellName: z.string().min(1),
+  gateLevel: z.number().int().positive(),
+  castingAbility: z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]),
+});
 
 export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   // Warrior of Shadow (Monk) — Minor Illusion, migrated from the former in-code

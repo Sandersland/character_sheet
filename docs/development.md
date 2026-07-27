@@ -68,3 +68,5 @@ A class/subclass **ability** skips steps 4–5: add one `ABILITY_REGISTRY` entry
 7. **Tests** — mirror `routes/character/__tests__/inventory.test.ts`; lib unit tests for non-trivial pure logic.
 
 **Catalog-table decision:** does the feature need a baseline list players pick from? Yes → catalog table + data-only seed module under `prisma/seed/*.ts` upserted from `prisma/seed.ts`, exposed via `GET /api/<plural>` (like `Spell`, `Item`). No → skip it (like `JournalEntry`). Category-polymorphic content needs detail tables (like `Item*Detail`); flat content doesn't (like `Spell`).
+
+**A new subclass row** additionally needs a slug: add the new member to `SUBCLASS_SLUGS` and its identity to `SUBCLASS_IDENTITY` (`lib/classes/subclass-slug.ts`), the matching literal on the seed row (`prisma/seed/subclasses.ts`) and its `SubclassDefinition` (`lib/classes/<class>.ts`) — the bijection tests in `seed-data.test.ts` fail with a diff if any of the three is missing — four directional checks over the three sides (#1277).

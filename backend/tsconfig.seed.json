@@ -1,0 +1,15 @@
+{
+  // Type-checks prisma/seed alongside src (#1277). backend/tsconfig.json's
+  // `include: ["src"]` never sees prisma/**, so a typed union on a seed field
+  // (e.g. SubclassSeed.slug) was decoration until this program existed — see
+  // seed/subclasses.ts's slug comment. Deliberately EXCLUDES prisma/seed.ts
+  // itself: it carries one pre-existing `improvements` TS2345 (measured
+  // 2026-07-26); widening to include it is a follow-up, not silently masked
+  // here by a broader `include`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["prisma/seed", "src"]
+}

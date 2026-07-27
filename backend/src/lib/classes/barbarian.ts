@@ -175,7 +175,7 @@ export const barbarian: ClassDefinition = {
     },
   ],
   subclasses: {
-    "totem warrior": { grantLevel: 3, features: TOTEM_WARRIOR_FEATURES },
-    berserker: { grantLevel: 3, features: BERSERKER_FEATURES },
+    "totem warrior": { slug: "barbarian-totem-warrior", grantLevel: 3, features: TOTEM_WARRIOR_FEATURES },
+    berserker: { slug: "barbarian-berserker", grantLevel: 3, features: BERSERKER_FEATURES },
   },
 };

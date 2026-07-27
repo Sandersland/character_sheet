@@ -29,6 +29,23 @@ jobs:
       - name: enum-narrowing migrations guarded
         run: sh scripts/check-enum-narrowing.sh
 
+      # Subclass identity must resolve via resolveSubclassSlug, never a
+      # substring match on the freeform display name (#1277). Needs no node,
+      # so it runs before `npm ci` alongside the enum-narrowing gate. Twin of
+      # the lefthook pre-commit job.
+      - name: subclass identity resolved via slug, not substring
+        run: sh scripts/check-subclass-substring.sh
+
+      # Boot-contract gate (#1277 defect 3): needs no node, runs alongside
+      # the other grep gates above.
+      - name: every migrate-deploy boot command also seeds
+        run: sh scripts/check-seed-required.sh
+
+      # AC-4 machine enforcement (#1277): a seed DATA module must carry no
+      # prisma/upsert/await token. Needs no node.
+      - name: seed data modules contain no upsert logic
+        run: sh scripts/check-seed-data-modules.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
@@ -212,6 +229,13 @@ jobs:
         run: npx prisma generate
 
       - run: npm run build
+
+      # `npm run build` (tsc && tsc-alias) never type-checks prisma/seed/*.ts —
+      # backend/tsconfig.json's `include` is src-only. This is the CI leg of
+      # backend's `typecheck` script (tsconfig.seed.json, #1277), which also
+      # type-checks src again — harmless, tsc is fast and idempotent here.
+      - name: Backend typecheck (incl. prisma/seed)
+        run: npm run typecheck --workspace backend
 
       # zod is a real backend/contracts dependency, but the frontend must only
       # ever `import type` from @character-sheet/contracts — a stray value

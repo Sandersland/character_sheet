@@ -24,9 +24,12 @@ export const FOCUS_CAST_CHARACTER_SELECT = {
   rulesEdition: true,
   // Every entry (not just the primary) + its level, so a non-primary Monk's
   // focus gate still resolves via deriveEntryScopedResources (#1072).
+  // subclassRef.slug (#1277) is what deriveEntryScopedActions' cast guard
+  // (shadow-arts.ts) resolves the subclass identity through — see
+  // resolveSubclassSlug.
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, subclass: true, level: true },
+    select: { name: true, subclass: true, level: true, subclassRef: { select: { slug: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 

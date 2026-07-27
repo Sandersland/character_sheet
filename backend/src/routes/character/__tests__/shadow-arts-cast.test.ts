@@ -106,7 +106,9 @@ describe("Shadow Arts cast endpoint", () => {
     const shadow = await upsertEditionRow(
       prisma.subclass,
       { classId, name: "Warrior of Shadow", edition: null },
-      { classId, name: "Warrior of Shadow", description: "Test subclass" },
+      // Distinct from the real seeded "monk-warrior-of-shadow" (#1277) —
+      // this test's Monk class is its own throwaway row.
+      { classId, name: "Warrior of Shadow", description: "Test subclass", slug: "monk-warrior-of-shadow-cast-test" },
       {},
     );
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });

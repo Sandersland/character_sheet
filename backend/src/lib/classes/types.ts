@@ -1,6 +1,8 @@
 // Shared types for the per-class definitions in classes/<class>.ts, flattened
 // by classes/registry.ts into the dispatch tables deriveResources() uses.
 
+import type { SubclassSlug } from "./subclass-slug.js";
+
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
 
 /**
@@ -161,6 +163,14 @@ export type ExtrasFn = (
 ) => ClassExtrasOnly;
 
 export interface SubclassDefinition {
+  /**
+   * Stable mechanics-identity join key (#1277) — must equal the seeded
+   * Subclass row's own `slug` (prisma/seed/subclasses.ts). See
+   * subclass-slug.ts's header for why this lives in a zero-import leaf and
+   * why a declared field here, rather than rekeying the registry.ts SUBCLASSES
+   * map itself, is the chosen shape.
+   */
+  slug: SubclassSlug;
   /**
    * The PHB'14 (2014) level at which this subclass's features/resources/extras
    * first apply — Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, everything else

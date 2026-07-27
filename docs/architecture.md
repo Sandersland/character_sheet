@@ -21,7 +21,7 @@ Ownership: `Character.ownerId` is a required FK. Every character-scoped route re
 
 Three distinct approaches, all in play — pick deliberately:
 
-- **Selection tables** (race/class/background): nullable FK to the catalog **and** an own `name` snapshot. The snapshot is the source of truth (homebrew/renames); the FK is provenance.
+- **Selection tables** (race/class/background/subclass): nullable FK to the catalog **and** an own `name` snapshot. The snapshot is the source of truth for **display** (homebrew/renames); the FK is provenance. Subclass is the exception for **mechanics identity**: the catalog row also carries a stable `slug` (#1277), and a character's mechanics resolve through `resolveSubclassSlug` (FK preferred, exact name as fallback) — never a substring of the display name, which is how a 2014 "Way of Shadow" monk once inherited 2024 "Warrior of Shadow" mechanics (#1339).
 - **Full snapshots** (inventory items, learned spells): at acquire/learn time all catalog fields are copied into the per-character row. After that the catalog is ignored — the snapshot is self-contained and freely editable ("Club" → "Club +1"). No merge-with-catalog logic anywhere.
 - **FK-keyed live reference** (subclass-granted spells): the *mapping* is seeded rows referencing the catalog by FK; content is resolved live at serialize time, never snapshotted. Reach for this when per-character state is "which catalog rows apply" rather than "an owned, editable copy" — it stays in sync automatically and adding content is seed rows, not code. Trade-off: no per-character drift, a live join on read. This is the substrate for data-authored/homebrew content.
 

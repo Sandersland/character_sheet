@@ -63,6 +63,22 @@ pre-commit:
     # aborts on populated rows can be caught before it lands. Also a CI step.
     enum-narrowing:
       run: sh scripts/check-enum-narrowing.sh
+    # Subclass identity must resolve via resolveSubclassSlug, never a
+    # substring match on the freeform display name (#1277 — generalizes
+    # #1339's fix from one gate to the other six). Also a CI step.
+    subclass-substring:
+      run: sh scripts/check-subclass-substring.sh
+    # Boot-contract gate (#1277 defect 3): every Dockerfile running `prisma
+    # migrate deploy` must also run `prisma db seed` — catalog content lives
+    # in the seed, not migrations. Also a CI step.
+    seed-required:
+      run: sh scripts/check-seed-required.sh
+    # AC-4 machine enforcement (#1277): a seed DATA module (everything except
+    # guards.ts/prune.ts/rename-spells.ts) must carry no prisma/upsert/await
+    # token, so a content-only edit can never silently grow upsert logic.
+    # Also a CI step.
+    seed-data-modules:
+      run: sh scripts/check-seed-data-modules.sh
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"
@@ -100,7 +116,9 @@ pre-push:
       run: npx tsc --noEmit
     typecheck-backend:
       root: "backend/"
-      run: npx tsc --noEmit
+      # npm run typecheck (not a bare tsc) so this also runs tsconfig.seed.json
+      # (#1277) — the program that actually type-checks prisma/seed/*.ts.
+      run: npm run typecheck
       fail_text: |
         Backend tsc failed. If errors say a model/enum is missing on PrismaClient
         (e.g. "Property 'x' does not exist"), the generated client is stale for
