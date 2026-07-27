@@ -58,6 +58,11 @@ const THEMES = { light, dark } as const;
 
 describe("garnet brand-surface tokens (#994)", () => {
   it("light values are byte-identical to the ramp they were copied from", () => {
+    // Anti-vacuity: if extractBlock ever silently returns {} (a parsing miss —
+    // wrong selector match, an off-by-one on the block boundary), every
+    // comparison below degenerates to undefined === undefined and passes for
+    // the wrong reason. Prove the parse actually found real tokens first.
+    expect(Object.keys(light).length).toBeGreaterThan(0);
     // A stronger proof of "light mode unchanged" than any screenshot: if this
     // assertion holds, every migrated fill resolves to the exact hex it did
     // before the migration, in light mode, full stop.
@@ -73,6 +78,11 @@ describe("garnet brand-surface tokens (#994)", () => {
     // redeclared under [data-theme="dark"], so it falls through to the same
     // #faf9f7 as light — that's the actual fix for the salmon-label bug.
     const darkOnly = extractBlock(css, '[data-theme="dark"]');
+    // Anti-vacuity: this is the ONE assertion in the file whose entire job is
+    // structural enforcement (on-surface is genuinely absent, not merely equal
+    // across themes) — a silent parse failure returning {} would make the
+    // absence check below pass trivially instead of proving anything.
+    expect(Object.keys(darkOnly).length).toBeGreaterThan(0);
     expect(darkOnly["garnet-on-surface"]).toBeUndefined();
   });
 
