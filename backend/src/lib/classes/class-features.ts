@@ -7,6 +7,7 @@ export {
   deriveEntryScopedResourcesForCharacterRow,
   deriveResources,
   deriveResourcesForCharacterRow,
+  featureAppliesToEdition,
   resolveClassDie,
   SHARED_POOL_MERGE,
 } from "./registry.js";

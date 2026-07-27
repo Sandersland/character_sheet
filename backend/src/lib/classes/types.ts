@@ -1,6 +1,8 @@
 // Shared types for the per-class definitions in classes/<class>.ts, flattened
 // by classes/registry.ts into the dispatch tables deriveResources() uses.
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { SubclassSlug } from "./subclass-slug.js";
 
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
@@ -74,6 +76,14 @@ export interface DerivedFeature {
   level: number;        // character level at which this feature is gained
   description: string;
   source: "class" | "subclass";
+  /**
+   * Absent means valid in both editions (the ~150-entry default). A feature
+   * whose text genuinely diverges between PHB'14 and PHB'24 forks into one
+   * row per edition sharing the same `name` — mirrors `Subclass.edition`
+   * (#1306) — filtered by `featureAppliesToEdition` (registry.ts), the one
+   * place this rule lives. A blanket tagging pass is not wanted (#1374).
+   */
+  edition?: RulesEdition;
 }
 
 /**
