@@ -169,7 +169,7 @@ const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
   },
 ];
 
-// 2024 rewrite (SRD 5.2, #1246): Shadow Arts drops the 2014 flat-2-focus/4-spell
+// 2024 rewrite (PHB'24 p.91, #1246): Shadow Arts drops the 2014 flat-2-focus/4-spell
 // menu for a single 1-focus Darkness cast + passive Minor Illusion/Darkvision
 // grants; Cloak of Shadows moves 11 -> 17 (replacing Opportunist, retired —
 // no 2024 equivalent) and Improved Shadow Step fills the vacated L11 slot.
@@ -259,7 +259,7 @@ const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
   },
 ];
 
-// Warrior of the Elements (2024, PHB'24 p.90 / SRD 5.2) — the 2024 rebuild of
+// Warrior of the Elements (2024, PHB'24 p.90) — the 2024 rebuild of
 // the retired Way of the Four Elements. Four fixed features (no chosen
 // abilities): Manipulate Elements + Elemental Attunement at L3, Elemental
 // Burst at L6, Stride of the Elements at L11, and the Elemental Epitome capstone

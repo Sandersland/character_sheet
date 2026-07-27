@@ -272,7 +272,7 @@ describe("deriveResources — Warrior of the Elements", () => {
   });
 });
 
-// ── Monk — Warrior of Shadow (2024 rewrite, SRD 5.2, #1246) ──────────────────
+// ── Monk — Warrior of Shadow (2024 rewrite, PHB'24 p.91, #1246) ──────────────
 // The Shadow Arts/Cloak of Shadows level gates moved off DerivedClassInfo
 // booleans onto DERIVED_ACTIONS rows (#1315) — see actions.test.ts's "Warrior
 // of Shadow" describe block for that gating coverage.

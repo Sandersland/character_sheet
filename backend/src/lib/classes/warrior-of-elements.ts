@@ -1,4 +1,4 @@
-// Warrior of the Elements (2024, PHB'24 p.90 / SRD 5.2) — the two Focus-spending
+// Warrior of the Elements (2024, PHB'24 p.90) — the two Focus-spending
 // session actions plus the Elemental Strikes rider, built as a dedicated vertical
 // like quivering-palm.ts (a bespoke monk-subclass flow that bypasses the generic
 // action catalog).
@@ -42,7 +42,7 @@ export const ELEMENTAL_ATTUNEMENT_BUFF_KEY = "elementalAttunement";
 const ELEMENTAL_BURST_FOCUS_COST = 2;
 const ELEMENTAL_ATTUNEMENT_FOCUS_COST = 1;
 
-// The five elemental damage types a Warrior of the Elements can deal (SRD 5.2).
+// The five elemental damage types a Warrior of the Elements can deal (PHB'24 p.90).
 // The tuple stays here because the route's z.enum consumes it; the union it used
 // to define lives in shared-types (#1273), latched by resource-wire-contract.test.ts.
 export const ELEMENTAL_DAMAGE_TYPES = ["acid", "cold", "fire", "lightning", "thunder"] as const;
