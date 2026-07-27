@@ -230,7 +230,7 @@ function SendButton({
       onClick={onClick}
       disabled={disabled}
       aria-label="Save note"
-      className={`flex ${dim} shrink-0 items-center justify-center rounded-full bg-garnet-700 text-parchment-50 transition-opacity hover:bg-garnet-800 disabled:opacity-40 ${className}`}
+      className={`flex ${dim} shrink-0 items-center justify-center rounded-full bg-garnet-surface text-garnet-on-surface transition-opacity hover:bg-garnet-surface-hover disabled:opacity-40 ${className}`}
     >
       <ArrowUp aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
     </button>

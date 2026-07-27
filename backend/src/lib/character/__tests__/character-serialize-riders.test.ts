@@ -22,6 +22,7 @@ const CHAR_IDS = [
   "riders-open-hand-l16",
   "riders-open-hand-l17",
   "riders-shadow-l17",
+  "riders-open-handbook-l17",
   "riders-no-classes",
   "riders-rogue3-monk5",
 ];
@@ -238,6 +239,26 @@ describe("serializeCharacter rider contract (#1316)", () => {
     expect(payload).not.toHaveProperty("quiveringPalm");
     // Base monk feature still gates purely on monk level, regardless of subclass.
     expect(payload.stunningStrike).toEqual({ saveDC: 17 });
+  });
+
+  // #1277: openHandMonkEntry used to substring-match ("open hand"), so a
+  // homebrew name merely CONTAINING "Open Hand" incorrectly surfaced both
+  // riders — the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
+  it('a level-17 monk named "Way of the Open Handbook" has neither Open Hand rider', async () => {
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        id: "riders-open-handbook-l17",
+        name: "Open Handbook L17 Snapshot",
+        experiencePoints: 225000, // level 17
+        hitDice: { total: 17, die: "d8", spent: 17 },
+        abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
+        classEntries: { create: [{ name: "monk", position: 0, level: 17, subclass: "Way of the Open Handbook" }] },
+      },
+    });
+    const payload = await serialize("riders-open-handbook-l17");
+    expect(payload).not.toHaveProperty("openHandTechnique");
+    expect(payload).not.toHaveProperty("quiveringPalm");
   });
 
   it("a character with zero class entries carries no rider keys at all", async () => {

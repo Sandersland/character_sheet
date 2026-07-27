@@ -145,6 +145,7 @@ export const ranger: ClassDefinition = {
   features: RANGER_FEATURES,
   subclasses: {
     hunter: {
+      slug: "ranger-hunter",
       grantLevel: 3,
       features: HUNTER_FEATURES,
       // Each Hunter tier is a "choose one" (#899): the option catalog lives as
@@ -171,6 +172,6 @@ export const ranger: ClassDefinition = {
         },
       ],
     },
-    "beast master": { grantLevel: 3, features: BEAST_MASTER_FEATURES },
+    "beast master": { slug: "ranger-beast-master", grantLevel: 3, features: BEAST_MASTER_FEATURES },
   },
 };

@@ -11,7 +11,7 @@ const SLOT_TONES: Record<SlotTone, { border: string; tile: string; useBtn: strin
   garnet: {
     border: "border-garnet-200",
     tile: "bg-garnet-100 text-garnet-700",
-    useBtn: "border-garnet-300 bg-garnet-700 text-parchment-50 hover:bg-garnet-800",
+    useBtn: "border-garnet-300 bg-garnet-surface text-garnet-on-surface hover:bg-garnet-surface-hover",
   },
   arcane: {
     border: "border-arcane-200",
@@ -21,7 +21,7 @@ const SLOT_TONES: Record<SlotTone, { border: string; tile: string; useBtn: strin
   neutral: {
     border: "border-parchment-200",
     tile: "bg-parchment-200 text-parchment-600",
-    useBtn: "border-garnet-300 bg-garnet-700 text-parchment-50 hover:bg-garnet-800",
+    useBtn: "border-garnet-300 bg-garnet-surface text-garnet-on-surface hover:bg-garnet-surface-hover",
   },
 };
 

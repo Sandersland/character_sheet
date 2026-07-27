@@ -154,7 +154,7 @@ export const cleric: ClassDefinition = {
   },
   // PHB'14 p.57: Divine Domain (Cleric's subclass) is chosen at 1st level.
   subclasses: {
-    "life domain": { grantLevel: 1, features: LIFE_DOMAIN_FEATURES },
-    "trickery domain": { grantLevel: 1, features: TRICKERY_DOMAIN_FEATURES },
+    "life domain": { slug: "cleric-life-domain", grantLevel: 1, features: LIFE_DOMAIN_FEATURES },
+    "trickery domain": { slug: "cleric-trickery-domain", grantLevel: 1, features: TRICKERY_DOMAIN_FEATURES },
   },
 };

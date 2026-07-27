@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { exhaustionRollEffects, exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
+import { exhaustionEffectText, exhaustionRollEffects, exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
 
 // SRD 5.2: each exhaustion level reduces Speed by 5 ft (−5 ft×level).
 describe("exhaustionSpeedPenalty — 2024 (SRD 5.2, #1136)", () => {
@@ -114,5 +114,99 @@ describe("exhaustionRollEffects — 2014 (PHB'14 p. 291)", () => {
 
   it("a stray sub-zero level grants nothing", () => {
     expect(exhaustionRollEffects(-2, "EDITION_2014")).toEqual([]);
+  });
+});
+
+// #1322: the display sentence next to the numbers above. Authored in this
+// module (not the frontend) so it can never drift from what
+// exhaustionRollEffects/exhaustionSpeedPenalty actually apply.
+describe("exhaustionEffectText — 2014 (PHB'14 p. 291, Appendix A)", () => {
+  it("level 0: no exhaustion", () => {
+    expect(exhaustionEffectText(0, "EDITION_2014")).toBe("No exhaustion.");
+  });
+
+  it("level 1: disadvantage on ability checks and initiative only — Speed-halved doesn't start until level 2", () => {
+    expect(exhaustionEffectText(1, "EDITION_2014")).toBe(
+      "Disadvantage on ability checks and initiative.",
+    );
+  });
+
+  it("level 2: adds Speed halved", () => {
+    expect(exhaustionEffectText(2, "EDITION_2014")).toBe(
+      "Disadvantage on ability checks and initiative; Speed halved.",
+    );
+  });
+
+  it("2014 level 3 text names every clause the rollModifiers and Speed actually apply (PHB'14 p. 291)", () => {
+    expect(exhaustionEffectText(3, "EDITION_2014")).toBe(
+      "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved.",
+    );
+  });
+
+  it("level 4: adds HP maximum halved (stated per PHB'14 p. 291 even though the app doesn't enforce it yet — #1400)", () => {
+    expect(exhaustionEffectText(4, "EDITION_2014")).toBe(
+      "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved; HP maximum halved.",
+    );
+  });
+
+  it("level 5: Speed 0 replaces Speed halved; HP maximum halved persists", () => {
+    expect(exhaustionEffectText(5, "EDITION_2014")).toBe(
+      "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed 0; HP maximum halved.",
+    );
+  });
+
+  it("level 6: death — no clause list", () => {
+    expect(exhaustionEffectText(6, "EDITION_2014")).toBe("Death.");
+  });
+
+  it("the HP-tier clause is included, honestly reporting an unimplemented rule rather than under-reporting PHB'14 p. 291 (#1400)", () => {
+    expect(exhaustionEffectText(4, "EDITION_2014")).toContain("HP maximum halved");
+  });
+
+  it("clamps out-of-range levels", () => {
+    expect(exhaustionEffectText(-5, "EDITION_2014")).toBe("No exhaustion.");
+    expect(exhaustionEffectText(99, "EDITION_2014")).toBe("Death.");
+  });
+
+  // Names what this actually verifies: the SET of categories, pinned on each
+  // side separately. Deliberately not their order — the sentence reads
+  // attack/check/save/initiative (summarizeRollModifiers' KIND_ORDER) while the
+  // grant array is check/initiative/attack/save, and nothing here reconciles
+  // the two. A character-by-character diff against the rendered banner is not
+  // available either: summarizeRollModifiers is a frontend presenter, so a
+  // backend test importing it would be a boundary-violation (#1272).
+  it("the disadvantage clause names the same categories that exhaustionRollEffects applies at that level", () => {
+    expect(exhaustionEffectText(3, "EDITION_2014")).toContain(
+      "Disadvantage on attack rolls, ability checks, saving throws, and initiative",
+    );
+    expect(exhaustionRollEffects(3, "EDITION_2014").map((e) => e.kind)).toEqual([
+      "check",
+      "initiative",
+      "attack",
+      "save",
+    ]);
+  });
+});
+
+describe("exhaustionEffectText — 2024 (SRD 5.2)", () => {
+  it("level 0: no exhaustion", () => {
+    expect(exhaustionEffectText(0, "EDITION_2024")).toBe("No exhaustion.");
+  });
+
+  it("level 1: −2 on d20 Tests; Speed −5 ft (Unicode minus U+2212, not hyphen-minus)", () => {
+    expect(exhaustionEffectText(1, "EDITION_2024")).toBe("−2 on d20 Tests; Speed −5 ft.");
+  });
+
+  it("level 3: −6 on d20 Tests; Speed −15 ft", () => {
+    expect(exhaustionEffectText(3, "EDITION_2024")).toBe("−6 on d20 Tests; Speed −15 ft.");
+  });
+
+  it("level 6: death", () => {
+    expect(exhaustionEffectText(6, "EDITION_2024")).toBe("Death.");
+  });
+
+  it("clamps out-of-range levels", () => {
+    expect(exhaustionEffectText(-5, "EDITION_2024")).toBe("No exhaustion.");
+    expect(exhaustionEffectText(99, "EDITION_2024")).toBe("Death.");
   });
 });

@@ -4,6 +4,7 @@
 
 import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 
+import type { ConditionKey } from "./combat";
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 
 // The starting-equipment shapes are the single cross-tier source of truth in
@@ -98,6 +99,15 @@ export interface ToolOption {
   weight?: number;
 }
 
+/** One of the 14 standard conditions, resolved for the requested edition
+ *  (#1322) — description is that edition's actual rules text; no
+ *  `rollEffects` (the client already gets resolved `rollModifiers`). */
+export interface ConditionOption {
+  key: ConditionKey;
+  label: string;
+  description: string;
+}
+
 export interface ReferenceData {
   races: RaceOption[];
   classes: ClassOption[];
@@ -105,6 +115,8 @@ export interface ReferenceData {
   alignments: string[];
   /** Artisan's tools for the sheet's Proficiencies-card dropdown. */
   artisanTools: ToolOption[];
+  /** The 14 conditions' rules text, resolved for the requested edition (#1322). */
+  conditions: ConditionOption[];
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills

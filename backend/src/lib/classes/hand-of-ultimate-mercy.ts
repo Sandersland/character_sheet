@@ -22,6 +22,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
+import { resolveSubclassSlug } from "./subclass-slug.js";
 
 export class InvalidHandOfUltimateMercyOperationError extends Error {}
 
@@ -33,7 +34,7 @@ export interface HandOfUltimateMercyResult {
 const HAND_OF_ULTIMATE_MERCY_SELECT = {
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, level: true, subclass: true },
+    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -43,8 +44,11 @@ function monkEntry(row: HandOfUltimateMercyRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
+// Resolved via slug (#1277: FK preferred, exact normalized name as fallback).
+// Was substring-matched on the word "mercy", same as hand-of-harm.ts's copy.
 function isWarriorOfMercy(row: HandOfUltimateMercyRow): boolean {
-  return (monkEntry(row)?.subclass ?? "").toLowerCase().includes("mercy");
+  const monk = monkEntry(row);
+  return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-mercy";
 }
 
 async function useHandOfUltimateMercy(

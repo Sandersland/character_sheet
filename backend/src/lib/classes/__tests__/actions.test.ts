@@ -10,12 +10,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   deriveActions,
+  deriveEntryScopedActions,
   ACTION_EFFECT_FN,
   ACTION_CAST_FN,
   rageMeleeDamageBonus,
   type AvailableAction,
+  type ResourcePool,
 } from "@/lib/classes/actions.js";
 import { monk } from "@/lib/classes/monk.js";
+import { SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -29,30 +32,46 @@ function keys(actions: AvailableAction[]) {
   return actions.map((a) => a.key);
 }
 
+// deriveActions is slug-native now (#1277); `at` goes through the real
+// resolveSubclassSlug-backed resolver (deriveEntryScopedActions) so the
+// display-name fallback path is exercised too, not just the slug. Behaviour-
+// identical to the old bare deriveActions for one entry:
+// effectiveEntryLevel(l, 1, l) === l (effective-levels.ts:9-11) — a rename of
+// every call site below, not a semantic edit. A handful of calls stay direct
+// `deriveActions(cls, "monk-warrior-of-shadow", …)` further down so the
+// slug-native contract is asserted without going through the resolver too.
+const at = (
+  cls: string,
+  subclass: string | undefined,
+  level: number,
+  pools: ResourcePool[] = [],
+  unarmored = true,
+) => deriveEntryScopedActions([{ name: cls, subclass, level }], level, pools, unarmored);
+
 // ── deriveActions ─────────────────────────────────────────────────────────────
 
 describe("deriveActions — class gates", () => {
   it("Fighter L1 gets secondWind, L2 adds actionSurge", () => {
-    const l1 = keys(deriveActions("fighter", undefined, 1, []));
+    const l1 = keys(at("fighter", undefined, 1, []));
     expect(l1).toContain("secondWind");
     expect(l1).not.toContain("actionSurge");
 
-    const l2 = keys(deriveActions("fighter", undefined, 2, []));
+    const l2 = keys(at("fighter", undefined, 2, []));
     expect(l2).toContain("secondWind");
     expect(l2).toContain("actionSurge");
   });
 
   it("Barbarian L1 gets rage, L2 adds recklessAttack", () => {
-    const l1 = keys(deriveActions("barbarian", undefined, 1, []));
+    const l1 = keys(at("barbarian", undefined, 1, []));
     expect(l1).toContain("rage");
     expect(l1).not.toContain("recklessAttack");
 
-    const l2 = keys(deriveActions("barbarian", undefined, 2, []));
+    const l2 = keys(at("barbarian", undefined, 2, []));
     expect(l2).toContain("recklessAttack");
   });
 
   it("Monk L2 gets flurryOfBlows/patientDefense(+Focus)/stepOfTheWind(+Focus); stunningStrike is not a catalog action (#1242)", () => {
-    const l2 = keys(deriveActions("monk", undefined, 2, []));
+    const l2 = keys(at("monk", undefined, 2, []));
     expect(l2).toContain("flurryOfBlows");
     expect(l2).toContain("patientDefense");
     expect(l2).toContain("patientDefenseFocus");
@@ -61,37 +80,37 @@ describe("deriveActions — class gates", () => {
     // Stunning Strike (L5) is a post-hit rider, not a catalog action — see
     // stunning-strike.test.ts (#1242).
     expect(l2).not.toContain("stunningStrike");
-    const l5 = keys(deriveActions("monk", undefined, 5, []));
+    const l5 = keys(at("monk", undefined, 5, []));
     expect(l5).not.toContain("stunningStrike");
   });
 
   it("Monk L1 gets bonusUnarmedStrike (Martial Arts, #1218)", () => {
-    expect(keys(deriveActions("monk", undefined, 1, []))).toContain("bonusUnarmedStrike");
+    expect(keys(at("monk", undefined, 1, []))).toContain("bonusUnarmedStrike");
   });
 
   it("Paladin L1 gets divineSense/layOnHands; L3 adds channelDivinity", () => {
-    const l1 = keys(deriveActions("paladin", undefined, 1, []));
+    const l1 = keys(at("paladin", undefined, 1, []));
     expect(l1).toContain("divineSense");
     expect(l1).toContain("layOnHands");
     expect(l1).not.toContain("channelDivinity");
 
-    const l3 = keys(deriveActions("paladin", undefined, 3, []));
+    const l3 = keys(at("paladin", undefined, 3, []));
     expect(l3).toContain("channelDivinity");
   });
 
   it("Bard L1 gets bardicInspiration; Cleric L2 gets channelDivinity", () => {
-    expect(keys(deriveActions("bard", undefined, 1, []))).toContain("bardicInspiration");
-    expect(keys(deriveActions("cleric", undefined, 2, []))).toContain("channelDivinity");
+    expect(keys(at("bard", undefined, 1, []))).toContain("bardicInspiration");
+    expect(keys(at("cleric", undefined, 2, []))).toContain("channelDivinity");
   });
 
   it("Druid L2 gets wildShape; Rogue L2 gets cunningAction; Sorcerer L3 gets metamagic", () => {
-    expect(keys(deriveActions("druid", undefined, 2, []))).toContain("wildShape");
-    expect(keys(deriveActions("rogue", undefined, 2, []))).toContain("cunningAction");
-    expect(keys(deriveActions("sorcerer", undefined, 3, []))).toContain("metamagic");
+    expect(keys(at("druid", undefined, 2, []))).toContain("wildShape");
+    expect(keys(at("rogue", undefined, 2, []))).toContain("cunningAction");
+    expect(keys(at("sorcerer", undefined, 3, []))).toContain("metamagic");
   });
 
   it("class gate: fighter result contains no barbarian-only actions", () => {
-    const result = keys(deriveActions("fighter", undefined, 20, []));
+    const result = keys(at("fighter", undefined, 20, []));
     expect(result).not.toContain("rage");
     expect(result).not.toContain("recklessAttack");
     expect(result).not.toContain("flurryOfBlows");
@@ -102,7 +121,7 @@ describe("deriveActions — universal actions excluded", () => {
   it("does not include generic actions like attack/dodge/dash", () => {
     // Universal actions (attack, castSpell, dodge, etc.) are handled client-side
     // by turnRules.ts UNIVERSAL_ACTIONS and must NOT appear in availableActions.
-    const result = keys(deriveActions("fighter", undefined, 5, []));
+    const result = keys(at("fighter", undefined, 5, []));
     const universalKeys = ["attack", "castSpell", "dodge", "dash", "disengage", "help", "hide", "search", "ready"];
     for (const key of universalKeys) {
       expect(result).not.toContain(key);
@@ -112,50 +131,50 @@ describe("deriveActions — universal actions excluded", () => {
 
 describe("deriveActions — case-insensitivity", () => {
   it("matches class name regardless of case", () => {
-    expect(keys(deriveActions("Fighter", undefined, 2, []))).toContain("secondWind");
-    expect(keys(deriveActions("FIGHTER", undefined, 2, []))).toContain("actionSurge");
-    expect(keys(deriveActions("Barbarian", undefined, 1, []))).toContain("rage");
+    expect(keys(at("Fighter", undefined, 2, []))).toContain("secondWind");
+    expect(keys(at("FIGHTER", undefined, 2, []))).toContain("actionSurge");
+    expect(keys(at("Barbarian", undefined, 1, []))).toContain("rage");
   });
 });
 
 describe("deriveActions — resource gating", () => {
   it("rage is enabled when remaining > 0", () => {
-    const actions = deriveActions("barbarian", undefined, 1, [pool("rage", 2)]);
+    const actions = at("barbarian", undefined, 1, [pool("rage", 2)]);
     const rage = actions.find((a) => a.key === "rage");
     expect(rage?.enabled).toBe(true);
     expect(rage?.disabledReason).toBeUndefined();
   });
 
   it("rage is disabled with 'No rage remaining' when remaining is 0", () => {
-    const actions = deriveActions("barbarian", undefined, 1, [pool("rage", 0)]);
+    const actions = at("barbarian", undefined, 1, [pool("rage", 0)]);
     const rage = actions.find((a) => a.key === "rage");
     expect(rage?.enabled).toBe(false);
     expect(rage?.disabledReason).toBe("No rage remaining");
   });
 
   it("flurryOfBlows needs 1 focus: disabled with 'No focus remaining' at 0 (#1217)", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
+    const actions = at("monk", undefined, 2, [pool("focus", 0)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(false);
     expect(flurry?.disabledReason).toBe("No focus remaining");
   });
 
   it("flurryOfBlows is enabled when focus >= 1 (still usable without the Attack action)", () => {
-    const actions = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const actions = at("monk", undefined, 2, [pool("focus", 1)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(true);
   });
 
   it("actions without a resourceKey are always enabled", () => {
     // recklessAttack has no resourceKey — should always be enabled.
-    const actions = deriveActions("barbarian", undefined, 2, []);
+    const actions = at("barbarian", undefined, 2, []);
     const reckless = actions.find((a) => a.key === "recklessAttack");
     expect(reckless?.enabled).toBe(true);
   });
 
   it("empty pools default to 0 remaining (action disabled)", () => {
     // No pool entry for "secondWind" → defaults to remaining=0 → disabled.
-    const actions = deriveActions("fighter", undefined, 1, []);
+    const actions = at("fighter", undefined, 1, []);
     const secondWind = actions.find((a) => a.key === "secondWind");
     expect(secondWind?.enabled).toBe(false);
     expect(secondWind?.disabledReason).toBe("No secondWind remaining");
@@ -164,21 +183,21 @@ describe("deriveActions — resource gating", () => {
 
 describe("deriveActions — requiresUnarmored gate (Bonus Unarmed Strike, #1218)", () => {
   it("is enabled when unarmoredUnshielded is true (default)", () => {
-    const actions = deriveActions("monk", undefined, 1, []);
+    const actions = at("monk", undefined, 1, []);
     const bonusUnarmedStrike = actions.find((a) => a.key === "bonusUnarmedStrike");
     expect(bonusUnarmedStrike?.enabled).toBe(true);
     expect(bonusUnarmedStrike?.disabledReason).toBeUndefined();
   });
 
   it("is disabled with 'Requires no armor or Shield' when unarmoredUnshielded is false", () => {
-    const actions = deriveActions("monk", undefined, 1, [], false);
+    const actions = at("monk", undefined, 1, [], false);
     const bonusUnarmedStrike = actions.find((a) => a.key === "bonusUnarmedStrike");
     expect(bonusUnarmedStrike?.enabled).toBe(false);
     expect(bonusUnarmedStrike?.disabledReason).toBe("Requires no armor or Shield");
   });
 
   it("has no resourceKey — spends no resource", () => {
-    const bonusUnarmedStrike = deriveActions("monk", undefined, 1, []).find(
+    const bonusUnarmedStrike = at("monk", undefined, 1, []).find(
       (a) => a.key === "bonusUnarmedStrike",
     );
     expect(bonusUnarmedStrike?.cost).toBe("bonusAction");
@@ -187,7 +206,7 @@ describe("deriveActions — requiresUnarmored gate (Bonus Unarmed Strike, #1218)
 
   it("actions with no requiresUnarmored flag ignore the unarmoredUnshielded param", () => {
     // Rage carries no requiresUnarmored — armored/shielded is irrelevant to it.
-    const actions = deriveActions("barbarian", undefined, 1, [pool("rage", 1)], false);
+    const actions = at("barbarian", undefined, 1, [pool("rage", 1)], false);
     const rage = actions.find((a) => a.key === "rage");
     expect(rage?.enabled).toBe(true);
   });
@@ -269,8 +288,8 @@ describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
   });
 
   it("endRage is a barbarian bonus action from L1", () => {
-    expect(keys(deriveActions("barbarian", undefined, 1, []))).toContain("endRage");
-    expect(keys(deriveActions("fighter", undefined, 20, []))).not.toContain("endRage");
+    expect(keys(at("barbarian", undefined, 1, []))).toContain("endRage");
+    expect(keys(at("fighter", undefined, 20, []))).not.toContain("endRage");
   });
 });
 
@@ -284,14 +303,14 @@ describe("ACTION_EFFECT_FN — monk focus actions", () => {
 
 describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (#1240)", () => {
   it("both are granted at monk L2, in both the free and Focus-spend forms", () => {
-    const l2 = keys(deriveActions("monk", undefined, 2, []));
+    const l2 = keys(at("monk", undefined, 2, []));
     expect(l2).toEqual(
       expect.arrayContaining(["patientDefense", "patientDefenseFocus", "stepOfTheWind", "stepOfTheWindFocus"]),
     );
   });
 
   it("free variants are always enabled — no resourceKey gate — regardless of remaining focus", () => {
-    const noFocus = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
+    const noFocus = at("monk", undefined, 2, [pool("focus", 0)]);
     const patientFree = noFocus.find((a) => a.key === "patientDefense");
     const stepFree = noFocus.find((a) => a.key === "stepOfTheWind");
     expect(patientFree?.enabled).toBe(true);
@@ -299,17 +318,17 @@ describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (
   });
 
   it("Focus variants are gated on 1 remaining focus, like any other resource-gated action", () => {
-    const noFocus = deriveActions("monk", undefined, 2, [pool("focus", 0)]);
+    const noFocus = at("monk", undefined, 2, [pool("focus", 0)]);
     expect(noFocus.find((a) => a.key === "patientDefenseFocus")?.enabled).toBe(false);
     expect(noFocus.find((a) => a.key === "stepOfTheWindFocus")?.enabled).toBe(false);
 
-    const withFocus = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const withFocus = at("monk", undefined, 2, [pool("focus", 1)]);
     expect(withFocus.find((a) => a.key === "patientDefenseFocus")?.enabled).toBe(true);
     expect(withFocus.find((a) => a.key === "stepOfTheWindFocus")?.enabled).toBe(true);
   });
 
   it("Patient Defense reminders name Disengage-only free vs Disengage+Dodge paid", () => {
-    const l2 = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const l2 = at("monk", undefined, 2, [pool("focus", 1)]);
     const patientFree = l2.find((a) => a.key === "patientDefense");
     const patientFocus = l2.find((a) => a.key === "patientDefenseFocus");
     expect(patientFree).toBeDefined();
@@ -321,7 +340,7 @@ describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (
   });
 
   it("Step of the Wind reminders name Dash-only free vs Disengage+Dash+doubled-jump paid", () => {
-    const l2 = deriveActions("monk", undefined, 2, [pool("focus", 1)]);
+    const l2 = at("monk", undefined, 2, [pool("focus", 1)]);
     const stepFree = l2.find((a) => a.key === "stepOfTheWind");
     const stepFocus = l2.find((a) => a.key === "stepOfTheWindFocus");
     expect(stepFree).toBeDefined();
@@ -374,16 +393,16 @@ describe("Heightened Focus (monk L10, #1244) — Patient Defense temp HP + remin
   });
 
   it("patientDefenseFocus reminder names the temp-HP rider only at monk L10+", () => {
-    const l9 = deriveActions("monk", undefined, 9, [pool("focus", 1)]);
-    const l10 = deriveActions("monk", undefined, 10, [pool("focus", 1)]);
+    const l9 = at("monk", undefined, 9, [pool("focus", 1)]);
+    const l10 = at("monk", undefined, 10, [pool("focus", 1)]);
     expect(l9.find((a) => a.key === "patientDefenseFocus")?.reminder).not.toMatch(/temporary hit points/i);
     expect(l10.find((a) => a.key === "patientDefenseFocus")?.reminder).toMatch(/temporary hit points/i);
     expect(l10.find((a) => a.key === "patientDefenseFocus")?.reminder).toMatch(/martial arts die/i);
   });
 
   it("stepOfTheWindFocus reminder names the move-a-willing-creature rider only at monk L10+", () => {
-    const l9 = deriveActions("monk", undefined, 9, [pool("focus", 1)]);
-    const l10 = deriveActions("monk", undefined, 10, [pool("focus", 1)]);
+    const l9 = at("monk", undefined, 9, [pool("focus", 1)]);
+    const l10 = at("monk", undefined, 10, [pool("focus", 1)]);
     expect(l9.find((a) => a.key === "stepOfTheWindFocus")?.reminder).not.toMatch(/creature/i);
     expect(l10.find((a) => a.key === "stepOfTheWindFocus")?.reminder).toMatch(/creature/i);
     expect(l10.find((a) => a.key === "stepOfTheWindFocus")?.reminder).toMatch(/opportunity attack/i);
@@ -395,9 +414,9 @@ describe("Heightened Focus (monk L10, #1244) — Patient Defense temp HP + remin
 // once-per-turn guard, DC math, and fail/success outcome coverage.
 describe("Monk Stunning Strike — not a catalog action (#1242)", () => {
   it("has no DERIVED_ACTIONS entry at any level", () => {
-    expect(keys(deriveActions("monk", undefined, 4, []))).not.toContain("stunningStrike");
-    expect(keys(deriveActions("monk", undefined, 5, []))).not.toContain("stunningStrike");
-    expect(keys(deriveActions("monk", undefined, 20, []))).not.toContain("stunningStrike");
+    expect(keys(at("monk", undefined, 4, []))).not.toContain("stunningStrike");
+    expect(keys(at("monk", undefined, 5, []))).not.toContain("stunningStrike");
+    expect(keys(at("monk", undefined, 20, []))).not.toContain("stunningStrike");
   });
 
   it("has no ACTION_EFFECT_FN entry (post-hit rider, not a selectable action)", () => {
@@ -409,15 +428,15 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
   const SHADOW = "Warrior of Shadow";
 
   it("Shadow monk gets shadowStep as a bonus action at L6, not at L5", () => {
-    expect(keys(deriveActions("monk", SHADOW, 5, []))).not.toContain("shadowStep");
-    const l6 = deriveActions("monk", SHADOW, 6, []);
+    expect(keys(at("monk", SHADOW, 5, []))).not.toContain("shadowStep");
+    const l6 = at("monk", SHADOW, 6, []);
     const shadowStep = l6.find((a) => a.key === "shadowStep");
     expect(shadowStep).toBeDefined();
     expect(shadowStep?.cost).toBe("bonusAction");
   });
 
   it("is always enabled (no resourceKey gate)", () => {
-    const l17 = deriveActions("monk", SHADOW, 17, []);
+    const l17 = at("monk", SHADOW, 17, []);
     const shadowStep = l17.find((a) => a.key === "shadowStep");
     expect(shadowStep?.enabled).toBe(true);
     expect(shadowStep?.disabledReason).toBeUndefined();
@@ -425,28 +444,28 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
 
   it("has no opportunist entry at any level (2014 L17 feature retired)", () => {
     for (const level of [17, 20]) {
-      expect(keys(deriveActions("monk", SHADOW, level, []))).not.toContain("opportunist");
+      expect(keys(at("monk", SHADOW, level, []))).not.toContain("opportunist");
     }
   });
 
   it("subclass gate: a non-Shadow monk doesn't get shadowStep at L17", () => {
-    const openHand = keys(deriveActions("monk", "Warrior of the Open Hand", 17, []));
+    const openHand = keys(at("monk", "Warrior of the Open Hand", 17, []));
     expect(openHand).not.toContain("shadowStep");
-    const noSub = keys(deriveActions("monk", undefined, 17, []));
+    const noSub = keys(at("monk", undefined, 17, []));
     expect(noSub).not.toContain("shadowStep");
   });
 
   it("class gate: a non-monk doesn't get shadowStep even with a Shadow-like subclass", () => {
-    const rogue = keys(deriveActions("rogue", SHADOW, 20, []));
+    const rogue = keys(at("rogue", SHADOW, 20, []));
     expect(rogue).not.toContain("shadowStep");
   });
 
   it("matches the subclass NAME case-insensitively", () => {
-    expect(keys(deriveActions("Monk", "warrior of shadow", 6, []))).toContain("shadowStep");
+    expect(keys(at("Monk", "warrior of shadow", 6, []))).toContain("shadowStep");
   });
 
   it("carries its rule text as a reminder for in-session surfacing", () => {
-    const l6 = deriveActions("monk", SHADOW, 6, []);
+    const l6 = at("monk", SHADOW, 6, []);
     const shadowStep = l6.find((a) => a.key === "shadowStep");
     expect(shadowStep?.reminder).toMatch(/teleport/i);
     expect(shadowStep?.reminder).toMatch(/dim light|darkness/i);
@@ -454,15 +473,15 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
   });
 
   it("Improved Shadow Step (L11) upgrades the reminder in place — no separate catalog row", () => {
-    const l10 = deriveActions("monk", SHADOW, 10, []).find((a) => a.key === "shadowStep");
-    const l11 = deriveActions("monk", SHADOW, 11, []).find((a) => a.key === "shadowStep");
+    const l10 = at("monk", SHADOW, 10, []).find((a) => a.key === "shadowStep");
+    const l11 = at("monk", SHADOW, 11, []).find((a) => a.key === "shadowStep");
     expect(l10?.reminder).not.toMatch(/1 focus/i);
     expect(l11?.reminder).toMatch(/1 focus/i);
-    expect(keys(deriveActions("monk", SHADOW, 11, []))).not.toContain("improvedShadowStep");
+    expect(keys(at("monk", SHADOW, 11, []))).not.toContain("improvedShadowStep");
   });
 
   it("resource-gated class actions carry no reminder (reminder is Shadow-only)", () => {
-    const flurry = deriveActions("monk", SHADOW, 17, []).find((a) => a.key === "flurryOfBlows");
+    const flurry = at("monk", SHADOW, 17, []).find((a) => a.key === "flurryOfBlows");
     expect(flurry?.reminder).toBeUndefined();
   });
 
@@ -474,8 +493,8 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
 
 describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   it("is granted at monk L3 as a reaction with no resourceKey (free reminder, base reduction costs nothing)", () => {
-    expect(keys(deriveActions("monk", undefined, 2, []))).not.toContain("deflectAttacks");
-    const l3 = deriveActions("monk", undefined, 3, []);
+    expect(keys(at("monk", undefined, 2, []))).not.toContain("deflectAttacks");
+    const l3 = at("monk", undefined, 3, []);
     const deflect = l3.find((a) => a.key === "deflectAttacks");
     expect(deflect).toBeDefined();
     expect(deflect?.cost).toBe("reaction");
@@ -484,7 +503,7 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   });
 
   it("carries its rule text as a reminder for in-session surfacing", () => {
-    const deflect = deriveActions("monk", undefined, 3, []).find((a) => a.key === "deflectAttacks");
+    const deflect = at("monk", undefined, 3, []).find((a) => a.key === "deflectAttacks");
     expect(deflect?.reminder).toMatch(/bludgeoning, piercing, or slashing/i);
     expect(deflect?.reminder).toMatch(/reaction/i);
   });
@@ -498,8 +517,8 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   });
 
   it("deflectAttacksRedirect is granted at monk L3 as a free-cost Focus spend", () => {
-    expect(keys(deriveActions("monk", undefined, 2, []))).not.toContain("deflectAttacksRedirect");
-    const l3 = deriveActions("monk", undefined, 3, [pool("focus", 3)]);
+    expect(keys(at("monk", undefined, 2, []))).not.toContain("deflectAttacksRedirect");
+    const l3 = at("monk", undefined, 3, [pool("focus", 3)]);
     const redirect = l3.find((a) => a.key === "deflectAttacksRedirect");
     expect(redirect).toBeDefined();
     expect(redirect?.cost).toBe("free");
@@ -507,7 +526,7 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   });
 
   it("deflectAttacksRedirect is disabled with no Focus remaining", () => {
-    const redirect = deriveActions("monk", undefined, 3, [pool("focus", 0)]).find(
+    const redirect = at("monk", undefined, 3, [pool("focus", 0)]).find(
       (a) => a.key === "deflectAttacksRedirect",
     );
     expect(redirect?.enabled).toBe(false);
@@ -521,7 +540,7 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   });
 
   it("class gate: a non-monk gets neither key", () => {
-    const fighter = keys(deriveActions("fighter", undefined, 20, []));
+    const fighter = keys(at("fighter", undefined, 20, []));
     expect(fighter).not.toContain("deflectAttacks");
     expect(fighter).not.toContain("deflectAttacksRedirect");
   });
@@ -598,17 +617,17 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
   const OPEN_HAND = "Warrior of the Open Hand";
 
   it("Open Hand monk gets wholenessOfBody as a bonus action at L6, not at L5", () => {
-    expect(keys(deriveActions("monk", OPEN_HAND, 5, []))).not.toContain("wholenessOfBody");
-    const l6 = deriveActions("monk", OPEN_HAND, 6, []);
+    expect(keys(at("monk", OPEN_HAND, 5, []))).not.toContain("wholenessOfBody");
+    const l6 = at("monk", OPEN_HAND, 6, []);
     const wholeness = l6.find((a) => a.key === "wholenessOfBody");
     expect(wholeness).toBeDefined();
     expect(wholeness?.cost).toBe("bonusAction");
   });
 
   it("wholenessOfBody is gated on the wholenessOfBody pool like any other resource-gated action", () => {
-    const noUses = deriveActions("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 0)]);
+    const noUses = at("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 0)]);
     expect(noUses.find((a) => a.key === "wholenessOfBody")?.enabled).toBe(false);
-    const withUses = deriveActions("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 1)]);
+    const withUses = at("monk", OPEN_HAND, 6, [pool("wholenessOfBody", 1)]);
     expect(withUses.find((a) => a.key === "wholenessOfBody")?.enabled).toBe(true);
   });
 
@@ -626,8 +645,8 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
   });
 
   it("Open Hand monk gets fleetStep as a free-cost reminder at L11, not at L10", () => {
-    expect(keys(deriveActions("monk", OPEN_HAND, 10, []))).not.toContain("fleetStep");
-    const l11 = deriveActions("monk", OPEN_HAND, 11, []);
+    expect(keys(at("monk", OPEN_HAND, 10, []))).not.toContain("fleetStep");
+    const l11 = at("monk", OPEN_HAND, 11, []);
     const fleetStep = l11.find((a) => a.key === "fleetStep");
     expect(fleetStep).toBeDefined();
     expect(fleetStep?.cost).toBe("free");
@@ -641,16 +660,16 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
   });
 
   it("subclass gate: a non-Open-Hand monk gets neither at L11+", () => {
-    const shadow = keys(deriveActions("monk", "Warrior of Shadow", 17, []));
+    const shadow = keys(at("monk", "Warrior of Shadow", 17, []));
     expect(shadow).not.toContain("wholenessOfBody");
     expect(shadow).not.toContain("fleetStep");
-    const noSub = keys(deriveActions("monk", undefined, 17, []));
+    const noSub = keys(at("monk", undefined, 17, []));
     expect(noSub).not.toContain("wholenessOfBody");
     expect(noSub).not.toContain("fleetStep");
   });
 
   it("Open Hand Technique and Quivering Palm are post-hit riders, not catalog actions", () => {
-    const l20 = keys(deriveActions("monk", OPEN_HAND, 20, []));
+    const l20 = keys(at("monk", OPEN_HAND, 20, []));
     expect(l20).not.toContain("openHandTechnique");
     expect(l20).not.toContain("quiveringPalm");
     expect(ACTION_EFFECT_FN.openHandTechnique).toBeUndefined();
@@ -662,7 +681,7 @@ describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
   const MERCY = "Warrior of Mercy";
 
   it("Warrior of Mercy monk gets handOfHealing (action) and handOfHealingFlurry (bonus action) at L3", () => {
-    const l3 = deriveActions("monk", MERCY, 3, []);
+    const l3 = at("monk", MERCY, 3, []);
     const healing = l3.find((a) => a.key === "handOfHealing");
     expect(healing).toBeDefined();
     expect(healing?.cost).toBe("action");
@@ -672,14 +691,14 @@ describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
   });
 
   it("handOfHealing is gated on the focus pool like any other resource-gated action", () => {
-    const noFocus = deriveActions("monk", MERCY, 3, [pool("focus", 0)]);
+    const noFocus = at("monk", MERCY, 3, [pool("focus", 0)]);
     expect(noFocus.find((a) => a.key === "handOfHealing")?.enabled).toBe(false);
-    const withFocus = deriveActions("monk", MERCY, 3, [pool("focus", 1)]);
+    const withFocus = at("monk", MERCY, 3, [pool("focus", 1)]);
     expect(withFocus.find((a) => a.key === "handOfHealing")?.enabled).toBe(true);
   });
 
   it("handOfHealingFlurry has no resource gate — it's always enabled once granted", () => {
-    const noFocus = deriveActions("monk", MERCY, 3, [pool("focus", 0)]);
+    const noFocus = at("monk", MERCY, 3, [pool("focus", 0)]);
     expect(noFocus.find((a) => a.key === "handOfHealingFlurry")?.enabled).toBe(true);
   });
 
@@ -703,16 +722,16 @@ describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
   });
 
   it("subclass gate: a non-Warrior-of-Mercy monk gets neither at L3+", () => {
-    const shadow = keys(deriveActions("monk", "Way of Shadow", 20, []));
+    const shadow = keys(at("monk", "Way of Shadow", 20, []));
     expect(shadow).not.toContain("handOfHealing");
     expect(shadow).not.toContain("handOfHealingFlurry");
-    const noSub = keys(deriveActions("monk", undefined, 20, []));
+    const noSub = keys(at("monk", undefined, 20, []));
     expect(noSub).not.toContain("handOfHealing");
     expect(noSub).not.toContain("handOfHealingFlurry");
   });
 
   it("Hand of Harm and Hand of Ultimate Mercy are dedicated verticals, not catalog actions", () => {
-    const l20 = keys(deriveActions("monk", MERCY, 20, []));
+    const l20 = keys(at("monk", MERCY, 20, []));
     expect(l20).not.toContain("handOfHarm");
     expect(l20).not.toContain("handOfUltimateMercy");
     expect(ACTION_EFFECT_FN.handOfHarm).toBeUndefined();
@@ -751,7 +770,9 @@ describe("ACTION_EFFECT_FN — useObject", () => {
 // fleetStep above. The dedicated endpoint (shadow-arts.ts) still owns the
 // actual cast/activate — these rows only express the level gate as data.
 describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#1315)", () => {
-  const SHADOW = "Warrior of Shadow";
+  // Direct deriveActions calls with a slug literal (not `at()`) — asserts the
+  // slug-native contract itself, not just the name-fallback path (#1277).
+  const SHADOW: SubclassSlug = "monk-warrior-of-shadow";
 
   it("Shadow monk gets shadowArts at L3, not L2", () => {
     expect(keys(deriveActions("monk", SHADOW, 2, []))).not.toContain("shadowArts");
@@ -784,10 +805,10 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
   });
 
   it("subclass gate: a non-Shadow monk gets neither at any level", () => {
-    const openHand = keys(deriveActions("monk", "Warrior of the Open Hand", 20, [pool("focus", 5)]));
+    const openHand = keys(at("monk", "Warrior of the Open Hand", 20, [pool("focus", 5)]));
     expect(openHand).not.toContain("shadowArts");
     expect(openHand).not.toContain("cloakOfShadows");
-    const noSub = keys(deriveActions("monk", undefined, 20, [pool("focus", 5)]));
+    const noSub = keys(at("monk", undefined, 20, [pool("focus", 5)]));
     expect(noSub).not.toContain("shadowArts");
     expect(noSub).not.toContain("cloakOfShadows");
   });
@@ -804,35 +825,35 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
   const ELEMENTS = "Warrior of the Elements";
 
   it("gets elementalAttunement at L3, not L2, as a no-action (free) toggle", () => {
-    expect(keys(deriveActions("monk", ELEMENTS, 2, []))).not.toContain("elementalAttunement");
-    const l3 = deriveActions("monk", ELEMENTS, 3, [pool("focus", 1)]);
+    expect(keys(at("monk", ELEMENTS, 2, []))).not.toContain("elementalAttunement");
+    const l3 = at("monk", ELEMENTS, 3, [pool("focus", 1)]);
     const attune = l3.find((a) => a.key === "elementalAttunement");
     expect(attune).toBeDefined();
     expect(attune?.cost).toBe("free");
   });
 
   it("gets elementalBurst at L6, not L5, as a Magic action", () => {
-    expect(keys(deriveActions("monk", ELEMENTS, 5, []))).not.toContain("elementalBurst");
-    const l6 = deriveActions("monk", ELEMENTS, 6, [pool("focus", 2)]);
+    expect(keys(at("monk", ELEMENTS, 5, []))).not.toContain("elementalBurst");
+    const l6 = at("monk", ELEMENTS, 6, [pool("focus", 2)]);
     const burst = l6.find((a) => a.key === "elementalBurst");
     expect(burst).toBeDefined();
     expect(burst?.cost).toBe("action");
   });
 
   it("elementalAttunement costs 1 focus, elementalBurst costs 2", () => {
-    const noFocus = deriveActions("monk", ELEMENTS, 6, [pool("focus", 0)]);
+    const noFocus = at("monk", ELEMENTS, 6, [pool("focus", 0)]);
     expect(noFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(false);
     expect(noFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
-    const oneFocus = deriveActions("monk", ELEMENTS, 6, [pool("focus", 1)]);
+    const oneFocus = at("monk", ELEMENTS, 6, [pool("focus", 1)]);
     expect(oneFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(true);
     expect(oneFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
   });
 
   it("subclass gate: a non-Elements monk gets neither at any level", () => {
-    const shadow = keys(deriveActions("monk", "Warrior of Shadow", 20, [pool("focus", 5)]));
+    const shadow = keys(at("monk", "Warrior of Shadow", 20, [pool("focus", 5)]));
     expect(shadow).not.toContain("elementalAttunement");
     expect(shadow).not.toContain("elementalBurst");
-    const noSub = keys(deriveActions("monk", undefined, 20, [pool("focus", 5)]));
+    const noSub = keys(at("monk", undefined, 20, [pool("focus", 5)]));
     expect(noSub).not.toContain("elementalAttunement");
     expect(noSub).not.toContain("elementalBurst");
   });
@@ -856,26 +877,26 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
 // new grantClasses shape).
 describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (#1340)", () => {
   it("granted class gate: cleric reaches it at L2, paladin at L3, in isolation", () => {
-    expect(keys(deriveActions("cleric", undefined, 1, []))).not.toContain("channelDivinity");
-    expect(keys(deriveActions("cleric", undefined, 2, []))).toContain("channelDivinity");
-    expect(keys(deriveActions("paladin", undefined, 2, []))).not.toContain("channelDivinity");
-    expect(keys(deriveActions("paladin", undefined, 3, []))).toContain("channelDivinity");
+    expect(keys(at("cleric", undefined, 1, []))).not.toContain("channelDivinity");
+    expect(keys(at("cleric", undefined, 2, []))).toContain("channelDivinity");
+    expect(keys(at("paladin", undefined, 2, []))).not.toContain("channelDivinity");
+    expect(keys(at("paladin", undefined, 3, []))).toContain("channelDivinity");
   });
 
   it("no other class gets it at any level", () => {
-    expect(keys(deriveActions("fighter", undefined, 20, []))).not.toContain("channelDivinity");
-    expect(keys(deriveActions("bard", undefined, 20, []))).not.toContain("channelDivinity");
+    expect(keys(at("fighter", undefined, 20, []))).not.toContain("channelDivinity");
+    expect(keys(at("bard", undefined, 20, []))).not.toContain("channelDivinity");
   });
 
   it("the reminder names both classes' effect menus", () => {
-    const cleric = deriveActions("cleric", undefined, 2, []).find((a) => a.key === "channelDivinity");
+    const cleric = at("cleric", undefined, 2, []).find((a) => a.key === "channelDivinity");
     expect(cleric?.reminder).toMatch(/Cleric/);
     expect(cleric?.reminder).toMatch(/Paladin/);
   });
 
   it("spends the channelDivinity pool, gated on the merged remaining count", () => {
     expect(ACTION_EFFECT_FN.channelDivinity({})).toEqual([{ type: "spendResource", key: "channelDivinity" }]);
-    const disabled = deriveActions("cleric", undefined, 2, [pool("channelDivinity", 0)]).find(
+    const disabled = at("cleric", undefined, 2, [pool("channelDivinity", 0)]).find(
       (a) => a.key === "channelDivinity",
     );
     expect(disabled?.enabled).toBe(false);
@@ -888,86 +909,84 @@ describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (
   });
 });
 
-// #1339: DERIVED_ACTIONS' subclass gate used to substring-match
-// (`sub.includes(a.grantSubclass.toLowerCase())`), so a 2014 "Way of Shadow"
-// monk (PHB'14 p.80) passed the 2024 "Warrior of Shadow" (PHB'24 p.91) gate
-// purely because "shadow" ⊂ "way of shadow". The gate now matches the
-// character's subclass EXACTLY (normalized: lowercased + trimmed) against a
-// list of accepted names — the subclass-registry key vocabulary (monk.ts's
-// `subclasses` map) — so the action gate agrees with deriveResources, which
-// already resolves subclasses by exact lowercase registry key.
-describe("subclass gate is exact-name, not substring (#1339)", () => {
+// #1339 fixed this ONE gate's substring bleed (a 2014 "Way of Shadow" monk
+// passing the 2024 "Warrior of Shadow" gate purely because "shadow" ⊂ "way of
+// shadow") by matching the display name EXACTLY. #1277 replaces that exact-
+// name table with resolveSubclassSlug (FK preferred, exact name as fallback)
+// — this block now exercises the fallback path via `at()`, which resolves
+// through the real resolver, so a display-name gate and a slug gate are
+// asserted by the SAME mechanism.
+describe("subclass gate resolves via slug — FK preferred, exact name as fallback, never substring (#1339, #1277)", () => {
   it('a 2014 "Way of Shadow" monk gets none of the Warrior of Shadow rows at L20', () => {
-    const wayOfShadow = keys(deriveActions("monk", "Way of Shadow", 20, [pool("focus", 5)]));
+    const wayOfShadow = keys(at("monk", "Way of Shadow", 20, [pool("focus", 5)]));
     expect(wayOfShadow).not.toContain("shadowArts");
     expect(wayOfShadow).not.toContain("cloakOfShadows");
     expect(wayOfShadow).not.toContain("shadowStep");
   });
 
   it('the 2024 "Warrior of Shadow" monk is unaffected at every gate level', () => {
-    expect(keys(deriveActions("monk", "Warrior of Shadow", 2, []))).not.toContain("shadowArts");
-    expect(keys(deriveActions("monk", "Warrior of Shadow", 3, [pool("focus", 1)]))).toContain("shadowArts");
-    expect(keys(deriveActions("monk", "Warrior of Shadow", 5, []))).not.toContain("shadowStep");
-    expect(keys(deriveActions("monk", "Warrior of Shadow", 6, []))).toContain("shadowStep");
-    expect(keys(deriveActions("monk", "Warrior of Shadow", 16, [pool("focus", 3)]))).not.toContain("cloakOfShadows");
-    expect(keys(deriveActions("monk", "Warrior of Shadow", 17, [pool("focus", 3)]))).toContain("cloakOfShadows");
+    expect(keys(at("monk", "Warrior of Shadow", 2, []))).not.toContain("shadowArts");
+    expect(keys(at("monk", "Warrior of Shadow", 3, [pool("focus", 1)]))).toContain("shadowArts");
+    expect(keys(at("monk", "Warrior of Shadow", 5, []))).not.toContain("shadowStep");
+    expect(keys(at("monk", "Warrior of Shadow", 6, []))).toContain("shadowStep");
+    expect(keys(at("monk", "Warrior of Shadow", 16, [pool("focus", 3)]))).not.toContain("cloakOfShadows");
+    expect(keys(at("monk", "Warrior of Shadow", 17, [pool("focus", 3)]))).toContain("cloakOfShadows");
   });
 
   it("a homebrew name containing a seeded subclass's name inherits nothing", () => {
     const openHandbook = keys(
-      deriveActions("monk", "Warrior of the Open Handbook", 20, [pool("wholenessOfBody", 5)]),
+      at("monk", "Warrior of the Open Handbook", 20, [pool("wholenessOfBody", 5)]),
     );
     expect(openHandbook).not.toContain("wholenessOfBody");
     expect(openHandbook).not.toContain("fleetStep");
 
-    const mercyReborn = keys(deriveActions("monk", "Way of Mercy Reborn", 20, [pool("focus", 5)]));
+    const mercyReborn = keys(at("monk", "Way of Mercy Reborn", 20, [pool("focus", 5)]));
     expect(mercyReborn).not.toContain("handOfHealing");
     expect(mercyReborn).not.toContain("handOfHealingFlurry");
 
-    const elementsPrime = keys(deriveActions("monk", "Warrior of the Elements Prime", 20, [pool("focus", 5)]));
+    const elementsPrime = keys(at("monk", "Warrior of the Elements Prime", 20, [pool("focus", 5)]));
     expect(elementsPrime).not.toContain("elementalAttunement");
     expect(elementsPrime).not.toContain("elementalBurst");
   });
 
   it("normalizes case and stray whitespace on both sides", () => {
-    expect(keys(deriveActions("Monk", "  WARRIOR OF SHADOW  ", 6, []))).toContain("shadowStep");
+    expect(keys(at("Monk", "  WARRIOR OF SHADOW  ", 6, []))).toContain("shadowStep");
   });
 
   it("the other three families still match their registry names exactly", () => {
-    const elements = keys(deriveActions("monk", "warrior of the elements", 6, [pool("focus", 2)]));
+    const elements = keys(at("monk", "warrior of the elements", 6, [pool("focus", 2)]));
     expect(elements).toContain("elementalAttunement");
     expect(elements).toContain("elementalBurst");
 
-    const openHand = keys(deriveActions("monk", "warrior of the open hand", 11, [pool("wholenessOfBody", 1)]));
+    const openHand = keys(at("monk", "warrior of the open hand", 11, [pool("wholenessOfBody", 1)]));
     expect(openHand).toContain("wholenessOfBody");
     expect(openHand).toContain("fleetStep");
 
-    const mercy = keys(deriveActions("monk", "warrior of mercy", 3, [pool("focus", 1)]));
+    const mercy = keys(at("monk", "warrior of mercy", 3, [pool("focus", 1)]));
     expect(mercy).toContain("handOfHealing");
     expect(mercy).toContain("handOfHealingFlurry");
   });
 
-  // Drift latch: under exact matching a mistyped accepted name silently grants
-  // nothing (substring matching over-matched loudly; exact matching
-  // under-matches silently) — this table pins each accepted name to the keys
-  // it must unlock at L20, so a typo in a row's grantSubclasses list fails
-  // HERE instead of shipping quiet (#1339).
-  //
-  // The table is hand-maintained because DERIVED_ACTIONS is deliberately
-  // unexported: a NEW subclass-gated row must be added here and to the
-  // registry-key check below, or the latch silently stops covering it. That
-  // trade-off is accepted rather than widening the module's public surface;
-  // #1277 replaces the vocabulary with slugs and can derive both from the
-  // catalog instead.
-  it("every subclass-gated row is reachable from its accepted name (#1339)", () => {
-    const ACCEPTED_NAME_KEYS: Record<string, string[]> = {
-      "warrior of shadow": ["shadowStep", "shadowArts", "cloakOfShadows"],
-      "warrior of the elements": ["elementalAttunement", "elementalBurst"],
-      "warrior of the open hand": ["wholenessOfBody", "fleetStep"],
-      "warrior of mercy": ["handOfHealing", "handOfHealingFlurry"],
-    };
-    for (const [name, expectedKeys] of Object.entries(ACCEPTED_NAME_KEYS)) {
-      const granted = keys(deriveActions("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5)]));
+  // Drift latch, RETARGETED for #1277: was a hand-maintained
+  // Record<string, string[]> keyed by display name (DERIVED_ACTIONS being
+  // unexported meant a new subclass-gated row needed adding here by hand or
+  // the latch silently stopped covering it). The key type now widens to
+  // Record<Extract<SubclassSlug, `monk-${string}`>, string[]> — exhaustive
+  // over EVERY monk slug, so a fifth monk subclass fails TYPECHECK instead of
+  // silently escaping the latch (strictly stronger than the old hand-
+  // maintained table). Still exercises the name-fallback path at runtime: for
+  // each slug, resolve its accepted NAME via SUBCLASS_IDENTITY and call
+  // through `at()`, so this is the same mechanism the FK path uses, minus the FK.
+  const MONK_SUBCLASS_GRANT_KEYS: Record<Extract<SubclassSlug, `monk-${string}`>, string[]> = {
+    "monk-warrior-of-shadow": ["shadowStep", "shadowArts", "cloakOfShadows"],
+    "monk-warrior-of-the-elements": ["elementalAttunement", "elementalBurst"],
+    "monk-warrior-of-the-open-hand": ["wholenessOfBody", "fleetStep"],
+    "monk-warrior-of-mercy": ["handOfHealing", "handOfHealingFlurry"],
+  };
+  it("every subclass-gated row is reachable from its accepted name (#1339, retargeted #1277)", () => {
+    for (const [slug, expectedKeys] of Object.entries(MONK_SUBCLASS_GRANT_KEYS) as [SubclassSlug, string[]][]) {
+      const name = SUBCLASS_IDENTITY[slug].nameKey;
+      const granted = keys(at("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5)]));
       for (const key of expectedKeys) {
         expect(granted).toContain(key);
       }
@@ -975,19 +994,16 @@ describe("subclass gate is exact-name, not substring (#1339)", () => {
   });
 
   // Ties the DERIVED_ACTIONS vocabulary to the subclasses-registry vocabulary
-  // (monk.ts's `subclasses` map) — deriveResources already resolves
-  // subclasses by exact lowercase registry key, so this proves the action
-  // gate can't silently drift from the resource/feature gate (#1339).
-  it("every accepted subclass name is a monk subclasses-registry key (#1339)", () => {
-    const registryKeys = Object.keys(monk.subclasses ?? {});
-    const acceptedNames = [
-      "warrior of shadow",
-      "warrior of the elements",
-      "warrior of the open hand",
-      "warrior of mercy",
-    ];
-    for (const name of acceptedNames) {
-      expect(registryKeys).toContain(name);
+  // (monk.ts's `subclasses` map) — RETARGETED for #1277: was "every accepted
+  // NAME is a registry key" (validity was runtime-checked here); now every
+  // grantSubclassSlugs entry must be a monk SubclassDefinition's OWN slug, and
+  // the *validity* half (is it a real SubclassSlug at all) is the compiler's
+  // job via the Record type above — this test keeps only the "agrees with the
+  // resource/feature gate's identity" half, which the compiler can't check.
+  it("every grantSubclassSlugs entry is a monk subclass definition's slug (#1339, retargeted #1277)", () => {
+    const monkDefSlugs = Object.values(monk.subclasses ?? {}).map((sub) => sub.slug);
+    for (const slug of Object.keys(MONK_SUBCLASS_GRANT_KEYS) as SubclassSlug[]) {
+      expect(monkDefSlugs).toContain(slug);
     }
   });
 });
@@ -1018,7 +1034,7 @@ describe("no two DERIVED_ACTIONS rows from different classes share a display nam
     const classesByName = new Map<string, Set<string>>();
     for (const [className, subclasses] of Object.entries(CLASS_SUBCLASSES)) {
       for (const subclass of subclasses) {
-        for (const action of deriveActions(className, subclass, 20, [])) {
+        for (const action of at(className, subclass, 20, [])) {
           const classes = classesByName.get(action.name) ?? new Set<string>();
           classes.add(className);
           classesByName.set(action.name, classes);

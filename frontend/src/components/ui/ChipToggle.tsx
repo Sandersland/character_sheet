@@ -17,7 +17,7 @@ export default function ChipToggle({ pressed, onChange, children, className = ""
       className={[
         "rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600",
         pressed
-          ? "border-garnet-600 bg-garnet-700 text-parchment-50"
+          ? "border-garnet-600 bg-garnet-surface text-garnet-on-surface"
           : "border-parchment-300 bg-parchment-50 text-parchment-700 hover:bg-parchment-200",
         className,
       ].join(" ")}

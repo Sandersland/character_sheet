@@ -1,9 +1,10 @@
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
-import { deriveAttacksPerAction, deriveRangedAttackRollBonus } from "@/lib/srd/srd.js";
+import { deriveAttacksPerAction, deriveRangedAttackRollBonus, exhaustionEffectText } from "@/lib/srd/srd.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { focusSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
+import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -60,19 +61,16 @@ function stunningStrikeRider(
   return monkLevel >= 5 ? { saveDC: focusSaveDC(abilityScores, profBonus) } : undefined;
 }
 
+type RiderClassEntry = SubclassIdentityInput & { name: string; level: number };
+
 // Warrior of the Open Hand's monk class entry, or undefined off-subclass —
-// shared by openHandTechniqueRider/quiveringPalmRider so both gate on the
-// same freeform, substring-matched subclass string. Still substring-matched
-// here, like isWarriorOfTheOpenHand (Open Hand Technique, Quivering Palm),
-// isWarriorOfMercy (Hand of Harm, Hand of Ultimate Mercy), and
-// attacksForClass's Valor-bard check — matchesActionGate no longer is, since
-// #1339 made that one gate's subclass axis exact-name; #1277 retires all six
-// onto a stable slug.
-function openHandMonkEntry(
-  classEntries: { name: string; level: number; subclass?: string | null }[],
-): { name: string; level: number; subclass?: string | null } | undefined {
+// shared by openHandTechniqueRider/quiveringPalmRider. Resolved via slug
+// (#1277: FK preferred, exact name as fallback) — was substring-matched on
+// the words "open hand", the same failure class #1339 fixed at the
+// DERIVED_ACTIONS gate.
+function openHandMonkEntry(classEntries: RiderClassEntry[]): RiderClassEntry | undefined {
   const monk = classEntries.find((c) => c.name.toLowerCase() === "monk");
-  return monk && (monk.subclass ?? "").toLowerCase().includes("open hand") ? monk : undefined;
+  return monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand" ? monk : undefined;
 }
 
 // Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC
@@ -80,7 +78,7 @@ function openHandMonkEntry(
 // carries no save, but the shape stays uniform (saveDC is always present once
 // unlocked) — live-play automation lives in open-hand-technique.ts.
 function openHandTechniqueRider(
-  classEntries: { name: string; level: number; subclass?: string | null }[],
+  classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
   profBonus: number,
 ): SaveRider | undefined {
@@ -93,7 +91,7 @@ function openHandTechniqueRider(
 // activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
 // quivering-palm.ts's header for why a buff, not new persisted state).
 function quiveringPalmRider(
-  classEntries: { name: string; level: number; subclass?: string | null }[],
+  classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
@@ -110,7 +108,7 @@ function quiveringPalmRider(
 // Kept as its own function (not inlined in serializeCharacter's return) so
 // adding a rider's gate doesn't grow serializeCharacter's own branching.
 function buildRiderView(
-  classEntries: { name: string; level: number; subclass?: string | null }[],
+  classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
@@ -378,6 +376,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // keys dropped, deduped by key, exhaustion clamped 0–6) — mutate via
     // POST /characters/:id/conditions/transactions, never PATCH.
     conditions,
+    // Display text for the CURRENT exhaustion level, resolved for this
+    // character's edition (#1322) so the sentence can never contradict `speed`
+    // or the rollModifiers below — the frontend used to author this text,
+    // edition-blind, and printed 2024 text on a 2014 character. NOT folded
+    // into `conditions`: that object is also the write shape and the audit
+    // before/after payload, and a derived string has no business being persisted.
+    exhaustionEffectText: exhaustionEffectText(conditions.exhaustion, editionOf(row)),
     // Active cast-granted passive modifiers (buffs). Normalized on read; each is
     // also summed into its target skill/stat's tempModifier above.
     activeEffects,

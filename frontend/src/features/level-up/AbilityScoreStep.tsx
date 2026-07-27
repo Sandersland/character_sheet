@@ -16,7 +16,7 @@ type Branch = "asi" | "feat";
 
 const BRANCH_BTN =
   "flex flex-1 items-center justify-center gap-2 rounded-control px-3 py-2.5 text-sm font-semibold transition-colors";
-const BRANCH_ON = "bg-garnet-700 text-parchment-50 shadow-raised";
+const BRANCH_ON = "bg-garnet-surface text-garnet-on-surface shadow-raised";
 const BRANCH_OFF = "text-parchment-600 hover:text-parchment-800";
 
 export default function AbilityScoreStep() {

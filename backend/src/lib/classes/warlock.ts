@@ -157,6 +157,7 @@ export const warlock: ClassDefinition = {
   // PHB'14 p.105: Otherworldly Patron (Warlock's subclass) is chosen at 1st level.
   subclasses: {
     "the fiend": {
+      slug: "warlock-the-fiend",
       grantLevel: 1,
       features: THE_FIEND_FEATURES,
       resourceFn: (level) => {
@@ -183,6 +184,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the archfey": {
+      slug: "warlock-the-archfey",
       grantLevel: 1,
       features: THE_ARCHFEY_FEATURES,
       resourceFn: (level) => {
@@ -217,6 +219,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the great old one": {
+      slug: "warlock-the-great-old-one",
       grantLevel: 1,
       features: THE_GREAT_OLD_ONE_FEATURES,
       resourceFn: (level) => {

@@ -28,7 +28,7 @@ const HP_MODES: Record<
   damage: {
     label: "Damage",
     fieldLabel: "Damage amount",
-    buttonClass: "bg-garnet-700 text-parchment-50 hover:bg-garnet-800",
+    buttonClass: "bg-garnet-surface text-garnet-on-surface hover:bg-garnet-surface-hover",
     applyLabel: (n) => `Apply ${n} damage`,
   },
   heal: {

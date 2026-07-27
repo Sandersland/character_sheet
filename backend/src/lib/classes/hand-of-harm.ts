@@ -20,6 +20,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
+import { resolveSubclassSlug } from "./subclass-slug.js";
 
 export class InvalidHandOfHarmOperationError extends Error {}
 
@@ -42,7 +43,7 @@ function handOfHarmSummary(necroticDamage: number, poisoned: boolean): string {
 const HAND_OF_HARM_SELECT = {
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, level: true, subclass: true },
+    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -52,10 +53,12 @@ function monkEntry(row: HandOfHarmRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-// Substring-matched against the freeform subclass string, like Open Hand
-// Technique's isWarriorOfTheOpenHand / Quivering Palm's own copy.
+// Resolved via slug (#1277: FK preferred, exact normalized name as
+// fallback), like Open Hand Technique's isWarriorOfTheOpenHand / Quivering
+// Palm's own copy. Was substring-matched on the word "mercy".
 function isWarriorOfMercy(row: HandOfHarmRow): boolean {
-  return (monkEntry(row)?.subclass ?? "").toLowerCase().includes("mercy");
+  const monk = monkEntry(row);
+  return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-mercy";
 }
 
 // Every guard for one dealHandOfHarm op, pulled out of the handler so its own

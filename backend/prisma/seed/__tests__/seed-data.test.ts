@@ -34,6 +34,7 @@ import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
 import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
+import { SUBCLASS_SLUGS, SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
 
 // The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
@@ -518,5 +519,66 @@ describe("referential integrity", () => {
       (row) => row.gateLevel < (subclassLevelByClass.get(row.className) ?? 0),
     ).map((row) => `${row.className}/${row.subclassName}/${row.spellName}@${row.gateLevel}`);
     expect(early, "granted spell gated below its 2024-resolved subclass gate").toEqual([]);
+  });
+});
+
+// #1277: SUBCLASS_SLUGS is the closed vocabulary joining a seeded Subclass row
+// to its lib/classes/*.ts SubclassDefinition, replacing the substring match
+// #1339 fixed on one of the seven gate sites. F2 measured the seed catalog and
+// the class definitions as ALREADY a perfect 1:1 bijection (31 rows, 31
+// definition keys), which is what makes a bidirectional, allowlist-EMPTY latch
+// possible at zero data cost — each assertion below is a toEqual([]) diff so a
+// broken row names the offender instead of a boolean pass/fail.
+describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
+  const CLASS_DEFS: Record<string, ClassDefinition> = {
+    barbarian, bard, cleric, druid, fighter, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+  };
+
+  it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
+    const bad = SUBCLASSES.filter((s) => {
+      const identity = SUBCLASS_IDENTITY[s.slug];
+      if (!identity) return true;
+      return identity.classKey !== s.className.toLowerCase() || identity.nameKey !== s.name.toLowerCase();
+    }).map((s) => `${s.className}/${s.name} -> ${s.slug}`);
+    expect(bad, "seed row's slug doesn't resolve back to its own (className, name)").toEqual([]);
+  });
+
+  it("every SUBCLASS_SLUGS member is seeded exactly once", () => {
+    const seededSlugs = SUBCLASSES.map((s) => s.slug);
+    const missing = SUBCLASS_SLUGS.filter((slug) => !seededSlugs.includes(slug));
+    const dupes = duplicates(seededSlugs);
+    expect(missing, "slug declared but never seeded").toEqual([]);
+    expect(dupes, "slug seeded more than once").toEqual([]);
+  });
+
+  it("every SubclassDefinition's slug is a member of SUBCLASS_SLUGS and matches its own (classKey, nameKey)", () => {
+    const bad: string[] = [];
+    for (const [classKey, def] of Object.entries(CLASS_DEFS)) {
+      for (const [nameKey, sub] of Object.entries(def.subclasses ?? {})) {
+        const identity = SUBCLASS_IDENTITY[sub.slug];
+        if (!identity || identity.classKey !== classKey || identity.nameKey !== nameKey) {
+          bad.push(`${classKey}/${nameKey} -> ${sub.slug}`);
+        }
+      }
+    }
+    expect(bad, "SubclassDefinition's slug doesn't resolve back to its own (classKey, nameKey)").toEqual([]);
+  });
+
+  it("every SUBCLASS_SLUGS member has a matching SubclassDefinition", () => {
+    const definedSlugs = new Set<SubclassSlug>();
+    for (const def of Object.values(CLASS_DEFS)) {
+      for (const sub of Object.values(def.subclasses ?? {})) definedSlugs.add(sub.slug);
+    }
+    const missing = SUBCLASS_SLUGS.filter((slug) => !definedSlugs.has(slug));
+    expect(missing, "slug declared but no SubclassDefinition carries it").toEqual([]);
+  });
+
+  // The declared intentional-gap allowlist — deliberately empty. A future
+  // subclass that legitimately can't join (e.g. creation-UX-only, no mechanics
+  // support) would be added HERE with a reason, never by leaving it out of
+  // SUBCLASS_SLUGS silently.
+  const INTENTIONAL_GAPS: SubclassSlug[] = [];
+  it("the intentional-gap allowlist is empty", () => {
+    expect(INTENTIONAL_GAPS).toEqual([]);
   });
 });

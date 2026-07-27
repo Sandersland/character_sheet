@@ -625,6 +625,15 @@ model Subclass {
   class       CharacterClass @relation(fields: [classId], references: [id], onDelete: Cascade)
   name        String
   description String
+  // Stable mechanics identity: the join key between this catalog row and the
+  // lib/classes/*.ts definition that implements it (#1277). Immutable — a
+  // display-name rename must NOT change it, which is the whole point: a player
+  // can edit `name`, and one lineage's 2014/2024 names differ, which is how the
+  // substring join let a "Way of Shadow" monk inherit Warrior of Shadow (#1339).
+  // Vocabulary is SUBCLASS_SLUGS; resolveSubclassSlug is the ONE place a
+  // character resolves onto it. Generated once from (class, name) by this
+  // column's migration as an authoring CONVENTION for new rows, never at read time.
+  slug        String
   // NULL = valid in both editions; a diverging subclass (gate level, grants)
   // forks into one row per edition sharing this name (#1306). Kept named
   // "classId_name" (not classId_name_edition) so the compound-key literal at
@@ -637,6 +646,11 @@ model Subclass {
   grantedSpells SubclassGrantedSpell[]
 
   @@unique([classId, name, edition], name: "classId_name")
+  // The slug-form twin of classId_name: a lineage that forks across editions
+  // keeps ONE slug and two rows (#1306), so edition is part of the key. NULLS
+  // NOT DISTINCT lives in the migration (Prisma's DSL can't express it), same
+  // as 20260726111922_catalog_edition_tagging's three indexes.
+  @@unique([slug, edition], name: "slug_edition")
 }
 
 // A spell a subclass grants for free (always-prepared), keyed to the shared Spell

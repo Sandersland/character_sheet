@@ -274,7 +274,7 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
               type="button"
               disabled={pending}
               onClick={confirm}
-              className="rounded-control bg-garnet-700 px-2.5 py-1 font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+              className="rounded-control bg-garnet-surface px-2.5 py-1 font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
             >
               Sell
             </button>

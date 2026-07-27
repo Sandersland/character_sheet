@@ -50,6 +50,7 @@ const reference: ReferenceData = {
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
+  conditions: [],
 };
 
 function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
