@@ -4,6 +4,7 @@ import {
   ALIGNMENTS,
   MULTICLASS_PREREQUISITES,
   cantripsKnownAtLevel,
+  conditionRulesText,
   multiclassPrerequisitesMet,
   preparedSpellCountAt,
   primaryAbilities,
@@ -142,5 +143,20 @@ referenceRouter.get("/reference", async (req, res) => {
   // Artisan tools for the sheet's Proficiencies-card dropdown (the only category consumed).
   const artisanTools = toolsByCategory("artisan");
 
-  res.json({ races: racesWithTools, classes, backgrounds: backgroundsWithTools, alignments: ALIGNMENTS, artisanTools });
+  // The 14 conditions' resolved {key,label,description} rows (#1322) — same
+  // precedent as artisanTools above: a sheet-consumed list riding this
+  // creation-named endpoint because it's catalog content (identical for every
+  // character of an edition), not per-character derived state. Descriptions
+  // are the requested edition's actual rules text, so no frontend module
+  // needs to hold any of its own.
+  const conditions = conditionRulesText(edition);
+
+  res.json({
+    races: racesWithTools,
+    classes,
+    backgrounds: backgroundsWithTools,
+    alignments: ALIGNMENTS,
+    artisanTools,
+    conditions,
+  });
 });
