@@ -159,7 +159,7 @@ function ReadyStep({
         canContinue={c.canContinue}
         onConfirm={() => void c.confirm()}
         confirmLabel="✓ Confirm Level Up"
-        confirmClassName="border-vitality-700 bg-vitality-700 hover:bg-vitality-800"
+        confirmClassName="border-vitality-700 bg-vitality-700 text-parchment-50 hover:bg-vitality-800"
         submitting={c.submitting}
       />
     </CeremonyCard>

@@ -59,7 +59,7 @@ export default function Segmented<T extends string>({
             className={[
               "flex flex-1 items-center justify-center rounded-control px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600",
               isActive
-                ? "bg-garnet-700 text-parchment-50 shadow-card"
+                ? "bg-garnet-surface text-garnet-on-surface shadow-card"
                 : "text-parchment-600 hover:bg-parchment-200 hover:text-parchment-800",
             ].join(" ")}
           >
