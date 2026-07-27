@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { CONDITIONS, conditionDefinition, conditionRulesText } from "@/lib/srd/condition-data.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
+
+import { CONDITIONS, conditionDefinition, conditionRulesText, exhaustionRollEffects } from "@/lib/srd/condition-data.js";
+import type { RollEffect } from "@/lib/srd/roll-effects.js";
 
 // #1309: the 2014 half of what #1135 replaced. Nine conditions carry real
 // mechanical or textual deltas from PHB'14 to SRD 5.2; the other five are
@@ -203,4 +206,65 @@ describe("conditionRulesText", () => {
     expect(rows[0]).toMatchObject({ key: "blinded", label: "Blinded" });
     expect(rows.find((r) => r.key === "grappled")).toMatchObject({ label: "Grappled" });
   });
+});
+
+// #1327: Initiative is a Dexterity check (SRD 5.2 / PHB'14 p. 189, Combat →
+// Initiative), so any condition granting unqualified disadvantage on ability
+// checks must grant it on Initiative too — RollModeKind splits `initiative`
+// out of `check` for engine reasons (see the module comment on
+// EXHAUSTION_ROLL_KINDS), not because the rules treat them differently. This
+// closes the footgun with a test rather than widening resolveRollMode, which
+// would (a) put a rule in the frontend and (b) double the flat exhaustion
+// penalty on Initiative (see frontend/src/lib/rollMode.test.ts).
+describe("CONDITIONS invariant — unqualified check disadvantage must cover Initiative (#1327)", () => {
+  // A grant of "disadvantage on ability checks" with no `ability` narrowing.
+  // Rage's { mode:"advantage", kind:"check", ability:"strength" } is excluded
+  // on two counts (mode and ability) and must stay excluded: a Strength-check
+  // advantage must never reach a Dexterity-based Initiative roll.
+  const isUnqualifiedCheckDisadvantage = (e: RollEffect): boolean =>
+    e.mode === "disadvantage" && e.kind === "check" && e.ability === undefined;
+
+  // The obligation it creates. `ability === undefined` on this side too: an
+  // ability-scoped initiative grant would not discharge an unqualified one.
+  const isUnqualifiedInitiativeDisadvantage = (e: RollEffect): boolean =>
+    e.mode === "disadvantage" && e.kind === "initiative" && e.ability === undefined;
+
+  const offenders = (edition: RulesEdition) =>
+    CONDITIONS.map((c) => c.key).filter((key) => {
+      const effects = conditionDefinition(key, edition).rollEffects ?? [];
+      return effects.some(isUnqualifiedCheckDisadvantage) && !effects.some(isUnqualifiedInitiativeDisadvantage);
+    });
+
+  it.each(["EDITION_2024", "EDITION_2014"] as const)(
+    "%s: every condition granting unqualified disadvantage on ability checks also grants it on Initiative",
+    (edition) => {
+      expect(offenders(edition)).toEqual([]);
+    },
+  );
+
+  // Non-vacuity pin: without this, deleting both `check` grants below would
+  // leave the invariant above passing on an empty set. Expected to be updated
+  // deliberately when a condition joins (or leaves) this set.
+  it.each(["EDITION_2024", "EDITION_2014"] as const)("%s: covers exactly frightened and poisoned today", (edition) => {
+    const covered = CONDITIONS.map((c) => c.key).filter((key) => {
+      const effects = conditionDefinition(key, edition).rollEffects ?? [];
+      return effects.some(isUnqualifiedCheckDisadvantage);
+    });
+    expect(covered).toEqual(["frightened", "poisoned"]);
+  });
+
+  // exhaustionRollEffects2014 is the other place this convention is
+  // load-bearing (tier 1: "disadvantage on ability checks" must also cover
+  // Initiative) — same invariant, different data source.
+  it.each(["EDITION_2024", "EDITION_2014"] as const)(
+    "%s: exhaustionRollEffects honours the same invariant at every level 0-6",
+    (edition) => {
+      for (let level = 0; level <= 6; level++) {
+        const effects = exhaustionRollEffects(level, edition);
+        if (effects.some(isUnqualifiedCheckDisadvantage)) {
+          expect(effects.some(isUnqualifiedInitiativeDisadvantage)).toBe(true);
+        }
+      }
+    },
+  );
 });

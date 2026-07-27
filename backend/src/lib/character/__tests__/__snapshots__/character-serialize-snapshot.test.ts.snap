@@ -470,6 +470,11 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "source": "Poisoned",
     },
     {
+      "kind": "initiative",
+      "mode": "disadvantage",
+      "source": "Poisoned",
+    },
+    {
       "kind": "attack",
       "mode": "flat",
       "modifier": -4,
