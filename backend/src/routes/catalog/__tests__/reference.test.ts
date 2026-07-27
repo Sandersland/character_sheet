@@ -13,7 +13,10 @@ beforeAll(async () => {
 
 describe("GET /api/reference", () => {
   it("returns the catalog lists and alignment set used to drive character creation", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .get("/api/reference?edition=EDITION_2024");
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("races");
@@ -65,7 +68,10 @@ describe("GET /api/reference", () => {
   // #1131: each class carries its level-1 creation pick counts (or null for a
   // non-caster) so the frontend never re-encodes the SRD 5.2 tables.
   it("ships level1SpellPicks per class (cantrips + spells, null for non-casters)", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .get("/api/reference?edition=EDITION_2024");
     const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
 
     expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2 });
@@ -77,7 +83,10 @@ describe("GET /api/reference", () => {
   // #1161: each class carries its PHB'24 primary ability/abilities so the
   // creation ability panel can flag recommended rows without re-encoding the rules.
   it("ships primaryAbility per class", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .get("/api/reference?edition=EDITION_2024");
     const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
     expect(byName("Wizard").primaryAbility).toEqual(["intelligence"]);
     expect(byName("Fighter").primaryAbility).toEqual(["strength", "dexterity"]);
@@ -118,6 +127,15 @@ describe("GET /api/reference", () => {
       .get("/api/reference?edition=EDITION_1974");
     expect(response.status).toBe(400);
     expect(response.body.error).toContain("EDITION_1974");
+  });
+
+  // #1325 (C4): edition is required in the final state — an omitted-edition
+  // default IS the hardcode this issue removes, so a caller that forgets it
+  // gets a 400, not a silent 2024 fallback.
+  it("400s when edition is omitted", async () => {
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("edition");
   });
 
   // #1325/#1348: Background.originFeatId is a raw FK baked onto the 2024 Feat

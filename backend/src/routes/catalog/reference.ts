@@ -25,16 +25,15 @@ export const referenceRouter = Router();
 // toolChoices, not this list).
 referenceRouter.get("/reference", async (req, res) => {
   const rawEdition = req.query.edition;
-  // TRANSITIONAL (#1325): the omitted-`edition` branch below is the pre-#1325
-  // behaviour, kept only until every caller passes one — removed in this same PR.
-  let edition: RulesEdition | undefined;
-  if (rawEdition !== undefined) {
-    if (!isRulesEdition(rawEdition)) {
-      res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
-      return;
-    }
-    edition = rawEdition;
+  if (rawEdition === undefined) {
+    res.status(400).json({ error: "Missing required query parameter: edition" });
+    return;
   }
+  if (!isRulesEdition(rawEdition)) {
+    res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
+    return;
+  }
+  const edition: RulesEdition = rawEdition;
 
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
@@ -68,12 +67,12 @@ referenceRouter.get("/reference", async (req, res) => {
   ];
   const originFeatRows = originFeatNames.length
     ? await prisma.feat.findMany({
-        where: withEditionOrShared({ name: { in: originFeatNames } }, edition ?? "EDITION_2024"),
+        where: withEditionOrShared({ name: { in: originFeatNames } }, edition),
         select: { id: true, name: true, description: true, category: true, edition: true },
       })
     : [];
   const originFeatByName = new Map(
-    resolveEditionCatalog(originFeatRows, edition ?? "EDITION_2024", (f) => f.name).map((f) => [f.name, f]),
+    resolveEditionCatalog(originFeatRows, edition, (f) => f.name).map((f) => [f.name, f]),
   );
 
   const classes = rawClasses.map((c) => ({
@@ -87,9 +86,7 @@ referenceRouter.get("/reference", async (req, res) => {
     // The caller's edition, never DEFAULT_RULES_EDITION: that names the edition a
     // NEW character defaults to, and coupling the two would let a change to the
     // creation default silently change what this catalog reports (#1325).
-    // TRANSITIONAL (#1325): `?? "EDITION_2024"` covers the omitted-edition
-    // callers that still exist — removed in this same PR once C3/C4 land.
-    subclassLevel: subclassGateLevel(c.subclassLevel, edition ?? "EDITION_2024"),
+    subclassLevel: subclassGateLevel(c.subclassLevel, edition),
     // Tool proficiency fields — parallel to skillChoices/skillChoiceCount.
     toolProficiencies: c.toolProficiencies,
     toolChoices: c.toolChoices,
