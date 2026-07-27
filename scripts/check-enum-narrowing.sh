@@ -37,7 +37,14 @@ for f in $(git grep --untracked -lF '_new" AS ENUM' -- ':(glob)backend/prisma/mi
     hit=$(awk '
       /-- *enum-narrowing-reviewed:[ \t]*[^ \t]/            { ack = 1 }
       toupper($0) ~ /^[ \t]*(DELETE[ \t]+FROM|UPDATE[ \t])/ { handled = 1 }
-      /_new" AS ENUM/ { if (!ack && !handled) { printf "%s:%d: unguarded enum swap\n", FILENAME, FNR } }
+      # Flags reset after each swap so every swap needs its OWN guard above it:
+      # a hand-authored migration narrowing two enums must not let the guard
+      # above the first swap silently cover the second. (No apostrophes in this
+      # awk program -- it is single-quoted in the surrounding sh.)
+      /_new" AS ENUM/ {
+        if (!ack && !handled) { printf "%s:%d: unguarded enum swap\n", FILENAME, FNR }
+        ack = 0; handled = 0
+      }
     ' "$f")
     if [ -n "$hit" ]; then
       bad="$bad$hit
