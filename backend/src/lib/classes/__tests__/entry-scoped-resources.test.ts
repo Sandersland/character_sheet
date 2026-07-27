@@ -187,4 +187,147 @@ describe("deriveEntryScopedResources", () => {
   // here moved off DerivedClassInfo onto DERIVED_ACTIONS rows (#1315) — see
   // entry-scoped-actions.test.ts for the equivalent entry-scoped-gate coverage
   // (deriveEntryScopedActions, keyed off the monk entry's own level).
+
+  // #1340: cleric.ts and paladin.ts both emit a pool keyed "channelDivinity" —
+  // before the fix, collectEntryScopedPools treated any repeated pool key as an
+  // invariant violation and threw. PHB'14 p.164 (multiclassing): getting the
+  // feature again from a second class grants that class's effects but no
+  // additional use — so the two entries must MERGE into one pool at the MAX
+  // total either class alone would grant, never the sum. These tests call
+  // deriveEntryScopedResources directly (no serialize layer) so they fail if the
+  // merge is ever moved to buildResourcesPayload instead of staying inside
+  // collectEntryScopedPools — see the PR's placement-risk note.
+  describe("channelDivinity — the one sanctioned shared pool key (#1340, PHB'14 p.164)", () => {
+    it("cleric 2 / paladin 3 (total 5): one pool, total 1 (only cleric-2 and paladin-3 each grant 1)", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 2 },
+        { name: "paladin", subclass: "oath of devotion", level: 3 },
+      ];
+      const { derived } = deriveEntryScopedResources(entries, 5, ABILITY_SCORES, proficiencyBonusForLevel(5), "EDITION_2024");
+      const pools = derived?.resources.filter((r) => r.key === "channelDivinity") ?? [];
+      expect(pools).toHaveLength(1);
+      expect(pools[0].total).toBe(1);
+    });
+
+    it("cleric 6 / paladin 4 (total 10): total is 2 (cleric-6's max), not the sum 3", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 6 },
+        { name: "paladin", subclass: "oath of devotion", level: 4 },
+      ];
+      const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024");
+      const pool = derived?.resources.find((r) => r.key === "channelDivinity");
+      expect(pool?.total).toBe(2);
+    });
+
+    it("paladin 4 (primary) / cleric 6 (secondary): total is still 2 — order-independent", () => {
+      const entries = [
+        { name: "paladin", subclass: "oath of devotion", level: 4 },
+        { name: "cleric", subclass: "life domain", level: 6 },
+      ];
+      const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024");
+      const pool = derived?.resources.find((r) => r.key === "channelDivinity");
+      expect(pool?.total).toBe(2);
+    });
+
+    it("non-total fields come from the PRIMARY entry (cleric-primary keeps the cleric's own label/recharge/description)", () => {
+      const totalLevel = 10;
+      const profBonus = proficiencyBonusForLevel(totalLevel);
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 6 },
+        { name: "paladin", subclass: "oath of devotion", level: 4 },
+      ];
+      const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const merged = derived?.resources.find((r) => r.key === "channelDivinity");
+      const bareCleric = deriveResources("cleric", "life domain", 6, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const clericPool = bareCleric?.resources.find((r) => r.key === "channelDivinity");
+      expect(merged?.label).toBe(clericPool?.label);
+      expect(merged?.recharge).toBe(clericPool?.recharge);
+      expect(merged?.description).toBe(clericPool?.description);
+    });
+
+    it("non-total fields come from the PRIMARY entry (paladin-primary keeps the paladin's own label/recharge/description)", () => {
+      const totalLevel = 10;
+      const profBonus = proficiencyBonusForLevel(totalLevel);
+      const entries = [
+        { name: "paladin", subclass: "oath of devotion", level: 4 },
+        { name: "cleric", subclass: "life domain", level: 6 },
+      ];
+      const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const merged = derived?.resources.find((r) => r.key === "channelDivinity");
+      const barePaladin = deriveResources("paladin", "oath of devotion", 4, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const paladinPool = barePaladin?.resources.find((r) => r.key === "channelDivinity");
+      expect(merged?.label).toBe(paladinPool?.label);
+      expect(merged?.recharge).toBe(paladinPool?.recharge);
+      expect(merged?.description).toBe(paladinPool?.description);
+    });
+
+    it("cleric 1 / paladin 3: one pool, total 1 (only paladin contributes — cleric hasn't reached L2 yet)", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 1 },
+        { name: "paladin", subclass: "oath of devotion", level: 3 },
+      ];
+      const { derived } = deriveEntryScopedResources(entries, 4, ABILITY_SCORES, proficiencyBonusForLevel(4), "EDITION_2024");
+      const pools = derived?.resources.filter((r) => r.key === "channelDivinity") ?? [];
+      expect(pools).toHaveLength(1);
+      expect(pools[0].total).toBe(1);
+    });
+
+    it("single-class parity: cleric 6 alone is byte-identical to a bare deriveResources call", () => {
+      const level = 6;
+      const profBonus = proficiencyBonusForLevel(level);
+      const entries = [{ name: "cleric", subclass: "life domain", level }];
+      const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const bare = deriveResources("cleric", "life domain", level, ABILITY_SCORES, profBonus, "EDITION_2024");
+      expect(derived).toEqual(bare);
+    });
+
+    it("single-class parity: paladin 4 alone is byte-identical to a bare deriveResources call", () => {
+      const level = 4;
+      const profBonus = proficiencyBonusForLevel(level);
+      const entries = [{ name: "paladin", subclass: "oath of devotion", level }];
+      const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const bare = deriveResources("paladin", "oath of devotion", level, ABILITY_SCORES, profBonus, "EDITION_2024");
+      expect(derived).toEqual(bare);
+    });
+  });
+
+  // The invariant collectEntryScopedPools still enforces: a duplicate pool key
+  // NOT sanctioned in SHARED_POOL_MERGE remains a hard throw — two classes
+  // silently fighting over one persisted `used` counter is a bug, not a merge
+  // candidate. Two monk entries both emitting "focus" exercises this with real
+  // registry data (same trick as entry-scoped-actions.test.ts's dedupe test).
+  it("an unsanctioned duplicate pool key still throws (two monk entries both emitting focus)", () => {
+    const entries = [
+      { name: "monk", subclass: undefined, level: 5 },
+      { name: "monk", subclass: undefined, level: 5 },
+    ];
+    expect(() =>
+      deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024"),
+    ).toThrow(/duplicate pool key "focus"/);
+  });
+
+  // Standing invariant (#1340 scope item 3): channelDivinity must stay the ONLY
+  // pool key two different classes emit. Loops every class × every level so the
+  // next colliding class module fails THIS test instead of shipping a 500 —
+  // discharges the pool half of the #1340 audit as a durable check.
+  it("channelDivinity is the ONLY pool key two different classes emit — any new one must be sanctioned in SHARED_POOL_MERGE (#1340)", () => {
+    const CLASS_NAMES = [
+      "barbarian", "bard", "cleric", "druid", "fighter", "monk",
+      "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard",
+    ];
+    const classesByPoolKey = new Map<string, Set<string>>();
+    for (const className of CLASS_NAMES) {
+      for (let level = 1; level <= 20; level++) {
+        const profBonus = proficiencyBonusForLevel(level);
+        const info = deriveResources(className, undefined, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+        for (const pool of info?.resources ?? []) {
+          const classes = classesByPoolKey.get(pool.key) ?? new Set<string>();
+          classes.add(className);
+          classesByPoolKey.set(pool.key, classes);
+        }
+      }
+    }
+    const crossClassKeys = [...classesByPoolKey.entries()].filter(([, classes]) => classes.size > 1).map(([key]) => key);
+    expect(crossClassKeys).toEqual(["channelDivinity"]);
+  });
 });

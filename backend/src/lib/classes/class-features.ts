@@ -8,4 +8,5 @@ export {
   deriveResources,
   deriveResourcesForCharacterRow,
   resolveClassDie,
+  SHARED_POOL_MERGE,
 } from "./registry.js";
