@@ -93,6 +93,9 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["cleric", "life domain", "Domain Spells"],
   ["cleric", "trickery domain", "Domain Spells"],
+  ["warlock", "the fiend", "Expanded Spell List"],
+  ["warlock", "the archfey", "Expanded Spell List"],
+  ["warlock", "the great old one", "Expanded Spell List"],
 ] as const;
 
 // Every tagged (class, subclass, name) key at one class/subclass, both

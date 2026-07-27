@@ -53644,6 +53644,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53690,6 +53691,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53736,6 +53738,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53782,6 +53785,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53841,6 +53845,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53900,6 +53905,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53959,6 +53965,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54018,6 +54025,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54083,6 +54091,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54154,6 +54163,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54225,6 +54235,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54296,6 +54307,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54380,6 +54392,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54464,6 +54477,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54548,6 +54562,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54632,6 +54647,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54716,6 +54732,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54800,6 +54817,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54935,6 +54953,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54973,6 +54992,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55011,6 +55031,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55049,6 +55070,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55101,6 +55123,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55153,6 +55176,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55205,6 +55229,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55257,6 +55282,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55315,6 +55341,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55379,6 +55406,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55443,6 +55471,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55507,6 +55536,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55584,6 +55614,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55661,6 +55692,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55738,6 +55770,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55815,6 +55848,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55892,6 +55926,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55969,6 +56004,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56091,6 +56127,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56129,6 +56166,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56167,6 +56205,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56205,6 +56244,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56257,6 +56297,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56309,6 +56350,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56361,6 +56403,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56413,6 +56456,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56471,6 +56515,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56535,6 +56580,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56599,6 +56645,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56663,6 +56710,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56733,6 +56781,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56803,6 +56852,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56873,6 +56923,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56943,6 +56994,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -57013,6 +57065,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -57083,6 +57136,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
