@@ -22,14 +22,14 @@ Use `@/` (→ `frontend/src/`) for **every** source import, including same-folde
 
 ## Design tokens & contrast
 
-Tokens live in `frontend/src/index.css` (`@theme`); the full reference and rationale is `.claude/agent-memory/frontend-design-architect/design_system.md`. Families: `parchment`/`garnet`/`arcane`/`gold`/`vitality` color ramps, `--font-display`/`--font-sans`, two radii (`card`/`control`), two shadows (`card`/`raised`).
+Tokens live in `frontend/src/index.css` (`@theme`); the full reference and rationale is `.claude/agent-memory/frontend-design-architect/design_system.md`. Families: `parchment`/`garnet`/`arcane`/`gold`/`vitality` color ramps, the `garnet-surface`/`garnet-surface-hover`/`garnet-surface-deep`/`garnet-on-surface`/`garnet-on-surface-dim` brand-surface role (#994), `--font-display`/`--font-sans`, two radii (`card`/`control`), two shadows (`card`/`raised`).
 
 WCAG AA rules that have shipped broken before (full rationale in `design_system.md`):
 
 - Readable text on parchment uses `parchment-600` or darker; `-400`/`-500` are reserved for `placeholder:`, `disabled:`, and decorative glyphs only.
 - Accent text on light surfaces: `gold` ≥ 800, `arcane` ≥ 700, `garnet` ≥ 600 (one step darker on a tinted fill).
-- Light text on accent fills must also clear 4.5:1 — use `text-parchment-50` (which flips with the theme), never `text-white`. Gold never carries white: filled gold is dark `text-ink` on `bg-gold-400`.
-- Dark mode is `[data-theme="dark"]` token overrides; use tokens that flip, never hard-coded colors.
+- Light text on accent fills must also clear 4.5:1 — use `text-parchment-50` (which flips with the theme), never `text-white`. Gold never carries white: filled gold is dark `text-ink` on `bg-gold-400`. **Exception: a filled garnet fill** (button, active tab, bottom nav) uses the `garnet-surface`/`garnet-on-surface` role pair instead, because the garnet ramp inverts and a fill needs a color that doesn't (#994) — arcane/vitality/gold still follow the rule above.
+- Dark mode is `[data-theme="dark"]` token overrides; use tokens that flip, never hard-coded colors. The garnet-surface role pair is the one deliberate exception: `garnet-on-surface` is never redeclared under `[data-theme="dark"]` (see `tokenContrast.test.ts`).
 
 ## UI patterns
 

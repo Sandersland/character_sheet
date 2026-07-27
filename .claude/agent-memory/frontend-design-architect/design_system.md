@@ -22,8 +22,12 @@ here: see `frontend/src/index.css` header comment block.
 
 - Neutrals: `--color-parchment-{50..900}` — `warm-grey` family from Refactoring
   UI `swatches.json` (warm off-white → deep umber).
-- Primary: `--color-garnet-{50..900}` — `red-vivid` family. 700/800 for
-  primary actions/text-on-light, 50/100 for tinted fills/badges.
+- Primary: `--color-garnet-{50..900}` — `red-vivid` family. 700/800 are the
+  **text**-on-light role (links, ability-score numerals, garnet-as-ink); 50/100
+  for tinted fills/badges. A garnet **fill** (button, active tab, bottom nav)
+  does not use the ramp — see the `garnet-surface` role pair below (#994):
+  the ramp inverts per-theme so it can serve as legible text on dark, and that
+  inversion is exactly what turns a filled 700/800/900 salmon in dark mode.
 - Accents: `--color-arcane-{50..900}` (teal, for spellcasting/magic UI),
   `--color-gold-{50..900}` (yellow, for resource meters/expertise),
   `--color-vitality-{50..900}` (green, for positive/equipped states).
@@ -41,6 +45,13 @@ here: see `frontend/src/index.css` header comment block.
   `gold` can never carry white (`gold-800` passes at ~6:1 but reads muddy), so
   filled gold flips to dark text on a bright fill: `text-parchment-900` on
   `bg-gold-400` (hover `bg-gold-500`), ≈10.5/8.5:1. (See #207.)
+  **Garnet fills are the one carve-out (#994):** `garnet-600` reads fine as a
+  fill in light, but that rule breaks in dark because the *ramp itself*
+  inverts (dark `garnet-600` is `#ec5d68`, close to white). A garnet fill uses
+  `bg-garnet-surface`/`text-garnet-on-surface` instead of a numbered ramp step
+  — see the token-role rule below and the ratios in `index.css`'s `@theme`
+  comments. Arcane/vitality/gold above are unaffected — none of those ramps
+  is asked to serve both a text role and a non-inverting fill role.
 - **Damage-type ink** (`--color-dmg-*`, #1160/#1237): one hue per 5e damage
   type — `fire cold lightning acid poison necrotic radiant force psychic
   thunder` — all verified ≥4.5:1 against `parchment-50` (oklch→sRGB contrast
@@ -107,6 +118,19 @@ parchment ramp stays warm (umber-tinted darks, cream-tinted lights), and each
 accent (garnet/arcane/gold/vitality) is rebuilt as a dark-to-light ramp so its
 mid/high steps read as text/affordances against dark surfaces.
 
+**Token-role rule (#994) — read this before "fixing" a ramp back:** an accent
+ramp that inverts per-theme is a **text** role — that's the whole point of
+reversing it, so it stays legible on dark. A **fill** (button/tab/nav
+background) is a different role with a different constraint: it must clear
+3:1 against the page in *both* themes (SC 1.4.11), which an inverted ramp
+cannot do (a fill built from a "text-legible-on-dark" step is, by
+construction, too light to read as a shape there). Don't reuse a ramp step for
+both roles on the same hue. If a hue needs a fill, give it its own
+non-inverting `<hue>-surface`/`<hue>-surface-hover`/`<hue>-surface-deep`/
+`<hue>-on-surface` set (the `garnet-surface` pair is the template) rather than
+picking a "less bad" ramp step — the two roles' constraints are incompatible,
+not just differently tuned.
+
 - **Shadows**: `--shadow-card`/`--shadow-raised` get deeper, near-black opacities
   for elevation against dark surfaces.
 - **Backdrop**: `--color-backdrop` (modal scrim) is a `@theme` token —
@@ -123,6 +147,17 @@ mid/high steps read as text/affordances against dark surfaces.
   #f7d070 light / #c2991f dark), so its label uses `--color-ink` (#27241d, the
   fixed `text-ink` token that does **not** flip), giving ≈10.5:1 light / ≈5.6:1
   dark. Apply the same choice to any new filled accent control.
+  **Garnet carve-out (#994):** this `text-parchment-50`-on-inverting-fill
+  pattern is exactly what broke on garnet — a *filled* garnet surface can't
+  co-flip with `text-parchment-50` and also satisfy the fill's own 3:1
+  page-boundary bar, because the two bars pull the ramp in opposite
+  directions. Garnet fills were carved out onto the non-inverting
+  `garnet-surface`/`garnet-on-surface` pair instead (measured ratios live in
+  `index.css`'s `@theme` comments; mechanically enforced by
+  `frontend/src/test/tokenContrast.test.ts`). Arcane/vitality/gold above are
+  unaffected — the failure mode was garnet specifically being asked to serve
+  both a text role (needs to invert) and a fill role (must not), and neither
+  of those hues is used as a full-saturation page-level fill today.
 
 ## Component conventions (`frontend/src/components/`)
 
