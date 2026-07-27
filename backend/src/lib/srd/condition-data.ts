@@ -61,9 +61,18 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     label: "Frightened",
     description:
       "Has disadvantage on ability checks and attack rolls while the source of its fear is within line of sight. Can't willingly move closer to the source of its fear.",
+    // Initiative is a Dexterity check (SRD 5.2 / PHB'14 p. 189, Combat →
+    // Initiative — RollModeKind just splits `initiative` out of `check` as its
+    // own kind), so the "disadvantage on ability checks" clause above already
+    // covers it; this entry makes that explicit per the convention documented
+    // at EXHAUSTION_ROLL_KINDS. The line-of-sight qualifier already goes
+    // unmodeled for the attack/check grants above (engine has no
+    // line-of-sight concept — self-or-announce), so extending it to
+    // Initiative is the existing approximation, not a new one (#1327).
     rollEffects: [
       { mode: "disadvantage", kind: "attack" },
       { mode: "disadvantage", kind: "check" },
+      { mode: "disadvantage", kind: "initiative" },
     ],
   },
   {
@@ -109,9 +118,16 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "poisoned",
     label: "Poisoned",
     description: "Has disadvantage on attack rolls and ability checks.",
+    // Same Initiative-is-a-Dexterity-check reasoning as frightened above.
+    // Decision A (#1327): the description is NOT edited to say "(including
+    // Initiative)" — SRD 5.2 and PHB'14 p. 292 both say only "ability
+    // checks"; that already includes Initiative as a matter of rules, so
+    // adding words to the transcription would fabricate text. The grant
+    // changes; the prose doesn't.
     rollEffects: [
       { mode: "disadvantage", kind: "attack" },
       { mode: "disadvantage", kind: "check" },
+      { mode: "disadvantage", kind: "initiative" },
     ],
   },
   {
