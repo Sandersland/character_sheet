@@ -136,6 +136,32 @@ describe("useLevelUpCeremony", () => {
     });
   });
 
+  // #1323: dependentPicksBySubclass is ceremony-local (the subclass re-pick
+  // stash, #1323) and must never reach the wire — the endpoint strips unknown
+  // keys silently (no 400), so this frontend assertion is the only guard.
+  it("strips ceremony-local draft state from the submitted body (#1323)", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    submitMock.mockResolvedValue({ id: "c1" } as Character);
+    const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.plan).not.toBeNull());
+
+    act(() =>
+      result.current.setDraft(() => ({
+        hp: { method: "average" },
+        maneuvers: [{ type: "learnManeuver", maneuverId: "m1" }],
+        dependentPicksBySubclass: { bm: { maneuvers: [{ type: "learnManeuver", maneuverId: "m9" }] } },
+      })),
+    );
+    act(() => result.current.next());
+    await act(() => result.current.confirm());
+
+    // Object.keys, not toHaveBeenCalledWith: vitest's argument matcher uses
+    // toEqual semantics, which treats a present-but-undefined key as absent.
+    const body = submitMock.mock.calls[0][1];
+    expect(Object.keys(body)).not.toContain("dependentPicksBySubclass");
+    expect(body.maneuvers).toEqual([{ type: "learnManeuver", maneuverId: "m1" }]);
+  });
+
   it("honors ?classId= for a multiclass add — plans and submits {kind:'new'} (#1131)", async () => {
     planMock.mockResolvedValue(
       plan([{ kind: "hitPoints" }, { kind: "review" }], { isPrimary: false, newLevel: 1, className: "warlock" }),
