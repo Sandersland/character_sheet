@@ -21,9 +21,12 @@ export type PreferenceKey = keyof UserPreferences;
 // #1365: per-key, not a shared flag — the sheet and the AccountMenu quick
 // controls can each be mid-write on a different key at the same moment, and a
 // shared boolean/error would mis-attribute one key's outcome to another.
+// Each error carries its own retry closure (re-issuing that exact key/value)
+// rather than a bare message, so a failed write can be resolved from the note
+// itself instead of only by touching the control again.
 export interface PreferenceSyncState {
   saving: Partial<Record<PreferenceKey, true>>;
-  errors: Partial<Record<PreferenceKey, string>>;
+  errors: Partial<Record<PreferenceKey, { message: string; retry: () => void }>>;
 }
 
 // Fixed string, not errorMessage(err) — the only realistic rejections are a
@@ -64,7 +67,10 @@ export function usePreferencesSync(): PreferencesContextValue {
 }
 
 /** One key's in-flight/error state, for a component that renders a single sync note. */
-export function usePreferenceSync(key: PreferenceKey): { saving: boolean; error: string | null } {
+export function usePreferenceSync(
+  key: PreferenceKey,
+): { saving: boolean; error: string | null; retry: (() => void) | null } {
   const { sync } = usePreferencesSync();
-  return { saving: sync.saving[key] === true, error: sync.errors[key] ?? null };
+  const entry = sync.errors[key];
+  return { saving: sync.saving[key] === true, error: entry?.message ?? null, retry: entry?.retry ?? null };
 }

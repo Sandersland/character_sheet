@@ -8,7 +8,11 @@ import { PreferencesContext, PREFERENCE_SYNC_ERROR, type PreferenceSyncState } f
 // Stands in for PreferencesProvider with a hand-built sync state — unit tests
 // of the note alone, not the provider's own write path (that's
 // PreferencesProvider.test.tsx).
-function renderNote(preferenceKey: "theme" | "diceRollStyle", sync: PreferenceSyncState) {
+function renderNote(
+  preferenceKey: "theme" | "diceRollStyle",
+  sync: PreferenceSyncState,
+  props: { announce?: boolean } = {},
+) {
   function Wrapper({ children }: { children: ReactNode }) {
     return createElement(
       PreferencesContext.Provider,
@@ -16,7 +20,11 @@ function renderNote(preferenceKey: "theme" | "diceRollStyle", sync: PreferenceSy
       children,
     );
   }
-  return render(<PreferenceSyncNote preferenceKey={preferenceKey} />, { wrapper: Wrapper });
+  return render(<PreferenceSyncNote preferenceKey={preferenceKey} {...props} />, { wrapper: Wrapper });
+}
+
+function errorState(retry = vi.fn()): PreferenceSyncState {
+  return { saving: {}, errors: { theme: { message: PREFERENCE_SYNC_ERROR, retry } } };
 }
 
 describe("PreferenceSyncNote", () => {
@@ -34,14 +42,14 @@ describe("PreferenceSyncNote", () => {
   });
 
   it("announces a failed sync for its key with role=alert", () => {
-    renderNote("theme", { saving: {}, errors: { theme: PREFERENCE_SYNC_ERROR } });
+    renderNote("theme", errorState());
     expect(screen.getByRole("alert")).toHaveTextContent(PREFERENCE_SYNC_ERROR);
   });
 
   it("ignores another key's error", () => {
     const { container } = renderNote("theme", {
       saving: {},
-      errors: { diceRollStyle: PREFERENCE_SYNC_ERROR },
+      errors: { diceRollStyle: { message: PREFERENCE_SYNC_ERROR, retry: vi.fn() } },
     });
     expect(container).toBeEmptyDOMElement();
   });
@@ -63,11 +71,34 @@ describe("PreferenceSyncNote", () => {
   });
 
   it("an error outranks an in-flight Saving… note", () => {
-    renderNote("theme", { saving: { theme: true }, errors: { theme: PREFERENCE_SYNC_ERROR } });
+    renderNote("theme", { saving: { theme: true }, errors: { theme: { message: PREFERENCE_SYNC_ERROR, retry: vi.fn() } } });
     act(() => {
       vi.advanceTimersByTime(600);
     });
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  describe("retry (#1365 chunk 4)", () => {
+    // Native click via act(), not userEvent: this file runs under fake timers
+    // (needed for the Saving-hint-delay tests above), and userEvent's own
+    // internal delays would need advanceTimers bridging that isn't worth it
+    // for a single synchronous click — see the plan's explicit fake-timers note.
+    it("renders a Retry button that calls the error's retry closure", () => {
+      const retry = vi.fn();
+      renderNote("theme", errorState(retry));
+
+      act(() => {
+        screen.getByRole("button", { name: "Retry" }).click();
+      });
+
+      expect(retry).toHaveBeenCalledTimes(1);
+    });
+
+    it("omits the Retry button when announce is false (menu context)", () => {
+      renderNote("theme", errorState(), { announce: false });
+      expect(screen.getByText(PREFERENCE_SYNC_ERROR)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    });
   });
 });

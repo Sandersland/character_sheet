@@ -16,6 +16,7 @@ vi.mock("@/api/client", () => ({
 
 import { fetchMe, patchPreferences } from "@/api/client";
 import { AuthProvider } from "@/features/auth/AuthProvider";
+import PreferenceSyncNote from "@/features/preferences/PreferenceSyncNote";
 import { PreferencesProvider } from "@/features/preferences/PreferencesProvider";
 import { usePreferencesSync, PREFERENCE_SYNC_ERROR } from "@/hooks/usePreferencesSync";
 import type { AuthUser, UserPreferences } from "@/types/auth";
@@ -36,6 +37,10 @@ function Probe() {
       <span data-testid="sync">{JSON.stringify(sync)}</span>
       <button onClick={() => setPreference("theme", "dark")}>Set theme dark</button>
       <button onClick={() => setPreference("diceRollStyle", "quick")}>Set dice quick</button>
+      {/* Renders the real Retry affordance end-to-end (#1365 chunk 4) — the
+          hand-built context fixtures in PreferenceSyncNote.test.tsx can't
+          exercise retry's actual setPreference-closure wiring. */}
+      <PreferenceSyncNote preferenceKey="theme" />
     </div>
   );
 }
@@ -176,7 +181,7 @@ describe("PreferencesProvider", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("sync")).toHaveTextContent(
-        JSON.stringify({ saving: {}, errors: { theme: PREFERENCE_SYNC_ERROR } }),
+        JSON.stringify({ saving: {}, errors: { theme: { message: PREFERENCE_SYNC_ERROR } } }),
       ),
     );
     expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
@@ -230,7 +235,7 @@ describe("PreferencesProvider", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("sync")).toHaveTextContent(
-        JSON.stringify({ saving: {}, errors: { theme: PREFERENCE_SYNC_ERROR } }),
+        JSON.stringify({ saving: {}, errors: { theme: { message: PREFERENCE_SYNC_ERROR } } }),
       ),
     );
   });
@@ -251,7 +256,7 @@ describe("PreferencesProvider", () => {
     await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
     await waitFor(() =>
       expect(screen.getByTestId("sync")).toHaveTextContent(
-        JSON.stringify({ saving: {}, errors: { theme: PREFERENCE_SYNC_ERROR } }),
+        JSON.stringify({ saving: {}, errors: { theme: { message: PREFERENCE_SYNC_ERROR } } }),
       ),
     );
 
@@ -259,6 +264,30 @@ describe("PreferencesProvider", () => {
     await waitFor(() =>
       expect(screen.getByTestId("sync")).toHaveTextContent(JSON.stringify({ saving: {}, errors: {} })),
     );
+  });
+
+  it("retrying a failed write re-sends the same value and clears the error", async () => {
+    const serverPrefs: UserPreferences = { theme: "light", diceRollStyle: "animated", autoRollConcentration: true };
+    const user: AuthUser = { ...BASE_USER, preferences: serverPrefs };
+    vi.mocked(fetchMe).mockResolvedValue(user);
+    vi.mocked(patchPreferences)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({ ...serverPrefs, theme: "dark" });
+
+    renderTree();
+    await waitFor(() =>
+      expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(patchPreferences).toHaveBeenCalledTimes(2);
+    expect(patchPreferences).toHaveBeenNthCalledWith(1, { theme: "dark" });
+    expect(patchPreferences).toHaveBeenNthCalledWith(2, { theme: "dark" });
   });
 
   it("a failed login-time migration does not surface a sync error", async () => {

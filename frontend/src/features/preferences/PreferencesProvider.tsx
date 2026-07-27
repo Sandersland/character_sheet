@@ -145,7 +145,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         () =>
           setSync((prev) => ({
             saving: without(prev.saving, key),
-            errors: { ...prev.errors, [key]: PREFERENCE_SYNC_ERROR },
+            // retry closes over this exact key/value and re-issues the same
+            // write; safe against staleness because a NEWER setPreference for
+            // this key drops this entry (the `without` above) before its own
+            // failure branch could install a new one, so a fired retry always
+            // matches what's currently shown.
+            errors: {
+              ...prev.errors,
+              [key]: { message: PREFERENCE_SYNC_ERROR, retry: () => setPreference(key, value) },
+            },
           })),
       );
       // The optimistic local write above keeps the change visible regardless

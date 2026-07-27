@@ -33,7 +33,7 @@ export default function PreferenceSyncNote({
   className = "",
   announce = true,
 }: PreferenceSyncNoteProps) {
-  const { saving, error } = usePreferenceSync(preferenceKey);
+  const { saving, error, retry } = usePreferenceSync(preferenceKey);
   const [showSavingHint, setShowSavingHint] = useState(false);
 
   useEffect(() => {
@@ -49,6 +49,17 @@ export default function PreferenceSyncNote({
     return (
       <p role={announce ? "alert" : undefined} className={`mt-1 text-xs text-garnet-700 ${className}`}>
         {error}
+        {/* Retry stays sheet-only (announce=true): AccountMenu's role="menu"
+            panel can't own an interactive descendant outside its required
+            {group, menuitem*} set (the same aria-required-children constraint
+            documented on `announce` above) — its quick controls already
+            settle for visual-only, so a click-to-retry there would need a
+            different affordance than "a button inside this note". */}
+        {announce && retry && (
+          <button type="button" onClick={retry} className="ml-1 underline">
+            Retry
+          </button>
+        )}
       </p>
     );
   }

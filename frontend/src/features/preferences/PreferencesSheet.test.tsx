@@ -176,14 +176,16 @@ describe("PreferencesSheet (#1167)", () => {
   });
 
   describe("sync note (#1365)", () => {
+    const SYNC_ERROR = "Not saved — this change stays on this device.";
+
     it("surfaces a failed theme sync inside the Appearance section", () => {
-      renderSheetWithSync({ saving: {}, errors: { theme: "Not saved — this change stays on this device." } });
+      renderSheetWithSync({ saving: {}, errors: { theme: { message: SYNC_ERROR, retry: vi.fn() } } });
       const appearance = within(screen.getByText("Appearance").closest("fieldset") as HTMLElement);
       expect(appearance.getByRole("alert")).toBeInTheDocument();
     });
 
     it("surfaces a failed dice sync inside the Dice section and nowhere else", () => {
-      renderSheetWithSync({ saving: {}, errors: { diceRollStyle: "Not saved — this change stays on this device." } });
+      renderSheetWithSync({ saving: {}, errors: { diceRollStyle: { message: SYNC_ERROR, retry: vi.fn() } } });
       const alerts = screen.getAllByRole("alert");
       expect(alerts).toHaveLength(1);
       const dice = within(screen.getByText("Dice").closest("fieldset") as HTMLElement);
@@ -210,9 +212,19 @@ describe("PreferencesSheet (#1167)", () => {
     it("has no axe violations while a sync error is showing", async () => {
       const { container } = renderSheetWithSync({
         saving: {},
-        errors: { theme: "Not saved — this change stays on this device." },
+        errors: { theme: { message: SYNC_ERROR, retry: vi.fn() } },
       });
       expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it("retrying a failed sync calls its retry closure", async () => {
+      const user = userEvent.setup();
+      const retry = vi.fn();
+      renderSheetWithSync({ saving: {}, errors: { theme: { message: SYNC_ERROR, retry } } });
+
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+
+      expect(retry).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -240,7 +240,7 @@ describe("AccountMenu", () => {
 
     it("surfaces a failed theme sync inside the Appearance quick controls", async () => {
       const user = userEvent.setup();
-      renderMenuWithSync({ saving: {}, errors: { theme: SYNC_ERROR } });
+      renderMenuWithSync({ saving: {}, errors: { theme: { message: SYNC_ERROR, retry: vi.fn() } } });
       await user.click(screen.getByRole("button", { name: "Account" }));
 
       expect(screen.getByText(SYNC_ERROR)).toBeInTheDocument();
@@ -248,7 +248,7 @@ describe("AccountMenu", () => {
 
     it("scopes the sync note to its own preference group", async () => {
       const user = userEvent.setup();
-      renderMenuWithSync({ saving: {}, errors: { diceRollStyle: SYNC_ERROR } });
+      renderMenuWithSync({ saving: {}, errors: { diceRollStyle: { message: SYNC_ERROR, retry: vi.fn() } } });
       await user.click(screen.getByRole("button", { name: "Account" }));
 
       // These groups ARE aria-labeled — getByRole("group", { name }) is safe
@@ -261,7 +261,7 @@ describe("AccountMenu", () => {
 
     it("keeps the menu's roving focus on menu items when a sync note is showing", async () => {
       const user = userEvent.setup();
-      renderMenuWithSync({ saving: {}, errors: { theme: "Not saved — this change stays on this device." } });
+      renderMenuWithSync({ saving: {}, errors: { theme: { message: SYNC_ERROR, retry: vi.fn() } } });
       await user.click(screen.getByRole("button", { name: "Account" }));
 
       for (let i = 0; i < 8; i++) {
@@ -274,10 +274,18 @@ describe("AccountMenu", () => {
       const user = userEvent.setup();
       const { container } = renderMenuWithSync({
         saving: {},
-        errors: { theme: "Not saved — this change stays on this device." },
+        errors: { theme: { message: SYNC_ERROR, retry: vi.fn() } },
       });
       await user.click(screen.getByRole("button", { name: "Account" }));
       expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it("omits a Retry control from the quick controls (announce=false suppresses it too)", async () => {
+      const user = userEvent.setup();
+      renderMenuWithSync({ saving: {}, errors: { theme: { message: SYNC_ERROR, retry: vi.fn() } } });
+      await user.click(screen.getByRole("button", { name: "Account" }));
+
+      expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     });
   });
 });
