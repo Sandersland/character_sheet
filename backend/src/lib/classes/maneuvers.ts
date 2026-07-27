@@ -11,6 +11,8 @@
  * from the catalog; the known list + die size come from resources + deriveResources.
  */
 
+import type { CastManeuverOperation, ManeuverOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
@@ -28,14 +30,6 @@ function abbr(ability: string): string {
 }
 
 export class InvalidManeuverOperationError extends Error {}
-
-/** Cast a known maneuver: spend one superiority die (server rolls it). */
-export interface CastManeuverOperation {
-  type: "castManeuver";
-  entryId: string; // per-character maneuversKnown entry id
-}
-
-export type ManeuverOperation = CastManeuverOperation;
 
 /** Result surfaced to the route so the client can fold the die into a roll. */
 export interface ManeuverCastResult {

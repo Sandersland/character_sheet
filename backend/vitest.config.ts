@@ -18,8 +18,19 @@ export default defineConfig(({ mode }) => {
   return {
     // Mirror the tsconfig `@/*` → `src/*` path alias so tests resolve the same
     // absolute imports as tsc (dev) and tsc-alias (prod build) do.
+    //
+    // "@character-sheet/contracts" is pinned to its SOURCE (not the package's
+    // `exports` "default" condition, which points at dist/): without this,
+    // vitest resolves the compiled dist/, so editing a schema and re-running
+    // tests silently validates the previous build instead of the one the
+    // type-checker just saw (#1370).
     resolve: {
-      alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+        "@character-sheet/contracts": fileURLToPath(
+          new URL("../packages/contracts/src/index.ts", import.meta.url),
+        ),
+      },
     },
     test: {
       env: { ...env, TEST_BASE_DATABASE_URL: process.env.DATABASE_URL ?? "" },

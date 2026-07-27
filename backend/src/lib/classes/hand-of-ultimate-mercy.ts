@@ -16,20 +16,14 @@
 // effect, so — like Quivering Palm's 10d12 and Second Wind's 1d10 — the
 // client rolls it and sends the total; the server only validates positivity.
 
+import type { HandOfUltimateMercyOperation, UseHandOfUltimateMercyOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
 
 export class InvalidHandOfUltimateMercyOperationError extends Error {}
-
-export interface UseHandOfUltimateMercyOperation {
-  type: "useHandOfUltimateMercy";
-  /** Client-rolled 4d10 + Wisdom modifier total (hit points restored). */
-  roll: number;
-}
-
-export type HandOfUltimateMercyOperation = UseHandOfUltimateMercyOperation;
 
 export interface HandOfUltimateMercyResult {
   hpRestored: number;

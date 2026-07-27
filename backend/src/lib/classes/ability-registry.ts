@@ -1,4 +1,17 @@
 import { z } from "zod";
+import {
+  activateCloakOfShadowsOpSchema,
+  attemptStunningStrikeOpSchema,
+  castChannelDivinityOpSchema,
+  castManeuverOpSchema,
+  castShadowArtOpSchema,
+  dealHandOfHarmOpSchema,
+  imposeOpenHandRiderOpSchema,
+  rollSneakAttackOpSchema,
+  setQuiveringPalmOpSchema,
+  triggerQuiveringPalmOpSchema,
+  useHandOfUltimateMercyOpSchema,
+} from "@character-sheet/contracts";
 
 import type { TransactionHandler } from "@/lib/http/transactions-endpoint.js";
 import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
@@ -62,10 +75,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // (Sacred Weapon attack buff, Cloak of Shadows invisibility) or reminder/DC.
   // The entitled-options picker stays a GET on channelDivinityRouter.
   "channel-divinity": defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("castChannelDivinity"),
-      abilityId: z.string().min(1),
-    })),
+    schema: opBatch(castChannelDivinityOpSchema),
     apply: (characterId, data) => applyChannelDivinityOperations(characterId, data.operations),
     domainErrors: [
       InvalidChannelDivinityOperationError,
@@ -79,12 +89,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // an Unarmed Strike hit; Physician's Touch (L6+) adds the Poisoned rider.
   // Returns the updated character plus per-op { necroticDamage, poisoned, summary }.
   "hand-of-harm": defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("dealHandOfHarm"),
-      usedThisTurn: z.boolean(),
-      roll: z.number().positive(),
-      freeFromFlurry: z.boolean().optional(),
-    })),
+    schema: opBatch(dealHandOfHarmOpSchema),
     apply: (characterId, data) => applyHandOfHarmOperations(characterId, data.operations),
     domainErrors: [InvalidHandOfHarmOperationError, InvalidResourceOperationError],
     respond: (character, results) => ({ character, results }),
@@ -94,10 +99,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // to narrate reviving a creature with the client-rolled 4d10 + Wis mod hit
   // points. Returns the updated character plus per-op { hpRestored, summary }.
   "hand-of-ultimate-mercy": defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("useHandOfUltimateMercy"),
-      roll: z.number().positive(),
-    })),
+    schema: opBatch(useHandOfUltimateMercyOpSchema),
     apply: (characterId, data) => applyHandOfUltimateMercyOperations(characterId, data.operations),
     domainErrors: [InvalidHandOfUltimateMercyOperationError, InvalidResourceOperationError],
     respond: (character, results) => ({ character, results }),
@@ -108,10 +110,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // per-op { roll, saveDc } so the client folds the die into the attack/damage
   // total. The learn-a-maneuver catalog stays a GET on maneuversRouter.
   maneuvers: defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("castManeuver"),
-      entryId: z.string().min(1),
-    })),
+    schema: opBatch(castManeuverOpSchema),
     apply: (characterId, data) => applyManeuverOperations(characterId, data.operations),
     domainErrors: [
       InvalidManeuverOperationError,
@@ -125,11 +124,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // (no save); Push/Topple roll a flat d20 vs the monk's focus save DC. Returns
   // the updated character plus per-op { rider, dc, roll?, outcome, summary }.
   "open-hand-technique": defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("imposeOpenHandRider"),
-      rider: z.enum(["addle", "push", "topple"]),
-      usedThisTurn: z.boolean(),
-    })),
+    schema: opBatch(imposeOpenHandRiderOpSchema),
     apply: (characterId, data) => applyOpenHandTechniqueOperations(characterId, data.operations),
     domainErrors: [InvalidOpenHandTechniqueOperationError],
     respond: (character, results) => ({ character, results }),
@@ -140,10 +135,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // the monk's focus save DC and halves the client-rolled 10d12 on a success,
   // clearing the active flag. Returns the updated character plus per-op result.
   "quivering-palm": defineAbility({
-    schema: opBatch(
-      z.object({ type: z.literal("setQuiveringPalm") }),
-      z.object({ type: z.literal("triggerQuiveringPalm"), roll: z.number().positive() }),
-    ),
+    schema: opBatch(setQuiveringPalmOpSchema, triggerQuiveringPalmOpSchema),
     apply: (characterId, data) => applyQuiveringPalmOperations(characterId, data.operations),
     domainErrors: [InvalidQuiveringPalmOperationError, InvalidResourceOperationError],
     respond: (character, results) => ({ character, results }),
@@ -154,10 +146,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   //   activateCloakOfShadows — spend 3 focus, self-apply invisible (L17).
   // The Shadow Arts picker stays a GET on shadowArtsRouter.
   "shadow-arts": defineAbility({
-    schema: opBatch(
-      z.object({ type: z.literal("castShadowArt"), shadowArtId: z.string().min(1) }),
-      z.object({ type: z.literal("activateCloakOfShadows") }),
-    ),
+    schema: opBatch(castShadowArtOpSchema, activateCloakOfShadowsOpSchema),
     apply: (characterId, data) => applyShadowArtsOperations(characterId, data.operations),
     domainErrors: [InvalidShadowArtOperationError],
   }),
@@ -167,11 +156,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // character plus per-op { roll, dice, faces } so the client folds the roll into
   // the attack's damage tally.
   "sneak-attack": defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("rollSneakAttack"),
-      eligible: z.boolean(),
-      usedThisTurn: z.boolean(),
-    })),
+    schema: opBatch(rollSneakAttackOpSchema),
     apply: (characterId, data) => applySneakAttackOperations(characterId, data.operations),
     domainErrors: [InvalidSneakAttackOperationError],
     respond: (character, results) => ({ character, results }),
@@ -182,10 +167,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // updated character plus per-op { dc, roll, outcome, summary } so the client
   // surfaces the fail(Stunned)/success(half-speed+advantage) rider inline.
   "stunning-strike": defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("attemptStunningStrike"),
-      usedThisTurn: z.boolean(),
-    })),
+    schema: opBatch(attemptStunningStrikeOpSchema),
     apply: (characterId, data) => applyStunningStrikeOperations(characterId, data.operations),
     domainErrors: [InvalidStunningStrikeOperationError, InvalidResourceOperationError],
     respond: (character, results) => ({ character, results }),

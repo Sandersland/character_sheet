@@ -11,6 +11,8 @@
  * from the catalog row.
  */
 
+import type { ChannelDivinityOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
@@ -24,14 +26,6 @@ import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js"
 import { abilityModifier } from "@/lib/srd/srd.js";
 
 export class InvalidChannelDivinityOperationError extends Error {}
-
-/** Use a Channel Divinity option. `abilityId` is the catalog GrantedAbility.id. */
-export interface CastChannelDivinityOperation {
-  type: "castChannelDivinity";
-  abilityId: string;
-}
-
-export type ChannelDivinityOperation = CastChannelDivinityOperation;
 
 // How a CD option expresses through the declarative core:
 //   announce  — spend CD, surface the save DC; the condition is reminder text.
