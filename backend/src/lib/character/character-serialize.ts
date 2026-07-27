@@ -1,6 +1,6 @@
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
-import { deriveAttacksPerAction, deriveRangedAttackRollBonus } from "@/lib/srd/srd.js";
+import { deriveAttacksPerAction, deriveRangedAttackRollBonus, exhaustionEffectText } from "@/lib/srd/srd.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { focusSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
@@ -378,6 +378,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // keys dropped, deduped by key, exhaustion clamped 0–6) — mutate via
     // POST /characters/:id/conditions/transactions, never PATCH.
     conditions,
+    // Display text for the CURRENT exhaustion level, resolved for this
+    // character's edition (#1322) so the sentence can never contradict `speed`
+    // or the rollModifiers below — the frontend used to author this text,
+    // edition-blind, and printed 2024 text on a 2014 character. NOT folded
+    // into `conditions`: that object is also the write shape and the audit
+    // before/after payload, and a derived string has no business being persisted.
+    exhaustionEffectText: exhaustionEffectText(conditions.exhaustion, editionOf(row)),
     // Active cast-granted passive modifiers (buffs). Normalized on read; each is
     // also summed into its target skill/stat's tempModifier above.
     activeEffects,

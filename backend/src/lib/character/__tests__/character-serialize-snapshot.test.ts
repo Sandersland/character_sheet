@@ -11,6 +11,14 @@
 // ("Fighter"/"Wizard") and looked up case-sensitively, so both fixtures miss it
 // — a real production defect (#1388), not fixed here because correcting it
 // would change both fixtures' derived proficiency and weapon-attack values.
+//
+// #1322 audit: both fixtures are EDITION_2024 (the default), so
+// `exhaustionEffectText`'s +1-line-per-fixture delta never exercises the 2014
+// fork — that coverage lives in exhaustion-edition.test.ts, which asserts both
+// editions end to end. Don't add a 2014 fixture here to compensate: per #1341,
+// the conditions/rollModifiers/speed fields these fixtures already lock would
+// become byte-identical copies with a forked exhaustion string bolted on,
+// diluting this file's signal for no new information.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

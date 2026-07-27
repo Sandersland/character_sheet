@@ -130,6 +130,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   },
   "currentLevelThreshold": 14000,
   "damageImmunities": [],
+  "exhaustionEffectText": "−4 on d20 Tests; Speed −10 ft.",
   "experiencePoints": 14000,
   "fightingStyleSlots": {
     "total": 1,
@@ -704,6 +705,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   },
   "currentLevelThreshold": 6500,
   "damageImmunities": [],
+  "exhaustionEffectText": "No exhaustion.",
   "experiencePoints": 6500,
   "fightingStyleSlots": {
     "total": 1,
