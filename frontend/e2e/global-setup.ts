@@ -195,7 +195,9 @@ async function api(cookie: string, path: string, init?: RequestInit): Promise<Re
 
 // Resolve a Fighter subclass id by name from the reference catalog.
 async function subclassId(cookie: string, className: string, subclassName: string): Promise<string> {
-  const response = await api(cookie, "/api/reference");
+  // Every seeded persona here is EDITION_2024 (#1325) — every Subclass row is
+  // edition: null (shared) today, so this resolves identically either way.
+  const response = await api(cookie, "/api/reference?edition=EDITION_2024");
   if (!response.ok) throw new Error(`Failed to load reference: ${response.status}`);
   const { classes } = (await response.json()) as {
     classes: { name: string; subclasses: { id: string; name: string }[] }[];

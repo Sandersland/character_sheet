@@ -27,6 +27,15 @@ export function editionOf(row: { rulesEdition: RulesEdition }): RulesEdition {
   return row.rulesEdition;
 }
 
+const RULES_EDITIONS: readonly RulesEdition[] = ["EDITION_2014", "EDITION_2024"];
+
+// The one guard for an edition arriving over the wire (a query param, a body
+// field) rather than read off a Character row — feats.ts and reference.ts both
+// need this, so it lives here rather than being copy-pasted a third time.
+export function isRulesEdition(raw: unknown): raw is RulesEdition {
+  return (RULES_EDITIONS as readonly string[]).includes(raw as string);
+}
+
 // Mirrors Character.rulesEdition's Prisma `@default(EDITION_2024)` — the ONE
 // place validation code names that default explicitly, for the rare case where
 // a decision (e.g. character-create.ts's creation-time subclass gate check)

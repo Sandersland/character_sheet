@@ -53,7 +53,7 @@ function HpGainPreview({
 
 export default function HitPointsStep() {
   const { character, target } = useLevelUpStepContext();
-  const { reference } = useReferenceData();
+  const { reference } = useReferenceData(character.rulesEdition);
 
   const math = hitPointStepMath(character, reference?.classes ?? [], target);
   const { roll, method, gain, handleRoll, chooseAverage, chooseRoll } = useHpRoll(math);

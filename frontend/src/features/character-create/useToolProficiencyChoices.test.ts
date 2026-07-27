@@ -59,7 +59,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     skillChoiceCount: 0,
     skillChoices: [],
     isSpellcaster: true,
-    subclassLevel: 3,
+    subclassGateLevel: 3,
     subclasses: [],
     startingEquipment: null,
     multiclassPrerequisite: null,

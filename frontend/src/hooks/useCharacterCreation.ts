@@ -69,7 +69,10 @@ export interface CharacterCreation {
 export function useCharacterCreation(): CharacterCreation {
   const navigate = useNavigate();
   const { draft, update, clear: clearDraft } = useCharacterDraft();
-  const { reference, error: referenceError } = useReferenceData();
+  // draft.rulesEdition is null until CreationEntryGate resolves it (#1286) —
+  // useReferenceData's skipToken defers the fetch until then, rather than
+  // fetching a wrong/default edition's catalog underneath the gate.
+  const { reference, error: referenceError } = useReferenceData(draft.rulesEdition);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<Item[]>([]);

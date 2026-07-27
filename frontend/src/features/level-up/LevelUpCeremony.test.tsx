@@ -17,6 +17,7 @@ const submitMock = vi.mocked(submitLevelUp);
 
 const character = {
   id: "c1",
+  rulesEdition: "EDITION_2024",
   pendingLevelUps: 1,
   classes: [{ id: "entry-1", name: "fighter", level: 7, subclass: "Champion" }],
   abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },

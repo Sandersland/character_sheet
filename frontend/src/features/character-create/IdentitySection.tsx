@@ -119,7 +119,7 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
         {(() => {
           const classDef = reference.classes.find((c) => c.name === draft.className);
           if (!classDef || classDef.subclasses.length === 0) return null;
-          const unlockedAtCreation = classDef.subclassLevel === 1;
+          const unlockedAtCreation = classDef.subclassGateLevel === 1;
           return (
             <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
               Subclass
@@ -144,7 +144,7 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
                 </select>
               ) : (
                 <div className="rounded-control border border-parchment-200 bg-parchment-100 px-2 py-1.5 text-sm font-normal normal-case text-parchment-600">
-                  Chosen at level {classDef.subclassLevel}
+                  Chosen at level {classDef.subclassGateLevel}
                 </div>
               )}
             </label>

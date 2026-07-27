@@ -37,7 +37,7 @@ function deriveRoster(character: Character): ClassEntry[] {
 
 function deriveNeedsSubclass(character: Character, classDef: ClassOption | undefined): boolean {
   if (!classDef) return false;
-  return character.level >= classDef.subclassLevel && !character.subclass;
+  return character.level >= classDef.subclassGateLevel && !character.subclass;
 }
 
 function deriveManeuverIds(resources: CharacterResources | undefined): string[] {

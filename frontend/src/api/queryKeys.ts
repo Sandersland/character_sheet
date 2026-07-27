@@ -7,6 +7,8 @@
 // Namespaces are added incrementally, one per commit, alongside their first
 // consumer — an export with no importer yet fails fallow's unused-exports gate.
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 export const characterKeys = {
   all: ["characters"] as const,
   list: () => [...characterKeys.all, "list"] as const,
@@ -21,7 +23,15 @@ export const campaignKeys = {
   items: (id: string | null | undefined) => [...campaignKeys.scope(id), "items"] as const,
 };
 
-export const referenceKeys = { all: ["reference"] as const };
+export const referenceKeys = {
+  all: ["reference"] as const,
+  // The edition is cache IDENTITY, not a filter: /reference serves values
+  // already resolved through subclassGateLevel and resolveEditionCatalog, so a
+  // 2014 payload handed to a 2024 surface would gate a form control on the
+  // wrong rule (#1325). `all` stays the prefix so one invalidate clears both.
+  byEdition: (edition: RulesEdition | null | undefined) =>
+    [...referenceKeys.all, edition] as const,
+};
 
 // The SRD item catalog (`GET /items`) — a separate endpoint from `/reference`,
 // so it gets its own key rather than overloading referenceKeys.

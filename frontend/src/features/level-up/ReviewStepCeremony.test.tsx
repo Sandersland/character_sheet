@@ -23,6 +23,7 @@ const submitMock = vi.mocked(submitLevelUp);
 // hitPoints/hitDice/abilityScores present because step 1 is the real HitPointsStep.
 const character = {
   id: "c1",
+  rulesEdition: "EDITION_2024",
   classes: [{ id: "entry-1", name: "fighter", level: 7, subclass: "Champion" }],
   abilityScores: { strength: 15, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 12, charisma: 8 },
   skills: [{ name: "athletics", ability: "strength", proficient: true }],

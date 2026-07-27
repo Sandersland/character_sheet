@@ -1,8 +1,13 @@
 import type { CatalogFeat, CatalogSpell, Item, ReferenceData } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 import { request } from "@/api/http";
 
-export async function fetchReference(): Promise<ReferenceData> {
-  return request<ReferenceData>("/reference", undefined, "Failed to fetch reference data");
+// A query param (not a header, #1325): there is no Cache-Control anywhere in
+// backend/src and Express's default weak ETag is on, so a header could let
+// HTTP hand a 2014 payload to a 2024 request underneath a correct TanStack
+// queryKey. A query param makes that structurally impossible.
+export async function fetchReference(edition: RulesEdition): Promise<ReferenceData> {
+  return request<ReferenceData>(`/reference?edition=${edition}`, undefined, "Failed to fetch reference data");
 }
 
 // Feeds the inventory editor's "add from catalog" picker (Phase B).

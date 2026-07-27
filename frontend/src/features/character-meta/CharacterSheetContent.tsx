@@ -44,7 +44,7 @@ const CombatLivePanel = lazy(() => import("@/features/session/CombatLivePanel"))
  */
 export default function CharacterSheetContent() {
   const { character } = useCurrentCharacter();
-  const { reference } = useReferenceData();
+  const { reference } = useReferenceData(character.rulesEdition);
   return (
     <LiveSessionProvider characterId={character.id}>
       <TurnStateProvider>
