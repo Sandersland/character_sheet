@@ -92,32 +92,33 @@ describe("GET /api/reference", () => {
     expect(byName("Fighter").primaryAbility).toEqual(["strength", "dexterity"]);
   });
 
-  // #1325: `?edition=` resolves subclassLevel through subclassGateLevel for the
-  // REQUESTED edition, not a baked-in default — 2014 exposes each class's real
-  // PHB'14 gate (Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, rest 3); 2024 flattens
-  // every class to 3 (SRD 5.2). Proves the endpoint no longer hardcodes an edition.
-  it("resolves subclassLevel for the requested edition (2014 per-class gate vs 2024's flat 3)", async () => {
+  // #1325: `?edition=` resolves subclassGateLevel (wire field, renamed from the
+  // raw-column-shaped `subclassLevel`) through subclassGateLevel (the rule
+  // function) for the REQUESTED edition, not a baked-in default — 2014 exposes
+  // each class's real PHB'14 gate (Cleric/Sorcerer/Warlock 1, Druid/Wizard 2,
+  // rest 3); 2024 flattens every class to 3 (SRD 5.2).
+  it("resolves subclassGateLevel for the requested edition (2014 per-class gate vs 2024's flat 3)", async () => {
     const app = createApp();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
     const byName = (body: any, name: string) => body.classes.find((c: { name: string }) => c.name === name);
 
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     expect(res2014.status).toBe(200);
-    expect(byName(res2014.body, "Cleric").subclassLevel).toBe(1);
-    expect(byName(res2014.body, "Sorcerer").subclassLevel).toBe(1);
-    expect(byName(res2014.body, "Warlock").subclassLevel).toBe(1);
-    expect(byName(res2014.body, "Druid").subclassLevel).toBe(2);
-    expect(byName(res2014.body, "Wizard").subclassLevel).toBe(2);
-    expect(byName(res2014.body, "Fighter").subclassLevel).toBe(3);
+    expect(byName(res2014.body, "Cleric").subclassGateLevel).toBe(1);
+    expect(byName(res2014.body, "Sorcerer").subclassGateLevel).toBe(1);
+    expect(byName(res2014.body, "Warlock").subclassGateLevel).toBe(1);
+    expect(byName(res2014.body, "Druid").subclassGateLevel).toBe(2);
+    expect(byName(res2014.body, "Wizard").subclassGateLevel).toBe(2);
+    expect(byName(res2014.body, "Fighter").subclassGateLevel).toBe(3);
 
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     expect(res2024.status).toBe(200);
-    expect(byName(res2024.body, "Cleric").subclassLevel).toBe(3);
-    expect(byName(res2024.body, "Sorcerer").subclassLevel).toBe(3);
-    expect(byName(res2024.body, "Warlock").subclassLevel).toBe(3);
-    expect(byName(res2024.body, "Druid").subclassLevel).toBe(3);
-    expect(byName(res2024.body, "Wizard").subclassLevel).toBe(3);
-    expect(byName(res2024.body, "Fighter").subclassLevel).toBe(3);
+    expect(byName(res2024.body, "Cleric").subclassGateLevel).toBe(3);
+    expect(byName(res2024.body, "Sorcerer").subclassGateLevel).toBe(3);
+    expect(byName(res2024.body, "Warlock").subclassGateLevel).toBe(3);
+    expect(byName(res2024.body, "Druid").subclassGateLevel).toBe(3);
+    expect(byName(res2024.body, "Wizard").subclassGateLevel).toBe(3);
+    expect(byName(res2024.body, "Fighter").subclassGateLevel).toBe(3);
   });
 
   it("400s on an unrecognized edition", async () => {

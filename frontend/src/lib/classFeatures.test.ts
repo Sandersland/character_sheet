@@ -18,7 +18,7 @@ function makeChar(overrides: Partial<Character>, resources?: Partial<CharacterRe
 const fighterDef = {
   id: "fighter",
   name: "Fighter",
-  subclassLevel: 3,
+  subclassGateLevel: 3,
   subclasses: [{ id: "champion", name: "Champion" }],
 } as unknown as ClassOption;
 

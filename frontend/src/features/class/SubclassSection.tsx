@@ -28,7 +28,7 @@ export default function SubclassSection({ classDef, needsSubclass, busy, onChoos
       ) : (
         <div className="flex flex-col gap-1.5">
           <p className="text-xs text-parchment-600">
-            You have reached level {classDef!.subclassLevel} — choose a subclass.
+            You have reached level {classDef!.subclassGateLevel} — choose a subclass.
           </p>
           <select
             defaultValue=""

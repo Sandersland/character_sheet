@@ -42,8 +42,10 @@ export interface ClassOption {
   skillChoiceCount: number;
   skillChoices: SkillName[];
   isSpellcaster: boolean;
-  /** Character level at which this class grants a subclass (1, 2, or 3). */
-  subclassLevel: number;
+  /** Character level at which this class grants a subclass, ALREADY resolved
+   *  for the requested edition by subclassGateLevel (#1325). Never compare a
+   *  level against a raw catalog column. */
+  subclassGateLevel: number;
   /** Available subclasses for this class, ordered alphabetically. */
   subclasses: SubclassOption[];
   /** Starting equipment definition, null if the class has no package defined. */

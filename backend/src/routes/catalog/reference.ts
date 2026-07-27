@@ -85,8 +85,10 @@ referenceRouter.get("/reference", async (req, res) => {
     isSpellcaster: c.isSpellcaster,
     // The caller's edition, never DEFAULT_RULES_EDITION: that names the edition a
     // NEW character defaults to, and coupling the two would let a change to the
-    // creation default silently change what this catalog reports (#1325).
-    subclassLevel: subclassGateLevel(c.subclassLevel, edition),
+    // creation default silently change what this catalog reports (#1325). Wire
+    // field named after the rule function that produced it — never `subclassLevel`,
+    // which is indistinguishable from the raw, edition-unresolved catalog column.
+    subclassGateLevel: subclassGateLevel(c.subclassLevel, edition),
     // Tool proficiency fields — parallel to skillChoices/skillChoiceCount.
     toolProficiencies: c.toolProficiencies,
     toolChoices: c.toolChoices,
