@@ -171,4 +171,41 @@ describe("GET /api/reference", () => {
     expect(byName(criminal2014.body, "Soldier").originFeat.name).toBe("Savage Attacker");
     expect(byName(criminal2024.body, "Soldier").originFeat.name).toBe("Savage Attacker");
   });
+
+  // #1322: the 14 conditions' resolved {key,label,description} rows, edition-
+  // aware — catalog content identical for every character of an edition, so it
+  // rides /reference rather than the character payload.
+  it("ships conditions resolved for the requested edition (#1322)", async () => {
+    const app = createApp();
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    expect(res2014.status).toBe(200);
+    expect(res2024.status).toBe(200);
+
+    expect(res2014.body.conditions).toHaveLength(14);
+    expect(res2024.body.conditions).toHaveLength(14);
+
+    // rollEffects never reaches the wire — shipping the raw grants would ship the rule.
+    for (const row of res2024.body.conditions) {
+      expect(Object.keys(row).sort()).toEqual(["description", "key", "label"]);
+    }
+
+    // Labels alphabetical, first is Blinded.
+    expect(res2024.body.conditions[0]).toMatchObject({ key: "blinded", label: "Blinded" });
+
+    // One of #1309's nine divergent conditions, forked both ways.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const findCond = (body: any, key: string) => body.conditions.find((c: { key: string }) => c.key === key);
+    const grappled2014 = findCond(res2014.body, "grappled");
+    const grappled2024 = findCond(res2024.body, "grappled");
+    expect(grappled2014.label).toBe("Grappled");
+    expect(grappled2014.description).toContain("The condition ends if the grappler is incapacitated");
+    expect(grappled2024.description).toContain("other than the grappler");
+
+    // 2014's incapacitated is the short, exact PHB'14 sentence.
+    expect(findCond(res2014.body, "incapacitated").description).toBe("Can't take actions or reactions.");
+
+    // One of the five edition-invariant conditions resolves identically.
+    expect(findCond(res2014.body, "poisoned").description).toBe(findCond(res2024.body, "poisoned").description);
+  });
 });

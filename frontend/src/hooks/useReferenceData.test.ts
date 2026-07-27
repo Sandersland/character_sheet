@@ -15,6 +15,7 @@ const REFERENCE: ReferenceData = {
   backgrounds: [],
   alignments: [],
   artisanTools: [],
+  conditions: [],
 };
 
 describe("useReferenceData", () => {

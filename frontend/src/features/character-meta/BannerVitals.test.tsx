@@ -48,6 +48,7 @@ const mockCharacter: Character = {
   inventory: [],
   currency: { cp: 0, sp: 0, gp: 25, pp: 0 },
   conditions: { active: [], exhaustion: 0 },
+  exhaustionEffectText: "No exhaustion.",
   activeEffects: { buffs: [] },
   rollModifiers: [],
   unarmedStrike: {
