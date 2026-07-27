@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CONDITIONS, conditionDefinition } from "@/lib/srd/condition-data.js";
+import { CONDITIONS, conditionDefinition, conditionRulesText } from "@/lib/srd/condition-data.js";
 
 // #1309: the 2014 half of what #1135 replaced. Nine conditions carry real
 // mechanical or textual deltas from PHB'14 to SRD 5.2; the other five are
@@ -117,4 +117,77 @@ describe("conditionDefinition — byte-identical conditions resolve to one share
       expect(c2014).toBe(CONDITIONS.find((c) => c.key === key));
     },
   );
+});
+
+// #1322: these five pins were deleted from the frontend's CONDITION_DESCRIPTIONS
+// (frontend/src/lib/conditions.test.ts) along with the mirror they lived in.
+// Carried here rather than dropped, now asserted against the backend rules
+// text they were always describing.
+describe("conditionDefinition — 2024 (SRD 5.2) text pins migrated from the deleted frontend CONDITION_DESCRIPTIONS (#1322)", () => {
+  it("scopes Grappled's attack disadvantage to targets other than the grappler", () => {
+    expect(conditionDefinition("grappled", "EDITION_2024").description).toContain(
+      "other than the grappler",
+    );
+  });
+
+  it("mentions Invisible's advantage on initiative", () => {
+    expect(conditionDefinition("invisible", "EDITION_2024").description.toLowerCase()).toContain(
+      "initiative",
+    );
+  });
+
+  it("mentions Incapacitated breaking Concentration and can't speak", () => {
+    const description = conditionDefinition("incapacitated", "EDITION_2024").description;
+    expect(description).toContain("Concentration");
+    expect(description.toLowerCase()).toContain("can't speak");
+  });
+
+  it("no longer says Stunned can't move (2024 trim)", () => {
+    expect(conditionDefinition("stunned", "EDITION_2024").description.toLowerCase()).not.toContain(
+      "can't move",
+    );
+  });
+
+  it("gives Petrified immunity to the Poisoned condition", () => {
+    expect(conditionDefinition("petrified", "EDITION_2024").description).toContain("Poisoned");
+  });
+});
+
+// #1322: the resolved {key,label,description} rows served on GET /api/reference.
+// rollEffects is deliberately dropped — the client receives resolved
+// rollModifiers already, so shipping raw per-condition grants would ship the rule.
+describe("conditionRulesText", () => {
+  it("returns all 14 conditions, in CONDITIONS' order, for both editions", () => {
+    expect(conditionRulesText("EDITION_2024")).toHaveLength(14);
+    expect(conditionRulesText("EDITION_2014")).toHaveLength(14);
+    expect(conditionRulesText("EDITION_2024").map((r) => r.key)).toEqual(
+      CONDITIONS.map((c) => c.key),
+    );
+  });
+
+  it("each row is exactly {key,label,description} — no rollEffects on the wire", () => {
+    for (const row of conditionRulesText("EDITION_2024")) {
+      expect(Object.keys(row).sort()).toEqual(["description", "key", "label"]);
+    }
+  });
+
+  it("forks one of #1309's nine divergent conditions between editions", () => {
+    const grappled2014 = conditionRulesText("EDITION_2014").find((r) => r.key === "grappled")!;
+    const grappled2024 = conditionRulesText("EDITION_2024").find((r) => r.key === "grappled")!;
+    expect(grappled2014.description).not.toBe(grappled2024.description);
+    expect(grappled2014.description).toContain("The condition ends if the grappler is incapacitated");
+    expect(grappled2024.description).toContain("other than the grappler");
+  });
+
+  it("resolves one of the five edition-invariant conditions identically across editions", () => {
+    const poisoned2014 = conditionRulesText("EDITION_2014").find((r) => r.key === "poisoned")!;
+    const poisoned2024 = conditionRulesText("EDITION_2024").find((r) => r.key === "poisoned")!;
+    expect(poisoned2014.description).toBe(poisoned2024.description);
+  });
+
+  it("labels never fork by edition and stay alphabetically ordered starting with Blinded", () => {
+    const rows = conditionRulesText("EDITION_2024");
+    expect(rows[0]).toMatchObject({ key: "blinded", label: "Blinded" });
+    expect(rows.find((r) => r.key === "grappled")).toMatchObject({ label: "Grappled" });
+  });
 });
