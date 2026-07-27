@@ -300,6 +300,22 @@ describe("Shadow Arts cast endpoint", () => {
     expect(l17Cast.status).toBe(200);
   });
 
+  // #1339: the subclass gate is an EXACT name match, so the 2014 "Way of Shadow"
+  // monk (PHB'14 p.80) cannot reach the 2024 Warrior of Shadow features
+  // (PHB'24 p.91). Asserted at BOTH layers — the wire availableActions[] and the
+  // cast guard — because no test asserted either, which is how the substring
+  // gate shipped past #1315.
+  it('a 2014 "Way of Shadow" monk at L17 surfaces neither action and is rejected by both guards', async () => {
+    await createMonk(XP_L17, "Way of Shadow");
+    const sheet = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    const sheetKeys = (sheet.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(sheetKeys).not.toContain("shadowArts");
+    expect(sheetKeys).not.toContain("cloakOfShadows");
+    expect(sheetKeys).not.toContain("shadowStep");
+    expect((await cast([{ type: "castShadowArt", shadowArtId: darknessId }])).status).toBe(400);
+    expect((await cast([{ type: "activateCloakOfShadows" }])).status).toBe(400);
+  });
+
   describe("activateCloakOfShadows (L17)", () => {
     it("spends 3 focus and self-applies invisible", async () => {
       await createMonk(XP_L17, "warrior of shadow");

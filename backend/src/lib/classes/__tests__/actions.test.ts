@@ -15,6 +15,7 @@ import {
   rageMeleeDamageBonus,
   type AvailableAction,
 } from "@/lib/classes/actions.js";
+import { monk } from "@/lib/classes/monk.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -440,7 +441,7 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
     expect(rogue).not.toContain("shadowStep");
   });
 
-  it("matches the subclass substring case-insensitively", () => {
+  it("matches the subclass NAME case-insensitively", () => {
     expect(keys(deriveActions("Monk", "warrior of shadow", 6, []))).toContain("shadowStep");
   });
 
@@ -884,6 +885,103 @@ describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (
   it("the old per-class keys no longer exist in either dispatch table", () => {
     expect(ACTION_EFFECT_FN.channelDivinityCleric).toBeUndefined();
     expect(ACTION_EFFECT_FN.channelDivinityPaladin).toBeUndefined();
+  });
+});
+
+// #1339: DERIVED_ACTIONS' subclass gate used to substring-match
+// (`sub.includes(a.grantSubclass.toLowerCase())`), so a 2014 "Way of Shadow"
+// monk (PHB'14 p.80) passed the 2024 "Warrior of Shadow" (PHB'24 p.91) gate
+// purely because "shadow" ⊂ "way of shadow". The gate now matches the
+// character's subclass EXACTLY (normalized: lowercased + trimmed) against a
+// list of accepted names — the subclass-registry key vocabulary (monk.ts's
+// `subclasses` map) — so the action gate agrees with deriveResources, which
+// already resolves subclasses by exact lowercase registry key.
+describe("subclass gate is exact-name, not substring (#1339)", () => {
+  it('a 2014 "Way of Shadow" monk gets none of the Warrior of Shadow rows at L20', () => {
+    const wayOfShadow = keys(deriveActions("monk", "Way of Shadow", 20, [pool("focus", 5)]));
+    expect(wayOfShadow).not.toContain("shadowArts");
+    expect(wayOfShadow).not.toContain("cloakOfShadows");
+    expect(wayOfShadow).not.toContain("shadowStep");
+  });
+
+  it('the 2024 "Warrior of Shadow" monk is unaffected at every gate level', () => {
+    expect(keys(deriveActions("monk", "Warrior of Shadow", 2, []))).not.toContain("shadowArts");
+    expect(keys(deriveActions("monk", "Warrior of Shadow", 3, [pool("focus", 1)]))).toContain("shadowArts");
+    expect(keys(deriveActions("monk", "Warrior of Shadow", 5, []))).not.toContain("shadowStep");
+    expect(keys(deriveActions("monk", "Warrior of Shadow", 6, []))).toContain("shadowStep");
+    expect(keys(deriveActions("monk", "Warrior of Shadow", 16, [pool("focus", 3)]))).not.toContain("cloakOfShadows");
+    expect(keys(deriveActions("monk", "Warrior of Shadow", 17, [pool("focus", 3)]))).toContain("cloakOfShadows");
+  });
+
+  it("a homebrew name containing a seeded subclass's name inherits nothing", () => {
+    const openHandbook = keys(
+      deriveActions("monk", "Warrior of the Open Handbook", 20, [pool("wholenessOfBody", 5)]),
+    );
+    expect(openHandbook).not.toContain("wholenessOfBody");
+    expect(openHandbook).not.toContain("fleetStep");
+
+    const mercyReborn = keys(deriveActions("monk", "Way of Mercy Reborn", 20, [pool("focus", 5)]));
+    expect(mercyReborn).not.toContain("handOfHealing");
+    expect(mercyReborn).not.toContain("handOfHealingFlurry");
+
+    const elementsPrime = keys(deriveActions("monk", "Warrior of the Elements Prime", 20, [pool("focus", 5)]));
+    expect(elementsPrime).not.toContain("elementalAttunement");
+    expect(elementsPrime).not.toContain("elementalBurst");
+  });
+
+  it("normalizes case and stray whitespace on both sides", () => {
+    expect(keys(deriveActions("Monk", "  WARRIOR OF SHADOW  ", 6, []))).toContain("shadowStep");
+  });
+
+  it("the other three families still match their registry names exactly", () => {
+    const elements = keys(deriveActions("monk", "warrior of the elements", 6, [pool("focus", 2)]));
+    expect(elements).toContain("elementalAttunement");
+    expect(elements).toContain("elementalBurst");
+
+    const openHand = keys(deriveActions("monk", "warrior of the open hand", 11, [pool("wholenessOfBody", 1)]));
+    expect(openHand).toContain("wholenessOfBody");
+    expect(openHand).toContain("fleetStep");
+
+    const mercy = keys(deriveActions("monk", "warrior of mercy", 3, [pool("focus", 1)]));
+    expect(mercy).toContain("handOfHealing");
+    expect(mercy).toContain("handOfHealingFlurry");
+  });
+
+  // Drift latch: under exact matching a mistyped accepted name silently grants
+  // nothing (substring matching over-matched loudly; exact matching
+  // under-matches silently) — this table pins each accepted name to the keys
+  // it must unlock at L20, so a typo in a row's grantSubclasses list fails
+  // HERE instead of shipping quiet (#1339).
+  it("every subclass-gated row is reachable from its accepted name (#1339)", () => {
+    const ACCEPTED_NAME_KEYS: Record<string, string[]> = {
+      "warrior of shadow": ["shadowStep", "shadowArts", "cloakOfShadows"],
+      "warrior of the elements": ["elementalAttunement", "elementalBurst"],
+      "warrior of the open hand": ["wholenessOfBody", "fleetStep"],
+      "warrior of mercy": ["handOfHealing", "handOfHealingFlurry"],
+    };
+    for (const [name, expectedKeys] of Object.entries(ACCEPTED_NAME_KEYS)) {
+      const granted = keys(deriveActions("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5)]));
+      for (const key of expectedKeys) {
+        expect(granted).toContain(key);
+      }
+    }
+  });
+
+  // Ties the DERIVED_ACTIONS vocabulary to the subclasses-registry vocabulary
+  // (monk.ts's `subclasses` map) — deriveResources already resolves
+  // subclasses by exact lowercase registry key, so this proves the action
+  // gate can't silently drift from the resource/feature gate (#1339).
+  it("every accepted subclass name is a monk subclasses-registry key (#1339)", () => {
+    const registryKeys = Object.keys(monk.subclasses ?? {});
+    const acceptedNames = [
+      "warrior of shadow",
+      "warrior of the elements",
+      "warrior of the open hand",
+      "warrior of mercy",
+    ];
+    for (const name of acceptedNames) {
+      expect(registryKeys).toContain(name);
+    }
   });
 });
 
