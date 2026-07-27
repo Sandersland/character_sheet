@@ -23,7 +23,12 @@ import {
   loadAutoRollConcentration,
   saveAutoRollConcentration,
 } from "@/features/hitpoints/concentrationPreference";
-import { PreferencesContext, type UserPreferences } from "@/hooks/usePreferencesSync";
+import {
+  PreferencesContext,
+  PREFERENCE_SYNC_ERROR,
+  type PreferenceSyncState,
+  type UserPreferences,
+} from "@/hooks/usePreferencesSync";
 
 // Mirrors backend DEFAULT_PREFERENCES — kept as a literal since this leaf has
 // no import path to the backend schema.
@@ -69,9 +74,21 @@ function mirrorToLocalStorage(preferences: UserPreferences): void {
   saveAutoRollConcentration(preferences.autoRollConcentration);
 }
 
+// Drops one key from a Partial<Record<...>> map, used to clear a key's
+// saving/error entry without mutating the previous state object.
+function without<T extends string, V>(
+  map: Partial<Record<T, V>>,
+  key: T,
+): Partial<Record<T, V>> {
+  const rest = { ...map };
+  delete rest[key];
+  return rest;
+}
+
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const { status, user } = useAuth();
   const [synced, setSynced] = useState<UserPreferences | undefined>(undefined);
+  const [sync, setSync] = useState<PreferenceSyncState>({ saving: {}, errors: {} });
   // Guards the once-per-login reconcile against re-renders while status/user
   // settle (and StrictMode's dev double-invoke of effects).
   const reconciledForUserId = useRef<string | null>(null);
@@ -93,7 +110,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       }
       // No marker (a genuine pre-upgrade browser) or this same account already
       // owns the mirrored values: push them up rather than resetting to
-      // defaults on the server.
+      // defaults on the server. No sync-error surface here (#1365) — this
+      // fires with no user gesture on every cold start for an account that's
+      // never stored preferences, and an offline cold start is not a user
+      // condition worth an error banner for.
       claimPreferencesOwner(user.id);
       const snapshot = localSnapshot();
       patchPreferences(snapshot)
@@ -117,19 +137,37 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const setPreference = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
       setSynced((prev) => ({ ...(prev ?? localSnapshot()), [key]: value }));
-      patchPreferences({ [key]: value } as Partial<UserPreferences>).catch(() => {
-        // Best-effort: the optimistic local write above keeps the change
-        // visible now, but a silent failure is not durable — once the account
-        // has any stored value, the next reconcile adopts the server's older
-        // one and reverts this. Deliberately no error UX for a background sync.
-      });
+      setSync((prev) => ({ saving: { ...prev.saving, [key]: true }, errors: without(prev.errors, key) }));
+      // .then(onOk, onErr), not .then(...).catch(...) — the latter would also
+      // catch a throw from onOk and misreport a succeeded write as failed.
+      patchPreferences({ [key]: value } as Partial<UserPreferences>).then(
+        () => setSync((prev) => ({ saving: without(prev.saving, key), errors: without(prev.errors, key) })),
+        () =>
+          setSync((prev) => ({
+            saving: without(prev.saving, key),
+            // retry closes over this exact key/value and re-issues the same
+            // write; safe against staleness because a NEWER setPreference for
+            // this key drops this entry (the `without` above) before its own
+            // failure branch could install a new one, so a fired retry always
+            // matches what's currently shown.
+            errors: {
+              ...prev.errors,
+              [key]: { message: PREFERENCE_SYNC_ERROR, retry: () => setPreference(key, value) },
+            },
+          })),
+      );
+      // The optimistic local write above keeps the change visible regardless
+      // of outcome, and a failure is surfaced per-key via `sync` (#1365) — but
+      // it is still not durable: once the account has any stored value, the
+      // next login's reconcile adopts the server's older one and reverts
+      // this. That revert is accepted; only the moment-of-failure is surfaced.
     },
     [],
   );
 
   // Memoized so an unrelated AuthProvider re-render (now outermost) doesn't
   // cascade through every preference-consuming provider below it.
-  const value = useMemo(() => ({ synced, setPreference }), [synced, setPreference]);
+  const value = useMemo(() => ({ synced, setPreference, sync }), [synced, setPreference, sync]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }
