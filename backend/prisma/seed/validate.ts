@@ -6,14 +6,15 @@
 // spells.ts's twin) rather than one central schema file, so a family's schema
 // changes in the same diff as its content shape.
 //
-// SEED_FAMILIES is a registry, not a hardcoded list of calls — adding a family
-// is one entry here (demonstrated by the second member landing alongside the
-// first, not merely asserted). Deliberately in scope for only SUBCLASSES +
-// SUBCLASS_GRANTED_SPELLS today; the other eleven seed families already carry
-// structural coverage via seed-data.test.ts and are a named follow-up.
+// SEED_FAMILIES is a registry, not a hardcoded list of calls — adding a
+// family is one entry here, demonstrated by the second member (SUBCLASS_
+// GRANTED_SPELLS) landing alongside the first, not merely asserted. Deliberately
+// in scope for only these two today; the other eleven seed families already
+// carry structural coverage via seed-data.test.ts and are a named follow-up.
 import { z } from "zod";
 
 import { SUBCLASSES, subclassSeedSchema } from "./subclasses.js";
+import { SUBCLASS_GRANTED_SPELLS, subclassGrantedSpellSeedSchema } from "./subclass-granted-spells.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -22,6 +23,7 @@ interface SeedFamily {
 
 const SEED_FAMILIES: Record<string, SeedFamily> = {
   SUBCLASSES: { schema: subclassSeedSchema, rows: SUBCLASSES },
+  SUBCLASS_GRANTED_SPELLS: { schema: subclassGrantedSpellSeedSchema, rows: SUBCLASS_GRANTED_SPELLS },
 };
 
 export interface SeedValidationSummary {

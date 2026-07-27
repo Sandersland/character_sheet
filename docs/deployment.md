@@ -107,6 +107,15 @@ docker compose exec -T backend npx prisma migrate deploy
 
 Done when the step-1 query returns no unfinished row, `migrate status` reports all migrations applied, `/api/health` is ok, and an audit log renders. On Railway `dev`, run the same steps with `railway connect Postgres` for psql and `DATABASE_URL="$DATABASE_PUBLIC_URL"` for the Prisma CLI — the service's own `DATABASE_URL` is `*.railway.internal` and is not reachable from a laptop.
 
+### Catalog content ships in the seed, not in migrations (#1277)
+
+Every boot command runs `prisma migrate deploy && prisma db seed` as one step (root `Dockerfile`, `backend/Dockerfile`, `backend/Dockerfile.prod`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
+
+1. **The failure mode is already structurally prevented** — there is no deployment path that runs `migrate deploy` without also running `db seed` (enforced above), so this is a defense-in-depth gate, not a live gap.
+2. **Data migrations can't express what the seed does.** Several seeders (`seedFeats`, `seedSpells`, `seedShadowArts`) prune stale rows, and spell seeding layers over `SPELL_COLUMN_DEFAULTS` so a removed optional field actually resets on re-seed (#1132's Barkskin fix) — an append-only migration history can only add UPDATEs, never re-derive a row.
+3. **A failed data migration is catastrophic; a failed seed is not.** A failed migration means P3009 — every migration behind it is blocked (see above; one instance cost 13 hours, #1373). A failed seed exits 1, leaves the schema advanced, and retries clean on the next boot.
+4. **Migrations are checksummed** — a content typo in a migration can never be corrected in place, unlike a seed row.
+
 Preventing the enum case is a CI gate — see `docs/development.md`, "Prisma workflow".
 
 ## When prod comes

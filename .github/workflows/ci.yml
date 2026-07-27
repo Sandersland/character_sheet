@@ -36,6 +36,16 @@ jobs:
       - name: subclass identity resolved via slug, not substring
         run: sh scripts/check-subclass-substring.sh
 
+      # Boot-contract gate (#1277 defect 3): needs no node, runs alongside
+      # the other grep gates above.
+      - name: every migrate-deploy boot command also seeds
+        run: sh scripts/check-seed-required.sh
+
+      # AC-4 machine enforcement (#1277): a seed DATA module must carry no
+      # prisma/upsert/await token. Needs no node.
+      - name: seed data modules contain no upsert logic
+        run: sh scripts/check-seed-data-modules.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc

@@ -14,7 +14,7 @@ Players build character sheets and optionally run campaigns. The product goal is
 Three commitments follow from that goal and decide most arguments below:
 
 - **Editions are content, not a fork.** A group runs 2014 *or* 2024 rules; both are supported per campaign (epic #1281).
-- **Content is data.** New rules content should be seed/catalog rows resolved at read time, not new TS modules — that is also the path to homebrew (#416, #1277).
+- **Content is data.** New rules content should be seed/catalog rows resolved at read time, not new TS modules — that is also the path to homebrew (#416, #1277). A pure identity/join table (e.g. `SUBCLASS_SLUGS`, #1277) is not an exception: it carries no rules text, description, or mechanics — only a key that must be type-checked — so the content itself still lives in the seed row.
 - **Effects are self-or-announce.** The engine mutates only the character's *own* state; anything targeting another creature is reminder text plus a computed DC, recorded in history. **There is no enemy/target model and modelling one is an explicit non-goal** — this is what keeps "support every class and subclass" reachable instead of a combat simulator.
 
 ## Quickstart
