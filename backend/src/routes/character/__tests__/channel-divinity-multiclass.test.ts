@@ -172,8 +172,8 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       const before = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(cdPools(before.body)[0]).toMatchObject({ total: 2, used: 2, remaining: 0 });
 
-      // Drop the cleric entry to level 2 and the XP to match (cleric 2 + paladin 4 → paladin's
-      // max(1) applies — total 1). Clamp-on-read (buildResourcesPayload) must cap `used` to the
+      // Drop the cleric entry to level 2 and the XP to match (max(cleric@2→1, paladin@4→1) = 1,
+      // down from 2). Clamp-on-read (buildResourcesPayload) must cap `used` to the
       // new total without any LEVEL_GATED_RECONCILERS entry (CLAUDE.md: derive, don't persist).
       await prisma.characterClassEntry.updateMany({
         where: { characterId: CHAR_ID, name: "cleric" },
