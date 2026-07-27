@@ -31,6 +31,15 @@ COPY package.json package-lock.json ./
 COPY packages/ packages/
 COPY backend/package.json backend/
 RUN npm ci --workspace backend
+# packages/contracts compiles to JS because the backend imports its zod schemas
+# as VALUES and node:22-alpine cannot execute a .ts (#1370). .dockerignore drops
+# **/dist, so the host's build never leaks in — this line is the only thing that
+# puts dist/ in the image, and stage 3's `COPY --from=backend /app /app` carries it.
+# The load assertion walks EVERY *Schema export rather than spot-checking one, so
+# a barrel that drops a schema fails the image build instead of at first request;
+# the count guard keeps an empty barrel from passing vacuously.
+RUN npm run build --workspace @character-sheet/contracts \
+ && node --input-type=module -e "import('@character-sheet/contracts').then(m => { const s = Object.keys(m).filter(k => k.endsWith('Schema')); if (s.length < 12 || s.some(k => typeof m[k]?.parse !== 'function')) { console.error('contracts barrel failed to load:', s.length, 'schemas'); process.exit(1); } console.log('contracts:', s.length, 'schemas loaded'); })"
 COPY backend/ backend/
 WORKDIR /app/backend
 # prisma.config.ts resolves env("DATABASE_URL") when the CLI loads it, so a

@@ -124,7 +124,7 @@ function assertCatalogPopulated(ref: Reference) {
 
 // 2. Read valid creation options from the catalog.
 async function loadReference(cookie: string): Promise<Reference> {
-  const ref = await api<Reference>("/api/reference", { cookie });
+  const ref = await api<Reference>("/api/reference?edition=EDITION_2024", { cookie });
   if (ref.status !== 200) die(`GET /api/reference returned ${ref.status}: ${JSON.stringify(ref.body)}`);
   assertCatalogPopulated(ref.body);
   return ref.body;

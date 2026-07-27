@@ -82,6 +82,11 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
   await page.getByLabel(/^Race/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Warlock" });
+  // #1325: a 2024 Warlock's subclass gate is level 3, so creation must offer NO
+  // picker. Asserting the disabled panel (not just "no combobox") also fails if
+  // the field vanishes entirely, which would hide a broken payload.
+  await expect(page.getByText("Chosen at level 3")).toBeVisible();
+  await expect(page.getByLabel("Subclass")).toHaveCount(0);
   await page.getByLabel("Background").selectOption({ label: "Sage" });
   await continueStep(page);
 
@@ -118,6 +123,63 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
 
   await page.getByRole("tab", { name: "Magic" }).click();
   await expect(page.getByText("Eldritch Blast").first()).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+// #1325: the half of this flow that could not exist before — a 2014 Warlock's
+// subclass gate is level 1 (PHB'14 p.105, Otherworldly Patron), so creation
+// must offer a real picker instead of the 2024 "Chosen at level 3" panel.
+// Verified safe against seed data: every Subclass row is edition: null
+// (shared), so "The Fiend" resolves under 2014 too, and resolveSubclass
+// accepts a subclass id whenever the edition-resolved gate is <= 1 (true here).
+test("creation: a 2014 warlock must choose its patron at creation", async ({ page }) => {
+  const name = uniqueName("Old Ways Warlock");
+
+  await login(page);
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: "New Character" }).first().click();
+  await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page, { edition: "EDITION_2014" });
+
+  // Identity step.
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
+  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Class/).selectOption({ label: "Warlock" });
+  await expect(page.getByText(/Chosen at level/)).toHaveCount(0);
+  await page.getByLabel("Subclass").selectOption({ label: "The Fiend" });
+  await page.getByLabel("Background").selectOption({ label: "Sage" });
+  await continueStep(page);
+
+  // Abilities step — Sage draws from Con/Int/Wis; assign the spread via radios.
+  await page.getByRole("radio", { name: "+2 to Intelligence" }).check();
+  await page.getByRole("radio", { name: "+1 to Constitution" }).check();
+  await continueStep(page);
+
+  // Skills & Tools step.
+  await continueStep(page);
+
+  // Spells step — level1SpellPicks is edition-invariant, so a 2014 Warlock
+  // still walks it exactly like the 2024 case above.
+  await expect(page.getByRole("heading", { name: "Learn your magic" })).toBeVisible();
+  await page.getByRole("button", { name: "Open Eldritch Blast" }).click();
+  await page.getByRole("button", { name: /Learn Eldritch Blast/ }).click();
+  await page.getByRole("button", { name: "Add Poison Spray" }).click();
+  await page.getByRole("button", { name: "Add Charm Person" }).click();
+  await page.getByRole("button", { name: "Add Hideous Laughter" }).click();
+  await continueStep(page);
+
+  // Equipment step — the deterministic starting-gold path (as above).
+  await page.getByRole("button", { name: /Starting gold/ }).click();
+  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  await continueStep(page);
+
+  // Review step — create.
+  await page.getByRole("button", { name: /Create Character/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
+
+  await expect(page.getByText("The Fiend").first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });

@@ -4,24 +4,14 @@
 // 5e rules — the Nd6 progression and the once-per-turn + eligibility guard —
 // live in rogue.ts and are consumed here.
 
+import type { RollSneakAttackOperation, SneakAttackOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { canApplySneakAttack, sneakAttackSpec } from "./rogue.js";
 
 export class InvalidSneakAttackOperationError extends Error {}
-
-// Roll Sneak Attack. `eligible` is the player's manual advantage-or-adjacent-ally
-// assertion (never auto-detected); `usedThisTurn` is the client-asserted turn
-// tracker's guard state — also never server-verified, since the server has no
-// session turn state to cross-check against.
-export interface RollSneakAttackOperation {
-  type: "rollSneakAttack";
-  eligible: boolean;
-  usedThisTurn: boolean;
-}
-
-export type SneakAttackOperation = RollSneakAttackOperation;
 
 export interface SneakAttackRollResult {
   roll: number;

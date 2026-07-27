@@ -20,6 +20,8 @@
 // client rolls it and sends the total; the server only decides full vs half
 // from its own save roll.
 
+import type { QuiveringPalmOperation, TriggerQuiveringPalmOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -32,18 +34,6 @@ export class InvalidQuiveringPalmOperationError extends Error {}
 
 export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
 const QUIVERING_PALM_FOCUS_COST = 4;
-
-export interface SetQuiveringPalmOperation {
-  type: "setQuiveringPalm";
-}
-
-export interface TriggerQuiveringPalmOperation {
-  type: "triggerQuiveringPalm";
-  /** Client-rolled 10d12 total (SRD 5.2: 10d12 Force, half on a successful save). */
-  roll: number;
-}
-
-export type QuiveringPalmOperation = SetQuiveringPalmOperation | TriggerQuiveringPalmOperation;
 
 export type QuiveringPalmSaveOutcome = "fail" | "success";
 

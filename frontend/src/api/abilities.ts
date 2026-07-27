@@ -1,17 +1,22 @@
 import type {
+  AttemptStunningStrikeOperation,
   CatalogChannelDivinity,
   CatalogManeuver,
   CatalogShadowArt,
   ChannelDivinityOperation,
   Character,
+  ImposeOpenHandRiderOperation,
   ManeuverCastResult,
   ManeuverOperation,
   OpenHandRider,
   OpenHandRiderResult,
   QuiveringPalmResult,
+  RollSneakAttackOperation,
+  SetQuiveringPalmOperation,
   ShadowArtOperation,
   SneakAttackRollResult,
   StunningStrikeAttemptResult,
+  TriggerQuiveringPalmOperation,
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@/types/character";
@@ -119,7 +124,7 @@ export async function rollSneakAttackTransaction(
   eligible: boolean,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: SneakAttackRollResult[] }> {
-  return applyAbilityTransactions<unknown, { character: Character; results: SneakAttackRollResult[] }>(
+  return applyAbilityTransactions<RollSneakAttackOperation, { character: Character; results: SneakAttackRollResult[] }>(
     characterId,
     "sneak-attack",
     [{ type: "rollSneakAttack", eligible, usedThisTurn }],
@@ -136,7 +141,10 @@ export async function attemptStunningStrikeTransaction(
   characterId: string,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: StunningStrikeAttemptResult[] }> {
-  return applyAbilityTransactions<unknown, { character: Character; results: StunningStrikeAttemptResult[] }>(
+  return applyAbilityTransactions<
+    AttemptStunningStrikeOperation,
+    { character: Character; results: StunningStrikeAttemptResult[] }
+  >(
     characterId,
     "stunning-strike",
     [{ type: "attemptStunningStrike", usedThisTurn }],
@@ -153,7 +161,10 @@ export async function imposeOpenHandRiderTransaction(
   rider: OpenHandRider,
   usedThisTurn: boolean,
 ): Promise<{ character: Character; results: OpenHandRiderResult[] }> {
-  return applyAbilityTransactions<unknown, { character: Character; results: OpenHandRiderResult[] }>(
+  return applyAbilityTransactions<
+    ImposeOpenHandRiderOperation,
+    { character: Character; results: OpenHandRiderResult[] }
+  >(
     characterId,
     "open-hand-technique",
     [{ type: "imposeOpenHandRider", rider, usedThisTurn }],
@@ -166,7 +177,7 @@ export async function imposeOpenHandRiderTransaction(
 export async function setQuiveringPalmTransaction(
   characterId: string,
 ): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
-  return applyAbilityTransactions<unknown, { character: Character; results: QuiveringPalmResult[] }>(
+  return applyAbilityTransactions<SetQuiveringPalmOperation, { character: Character; results: QuiveringPalmResult[] }>(
     characterId,
     "quivering-palm",
     [{ type: "setQuiveringPalm" }],
@@ -182,7 +193,10 @@ export async function triggerQuiveringPalmTransaction(
   characterId: string,
   roll: number,
 ): Promise<{ character: Character; results: QuiveringPalmResult[] }> {
-  return applyAbilityTransactions<unknown, { character: Character; results: QuiveringPalmResult[] }>(
+  return applyAbilityTransactions<
+    TriggerQuiveringPalmOperation,
+    { character: Character; results: QuiveringPalmResult[] }
+  >(
     characterId,
     "quivering-palm",
     [{ type: "triggerQuiveringPalm", roll }],

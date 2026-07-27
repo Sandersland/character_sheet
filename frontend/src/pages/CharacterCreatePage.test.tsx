@@ -48,7 +48,7 @@ const referenceFixture: ReferenceData = {
       skillChoiceCount: 2,
       skillChoices: ["acrobatics", "arcana", "stealth"],
       isSpellcaster: true,
-      subclassLevel: 3,
+      subclassGateLevel: 3,
       subclasses: [],
       startingEquipment: null,
       multiclassPrerequisite: null,
@@ -66,7 +66,7 @@ const referenceFixture: ReferenceData = {
       skillChoiceCount: 2,
       skillChoices: ["athletics", "acrobatics", "perception"],
       isSpellcaster: false,
-      subclassLevel: 3,
+      subclassGateLevel: 3,
       subclasses: [],
       startingEquipment: null,
       multiclassPrerequisite: null,
@@ -127,6 +127,14 @@ const user = () => userEvent.setup();
 // default and continues past it first.
 async function passEntryGate(u: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole("radio", { name: "2024 rules" });
+  await u.click(screen.getByRole("button", { name: /continue/i }));
+}
+
+// #1325: the 2014 half of the entry gate — picks "2014 rules" before
+// Continue, so the ceremony's reference fetch (skipToken-gated on
+// draft.rulesEdition) resolves for 2014 instead of the 2024 default.
+async function passEntryGate2014(u: ReturnType<typeof userEvent.setup>) {
+  await u.click(await screen.findByRole("radio", { name: "2014 rules" }));
   await u.click(screen.getByRole("button", { name: /continue/i }));
 }
 
@@ -273,5 +281,60 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     await u.click(screen.getByRole("button", { name: "+2 / +1" }));
     expect((screen.getByRole("radio", { name: "+2 to Dexterity" }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("radio", { name: "+1 to Intelligence" }) as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+// #1325: the subclass picker's shape must follow the REQUESTED edition's
+// subclassGateLevel, not a value the frontend derives itself — a raw catalog
+// column read directly would be a frontend-originated rule (CLAUDE.md,
+// post-#1272 no exception). Two hand-authored fixtures, one per edition — the
+// gate numbers below (1 vs 3) are LITERALS, never computed from `edition`,
+// so this test can't re-derive the rule it's asserting against.
+const cleric = (subclassGateLevel: number): ReferenceData["classes"][number] => ({
+  id: "class-cleric",
+  name: "Cleric",
+  hitDie: "d8",
+  savingThrows: [],
+  skillChoiceCount: 2,
+  skillChoices: ["history", "insight", "medicine", "persuasion", "religion"],
+  isSpellcaster: true,
+  subclassGateLevel,
+  subclasses: [{ id: "sc-life", name: "Life Domain", description: "" }],
+  startingEquipment: null,
+  multiclassPrerequisite: null,
+  toolProficiencies: [],
+  toolChoices: [],
+  toolChoiceCount: 0,
+  level1SpellPicks: { cantrips: 3, spells: 2 },
+  primaryAbility: ["wisdom"],
+});
+
+const REFERENCE_2024: ReferenceData = { ...referenceFixture, classes: [...referenceFixture.classes, cleric(3)] };
+const REFERENCE_2014: ReferenceData = { ...referenceFixture, classes: [...referenceFixture.classes, cleric(1)] };
+
+describe("CharacterCreatePage — subclass gate per edition (#1325)", () => {
+  beforeEach(() => {
+    mockFetchReference.mockImplementation((edition) =>
+      Promise.resolve(edition === "EDITION_2014" ? REFERENCE_2014 : REFERENCE_2024),
+    );
+  });
+
+  it("offers a 2024 Cleric no subclass at creation", async () => {
+    const u = user();
+    renderPage();
+    await passEntryGate(u);
+    await u.selectOptions(await screen.findByLabelText(/class/i), "Cleric");
+
+    expect(screen.queryByRole("combobox", { name: /subclass/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Chosen at level 3")).toBeInTheDocument();
+  });
+
+  it("offers a 2014 Cleric a subclass at creation", async () => {
+    const u = user();
+    renderPage();
+    await passEntryGate2014(u);
+    await u.selectOptions(await screen.findByLabelText(/class/i), "Cleric");
+
+    expect(screen.getByRole("combobox", { name: /subclass/i })).toBeInTheDocument();
   });
 });

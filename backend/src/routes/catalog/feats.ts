@@ -2,14 +2,10 @@ import { Router } from "express";
 
 import { prisma } from "@/lib/core/prisma.js";
 import { resolveEditionCatalog } from "@/lib/rules/catalog-edition.js";
+import { isRulesEdition } from "@/lib/rules/edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 export const featsRouter = Router();
-
-const RULES_EDITIONS: readonly RulesEdition[] = ["EDITION_2014", "EDITION_2024"];
-function isRulesEdition(raw: unknown): raw is RulesEdition {
-  return (RULES_EDITIONS as readonly string[]).includes(raw as string);
-}
 
 // Feeds the advancement section's feat picker — same role as GET /api/maneuvers.
 // Ordered alphabetically server-side.

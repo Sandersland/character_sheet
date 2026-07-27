@@ -19,6 +19,8 @@
  * Darkvision is flavor text — this app tracks no senses).
  */
 
+import type { CastShadowArtOperation, ShadowArtOperation } from "@character-sheet/contracts";
+
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type AbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
@@ -32,19 +34,6 @@ import { FOCUS_CAST_CHARACTER_SELECT, emitFocusCastEvents } from "./focus-cast.j
 import type { Prisma } from "@/generated/prisma/client.js";
 
 export class InvalidShadowArtOperationError extends Error {}
-
-/** Cast the Shadow Arts Darkness spell. `shadowArtId` is the catalog GrantedAbility.id. */
-export interface CastShadowArtOperation {
-  type: "castShadowArt";
-  shadowArtId: string;
-}
-
-/** Activate Cloak of Shadows (L17): spend 3 focus, become invisible. No catalog id — one fixed feature. */
-export interface ActivateCloakOfShadowsOperation {
-  type: "activateCloakOfShadows";
-}
-
-export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
 
 // Prefix stamped on a Shadow Art's concentration entryId so its id space never overlaps a spellbook Spell.id.
 export const SHADOW_ART_CONCENTRATION_PREFIX = "shadow-art:";

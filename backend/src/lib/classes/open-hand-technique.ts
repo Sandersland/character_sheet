@@ -18,6 +18,8 @@
 // (Heightened Focus, #1244) from re-choosing a rider on every individual
 // strike within the same Flurry use.
 
+import type { ImposeOpenHandRiderOperation, OpenHandRider, OpenHandTechniqueOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -25,17 +27,6 @@ import { runCharacterTransaction, type CharacterTxContext } from "@/lib/characte
 import { focusSaveDC } from "./monk.js";
 
 export class InvalidOpenHandTechniqueOperationError extends Error {}
-
-export type OpenHandRider = "addle" | "push" | "topple";
-
-// Once per turn, client-asserted (mirrors AttemptStunningStrikeOperation).
-export interface ImposeOpenHandRiderOperation {
-  type: "imposeOpenHandRider";
-  rider: OpenHandRider;
-  usedThisTurn: boolean;
-}
-
-export type OpenHandTechniqueOperation = ImposeOpenHandRiderOperation;
 
 export type OpenHandRiderOutcome = "applied" | "resisted";
 
@@ -99,8 +90,13 @@ type OpenHandTechniqueRow = Prisma.CharacterGetPayload<{ select: typeof OPEN_HAN
 
 // Open Hand Technique is a subclass feature (Warrior of the Open Hand), unlike
 // Stunning Strike's base-class monkLevel() gate — so it checks the monk entry's
-// own subclass string too (freeform display name; substring-matched like
-// DERIVED_ACTIONS' grantSubclass in actions.ts).
+// own subclass string too (freeform display name; substring-matched, not
+// exact). isWarriorOfTheOpenHand (this function and Quivering Palm's own
+// copy), isWarriorOfMercy (Hand of Harm and Hand of Ultimate Mercy),
+// openHandMonkEntry, and attacksForClass's Valor-bard check are the six sites
+// still on substring matching — matchesActionGate no longer is, since #1339
+// made that one gate's subclass axis exact-name. #1277 retires all six onto a
+// stable slug together.
 function monkEntry(row: OpenHandTechniqueRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }

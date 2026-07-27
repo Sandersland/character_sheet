@@ -5,6 +5,7 @@
 import { fetchFeats, fetchManeuvers, fetchReference } from "@/api/client";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type { Character, LevelUpStepKind } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 export interface ChoiceOption {
   id: string;
@@ -17,6 +18,8 @@ export interface ChoiceOption {
 export interface ChoiceLoadContext {
   /** Post-level-up class level (LevelUpPlanResponse.target.newLevel), for gates keyed on it. */
   targetLevel: number;
+  /** The advancing character's edition — toolProficiency's fetchReference call needs it (#1325). */
+  edition: RulesEdition;
 }
 
 export interface ChoiceKindConfig {
@@ -69,8 +72,8 @@ const fightingStyleFeat: ChoiceKindConfig = {
 };
 
 const toolProficiency: ChoiceKindConfig = {
-  loadOptions: () =>
-    fetchReference().then((ref) => ref.artisanTools.map((t) => ({ id: t.name, name: t.name }))),
+  loadOptions: (ctx) =>
+    fetchReference(ctx.edition).then((ref) => ref.artisanTools.map((t) => ({ id: t.name, name: t.name }))),
   fromCharacter: (character) =>
     new Set((character.resources?.toolProficienciesKnown ?? []).map((e) => e.name)),
   selected: (draft) => (draft.toolProficiencies ?? []).map((op) => op.name),

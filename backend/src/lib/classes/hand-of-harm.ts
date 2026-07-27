@@ -14,29 +14,14 @@
 // client rolls the Martial Arts die + Wis mod total and sends it; the server
 // only validates positivity and narrates it, same as Quivering Palm's 10d12.
 
+import type { DealHandOfHarmOperation, HandOfHarmOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
 
 export class InvalidHandOfHarmOperationError extends Error {}
-
-// Once per turn, client-asserted (mirrors AttemptStunningStrikeOperation — no
-// server-side turn state exists to cross-check).
-export interface DealHandOfHarmOperation {
-  type: "dealHandOfHarm";
-  usedThisTurn: boolean;
-  /** Client-rolled Martial Arts die + Wisdom modifier total (necrotic damage). */
-  roll: number;
-  /**
-   * Flurry of Healing and Harm (L11, PHB'24 p.92): spend a free use from that
-   * pool instead of the base Focus pool. Still requires a level 11+ Warrior
-   * of Mercy; the once-per-turn limit above still applies.
-   */
-  freeFromFlurry?: boolean;
-}
-
-export type HandOfHarmOperation = DealHandOfHarmOperation;
 
 export interface HandOfHarmResult {
   necroticDamage: number;

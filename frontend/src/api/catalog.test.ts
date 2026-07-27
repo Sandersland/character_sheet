@@ -10,28 +10,29 @@ describe("fetchReference", () => {
   });
 
   it("returns the parsed catalog on success", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          races: [{ id: "r1", name: "Human", speed: 30 }],
-          classes: [],
-          backgrounds: [],
-          alignments: ["Lawful Good"],
-        }),
-      })
-    );
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        races: [{ id: "r1", name: "Human", speed: 30 }],
+        classes: [],
+        backgrounds: [],
+        alignments: ["Lawful Good"],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchReference()).resolves.toMatchObject({
+    await expect(fetchReference("EDITION_2024")).resolves.toMatchObject({
       races: [{ name: "Human", speed: 30 }],
     });
+    // Proves the edition reaches the wire (#1325) — a query param, not a header,
+    // so it participates in the queryKey/cache identity structurally.
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/reference\?edition=EDITION_2024$/);
   });
 
   it("throws on a non-ok response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
-    await expect(fetchReference()).rejects.toThrow();
+    await expect(fetchReference("EDITION_2024")).rejects.toThrow();
   });
 });
 

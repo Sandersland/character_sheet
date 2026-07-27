@@ -30,6 +30,7 @@ function spell(id: string, level: number): CatalogSpell {
 // hitPoints/hitDice/abilityScores present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
+  rulesEdition: "EDITION_2024",
   pendingLevelUps: 1,
   classes: [{ id: "entry-1", name: "wizard", level: 2 }],
   resources: {},

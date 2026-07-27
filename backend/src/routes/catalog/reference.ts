@@ -12,6 +12,9 @@ import {
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
+import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
+import { isRulesEdition } from "@/lib/rules/edition.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 export const referenceRouter = Router();
 
@@ -20,7 +23,18 @@ export const referenceRouter = Router();
 // equipment definitions. Also ships the artisan-tool list for the sheet's
 // Proficiencies-card dropdown (creation tool pickers derive from per-class
 // toolChoices, not this list).
-referenceRouter.get("/reference", async (_req, res) => {
+referenceRouter.get("/reference", async (req, res) => {
+  const rawEdition = req.query.edition;
+  if (rawEdition === undefined) {
+    res.status(400).json({ error: "Missing required query parameter: edition" });
+    return;
+  }
+  if (!isRulesEdition(rawEdition)) {
+    res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
+    return;
+  }
+  const edition: RulesEdition = rawEdition;
+
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
   const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
@@ -33,6 +47,41 @@ referenceRouter.get("/reference", async (_req, res) => {
     include: { originFeat: { select: { id: true, name: true, description: true, category: true } } },
   });
 
+  // Resolved per-edition BY NAME, not by following the FK: Background.originFeatId
+  // is whatever seed-time resolveOriginFeatId baked on (EDITION_2024), and a
+  // NULL-edition Background row holding a hard FK to an edition-tagged Feat row
+  // is the contradiction #1348 exists to remove. Resolving through
+  // resolveEditionCatalog here makes this preview agree with what a character
+  // actually gets — buildOriginEntry re-resolves the same way against the
+  // CREATING character's edition, so the two can no longer disagree (they did:
+  // a 2014 Criminal saw 2024 Alert text). The FK survives only as a name source
+  // until #1348 replaces it with originFeatName.
+  //
+  // Scope latch (#1325 vs #1336): this endpoint resolves edition-dependent RULE
+  // VALUES and this one feat text. WHICH catalog ROWS it returns (classes,
+  // subclasses, backgrounds, spells) is still edition-unfiltered and is #1336's
+  // job — no forked class/subclass/background rows are seeded today, so the lists
+  // are identical for both editions and nothing is silently wrong yet.
+  const originFeatNames = [
+    ...new Set(backgrounds.map((b) => b.originFeat?.name).filter((n): n is string => n != null)),
+  ];
+  const originFeatRows = originFeatNames.length
+    ? await prisma.feat.findMany({
+        where: withEditionOrShared({ name: { in: originFeatNames } }, edition),
+        select: { id: true, name: true, description: true, category: true, edition: true },
+      })
+    : [];
+  // Projected back to OriginFeatOption's four fields: `edition` is selected only
+  // so resolveEditionCatalog can do the exact-then-shared resolution, and must
+  // not reach the wire — the pre-#1325 include didn't select it, and a resolved
+  // row is an implementation detail of the resolution, not part of the contract.
+  const originFeatByName = new Map(
+    resolveEditionCatalog(originFeatRows, edition, (f) => f.name).map((f) => [
+      f.name,
+      { id: f.id, name: f.name, description: f.description, category: f.category },
+    ]),
+  );
+
   const classes = rawClasses.map((c) => ({
     id: c.id,
     name: c.name,
@@ -41,16 +90,12 @@ referenceRouter.get("/reference", async (_req, res) => {
     skillChoiceCount: c.skillChoiceCount,
     skillChoices: c.skillChoices,
     isSpellcaster: c.isSpellcaster,
-    // This endpoint has no character, so no rulesEdition to resolve against —
-    // the catalog column is 2014-only (#1308), and no frontend surface resolves
-    // the edition seam yet (#1325). Serving it resolved for 2024 (always 3) is
-    // the only value this endpoint can honestly give today; serving it raw
-    // would make the creation flow originate a 2014 rule and get rejected.
-    // Deliberately NOT DEFAULT_RULES_EDITION: that names the edition a new
-    // character defaults to, and coupling the two would let a change to the
-    // creation default silently change what this catalog reports. #1325
-    // replaces this with real per-edition resolution.
-    subclassLevel: subclassGateLevel(c.subclassLevel, "EDITION_2024"),
+    // The caller's edition, never DEFAULT_RULES_EDITION: that names the edition a
+    // NEW character defaults to, and coupling the two would let a change to the
+    // creation default silently change what this catalog reports (#1325). Wire
+    // field named after the rule function that produced it — never `subclassLevel`,
+    // which is indistinguishable from the raw, edition-unresolved catalog column.
+    subclassGateLevel: subclassGateLevel(c.subclassLevel, edition),
     // Tool proficiency fields — parallel to skillChoices/skillChoiceCount.
     toolProficiencies: c.toolProficiencies,
     toolChoices: c.toolChoices,
@@ -90,17 +135,8 @@ referenceRouter.get("/reference", async (_req, res) => {
     toolProficiencies: b.toolProficiencies,
     // PHB'24 ability spread + Origin feat; empty/null for spec-less legacy rows (#1130).
     abilityChoices: b.abilityChoices,
-    // Same gap as subclassLevel above: this endpoint has no character, so no
-    // rulesEdition to resolve the origin feat against — b.originFeat is
-    // whatever seed-time resolveOriginFeatId baked onto the FK (EDITION_2024
-    // today), served as-is rather than through resolveEditionRow. Deliberately
-    // NOT DEFAULT_RULES_EDITION for the same reason named above. A 2014
-    // character's actual origin feat is still correct — character-create.ts's
-    // buildOriginEntry re-resolves it per the CREATING character's edition at
-    // creation time rather than trusting this preview — but the creation-form
-    // preview itself shows 2024 text to every edition until #1336 (per-edition
-    // /api/reference resolution) lands.
-    originFeat: b.originFeat,
+    // Resolved for the requested edition — see the originFeatByName comment above.
+    originFeat: b.originFeat ? (originFeatByName.get(b.originFeat.name) ?? null) : null,
   }));
 
   // Artisan tools for the sheet's Proficiencies-card dropdown (the only category consumed).

@@ -13,8 +13,8 @@ const CARD_SELECTED = "border-garnet-600 bg-parchment-50 ring-2 ring-garnet-50";
 const CARD_IDLE = "border-parchment-300 bg-parchment-50 hover:border-garnet-400";
 
 export default function SubclassStep() {
-  const { draft, setDraft, plan } = useLevelUpStepContext();
-  const { reference } = useReferenceData();
+  const { character, draft, setDraft, plan } = useLevelUpStepContext();
+  const { reference } = useReferenceData(character.rulesEdition);
 
   const classDef = reference?.classes.find((c) => c.name === plan.target.className);
   const subclasses = classDef?.subclasses ?? [];

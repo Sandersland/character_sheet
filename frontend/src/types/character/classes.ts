@@ -3,6 +3,10 @@
  */
 
 import type { EffectSpec } from "@/lib/effects";
+// OpenHandRider is used below (OpenHandRiderResult.rider) as well as
+// re-exported (the `export type` block further down) — a bare `export …
+// from` doesn't bind a local name, so it needs its own `import type` too.
+import type { OpenHandRider } from "@character-sheet/contracts";
 
 // The resource + Warrior-of-the-Elements op shapes are the single cross-tier
 // source of truth in shared-types (#1273); re-exported here so this module stays
@@ -30,6 +34,30 @@ export type {
 // called ResourceOpAudit (what the server logs) where the client sees a result.
 // Aliasing keeps api/client.ts out of this diff — #1275 is rewriting that file.
 export type { ResourceOpAudit as ResourceOpResult } from "@character-sheet/shared-types";
+
+// The Channel Divinity / Shadow Arts / maneuver / ability-op shapes are derived
+// from the route zod schemas in @character-sheet/contracts (#1370) — `import
+// type` only, so zod never enters the client bundle
+// (scripts/check-no-zod-in-client-bundle.sh). Only the names this tier
+// actually consumes are re-exported: CastManeuverOperation and
+// ActivateCloakOfShadowsOperation have zero frontend call sites (mirrored
+// backend-only in maneuvers.ts/shadow-arts.ts), and Hand of Harm / Hand of
+// Ultimate Mercy have no frontend feature at all yet, so none of those three
+// forward here — a forwarded-only name is a dead export under the repo-wide
+// fallow gate.
+export type {
+  AttemptStunningStrikeOperation,
+  CastChannelDivinityOperation,
+  CastShadowArtOperation,
+  ChannelDivinityOperation,
+  ImposeOpenHandRiderOperation,
+  ManeuverOperation,
+  OpenHandRider,
+  RollSneakAttackOperation,
+  SetQuiveringPalmOperation,
+  ShadowArtOperation,
+  TriggerQuiveringPalmOperation,
+} from "@character-sheet/contracts";
 
 /** Focus (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
 export type AbilityCost =
@@ -116,14 +144,6 @@ export interface CatalogManeuver {
   saveAbility?: string | null;
 }
 
-/** Cast a known maneuver: spend one superiority die (the server rolls it). */
-export interface CastManeuverOperation {
-  type: "castManeuver";
-  entryId: string;
-}
-
-export type ManeuverOperation = CastManeuverOperation;
-
 /** Per-op result from POST …/maneuvers/transactions — die + announced save DC. */
 export interface ManeuverCastResult {
   roll: number;
@@ -146,9 +166,6 @@ export interface StunningStrikeAttemptResult {
   outcome: "fail" | "success";
   summary: string;
 }
-
-/** Warrior of the Open Hand's Flurry-of-Blows rider choice (#1245). */
-export type OpenHandRider = "addle" | "push" | "topple";
 
 /** Per-op result from POST …/open-hand-technique/transactions — Addle has no roll. */
 export interface OpenHandRiderResult {
@@ -255,36 +272,3 @@ export interface SetSubclassOperation { type: "setSubclass"; subclassId: string 
 // #1137: setFightingStyle is gone — Fighting Style is now a feat taken via the
 // advancement endpoint (fightingStyle slot), not a class-scalar op.
 export type ClassOperation = SetSubclassOperation;
-
-/**
- * Warrior of Shadow operation types — mirror of `applyShadowArtsOperations`.
- * Sent as `{ operations: ShadowArtOperation[] }` to
- * POST /api/characters/:id/shadow-arts/transactions.
- *
- *   castShadowArt          — cast Shadow Arts' Darkness (1 focus, concentration).
- *   activateCloakOfShadows — L17: spend 3 focus, become invisible.
- */
-export interface CastShadowArtOperation {
-  type: "castShadowArt";
-  shadowArtId: string;
-}
-
-export interface ActivateCloakOfShadowsOperation {
-  type: "activateCloakOfShadows";
-}
-
-export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
-
-/**
- * Channel Divinity operation types — mirror of `applyChannelDivinityOperations`.
- * Sent as `{ operations: ChannelDivinityOperation[] }` to
- * POST /api/characters/:id/channel-divinity/transactions.
- *
- * Use a Channel Divinity option (Cleric/Paladin): spend 1 CD charge.
- */
-export interface CastChannelDivinityOperation {
-  type: "castChannelDivinity";
-  abilityId: string;
-}
-
-export type ChannelDivinityOperation = CastChannelDivinityOperation;

@@ -213,6 +213,14 @@ jobs:
 
       - run: npm run build
 
+      # zod is a real backend/contracts dependency, but the frontend must only
+      # ever `import type` from @character-sheet/contracts — a stray value
+      # import would ship zod's runtime to every player (#1370). Runs right
+      # after `npm run build` so it inspects the actual frontend/dist this job
+      # just produced, not a separate build.
+      - name: zod absent from client bundle
+        run: sh scripts/check-no-zod-in-client-bundle.sh
+
   test:
     runs-on: ubuntu-latest
 
