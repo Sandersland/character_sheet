@@ -92,7 +92,11 @@ async function createMulticlassCaster() {
       },
       resources: {
         used: {},
-        fightingStyle: "defense", // wizard primary: clamps to null on read
+        // Stored but never serialized: the wire expresses the choice through
+        // fightingStyleSlots + advancements (#1137), so this legacy scalar is
+        // ignored rather than clamped — no fightingStyle key appears in the
+        // snapshot at all. Kept to prove a stale stored value stays invisible.
+        fightingStyle: "defense",
         advancements: [
           { id: "adv-tough", level: 4, kind: "feat", abilityDeltas: {}, hpDelta: 0, initDelta: 0, featName: "Tough", featDescription: "Sturdy.", improvements: [{ target: "maxHp", amount: 2, perLevel: true }] },
           { id: "adv-over", level: 8, kind: "asi", abilityDeltas: { dexterity: 2 }, hpDelta: 6, initDelta: 1 }, // over-cap, reversed on read
