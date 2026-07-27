@@ -7,23 +7,30 @@ import DropdownMenu from "@/components/ui/DropdownMenu";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useTheme } from "@/features/theme/ThemeProvider";
 import { useDiceRollStyle } from "@/features/dice/DiceRollStyleProvider";
+import PreferenceSyncNote from "@/features/preferences/PreferenceSyncNote";
 import PreferencesSheet from "@/features/preferences/PreferencesSheet";
 import {
   THEME_OPTIONS,
   DICE_OPTIONS,
   type PreferenceOption,
 } from "@/features/preferences/preferenceOptions";
+import type { PreferenceKey } from "@/hooks/usePreferencesSync";
 import type { AuthUser } from "@/types/auth";
 
 // A titled radio group of preference options (Appearance, Dice rolls). Each row
 // is a menuitemradio so the dropdown's roving focus and aria state stay correct.
+// preferenceKey scopes the shared PreferenceSyncNote (#1365) to this group —
+// it's nested inside the existing role="group" div (not a direct child of the
+// role="menu" panel) so axe's aria-required-children stays satisfied.
 function PreferenceRadioGroup<T extends string>({
   label,
+  preferenceKey,
   options,
   value: current,
   onSelect,
 }: {
   label: string;
+  preferenceKey: PreferenceKey;
   options: PreferenceOption<T>[];
   value: T;
   onSelect: (value: T) => void;
@@ -52,6 +59,9 @@ function PreferenceRadioGroup<T extends string>({
           </button>
         );
       })}
+      {/* announce=false: this panel is DropdownMenu's role="menu" (#1365) — see
+          PreferenceSyncNote's own comment for why a live role can't nest here. */}
+      <PreferenceSyncNote preferenceKey={preferenceKey} className="px-3 pb-1" announce={false} />
     </div>
   );
 }
@@ -106,12 +116,14 @@ export default function AccountMenu() {
                 automation) lives in PreferencesSheet below (#1167). */}
             <PreferenceRadioGroup
               label="Appearance"
+              preferenceKey="theme"
               options={THEME_OPTIONS}
               value={preference}
               onSelect={setPreference}
             />
             <PreferenceRadioGroup
               label="Dice rolls"
+              preferenceKey="diceRollStyle"
               options={DICE_OPTIONS}
               value={diceStyle}
               onSelect={setDiceStyle}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { axe } from "@/test/axe";
@@ -15,6 +15,7 @@ vi.mock("@/features/auth/AuthProvider", () => ({
 import AccountMenu from "@/features/auth/AccountMenu";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
+import { PreferencesContext, type PreferenceSyncState } from "@/hooks/usePreferencesSync";
 
 function renderMenu() {
   return render(
@@ -24,6 +25,24 @@ function renderMenu() {
           <AccountMenu />
         </DiceRollStyleProvider>
       </ThemeProvider>
+    </MemoryRouter>,
+  );
+}
+
+// #1365: a SECOND helper (never modify renderMenu above) that wraps in a real
+// PreferencesContext.Provider — renderMenu's no-provider tree makes
+// setPreference a no-op that can never fail, so a sync-error test built on it
+// would pass for the wrong reason (vacuous — see M-CTRL-B in the PR).
+function renderMenuWithSync(sync: PreferenceSyncState) {
+  return render(
+    <MemoryRouter>
+      <PreferencesContext.Provider value={{ synced: undefined, setPreference: vi.fn(), sync }}>
+        <ThemeProvider>
+          <DiceRollStyleProvider>
+            <AccountMenu />
+          </DiceRollStyleProvider>
+        </ThemeProvider>
+      </PreferencesContext.Provider>
     </MemoryRouter>,
   );
 }
@@ -208,6 +227,57 @@ describe("AccountMenu", () => {
         baseElement.querySelector('[role="dialog"]')?.dispatchEvent(e);
       });
       expect(screen.queryByRole("dialog", { name: /preferences/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("sync note (#1365)", () => {
+    // Queried by text, not role="alert": the note renders with announce={false}
+    // inside AccountMenu (see PreferenceSyncNote's own comment) — a role="alert"
+    // here would fail aria-required-children on DropdownMenu's role="menu"
+    // panel (confirmed via axe below), so this surface is visual-only; the
+    // Preferences sheet, one click away via "Preferences…", carries the live role.
+    const SYNC_ERROR = "Not saved — this change stays on this device.";
+
+    it("surfaces a failed theme sync inside the Appearance quick controls", async () => {
+      const user = userEvent.setup();
+      renderMenuWithSync({ saving: {}, errors: { theme: SYNC_ERROR } });
+      await user.click(screen.getByRole("button", { name: "Account" }));
+
+      expect(screen.getByText(SYNC_ERROR)).toBeInTheDocument();
+    });
+
+    it("scopes the sync note to its own preference group", async () => {
+      const user = userEvent.setup();
+      renderMenuWithSync({ saving: {}, errors: { diceRollStyle: SYNC_ERROR } });
+      await user.click(screen.getByRole("button", { name: "Account" }));
+
+      // These groups ARE aria-labeled — getByRole("group", { name }) is safe
+      // here, unlike the sheet's unlabeled <fieldset>s.
+      const appearanceGroup = screen.getByRole("group", { name: "Appearance" });
+      const diceGroup = screen.getByRole("group", { name: "Dice rolls" });
+      expect(within(appearanceGroup).queryByText(SYNC_ERROR)).not.toBeInTheDocument();
+      expect(within(diceGroup).getByText(SYNC_ERROR)).toBeInTheDocument();
+    });
+
+    it("keeps the menu's roving focus on menu items when a sync note is showing", async () => {
+      const user = userEvent.setup();
+      renderMenuWithSync({ saving: {}, errors: { theme: "Not saved — this change stays on this device." } });
+      await user.click(screen.getByRole("button", { name: "Account" }));
+
+      for (let i = 0; i < 8; i++) {
+        await user.keyboard("{ArrowDown}");
+        expect(document.activeElement?.getAttribute("role")).toMatch(/^menuitem/);
+      }
+    });
+
+    it("has no axe violations while a sync error is showing in the menu", async () => {
+      const user = userEvent.setup();
+      const { container } = renderMenuWithSync({
+        saving: {},
+        errors: { theme: "Not saved — this change stays on this device." },
+      });
+      await user.click(screen.getByRole("button", { name: "Account" }));
+      expect(await axe(container)).toHaveNoViolations();
     });
   });
 });

@@ -10,6 +10,15 @@ const SAVING_HINT_DELAY_MS = 500;
 interface PreferenceSyncNoteProps {
   preferenceKey: PreferenceKey;
   className?: string;
+  // AccountMenu's quick controls live inside DropdownMenu's role="menu" panel
+  // (#1365), whose ARIA-required-owned-elements list is {group, menuitem,
+  // menuitemradio, menuitemcheckbox} — role="alert"/"status" anywhere in that
+  // subtree fails aria-required-children (confirmed via axe, not assumed).
+  // The Preferences sheet has no such constraint, so it keeps the live role;
+  // the menu's copy stays visually identical but silent to assistive tech —
+  // the full accessible (role="alert") experience is one click away via the
+  // sheet's own "Preferences…" entry, which every quick control links to.
+  announce?: boolean;
 }
 
 /**
@@ -19,7 +28,11 @@ interface PreferenceSyncNoteProps {
  * are silent otherwise. Visual treatment matches CampaignPreferencesFields'
  * error line, plus `role="alert"`, which that component lacks.
  */
-export default function PreferenceSyncNote({ preferenceKey, className = "" }: PreferenceSyncNoteProps) {
+export default function PreferenceSyncNote({
+  preferenceKey,
+  className = "",
+  announce = true,
+}: PreferenceSyncNoteProps) {
   const { saving, error } = usePreferenceSync(preferenceKey);
   const [showSavingHint, setShowSavingHint] = useState(false);
 
@@ -33,10 +46,18 @@ export default function PreferenceSyncNote({ preferenceKey, className = "" }: Pr
   }, [saving]);
 
   if (error) {
-    return <p role="alert" className={`mt-1 text-xs text-garnet-700 ${className}`}>{error}</p>;
+    return (
+      <p role={announce ? "alert" : undefined} className={`mt-1 text-xs text-garnet-700 ${className}`}>
+        {error}
+      </p>
+    );
   }
   if (showSavingHint) {
-    return <p role="status" className={`mt-1 text-xs text-parchment-600 ${className}`}>Saving…</p>;
+    return (
+      <p role={announce ? "status" : undefined} className={`mt-1 text-xs text-parchment-600 ${className}`}>
+        Saving…
+      </p>
+    );
   }
   return null;
 }
