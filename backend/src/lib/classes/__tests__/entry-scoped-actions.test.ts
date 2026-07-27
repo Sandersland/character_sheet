@@ -59,4 +59,80 @@ describe("deriveEntryScopedActions", () => {
     const actions = deriveEntryScopedActions(entries, 12, [], true);
     expect(actions.filter((a) => a.key === "shadowStep")).toHaveLength(1);
   });
+
+  // #1340: cleric.ts (grantLevel 2) and paladin.ts (grantLevel 3) both grant
+  // "Channel Divinity" — one merged DERIVED_ACTIONS row (key "channelDivinity",
+  // grantClasses) must surface as exactly ONE card for a Cleric/Paladin
+  // multiclass, keyed off each entry's own effective level (mirrors
+  // deriveEntryScopedActions' existing dedupe-by-key policy).
+  describe("channelDivinity — one row, two granting classes (#1340)", () => {
+    it("cleric 2 / paladin 3: exactly one card, keyed channelDivinity (not the old per-class keys)", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 2 },
+        { name: "paladin", subclass: "oath of devotion", level: 3 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 1 }], true);
+      expect(actions.filter((a) => a.key === "channelDivinity")).toHaveLength(1);
+      expect(actions.filter((a) => a.name === "Channel Divinity")).toHaveLength(1);
+      expect(actions.some((a) => a.key === "channelDivinityCleric")).toBe(false);
+      expect(actions.some((a) => a.key === "channelDivinityPaladin")).toBe(false);
+    });
+
+    it("paladin 4 (primary) / cleric 6 (secondary): still exactly one card", () => {
+      const entries = [
+        { name: "paladin", subclass: "oath of devotion", level: 4 },
+        { name: "cleric", subclass: "life domain", level: 6 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 10, [{ key: "channelDivinity", remaining: 2 }], true);
+      expect(actions.filter((a) => a.key === "channelDivinity")).toHaveLength(1);
+    });
+
+    it("cleric 1 / paladin 3: present (paladin's own gate alone grants it)", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 1 },
+        { name: "paladin", subclass: "oath of devotion", level: 3 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 4, [{ key: "channelDivinity", remaining: 1 }], true);
+      expect(actions.some((a) => a.key === "channelDivinity")).toBe(true);
+    });
+
+    it("cleric 1 / paladin 2: absent (neither entry has reached its own gate)", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 1 },
+        { name: "paladin", subclass: "oath of devotion", level: 2 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 3, [], true);
+      expect(actions.some((a) => a.key === "channelDivinity")).toBe(false);
+    });
+
+    it("cleric 2 / paladin 2: present (cleric's own gate alone grants it)", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 2 },
+        { name: "paladin", subclass: "oath of devotion", level: 2 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 4, [{ key: "channelDivinity", remaining: 1 }], true);
+      expect(actions.some((a) => a.key === "channelDivinity")).toBe(true);
+    });
+
+    it("the card's reminder names both granting classes", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 2 },
+        { name: "paladin", subclass: "oath of devotion", level: 3 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 1 }], true);
+      const card = actions.find((a) => a.key === "channelDivinity");
+      expect(card?.reminder).toMatch(/Cleric/);
+      expect(card?.reminder).toMatch(/Paladin/);
+    });
+
+    it("enabled respects the merged pool's remaining, not a per-class count", () => {
+      const entries = [
+        { name: "cleric", subclass: "life domain", level: 2 },
+        { name: "paladin", subclass: "oath of devotion", level: 3 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 0 }], true);
+      const card = actions.find((a) => a.key === "channelDivinity");
+      expect(card?.enabled).toBe(false);
+    });
+  });
 });

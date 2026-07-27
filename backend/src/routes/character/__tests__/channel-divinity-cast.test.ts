@@ -1,8 +1,10 @@
 /**
  * Channel Divinity cast endpoint (#419): POST /abilities/channel-divinity/transactions and
- * GET /characters/:id/channel-divinity. Real Postgres + supertest. Fixtures are
+ * GET /characters/:id/channel-divinity. Real Postgres + supertest. Most fixtures are
  * single-class clerics/paladins whose XP sets the level; CD options are read from
- * the seeded catalog by name.
+ * the seeded catalog by name. One multiclass fixture (#1340) proves the "spending
+ * decrements the single shared pool" AC end-to-end: both classes' options draw on
+ * ONE pool, not two.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -21,10 +23,11 @@ let COOKIE: string;
 const FIXTURE_ID = "test-cd-cast-1";
 const CLASS_NAME = "CD Test Class";
 
-// XP thresholds → level: L2=300, L3=900, L6=14000.
+// XP thresholds → level: L2=300, L3=900, L6=14000, L10=64000.
 const XP_L2 = 300;
 const XP_L3 = 900;
 const XP_L6 = 14000;
+const XP_L10 = 64000;
 
 const url = `/api/characters/${FIXTURE_ID}/abilities/channel-divinity/transactions`;
 const activityUrl = `/api/characters/${FIXTURE_ID}/activity?category=resources`;
@@ -79,6 +82,26 @@ async function createCharacter(experiencePoints: number, className: string, subc
       ownerId: OWNER_ID,
       resources: Prisma.JsonNull,
       classEntries: { create: [{ name: className, subclass, classId, position: 0 }] },
+    },
+  });
+}
+
+// Multiclass fixture (#1340): both entries reference the same test-only
+// CharacterClass row (classId), one per granting class, same shape as the
+// single-class helper above but with two classEntries.
+async function createMulticlass(
+  experiencePoints: number,
+  entries: { name: string; subclass: string | null; level: number }[],
+) {
+  await prisma.character.create({
+    data: {
+      ...FIXTURE_BASE,
+      experiencePoints,
+      ownerId: OWNER_ID,
+      resources: Prisma.JsonNull,
+      classEntries: {
+        create: entries.map((e, i) => ({ name: e.name, subclass: e.subclass, classId, position: i, level: e.level })),
+      },
     },
   });
 }
@@ -261,6 +284,34 @@ describe("Channel Divinity cast endpoint", () => {
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/cleric/i);
+  });
+
+  // ── Multiclass: one shared pool, effect menu is the union (#1340) ──────────
+
+  it("Cleric 6 / Paladin 4 (Devotion): both classes' options draw on the ONE shared pool", async () => {
+    await createMulticlass(XP_L10, [
+      { name: "cleric", subclass: null, level: 6 },
+      { name: "paladin", subclass: "oath of devotion", level: 4 },
+    ]);
+
+    const initial = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect(initial.status).toBe(200);
+    const initialPool = (initial.body.resources.pools as { key: string; total: number }[]).find(
+      (p) => p.key === "channelDivinity",
+    );
+    expect(initialPool?.total).toBe(2); // max(cleric@6→2, paladin@4→1)
+
+    const turnUndead = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
+    expect(turnUndead.status).toBe(200);
+    expect(cdUsed(turnUndead.body)).toBe(1);
+
+    const sacredWeapon = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Sacred Weapon"] }]);
+    expect(sacredWeapon.status).toBe(200);
+    expect(cdUsed(sacredWeapon.body)).toBe(2); // same pool — both classes' options spent from it
+
+    const third = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
+    expect(third.status).toBe(400);
+    expect(third.body.error).toMatch(/only 0 remaining/);
   });
 
   // ── GET picker ──────────────────────────────────────────────────────────────

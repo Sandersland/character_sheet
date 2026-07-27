@@ -68,19 +68,19 @@ describe("deriveActions — class gates", () => {
     expect(keys(deriveActions("monk", undefined, 1, []))).toContain("bonusUnarmedStrike");
   });
 
-  it("Paladin L1 gets divineSense/layOnHands; L3 adds channelDivinityPaladin", () => {
+  it("Paladin L1 gets divineSense/layOnHands; L3 adds channelDivinity", () => {
     const l1 = keys(deriveActions("paladin", undefined, 1, []));
     expect(l1).toContain("divineSense");
     expect(l1).toContain("layOnHands");
-    expect(l1).not.toContain("channelDivinityPaladin");
+    expect(l1).not.toContain("channelDivinity");
 
     const l3 = keys(deriveActions("paladin", undefined, 3, []));
-    expect(l3).toContain("channelDivinityPaladin");
+    expect(l3).toContain("channelDivinity");
   });
 
-  it("Bard L1 gets bardicInspiration; Cleric L2 gets channelDivinityCleric", () => {
+  it("Bard L1 gets bardicInspiration; Cleric L2 gets channelDivinity", () => {
     expect(keys(deriveActions("bard", undefined, 1, []))).toContain("bardicInspiration");
-    expect(keys(deriveActions("cleric", undefined, 2, []))).toContain("channelDivinityCleric");
+    expect(keys(deriveActions("cleric", undefined, 2, []))).toContain("channelDivinity");
   });
 
   it("Druid L2 gets wildShape; Rogue L2 gets cunningAction; Sorcerer L3 gets metamagic", () => {
@@ -211,8 +211,7 @@ describe("ACTION_EFFECT_FN — no-op keys return []", () => {
 describe("ACTION_EFFECT_FN — single spendResource keys", () => {
   const singleResource: Array<[string, string]> = [
     ["bardicInspiration", "bardicInspiration"],
-    ["channelDivinityCleric", "channelDivinity"],
-    ["channelDivinityPaladin", "channelDivinity"],
+    ["channelDivinity", "channelDivinity"],
     ["wildShape", "wildShape"],
     ["actionSurge", "actionSurge"],
     ["divineSense", "divineSense"],
@@ -842,5 +841,88 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
     expect(ACTION_CAST_FN.elementalAttunement).toBeUndefined();
     expect(ACTION_EFFECT_FN.elementalBurst).toBeUndefined();
     expect(ACTION_CAST_FN.elementalBurst).toBeUndefined();
+  });
+});
+
+// #1340: cleric.ts and paladin.ts both grant a feature named "Channel
+// Divinity" (cleric at L2, paladin at L3) drawing on the same channelDivinity
+// pool. Before the fix, DERIVED_ACTIONS carried two rows (channelDivinityCleric/
+// channelDivinityPaladin) — a single-class read only ever sees its own class's
+// row, but a multiclass read surfaced both as duplicate cards. PHB'14 p.164:
+// one feature, one pool, one card — merged via the single-class-gate-or-class
+// grantClasses array so matchesActionGate keeps one class-gate code path
+// (classGatesOf normalizes both the legacy grantClass/grantLevel shape and the
+// new grantClasses shape).
+describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (#1340)", () => {
+  it("granted class gate: cleric reaches it at L2, paladin at L3, in isolation", () => {
+    expect(keys(deriveActions("cleric", undefined, 1, []))).not.toContain("channelDivinity");
+    expect(keys(deriveActions("cleric", undefined, 2, []))).toContain("channelDivinity");
+    expect(keys(deriveActions("paladin", undefined, 2, []))).not.toContain("channelDivinity");
+    expect(keys(deriveActions("paladin", undefined, 3, []))).toContain("channelDivinity");
+  });
+
+  it("no other class gets it at any level", () => {
+    expect(keys(deriveActions("fighter", undefined, 20, []))).not.toContain("channelDivinity");
+    expect(keys(deriveActions("bard", undefined, 20, []))).not.toContain("channelDivinity");
+  });
+
+  it("the reminder names both classes' effect menus", () => {
+    const cleric = deriveActions("cleric", undefined, 2, []).find((a) => a.key === "channelDivinity");
+    expect(cleric?.reminder).toMatch(/Cleric/);
+    expect(cleric?.reminder).toMatch(/Paladin/);
+  });
+
+  it("spends the channelDivinity pool, gated on the merged remaining count", () => {
+    expect(ACTION_EFFECT_FN.channelDivinity({})).toEqual([{ type: "spendResource", key: "channelDivinity" }]);
+    const disabled = deriveActions("cleric", undefined, 2, [pool("channelDivinity", 0)]).find(
+      (a) => a.key === "channelDivinity",
+    );
+    expect(disabled?.enabled).toBe(false);
+    expect(disabled?.disabledReason).toBe("No channelDivinity remaining");
+  });
+
+  it("the old per-class keys no longer exist in either dispatch table", () => {
+    expect(ACTION_EFFECT_FN.channelDivinityCleric).toBeUndefined();
+    expect(ACTION_EFFECT_FN.channelDivinityPaladin).toBeUndefined();
+  });
+});
+
+// Standing invariant (#1340 scope item 3): discharges the action half of the
+// audit — Channel Divinity must stay the only cross-class DERIVED_ACTIONS
+// name/row-set. Loops every class × its subclasses (mirrors class-features-
+// snapshot.test.ts's CLASS_SUBCLASSES table) at the max level so the next
+// action a second class grants under the same display name fails THIS test
+// instead of silently shipping two identical cards.
+describe("no two DERIVED_ACTIONS rows from different classes share a display name (#1340)", () => {
+  const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
+    barbarian: [undefined, "totem warrior", "berserker"],
+    bard: [undefined, "college of lore", "college of valor"],
+    cleric: [undefined, "life domain", "trickery domain"],
+    druid: [undefined, "circle of the land", "circle of the moon"],
+    fighter: [undefined, "battle master", "champion", "eldritch knight"],
+    monk: [undefined, "warrior of the open hand", "warrior of shadow", "warrior of the elements", "warrior of mercy"],
+    paladin: [undefined, "oath of devotion", "oath of the ancients", "oath of vengeance"],
+    ranger: [undefined, "hunter", "beast master"],
+    rogue: [undefined, "arcane trickster", "assassin", "thief"],
+    sorcerer: [undefined, "draconic bloodline", "wild magic"],
+    warlock: [undefined, "the fiend", "the archfey", "the great old one"],
+    wizard: [undefined, "school of evocation", "school of abjuration", "school of illusion"],
+  };
+
+  it("every action name maps to at most one granting class", () => {
+    const classesByName = new Map<string, Set<string>>();
+    for (const [className, subclasses] of Object.entries(CLASS_SUBCLASSES)) {
+      for (const subclass of subclasses) {
+        for (const action of deriveActions(className, subclass, 20, [])) {
+          const classes = classesByName.get(action.name) ?? new Set<string>();
+          classes.add(className);
+          classesByName.set(action.name, classes);
+        }
+      }
+    }
+    const crossClassNames = [...classesByName.entries()]
+      .filter(([, classes]) => classes.size > 1)
+      .map(([name]) => name);
+    expect(crossClassNames).toEqual(["Channel Divinity"]);
   });
 });

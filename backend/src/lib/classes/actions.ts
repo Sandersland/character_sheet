@@ -52,6 +52,12 @@ export function rageMeleeDamageBonus(barbarianLevel: number): number {
   return barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2;
 }
 
+/** One class/level gate: this class grants the row from this class level up. */
+interface ActionClassGate {
+  className: string; // lowercase
+  minLevel: number;
+}
+
 /** Record in the DERIVED_ACTIONS table — mirrors the Prisma Action model but is pure TS. */
 interface DerivedActionRecord {
   key: string;
@@ -61,6 +67,15 @@ interface DerivedActionRecord {
   grantClass?: string;   // lowercase class name
   grantSubclass?: string; // substring-matched against the character's subclass
   grantLevel?: number;   // min level for this action
+  /**
+   * Class/level gates for a row TWO classes grant as ONE feature — matched when
+   * ANY gate matches. Channel Divinity is the case: cleric 2 and paladin 3 both
+   * grant it, and PHB'14 p.164 makes it one feature drawing on one pool, so it
+   * must be one row (deriveEntryScopedActions dedupes by key ⇒ one card).
+   * Mutually exclusive with grantClass/grantLevel; both normalize through
+   * classGatesOf so matchesActionGate keeps a single class-gate code path.
+   */
+  grantClasses?: ActionClassGate[];
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
   // In-play rule text for no-server-effect reminder actions. A function form
@@ -71,6 +86,18 @@ interface DerivedActionRecord {
   // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
   // future Martial-Arts-conditioned action can reuse the same gate.
   requiresUnarmored?: boolean;
+}
+
+// The row's class/level gate as a list — the one normalization both the legacy
+// grantClass/grantLevel shape and the grantClasses shape resolve through, so
+// matchesActionGate/actionGrantLevel each keep a single class-gate code path.
+function classGatesOf(a: DerivedActionRecord): ActionClassGate[] {
+  return a.grantClasses ?? [{ className: a.grantClass ?? "", minLevel: a.grantLevel ?? 0 }];
+}
+
+function matchesClassGate(gate: ActionClassGate, cls: string, level: number): boolean {
+  if (gate.className && gate.className.toLowerCase() !== cls) return false;
+  return level >= gate.minLevel;
 }
 
 /** Available action shape serialized onto the character. */
@@ -109,8 +136,25 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Bard
   { key: "bardicInspiration", name: "Bardic Inspiration", cost: "bonusAction", grantClass: "bard", grantLevel: 1, resourceKey: "bardicInspiration", resourceAmount: 1 },
 
-  // Cleric
-  { key: "channelDivinityCleric", name: "Channel Divinity", cost: "action", grantClass: "cleric", grantLevel: 2, resourceKey: "channelDivinity", resourceAmount: 1 },
+  // Cleric / Paladin — ONE Channel Divinity row for both classes, not one per
+  // class. PHB'14 p.164 (multiclassing): gaining the feature from a second
+  // class grants that class's effects but no additional uses — so cleric 2 and
+  // paladin 3 share one pool (SHARED_POOL_MERGE, registry.ts) and one
+  // affordance. deriveEntryScopedActions dedupes by key, so a Cleric/Paladin
+  // multiclass surfaces exactly one card (#1340).
+  {
+    key: "channelDivinity",
+    name: "Channel Divinity",
+    cost: "action",
+    grantClasses: [
+      { className: "cleric", minLevel: 2 },
+      { className: "paladin", minLevel: 3 },
+    ],
+    resourceKey: "channelDivinity",
+    resourceAmount: 1,
+    reminder:
+      "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.",
+  },
 
   // Druid
   { key: "wildShape", name: "Wild Shape", cost: "action", grantClass: "druid", grantLevel: 2, resourceKey: "wildShape", resourceAmount: 1 },
@@ -328,7 +372,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Paladin
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
   { key: "layOnHands", name: "Lay on Hands", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "layOnHands", resourceAmount: 5 },
-  { key: "channelDivinityPaladin", name: "Channel Divinity", cost: "action", grantClass: "paladin", grantLevel: 3, resourceKey: "channelDivinity", resourceAmount: 1 },
+  // Channel Divinity is a single cross-class row — see channelDivinity above (PHB'14 p.164).
 
   // Rogue
   { key: "cunningAction", name: "Cunning Action", cost: "bonusAction", grantClass: "rogue", grantLevel: 2 },
@@ -346,14 +390,12 @@ function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, lev
   // Only include class-specific actions here (universal handled client-side).
   if (a.universal) return false;
 
-  // Class gate.
-  if (a.grantClass && a.grantClass.toLowerCase() !== cls) return false;
+  // Class + level gate (single-class grantClass/grantLevel or a multi-class
+  // grantClasses list — matched when ANY gate matches; see classGatesOf).
+  if (!classGatesOf(a).some((g) => matchesClassGate(g, cls, level))) return false;
 
   // Subclass gate (substring match, case-insensitive).
   if (a.grantSubclass && !sub.includes(a.grantSubclass.toLowerCase())) return false;
-
-  // Level gate.
-  if (a.grantLevel && level < a.grantLevel) return false;
 
   return true;
 }
@@ -436,7 +478,12 @@ export function deriveEntryScopedActions(
  * kind of drift deriveEntryScopedActions itself exists to prevent (#1315).
  */
 export function actionGrantLevel(key: string): number | undefined {
-  return DERIVED_ACTIONS.find((a) => a.key === key)?.grantLevel;
+  const row = DERIVED_ACTIONS.find((a) => a.key === key);
+  if (!row) return undefined;
+  // Min across gates so a row two classes grant (channelDivinity) reports the
+  // earliest level any of them grants it, rather than undefined.
+  const levels = classGatesOf(row).map((g) => g.minLevel).filter((l) => l > 0);
+  return levels.length > 0 ? Math.min(...levels) : undefined;
 }
 
 // One action row's enabled/disabledReason — pulled out of the `.map()` above to
@@ -561,8 +608,8 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // Bard
   bardicInspiration: () => [{ type: "spendResource", key: "bardicInspiration" }],
 
-  // Cleric
-  channelDivinityCleric: () => [{ type: "spendResource", key: "channelDivinity" }],
+  // Cleric / Paladin — one merged row (see the DERIVED_ACTIONS comment above).
+  channelDivinity: () => [{ type: "spendResource", key: "channelDivinity" }],
 
   // Druid
   wildShape: () => [{ type: "spendResource", key: "wildShape" }],
@@ -649,7 +696,6 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
     }
     return ops;
   },
-  channelDivinityPaladin: () => [{ type: "spendResource", key: "channelDivinity" }],
 
   // Rogue
   cunningAction: () => [], // bonus action consumed ephemerally; no server effect
