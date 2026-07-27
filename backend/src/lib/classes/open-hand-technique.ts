@@ -99,8 +99,13 @@ type OpenHandTechniqueRow = Prisma.CharacterGetPayload<{ select: typeof OPEN_HAN
 
 // Open Hand Technique is a subclass feature (Warrior of the Open Hand), unlike
 // Stunning Strike's base-class monkLevel() gate — so it checks the monk entry's
-// own subclass string too (freeform display name; substring-matched like
-// DERIVED_ACTIONS' grantSubclass in actions.ts).
+// own subclass string too (freeform display name; substring-matched, not
+// exact). isWarriorOfTheOpenHand (this function and Quivering Palm's own
+// copy), isWarriorOfMercy (Hand of Harm and Hand of Ultimate Mercy),
+// openHandMonkEntry, and attacksForClass's Valor-bard check are the six sites
+// still on substring matching — matchesActionGate no longer is, since #1339
+// made that one gate's subclass axis exact-name. #1277 retires all six onto a
+// stable slug together.
 function monkEntry(row: OpenHandTechniqueRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
