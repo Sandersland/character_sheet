@@ -10,10 +10,11 @@
  * undefined if beforeAll threw partway (an undefined classId reads to Prisma
  * as "no filter" and would delete the real catalog).
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "@/app.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -318,5 +319,158 @@ describe("Chunk 3 — Subclass / character-create.resolveSubclass (lib/character
   it("(unchanged) accepts a same-edition subclass at creation", async () => {
     const res = await createWithSubclass("EDITION_2014", "XEd Create 2014c", subId2014);
     expect(res.status).toBe(201);
+  });
+});
+
+describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the two sites this plan's audit found)", () => {
+  const CLASS_NAME = "XEd Battle Master Fighter";
+  const MANEUVER_2014 = "XEd Maneuver 2014";
+  const MANEUVER_SHARED = "XEd Maneuver Shared";
+  const CHOICE_2014 = "XEd Choice 2014";
+  const CHOICE_SHARED = "XEd Choice Shared";
+  const FIXTURE_ID = "xed-resources-battle-master-1";
+  const HUNTER_ID = "xed-resources-hunter-1";
+  let classId: string;
+  let maneuverId2014: string;
+  let maneuverIdShared: string;
+  let choiceId2014: string;
+  let choiceIdShared: string;
+
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: {
+        name: CLASS_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: {},
+    });
+    classId = cls.id;
+
+    const mkGranted = (name: string, source: string, edition: "EDITION_2014" | null) =>
+      upsertEditionRow(
+        prisma.grantedAbility,
+        { name, edition },
+        { name, source, edition, description: "Cross-edition guard test fixture." },
+        { source },
+      );
+    maneuverId2014 = (await mkGranted(MANEUVER_2014, "maneuver", "EDITION_2014")).id;
+    maneuverIdShared = (await mkGranted(MANEUVER_SHARED, "maneuver", null)).id;
+    choiceId2014 = (await mkGranted(CHOICE_2014, "huntersPrey", "EDITION_2014")).id;
+    choiceIdShared = (await mkGranted(CHOICE_SHARED, "huntersPrey", null)).id;
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: { in: [FIXTURE_ID, HUNTER_ID] } } });
+  });
+
+  afterAll(async () => {
+    await prisma.grantedAbility.deleteMany({
+      where: { name: { in: [MANEUVER_2014, MANEUVER_SHARED, CHOICE_2014, CHOICE_SHARED] } },
+    });
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  // Level-3 Battle Master Fighter, created via Prisma directly (not HTTP) so
+  // rulesEdition takes the column default EDITION_2024 — mirrors
+  // resources.test.ts's fixture shape (learnManeuver has no creation-flow
+  // analog to exercise over HTTP).
+  async function createBattleMaster() {
+    await prisma.character.create({
+      data: {
+        id: FIXTURE_ID,
+        name: "XEd Resources Battle Master",
+        alignment: "Lawful Neutral",
+        ownerId: OWNER_ID,
+        experiencePoints: 900,
+        initiativeBonus: 0,
+        speed: 30,
+        hitPoints: { current: 28, max: 28, temp: 0 },
+        hitDice: { total: 3, die: "d10" },
+        abilityScores: { strength: 16, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: ["strength", "constitution"],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        resources: Prisma.JsonNull,
+        classEntries: { create: [{ name: "fighter", subclass: "battle master", classId, position: 0 }] },
+      },
+    });
+  }
+
+  async function learnManeuver(maneuverId: string) {
+    return agent()
+      .post(`/api/characters/${FIXTURE_ID}/resources/transactions`)
+      .send({ operations: [{ type: "learnManeuver", maneuverId }] });
+  }
+
+  it("(AC) rejects a 2014-tagged maneuver on the (default-2024) fixture", async () => {
+    await createBattleMaster();
+    const res = await learnManeuver(maneuverId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+  });
+
+  it("(NULL-row AC) accepts a shared maneuver, snapshotting it into maneuversKnown", async () => {
+    await createBattleMaster();
+    const res = await learnManeuver(maneuverIdShared);
+    expect(res.status).toBe(200);
+    const learned = (res.body.resources.maneuversKnown as { maneuverId?: string }[]).find(
+      (m) => m.maneuverId === maneuverIdShared,
+    );
+    expect(learned).toBeDefined();
+  });
+
+  // Level-7 Hunter Ranger, mirroring subclass-choices.test.ts's fixture — the
+  // subclass key "hunter" drives deriveResources directly (no Subclass
+  // catalog row needed).
+  async function createHunter() {
+    await prisma.character.create({
+      data: {
+        id: HUNTER_ID,
+        name: "XEd Resources Hunter",
+        alignment: "True Neutral",
+        ownerId: OWNER_ID,
+        experiencePoints: 23000,
+        initiativeBonus: 0,
+        speed: 30,
+        hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 7, die: "d10", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10 },
+        savingThrowProficiencies: [],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        spellcasting: Prisma.JsonNull,
+        resources: Prisma.JsonNull,
+        classEntries: { create: [{ name: "ranger", subclass: "hunter", position: 0, level: 7 }] },
+      },
+    });
+  }
+
+  async function learnSubclassChoice(optionId: string) {
+    return agent()
+      .post(`/api/characters/${HUNTER_ID}/resources/transactions`)
+      .send({ operations: [{ type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId }] });
+  }
+
+  it("(AC) rejects a 2014-tagged subclass-choice option on the (default-2024) fixture", async () => {
+    await createHunter();
+    const res = await learnSubclassChoice(choiceId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+  });
+
+  it("(NULL-row AC) accepts a shared subclass-choice option, snapshotting it into choicesKnown", async () => {
+    await createHunter();
+    const res = await learnSubclassChoice(choiceIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.resources.choicesKnown.huntersPrey[0].optionId).toBe(choiceIdShared);
   });
 });
