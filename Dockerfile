@@ -31,6 +31,12 @@ COPY package.json package-lock.json ./
 COPY packages/ packages/
 COPY backend/package.json backend/
 RUN npm ci --workspace backend
+# packages/contracts compiles to JS because the backend imports its zod schemas
+# as VALUES and node:22-alpine cannot execute a .ts (#1370). .dockerignore drops
+# **/dist, so the host's build never leaks in — this line is the only thing that
+# puts dist/ in the image, and stage 3's `COPY --from=backend /app /app` carries it.
+RUN npm run build --workspace @character-sheet/contracts \
+ && node --input-type=module -e "import('@character-sheet/contracts').then(m => { if (typeof m.castChannelDivinityOpSchema?.parse !== 'function') process.exit(1); })"
 COPY backend/ backend/
 WORKDIR /app/backend
 # prisma.config.ts resolves env("DATABASE_URL") when the CLI loads it, so a

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { castChannelDivinityOpSchema } from "@character-sheet/contracts";
 
 import type { TransactionHandler } from "@/lib/http/transactions-endpoint.js";
 import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
@@ -62,10 +63,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // (Sacred Weapon attack buff, Cloak of Shadows invisibility) or reminder/DC.
   // The entitled-options picker stays a GET on channelDivinityRouter.
   "channel-divinity": defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("castChannelDivinity"),
-      abilityId: z.string().min(1),
-    })),
+    schema: opBatch(castChannelDivinityOpSchema),
     apply: (characterId, data) => applyChannelDivinityOperations(characterId, data.operations),
     domainErrors: [
       InvalidChannelDivinityOperationError,

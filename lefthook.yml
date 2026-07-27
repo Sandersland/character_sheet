@@ -95,6 +95,9 @@ pre-push:
     typecheck-shared:
       root: "packages/shared-types/"
       run: npx tsc --noEmit
+    typecheck-contracts:
+      root: "packages/contracts/"
+      run: npx tsc --noEmit
     typecheck-backend:
       root: "backend/"
       run: npx tsc --noEmit
