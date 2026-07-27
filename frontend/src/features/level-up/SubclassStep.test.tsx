@@ -43,7 +43,7 @@ function renderStep({ draft: initial, setDraft }: { draft?: LevelUpDraft; setDra
   function Harness() {
     const [liveDraft, liveSetDraft] = useState<LevelUpDraft>(seed);
     const value: LevelUpStepContextValue = {
-      character: { id: "c1" } as Character,
+      character: { id: "c1", rulesEdition: "EDITION_2024" } as Character,
       plan,
       draft: setDraft ? seed : liveDraft,
       setDraft: setDraft ?? liveSetDraft,

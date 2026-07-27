@@ -16,12 +16,14 @@ import {
   type ChoiceOption,
 } from "@/lib/levelUpChoices";
 import type { Character } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 const SEARCH_THRESHOLD = 8;
 
 function useChoiceOptions(
   config: ChoiceKindConfig | undefined,
   targetLevel: number,
+  edition: RulesEdition,
 ): {
   options: ChoiceOption[] | null;
   loadError: boolean;
@@ -35,7 +37,7 @@ function useChoiceOptions(
     setOptions(null);
     setLoadError(false);
     config
-      .loadOptions({ targetLevel })
+      .loadOptions({ targetLevel, edition })
       .then((opts) => {
         if (!ignore) setOptions(opts);
       })
@@ -45,7 +47,7 @@ function useChoiceOptions(
     return () => {
       ignore = true;
     };
-  }, [config, targetLevel]);
+  }, [config, targetLevel, edition]);
 
   return { options, loadError };
 }
@@ -69,7 +71,7 @@ export function useChoiceCatalog(
   character: Character,
   targetLevel: number,
 ): ChoiceCatalog {
-  const { options, loadError } = useChoiceOptions(config, targetLevel);
+  const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition);
   const showSpinner = useDelayedFlag(options === null && !loadError);
   const [search, setSearch] = useState("");
   useEffect(() => setSearch(""), [config]);

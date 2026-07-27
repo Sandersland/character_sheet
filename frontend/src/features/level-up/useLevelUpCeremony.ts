@@ -76,7 +76,7 @@ function useClassChoice(
   character: Character,
   deepLinkTarget: LevelUpTarget | null,
 ): ClassChoiceResult & { resetChoice: () => void } {
-  const { reference, error: referenceError } = useReferenceData();
+  const { reference, error: referenceError } = useReferenceData(character.rulesEdition);
   const classChoiceOptions = useMemo(
     () => buildClassChoiceOptions(character, reference?.classes),
     [character, reference],

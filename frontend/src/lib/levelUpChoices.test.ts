@@ -33,7 +33,7 @@ describe("CHOICE_KIND_CONFIGS", () => {
     const cfg = CHOICE_KIND_CONFIGS.maneuvers!;
 
     it("loads catalog options", async () => {
-      expect(await cfg.loadOptions({ targetLevel: 1 })).toEqual([
+      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024" })).toEqual([
         { id: "m1", name: "Riposte", description: "riposte" },
         { id: "m2", name: "Trip Attack", description: "trip" },
       ]);
@@ -66,7 +66,7 @@ describe("CHOICE_KIND_CONFIGS", () => {
     });
 
     it("loads only the catalog's fighting_style feats", async () => {
-      const opts = await cfg.loadOptions({ targetLevel: 1 });
+      const opts = await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024" });
       expect(opts).toEqual([
         { id: "archery", name: "Archery", description: "arch" },
         { id: "defense", name: "Defense", description: "def" },
@@ -100,7 +100,7 @@ describe("CHOICE_KIND_CONFIGS", () => {
     const cfg = CHOICE_KIND_CONFIGS.toolProficiency!;
 
     it("uses the tool name as id", async () => {
-      expect(await cfg.loadOptions({ targetLevel: 1 })).toEqual([{ id: "Smith's Tools", name: "Smith's Tools" }]);
+      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024" })).toEqual([{ id: "Smith's Tools", name: "Smith's Tools" }]);
     });
 
     it("round-trips select → selected as learnToolProficiency ops", () => {
