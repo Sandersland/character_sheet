@@ -6,6 +6,7 @@ import Spinner from "@/components/ui/Spinner";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
+import { applySubclassPick } from "@/lib/levelUpSteps";
 
 const CARD_BASE =
   "flex flex-col gap-1 rounded border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-garnet-400";
@@ -20,21 +21,13 @@ export default function SubclassStep() {
   const subclasses = classDef?.subclasses ?? [];
   const checkedIndex = subclasses.findIndex((sub) => sub.id === draft.subclassId);
 
-  // Changing to a different subclass invalidates any dependent picks made under
-  // the old one — clear them in the same update so a stale sibling can't survive
-  // the re-plan (#889).
+  // Back-navigation makes this step re-reachable after dependent picks
+  // (maneuvers, tool proficiencies, subclass choices) have been made under the
+  // current subclass — applySubclassPick (#1323) stashes them under the
+  // outgoing subclass's id and restores the incoming one's, so arrowing A→B→A
+  // doesn't lose A's picks the way a plain clear-on-pick (#889) would.
   function pick(subclassId: string) {
-    setDraft((d) =>
-      d.subclassId === subclassId
-        ? d
-        : {
-            ...d,
-            subclassId,
-            maneuvers: undefined,
-            toolProficiencies: undefined,
-            subclassChoices: undefined,
-          },
-    );
+    setDraft((d) => applySubclassPick(d, subclassId));
   }
 
   // Called unconditionally (before the `!reference` early return below) so the

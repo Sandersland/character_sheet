@@ -76,10 +76,10 @@ describe("CampaignsPage (#246)", () => {
     expect(await screen.findByRole("link", { name: /new campaign/i })).toBeInTheDocument();
   });
 
-  it("sends the picked edition when the DM chooses 2014 (#1286)", async () => {
+  it("cannot send 2014 from the campaign form while its content is gated (#1371)", async () => {
     const user = userEvent.setup();
     vi.mocked(client.fetchCampaigns).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    vi.mocked(client.createCampaign).mockResolvedValue(makeCampaign({ rulesEdition: "EDITION_2014" }));
+    vi.mocked(client.createCampaign).mockResolvedValue(makeCampaign());
 
     render(
       <MemoryRouter>
@@ -92,7 +92,7 @@ describe("CampaignsPage (#246)", () => {
     await user.click(screen.getByRole("radio", { name: "2014 rules" }));
     await user.click(screen.getByRole("button", { name: /create campaign/i }));
 
-    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("Classic Table", "EDITION_2014");
+    expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("Classic Table", "EDITION_2024");
   });
 
   // #1286: there is no PATCH /campaigns/:id — the edition is immutable from the

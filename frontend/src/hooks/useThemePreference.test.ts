@@ -19,7 +19,11 @@ const SYNCED: UserPreferences = { theme: "light", diceRollStyle: "animated", aut
 // alone (PreferencesProvider's own tests cover the reconcile-on-login logic).
 function withSynced(synced: UserPreferences | undefined, setPreference = vi.fn()) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(PreferencesContext.Provider, { value: { synced, setPreference } }, children);
+    return createElement(
+      PreferencesContext.Provider,
+      { value: { synced, setPreference, sync: { saving: {}, errors: {} } } },
+      children,
+    );
   };
 }
 
