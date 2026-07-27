@@ -21,7 +21,7 @@ Running outside Docker: `docker compose up db -d`, then `npm run dev` in each wo
 
 Hooks install via the root `prepare` script; config is `lefthook.yml`.
 
-- `pre-commit`: `eslint --fix` on staged files + `fallow audit` on changed files (gates new dead code / complexity / duplication; config `.fallowrc.jsonc`).
+- `pre-commit`: `eslint --fix` on staged files + `fallow audit` on changed files (gates new dead code / complexity / duplication / architecture-boundary violations; config `.fallowrc.jsonc`).
 - `pre-push`: `tsc --noEmit` + frontend unit tests, scoped per workspace. Backend vitest stays CI-only (needs Postgres).
 - `post-checkout`/`post-merge`: regenerate the Prisma client only when `schema.prisma`/migrations changed — the fix for stale-client `tsc` failures after a pull (`Property 'x' does not exist on type 'PrismaClient'`). Manual fix: `cd backend && npx prisma generate`.
 
