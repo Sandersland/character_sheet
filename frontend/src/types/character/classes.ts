@@ -3,6 +3,10 @@
  */
 
 import type { EffectSpec } from "@/lib/effects";
+// OpenHandRider is used below (OpenHandRiderResult.rider) as well as
+// re-exported (the `export type` block further down) — a bare `export …
+// from` doesn't bind a local name, so it needs its own `import type` too.
+import type { OpenHandRider } from "@character-sheet/contracts";
 
 // The resource + Warrior-of-the-Elements op shapes are the single cross-tier
 // source of truth in shared-types (#1273); re-exported here so this module stays
@@ -31,18 +35,28 @@ export type {
 // Aliasing keeps api/client.ts out of this diff — #1275 is rewriting that file.
 export type { ResourceOpAudit as ResourceOpResult } from "@character-sheet/shared-types";
 
-// The Channel Divinity / Shadow Arts / maneuver op shapes are derived from the
-// route zod schemas in @character-sheet/contracts (#1370) — `import type` only,
-// so zod never enters the client bundle (scripts/check-no-zod-in-client-bundle.sh).
-// Only the names this tier actually consumes are re-exported: CastManeuverOperation
-// and ActivateCloakOfShadowsOperation have zero frontend call sites, so forwarding
-// them here would be a dead export under the repo-wide fallow gate.
+// The Channel Divinity / Shadow Arts / maneuver / ability-op shapes are derived
+// from the route zod schemas in @character-sheet/contracts (#1370) — `import
+// type` only, so zod never enters the client bundle
+// (scripts/check-no-zod-in-client-bundle.sh). Only the names this tier
+// actually consumes are re-exported: CastManeuverOperation and
+// ActivateCloakOfShadowsOperation have zero frontend call sites (mirrored
+// backend-only in maneuvers.ts/shadow-arts.ts), and Hand of Harm / Hand of
+// Ultimate Mercy have no frontend feature at all yet, so none of those three
+// forward here — a forwarded-only name is a dead export under the repo-wide
+// fallow gate.
 export type {
+  AttemptStunningStrikeOperation,
   CastChannelDivinityOperation,
   CastShadowArtOperation,
   ChannelDivinityOperation,
+  ImposeOpenHandRiderOperation,
   ManeuverOperation,
+  OpenHandRider,
+  RollSneakAttackOperation,
+  SetQuiveringPalmOperation,
   ShadowArtOperation,
+  TriggerQuiveringPalmOperation,
 } from "@character-sheet/contracts";
 
 /** Focus (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
@@ -152,9 +166,6 @@ export interface StunningStrikeAttemptResult {
   outcome: "fail" | "success";
   summary: string;
 }
-
-/** Warrior of the Open Hand's Flurry-of-Blows rider choice (#1245). */
-export type OpenHandRider = "addle" | "push" | "topple";
 
 /** Per-op result from POST …/open-hand-technique/transactions — Addle has no roll. */
 export interface OpenHandRiderResult {

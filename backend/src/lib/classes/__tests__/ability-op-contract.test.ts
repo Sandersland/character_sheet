@@ -17,9 +17,16 @@ import { describe, expectTypeOf, it } from "vitest";
 
 import {
   activateCloakOfShadowsOpSchema,
+  attemptStunningStrikeOpSchema,
   castChannelDivinityOpSchema,
   castManeuverOpSchema,
   castShadowArtOpSchema,
+  dealHandOfHarmOpSchema,
+  imposeOpenHandRiderOpSchema,
+  rollSneakAttackOpSchema,
+  setQuiveringPalmOpSchema,
+  triggerQuiveringPalmOpSchema,
+  useHandOfUltimateMercyOpSchema,
   type ActivateCloakOfShadowsOperation,
   type CastShadowArtOperation,
   type ShadowArtOperation,
@@ -35,6 +42,23 @@ describe("ability-op wire contract", () => {
     expectTypeOf<z.input<typeof castShadowArtOpSchema>>().toEqualTypeOf<z.output<typeof castShadowArtOpSchema>>();
     expectTypeOf<z.input<typeof activateCloakOfShadowsOpSchema>>().toEqualTypeOf<
       z.output<typeof activateCloakOfShadowsOpSchema>
+    >();
+    expectTypeOf<z.input<typeof attemptStunningStrikeOpSchema>>().toEqualTypeOf<
+      z.output<typeof attemptStunningStrikeOpSchema>
+    >();
+    expectTypeOf<z.input<typeof rollSneakAttackOpSchema>>().toEqualTypeOf<z.output<typeof rollSneakAttackOpSchema>>();
+    expectTypeOf<z.input<typeof imposeOpenHandRiderOpSchema>>().toEqualTypeOf<
+      z.output<typeof imposeOpenHandRiderOpSchema>
+    >();
+    expectTypeOf<z.input<typeof setQuiveringPalmOpSchema>>().toEqualTypeOf<
+      z.output<typeof setQuiveringPalmOpSchema>
+    >();
+    expectTypeOf<z.input<typeof triggerQuiveringPalmOpSchema>>().toEqualTypeOf<
+      z.output<typeof triggerQuiveringPalmOpSchema>
+    >();
+    expectTypeOf<z.input<typeof dealHandOfHarmOpSchema>>().toEqualTypeOf<z.output<typeof dealHandOfHarmOpSchema>>();
+    expectTypeOf<z.input<typeof useHandOfUltimateMercyOpSchema>>().toEqualTypeOf<
+      z.output<typeof useHandOfUltimateMercyOpSchema>
     >();
   });
 

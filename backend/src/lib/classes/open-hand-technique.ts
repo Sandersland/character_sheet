@@ -18,6 +18,8 @@
 // (Heightened Focus, #1244) from re-choosing a rider on every individual
 // strike within the same Flurry use.
 
+import type { ImposeOpenHandRiderOperation, OpenHandRider, OpenHandTechniqueOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -25,17 +27,6 @@ import { runCharacterTransaction, type CharacterTxContext } from "@/lib/characte
 import { focusSaveDC } from "./monk.js";
 
 export class InvalidOpenHandTechniqueOperationError extends Error {}
-
-export type OpenHandRider = "addle" | "push" | "topple";
-
-// Once per turn, client-asserted (mirrors AttemptStunningStrikeOperation).
-export interface ImposeOpenHandRiderOperation {
-  type: "imposeOpenHandRider";
-  rider: OpenHandRider;
-  usedThisTurn: boolean;
-}
-
-export type OpenHandTechniqueOperation = ImposeOpenHandRiderOperation;
 
 export type OpenHandRiderOutcome = "applied" | "resisted";
 

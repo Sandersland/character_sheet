@@ -23,6 +23,8 @@
 // NPC stat-block model. The DM may narrate an override if the target's actual
 // Constitution save would differ materially.
 
+import type { AttemptStunningStrikeOperation, StunningStrikeOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -31,15 +33,6 @@ import { applySpendResourceInTx } from "./resources.js";
 import { focusSaveDC } from "./monk.js";
 
 export class InvalidStunningStrikeOperationError extends Error {}
-
-// Once per turn, client-asserted (mirrors Sneak Attack's usedThisTurn — the
-// server has no session turn state to cross-check against).
-export interface AttemptStunningStrikeOperation {
-  type: "attemptStunningStrike";
-  usedThisTurn: boolean;
-}
-
-export type StunningStrikeOperation = AttemptStunningStrikeOperation;
 
 export type StunningStrikeOutcome = "fail" | "success";
 
