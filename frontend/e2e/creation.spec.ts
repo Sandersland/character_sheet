@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 import { passEntryGate } from "./helpers/creation";
-import { uniqueName } from "./helpers/api";
+import { createCampaign, uniqueName } from "./helpers/api";
 
 // The creation ceremony (#1176) walks one step at a time behind a Continue gate;
 // the footer flips to "Create Character" on the Review step.
@@ -133,14 +133,20 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
 // Verified safe against seed data: every Subclass row is edition: null
 // (shared), so "The Fiend" resolves under 2014 too, and resolveSubclass
 // accepts a subclass id whenever the edition-resolved gate is <= 1 (true here).
+//
+// #1371 gates the picker, so 2014 is reached by joining a 2014 campaign rather
+// than clicking the radio directly — otherwise Playwright 1.49's actionability
+// check treats aria-disabled="true" as not-enabled and .click() times out.
 test("creation: a 2014 warlock must choose its patron at creation", async ({ page }) => {
   const name = uniqueName("Old Ways Warlock");
+  const campaignName = uniqueName("Old Ways Table");
 
   await login(page);
+  await createCampaign(page.request, { name: campaignName, rulesEdition: "EDITION_2014" });
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
-  await passEntryGate(page, { edition: "EDITION_2014" });
+  await passEntryGate(page, { campaign: campaignName });
 
   // Identity step.
   await page.getByLabel(/^Name/).fill(name);

@@ -129,6 +129,21 @@ export async function setExperience(
   expect(response.ok(), `set XP: ${response.status()}`).toBeTruthy();
 }
 
+// Create a campaign via the API and return its id. #1371 gates the picker so no
+// UI path can create a 2014 campaign; a 2014 campaign is only reachable through
+// this endpoint (or pre-existing data), so specs that need one must go through it.
+export async function createCampaign(
+  request: APIRequestContext,
+  opts: { name: string; rulesEdition?: "EDITION_2014" | "EDITION_2024" },
+): Promise<string> {
+  const response = await request.post("/api/campaigns", {
+    data: { name: opts.name, ...(opts.rulesEdition ? { rulesEdition: opts.rulesEdition } : {}) },
+  });
+  expect(response.ok(), `create campaign ${opts.name}: ${response.status()}`).toBeTruthy();
+  const { id } = (await response.json()) as { id: string };
+  return id;
+}
+
 // Create a fresh character already attached to its own new campaign, so it can
 // start a live session in-spec without touching the shared roster's campaigns.
 export async function createSessionCharacter(
