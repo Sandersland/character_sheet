@@ -83,20 +83,68 @@ describe("GET /api/reference", () => {
     expect(byName("Fighter").primaryAbility).toEqual(["strength", "dexterity"]);
   });
 
-  // #1308: this endpoint has no character, so no `rulesEdition` — the catalog
-  // `subclassLevel` column is 2014-only (subclassGateLevel ignores it under
-  // 2024). No frontend surface resolves the edition seam yet (that's the
-  // deferred per-edition frontend work), so serving the raw 2014 value would
-  // make the client originate a 2014 rule against a 2024-default creation flow.
-  // This endpoint must report the 2024-resolved gate (always 3) for every class.
-  it("reports subclassLevel resolved for 2024 (3 for every class, never the raw 2014 column)", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
-    const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
-    expect(byName("Cleric").subclassLevel).toBe(3);
-    expect(byName("Sorcerer").subclassLevel).toBe(3);
-    expect(byName("Warlock").subclassLevel).toBe(3);
-    expect(byName("Druid").subclassLevel).toBe(3);
-    expect(byName("Wizard").subclassLevel).toBe(3);
-    expect(byName("Fighter").subclassLevel).toBe(3);
+  // #1325: `?edition=` resolves subclassLevel through subclassGateLevel for the
+  // REQUESTED edition, not a baked-in default — 2014 exposes each class's real
+  // PHB'14 gate (Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, rest 3); 2024 flattens
+  // every class to 3 (SRD 5.2). Proves the endpoint no longer hardcodes an edition.
+  it("resolves subclassLevel for the requested edition (2014 per-class gate vs 2024's flat 3)", async () => {
+    const app = createApp();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const byName = (body: any, name: string) => body.classes.find((c: { name: string }) => c.name === name);
+
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    expect(res2014.status).toBe(200);
+    expect(byName(res2014.body, "Cleric").subclassLevel).toBe(1);
+    expect(byName(res2014.body, "Sorcerer").subclassLevel).toBe(1);
+    expect(byName(res2014.body, "Warlock").subclassLevel).toBe(1);
+    expect(byName(res2014.body, "Druid").subclassLevel).toBe(2);
+    expect(byName(res2014.body, "Wizard").subclassLevel).toBe(2);
+    expect(byName(res2014.body, "Fighter").subclassLevel).toBe(3);
+
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    expect(res2024.status).toBe(200);
+    expect(byName(res2024.body, "Cleric").subclassLevel).toBe(3);
+    expect(byName(res2024.body, "Sorcerer").subclassLevel).toBe(3);
+    expect(byName(res2024.body, "Warlock").subclassLevel).toBe(3);
+    expect(byName(res2024.body, "Druid").subclassLevel).toBe(3);
+    expect(byName(res2024.body, "Wizard").subclassLevel).toBe(3);
+    expect(byName(res2024.body, "Fighter").subclassLevel).toBe(3);
+  });
+
+  it("400s on an unrecognized edition", async () => {
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .get("/api/reference?edition=EDITION_1974");
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("EDITION_1974");
+  });
+
+  // #1325/#1348: Background.originFeatId is a raw FK baked onto the 2024 Feat
+  // row at seed time (resolveOriginFeatId) — resolving it BY NAME through
+  // resolveEditionCatalog instead makes this preview agree with what
+  // buildOriginEntry actually grants a 2014 character. Alert is the only
+  // origin feat with textually distinct 2014/2024 rows.
+  it("resolves a background's origin feat for the requested edition (#1348 cross-link)", async () => {
+    const app = createApp();
+    const criminal2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const criminal2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const byName = (body: any, name: string) => body.backgrounds.find((b: { name: string }) => b.name === name);
+
+    const alert2014 = byName(criminal2014.body, "Criminal").originFeat;
+    const alert2024 = byName(criminal2024.body, "Criminal").originFeat;
+    expect(alert2014.name).toBe("Alert");
+    expect(alert2024.name).toBe("Alert");
+    expect(alert2014.description).toMatch(/\+5 bonus to initiative/);
+    expect(alert2024.description).toMatch(/Proficiency Bonus/);
+
+    // Folk Hero: no origin feat in either edition (spec-less legacy row, #1130).
+    expect(byName(criminal2014.body, "Folk Hero").originFeat).toBeNull();
+    expect(byName(criminal2024.body, "Folk Hero").originFeat).toBeNull();
+
+    // Soldier: Savage Attacker is edition: null (shared path) — same row both editions.
+    expect(byName(criminal2014.body, "Soldier").originFeat.name).toBe("Savage Attacker");
+    expect(byName(criminal2024.body, "Soldier").originFeat.name).toBe("Savage Attacker");
   });
 });
