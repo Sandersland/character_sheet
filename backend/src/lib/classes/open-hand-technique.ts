@@ -18,24 +18,16 @@
 // (Heightened Focus, #1244) from re-choosing a rider on every individual
 // strike within the same Flurry use.
 
+import type { ImposeOpenHandRiderOperation, OpenHandRider, OpenHandTechniqueOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { focusSaveDC } from "./monk.js";
+import { resolveSubclassSlug } from "./subclass-slug.js";
 
 export class InvalidOpenHandTechniqueOperationError extends Error {}
-
-export type OpenHandRider = "addle" | "push" | "topple";
-
-// Once per turn, client-asserted (mirrors AttemptStunningStrikeOperation).
-export interface ImposeOpenHandRiderOperation {
-  type: "imposeOpenHandRider";
-  rider: OpenHandRider;
-  usedThisTurn: boolean;
-}
-
-export type OpenHandTechniqueOperation = ImposeOpenHandRiderOperation;
 
 export type OpenHandRiderOutcome = "applied" | "resisted";
 
@@ -91,22 +83,25 @@ const OPEN_HAND_TECHNIQUE_SELECT = {
   abilityScores: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, level: true, subclass: true },
+    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
 type OpenHandTechniqueRow = Prisma.CharacterGetPayload<{ select: typeof OPEN_HAND_TECHNIQUE_SELECT }>;
 
 // Open Hand Technique is a subclass feature (Warrior of the Open Hand), unlike
-// Stunning Strike's base-class monkLevel() gate — so it checks the monk entry's
-// own subclass string too (freeform display name; substring-matched like
-// DERIVED_ACTIONS' grantSubclass in actions.ts).
+// Stunning Strike's base-class monkLevel() gate — so it checks the monk
+// entry's own subclass identity too, resolved via resolveSubclassSlug (#1277:
+// FK preferred, exact normalized name as fallback). Was substring-matched on
+// the words "open hand" — the same failure class #1339 fixed at the
+// DERIVED_ACTIONS gate.
 function monkEntry(row: OpenHandTechniqueRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
 function isWarriorOfTheOpenHand(row: OpenHandTechniqueRow): boolean {
-  return (monkEntry(row)?.subclass ?? "").toLowerCase().includes("open hand");
+  const monk = monkEntry(row);
+  return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand";
 }
 
 async function imposeOpenHandRider(

@@ -2,14 +2,85 @@
 // Continue-gating. Rail-state math is shared in ceremonySteps. No JSX; consumed
 // by useLevelUpCeremony / LevelUpCeremony (which build the rail via CeremonyStepRail).
 
-import type { LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
+import type { LevelUpStep, LevelUpStepKind, LevelUpSubmission, LevelUpTarget } from "@/types/character";
+
+// Fields SubclassStep's re-pick stash (#1323) saves/restores per subclass id —
+// invalidated by an actual subclass change, so kept separate from the fields
+// that survive one (e.g. spellsLearned, F5 in the #1323 plan — a known,
+// out-of-scope leak). Named once so applySubclassPick's stash-write and
+// restore reads can't drift apart.
+const SUBCLASS_DEPENDENT_KEYS = ["maneuvers", "toolProficiencies", "subclassChoices"] as const satisfies readonly (keyof LevelUpSubmission)[];
+
+type SubclassDependentPicks = Pick<LevelUpSubmission, (typeof SUBCLASS_DEPENDENT_KEYS)[number]>;
 
 // The in-progress submission minus its target (owned by useLevelUpCeremony). hp
 // is optional here because the ceremony starts before the player picks it — the
 // HitPointsStep (#887) sets it, and draftSatisfies gates Continue until it does.
 export type LevelUpDraft = Omit<LevelUpSubmission, "target" | "hp"> & {
   hp?: LevelUpSubmission["hp"];
+  // #1323: SubclassStep's re-pick stash, keyed by subclass id so a bucket can
+  // only ever be restored into the exact plan it was authored under (subclass
+  // ids are DB ids, globally unique — no multiclass collision risk). Ceremony-
+  // local: carried in the draft (not ceremony-level state) purely so
+  // resetForNextLevel's setDraft({}) clears it for free between levels — see
+  // levelUpSubmissionOf for why it must never reach the wire.
+  dependentPicksBySubclass?: Record<string, SubclassDependentPicks>;
 };
+
+// Draft keys that exist only to drive the ceremony UI and have no counterpart
+// in LevelUpSubmission — stripped by levelUpSubmissionOf before the wire.
+const CEREMONY_LOCAL_DRAFT_KEYS = ["dependentPicksBySubclass"] as const satisfies readonly (keyof LevelUpDraft)[];
+
+/**
+ * Builds the POST /level-up/transactions body from the ceremony draft. The
+ * endpoint's schema is a non-strict z.object, so an unstripped ceremony-local
+ * field wouldn't be rejected — it would cross the wire and vanish silently,
+ * with no 400 and no type error (spreads get no excess-property checking).
+ * This is the only guard.
+ */
+export function levelUpSubmissionOf(
+  draft: LevelUpDraft,
+  target: LevelUpTarget,
+  hp: LevelUpSubmission["hp"],
+): LevelUpSubmission {
+  const rest: Partial<LevelUpDraft> = { ...draft };
+  for (const key of CEREMONY_LOCAL_DRAFT_KEYS) delete rest[key];
+  return { ...rest, target, hp } as LevelUpSubmission;
+}
+
+function subclassDependentPicksOf(source: LevelUpDraft | SubclassDependentPicks | undefined): SubclassDependentPicks {
+  const result: Record<string, unknown> = {};
+  for (const key of SUBCLASS_DEPENDENT_KEYS) result[key] = source?.[key];
+  return result as SubclassDependentPicks;
+}
+
+/**
+ * SubclassStep's pick handler (#1323): stashes the outgoing subclass's
+ * dependent picks (maneuvers/toolProficiencies/subclassChoices) under its id
+ * before clearing them, and restores the incoming subclass's bucket if one
+ * was stashed earlier this ceremony. Keyed by subclass id rather than plan
+ * position: subclass ids are DB ids (globally unique across classes), so a
+ * bucket can only ever be restored into the exact plan it was authored
+ * under — no multiclass collision risk (see the #1323 plan, F8).
+ *
+ * The re-selected-subclass identity guard (returning `draft` unchanged) must
+ * stay — useRovingRadioGroup can still invoke this on a click of the already-
+ * checked card, and it's also what keeps a no-op pick from re-rendering.
+ */
+export function applySubclassPick(draft: LevelUpDraft, subclassId: string): LevelUpDraft {
+  if (draft.subclassId === subclassId) return draft;
+
+  const nextStash = { ...(draft.dependentPicksBySubclass ?? {}) };
+  if (draft.subclassId != null) nextStash[draft.subclassId] = subclassDependentPicksOf(draft);
+
+  // Every dependent key is written here, even when the incoming bucket is
+  // absent or partial — a sparse spread of the bucket would leave the
+  // OUTGOING subclass's picks sitting on the incoming one (the exact
+  // reverse-regression this function exists to prevent).
+  const restoredFields = subclassDependentPicksOf(nextStash[subclassId]);
+
+  return { ...draft, subclassId, ...restoredFields, dependentPicksBySubclass: nextStash };
+}
 
 /**
  * Stable identity for a step across re-plans: kind, plus meta.key for the

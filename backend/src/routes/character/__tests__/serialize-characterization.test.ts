@@ -51,7 +51,10 @@ beforeAll(async () => {
   const bm = await upsertEditionRow(
     prisma.subclass,
     { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
-    { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers." },
+    // Distinct from the real seeded slugs (#1277) — this test's Fighter/Monk
+    // classes are their own throwaway rows, and (slug, edition) is unique
+    // catalog-wide regardless of classId.
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers.", slug: "fighter-battle-master-serialize-characterization-test" },
     {},
   );
   bmSubclassId = bm.id;
@@ -70,7 +73,7 @@ beforeAll(async () => {
   const shadow = await upsertEditionRow(
     prisma.subclass,
     { classId: monk.id, name: SHADOW_SUBCLASS_NAME, edition: null },
-    { classId: monk.id, name: SHADOW_SUBCLASS_NAME, description: "Minor Illusion at 3." },
+    { classId: monk.id, name: SHADOW_SUBCLASS_NAME, description: "Minor Illusion at 3.", slug: "monk-warrior-of-shadow-serialize-characterization-test" },
     {},
   );
   shadowSubclassId = shadow.id;

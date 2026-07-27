@@ -20,6 +20,39 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Migration-shape gate (#1373): an enum-narrowing migration whose USING
+      # cast aborts on populated rows leaves the DB in P3009, which blocks every
+      # migration behind it. Deliberately in `lint`, not the `fallow` job where
+      # the other grep gates live: `fallow` needs: test, so this 10ms sh gate
+      # would otherwise wait on Postgres + vitest + coverage. Needs no node, so
+      # it runs before `npm ci`. Twin of the lefthook pre-commit job.
+      - name: enum-narrowing migrations guarded
+        run: sh scripts/check-enum-narrowing.sh
+
+      # Subclass identity must resolve via resolveSubclassSlug, never a
+      # substring match on the freeform display name (#1277). Needs no node,
+      # so it runs before `npm ci` alongside the enum-narrowing gate. Twin of
+      # the lefthook pre-commit job.
+      - name: subclass identity resolved via slug, not substring
+        run: sh scripts/check-subclass-substring.sh
+
+      # Boot-contract gate (#1277 defect 3): needs no node, runs alongside
+      # the other grep gates above.
+      - name: every migrate-deploy boot command also seeds
+        run: sh scripts/check-seed-required.sh
+
+      # AC-4 machine enforcement (#1277): a seed DATA module must carry no
+      # prisma/upsert/await token. Needs no node.
+      - name: seed data modules contain no upsert logic
+        run: sh scripts/check-seed-data-modules.sh
+
+      # Every client-supplied catalog id (Feat/Subclass/GrantedAbility/
+      # Background/Action) must resolve through crossEditionRejection or be on
+      # the declared exemption list (#1345). Needs no node, so it runs
+      # alongside the other grep gates above. Twin of the lefthook pre-commit job.
+      - name: catalog ids resolved with the cross-edition guard
+        run: sh scripts/check-catalog-id-edition-guard.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
@@ -203,6 +236,21 @@ jobs:
         run: npx prisma generate
 
       - run: npm run build
+
+      # `npm run build` (tsc && tsc-alias) never type-checks prisma/seed/*.ts —
+      # backend/tsconfig.json's `include` is src-only. This is the CI leg of
+      # backend's `typecheck` script (tsconfig.seed.json, #1277), which also
+      # type-checks src again — harmless, tsc is fast and idempotent here.
+      - name: Backend typecheck (incl. prisma/seed)
+        run: npm run typecheck --workspace backend
+
+      # zod is a real backend/contracts dependency, but the frontend must only
+      # ever `import type` from @character-sheet/contracts — a stray value
+      # import would ship zod's runtime to every player (#1370). Runs right
+      # after `npm run build` so it inspects the actual frontend/dist this job
+      # just produced, not a separate build.
+      - name: zod absent from client bundle
+        run: sh scripts/check-no-zod-in-client-bundle.sh
 
   test:
     runs-on: ubuntu-latest

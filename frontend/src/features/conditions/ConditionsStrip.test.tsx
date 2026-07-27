@@ -4,22 +4,42 @@ import userEvent from "@testing-library/user-event";
 
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import { getQueryClient } from "@/api/queryClient";
-import { characterKeys } from "@/api/queryKeys";
+import { characterKeys, referenceKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
-import type { Character, ConditionsState } from "@/types/character";
+import type { Character, ConditionOption, ConditionsState } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 // Mock the API client — ConditionsStrip batches condition ops and swaps the
-// returned Character straight into the character query cache.
+// returned Character straight into the character query cache. fetchReference
+// must be present even though these tests seed the reference cache directly
+// (never call it) — ConditionsSheetBody's useReferenceData imports it from
+// this same barrel, and an omitted export here is `undefined`, which the
+// skipped-then-enabled query would call the moment a real edition arrives.
 vi.mock("@/api/client", () => ({
   applyConditionTransactions: vi.fn(),
+  fetchReference: vi.fn(),
 }));
 
-function makeCharacter(conditions: ConditionsState): Character {
+function makeCharacter(conditions: ConditionsState, over?: Partial<Character>): Character {
   return {
     id: "char-1",
+    rulesEdition: "EDITION_2024",
+    exhaustionEffectText: "No exhaustion.",
     conditions,
+    ...over,
   } as unknown as Character;
+}
+
+function seedReference(edition: RulesEdition, conditions: ConditionOption[]) {
+  getQueryClient().setQueryData(referenceKeys.byEdition(edition), {
+    races: [],
+    classes: [],
+    backgrounds: [],
+    alignments: [],
+    artisanTools: [],
+    conditions,
+  });
 }
 
 beforeEach(() => {
@@ -149,5 +169,100 @@ describe("ConditionsStrip", () => {
 
     rerender(makeCharacter({ active: [], exhaustion: 6 }));
     expect(screen.getByRole("button", { name: /increase exhaustion/i })).toBeDisabled();
+  });
+
+  // #1322: a 2014-stamped character used to render exhaustionEffect(3)'s 2024
+  // text (a flat "−6 on d20 Tests…") regardless of edition — contradicting the
+  // Speed value and roll chips rendered right beside it. The sentence now
+  // comes off the wire (exhaustionEffectText), authored server-side beside the
+  // same numbers that drive Speed and rollModifiers.
+  it("a 2014 character at exhaustion 3 sees 2014 text, not 2024's", () => {
+    render(
+      makeCharacter(
+        { active: [], exhaustion: 3 },
+        {
+          rulesEdition: "EDITION_2014",
+          exhaustionEffectText:
+            "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved.",
+        },
+      ),
+    );
+    expect(
+      screen.getByText(
+        "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/−6 on d20 Tests/)).not.toBeInTheDocument();
+  });
+
+  it("a 2024 character at exhaustion 3 is unchanged — the flat d20-Tests/Speed sentence", () => {
+    render(
+      makeCharacter(
+        { active: [], exhaustion: 3 },
+        { rulesEdition: "EDITION_2024", exhaustionEffectText: "−6 on d20 Tests; Speed −15 ft." },
+      ),
+    );
+    expect(screen.getByText("−6 on d20 Tests; Speed −15 ft.")).toBeInTheDocument();
+  });
+
+  it("the picker lists a 2014 character's condition text (Grappled), not 2024's", async () => {
+    const user = userEvent.setup();
+    seedReference("EDITION_2014", [
+      {
+        key: "grappled",
+        label: "Grappled",
+        description:
+          "Speed becomes 0, and it can't benefit from any bonus to its speed. The condition ends if the grappler is incapacitated or if the creature is moved out of reach.",
+      },
+    ]);
+    render(makeCharacter({ active: [], exhaustion: 0 }, { rulesEdition: "EDITION_2014" }));
+
+    await user.click(screen.getByRole("button", { name: /add condition/i }));
+    expect(
+      screen.getByText(/The condition ends if the grappler is incapacitated/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/other than the grappler/)).not.toBeInTheDocument();
+  });
+
+  it("the picker lists a 2024 character's condition text (Grappled), not 2014's", async () => {
+    const user = userEvent.setup();
+    seedReference("EDITION_2024", [
+      {
+        key: "grappled",
+        label: "Grappled",
+        description:
+          "Speed is 0 and can't increase. Has disadvantage on attack rolls against any target other than the grappler.",
+      },
+    ]);
+    render(makeCharacter({ active: [], exhaustion: 0 }, { rulesEdition: "EDITION_2024" }));
+
+    await user.click(screen.getByRole("button", { name: /add condition/i }));
+    expect(screen.getByText(/other than the grappler/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/The condition ends if the grappler is incapacitated/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("edition is cache identity: a 2024 character never renders a 2014-seeded description", async () => {
+    const user = userEvent.setup();
+    seedReference("EDITION_2014", [
+      { key: "grappled", label: "Grappled", description: "2014-only text that must never leak." },
+    ]);
+    render(makeCharacter({ active: [], exhaustion: 0 }, { rulesEdition: "EDITION_2024" }));
+
+    await user.click(screen.getByRole("button", { name: /add condition/i }));
+    expect(screen.queryByText("2014-only text that must never leak.")).not.toBeInTheDocument();
+    // Falls back to the edition-invariant label-only list — still lists Grappled.
+    expect(screen.getByText("Grappled")).toBeInTheDocument();
+  });
+
+  it("degrades gracefully with no reference cached: all 14 conditions still list by label, no description", async () => {
+    const user = userEvent.setup();
+    render(makeCharacter({ active: [], exhaustion: 0 }));
+
+    await user.click(screen.getByRole("button", { name: /add condition/i }));
+    const poisonedRow = screen.getByText("Poisoned").closest("li")!;
+    expect(within(poisonedRow).getByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(screen.getByText("Grappled")).toBeInTheDocument();
   });
 });

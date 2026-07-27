@@ -52,6 +52,7 @@ const EMPTY_REFERENCE = {
 
 const baseCharacter = {
   id: "c1",
+  rulesEdition: "EDITION_2024",
   classes: [{ id: "entry-1", name: "fighter", level: 7, subclass: "Champion" }],
   abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
   hitPoints: { current: 52, max: 52, temp: 0, deathSaves: { successes: 0, failures: 0 } },

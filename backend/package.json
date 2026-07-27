@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "cd .. && npm run build --workspace @character-sheet/contracts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc && tsc-alias",
     "start": "node dist/index.js",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.seed.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "seed:verify": "tsx scripts/seed-verify.ts",
@@ -17,6 +18,7 @@
     "backfill:combat-round": "tsx scripts/backfill-session-combat-round.ts"
   },
   "dependencies": {
+    "@character-sheet/contracts": "*",
     "@character-sheet/shared-types": "*",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",

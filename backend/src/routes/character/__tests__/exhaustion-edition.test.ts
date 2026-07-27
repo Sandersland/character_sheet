@@ -79,6 +79,11 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
         { mode: "disadvantage", kind: "save", source: "Exhaustion" },
       ]),
     );
+    // #1322 — the display sentence beside the Speed value and roll chips above:
+    // must agree with both, never contradict them (the bug this issue fixes).
+    expect(char2014.exhaustionEffectText).toBe(
+      "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved.",
+    );
 
     expect(char2024.speed).toBe(10); // 25 − 15 (−5 ft×level)
     expect(char2024.rollModifiers).toEqual(
@@ -89,6 +94,7 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
         { mode: "flat", modifier: -6, kind: "initiative", source: "Exhaustion" },
       ]),
     );
+    expect(char2024.exhaustionEffectText).toBe("−6 on d20 Tests; Speed −15 ft.");
   });
 
   it("2014 exhaustion 2-4: an even base Speed (Human 30) halves cleanly, pinning the round-down direction from both sides", async () => {
@@ -103,6 +109,9 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
     await setExhaustion(id, 5);
     const char = (await get(id)).body;
     expect(char.speed).toBe(0);
+    expect(char.exhaustionEffectText).toBe(
+      "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed 0; HP maximum halved.",
+    );
   });
 
   it("2014 exhaustion 1: disadvantage on ability checks only (Speed-halved doesn't start until level 2)", async () => {
@@ -114,6 +123,14 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
       { mode: "disadvantage", kind: "check", source: "Exhaustion" },
       { mode: "disadvantage", kind: "initiative", source: "Exhaustion" },
     ]);
+    expect(char.exhaustionEffectText).toBe("Disadvantage on ability checks and initiative.");
+  });
+
+  it("exhaustion 0: no active exhaustion, in both editions", async () => {
+    const id2014 = await createAt("EDITION_2014", "ExhEdition 2014-L0");
+    const id2024 = await createAt("EDITION_2024", "ExhEdition 2024-L0");
+    expect((await get(id2014)).body.exhaustionEffectText).toBe("No exhaustion.");
+    expect((await get(id2024)).body.exhaustionEffectText).toBe("No exhaustion.");
   });
 
   it("exhaustion 6 (death) is accepted identically in both editions — EXHAUSTION_MAX is edition-invariant", async () => {

@@ -30,7 +30,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     skillChoiceCount: 2,
     skillChoices: ["acrobatics", "stealth", "perception"],
     isSpellcaster: false,
-    subclassLevel: 3,
+    subclassGateLevel: 3,
     subclasses: [],
     startingEquipment: null,
     multiclassPrerequisite: null,
@@ -61,6 +61,7 @@ const reference: ReferenceData = {
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
+  conditions: [],
 };
 
 function seedDraft(overrides: Partial<CharacterDraft>) {

@@ -159,7 +159,7 @@ export const druid: ClassDefinition = {
   },
   // PHB'14 p.66: Druid Circle (Druid's subclass) is chosen at 2nd level.
   subclasses: {
-    "circle of the land": { grantLevel: 2, features: CIRCLE_OF_THE_LAND_FEATURES },
-    "circle of the moon": { grantLevel: 2, features: CIRCLE_OF_THE_MOON_FEATURES },
+    "circle of the land": { slug: "druid-circle-of-the-land", grantLevel: 2, features: CIRCLE_OF_THE_LAND_FEATURES },
+    "circle of the moon": { slug: "druid-circle-of-the-moon", grantLevel: 2, features: CIRCLE_OF_THE_MOON_FEATURES },
   },
 };

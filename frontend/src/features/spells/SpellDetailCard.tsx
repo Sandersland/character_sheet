@@ -116,7 +116,7 @@ export default function SpellDetailCard({
           type="button"
           disabled={cta.disabled}
           onClick={cta.onPress}
-          className="w-full rounded-control bg-garnet-700 py-3 text-center text-sm font-semibold text-parchment-50 hover:bg-garnet-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-control bg-garnet-surface py-3 text-center text-sm font-semibold text-garnet-on-surface hover:bg-garnet-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {cta.label}
         </button>

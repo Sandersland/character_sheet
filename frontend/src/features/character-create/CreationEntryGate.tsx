@@ -34,12 +34,17 @@ interface CreationEntryGateProps {
 // can never be the empty string, so this never collides with one.
 const SOLO = "";
 
+// #1343: below this count the list is shorter than the cap at every supported
+// viewport, so capping would only draw an empty scroll gutter (AC4) — Solo + 3
+// campaigns is the largest uncapped roster.
+const SCROLL_ABOVE = 3;
+
 const CARD_BASE =
   "flex flex-col gap-1 rounded border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-garnet-400";
 const CARD_SELECTED = "border-garnet-600 bg-parchment-50 ring-2 ring-garnet-50";
 const CARD_IDLE = "border-parchment-300 bg-parchment-50 hover:border-garnet-400";
 const PRIMARY_BTN =
-  "min-h-11 rounded-control border border-garnet-800 bg-garnet-700 px-5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800";
+  "min-h-11 rounded-control border border-garnet-surface-hover bg-garnet-surface px-5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover";
 
 // One "which campaign" card per membership + a leading Solo option. Extracted
 // so CreationEntryGate's own render stays a plain if/else over load state.
@@ -58,8 +63,23 @@ function CampaignChoiceCards({
     onChoose(options[index].id),
   );
 
+  // #1343: FeatFlow's cap-and-scroll shape (FeatCatalogList). p-0.5 is bundled
+  // into the scrolls-only classes (not applied unconditionally) so the
+  // uncapped case stays byte-identical to the pre-#1343 markup (AC4) — a
+  // padding shift would be a visible regression for the 0-3-campaign majority.
+  // pr-3 clears the focus-visible:ring-2 from the scrollbar; overflow-x-hidden
+  // stops that ring computing a spurious horizontal scrollbar (overflow-y:auto
+  // with overflow-x:visible resolves x to auto too).
+  const scrolls = campaigns.length > SCROLL_ABOVE;
+  const listClass = [
+    "grid gap-3 sm:grid-cols-2",
+    scrolls ? "p-0.5 thin-scrollbar max-h-48 overflow-y-auto overflow-x-hidden pr-3 sm:max-h-60" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div role="radiogroup" aria-label="Which campaign is this for?" className="grid gap-3 sm:grid-cols-2">
+    <div role="radiogroup" aria-label="Which campaign is this for?" className={listClass}>
       {options.map((opt, i) => {
         const selected = opt.id === choice;
         return (

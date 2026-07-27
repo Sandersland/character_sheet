@@ -21,8 +21,13 @@ const PAPER =
 export const GHOST_BTN =
   "min-h-11 rounded-control border border-parchment-300 px-4 text-sm font-semibold text-parchment-600 transition-colors hover:bg-parchment-100";
 
+// No label color here — equal-specificity `.text-*` utilities collide by
+// emitted-CSS order, not by class-attribute order, so a shared constant that
+// carries one can silently lose to a second appended by a caller (#994).
+// Callers supply their own text color alongside their fill (see confirmClassName
+// call sites and the Continue button below).
 const PRIMARY_BTN =
-  "min-h-11 rounded-control border px-5 text-sm font-semibold text-parchment-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+  "min-h-11 rounded-control border px-5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 export function CeremonyStage({ layout, children }: { layout: "page" | "viewport"; children: ReactNode }) {
   if (layout === "viewport") {
@@ -99,7 +104,7 @@ export function CeremonyFooter({
           type="button"
           onClick={onContinue}
           disabled={!canContinue}
-          className={`${PRIMARY_BTN} border-garnet-800 bg-garnet-700 hover:bg-garnet-800`}
+          className={`${PRIMARY_BTN} border-garnet-surface-hover bg-garnet-surface text-garnet-on-surface hover:bg-garnet-surface-hover`}
         >
           Continue ›
         </button>

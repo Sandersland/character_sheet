@@ -4,6 +4,7 @@
 
 import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 
+import type { ConditionKey } from "./combat";
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 
 // The starting-equipment shapes are the single cross-tier source of truth in
@@ -42,8 +43,10 @@ export interface ClassOption {
   skillChoiceCount: number;
   skillChoices: SkillName[];
   isSpellcaster: boolean;
-  /** Character level at which this class grants a subclass (1, 2, or 3). */
-  subclassLevel: number;
+  /** Character level at which this class grants a subclass, ALREADY resolved
+   *  for the requested edition by subclassGateLevel (#1325). Never compare a
+   *  level against a raw catalog column. */
+  subclassGateLevel: number;
   /** Available subclasses for this class, ordered alphabetically. */
   subclasses: SubclassOption[];
   /** Starting equipment definition, null if the class has no package defined. */
@@ -96,6 +99,15 @@ export interface ToolOption {
   weight?: number;
 }
 
+/** One of the 14 standard conditions, resolved for the requested edition
+ *  (#1322) — description is that edition's actual rules text; no
+ *  `rollEffects` (the client already gets resolved `rollModifiers`). */
+export interface ConditionOption {
+  key: ConditionKey;
+  label: string;
+  description: string;
+}
+
 export interface ReferenceData {
   races: RaceOption[];
   classes: ClassOption[];
@@ -103,6 +115,8 @@ export interface ReferenceData {
   alignments: string[];
   /** Artisan's tools for the sheet's Proficiencies-card dropdown. */
   artisanTools: ToolOption[];
+  /** The 14 conditions' rules text, resolved for the requested edition (#1322). */
+  conditions: ConditionOption[];
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills

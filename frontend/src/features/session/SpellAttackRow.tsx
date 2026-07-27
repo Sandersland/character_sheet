@@ -50,7 +50,7 @@ export default function SpellAttackRow({
             type="button"
             onClick={onAttack}
             disabled={busy || attackRolled}
-            className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+            className="rounded-control border border-garnet-300 bg-garnet-surface px-3 py-1.5 text-xs font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
           >
             Attack {formatModifier(attackBonus)}
           </button>

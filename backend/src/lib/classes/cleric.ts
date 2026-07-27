@@ -40,12 +40,28 @@ const CLERIC_FEATURES: DerivedFeature[] = [
 ];
 
 const LIFE_DOMAIN_FEATURES: DerivedFeature[] = [
+  // #1374: the lowest domain-spell tier is cleric level 1 in PHB'14 but level
+  // 3 in PHB'24 (#1128) — the two editions genuinely disagree on this text,
+  // so it forks into one row per edition sharing the "Domain Spells" name
+  // (plan §C). The 2024 row below is unchanged text/level; only the tag is new.
   {
     name: "Domain Spells",
     level: 1,
     source: "subclass",
+    edition: "EDITION_2024",
     description:
       "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+  },
+  {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2014",
+    // SRD 5.1, "Life Domain" (Life Domain Spells table) — openly licensed,
+    // independently verifiable. Identical to the row above but for the first
+    // tier's label (L3 -> L1), matching PHB'14's actual gate.
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
   },
   {
     name: "Bonus Proficiency",
@@ -91,12 +107,25 @@ const LIFE_DOMAIN_FEATURES: DerivedFeature[] = [
 ];
 
 const TRICKERY_DOMAIN_FEATURES: DerivedFeature[] = [
+  // #1374: same PHB'14-vs-PHB'24 lowest-tier fork as Life Domain above.
   {
     name: "Domain Spells",
     level: 1,
     source: "subclass",
+    edition: "EDITION_2024",
     description:
       "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+  },
+  {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2014",
+    // PHB'14, "Trickery Domain" — Trickery Domain Spells. Page number
+    // deliberately omitted — could not be verified from a licensed source
+    // (see PR description).
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
   },
   {
     name: "Blessing of the Trickster",
@@ -154,7 +183,7 @@ export const cleric: ClassDefinition = {
   },
   // PHB'14 p.57: Divine Domain (Cleric's subclass) is chosen at 1st level.
   subclasses: {
-    "life domain": { grantLevel: 1, features: LIFE_DOMAIN_FEATURES },
-    "trickery domain": { grantLevel: 1, features: TRICKERY_DOMAIN_FEATURES },
+    "life domain": { slug: "cleric-life-domain", grantLevel: 1, features: LIFE_DOMAIN_FEATURES },
+    "trickery domain": { slug: "cleric-trickery-domain", grantLevel: 1, features: TRICKERY_DOMAIN_FEATURES },
   },
 };

@@ -57,7 +57,7 @@ export default function DeleteCharacterModal({
             type="button"
             onClick={handleConfirm}
             disabled={pending}
-            className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+            className="rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
           >
             {pending ? "Deleting…" : "Delete"}
           </button>

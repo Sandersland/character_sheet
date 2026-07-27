@@ -77,6 +77,47 @@ For hosted (Railway) dev, `pg_dump "$DATABASE_URL" -Fc` works directly; automate
 
 **Prisma migrations are forward-only** — there is no rollback. A migration that drops or corrupts data is recovered by **restoring the pre-migration dump**, fixing the migration in code, and redeploying. Always take a fresh dump immediately before applying a migration to any environment with real data; develop migrations against a throwaway DB first.
 
+### A failed migration blocks every later one (P3009)
+
+`migrate deploy` refuses to apply **anything** once one migration has failed, so the schema stops advancing while later migrations' models and columns appear simply "missing" and the backend container exits 1 on every boot. Look here first — it reads like an unrelated feature being broken. One instance cost 13 hours (#1373). Recovery is always operational: a fix-up migration can never run (it sits behind the failed one) and editing the failed migration's SQL changes its checksum, after which `migrate dev` reports it "was modified after it was applied".
+
+```bash
+# 1. Which migration failed, and why (logs holds the Postgres error):
+docker compose exec -T db psql -U character_sheet -d character_sheet -c \
+  "SELECT migration_name, started_at, finished_at, rolled_back_at, logs
+     FROM _prisma_migrations WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL;"
+
+# 2. Take a full dump first (backup command above). Non-negotiable — step 4 deletes rows.
+
+# 3. Find the blocking rows. An enum narrowing aborts on rows still holding a
+#    dropped value; the dropped values are those absent from the migration's
+#    CREATE TYPE "<Enum>_new" AS ENUM (...) list. e.g.:
+docker compose exec -T db psql -U character_sheet -d character_sheet -c \
+  "SELECT type, count(*) FROM \"CharacterEvent\"
+    WHERE type::text IN ('learnDiscipline','castDiscipline') GROUP BY type;"
+
+# 4. Remap them to a surviving value, or delete them — an explicit decision,
+#    recorded. Deleting a CharacterEvent cascades its CharacterEventField rows
+#    and can strand a sibling event from the same batch; note what you removed.
+
+# 5. Clear the failed attempt, then re-run. Both are safe to repeat.
+docker compose exec -T backend npx prisma migrate resolve --rolled-back <migration_name>
+docker compose exec -T backend npx prisma migrate deploy
+```
+
+Done when the step-1 query returns no unfinished row, `migrate status` reports all migrations applied, `/api/health` is ok, and an audit log renders. On Railway `dev`, run the same steps with `railway connect Postgres` for psql and `DATABASE_URL="$DATABASE_PUBLIC_URL"` for the Prisma CLI — the service's own `DATABASE_URL` is `*.railway.internal` and is not reachable from a laptop.
+
+### Catalog content ships in the seed, not in migrations (#1277)
+
+Every boot command runs `prisma migrate deploy && prisma db seed` as one step (root `Dockerfile`, `backend/Dockerfile`, `backend/Dockerfile.prod`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
+
+1. **The failure mode is already structurally prevented** — there is no deployment path that runs `migrate deploy` without also running `db seed` (enforced above), so this is a defense-in-depth gate, not a live gap.
+2. **Data migrations can't express what the seed does.** Several seeders (`seedFeats`, `seedSpells`, `seedShadowArts`) prune stale rows, and spell seeding layers over `SPELL_COLUMN_DEFAULTS` so a removed optional field actually resets on re-seed (#1132's Barkskin fix) — an append-only migration history can only add UPDATEs, never re-derive a row.
+3. **A failed data migration is catastrophic; a failed seed is not.** A failed migration means P3009 — every migration behind it is blocked (see above; one instance cost 13 hours, #1373). A failed seed exits 1, leaves the schema advanced, and retries clean on the next boot.
+4. **Migrations are checksummed** — a content typo in a migration can never be corrected in place, unlike a seed row.
+
+Preventing the enum case is a CI gate — see `docs/development.md`, "Prisma workflow".
+
 ## When prod comes
 
 Auth + ownership are shipped, so prod reuses the combined image in a second Railway environment (public, or behind its own Access policy). Remaining: a prod Google OAuth client + redirect URI, and `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true` for the prod origin.

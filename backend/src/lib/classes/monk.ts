@@ -169,7 +169,7 @@ const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
   },
 ];
 
-// 2024 rewrite (SRD 5.2, #1246): Shadow Arts drops the 2014 flat-2-focus/4-spell
+// 2024 rewrite (PHB'24 p.91, #1246): Shadow Arts drops the 2014 flat-2-focus/4-spell
 // menu for a single 1-focus Darkness cast + passive Minor Illusion/Darkvision
 // grants; Cloak of Shadows moves 11 -> 17 (replacing Opportunist, retired —
 // no 2024 equivalent) and Improved Shadow Step fills the vacated L11 slot.
@@ -259,7 +259,7 @@ const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
   },
 ];
 
-// Warrior of the Elements (2024, PHB'24 p.90 / SRD 5.2) — the 2024 rebuild of
+// Warrior of the Elements (2024, PHB'24 p.90) — the 2024 rebuild of
 // the retired Way of the Four Elements. Four fixed features (no chosen
 // abilities): Manipulate Elements + Elemental Attunement at L3, Elemental
 // Burst at L6, Stride of the Elements at L11, and the Elemental Epitome capstone
@@ -342,6 +342,7 @@ export const monk: ClassDefinition = {
   },
   subclasses: {
     "warrior of the open hand": {
+      slug: "monk-warrior-of-the-open-hand",
       grantLevel: 3,
       features: WARRIOR_OF_THE_OPEN_HAND_FEATURES,
       // Wholeness of Body (SRD 5.2): uses = Wisdom modifier (min 1), not the
@@ -362,6 +363,7 @@ export const monk: ClassDefinition = {
       },
     },
     "warrior of shadow": {
+      slug: "monk-warrior-of-shadow",
       grantLevel: 3,
       features: WARRIOR_OF_SHADOW_FEATURES,
       // Shadow Arts (L3) / Cloak of Shadows (L17, moved from 11 in the 2024
@@ -370,6 +372,7 @@ export const monk: ClassDefinition = {
       // monk action instead of a second copy here (#1315).
     },
     "warrior of the elements": {
+      slug: "monk-warrior-of-the-elements",
       grantLevel: 3,
       features: WARRIOR_OF_THE_ELEMENTS_FEATURES,
       // Elemental Attunement (L3) / Elemental Burst (L6) gates live as
@@ -378,6 +381,7 @@ export const monk: ClassDefinition = {
       // via the Focus pool), so no separate DC field is derived here.
     },
     "warrior of mercy": {
+      slug: "monk-warrior-of-mercy",
       grantLevel: 3,
       features: WARRIOR_OF_MERCY_FEATURES,
       // Hand of Harm / Hand of Healing (L3) spend the base Focus pool directly

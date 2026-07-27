@@ -240,8 +240,8 @@ const THIEF_FEATURES: DerivedFeature[] = [
 export const rogue: ClassDefinition = {
   features: ROGUE_FEATURES,
   subclasses: {
-    "arcane trickster": { grantLevel: 3, features: ARCANE_TRICKSTER_FEATURES },
-    assassin: { grantLevel: 3, features: ASSASSIN_FEATURES },
-    thief: { grantLevel: 3, features: THIEF_FEATURES },
+    "arcane trickster": { slug: "rogue-arcane-trickster", grantLevel: 3, features: ARCANE_TRICKSTER_FEATURES },
+    assassin: { slug: "rogue-assassin", grantLevel: 3, features: ASSASSIN_FEATURES },
+    thief: { slug: "rogue-thief", grantLevel: 3, features: THIEF_FEATURES },
   },
 };

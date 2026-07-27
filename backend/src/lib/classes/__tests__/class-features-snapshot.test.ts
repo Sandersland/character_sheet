@@ -7,20 +7,7 @@ import { describe, expect, it } from "vitest";
 import { deriveResources, deriveResourcesForCharacterRow, resolveClassDie } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
-const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
-  barbarian: [undefined, "totem warrior", "berserker"],
-  bard: [undefined, "college of lore", "college of valor"],
-  cleric: [undefined, "life domain", "trickery domain"],
-  druid: [undefined, "circle of the land", "circle of the moon"],
-  fighter: [undefined, "battle master", "champion", "eldritch knight"],
-  monk: [undefined, "warrior of the open hand", "warrior of shadow", "warrior of the elements", "warrior of mercy"],
-  paladin: [undefined, "oath of devotion", "oath of the ancients", "oath of vengeance"],
-  ranger: [undefined, "hunter", "beast master"],
-  rogue: [undefined, "arcane trickster", "assassin", "thief"],
-  sorcerer: [undefined, "draconic bloodline", "wild magic"],
-  warlock: [undefined, "the fiend", "the archfey", "the great old one"],
-  wizard: [undefined, "school of evocation", "school of abjuration", "school of illusion"],
-};
+import { CLASS_SUBCLASSES } from "./class-subclasses.fixture.js";
 
 const ABILITY_SCORES = {
   strength: 14,

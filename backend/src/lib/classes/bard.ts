@@ -148,7 +148,7 @@ export const bard: ClassDefinition = {
     ];
   },
   subclasses: {
-    "college of lore": { grantLevel: 3, features: COLLEGE_OF_LORE_FEATURES },
-    "college of valor": { grantLevel: 3, features: COLLEGE_OF_VALOR_FEATURES },
+    "college of lore": { slug: "bard-college-of-lore", grantLevel: 3, features: COLLEGE_OF_LORE_FEATURES },
+    "college of valor": { slug: "bard-college-of-valor", grantLevel: 3, features: COLLEGE_OF_VALOR_FEATURES },
   },
 };

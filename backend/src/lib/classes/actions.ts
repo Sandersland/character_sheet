@@ -38,6 +38,7 @@ import type { ActiveBuff } from "@/lib/combat/active-effects.js";
 import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -52,6 +53,12 @@ export function rageMeleeDamageBonus(barbarianLevel: number): number {
   return barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2;
 }
 
+/** One class/level gate: this class grants the row from this class level up. */
+interface ActionClassGate {
+  className: string; // lowercase
+  minLevel: number;
+}
+
 /** Record in the DERIVED_ACTIONS table — mirrors the Prisma Action model but is pure TS. */
 interface DerivedActionRecord {
   key: string;
@@ -59,8 +66,30 @@ interface DerivedActionRecord {
   cost: ActionCost;
   universal?: boolean;
   grantClass?: string;   // lowercase class name
-  grantSubclass?: string; // substring-matched against the character's subclass
   grantLevel?: number;   // min level for this action
+  /**
+   * Class/level gates for a row TWO classes grant as ONE feature — matched when
+   * ANY gate matches. Channel Divinity is the case: cleric 2 and paladin 3 both
+   * grant it, and PHB'14 p.164 makes it one feature drawing on one pool, so it
+   * must be one row (deriveEntryScopedActions dedupes by key ⇒ one card).
+   * Mutually exclusive with grantClass/grantLevel; both normalize through
+   * classGatesOf so matchesActionGate keeps a single class-gate code path.
+   */
+  grantClasses?: ActionClassGate[];
+  /**
+   * Accepted subclass slugs (#1277) — resolved via resolveSubclassSlug (FK
+   * preferred, exact normalized name as fallback), never a substring. A list
+   * so one row can serve two slugs when the mechanics genuinely are shared.
+   * Was `grantSubclasses?: string[]` matched by exact display name (#1339,
+   * which fixed this ONE gate's substring bleed — a 2014 "Way of Shadow" monk
+   * inheriting 2024 "Warrior of Shadow" mechanics, #1322/#1331); #1277
+   * generalizes the same discipline to the other six substring sites
+   * (isWarriorOfTheOpenHand, isWarriorOfMercy, openHandMonkEntry,
+   * attacksForClass) via the shared slug vocabulary instead of a second
+   * exact-name table. matchesSubclassGate is still the one normalization
+   * matchesActionGate goes through per axis.
+   */
+  grantSubclassSlugs?: SubclassSlug[];
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
   // In-play rule text for no-server-effect reminder actions. A function form
@@ -71,6 +100,28 @@ interface DerivedActionRecord {
   // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
   // future Martial-Arts-conditioned action can reuse the same gate.
   requiresUnarmored?: boolean;
+}
+
+// The row's class/level gate as a list — the one normalization both the legacy
+// grantClass/grantLevel shape and the grantClasses shape resolve through, so
+// matchesActionGate/actionGrantLevel each keep a single class-gate code path.
+function classGatesOf(a: DerivedActionRecord): ActionClassGate[] {
+  return a.grantClasses ?? [{ className: a.grantClass ?? "", minLevel: a.grantLevel ?? 0 }];
+}
+
+function matchesClassGate(gate: ActionClassGate, cls: string, level: number): boolean {
+  if (gate.className && gate.className.toLowerCase() !== cls) return false;
+  return level >= gate.minLevel;
+}
+
+// Slug equality against the row's accepted slugs; an ungated row matches
+// every subclass (including `undefined` — a homebrew/off-catalog subclass).
+// `slug` arrives already resolved (FK-or-name, never substring) — the
+// resolution happens per class entry in deriveEntryScopedActions, which is the
+// only caller that has the entry's subclassRef in scope.
+function matchesSubclassGate(a: DerivedActionRecord, slug: SubclassSlug | undefined): boolean {
+  if (!a.grantSubclassSlugs) return true;
+  return slug !== undefined && a.grantSubclassSlugs.includes(slug);
 }
 
 /** Available action shape serialized onto the character. */
@@ -109,8 +160,25 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Bard
   { key: "bardicInspiration", name: "Bardic Inspiration", cost: "bonusAction", grantClass: "bard", grantLevel: 1, resourceKey: "bardicInspiration", resourceAmount: 1 },
 
-  // Cleric
-  { key: "channelDivinityCleric", name: "Channel Divinity", cost: "action", grantClass: "cleric", grantLevel: 2, resourceKey: "channelDivinity", resourceAmount: 1 },
+  // Cleric / Paladin — ONE Channel Divinity row for both classes, not one per
+  // class. PHB'14 p.164 (multiclassing): gaining the feature from a second
+  // class grants that class's effects but no additional uses — so cleric 2 and
+  // paladin 3 share one pool (SHARED_POOL_MERGE, registry.ts) and one
+  // affordance. deriveEntryScopedActions dedupes by key, so a Cleric/Paladin
+  // multiclass surfaces exactly one card (#1340).
+  {
+    key: "channelDivinity",
+    name: "Channel Divinity",
+    cost: "action",
+    grantClasses: [
+      { className: "cleric", minLevel: 2 },
+      { className: "paladin", minLevel: 3 },
+    ],
+    resourceKey: "channelDivinity",
+    resourceAmount: 1,
+    reminder:
+      "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.",
+  },
 
   // Druid
   { key: "wildShape", name: "Wild Shape", cost: "action", grantClass: "druid", grantLevel: 2, resourceKey: "wildShape", resourceAmount: 1 },
@@ -201,7 +269,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Step",
     cost: "bonusAction",
     grantClass: "monk",
-    grantSubclass: "Shadow",
+    grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 6,
     reminder: (level) =>
       level >= 11
@@ -223,7 +291,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Arts (Darkness)",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Shadow",
+    grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -234,7 +302,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Cloak of Shadows",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Shadow",
+    grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 17,
     resourceKey: "focus",
     resourceAmount: 3,
@@ -252,7 +320,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Elemental Attunement",
     cost: "free",
     grantClass: "monk",
-    grantSubclass: "Elements",
+    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -263,7 +331,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Elemental Burst",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Elements",
+    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
     grantLevel: 6,
     resourceKey: "focus",
     resourceAmount: 2,
@@ -276,7 +344,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // like Stunning Strike bypasses this catalog — neither is a selectable action.
   // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
   // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
-  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclass: "Open Hand", grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
+  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclassSlugs: ["monk-warrior-of-the-open-hand"], grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
   // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
   // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
   // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
@@ -288,7 +356,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Fleet Step",
     cost: "free",
     grantClass: "monk",
-    grantSubclass: "Open Hand",
+    grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
     grantLevel: 11,
     reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
   },
@@ -303,7 +371,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Hand of Healing",
     cost: "action",
     grantClass: "monk",
-    grantSubclass: "Mercy",
+    grantSubclassSlugs: ["monk-warrior-of-mercy"],
     grantLevel: 3,
     resourceKey: "focus",
     resourceAmount: 1,
@@ -320,7 +388,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Hand of Healing (Flurry replacement)",
     cost: "bonusAction",
     grantClass: "monk",
-    grantSubclass: "Mercy",
+    grantSubclassSlugs: ["monk-warrior-of-mercy"],
     grantLevel: 3,
     reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
   },
@@ -328,7 +396,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Paladin
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
   { key: "layOnHands", name: "Lay on Hands", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "layOnHands", resourceAmount: 5 },
-  { key: "channelDivinityPaladin", name: "Channel Divinity", cost: "action", grantClass: "paladin", grantLevel: 3, resourceKey: "channelDivinity", resourceAmount: 1 },
+  // Channel Divinity is a single cross-class row — see channelDivinity above (PHB'14 p.164).
 
   // Rogue
   { key: "cunningAction", name: "Cunning Action", cost: "bonusAction", grantClass: "rogue", grantLevel: 2 },
@@ -342,18 +410,21 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
 // (below, which both `availableActions[]` and shadow-arts.ts's cast guards
 // resolve through) key off, so a level gate can never drift into two
 // independent copies (#1315 — CLAUDE.md's level-gated-registry rule).
-function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, level: number): boolean {
+function matchesActionGate(
+  a: DerivedActionRecord,
+  cls: string,
+  slug: SubclassSlug | undefined,
+  level: number,
+): boolean {
   // Only include class-specific actions here (universal handled client-side).
   if (a.universal) return false;
 
-  // Class gate.
-  if (a.grantClass && a.grantClass.toLowerCase() !== cls) return false;
+  // Class + level gate (single-class grantClass/grantLevel or a multi-class
+  // grantClasses list — matched when ANY gate matches; see classGatesOf).
+  if (!classGatesOf(a).some((g) => matchesClassGate(g, cls, level))) return false;
 
-  // Subclass gate (substring match, case-insensitive).
-  if (a.grantSubclass && !sub.includes(a.grantSubclass.toLowerCase())) return false;
-
-  // Level gate.
-  if (a.grantLevel && level < a.grantLevel) return false;
+  // Subclass gate (slug equality, ANY accepted slug; see grantSubclassSlugs).
+  if (!matchesSubclassGate(a, slug)) return false;
 
   return true;
 }
@@ -370,7 +441,7 @@ function matchesActionGate(a: DerivedActionRecord, cls: string, sub: string, lev
  */
 export function deriveActions(
   className: string,
-  subclass: string | undefined,
+  subclassSlug: SubclassSlug | undefined,
   level: number,
   pools: ResourcePool[],
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218).
@@ -378,12 +449,11 @@ export function deriveActions(
   unarmoredUnshielded = true,
 ): AvailableAction[] {
   const cls = (className ?? "").toLowerCase();
-  const sub = (subclass ?? "").toLowerCase();
 
   const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
 
   return DERIVED_ACTIONS
-    .filter((a) => matchesActionGate(a, cls, sub, level))
+    .filter((a) => matchesActionGate(a, cls, subclassSlug, level))
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
@@ -410,7 +480,7 @@ export function deriveActions(
  * can never independently drift on the gate.
  */
 export function deriveEntryScopedActions(
-  classEntries: { name: string; subclass?: string | null; level: number }[],
+  classEntries: (SubclassIdentityInput & { name: string; level: number })[],
   totalLevel: number,
   pools: ResourcePool[],
   unarmoredUnshielded = true,
@@ -419,7 +489,8 @@ export function deriveEntryScopedActions(
   const actions: AvailableAction[] = [];
   for (const entry of classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
-    for (const action of deriveActions(entry.name, entry.subclass ?? undefined, effLevel, pools, unarmoredUnshielded)) {
+    const slug = resolveSubclassSlug(entry.name, entry);
+    for (const action of deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded)) {
       if (seenKeys.has(action.key)) continue;
       seenKeys.add(action.key);
       actions.push(action);
@@ -436,7 +507,12 @@ export function deriveEntryScopedActions(
  * kind of drift deriveEntryScopedActions itself exists to prevent (#1315).
  */
 export function actionGrantLevel(key: string): number | undefined {
-  return DERIVED_ACTIONS.find((a) => a.key === key)?.grantLevel;
+  const row = DERIVED_ACTIONS.find((a) => a.key === key);
+  if (!row) return undefined;
+  // Min across gates so a row two classes grant (channelDivinity) reports the
+  // earliest level any of them grants it, rather than undefined.
+  const levels = classGatesOf(row).map((g) => g.minLevel).filter((l) => l > 0);
+  return levels.length > 0 ? Math.min(...levels) : undefined;
 }
 
 // One action row's enabled/disabledReason — pulled out of the `.map()` above to
@@ -561,8 +637,8 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // Bard
   bardicInspiration: () => [{ type: "spendResource", key: "bardicInspiration" }],
 
-  // Cleric
-  channelDivinityCleric: () => [{ type: "spendResource", key: "channelDivinity" }],
+  // Cleric / Paladin — one merged row (see the DERIVED_ACTIONS comment above).
+  channelDivinity: () => [{ type: "spendResource", key: "channelDivinity" }],
 
   // Druid
   wildShape: () => [{ type: "spendResource", key: "wildShape" }],
@@ -649,7 +725,6 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
     }
     return ops;
   },
-  channelDivinityPaladin: () => [{ type: "spendResource", key: "channelDivinity" }],
 
   // Rogue
   cunningAction: () => [], // bonus action consumed ephemerally; no server effect

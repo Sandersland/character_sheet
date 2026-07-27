@@ -16,11 +16,12 @@ function condition(key: string): ConditionsMutableState {
 }
 
 describe("buildRollModifiers (#486)", () => {
-  it("emits Poisoned's disadvantage on attacks + ability checks, sourced to the label", () => {
+  it("emits Poisoned's disadvantage on attacks + ability checks + initiative (a Dex check), sourced to the label", () => {
     const mods = buildRollModifiers(condition("poisoned"), noEffects, "EDITION_2024");
     expect(mods).toEqual([
       { mode: "disadvantage", kind: "attack", source: "Poisoned" },
       { mode: "disadvantage", kind: "check", source: "Poisoned" },
+      { mode: "disadvantage", kind: "initiative", source: "Poisoned" },
     ]);
   });
 
@@ -62,8 +63,8 @@ describe("buildRollModifiers (#486)", () => {
       ],
     };
     const mods = buildRollModifiers(condition("poisoned"), effects, "EDITION_2024");
-    expect(mods).toHaveLength(3);
-    expect(mods.map((m) => m.source)).toEqual(["Poisoned", "Poisoned", "Rage"]);
+    expect(mods).toHaveLength(4);
+    expect(mods.map((m) => m.source)).toEqual(["Poisoned", "Poisoned", "Poisoned", "Rage"]);
   });
 
   it("returns [] when no active state grants a roll effect", () => {
@@ -90,10 +91,11 @@ describe("buildRollModifiers (#486)", () => {
     ]);
   });
 
-  it("emits Frightened's disadvantage on attacks + ability checks", () => {
+  it("emits Frightened's disadvantage on attacks + ability checks + initiative (a Dex check)", () => {
     expect(buildRollModifiers(condition("frightened"), noEffects, "EDITION_2024")).toEqual([
       { mode: "disadvantage", kind: "attack", source: "Frightened" },
       { mode: "disadvantage", kind: "check", source: "Frightened" },
+      { mode: "disadvantage", kind: "initiative", source: "Frightened" },
     ]);
   });
 
@@ -231,6 +233,7 @@ describe("buildRollModifiers exhaustion — 2024 flat penalty (#1136)", () => {
     expect(mods.map((m) => m.source)).toEqual([
       "Poisoned",
       "Poisoned",
+      "Poisoned",
       "Exhaustion",
       "Exhaustion",
       "Exhaustion",
@@ -283,6 +286,7 @@ describe("buildRollModifiers exhaustion — 2014 tiered disadvantage (#1307, PHB
     };
     const mods = buildRollModifiers(state, noEffects, "EDITION_2014");
     expect(mods.map((m) => m.source)).toEqual([
+      "Poisoned",
       "Poisoned",
       "Poisoned",
       "Exhaustion",

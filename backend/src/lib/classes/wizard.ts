@@ -161,9 +161,14 @@ export const wizard: ClassDefinition = {
   ],
   // PHB'14 p.114: Arcane Tradition (Wizard's subclass) is chosen at 2nd level.
   subclasses: {
-    "school of evocation": { grantLevel: 2, features: SCHOOL_OF_EVOCATION_FEATURES },
-    "school of abjuration": { grantLevel: 2, features: SCHOOL_OF_ABJURATION_FEATURES },
+    "school of evocation": { slug: "wizard-school-of-evocation", grantLevel: 2, features: SCHOOL_OF_EVOCATION_FEATURES },
+    "school of abjuration": {
+      slug: "wizard-school-of-abjuration",
+      grantLevel: 2,
+      features: SCHOOL_OF_ABJURATION_FEATURES,
+    },
     "school of illusion": {
+      slug: "wizard-school-of-illusion",
       grantLevel: 2,
       features: SCHOOL_OF_ILLUSION_FEATURES,
       resourceFn: (level) => {

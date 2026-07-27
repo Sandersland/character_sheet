@@ -26,7 +26,7 @@ interface CodexRailProps {
 
 const filterBase =
   "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600 lg:w-full lg:rounded-control lg:px-2.5 lg:py-1.5";
-const filterOn = "bg-garnet-700 text-parchment-50";
+const filterOn = "bg-garnet-surface text-garnet-on-surface";
 const filterOff =
   "bg-parchment-200/60 text-parchment-700 hover:bg-parchment-200 hover:text-parchment-900 lg:bg-transparent lg:hover:bg-parchment-100";
 
@@ -127,7 +127,7 @@ export default function CodexRail({
           type="button"
           aria-expanded={creating}
           onClick={onToggleCreate}
-          className="inline-flex items-center justify-center gap-1.5 rounded-control bg-garnet-700 px-3 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
+          className="inline-flex items-center justify-center gap-1.5 rounded-control bg-garnet-surface px-3 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover"
         >
           <Plus aria-hidden="true" className="h-4 w-4" />
           New entry

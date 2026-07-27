@@ -27,6 +27,7 @@ const CATALOG: CatalogFeat[] = [
 // hitPoints/hitDice present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
+  rulesEdition: "EDITION_2024",
   classes: [{ id: "entry-1", name: "fighter", level: 7, subclass: "Champion" }],
   abilityScores: { strength: 15, dexterity: 14, constitution: 16, intelligence: 10, wisdom: 12, charisma: 8 },
   skills: [{ name: "athletics", ability: "strength", proficient: true }],

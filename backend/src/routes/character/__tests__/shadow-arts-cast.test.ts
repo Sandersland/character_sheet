@@ -106,7 +106,9 @@ describe("Shadow Arts cast endpoint", () => {
     const shadow = await upsertEditionRow(
       prisma.subclass,
       { classId, name: "Warrior of Shadow", edition: null },
-      { classId, name: "Warrior of Shadow", description: "Test subclass" },
+      // Distinct from the real seeded "monk-warrior-of-shadow" (#1277) —
+      // this test's Monk class is its own throwaway row.
+      { classId, name: "Warrior of Shadow", description: "Test subclass", slug: "monk-warrior-of-shadow-cast-test" },
       {},
     );
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
@@ -298,6 +300,22 @@ describe("Shadow Arts cast endpoint", () => {
     expect((l17.body.availableActions as { key: string }[]).some((a) => a.key === "cloakOfShadows")).toBe(true);
     const l17Cast = await cast([{ type: "activateCloakOfShadows" }]);
     expect(l17Cast.status).toBe(200);
+  });
+
+  // #1339: the subclass gate is an EXACT name match, so the 2014 "Way of Shadow"
+  // monk (PHB'14 p.80) cannot reach the 2024 Warrior of Shadow features
+  // (PHB'24 p.91). Asserted at BOTH layers — the wire availableActions[] and the
+  // cast guard — because no test asserted either, which is how the substring
+  // gate shipped past #1315.
+  it('a 2014 "Way of Shadow" monk at L17 surfaces neither action and is rejected by both guards', async () => {
+    await createMonk(XP_L17, "Way of Shadow");
+    const sheet = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    const sheetKeys = (sheet.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(sheetKeys).not.toContain("shadowArts");
+    expect(sheetKeys).not.toContain("cloakOfShadows");
+    expect(sheetKeys).not.toContain("shadowStep");
+    expect((await cast([{ type: "castShadowArt", shadowArtId: darknessId }])).status).toBe(400);
+    expect((await cast([{ type: "activateCloakOfShadows" }])).status).toBe(400);
   });
 
   describe("activateCloakOfShadows (L17)", () => {
@@ -566,5 +584,50 @@ describe("Shadow Arts source guard", () => {
       .send({ operations: [{ type: "castShadowArt", shadowArtId: nonShadowId }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not found in catalog/);
+  });
+
+  // #1345 (Chunk 5, plan audit — not named in the issue as filed): a
+  // transient cast, not a permanent snapshot, but still a wrong-edition rule
+  // applied to one cast and recorded in the audit event. Own fixture id (not
+  // FIXTURE_ID_2) — the sibling test above creates FIXTURE_ID_2 with no
+  // per-test cleanup (only this describe's afterAll clears it).
+  const FIXTURE_ID_3 = "test-shadow-source-monk-1345";
+
+  it("(#1345) rejects a 2014-tagged Shadow Art against the (default-2024) fixture", async () => {
+    const row = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: "XEd Shadow Art 2014", edition: "EDITION_2014" },
+      {
+        name: "XEd Shadow Art 2014",
+        source: "shadowArts",
+        edition: "EDITION_2014",
+        description: "Cross-edition guard test fixture.",
+        costKind: "pool",
+        costPoolKey: "focus",
+        costBase: 1,
+      },
+      { source: "shadowArts" },
+    );
+    try {
+      await prisma.character.create({
+        data: {
+          ...FIXTURE_BASE,
+          id: FIXTURE_ID_3,
+          experiencePoints: XP_L3,
+          ownerId: OWNER_ID,
+          resources: Prisma.JsonNull,
+          classEntries: { create: [{ name: "monk", subclass: "warrior of shadow", classId: sourceClassId, position: 0 }] },
+        },
+      });
+      const res = await agent()
+        .post(`/api/characters/${FIXTURE_ID_3}/abilities/shadow-arts/transactions`)
+        .send({ operations: [{ type: "castShadowArt", shadowArtId: row.id }] });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/2014 rules/);
+      expect(res.body.error).toMatch(/2024 rules/);
+    } finally {
+      await prisma.character.deleteMany({ where: { id: FIXTURE_ID_3 } });
+      await prisma.grantedAbility.delete({ where: { id: row.id } });
+    }
   });
 });

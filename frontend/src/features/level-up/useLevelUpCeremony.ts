@@ -19,7 +19,7 @@ import {
   selectableClassChoiceCount,
   type ClassChoiceOption,
 } from "@/lib/levelUpClassChoice";
-import { draftSatisfies, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
+import { draftSatisfies, levelUpSubmissionOf, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
 import type {
   Character,
   LevelUpPlanResponse,
@@ -76,7 +76,7 @@ function useClassChoice(
   character: Character,
   deepLinkTarget: LevelUpTarget | null,
 ): ClassChoiceResult & { resetChoice: () => void } {
-  const { reference, error: referenceError } = useReferenceData();
+  const { reference, error: referenceError } = useReferenceData(character.rulesEdition);
   const classChoiceOptions = useMemo(
     () => buildClassChoiceOptions(character, reference?.classes),
     [character, reference],
@@ -197,7 +197,7 @@ function useLevelUpSubmit(
     try {
       // #1131: one ceremony advances an existing class OR adds a first level in a
       // new one — the chooser (#1170) resolves target to either shape.
-      await mutation.mutateAsync({ ...draft, target, hp: draft.hp });
+      await mutation.mutateAsync(levelUpSubmissionOf(draft, target, draft.hp));
     } catch {
       // mutation.error already carries the message.
     }

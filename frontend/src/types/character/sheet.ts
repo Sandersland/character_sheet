@@ -123,6 +123,12 @@ export interface Character {
    */
   conditions: ConditionsState;
   /**
+   * Display text for the CURRENT exhaustion level, resolved server-side for
+   * this character's edition (#1322) — never author this text client-side; a
+   * frontend-authored sentence is what let a 2014 character show 2024 text.
+   */
+  exhaustionEffectText: string;
+  /**
    * Active cast-granted passive modifiers (buffs). Always present (normalized on
    * read). Each is also summed into its target skill/stat's tempModifier.
    */

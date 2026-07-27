@@ -102,7 +102,9 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
 
   bardicInspiration: { key: "bardicInspiration", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "bardicInspiration" },
 
-  channelDivinityCleric: { key: "channelDivinityCleric", kind: "simple-confirm", slot: "action", serverEffect: true, resourceKey: "channelDivinity" },
+  // One row for both granting classes — the backend merged the two CD rows
+  // into one, PHB'14 p.164 (#1340).
+  channelDivinity: { key: "channelDivinity", kind: "simple-confirm", slot: "action", serverEffect: true, resourceKey: "channelDivinity" },
 
   wildShape:         { key: "wildShape",         kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "wildShape" },
 
@@ -186,7 +188,6 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
 
   divineSense:       { key: "divineSense",       kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "divineSense" },
   layOnHands:        { key: "layOnHands",        kind: "heal-input",     slot: "action",      serverEffect: true,  resourceKey: "layOnHands" },
-  channelDivinityPaladin: { key: "channelDivinityPaladin", kind: "simple-confirm", slot: "action", serverEffect: true, resourceKey: "channelDivinity" },
 
   cunningAction:     { key: "cunningAction",     kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
 

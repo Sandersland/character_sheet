@@ -1,6 +1,24 @@
 // Behavior lock for the #1003 serializer split: full-object snapshots of
 // serializeCharacter over two deterministic fixtures. Must stay green UNEDITED
 // while the builders move into lib/character/serialize/*.
+//
+// #1341 audit: every class-entry `name` here must match the rule registries
+// that gate mechanical derivation off it. DERIVED_ACTIONS (matchesActionGate),
+// CLASSES (deriveResources), and the ASI/fighting-style/caster-fraction/
+// extra-attack tables all lowercase before lookup, so both fixtures' lowercase
+// entry names ("fighter"/"wizard") match them correctly. CLASS_PROFICIENCY_GRANTS
+// is the one exception: it's keyed on the capitalized catalog display name
+// ("Fighter"/"Wizard") and looked up case-sensitively, so both fixtures miss it
+// — a real production defect (#1388), not fixed here because correcting it
+// would change both fixtures' derived proficiency and weapon-attack values.
+//
+// #1322 audit: both fixtures are EDITION_2024 (the default), so
+// `exhaustionEffectText`'s +1-line-per-fixture delta never exercises the 2014
+// fork — that coverage lives in exhaustion-edition.test.ts, which asserts both
+// editions end to end. Don't add a 2014 fixture here to compensate: per #1341,
+// the conditions/rollModifiers/speed fields these fixtures already lock would
+// become byte-identical copies with a forked exhaustion string bolted on,
+// diluting this file's signal for no new information.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -82,7 +100,11 @@ async function createMulticlassCaster() {
       },
       resources: {
         used: {},
-        fightingStyle: "defense", // wizard primary: clamps to null on read
+        // Stored but never serialized: the wire expresses the choice through
+        // fightingStyleSlots + advancements (#1137), so this legacy scalar is
+        // ignored rather than clamped — no fightingStyle key appears in the
+        // snapshot at all. Kept to prove a stale stored value stays invisible.
+        fightingStyle: "defense",
         advancements: [
           { id: "adv-tough", level: 4, kind: "feat", abilityDeltas: {}, hpDelta: 0, initDelta: 0, featName: "Tough", featDescription: "Sturdy.", improvements: [{ target: "maxHp", amount: 2, perLevel: true }] },
           { id: "adv-over", level: 8, kind: "asi", abilityDeltas: { dexterity: 2 }, hpDelta: 6, initDelta: 1 }, // over-cap, reversed on read
@@ -91,7 +113,12 @@ async function createMulticlassCaster() {
       classEntries: {
         create: [
           { id: "ce-snap-wiz", name: "wizard", position: 0, level: 5 },
-          { id: "ce-snap-ftr", name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 1, level: 1 },
+          // name must match a DERIVED_ACTIONS grantClass ("fighter") or
+          // availableActions[] is structurally empty and this snapshot can't
+          // regress — #1315's entry-scoping fix shipped with zero snapshot
+          // coverage because of that (#1341). The CATALOG row keeps its
+          // distinctive name: it's @unique and deleteMany'd by it for isolation.
+          { id: "ce-snap-ftr", name: "fighter", classId: fighterClassId, position: 1, level: 1 },
         ],
       },
       inventoryItems: {
@@ -211,7 +238,15 @@ async function createSimpleFighter() {
 describe("serializeCharacter snapshot lock (#1003)", () => {
   it("multiclass caster with inventory, conditions, buffs and over-cap advancements", async () => {
     await createMulticlassCaster();
-    expect(await serialize("snap-char-multi")).toMatchSnapshot();
+    const serialized = await serialize("snap-char-multi");
+    // #1341: pinned outside the snapshot too, so a primary-entry-only regression
+    // (#1315's widest behavioural change) fails with a readable diff instead of
+    // one line inside a 500-line blob. Fighter is the SECONDARY entry at its own
+    // level 1 — Second Wind is the only row fighter 1 grants.
+    expect(serialized.availableActions).toEqual([
+      { key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true },
+    ]);
+    expect(serialized).toMatchSnapshot();
   });
 
   it("single-class non-caster control with resource clamps", async () => {

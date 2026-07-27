@@ -17,7 +17,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "useObject",
   "rage", "endRage", "recklessAttack",
   "bardicInspiration",
-  "channelDivinityCleric",
+  "channelDivinity",
   "wildShape",
   "secondWind", "actionSurge",
   "bonusUnarmedStrike",
@@ -25,7 +25,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "deflectAttacksRedirect",
   "wholenessOfBody",
   "handOfHealing", "handOfHealingFlurry",
-  "divineSense", "layOnHands", "channelDivinityPaladin",
+  "divineSense", "layOnHands",
   "cunningAction",
   "metamagic",
 ]);

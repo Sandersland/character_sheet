@@ -28,7 +28,7 @@ import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
-import { resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
+import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -170,6 +170,14 @@ async function resolveSubclass(
     if (!subclass) {
       return { ok: false, status: 400, error: `Unknown subclass id: ${primaryClassChoice.subclassId}` };
     }
+    // Before the class-membership check, same ordering as class.ts's
+    // applySetSubclass — a wrong-edition row is "not in this character's
+    // catalog at all" (#1345). `editionOf` is structurally impossible here:
+    // the Character row doesn't exist yet, so this function's `edition` param
+    // is resolveSelections' `input.rulesEdition ?? DEFAULT_RULES_EDITION`
+    // (see that call site's comment) rather than a column read.
+    const mismatch = crossEditionRejection(subclass, `Subclass "${subclass.name}"`, edition);
+    if (mismatch) return { ok: false, status: 400, error: mismatch };
     if (subclass.classId !== characterClass.id) {
       return {
         ok: false,

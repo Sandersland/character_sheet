@@ -1,10 +1,12 @@
+import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
+
 // Attacks made when taking the Attack action, by class + level (PHB Extra
 // Attack). Multiclass takes the MAX across classes — Extra Attack never stacks.
 export function deriveAttacksPerAction(
-  classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null }>,
+  classEntries: ReadonlyArray<SubclassIdentityInput & { name: string; level: number }>,
 ): number {
   return classEntries.reduce(
-    (best, e) => Math.max(best, attacksForClass(e.name, e.level, e.subclass)),
+    (best, e) => Math.max(best, attacksForClass(e.name, e.level, e)),
     1,
   );
 }
@@ -20,11 +22,13 @@ const EXTRA_ATTACK_TIERS: Record<string, ReadonlyArray<readonly [number, number]
   ranger: [[5, 2]],
 };
 
-function attacksForClass(name: string, level: number, subclass?: string | null): number {
+function attacksForClass(name: string, level: number, entry: SubclassIdentityInput): number {
   const cls = name.toLowerCase();
-  // College of Valor bard gains Extra Attack at bard level 6.
+  // College of Valor bard gains Extra Attack at bard level 6. Resolved via
+  // slug (#1277), not a substring — was matched on the word "valor", which
+  // let a homebrew "College of Valorous Deeds" inherit Extra Attack it never earned.
   if (cls === "bard") {
-    return level >= 6 && (subclass ?? "").toLowerCase().includes("valor") ? 2 : 1;
+    return level >= 6 && resolveSubclassSlug(cls, entry) === "bard-college-of-valor" ? 2 : 1;
   }
   for (const [minLevel, attacks] of EXTRA_ATTACK_TIERS[cls] ?? []) {
     if (level >= minLevel) return attacks;

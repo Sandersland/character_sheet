@@ -710,13 +710,21 @@ describe("subclass-granted spells", () => {
     const shadow = await upsertEditionRow(
       prisma.subclass,
       { classId: monkClassId, name: "Warrior of Shadow", edition: null },
-      { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
+      // Distinct from the real seeded slugs (#1277) — this test's Monk class
+      // is its own throwaway row, and (slug, edition) is unique catalog-wide
+      // regardless of classId.
+      { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass", slug: "monk-warrior-of-shadow-spellcasting-test" },
       {},
     );
     await upsertEditionRow(
       prisma.subclass,
       { classId: monkClassId, name: "Warrior of the Open Hand", edition: null },
-      { classId: monkClassId, name: "Warrior of the Open Hand", description: "Test subclass" },
+      {
+        classId: monkClassId,
+        name: "Warrior of the Open Hand",
+        description: "Test subclass",
+        slug: "monk-warrior-of-the-open-hand-spellcasting-test",
+      },
       {},
     );
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });

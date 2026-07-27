@@ -21,7 +21,7 @@ Ownership: `Character.ownerId` is a required FK. Every character-scoped route re
 
 Three distinct approaches, all in play — pick deliberately:
 
-- **Selection tables** (race/class/background): nullable FK to the catalog **and** an own `name` snapshot. The snapshot is the source of truth (homebrew/renames); the FK is provenance.
+- **Selection tables** (race/class/background/subclass): nullable FK to the catalog **and** an own `name` snapshot. The snapshot is the source of truth for **display** (homebrew/renames); the FK is provenance. Subclass is the exception for **mechanics identity**: the catalog row also carries a stable `slug` (#1277), and a character's mechanics resolve through `resolveSubclassSlug` (FK preferred, exact name as fallback) — never a substring of the display name, which is how a 2014 "Way of Shadow" monk once inherited 2024 "Warrior of Shadow" mechanics (#1339).
 - **Full snapshots** (inventory items, learned spells): at acquire/learn time all catalog fields are copied into the per-character row. After that the catalog is ignored — the snapshot is self-contained and freely editable ("Club" → "Club +1"). No merge-with-catalog logic anywhere.
 - **FK-keyed live reference** (subclass-granted spells): the *mapping* is seeded rows referencing the catalog by FK; content is resolved live at serialize time, never snapshotted. Reach for this when per-character state is "which catalog rows apply" rather than "an owned, editable copy" — it stays in sync automatically and adding content is seed rows, not code. Trade-off: no per-character drift, a live join on read. This is the substrate for data-authored/homebrew content.
 
@@ -36,6 +36,8 @@ Item mechanics live in category detail tables (`Item*Detail` + their `Inventory*
 `Character.rulesEdition` is authoritative for a sheet; `Campaign.rulesEdition` is only the default a new character is created with (a character may link to several campaigns, and a solo session #1080 has none). It is **write-once** — set by the create transaction, excluded from `PATCH /characters/:id` and from every transaction op — so no reconciler ever has to handle an edition change (#1281, 2026-07-25).
 
 Rules code obtains it exactly one way: `editionOf` (`lib/rules/edition.ts`). The parameter is required, so a `select` that omits `rulesEdition` is a compile error rather than a silent 2024 default. A rule that varies by edition takes `edition` as its last parameter and stays one function per rule; a rule that is edition-invariant — the majority (XP/PB, every spell-slot table, death saves, ASI levels, multiclass prerequisites, Unarmored Defense) — takes no `edition`. `subclassGateLevel` is the pattern-setter, and shows the required discipline: its reconcile-on-write (`reconcileSubclass`), clamp-on-read (`buildClassesView`), write-side-validation (`applySetSubclass`, post-creation subclass set), level-up-plan resolution (`subclassLevelFor`), creation-time validation (`resolveSubclass`/`resolveSubclassName`), and feature/pool derivation (`isSubclassActive`, #1291) callers all resolve through it, so none of the six can disagree (#1308, #1291).
+
+Edition-tagged **content** is the second edition-varying mechanism alongside `subclassGateLevel`: a `DerivedFeature` whose text genuinely diverges between editions forks into one row per edition sharing a name, resolved by `featureAppliesToEdition` (`lib/classes/registry.ts`) at read time and stripped before the wire (#1374).
 
 ### JSON columns on Character
 
@@ -72,6 +74,8 @@ Two rules the package can't enforce for you:
 
 - **A runtime value that used to define its type is now a separate declaration.** Where an `as const` tuple fed both a zod schema and `type X = (typeof TUPLE)[number]`, the tuple stays backend-side and the union moves — so add a `expectTypeOf<(typeof TUPLE)[number]>().toEqualTypeOf<X>()` latch, or the schema and the wire type will drift silently. Same for any Prisma enum a shared type spells out as a literal union (the package has no Prisma dependency).
 - **Not every look-alike pair is one type.** If a serializer remaps fields on the way out, the internal and wire shapes are genuinely different types that a token-based clone detector cannot tell apart — leave the internal one private.
+
+`@character-sheet/contracts` (`packages/contracts/`, #1370, epic #1369) is `shared-types`' sibling for the one case that package can't cover: a route's zod **validator**, not just its type. It builds to `dist/` and the backend value-imports the schema (it calls `.parse()`); the frontend still only ever `import type`s the schema's `z.infer`, so zod itself never reaches the client bundle. Pick shared-types for a pure wire type; pick contracts when the frontend needs the type a backend route actually validates against.
 
 ## Docker Compose
 

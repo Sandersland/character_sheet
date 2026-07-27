@@ -8,7 +8,7 @@ import { railState, type CeremonyStepState, type RailStep } from "@/lib/ceremony
 
 const DOT_STYLE: Record<CeremonyStepState, string> = {
   done: "border-vitality-600 bg-vitality-600 text-parchment-50",
-  active: "border-garnet-700 bg-garnet-700 text-parchment-50",
+  active: "border-garnet-surface bg-garnet-surface text-garnet-on-surface",
   pending: "border-parchment-300 bg-parchment-50 text-parchment-400",
 };
 

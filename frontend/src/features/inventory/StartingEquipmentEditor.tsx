@@ -284,7 +284,7 @@ export default function StartingEquipmentEditor({
             <button
               type="button"
               onClick={() => setGold(rollGold(startingEquipment.gold))}
-              className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
+              className="rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover"
             >
               Roll {goldLabel(startingEquipment.gold)}
             </button>

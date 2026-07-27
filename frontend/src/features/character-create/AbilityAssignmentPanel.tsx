@@ -108,7 +108,7 @@ function PoolChips({
               isUsed
                 ? "border-parchment-300 bg-parchment-100 text-parchment-400 line-through"
                 : isHeld
-                  ? "border-garnet-700 bg-garnet-700 text-parchment-50"
+                  ? "border-garnet-surface bg-garnet-surface text-garnet-on-surface"
                   : "border-arcane-400 bg-arcane-50 text-arcane-800 hover:border-garnet-600"
             }`}
           >
@@ -249,7 +249,7 @@ function RowBonusCells({ row, label, mode, isBonusAbility, bonusAbilities, bonus
               aria-label={`+2 to ${label}`}
               checked={bonusAssignment[row.ability] === 2}
               onChange={() => update({ backgroundAbilities: setPlusTwo(bonusAssignment, bonusAbilities, row.ability) })}
-              className="h-4 w-4 accent-garnet-700"
+              className="h-4 w-4 accent-garnet-surface"
             />
           )}
         </span>
@@ -261,7 +261,7 @@ function RowBonusCells({ row, label, mode, isBonusAbility, bonusAbilities, bonus
               aria-label={`+1 to ${label}`}
               checked={bonusAssignment[row.ability] === 1}
               onChange={() => update({ backgroundAbilities: setPlusOne(bonusAssignment, bonusAbilities, row.ability) })}
-              className="h-4 w-4 accent-garnet-700"
+              className="h-4 w-4 accent-garnet-surface"
             />
           )}
         </span>
@@ -274,7 +274,7 @@ function RowBonusCells({ row, label, mode, isBonusAbility, bonusAbilities, bonus
         <span
           data-testid="spread-dot"
           aria-label={`+1 to ${label}`}
-          className="inline-block h-3 w-3 rounded-full bg-garnet-700"
+          className="inline-block h-3 w-3 rounded-full bg-garnet-surface"
         />
       )}
     </span>
@@ -384,7 +384,7 @@ function SpreadControls({
             type="button"
             aria-pressed={mode === "twoOne"}
             onClick={() => { if (mode !== "twoOne") update({ backgroundAbilities: toTwoOne() }); }}
-            className={`${CHIP_BASE} ${mode === "twoOne" ? "border-garnet-700 bg-garnet-700 text-parchment-50" : "border-parchment-300 text-parchment-700"}`}
+            className={`${CHIP_BASE} ${mode === "twoOne" ? "border-garnet-surface bg-garnet-surface text-garnet-on-surface" : "border-parchment-300 text-parchment-700"}`}
           >
             +2 / +1
           </button>
@@ -392,7 +392,7 @@ function SpreadControls({
             type="button"
             aria-pressed={mode === "oneOneOne"}
             onClick={() => { if (mode !== "oneOneOne") update({ backgroundAbilities: toOneOneOne(bonusAbilities) }); }}
-            className={`${CHIP_BASE} ${mode === "oneOneOne" ? "border-garnet-700 bg-garnet-700 text-parchment-50" : "border-parchment-300 text-parchment-700"}`}
+            className={`${CHIP_BASE} ${mode === "oneOneOne" ? "border-garnet-surface bg-garnet-surface text-garnet-on-surface" : "border-parchment-300 text-parchment-700"}`}
           >
             +1 / +1 / +1
           </button>

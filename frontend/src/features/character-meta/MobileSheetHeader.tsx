@@ -58,7 +58,7 @@ function LivePill({ round, onGoToCombat }: { round: number | null; onGoToCombat?
       type="button"
       onClick={onGoToCombat}
       aria-label={`${state} — go to fight`}
-      className="flex flex-none items-center gap-1.5 rounded-full bg-garnet-800 px-2.5 py-1 text-[11px] font-bold text-parchment-50 transition-colors hover:bg-garnet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+      className="flex flex-none items-center gap-1.5 rounded-full bg-garnet-surface px-2.5 py-1 text-[11px] font-bold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
     >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-vitality-400 motion-safe:animate-pulse" />
       {state}
@@ -310,7 +310,7 @@ function CollapsedBar({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
         aria-label="Switch character"
         className="flex min-w-0 flex-1 items-center gap-2 rounded-control text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
       >
-        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-700 to-garnet-900 font-display text-sm font-semibold text-parchment-50 shadow-raised">
+        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-surface to-garnet-surface-deep font-display text-sm font-semibold text-garnet-on-surface shadow-raised">
           {character.name.charAt(0)}
         </span>
         <span className="truncate font-display text-[15px] font-semibold leading-tight text-garnet-800">
@@ -361,7 +361,7 @@ function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps
           aria-label="Switch character"
           className="flex min-w-0 flex-1 items-center gap-2 rounded-control text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
         >
-          <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-700 to-garnet-900 font-display text-lg font-semibold text-parchment-50 shadow-raised">
+          <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-surface to-garnet-surface-deep font-display text-lg font-semibold text-garnet-on-surface shadow-raised">
             {character.name.charAt(0)}
           </span>
           <span className="min-w-0 flex-1">

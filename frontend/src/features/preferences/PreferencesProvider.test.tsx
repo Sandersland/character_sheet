@@ -4,7 +4,7 @@
  * nesting order — a Probe reads usePreferencesSync() to observe synced state.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("@/api/client", () => ({
@@ -16,8 +16,9 @@ vi.mock("@/api/client", () => ({
 
 import { fetchMe, patchPreferences } from "@/api/client";
 import { AuthProvider } from "@/features/auth/AuthProvider";
+import PreferenceSyncNote from "@/features/preferences/PreferenceSyncNote";
 import { PreferencesProvider } from "@/features/preferences/PreferencesProvider";
-import { usePreferencesSync } from "@/hooks/usePreferencesSync";
+import { usePreferencesSync, PREFERENCE_SYNC_ERROR } from "@/hooks/usePreferencesSync";
 import type { AuthUser, UserPreferences } from "@/types/auth";
 
 const BASE_USER = { id: "u1", email: "ada@x.dev", name: "Ada", imageUrl: null };
@@ -29,11 +30,17 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 const OWNER_KEY = "cs:pref:owner";
 
 function Probe() {
-  const { synced, setPreference } = usePreferencesSync();
+  const { synced, setPreference, sync } = usePreferencesSync();
   return (
     <div>
       <span data-testid="synced">{synced ? JSON.stringify(synced) : "undefined"}</span>
+      <span data-testid="sync">{JSON.stringify(sync)}</span>
       <button onClick={() => setPreference("theme", "dark")}>Set theme dark</button>
+      <button onClick={() => setPreference("diceRollStyle", "quick")}>Set dice quick</button>
+      {/* Renders the real Retry affordance end-to-end (#1365 chunk 4) — the
+          hand-built context fixtures in PreferenceSyncNote.test.tsx can't
+          exercise retry's actual setPreference-closure wiring. */}
+      <PreferenceSyncNote preferenceKey="theme" />
     </div>
   );
 }
@@ -146,9 +153,154 @@ describe("PreferencesProvider", () => {
       expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+    // Synchronous native click (not userEvent, which yields to microtasks
+    // internally) — pins AC2: the optimistic local write and the "saving" flag
+    // both land synchronously with the click, before the mocked PATCH's own
+    // already-resolved promise gets a chance to settle.
+    act(() => {
+      screen.getByRole("button", { name: "Set theme dark" }).click();
+    });
 
+    expect(screen.getByTestId("sync")).toHaveTextContent('"saving":{"theme":true}');
     expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
     expect(patchPreferences).toHaveBeenCalledWith({ theme: "dark" });
+  });
+
+  it("records a per-key sync error when the PATCH rejects, keeping the optimistic local value", async () => {
+    const serverPrefs: UserPreferences = { theme: "light", diceRollStyle: "animated", autoRollConcentration: true };
+    const user: AuthUser = { ...BASE_USER, preferences: serverPrefs };
+    vi.mocked(fetchMe).mockResolvedValue(user);
+    vi.mocked(patchPreferences).mockRejectedValue(new TypeError("Failed to fetch"));
+
+    renderTree();
+    await waitFor(() =>
+      expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sync")).toHaveTextContent(
+        JSON.stringify({ saving: {}, errors: { theme: { message: PREFERENCE_SYNC_ERROR } } }),
+      ),
+    );
+    expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
+  });
+
+  it("marks the key as saving while the PATCH is in flight and clears it on success", async () => {
+    const serverPrefs: UserPreferences = { theme: "light", diceRollStyle: "animated", autoRollConcentration: true };
+    const user: AuthUser = { ...BASE_USER, preferences: serverPrefs };
+    vi.mocked(fetchMe).mockResolvedValue(user);
+    let resolvePatch!: (value: UserPreferences) => void;
+    vi.mocked(patchPreferences).mockReturnValue(
+      new Promise((resolve) => {
+        resolvePatch = resolve;
+      }),
+    );
+
+    renderTree();
+    await waitFor(() =>
+      expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+
+    expect(screen.getByTestId("sync")).toHaveTextContent(
+      JSON.stringify({ saving: { theme: true }, errors: {} }),
+    );
+
+    resolvePatch({ ...serverPrefs, theme: "dark" });
+    await waitFor(() =>
+      expect(screen.getByTestId("sync")).toHaveTextContent(JSON.stringify({ saving: {}, errors: {} })),
+    );
+  });
+
+  it("a rejected write for one key never marks a different key as failed", async () => {
+    const serverPrefs: UserPreferences = { theme: "light", diceRollStyle: "animated", autoRollConcentration: true };
+    const user: AuthUser = { ...BASE_USER, preferences: serverPrefs };
+    vi.mocked(fetchMe).mockResolvedValue(user);
+    vi.mocked(patchPreferences).mockImplementation((patch) =>
+      "theme" in patch
+        ? Promise.reject(new TypeError("Failed to fetch"))
+        : Promise.resolve({ ...serverPrefs, ...patch }),
+    );
+
+    renderTree();
+    await waitFor(() =>
+      expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+    await userEvent.click(screen.getByRole("button", { name: "Set dice quick" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sync")).toHaveTextContent(
+        JSON.stringify({ saving: {}, errors: { theme: { message: PREFERENCE_SYNC_ERROR } } }),
+      ),
+    );
+  });
+
+  it("a later successful write for the same key clears that key's error", async () => {
+    const serverPrefs: UserPreferences = { theme: "light", diceRollStyle: "animated", autoRollConcentration: true };
+    const user: AuthUser = { ...BASE_USER, preferences: serverPrefs };
+    vi.mocked(fetchMe).mockResolvedValue(user);
+    vi.mocked(patchPreferences)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({ ...serverPrefs, theme: "dark" });
+
+    renderTree();
+    await waitFor(() =>
+      expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("sync")).toHaveTextContent(
+        JSON.stringify({ saving: {}, errors: { theme: { message: PREFERENCE_SYNC_ERROR } } }),
+      ),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("sync")).toHaveTextContent(JSON.stringify({ saving: {}, errors: {} })),
+    );
+  });
+
+  it("retrying a failed write re-sends the same value and clears the error", async () => {
+    const serverPrefs: UserPreferences = { theme: "light", diceRollStyle: "animated", autoRollConcentration: true };
+    const user: AuthUser = { ...BASE_USER, preferences: serverPrefs };
+    vi.mocked(fetchMe).mockResolvedValue(user);
+    vi.mocked(patchPreferences)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({ ...serverPrefs, theme: "dark" });
+
+    renderTree();
+    await waitFor(() =>
+      expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Set theme dark" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(patchPreferences).toHaveBeenCalledTimes(2);
+    expect(patchPreferences).toHaveBeenNthCalledWith(1, { theme: "dark" });
+    expect(patchPreferences).toHaveBeenNthCalledWith(2, { theme: "dark" });
+  });
+
+  it("a failed login-time migration does not surface a sync error", async () => {
+    localStorage.setItem("cs:pref:theme", "dark");
+    const user: AuthUser = { ...BASE_USER, preferences: null };
+    vi.mocked(fetchMe).mockResolvedValue(user);
+    vi.mocked(patchPreferences).mockRejectedValue(new TypeError("Failed to fetch"));
+
+    renderTree();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify({ theme: "dark", diceRollStyle: "animated", autoRollConcentration: true })),
+    );
+    expect(screen.getByTestId("sync")).toHaveTextContent(JSON.stringify({ saving: {}, errors: {} }));
   });
 });

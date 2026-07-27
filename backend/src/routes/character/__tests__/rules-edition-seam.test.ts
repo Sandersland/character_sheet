@@ -81,7 +81,7 @@ beforeAll(async () => {
   const sub = await upsertEditionRow(
     prisma.subclass,
     { classId, name: SUBCLASS_NAME, edition: null },
-    { classId, name: SUBCLASS_NAME, description: "Seam fixture." },
+    { classId, name: SUBCLASS_NAME, description: "Seam fixture.", slug: "rules-edition-seam-school" },
     {},
   );
   subclassId = sub.id;

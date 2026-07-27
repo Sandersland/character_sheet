@@ -10,12 +10,13 @@ interface ConditionRollBannerProps {
 
 /**
  * One amber banner per active roll-modifying state (#984). Says the fact ONCE —
- * "Poisoned · Disadvantage on attack rolls and ability checks" — at the top of
- * the roll rails, replacing the ~24 identical "disadvantage — Poisoned" stamps
- * the sheet used to render under every ability box and all 18 skill rows
- * (repetition kills scanability). The roll itself still auto-applies the mode
- * via resolveRollMode; affected rows keep only a subtle amber dot. Renders
- * nothing when no state is active, so hosts can mount it unconditionally.
+ * "Poisoned · Disadvantage on attack rolls, ability checks, and initiative" —
+ * at the top of the roll rails, replacing the ~24 identical "disadvantage —
+ * Poisoned" stamps the sheet used to render under every ability box and all
+ * 18 skill rows (repetition kills scanability). The roll itself still
+ * auto-applies the mode via resolveRollMode; affected rows keep only a subtle
+ * amber dot. Renders nothing when no state is active, so hosts can mount it
+ * unconditionally.
  *
  * Amber/gold tone per the liveplay redesign mockup (Fix B). Both advantage and
  * disadvantage sources use the same treatment; the effect text carries the

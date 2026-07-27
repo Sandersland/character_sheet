@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { CONDITIONS, conditionDefinition } from "@/lib/srd/condition-data.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
+
+import { CONDITIONS, conditionDefinition, conditionRulesText, exhaustionRollEffects } from "@/lib/srd/condition-data.js";
+import type { RollEffect } from "@/lib/srd/roll-effects.js";
 
 // #1309: the 2014 half of what #1135 replaced. Nine conditions carry real
 // mechanical or textual deltas from PHB'14 to SRD 5.2; the other five are
@@ -115,6 +118,153 @@ describe("conditionDefinition — byte-identical conditions resolve to one share
       const c2024 = conditionDefinition(key, "EDITION_2024");
       expect(c2014).toBe(c2024);
       expect(c2014).toBe(CONDITIONS.find((c) => c.key === key));
+    },
+  );
+});
+
+// #1322: these five pins were deleted from the frontend's CONDITION_DESCRIPTIONS
+// (frontend/src/lib/conditions.test.ts) along with the mirror they lived in.
+// Carried here rather than dropped, now asserted against the backend rules
+// text they were always describing.
+describe("conditionDefinition — 2024 (SRD 5.2) text pins migrated from the deleted frontend CONDITION_DESCRIPTIONS (#1322)", () => {
+  it("scopes Grappled's attack disadvantage to targets other than the grappler", () => {
+    expect(conditionDefinition("grappled", "EDITION_2024").description).toContain(
+      "other than the grappler",
+    );
+  });
+
+  it("mentions Invisible's advantage on initiative", () => {
+    expect(conditionDefinition("invisible", "EDITION_2024").description.toLowerCase()).toContain(
+      "initiative",
+    );
+  });
+
+  it("mentions Incapacitated breaking Concentration and can't speak", () => {
+    const description = conditionDefinition("incapacitated", "EDITION_2024").description;
+    expect(description).toContain("Concentration");
+    expect(description.toLowerCase()).toContain("can't speak");
+  });
+
+  it("no longer says Stunned can't move (2024 trim)", () => {
+    expect(conditionDefinition("stunned", "EDITION_2024").description.toLowerCase()).not.toContain(
+      "can't move",
+    );
+  });
+
+  it("gives Petrified immunity to the Poisoned condition", () => {
+    expect(conditionDefinition("petrified", "EDITION_2024").description).toContain("Poisoned");
+  });
+});
+
+// #1322: the resolved {key,label,description} rows served on GET /api/reference.
+// rollEffects is deliberately dropped — the client receives resolved
+// rollModifiers already, so shipping raw per-condition grants would ship the rule.
+describe("conditionRulesText", () => {
+  // Asserts ALPHABETICAL LABEL order — what the sort guarantees — not
+  // CONDITIONS' declaration order, which only coincides with it today. Pinning
+  // the declaration order would re-create the implicit dependency the sort
+  // exists to break, and would fail with a message pointing at CONDITIONS
+  // rather than at the out-of-order entry a reader actually needs to fix.
+  //
+  // Honest limit: this cannot currently detect the sort being REMOVED, because
+  // CONDITIONS is alphabetical as authored, so sorted and unsorted output are
+  // identical. It pins the observable contract, and it goes red the moment a
+  // condition is added out of alphabetical order while the sort is missing —
+  // which is the failure this exists for. conditionRulesText reads the module
+  // constant, so there is no seam to inject unsorted input through.
+  it("returns all 14 conditions in alphabetical label order, for both editions", () => {
+    for (const edition of ["EDITION_2024", "EDITION_2014"] as const) {
+      const rows = conditionRulesText(edition);
+      expect(rows).toHaveLength(14);
+      expect(rows.map((r) => r.label)).toEqual([...rows.map((r) => r.label)].sort((a, b) => a.localeCompare(b)));
+      expect([...rows.map((r) => r.key)].sort()).toEqual([...CONDITIONS.map((c) => c.key)].sort());
+    }
+  });
+
+  it("each row is exactly {key,label,description} — no rollEffects on the wire", () => {
+    for (const row of conditionRulesText("EDITION_2024")) {
+      expect(Object.keys(row).sort()).toEqual(["description", "key", "label"]);
+    }
+  });
+
+  it("forks one of #1309's nine divergent conditions between editions", () => {
+    const grappled2014 = conditionRulesText("EDITION_2014").find((r) => r.key === "grappled")!;
+    const grappled2024 = conditionRulesText("EDITION_2024").find((r) => r.key === "grappled")!;
+    expect(grappled2014.description).not.toBe(grappled2024.description);
+    expect(grappled2014.description).toContain("The condition ends if the grappler is incapacitated");
+    expect(grappled2024.description).toContain("other than the grappler");
+  });
+
+  it("resolves one of the five edition-invariant conditions identically across editions", () => {
+    const poisoned2014 = conditionRulesText("EDITION_2014").find((r) => r.key === "poisoned")!;
+    const poisoned2024 = conditionRulesText("EDITION_2024").find((r) => r.key === "poisoned")!;
+    expect(poisoned2014.description).toBe(poisoned2024.description);
+  });
+
+  it("labels never fork by edition and stay alphabetically ordered starting with Blinded", () => {
+    const rows = conditionRulesText("EDITION_2024");
+    expect(rows[0]).toMatchObject({ key: "blinded", label: "Blinded" });
+    expect(rows.find((r) => r.key === "grappled")).toMatchObject({ label: "Grappled" });
+  });
+});
+
+// #1327: Initiative is a Dexterity check (SRD 5.2 / PHB'14 p. 189, Combat →
+// Initiative), so any condition granting unqualified disadvantage on ability
+// checks must grant it on Initiative too — RollModeKind splits `initiative`
+// out of `check` for engine reasons (see the module comment on
+// EXHAUSTION_ROLL_KINDS), not because the rules treat them differently. This
+// closes the footgun with a test rather than widening resolveRollMode, which
+// would (a) put a rule in the frontend and (b) double the flat exhaustion
+// penalty on Initiative (see frontend/src/lib/rollMode.test.ts).
+describe("CONDITIONS invariant — unqualified check disadvantage must cover Initiative (#1327)", () => {
+  // A grant of "disadvantage on ability checks" with no `ability` narrowing.
+  // Rage's { mode:"advantage", kind:"check", ability:"strength" } is excluded
+  // on two counts (mode and ability) and must stay excluded: a Strength-check
+  // advantage must never reach a Dexterity-based Initiative roll.
+  const isUnqualifiedCheckDisadvantage = (e: RollEffect): boolean =>
+    e.mode === "disadvantage" && e.kind === "check" && e.ability === undefined;
+
+  // The obligation it creates. `ability === undefined` on this side too: an
+  // ability-scoped initiative grant would not discharge an unqualified one.
+  const isUnqualifiedInitiativeDisadvantage = (e: RollEffect): boolean =>
+    e.mode === "disadvantage" && e.kind === "initiative" && e.ability === undefined;
+
+  const offenders = (edition: RulesEdition) =>
+    CONDITIONS.map((c) => c.key).filter((key) => {
+      const effects = conditionDefinition(key, edition).rollEffects ?? [];
+      return effects.some(isUnqualifiedCheckDisadvantage) && !effects.some(isUnqualifiedInitiativeDisadvantage);
+    });
+
+  it.each(["EDITION_2024", "EDITION_2014"] as const)(
+    "%s: every condition granting unqualified disadvantage on ability checks also grants it on Initiative",
+    (edition) => {
+      expect(offenders(edition)).toEqual([]);
+    },
+  );
+
+  // Non-vacuity pin: without this, deleting both `check` grants below would
+  // leave the invariant above passing on an empty set. Expected to be updated
+  // deliberately when a condition joins (or leaves) this set.
+  it.each(["EDITION_2024", "EDITION_2014"] as const)("%s: covers exactly frightened and poisoned today", (edition) => {
+    const covered = CONDITIONS.map((c) => c.key).filter((key) => {
+      const effects = conditionDefinition(key, edition).rollEffects ?? [];
+      return effects.some(isUnqualifiedCheckDisadvantage);
+    });
+    expect(covered).toEqual(["frightened", "poisoned"]);
+  });
+
+  // exhaustionRollEffects2014 is the other place this convention is
+  // load-bearing (tier 1: "disadvantage on ability checks" must also cover
+  // Initiative) — same invariant, different data source.
+  it.each(["EDITION_2024", "EDITION_2014"] as const)(
+    "%s: exhaustionRollEffects honours the same invariant at every level 0-6",
+    (edition) => {
+      for (let level = 0; level <= 6; level++) {
+        const effects = exhaustionRollEffects(level, edition);
+        if (effects.some(isUnqualifiedCheckDisadvantage)) {
+          expect(effects.some(isUnqualifiedInitiativeDisadvantage)).toBe(true);
+        }
+      }
     },
   );
 });

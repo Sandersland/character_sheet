@@ -9516,6 +9516,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9568,6 +9569,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9620,6 +9622,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9678,6 +9681,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9742,6 +9746,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9806,6 +9811,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9876,6 +9882,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -9946,6 +9953,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10022,6 +10030,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10098,6 +10107,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10174,6 +10184,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10250,6 +10261,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10326,6 +10338,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10402,6 +10415,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10478,6 +10492,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10560,6 +10575,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10642,6 +10658,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10724,6 +10741,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10853,6 +10871,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10899,6 +10918,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10945,6 +10965,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -10997,6 +11018,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11055,6 +11077,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11113,6 +11136,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11177,6 +11201,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11241,6 +11266,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11311,6 +11337,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11381,6 +11408,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11451,6 +11479,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11521,6 +11550,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11591,6 +11621,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11661,6 +11692,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11731,6 +11763,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11807,6 +11840,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11883,6 +11917,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -11959,6 +11994,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Domain Spells",
           "source": "subclass",
@@ -53608,6 +53644,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53654,6 +53691,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53700,6 +53738,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53746,6 +53785,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53805,6 +53845,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53864,6 +53905,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53923,6 +53965,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -53982,6 +54025,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54047,6 +54091,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54118,6 +54163,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54189,6 +54235,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54260,6 +54307,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54344,6 +54392,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54428,6 +54477,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54512,6 +54562,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54596,6 +54647,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54680,6 +54732,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54764,6 +54817,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "features": [
         {
           "description": "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54899,6 +54953,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54937,6 +54992,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -54975,6 +55031,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55013,6 +55070,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55065,6 +55123,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55117,6 +55176,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55169,6 +55229,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55221,6 +55282,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55279,6 +55341,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55343,6 +55406,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55407,6 +55471,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55471,6 +55536,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55548,6 +55614,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55625,6 +55692,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55702,6 +55770,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55779,6 +55848,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55856,6 +55926,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -55933,6 +56004,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56055,6 +56127,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56093,6 +56166,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56131,6 +56205,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56169,6 +56244,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56221,6 +56297,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56273,6 +56350,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56325,6 +56403,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56377,6 +56456,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56435,6 +56515,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56499,6 +56580,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56563,6 +56645,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56627,6 +56710,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56697,6 +56781,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56767,6 +56852,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56837,6 +56923,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56907,6 +56994,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -56977,6 +57065,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",
@@ -57047,6 +57136,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
         },
         {
           "description": "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+          "edition": "EDITION_2024",
           "level": 1,
           "name": "Expanded Spell List",
           "source": "subclass",

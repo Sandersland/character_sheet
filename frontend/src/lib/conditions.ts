@@ -1,11 +1,15 @@
 import type { ConditionKey } from "@/types/character";
 
 /**
- * Display labels + short descriptions for the 14 standard 5e conditions and
- * exhaustion. This mirrors the backend SRD rules data — the
- * backend remains the single source of truth for rules; this is presentation
- * metadata only (labels/descriptions for the chip strip + picker). Never render
- * a raw condition key in the UI; resolve through conditionLabel().
+ * Edition-invariant presentation metadata for the 14 standard 5e conditions:
+ * display labels, alphabetical ordering, and a key+label fallback list. Rules
+ * text (descriptions) is resolved backend-side per edition and arrives on the
+ * wire via GET /api/reference's `conditions` field (#1322) — this module holds
+ * no rules text of its own. Labels never fork by edition (the backend's
+ * condition-data override table has no `label` field, so `tsc` itself forbids
+ * an attempt to override it), which is what lets CONDITION_LABELS stay
+ * edition-free by construction. Never render a raw condition key in the UI;
+ * resolve through conditionLabel().
  */
 
 export const CONDITION_LABELS: Record<ConditionKey, string> = {
@@ -25,37 +29,22 @@ export const CONDITION_LABELS: Record<ConditionKey, string> = {
   unconscious: "Unconscious",
 };
 
-/** Short effect summaries for the picker (shortened from SRD 5.2). */
-export const CONDITION_DESCRIPTIONS: Record<ConditionKey, string> = {
-  blinded: "Can't see; auto-fail sight checks. Attacks against have advantage; its attacks have disadvantage.",
-  charmed: "Can't attack the charmer or target it with damaging abilities/effects; charmer has advantage on social checks.",
-  deafened: "Can't hear; auto-fail hearing checks.",
-  frightened: "Disadvantage on checks/attacks while the source is in sight; can't move closer to it.",
-  grappled: "Speed 0 (can't increase); disadvantage on attacks against targets other than the grappler; grappler can drag/carry it.",
-  incapacitated: "No action, Bonus Action, or Reaction; Concentration is broken; can't speak; disadvantage on Initiative.",
-  invisible: "Can't be seen unaided; equipment concealed. Advantage on Initiative and its attacks; attacks against have disadvantage.",
-  paralyzed: "Incapacitated, Speed 0; auto-fail STR/DEX saves; attacks against have advantage; melee hits are crits.",
-  petrified: "Turned to stone; incapacitated, Speed 0; auto-fail STR/DEX saves; resists all damage; immune to the Poisoned condition.",
-  poisoned: "Disadvantage on attack rolls and ability checks.",
-  prone: "Can only crawl or spend half Speed to stand. Disadvantage on attacks; melee against has advantage, ranged has disadvantage.",
-  restrained: "Speed 0; disadvantage on attacks & DEX saves; attacks against have advantage.",
-  stunned: "Incapacitated; auto-fail STR/DEX saves; attacks against have advantage.",
-  unconscious: "Incapacitated & prone, drops items, unaware; Speed 0; auto-fail STR/DEX saves; attacks against have advantage; melee hits are crits.",
-};
-
 /** Canonical alphabetical order for iterating conditions in pickers/strips. */
 const CONDITION_ORDER: readonly ConditionKey[] = (
   Object.keys(CONDITION_LABELS) as ConditionKey[]
 ).sort((a, b) => CONDITION_LABELS[a].localeCompare(CONDITION_LABELS[b]));
 
-export const CONDITION_OPTIONS: readonly {
-  key: ConditionKey;
-  label: string;
-  description: string;
-}[] = CONDITION_ORDER.map((key) => ({
+/**
+ * Key+label fallback list — no description (that's rules text, resolved
+ * server-side). Two consumers: `AddConditionPanel`'s picker falls back to this
+ * while `/reference`'s conditions haven't loaded yet (a missing sentence
+ * degrades; a wrong-edition sentence lies), and `GrantFields` (the DM's
+ * condition-immunity dropdown) has no character — and so no edition — in
+ * scope, and only ever reads `key`/`label`.
+ */
+export const CONDITION_OPTIONS: readonly { key: ConditionKey; label: string }[] = CONDITION_ORDER.map((key) => ({
   key,
   label: CONDITION_LABELS[key],
-  description: CONDITION_DESCRIPTIONS[key],
 }));
 
 /** Display label for a condition key. Tolerant: unknown keys degrade to self. */
@@ -70,16 +59,4 @@ export const EXHAUSTION_MAX = 6;
 export function exhaustionLabel(level: number): string {
   const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
   return `Exhaustion ${clamped}`;
-}
-
-/**
- * Effect text for an exhaustion level, clamped to 0–6 (SRD 5.2 / #1136). Each
- * level is a flat −2 on d20 Tests and −5 ft Speed; level 6 is death. The rules
- * themselves live in backend lib/srd — this is the presentation string.
- */
-export function exhaustionEffect(level: number): string {
-  const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
-  if (clamped === 0) return "No exhaustion.";
-  if (clamped === EXHAUSTION_MAX) return "Death.";
-  return `−${2 * clamped} on d20 Tests; Speed −${5 * clamped} ft.`;
 }

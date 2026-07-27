@@ -79,13 +79,13 @@ export default function Tabs({ tabs, active, onChange, className = "", idBase }:
             className={[
               "flex flex-1 items-center justify-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600",
               isActive
-                ? "bg-garnet-700 text-parchment-50 shadow-card"
+                ? "bg-garnet-surface text-garnet-on-surface shadow-card"
                 : "text-parchment-600 hover:bg-parchment-200 hover:text-parchment-800",
             ].join(" ")}
           >
             <span>{tab.label}</span>
             {tab.badge !== undefined && (
-              <span className={isActive ? "text-parchment-200" : "text-parchment-600"}>
+              <span className={isActive ? "text-garnet-on-surface-dim" : "text-parchment-600"}>
                 {tab.badge}
               </span>
             )}

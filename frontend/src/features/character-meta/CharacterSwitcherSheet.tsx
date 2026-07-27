@@ -16,7 +16,7 @@ interface CharacterSwitcherSheetProps {
 // Garnet identity chip, matching the header avatar.
 function Avatar({ name }: { name: string }) {
   return (
-    <span className="flex h-9 w-9 flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-700 to-garnet-900 font-display text-base font-semibold text-parchment-50 shadow-raised">
+    <span className="flex h-9 w-9 flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-surface to-garnet-surface-deep font-display text-base font-semibold text-garnet-on-surface shadow-raised">
       {name.charAt(0)}
     </span>
   );

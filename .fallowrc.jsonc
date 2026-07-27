@@ -18,6 +18,48 @@
   // Error classes carry a numeric `status` read duck-typed by the Express error
   // middleware (backend/src/lib/auth/errors.ts, lib/inventory/inventory.ts) — never a static reference.
   "usedClassMembers": ["status"],
+  // The frontend/backend 5e-rules boundary (#1272, epic #1369), as a machine
+  // check instead of a paragraph. Four disjoint zones; a violation needs BOTH
+  // files zoned, so unzoned trees (backend/prisma/seed, frontend/e2e,
+  // node_modules, the generated Prisma client) are unconstrained by design.
+  //
+  // What this mechanically enforces:
+  //   1. Neither tier may import the other AT ALL. Nothing else stops it —
+  //      eslint has no relative-parent ban, so `../../../backend/src/lib/...`
+  //      compiles today.
+  //   2. shared-types is reachable type-only. That invariant is currently
+  //      self-policing (the backend emits `dist/` and `node dist/index.js` on
+  //      node:22-alpine would try to load a raw `.ts`); allowTypeOnly makes it
+  //      a check that fails at audit time instead of at container start.
+  //   3. shared-types imports nothing but itself — a rule can never sneak in
+  //      by way of a tier import.
+  //   4. contracts is reachable as a VALUE from the backend (it calls .parse())
+  //      and type-only from the frontend (#1370). That asymmetry IS the
+  //      design: the package builds to dist/ so node:22-alpine can load it,
+  //      and the frontend's type-only side erases, so zod never enters the
+  //      client bundle (scripts/check-no-zod-in-client-bundle.sh is the check).
+  //   5. contracts imports nothing zoned — not even shared-types. Keeping the
+  //      two packages' invariants independent means a value import of
+  //      contracts can never drag a shared-types path into the compiled
+  //      backend dist, where a raw .ts would fail at container start. zod is
+  //      a node_module, so it is unzoned and unconstrained.
+  // What it CANNOT enforce: "this frontend file contains 5e logic". Boundary
+  // rules constrain imports, not file contents; that half stays a review norm
+  // (CLAUDE.md) plus the per-module follow-ups.
+  "boundaries": {
+    "zones": [
+      { "name": "backend", "patterns": ["backend/src/**"] },
+      { "name": "frontend", "patterns": ["frontend/src/**"] },
+      { "name": "shared-types", "patterns": ["packages/shared-types/src/**"] },
+      { "name": "contracts", "patterns": ["packages/contracts/src/**"] }
+    ],
+    "rules": [
+      { "from": "backend", "allow": ["contracts"], "allowTypeOnly": ["shared-types"] },
+      { "from": "frontend", "allow": [], "allowTypeOnly": ["shared-types", "contracts"] },
+      { "from": "shared-types", "allow": [] },
+      { "from": "contracts", "allow": [] }
+    ]
+  },
   "duplicates": {
     // Report every duplicate pair (#691 phase 2, 2026-07-11): pair-clones like
     // the #642 disciplines/shadow-arts twin were invisible at 3. The audit
@@ -47,5 +89,10 @@
   "audit": {
     "gate": "new-only"
   },
-  "rules": {}
+  "rules": {
+    // Pinned, not inherited: boundary-violation is fallow 3.2.0's default
+    // `error`, and the bar for OUR boundary is ours to hold across version
+    // bumps (same reasoning as the `health` ceilings above).
+    "boundary-violation": "error"
+  }
 }

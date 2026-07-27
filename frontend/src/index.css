@@ -49,6 +49,40 @@
   --color-garnet-800: #8a041a;
   --color-garnet-900: #610316;
 
+  /* Brand-surface role (#994). The garnet ramp inverts under [data-theme="dark"]
+     so garnet-as-TEXT stays legible on dark — correct, and unchanged. That same
+     inversion is what turns every brand FILL pale salmon (dark garnet-700 is
+     #f5868c). These tokens are the fill-only role and never invert direction;
+     only the exact value is re-tuned, because the two page backgrounds impose
+     different floors. Light values are today's garnet-700/800/900/100 and
+     parchment-50 verbatim, so light mode stays byte-identical.
+     Dark #da2233 is the ONLY value that clears both bars at once: 4.69:1 under
+     --color-garnet-on-surface (AA 4.5) and 3.13:1 against the dark page
+     parchment-100 #28241c (SC 1.4.11, 3:1). The legal band is ~#d71e2d…#dd2735
+     and spans 11% relative luminance — do not "tidy" any of this back onto the
+     ramp, and do not nudge the hue; there is no headroom. */
+  --color-garnet-surface: #ab091e;
+  /* Hover/pressed, and the bevel edge drawn on a brand fill. In dark this goes
+     DEEPER, not lighter: lighter would push on-surface text under 4.5:1 (the
+     resting surface has only 4% headroom). #b81326 holds text at 6.32:1. Its
+     2.32:1 against the dark page is a deliberate, transient-state exemption —
+     the resting surface already carries the 3:1 identifiability boundary. */
+  --color-garnet-surface-hover: #8a041a;
+  /* Far end of a brand gradient, and the recessed "active" slab drawn ON a brand
+     surface (SheetBottomNav). Never governs a page boundary: the lightest stop
+     of any garnet gradient must be --color-garnet-surface. */
+  --color-garnet-surface-deep: #610316;
+  /* Label on any of the three above. Deliberately absent from the dark block —
+     that invariance IS the fix: text-parchment-50 flips to #1f1c15, which
+     measures 1.71–2.26:1 on a deep garnet fill. */
+  --color-garnet-on-surface: #faf9f7;
+  /* De-emphasised label on a brand surface (inactive bottom-nav tab, active-tab
+     badge count). Resolves to the same value as --color-garnet-on-surface in
+     dark on purpose: the dark surface's luminance caps the best achievable text
+     ratio at 5.01:1 (pure white), so nothing dimmer than near-white clears 4.5
+     there. */
+  --color-garnet-on-surface-dim: #ffbdbd;
+
   /* Accent — arcane teal, for magic/spell affordances (swatches.json: teal-*) */
   --color-arcane-50: #effcf6;
   --color-arcane-100: #c6f7e2;
@@ -311,6 +345,13 @@
   --color-garnet-700: #f5868c;
   --color-garnet-800: #ffb0b2;
   --color-garnet-900: #ffd9d9;
+
+  /* #994 — see the @theme comments for the contrast math. --color-garnet-on-surface
+     is intentionally NOT redeclared here. */
+  --color-garnet-surface: #da2233;
+  --color-garnet-surface-hover: #b81326;
+  --color-garnet-surface-deep: #8c1220;
+  --color-garnet-on-surface-dim: #faf9f7;
 
   --color-arcane-50: #02312a;
   --color-arcane-100: #064a3e;

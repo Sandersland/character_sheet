@@ -79,7 +79,9 @@ beforeAll(async () => {
   const bm = await upsertEditionRow(
     prisma.subclass,
     { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
-    { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers + Student of War." },
+    // Distinct from the real seeded "fighter-battle-master" (#1277) — this
+    // test's Fighter class is its own throwaway row.
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers + Student of War.", slug: "fighter-battle-master-snapshot-undo-test" },
     {},
   );
   bmSubclassId = bm.id;

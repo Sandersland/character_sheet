@@ -232,3 +232,68 @@ test("visual: creation ceremony — steps", async ({ page }) => {
     maxDiffPixelRatio: 0.02,
   });
 });
+
+// #994: sheet-dark's fullPage maxDiffPixelRatio (0.02, ~51k px on this shot)
+// comfortably exceeds the brand-surface fix's actual footprint (~17k px), so
+// that baseline alone could pass unchanged — the flagship fix would ship with
+// zero baseline movement. These two tight, scoped shots exist to make the
+// salmon-vs-garnet difference an actual gate instead of a rounding error.
+test("visual: brand surfaces — dark, desktop", async ({ page }) => {
+  await login(page);
+  await pinFonts(page);
+  const id = await createCharacter(page.request, {
+    name: uniqueName("Brand Hero"),
+    className: "Fighter",
+    race: "Human",
+    background: "Soldier",
+  });
+
+  await setTheme(page, "dark");
+  await gotoSheet(page, id, "combat");
+  const tablist = page.getByRole("tablist", { name: "Section tabs" });
+  const doorway = page.getByRole("button", { name: "Start session" });
+  await expect(doorway).toBeVisible();
+  await ready(page);
+
+  // Clip from the tab rail down through the SessionDoorwayCard "Start session"
+  // button — the two migrated fills a full-page shot's budget would hide.
+  const tabBox = await tablist.boundingBox();
+  const doorwayBox = await doorway.boundingBox();
+  if (!tabBox || !doorwayBox) throw new Error("brand-surface region not visible");
+  const x = Math.min(tabBox.x, doorwayBox.x);
+  const clip = {
+    x,
+    y: tabBox.y,
+    width: Math.max(tabBox.x + tabBox.width, doorwayBox.x + doorwayBox.width) - x,
+    height: doorwayBox.y + doorwayBox.height - tabBox.y,
+  };
+
+  await expect(page).toHaveScreenshot("brand-surfaces-dark.png", {
+    clip,
+    maxDiffPixelRatio: 0.001,
+  });
+});
+
+test("visual: bottom nav — dark, mobile", async ({ page }) => {
+  await login(page);
+  await pinFonts(page);
+  const id = await createCharacter(page.request, {
+    name: uniqueName("Nav Hero"),
+    className: "Fighter",
+    race: "Human",
+    background: "Soldier",
+  });
+
+  // The acceptance surface (#994's "worst case" per the issue) has zero
+  // coverage otherwise: it's md:hidden and every other spec runs at 1280×800.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setTheme(page, "dark");
+  await gotoSheet(page, id, "overview");
+  const nav = page.getByRole("navigation", { name: "Sheet sections" });
+  await expect(nav).toBeVisible();
+  await ready(page);
+
+  await expect(nav).toHaveScreenshot("bottom-nav-dark.png", {
+    maxDiffPixelRatio: 0,
+  });
+});

@@ -39,12 +39,27 @@ const WARLOCK_FEATURES: DerivedFeature[] = [
 ];
 
 const THE_FIEND_FEATURES: DerivedFeature[] = [
+  // #1374: PHB'14 grants the Expanded Spell List at warlock level 1, keyed by
+  // SPELL level (not character level) — genuinely different text from the
+  // 2024 row below (which labels tiers by 2024 character level, #1128), so
+  // it forks into one row per edition sharing the "Expanded Spell List" name.
   {
     name: "Expanded Spell List",
     level: 1,
     source: "subclass",
+    edition: "EDITION_2024",
     description:
       "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+  },
+  {
+    name: "Expanded Spell List",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2014",
+    // PHB'14, "The Fiend" — Expanded Spell List. Page number deliberately
+    // omitted — could not be verified from a licensed source (see PR).
+    description:
+      "Add fiend spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Burning Hands, Command (1st); Blindness/Deafness, Scorching Ray (2nd); Fireball, Stinking Cloud (3rd); Fire Shield, Wall of Fire (4th); Flame Strike, Hallow (5th).",
   },
   {
     name: "Dark One's Blessing",
@@ -77,12 +92,25 @@ const THE_FIEND_FEATURES: DerivedFeature[] = [
 ];
 
 const THE_ARCHFEY_FEATURES: DerivedFeature[] = [
+  // #1374: same PHB'14-vs-PHB'24 spell-level-vs-character-level fork as The
+  // Fiend above.
   {
     name: "Expanded Spell List",
     level: 1,
     source: "subclass",
+    edition: "EDITION_2024",
     description:
       "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+  },
+  {
+    name: "Expanded Spell List",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2014",
+    // PHB'14, "The Archfey" — Expanded Spell List. Page number deliberately
+    // omitted — could not be verified from a licensed source (see PR).
+    description:
+      "Add archfey spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Faerie Fire, Sleep (1st); Calm Emotions, Phantasmal Force (2nd); Blink, Plant Growth (3rd); Dominate Beast, Greater Invisibility (4th); Dominate Person, Seeming (5th).",
   },
   {
     name: "Fey Presence",
@@ -115,12 +143,26 @@ const THE_ARCHFEY_FEATURES: DerivedFeature[] = [
 ];
 
 const THE_GREAT_OLD_ONE_FEATURES: DerivedFeature[] = [
+  // #1374: same PHB'14-vs-PHB'24 spell-level-vs-character-level fork as The
+  // Fiend/Archfey above.
   {
     name: "Expanded Spell List",
     level: 1,
     source: "subclass",
+    edition: "EDITION_2024",
     description:
       "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+  },
+  {
+    name: "Expanded Spell List",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2014",
+    // PHB'14, "The Great Old One" — Expanded Spell List. Page number
+    // deliberately omitted — could not be verified from a licensed source
+    // (see PR).
+    description:
+      "Add Great Old One spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Dissonant Whispers, Hideous Laughter (1st); Detect Thoughts, Phantasmal Force (2nd); Clairvoyance, Sending (3rd); Dominate Beast, Black Tentacles (4th); Dominate Person, Telekinesis (5th).",
   },
   {
     name: "Awakened Mind",
@@ -157,6 +199,7 @@ export const warlock: ClassDefinition = {
   // PHB'14 p.105: Otherworldly Patron (Warlock's subclass) is chosen at 1st level.
   subclasses: {
     "the fiend": {
+      slug: "warlock-the-fiend",
       grantLevel: 1,
       features: THE_FIEND_FEATURES,
       resourceFn: (level) => {
@@ -183,6 +226,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the archfey": {
+      slug: "warlock-the-archfey",
       grantLevel: 1,
       features: THE_ARCHFEY_FEATURES,
       resourceFn: (level) => {
@@ -217,6 +261,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the great old one": {
+      slug: "warlock-the-great-old-one",
       grantLevel: 1,
       features: THE_GREAT_OLD_ONE_FEATURES,
       resourceFn: (level) => {

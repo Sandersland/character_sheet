@@ -20,6 +20,8 @@
 // client rolls it and sends the total; the server only decides full vs half
 // from its own save roll.
 
+import type { QuiveringPalmOperation, TriggerQuiveringPalmOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -27,23 +29,12 @@ import { runCharacterTransaction, type CharacterTxContext } from "@/lib/characte
 import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { focusSaveDC } from "./monk.js";
+import { resolveSubclassSlug } from "./subclass-slug.js";
 
 export class InvalidQuiveringPalmOperationError extends Error {}
 
 export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
 const QUIVERING_PALM_FOCUS_COST = 4;
-
-export interface SetQuiveringPalmOperation {
-  type: "setQuiveringPalm";
-}
-
-export interface TriggerQuiveringPalmOperation {
-  type: "triggerQuiveringPalm";
-  /** Client-rolled 10d12 total (SRD 5.2: 10d12 Force, half on a successful save). */
-  roll: number;
-}
-
-export type QuiveringPalmOperation = SetQuiveringPalmOperation | TriggerQuiveringPalmOperation;
 
 export type QuiveringPalmSaveOutcome = "fail" | "success";
 
@@ -80,7 +71,7 @@ const QUIVERING_PALM_SELECT = {
   activeEffects: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, level: true, subclass: true },
+    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -90,8 +81,12 @@ function monkEntry(row: QuiveringPalmRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
+// Resolved via slug (#1277: FK preferred, exact normalized name as fallback).
+// Was substring-matched on the words "open hand" — the same failure class
+// #1339 fixed at the DERIVED_ACTIONS gate.
 function isWarriorOfTheOpenHand(row: QuiveringPalmRow): boolean {
-  return (monkEntry(row)?.subclass ?? "").toLowerCase().includes("open hand");
+  const monk = monkEntry(row);
+  return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand";
 }
 
 /** Throws unless this is a level-17+ Warrior of the Open Hand; returns the monk level. */

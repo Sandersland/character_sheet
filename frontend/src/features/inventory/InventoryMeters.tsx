@@ -28,7 +28,7 @@ export default function InventoryMeters({ slim = false, ...props }: InventoryMet
             <span className={overCapacity ? "font-semibold text-garnet-700" : "text-parchment-600"}>
               {totalWeight.toFixed(1)} / {capacity} lb
               {overCapacity && (
-                <span className="ml-2 rounded-control bg-garnet-700 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-parchment-50">
+                <span className="ml-2 rounded-control bg-garnet-surface px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-garnet-on-surface">
                   Over capacity
                 </span>
               )}

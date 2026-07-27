@@ -211,7 +211,7 @@ function JournalMobileView(props: JournalViewProps) {
           <button
             type="button"
             onClick={() => setCaptureOpen(true)}
-            className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 inline-flex h-13 items-center gap-2 rounded-full bg-garnet-700 px-5 py-3 text-sm font-semibold text-parchment-50 shadow-raised"
+            className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 inline-flex h-13 items-center gap-2 rounded-full bg-garnet-surface px-5 py-3 text-sm font-semibold text-garnet-on-surface shadow-raised"
           >
             ✎ Note
           </button>
