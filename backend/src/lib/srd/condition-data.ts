@@ -265,12 +265,17 @@ export interface ConditionRulesTextRow {
  * dropped: the client already receives resolved `rollModifiers` (see
  * buildRollModifiers), so shipping the raw per-condition grants here would be
  * shipping the rule itself, not just its text.
+ *
+ * Sorted by label rather than trusting CONDITIONS' declaration order: the
+ * client renders this list as-is, so a new condition declared out of order
+ * would reorder the picker silently — the frontend's own CONDITION_ORDER
+ * sorts for the same reason, and the two must not disagree.
  */
 export function conditionRulesText(edition: RulesEdition): ConditionRulesTextRow[] {
   return CONDITIONS.map(({ key }) => {
     const { label, description } = conditionDefinition(key, edition);
     return { key, label, description };
-  });
+  }).sort((a, b) => a.label.localeCompare(b.label));
 }
 
 // The four d20 Test categories a flat exhaustion penalty binds to. Initiative is

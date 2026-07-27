@@ -2,20 +2,21 @@
  * AddConditionPanel — inline expand-in-place picker for applying a status
  * condition. Not a modal — follows the same "inline panel, collapsed by
  * default" pattern as AddManeuverPanel. The condition list (with rules text)
- * is resolved server-side per edition and passed in via `options` (#1322) —
- * the host (ConditionsSheetBody) reads it from GET /api/reference and falls
- * back to the edition-invariant CONDITION_OPTIONS while it's loading.
+ * is resolved server-side per edition and passed in via `options` (#1322).
+ * This panel renders whatever it is given and owns no fallback of its own —
+ * resolving and degrading is the host's job.
  */
 
 import { useState } from "react";
 
 import type { ApplyConditionOperation, ConditionKey } from "@/types/character";
 
-interface ConditionChoice {
+/** Named for what this panel accepts, not for the host's union of the same
+ *  shape: `description` is optional here because the host degrades to a
+ *  key+label list before /reference resolves (#1322). */
+interface ConditionPickerOption {
   key: ConditionKey;
   label: string;
-  /** Absent while /reference hasn't resolved yet — the picker still lists the
-   *  condition by label, just without its rules text (#1322). */
   description?: string;
 }
 
@@ -28,7 +29,7 @@ interface Props {
    *  (the live-Combat utility strip's "+ Add", #982). Defaults to collapsed. */
   defaultOpen?: boolean;
   /** The 14 conditions to list, resolved for the viewing character's edition. */
-  options: readonly ConditionChoice[];
+  options: readonly ConditionPickerOption[];
 }
 
 export default function AddConditionPanel({ activeKeys, busy, onApply, defaultOpen = false, options }: Props) {
