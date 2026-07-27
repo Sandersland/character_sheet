@@ -26,7 +26,10 @@
 # typo'd glob (or backend/src disappearing) turns this red, not silently green.
 set -eu
 
-FILES=$(git ls-files -- ':(glob)backend/src/**/*.ts' | grep -v '__tests__/')
+# --others --exclude-standard alongside --cached so a NEW, not-yet-staged file
+# carrying the defect is caught at pre-commit rather than after it lands — the
+# same reason check-enum-narrowing.sh greps --untracked.
+FILES=$(git ls-files --cached --others --exclude-standard -- ':(glob)backend/src/**/*.ts' | grep -v '__tests__/')
 FILE_COUNT=$(printf '%s\n' "$FILES" | grep -c . || true)
 
 if [ "$FILE_COUNT" -eq 0 ]; then
@@ -36,7 +39,11 @@ fi
 
 bad=""
 for f in $FILES; do
-  hit=$(grep -nE '\(\s*[a-zA-Z0-9_.?]*subclass[a-zA-Z0-9_.?]*\s*\?\?\s*""\s*\)\s*\.toLowerCase\(\)\s*\.includes\(|\.includes\("(open hand|mercy|valor|shadow)"\)' "$f" || true)
+  # `\?\?|\|\|` catches both null-coalescing and logical-OR defaulting: the
+  # retired code used `?? ""`, but `(subclass || "")` is the same defect and
+  # would otherwise slip past whenever its fragment isn't one of the four
+  # literals the second alternative pins.
+  hit=$(grep -nE '\(\s*[a-zA-Z0-9_.?]*subclass[a-zA-Z0-9_.?]*\s*(\?\?|\|\|)\s*""\s*\)\s*\.toLowerCase\(\)\s*\.includes\(|\.includes\("(open hand|mercy|valor|shadow)"\)' "$f" || true)
   if [ -n "$hit" ]; then
     bad="$bad$f:$hit
 "

@@ -116,8 +116,9 @@ function matchesClassGate(gate: ActionClassGate, cls: string, level: number): bo
 
 // Slug equality against the row's accepted slugs; an ungated row matches
 // every subclass (including `undefined` — a homebrew/off-catalog subclass).
-// `slug` arrives already resolved (FK-or-name, never substring) from
-// deriveActions via resolveSubclassSlug.
+// `slug` arrives already resolved (FK-or-name, never substring) — the
+// resolution happens per class entry in deriveEntryScopedActions, which is the
+// only caller that has the entry's subclassRef in scope.
 function matchesSubclassGate(a: DerivedActionRecord, slug: SubclassSlug | undefined): boolean {
   if (!a.grantSubclassSlugs) return true;
   return slug !== undefined && a.grantSubclassSlugs.includes(slug);

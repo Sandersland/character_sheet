@@ -161,8 +161,15 @@ export function resolveSubclassSlug(
   classKey: string,
   input: SubclassIdentityInput | undefined,
 ): SubclassSlug | undefined {
+  // The FK is trusted only when its slug belongs to the class being resolved.
+  // A class-mismatched FK (a monk entry pointing at a fighter subclass) is a
+  // data anomaly, and returning that slug would hand a caller an identity for
+  // the wrong class rather than the honest `undefined` — the identity resolver
+  // must not invent one. setSubclass enforces class scoping on write, so this
+  // is defence in depth, and it costs one lookup in a table already in scope.
   const fk = input?.subclassRef?.slug;
-  if (fk && (SUBCLASS_SLUGS as readonly string[]).includes(fk)) return fk as SubclassSlug;
+  const fkIdentity = fk ? SUBCLASS_IDENTITY[fk as SubclassSlug] : undefined;
+  if (fkIdentity && fkIdentity.classKey === classKey.trim().toLowerCase()) return fk as SubclassSlug;
 
   const name = input?.subclass;
   if (!name) return undefined;
