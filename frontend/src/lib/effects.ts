@@ -1,59 +1,17 @@
-// Mirror of the backend combat-effects module — keep in sync. Canonical 5e effect model
-// (dice + save + scaling) extracted from Spell so it can describe any activated
-// ability. The one intentional divergence: resolveEffectSpec returns the real
-// RollSpec from @/lib/dice (the backend has no RollSpec type).
+// The effect model TYPES are single-sourced in shared-types (#1272); this file
+// keeps the RUNTIME resolution mirrored from backend/src/lib/combat/effects.ts
+// (follow-up work, not this change) — the one intentional divergence:
+// resolveEffectSpec returns the real RollSpec from @/lib/dice (the backend has
+// no RollSpec type).
 
 import type { RollSpec } from "@/lib/dice";
-
-// Kind of thing an effect does. "utility" carries no roll today; "buff" applies
-// a passive stat modifier (no roll) while the granting concentration holds.
-export type EffectType = "damage" | "heal" | "utility" | "buff";
-
-// How the dice count grows: cantrips scale by character level, leveled spells by
-// slot upcast steps.
-export interface EffectScaling {
-  mode: "none" | "slotUpcast" | "cantripLevel";
-  dicePerStep?: number;
-}
-
-// Structured effect describing an activated ability's roll.
-export interface EffectSpec {
-  effectType: EffectType;
-  dice?: { count: number; faces: number; modifier?: number };
-  damageType?: string | null;
-  attackType?: string | null;
-  saveAbility?: string | null;
-  saveEffect?: string | null;
-  scaling: EffectScaling;
-  concentration?: boolean;
-  addAbilityModToHeal?: boolean;
-  // Passive-modifier ("buff") payload — present only for effectType "buff".
-  buffTarget?: string | null;
-  buffModifier?: number | null;
-}
-
-// The flat effect columns snapshotted from the catalog.
-export interface EffectColumns {
-  effectKind?: string | null;
-  effectDiceCount?: number | null;
-  effectDiceFaces?: number | null;
-  effectModifier?: number | null;
-  damageType?: string | null;
-  attackType?: string | null;
-  saveAbility?: string | null;
-  saveEffect?: string | null;
-  upcastDicePerLevel?: number | null;
-  cantripScaling?: boolean;
-  buffTarget?: string | null;
-  buffModifier?: number | null;
-}
-
-// A row carrying effect columns plus the level that decides the scaling axis.
-export type EffectRow = EffectColumns & { level: number; concentration?: boolean };
+export type { EffectRow, EffectSpec } from "@character-sheet/shared-types";
+import type { EffectRow, EffectScaling, EffectSpec, EffectType } from "@character-sheet/shared-types";
 
 // Dice resolution: a row without kind, count, or faces reads as dice-less.
-// (The backend twin additionally resolves effectDieSource via a ClassDieResolver
-// — frontend rows never carry that column.)
+// The wire type's effectDieSource (a class-die reference the backend resolves
+// via ClassDieResolver) is never read here — frontend rows never carry a
+// resolved value for it, so this stays the fixed-effectDiceFaces-only arm.
 function resolveEffectDice(row: EffectRow): EffectSpec["dice"] {
   const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
   return hasDice
