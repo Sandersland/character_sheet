@@ -8,7 +8,7 @@ import type { CampaignEntity, EntityType } from "@/types/character";
 
 const chipBase =
   "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600";
-const chipOn = "bg-garnet-700 text-parchment-50";
+const chipOn = "bg-garnet-surface text-garnet-on-surface";
 const chipOff = "bg-parchment-200/60 text-parchment-700 hover:bg-parchment-200";
 
 // Compact sibling list beside the reading pane (#842). Filter state is local on

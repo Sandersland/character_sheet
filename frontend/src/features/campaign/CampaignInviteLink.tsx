@@ -33,7 +33,7 @@ export default function CampaignInviteLink({ inviteCode }: { inviteCode: string 
         <button
           type="button"
           onClick={copyInvite}
-          className="shrink-0 rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
+          className="shrink-0 rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover"
         >
           {status === "copied" ? "Copied" : "Copy"}
         </button>

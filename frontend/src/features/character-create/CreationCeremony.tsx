@@ -210,7 +210,7 @@ export default function CreationCeremony() {
           canContinue={c.canContinue}
           onConfirm={() => void c.save()}
           confirmLabel="✓ Create Character"
-          confirmClassName="border-garnet-800 bg-garnet-700 hover:bg-garnet-800"
+          confirmClassName="border-garnet-surface-hover bg-garnet-surface text-garnet-on-surface hover:bg-garnet-surface-hover"
           submitting={c.submitting}
           confirmDisabled={!c.isValid}
         />

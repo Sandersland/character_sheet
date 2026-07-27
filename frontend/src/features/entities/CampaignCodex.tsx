@@ -130,7 +130,7 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
             type="button"
             aria-expanded={creating}
             onClick={() => (creating ? closeForm() : setCreating(true))}
-            className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-1.5 rounded-full bg-garnet-700 px-4 py-3 text-sm font-semibold text-parchment-50 shadow-raised transition-colors hover:bg-garnet-800"
+            className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-1.5 rounded-full bg-garnet-surface px-4 py-3 text-sm font-semibold text-garnet-on-surface shadow-raised transition-colors hover:bg-garnet-surface-hover"
           >
             <Plus aria-hidden="true" className="h-4 w-4" />
             New entry

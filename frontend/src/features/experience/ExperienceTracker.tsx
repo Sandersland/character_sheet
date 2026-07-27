@@ -134,7 +134,7 @@ function AwardXpForm({ pending, apply }: { pending: boolean; apply: ApplyXp }) {
         type="button"
         disabled={pending || !awardValue}
         onClick={submit}
-        className="inline-flex items-center gap-1.5 rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
       >
         <Plus aria-hidden="true" className="h-4 w-4" />
         Award XP

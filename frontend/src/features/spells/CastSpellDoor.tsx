@@ -114,7 +114,7 @@ export default function CastSpellDoor({ derived, busy, isLive, onCast, onGoToCom
       <button
         type="button"
         onClick={handleDoorClick}
-        className="rounded-lg bg-garnet-700 py-2.5 text-center text-sm font-semibold text-parchment-50 hover:bg-garnet-800"
+        className="rounded-lg bg-garnet-surface py-2.5 text-center text-sm font-semibold text-garnet-on-surface hover:bg-garnet-surface-hover"
       >
         Cast a spell
       </button>

@@ -27,7 +27,7 @@ export default function LevelUpBanner() {
         </div>
         <Link
           to={`/characters/${id}/level-up`}
-          className="rounded-control bg-garnet-700 px-4 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600 focus-visible:ring-offset-1"
+          className="rounded-control bg-garnet-surface px-4 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600 focus-visible:ring-offset-1"
         >
           Level Up
         </Link>

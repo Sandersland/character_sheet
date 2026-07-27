@@ -36,7 +36,7 @@ function EmptyState() {
       </p>
       <Link
         to="/characters/new"
-        className="mt-2 rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 focus-visible:bg-garnet-800"
+        className="mt-2 rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover focus-visible:bg-garnet-surface-hover"
       >
         New Character
       </Link>

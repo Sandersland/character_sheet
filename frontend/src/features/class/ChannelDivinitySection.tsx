@@ -80,7 +80,7 @@ export default function ChannelDivinitySection({ busy, onCast }: Props) {
                 </div>
                 <button
                   type="button"
-                  className="shrink-0 rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                  className="shrink-0 rounded-control bg-garnet-surface px-3 py-1.5 text-xs font-semibold text-garnet-on-surface disabled:opacity-40"
                   disabled={busy || remaining <= 0}
                   onClick={() => onCast({ type: "castChannelDivinity", abilityId: option.id })}
                 >

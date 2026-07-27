@@ -186,10 +186,12 @@ function DesktopBanner({
   const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
     <header className="hidden border-b border-parchment-200 bg-parchment-50 text-parchment-900 md:block">
-      {/* Thin garnet top rule — the one saturated accent on the light surface. */}
+      {/* Thin garnet top rule — the one saturated accent on the light surface.
+          garnet-surface-deep/-surface (#994), not the inverting ramp: via-garnet-600
+          would leave a pale-salmon core in dark mode, a half-migrated rule. */}
       <div
         aria-hidden
-        className="h-[5px] bg-gradient-to-r from-garnet-800 via-garnet-600 to-garnet-800"
+        className="h-[5px] bg-gradient-to-r from-garnet-surface-deep via-garnet-surface to-garnet-surface-deep"
       />
       <div className="mx-auto max-w-6xl px-6 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">

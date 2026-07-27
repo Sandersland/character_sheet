@@ -23,7 +23,7 @@ function toneClass(mode: RollMode, active: boolean): string {
     return "text-parchment-600 hover:bg-parchment-100";
   }
   if (mode === "advantage") return "bg-vitality-600 text-parchment-50";
-  if (mode === "disadvantage") return "bg-garnet-700 text-parchment-50";
+  if (mode === "disadvantage") return "bg-garnet-surface text-garnet-on-surface";
   return "bg-parchment-50 text-parchment-900 shadow-sm";
 }
 

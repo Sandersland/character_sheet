@@ -21,7 +21,7 @@ const inputCls =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 const labelCls = "block text-xs font-semibold text-parchment-700";
 const primaryBtn =
-  "rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-40";
+  "rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-40";
 
 // Campaigns hub: lists the campaigns the caller belongs to (real list endpoint),
 // plus a create surface. Each card links to the management detail page.

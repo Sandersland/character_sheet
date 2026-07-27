@@ -88,7 +88,7 @@ function HandCard({ slot, current, ctx, inventory, busy, expanded, onToggle, onC
                     type="button"
                     onClick={() => onChoose(opt)}
                     disabled={busy || Boolean(opt.disabledReason)}
-                    className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:cursor-not-allowed disabled:border-parchment-300 disabled:bg-parchment-200 disabled:text-parchment-500"
+                    className="shrink-0 rounded-control border border-garnet-300 bg-garnet-surface px-3 py-1 text-xs font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:cursor-not-allowed disabled:border-parchment-300 disabled:bg-parchment-200 disabled:text-parchment-500"
                   >
                     {optionVerb(opt, Boolean(current))}
                   </button>

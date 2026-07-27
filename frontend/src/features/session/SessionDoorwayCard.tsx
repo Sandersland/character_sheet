@@ -29,7 +29,7 @@ export default function SessionDoorwayCard({ characterId, onEnterCombat }: Sessi
           type="button"
           disabled={pending}
           onClick={onAction}
-          className="mt-4 inline-flex items-center justify-center rounded-control bg-garnet-800 px-5 py-2.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600 focus-visible:ring-offset-1 disabled:opacity-60"
+          className="mt-4 inline-flex items-center justify-center rounded-control bg-garnet-surface px-5 py-2.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600 focus-visible:ring-offset-1 disabled:opacity-60"
         >
           {actionLabel}
         </button>

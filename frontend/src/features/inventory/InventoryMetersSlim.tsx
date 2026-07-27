@@ -32,7 +32,7 @@ export default function InventoryMetersSlim({
             className="h-1.5 flex-1"
           />
           {overCapacity && (
-            <span className="rounded-control bg-garnet-700 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-parchment-50">
+            <span className="rounded-control bg-garnet-surface px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-garnet-on-surface">
               Over capacity
             </span>
           )}

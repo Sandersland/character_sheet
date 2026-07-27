@@ -39,7 +39,7 @@ const CARD_BASE =
 const CARD_SELECTED = "border-garnet-600 bg-parchment-50 ring-2 ring-garnet-50";
 const CARD_IDLE = "border-parchment-300 bg-parchment-50 hover:border-garnet-400";
 const PRIMARY_BTN =
-  "min-h-11 rounded-control border border-garnet-800 bg-garnet-700 px-5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800";
+  "min-h-11 rounded-control border border-garnet-surface-hover bg-garnet-surface px-5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover";
 
 // One "which campaign" card per membership + a leading Solo option. Extracted
 // so CreationEntryGate's own render stays a plain if/else over load state.
