@@ -3,7 +3,7 @@
 // module and frontend/src/types/character/classes.ts. Sent as
 // `{ operations: WarriorOfElementsOperation[] }` to POST /api/characters/:id/elements/transactions.
 
-/** The five elemental damage types a Warrior of the Elements can deal (SRD 5.2). */
+/** The five elemental damage types a Warrior of the Elements can deal (PHB'24 p.90). */
 export type ElementalDamageType = "acid" | "cold" | "fire" | "lightning" | "thunder";
 
 /** Toggle Elemental Attunement on (spends 1 Focus) or off (no refund). */
