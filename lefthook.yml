@@ -100,7 +100,9 @@ pre-push:
       run: npx tsc --noEmit
     typecheck-backend:
       root: "backend/"
-      run: npx tsc --noEmit
+      # npm run typecheck (not a bare tsc) so this also runs tsconfig.seed.json
+      # (#1277) — the program that actually type-checks prisma/seed/*.ts.
+      run: npm run typecheck
       fail_text: |
         Backend tsc failed. If errors say a model/enum is missing on PrismaClient
         (e.g. "Property 'x' does not exist"), the generated client is stale for

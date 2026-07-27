@@ -213,6 +213,13 @@ jobs:
 
       - run: npm run build
 
+      # `npm run build` (tsc && tsc-alias) never type-checks prisma/seed/*.ts —
+      # backend/tsconfig.json's `include` is src-only. This is the CI leg of
+      # backend's `typecheck` script (tsconfig.seed.json, #1277), which also
+      # type-checks src again — harmless, tsc is fast and idempotent here.
+      - name: Backend typecheck (incl. prisma/seed)
+        run: npm run typecheck --workspace backend
+
       # zod is a real backend/contracts dependency, but the frontend must only
       # ever `import type` from @character-sheet/contracts — a stray value
       # import would ship zod's runtime to every player (#1370). Runs right
