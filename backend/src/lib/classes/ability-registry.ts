@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { castChannelDivinityOpSchema } from "@character-sheet/contracts";
+import {
+  activateCloakOfShadowsOpSchema,
+  castChannelDivinityOpSchema,
+  castManeuverOpSchema,
+  castShadowArtOpSchema,
+} from "@character-sheet/contracts";
 
 import type { TransactionHandler } from "@/lib/http/transactions-endpoint.js";
 import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
@@ -106,10 +111,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   // per-op { roll, saveDc } so the client folds the die into the attack/damage
   // total. The learn-a-maneuver catalog stays a GET on maneuversRouter.
   maneuvers: defineAbility({
-    schema: opBatch(z.object({
-      type: z.literal("castManeuver"),
-      entryId: z.string().min(1),
-    })),
+    schema: opBatch(castManeuverOpSchema),
     apply: (characterId, data) => applyManeuverOperations(characterId, data.operations),
     domainErrors: [
       InvalidManeuverOperationError,
@@ -152,10 +154,7 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   //   activateCloakOfShadows — spend 3 focus, self-apply invisible (L17).
   // The Shadow Arts picker stays a GET on shadowArtsRouter.
   "shadow-arts": defineAbility({
-    schema: opBatch(
-      z.object({ type: z.literal("castShadowArt"), shadowArtId: z.string().min(1) }),
-      z.object({ type: z.literal("activateCloakOfShadows") }),
-    ),
+    schema: opBatch(castShadowArtOpSchema, activateCloakOfShadowsOpSchema),
     apply: (characterId, data) => applyShadowArtsOperations(characterId, data.operations),
     domainErrors: [InvalidShadowArtOperationError],
   }),

@@ -31,6 +31,20 @@ export type {
 // Aliasing keeps api/client.ts out of this diff — #1275 is rewriting that file.
 export type { ResourceOpAudit as ResourceOpResult } from "@character-sheet/shared-types";
 
+// The Channel Divinity / Shadow Arts / maneuver op shapes are derived from the
+// route zod schemas in @character-sheet/contracts (#1370) — `import type` only,
+// so zod never enters the client bundle (scripts/check-no-zod-in-client-bundle.sh).
+// Only the names this tier actually consumes are re-exported: CastManeuverOperation
+// and ActivateCloakOfShadowsOperation have zero frontend call sites, so forwarding
+// them here would be a dead export under the repo-wide fallow gate.
+export type {
+  CastChannelDivinityOperation,
+  CastShadowArtOperation,
+  ChannelDivinityOperation,
+  ManeuverOperation,
+  ShadowArtOperation,
+} from "@character-sheet/contracts";
+
 /** Focus (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
 export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
@@ -115,14 +129,6 @@ export interface CatalogManeuver {
   actionSlot?: "bonusAction" | "reaction" | null;
   saveAbility?: string | null;
 }
-
-/** Cast a known maneuver: spend one superiority die (the server rolls it). */
-export interface CastManeuverOperation {
-  type: "castManeuver";
-  entryId: string;
-}
-
-export type ManeuverOperation = CastManeuverOperation;
 
 /** Per-op result from POST …/maneuvers/transactions — die + announced save DC. */
 export interface ManeuverCastResult {
@@ -255,36 +261,3 @@ export interface SetSubclassOperation { type: "setSubclass"; subclassId: string 
 // #1137: setFightingStyle is gone — Fighting Style is now a feat taken via the
 // advancement endpoint (fightingStyle slot), not a class-scalar op.
 export type ClassOperation = SetSubclassOperation;
-
-/**
- * Warrior of Shadow operation types — mirror of `applyShadowArtsOperations`.
- * Sent as `{ operations: ShadowArtOperation[] }` to
- * POST /api/characters/:id/shadow-arts/transactions.
- *
- *   castShadowArt          — cast Shadow Arts' Darkness (1 focus, concentration).
- *   activateCloakOfShadows — L17: spend 3 focus, become invisible.
- */
-export interface CastShadowArtOperation {
-  type: "castShadowArt";
-  shadowArtId: string;
-}
-
-export interface ActivateCloakOfShadowsOperation {
-  type: "activateCloakOfShadows";
-}
-
-export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
-
-/**
- * Channel Divinity operation types — mirror of `applyChannelDivinityOperations`.
- * Sent as `{ operations: ChannelDivinityOperation[] }` to
- * POST /api/characters/:id/channel-divinity/transactions.
- *
- * Use a Channel Divinity option (Cleric/Paladin): spend 1 CD charge.
- */
-export interface CastChannelDivinityOperation {
-  type: "castChannelDivinity";
-  abilityId: string;
-}
-
-export type ChannelDivinityOperation = CastChannelDivinityOperation;

@@ -19,3 +19,23 @@ export const castChannelDivinityOpSchema = z.object({
 });
 export type CastChannelDivinityOperation = z.infer<typeof castChannelDivinityOpSchema>;
 export type ChannelDivinityOperation = CastChannelDivinityOperation;
+
+export const castManeuverOpSchema = z.object({
+  type: z.literal("castManeuver"),
+  entryId: z.string().min(1),
+});
+export type CastManeuverOperation = z.infer<typeof castManeuverOpSchema>;
+export type ManeuverOperation = CastManeuverOperation;
+
+export const castShadowArtOpSchema = z.object({
+  type: z.literal("castShadowArt"),
+  shadowArtId: z.string().min(1),
+});
+export type CastShadowArtOperation = z.infer<typeof castShadowArtOpSchema>;
+
+export const activateCloakOfShadowsOpSchema = z.object({
+  type: z.literal("activateCloakOfShadows"),
+});
+export type ActivateCloakOfShadowsOperation = z.infer<typeof activateCloakOfShadowsOpSchema>;
+
+export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
