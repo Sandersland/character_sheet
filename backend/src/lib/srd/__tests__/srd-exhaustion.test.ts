@@ -168,12 +168,14 @@ describe("exhaustionEffectText — 2014 (PHB'14 p. 291, Appendix A)", () => {
     expect(exhaustionEffectText(99, "EDITION_2014")).toBe("Death.");
   });
 
-  // Names what this actually verifies: the categories and their order, not a
-  // character-by-character diff against the rendered banner. summarizeRollModifiers
-  // is a frontend presenter, and a backend test importing it would be a
-  // boundary-violation (#1272) — so the shared vocabulary is pinned on both
-  // sides separately, and this is the backend half.
-  it("the disadvantage clause names the same categories, in the same order, that exhaustionRollEffects applies at that level", () => {
+  // Names what this actually verifies: the SET of categories, pinned on each
+  // side separately. Deliberately not their order — the sentence reads
+  // attack/check/save/initiative (summarizeRollModifiers' KIND_ORDER) while the
+  // grant array is check/initiative/attack/save, and nothing here reconciles
+  // the two. A character-by-character diff against the rendered banner is not
+  // available either: summarizeRollModifiers is a frontend presenter, so a
+  // backend test importing it would be a boundary-violation (#1272).
+  it("the disadvantage clause names the same categories that exhaustionRollEffects applies at that level", () => {
     expect(exhaustionEffectText(3, "EDITION_2014")).toContain(
       "Disadvantage on attack rolls, ability checks, saving throws, and initiative",
     );
