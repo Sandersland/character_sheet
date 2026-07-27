@@ -7,7 +7,7 @@
 // level-gated-registry rule: one shared function, never two inline copies.
 import { describe, expect, it } from "vitest";
 
-import { deriveEntryScopedResources, deriveResources } from "@/lib/classes/class-features.js";
+import { deriveEntryScopedResources, deriveResources, SHARED_POOL_MERGE } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 const ABILITY_SCORES = {
@@ -306,11 +306,13 @@ describe("deriveEntryScopedResources", () => {
     ).toThrow(/duplicate pool key "focus"/);
   });
 
-  // Standing invariant (#1340 scope item 3): channelDivinity must stay the ONLY
-  // pool key two different classes emit. Loops every class × every level so the
-  // next colliding class module fails THIS test instead of shipping a 500 —
-  // discharges the pool half of the #1340 audit as a durable check.
-  it("channelDivinity is the ONLY pool key two different classes emit — any new one must be sanctioned in SHARED_POOL_MERGE (#1340)", () => {
+  // Standing invariant (#1340 scope item 3): any pool key two different classes
+  // emit MUST be sanctioned in SHARED_POOL_MERGE — loops every class × every
+  // level so the next colliding class module fails THIS test (with a clear
+  // "add it to SHARED_POOL_MERGE" fix) instead of shipping a 500. Also pins
+  // that SHARED_POOL_MERGE carries no unnecessary entries beyond the real
+  // cross-class keys.
+  it("every cross-class pool key is sanctioned in SHARED_POOL_MERGE, and SHARED_POOL_MERGE carries no extra entries (#1340)", () => {
     const CLASS_NAMES = [
       "barbarian", "bard", "cleric", "druid", "fighter", "monk",
       "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard",
@@ -328,6 +330,6 @@ describe("deriveEntryScopedResources", () => {
       }
     }
     const crossClassKeys = [...classesByPoolKey.entries()].filter(([, classes]) => classes.size > 1).map(([key]) => key);
-    expect(crossClassKeys).toEqual(["channelDivinity"]);
+    expect(crossClassKeys.sort()).toEqual(Object.keys(SHARED_POOL_MERGE).sort());
   });
 });
