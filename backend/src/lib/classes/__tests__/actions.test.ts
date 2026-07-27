@@ -952,6 +952,13 @@ describe("subclass gate is exact-name, not substring (#1339)", () => {
   // under-matches silently) — this table pins each accepted name to the keys
   // it must unlock at L20, so a typo in a row's grantSubclasses list fails
   // HERE instead of shipping quiet (#1339).
+  //
+  // The table is hand-maintained because DERIVED_ACTIONS is deliberately
+  // unexported: a NEW subclass-gated row must be added here and to the
+  // registry-key check below, or the latch silently stops covering it. That
+  // trade-off is accepted rather than widening the module's public surface;
+  // #1277 replaces the vocabulary with slugs and can derive both from the
+  // catalog instead.
   it("every subclass-gated row is reachable from its accepted name (#1339)", () => {
     const ACCEPTED_NAME_KEYS: Record<string, string[]> = {
       "warrior of shadow": ["shadowStep", "shadowArts", "cloakOfShadows"],

@@ -84,8 +84,10 @@ interface DerivedActionRecord {
    * and the resource/feature gate agree on identity. Substring matching let a
    * 2014 "Way of Shadow" monk inherit the 2024 "Warrior of Shadow" mechanics —
    * the edition bleed of #1322/#1331 (#1339). Both normalize through
-   * matchesSubclassGate so matchesActionGate keeps ONE code path per axis; #1277
-   * replaces these names with a stable slug at all seven substring sites.
+   * matchesSubclassGate so matchesActionGate keeps ONE code path per axis. #1277
+   * revisits this field to swap the names for a stable slug — it counts this as
+   * the seventh of its substring sites; the other six (isWarriorOfTheOpenHand,
+   * isWarriorOfMercy, openHandMonkEntry, attacksForClass) still substring-match.
    */
   grantSubclasses?: string[];
   resourceKey?: string;  // pool key to check for `enabled`
