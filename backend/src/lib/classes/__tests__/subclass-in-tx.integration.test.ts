@@ -50,13 +50,13 @@ describe("setSubclassInTx (#895 seam)", () => {
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId: fighterId, name: "Battle Master InTx", edition: null },
-      { classId: fighterId, name: "Battle Master InTx", description: "Test subclass." },
+      { classId: fighterId, name: "Battle Master InTx", description: "Test subclass.", slug: "fighter-battle-master-in-tx" },
       {},
     );
     const evo = await upsertEditionRow(
       prisma.subclass,
       { classId: wizardId, name: "Evocation InTx", edition: null },
-      { classId: wizardId, name: "Evocation InTx", description: "Test subclass." },
+      { classId: wizardId, name: "Evocation InTx", description: "Test subclass.", slug: "wizard-evocation-in-tx" },
       {},
     );
     battleMasterId = bm.id;

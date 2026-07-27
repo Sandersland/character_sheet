@@ -483,7 +483,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
     const subclass = await upsertEditionRow(
       prisma.subclass,
       { classId: cls.id, name: SUBCLASS_NAME, edition: null },
-      { classId: cls.id, name: SUBCLASS_NAME, description: "Test subclass." },
+      { classId: cls.id, name: SUBCLASS_NAME, description: "Test subclass.", slug: "fighter-activity-revert-test-battle-master" },
       {},
     );
     subclassId = subclass.id;

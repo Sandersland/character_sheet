@@ -93,7 +93,9 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, edition: null },
-      { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, description: "Maneuvers." },
+      // Distinct from the real seeded "fighter-battle-master" (#1277) — this
+      // test's Fighter class is its own throwaway row.
+      { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, description: "Maneuvers.", slug: "fighter-battle-master-experience-test" },
       {},
     );
     battleMasterSubclassId = bm.id;
@@ -116,7 +118,7 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     const life = await upsertEditionRow(
       prisma.subclass,
       { classId: clericClass.id, name: LIFE_DOMAIN_SUBCLASS_NAME, edition: null },
-      { classId: clericClass.id, name: LIFE_DOMAIN_SUBCLASS_NAME, description: "Healing." },
+      { classId: clericClass.id, name: LIFE_DOMAIN_SUBCLASS_NAME, description: "Healing.", slug: "cleric-test-life-domain-xp-suite" },
       {},
     );
     lifeSubclassId = life.id;
@@ -395,7 +397,7 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId: fc.id, name: BM_SUBCLASS_NAME2, edition: null },
-      { classId: fc.id, name: BM_SUBCLASS_NAME2, description: "Maneuvers." },
+      { classId: fc.id, name: BM_SUBCLASS_NAME2, description: "Maneuvers.", slug: "fighter-battle-master-experience-test-2" },
       {},
     );
     battleMasterSubclassId2 = bm.id;

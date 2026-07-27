@@ -229,6 +229,7 @@ export const fighter: ClassDefinition = {
   },
   subclasses: {
     "battle master": {
+      slug: "fighter-battle-master",
       grantLevel: 3,
       features: BATTLE_MASTER_FEATURES,
       resourceFn: (level, abilityScores, profBonus) => {
@@ -259,7 +260,7 @@ export const fighter: ClassDefinition = {
         };
       },
     },
-    champion: { grantLevel: 3, features: CHAMPION_FEATURES },
-    "eldritch knight": { grantLevel: 3, features: ELDRITCH_KNIGHT_FEATURES },
+    champion: { slug: "fighter-champion", grantLevel: 3, features: CHAMPION_FEATURES },
+    "eldritch knight": { slug: "fighter-eldritch-knight", grantLevel: 3, features: ELDRITCH_KNIGHT_FEATURES },
   },
 };

@@ -35,7 +35,16 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
     const shadow = await upsertEditionRow(
       prisma.subclass,
       { classId: monkClassId, name: "Warrior of Shadow", edition: null },
-      { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass" },
+      {
+        classId: monkClassId,
+        name: "Warrior of Shadow",
+        description: "Test subclass",
+        // Distinct from the real seeded "monk-warrior-of-shadow" — this test
+        // creates its OWN throwaway Monk class, and (slug, edition) is unique
+        // catalog-wide regardless of classId, so reusing the real slug here
+        // would collide with the seeded row (#1277).
+        slug: "monk-warrior-of-shadow-granted-stale-level-test",
+      },
       {},
     );
     shadowId = shadow.id;

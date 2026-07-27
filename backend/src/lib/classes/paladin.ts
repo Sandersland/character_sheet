@@ -255,8 +255,12 @@ export const paladin: ClassDefinition = {
     return pools;
   },
   subclasses: {
-    "oath of devotion": { grantLevel: 3, features: OATH_OF_DEVOTION_FEATURES },
-    "oath of the ancients": { grantLevel: 3, features: OATH_OF_THE_ANCIENTS_FEATURES },
-    "oath of vengeance": { grantLevel: 3, features: OATH_OF_VENGEANCE_FEATURES },
+    "oath of devotion": { slug: "paladin-oath-of-devotion", grantLevel: 3, features: OATH_OF_DEVOTION_FEATURES },
+    "oath of the ancients": {
+      slug: "paladin-oath-of-the-ancients",
+      grantLevel: 3,
+      features: OATH_OF_THE_ANCIENTS_FEATURES,
+    },
+    "oath of vengeance": { slug: "paladin-oath-of-vengeance", grantLevel: 3, features: OATH_OF_VENGEANCE_FEATURES },
   },
 };

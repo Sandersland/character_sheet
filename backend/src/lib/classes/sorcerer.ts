@@ -141,8 +141,13 @@ export const sorcerer: ClassDefinition = {
   },
   // PHB'14 p.99: Sorcerous Origin (Sorcerer's subclass) is chosen at 1st level.
   subclasses: {
-    "draconic bloodline": { grantLevel: 1, features: DRACONIC_BLOODLINE_FEATURES },
+    "draconic bloodline": {
+      slug: "sorcerer-draconic-bloodline",
+      grantLevel: 1,
+      features: DRACONIC_BLOODLINE_FEATURES,
+    },
     "wild magic": {
+      slug: "sorcerer-wild-magic",
       grantLevel: 1,
       features: WILD_MAGIC_FEATURES,
       resourceFn: () => [
