@@ -1,14 +1,23 @@
 /**
  * AddConditionPanel — inline expand-in-place picker for applying a status
  * condition. Not a modal — follows the same "inline panel, collapsed by
- * default" pattern as AddManeuverPanel. The condition list is static rules data
- * (CONDITION_OPTIONS from lib/conditions.ts), so there's nothing to fetch.
+ * default" pattern as AddManeuverPanel. The condition list (with rules text)
+ * is resolved server-side per edition and passed in via `options` (#1322) —
+ * the host (ConditionsSheetBody) reads it from GET /api/reference and falls
+ * back to the edition-invariant CONDITION_OPTIONS while it's loading.
  */
 
 import { useState } from "react";
 
-import { CONDITION_OPTIONS } from "@/lib/conditions";
 import type { ApplyConditionOperation, ConditionKey } from "@/types/character";
+
+interface ConditionChoice {
+  key: ConditionKey;
+  label: string;
+  /** Absent while /reference hasn't resolved yet — the picker still lists the
+   *  condition by label, just without its rules text (#1322). */
+  description?: string;
+}
 
 interface Props {
   /** Keys already active — filtered out of the picker. */
@@ -18,9 +27,11 @@ interface Props {
   /** Start expanded — used when a host opens the picker directly in an overlay
    *  (the live-Combat utility strip's "+ Add", #982). Defaults to collapsed. */
   defaultOpen?: boolean;
+  /** The 14 conditions to list, resolved for the viewing character's edition. */
+  options: readonly ConditionChoice[];
 }
 
-export default function AddConditionPanel({ activeKeys, busy, onApply, defaultOpen = false }: Props) {
+export default function AddConditionPanel({ activeKeys, busy, onApply, defaultOpen = false, options }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("");
@@ -35,11 +46,11 @@ export default function AddConditionPanel({ activeKeys, busy, onApply, defaultOp
   }
 
   const activeSet = new Set(activeKeys);
-  const available = CONDITION_OPTIONS.filter((c) => {
+  const available = options.filter((c) => {
     if (activeSet.has(c.key)) return false;
     if (search) {
       const q = search.toLowerCase();
-      return c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q);
+      return c.label.toLowerCase().includes(q) || (c.description ?? "").toLowerCase().includes(q);
     }
     return true;
   });
@@ -103,9 +114,11 @@ export default function AddConditionPanel({ activeKeys, busy, onApply, defaultOp
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-parchment-900">{condition.label}</p>
-                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-600">
-                  {condition.description}
-                </p>
+                {condition.description && (
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-600">
+                    {condition.description}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

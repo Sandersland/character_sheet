@@ -61,6 +61,7 @@ const reference: ReferenceData = {
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
+  conditions: [],
 };
 
 function seedDraft(overrides: Partial<CharacterDraft>) {

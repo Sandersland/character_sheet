@@ -10,10 +10,15 @@ import * as client from "@/api/client";
 import type { Character, ConditionsState } from "@/types/character";
 
 // The strip drives conditions through the shared ConditionsSheetBody (which
-// batches ops via applyConditionTransactions) and rest through RestButton.
+// batches ops via applyConditionTransactions and also imports fetchReference
+// via useReferenceData — must be present here even though these fixtures omit
+// rulesEdition (skipToken keeps the query pending, so it's never actually
+// called), or a future fixture that adds rulesEdition would call `undefined(...)`)
+// and rest through RestButton.
 vi.mock("@/api/client", () => ({
   applyConditionTransactions: vi.fn(),
   applyHitPointOperations: vi.fn(),
+  fetchReference: vi.fn(),
 }));
 
 function makeCharacter(conditions: ConditionsState): Character {
