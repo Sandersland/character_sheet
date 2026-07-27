@@ -142,6 +142,19 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(pools[0].total).toBe(2);
     });
 
+    // #1340 Chunk 2: the merged DERIVED_ACTIONS row must surface as exactly one
+    // card on the wire, not the two duplicate channelDivinityCleric/
+    // channelDivinityPaladin cards a Cleric/Paladin multiclass used to get.
+    it("availableActions has exactly one enabled Channel Divinity card", async () => {
+      const res = await agent().get(`/api/characters/${CHAR_ID}`);
+      expect(res.status).toBe(200);
+      const cards = (res.body.availableActions as { key: string; name: string; cost: string; enabled: boolean }[]).filter(
+        (a) => a.name === "Channel Divinity",
+      );
+      expect(cards).toHaveLength(1);
+      expect(cards[0]).toMatchObject({ key: "channelDivinity", cost: "action", enabled: true });
+    });
+
     it("persisted used clamps to the current total after a level-down (cleric 6→2, no reconciler needed)", async () => {
       // Spend both uses at the current (total 2) state.
       await prisma.character.update({
