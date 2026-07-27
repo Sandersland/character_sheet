@@ -38,6 +38,9 @@ const plan: LevelUpPlanResponse = {
 
 // Live harness: a real useState draft so aria-checked reflects clicks. Pass a
 // `setDraft` spy to instead pin the draft and assert the updater in isolation.
+// The rendered draft (data-testid="draft") is what makes a keyboard/mouse
+// round-trip through the stash (#1323) assertable — without it, a test can
+// only see aria-checked flip, which is already covered by the #1111 tests.
 function renderStep({ draft: initial, setDraft }: { draft?: LevelUpDraft; setDraft?: LevelUpStepContextValue["setDraft"] } = {}) {
   const seed = initial ?? { hp: { method: "average" } };
   function Harness() {
@@ -52,6 +55,7 @@ function renderStep({ draft: initial, setDraft }: { draft?: LevelUpDraft; setDra
     return (
       <LevelUpStepContext.Provider value={value}>
         <SubclassStep />
+        <pre data-testid="draft">{JSON.stringify(liveDraft)}</pre>
       </LevelUpStepContext.Provider>
     );
   }
@@ -208,5 +212,63 @@ describe("SubclassStep — radiogroup keyboard nav (#1111)", () => {
     await user.keyboard("{ArrowUp}");
     expect(document.activeElement).toBe(radios[1]);
     expect(radios[1]).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+// #1323: re-picking a subclass after making dependent picks (maneuvers, tool
+// proficiencies, subclass choices) under it must not silently discard them —
+// applySubclassPick stashes/restores per subclass id (unit-tested directly in
+// levelUpSteps.test.ts); these exercise it through the real radiogroup.
+describe("SubclassStep — subclass re-pick stash (#1323)", () => {
+  const m1 = { type: "learnManeuver", maneuverId: "m1" } as never;
+
+  async function findRadios() {
+    return [
+      await screen.findByRole("radio", { name: "Battle Master" }),
+      screen.getByRole("radio", { name: "Champion" }),
+      screen.getByRole("radio", { name: "Eldritch Knight" }),
+    ];
+  }
+
+  it("restores dependent picks when arrowing back to a previously chosen subclass", async () => {
+    renderStep({ draft: { hp: { method: "average" }, subclassId: "bm", maneuvers: [m1] } });
+    const user = userEvent.setup();
+    const radios = await findRadios();
+    radios[0].focus();
+
+    await user.keyboard("{ArrowRight}"); // bm → champ: stashes bm's maneuvers, clears them
+    await user.keyboard("{ArrowLeft}"); // champ → bm: restores bm's stashed maneuvers
+
+    const draft = JSON.parse(screen.getByTestId("draft").textContent!);
+    expect(draft.maneuvers).toEqual([m1]);
+  });
+
+  it("restores identically via mouse clicks (keyboard and pointer agree)", async () => {
+    renderStep({ draft: { hp: { method: "average" }, subclassId: "bm", maneuvers: [m1] } });
+    const user = userEvent.setup();
+    const radios = await findRadios();
+
+    await user.click(radios[1]); // Champion
+    await user.click(radios[0]); // back to Battle Master
+
+    const draft = JSON.parse(screen.getByTestId("draft").textContent!);
+    expect(draft.maneuvers).toEqual([m1]);
+  });
+
+  it("leaves a newly chosen subclass with none of the previous subclass's picks", async () => {
+    renderStep({ draft: { hp: { method: "average" }, subclassId: "bm", maneuvers: [m1] } });
+    const user = userEvent.setup();
+    const radios = await findRadios();
+    radios[0].focus();
+
+    // Positive control: fails if a "fix" stops clearing entirely instead of
+    // stashing (M5) — the seeded maneuvers must actually be present first.
+    expect(JSON.parse(screen.getByTestId("draft").textContent!).maneuvers).toEqual([m1]);
+
+    await user.keyboard("{ArrowRight}"); // bm → champ
+
+    const draft = JSON.parse(screen.getByTestId("draft").textContent!);
+    expect(draft.maneuvers).toBeUndefined();
+    expect(draft.subclassId).toBe("champ");
   });
 });
