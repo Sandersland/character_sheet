@@ -1,0 +1,133 @@
+/**
+ * #1345: a client-supplied catalog id must not resolve against the OTHER
+ * edition's row. Covers all seven sites the plan audit found (the issue named
+ * three) — grouped by chunk below. Modelled on rules-edition-seam.test.ts:
+ * real Postgres, characters built over HTTP with explicit rulesEdition.
+ *
+ * Fixture rows are built through upsertEditionRow (compound keys containing
+ * `edition` reject a literal null on findUnique/upsert — catalog-edition.ts).
+ * afterAll deletes fixtures by NAME, never by an id/classId var that could be
+ * undefined if beforeAll threw partway (an undefined classId reads to Prisma
+ * as "no filter" and would delete the real catalog).
+ */
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+
+const OWNER_ID = "owner-cross-edition-catalog-id";
+let COOKIE: string;
+const app = createApp();
+
+function agent() {
+  return supertest.agent(app).set("Cookie", COOKIE);
+}
+
+beforeAll(async () => {
+  await ensureTestOwner(OWNER_ID);
+  COOKIE = await authCookie(OWNER_ID);
+});
+
+describe("Chunk 1 — Feat / advancement.takeFeat (lib/leveling/advancement.ts:353)", () => {
+  // The seeded Alert fork (#1306's worked example) is unusable here: both rows
+  // are category "origin", rejected by featOfferedForAsiSlot BEFORE the guard
+  // runs — a naive test against Alert would pass for the wrong reason. This
+  // trio is "general" category, reachable through the ASI slot at level 4.
+  const FEAT_2014 = "XEd General 2014";
+  const FEAT_2024 = "XEd General 2024";
+  const FEAT_SHARED = "XEd General Shared";
+  let featId2014: string;
+  let featId2024: string;
+  let featIdShared: string;
+
+  beforeAll(async () => {
+    const mk = (name: string, edition: "EDITION_2014" | "EDITION_2024" | null) =>
+      upsertEditionRow(
+        prisma.feat,
+        { name, edition },
+        {
+          name,
+          edition,
+          category: "general",
+          description: "Cross-edition guard test fixture.",
+          levelPrerequisite: 4,
+          abilityOptions: [],
+          abilityIncrease: 1,
+          improvements: [],
+        },
+        { category: "general", levelPrerequisite: 4 },
+      );
+    [featId2014, featId2024, featIdShared] = await Promise.all([
+      mk(FEAT_2014, "EDITION_2014"),
+      mk(FEAT_2024, "EDITION_2024"),
+      mk(FEAT_SHARED, null),
+    ]).then((rows) => rows.map((r) => r.id));
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "XEd Advancement" } } });
+    await prisma.feat.deleteMany({ where: { name: { in: [FEAT_2014, FEAT_2024, FEAT_SHARED] } } });
+  });
+
+  // Level 4 (XP 2700) → one ASI slot (advancement.test.ts:20 convention).
+  async function createCharacter(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string) {
+    const res = await agent()
+      .post("/api/characters")
+      .send({
+        name,
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: "Fighter" }],
+        abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
+        rulesEdition,
+        experiencePoints: 2700,
+      });
+    expect(res.status).toBe(201);
+    return res.body.id as string;
+  }
+
+  async function takeFeat(characterId: string, featId: string) {
+    return agent()
+      .post(`/api/characters/${characterId}/advancement/transactions`)
+      .send({ operations: [{ type: "takeFeat", featId }] });
+  }
+
+  it("(AC) rejects a 2014-tagged feat for a 2024 character with a 400 naming both editions", async () => {
+    const id = await createCharacter("EDITION_2024", "XEd Advancement 2024a");
+    const res = await takeFeat(id, featId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+  });
+
+  it("(symmetry) rejects a 2024-tagged feat for a 2014 character", async () => {
+    const id = await createCharacter("EDITION_2014", "XEd Advancement 2014a");
+    const res = await takeFeat(id, featId2024);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+  });
+
+  it("(NULL-row AC) accepts the shared feat for a 2024 character", async () => {
+    const id = await createCharacter("EDITION_2024", "XEd Advancement 2024b");
+    const res = await takeFeat(id, featIdShared);
+    expect(res.status).toBe(200);
+  });
+
+  it("(NULL-row AC) accepts the shared feat for a 2014 character", async () => {
+    const id = await createCharacter("EDITION_2014", "XEd Advancement 2014b");
+    const res = await takeFeat(id, featIdShared);
+    expect(res.status).toBe(200);
+  });
+
+  it("(unchanged) accepts a same-edition feat", async () => {
+    const id = await createCharacter("EDITION_2024", "XEd Advancement 2024c");
+    const res = await takeFeat(id, featId2024);
+    expect(res.status).toBe(200);
+  });
+});

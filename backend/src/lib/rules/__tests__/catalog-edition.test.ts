@@ -3,7 +3,7 @@
 // edition-tagged catalogs (Feat, Subclass, GrantedAbility, Action, Background).
 import { describe, expect, it } from "vitest";
 
-import { resolveEditionCatalog, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
+import { crossEditionRejection, resolveEditionCatalog, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 
 interface Row {
   id: string;
@@ -91,6 +91,38 @@ describe("resolveEditionCatalog", () => {
     ];
     const resolved = resolveEditionCatalog(rows, "EDITION_2024", (r) => `${r.classId}::${r.name}`);
     expect(resolved.map((r) => r.id).sort()).toEqual(["fighter-champion", "monk-champion"]);
+  });
+});
+
+describe("crossEditionRejection", () => {
+  it("rejects a 2014 row against a 2024 character, naming both labels", () => {
+    const msg = crossEditionRejection({ edition: "EDITION_2014" }, 'Feat "Mobile"', "EDITION_2024");
+    expect(msg).not.toBeNull();
+    expect(msg).toMatch(/2014 rules/);
+    expect(msg).toMatch(/2024 rules/);
+  });
+
+  it("rejects a 2024 row against a 2014 character (symmetry)", () => {
+    const msg = crossEditionRejection({ edition: "EDITION_2024" }, 'Feat "Mobile"', "EDITION_2014");
+    expect(msg).not.toBeNull();
+    expect(msg).toMatch(/2014 rules/);
+    expect(msg).toMatch(/2024 rules/);
+  });
+
+  it("accepts a NULL-edition (shared) row for a 2014 character", () => {
+    expect(crossEditionRejection({ edition: null }, 'Feat "Mobile"', "EDITION_2014")).toBeNull();
+  });
+
+  it("accepts a NULL-edition (shared) row for a 2024 character", () => {
+    expect(crossEditionRejection({ edition: null }, 'Feat "Mobile"', "EDITION_2024")).toBeNull();
+  });
+
+  it("accepts a same-edition row (2014)", () => {
+    expect(crossEditionRejection({ edition: "EDITION_2014" }, 'Feat "Mobile"', "EDITION_2014")).toBeNull();
+  });
+
+  it("accepts a same-edition row (2024)", () => {
+    expect(crossEditionRejection({ edition: "EDITION_2024" }, 'Feat "Mobile"', "EDITION_2024")).toBeNull();
   });
 });
 

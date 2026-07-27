@@ -1,5 +1,7 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import { RULES_EDITION_LABELS } from "./edition.js";
+
 /** Shape shared by every edition-tagged catalog row (Feat, Subclass, GrantedAbility, Action, Background). */
 export interface EditionTagged {
   edition: RulesEdition | null;
@@ -23,6 +25,30 @@ export function resolveEditionRow<T extends EditionTagged>(
   edition: RulesEdition,
 ): T | undefined {
   return candidates.find((row) => row.edition === edition) ?? candidates.find((row) => row.edition === null);
+}
+
+/**
+ * Admission check for a CLIENT-SUPPLIED catalog row id (#1345) — the write-path
+ * counterpart to resolveEditionRow's read-path fallback ordering. `null` means
+ * usable (a NULL/shared row, or an exact-edition match); otherwise the
+ * player-facing rejection message. Lives next to resolveEditionRow because both
+ * express the one comparison this module owns: whether a row's `edition`
+ * admits a given character's edition.
+ *
+ * Message-returning rather than throwing, mirroring multiclassPrerequisitesMet
+ * (srd/srd.ts): each of the seven call sites already has its own registered
+ * domain error (InvalidAdvancementOperationError, InvalidClassOperationError,
+ * …) or, at character creation, the `{ ok: false, status: 400, error }` shape
+ * that PhaseResult never throws — so this stays a rules leaf with zero
+ * HTTP/domain-error knowledge and no site needs a new error class registered
+ * in a `domainErrors` array (a throwing helper would need six such
+ * registrations, each a silent-500 hazard if missed).
+ *
+ * `edition` last, per CLAUDE.md's edition-parameter convention.
+ */
+export function crossEditionRejection(row: EditionTagged, what: string, edition: RulesEdition): string | null {
+  if (row.edition === null || row.edition === edition) return null;
+  return `${what} is ${RULES_EDITION_LABELS[row.edition]} content, not usable by a ${RULES_EDITION_LABELS[edition]} character`;
 }
 
 /**
