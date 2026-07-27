@@ -131,3 +131,103 @@ describe("Chunk 1 — Feat / advancement.takeFeat (lib/leveling/advancement.ts:3
     expect(res.status).toBe(200);
   });
 });
+
+describe("Chunk 2 — Subclass / class.setSubclass (lib/classes/class.ts:83)", () => {
+  const CLASS_NAME = "XEd Fighter";
+  const SUB_2014 = "XEd Sub 2014";
+  const SUB_2024 = "XEd Sub 2024";
+  const SUB_SHARED = "XEd Sub Shared";
+  let classId: string;
+  let subId2014: string;
+  let subId2024: string;
+  let subIdShared: string;
+
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: {
+        name: CLASS_NAME,
+        hitDie: "d10",
+        subclassLevel: 3,
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+      },
+      update: { subclassLevel: 3 },
+    });
+    classId = cls.id;
+
+    const mk = (name: string, edition: "EDITION_2014" | "EDITION_2024" | null, slug: string) =>
+      upsertEditionRow(
+        prisma.subclass,
+        { classId, name, edition },
+        { classId, name, edition, description: "Cross-edition guard test fixture.", slug },
+        {},
+      );
+    [subId2014, subId2024, subIdShared] = await Promise.all([
+      mk(SUB_2014, "EDITION_2014", "xed-sub-2014"),
+      mk(SUB_2024, "EDITION_2024", "xed-sub-2024"),
+      mk(SUB_SHARED, null, "xed-sub-shared"),
+    ]).then((rows) => rows.map((r) => r.id));
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "XEd Class" } } });
+    await prisma.subclass.deleteMany({ where: { name: { in: [SUB_2014, SUB_2024, SUB_SHARED] } } });
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  // Level 3+ (XP 900, hitDice.total 3) so subclassGateLevel passes for both editions.
+  async function createCharacter(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string) {
+    const res = await agent()
+      .post("/api/characters")
+      .send({
+        name,
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: CLASS_NAME }],
+        abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
+        rulesEdition,
+        experiencePoints: 900,
+      });
+    expect(res.status).toBe(201);
+    const id = res.body.id as string;
+    await prisma.characterClassEntry.updateMany({ where: { characterId: id }, data: { level: 3 } });
+    await prisma.character.update({ where: { id }, data: { hitDice: { total: 3, die: "d10" } } });
+    return id;
+  }
+
+  async function setSubclass(characterId: string, subclassId: string) {
+    return agent()
+      .post(`/api/characters/${characterId}/class/transactions`)
+      .send({ operations: [{ type: "setSubclass", subclassId }] });
+  }
+
+  it("(AC) rejects a 2014-tagged subclass for a 2024 character", async () => {
+    const id = await createCharacter("EDITION_2024", "XEd Class 2024a");
+    const res = await setSubclass(id, subId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+  });
+
+  it("(NULL-row AC) accepts the shared subclass for a 2024 character", async () => {
+    const id = await createCharacter("EDITION_2024", "XEd Class 2024b");
+    const res = await setSubclass(id, subIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.classes[0].subclass).toBe(SUB_SHARED);
+  });
+
+  it("(NULL-row AC) accepts the shared subclass for a 2014 character", async () => {
+    const id = await createCharacter("EDITION_2014", "XEd Class 2014a");
+    const res = await setSubclass(id, subIdShared);
+    expect(res.status).toBe(200);
+  });
+
+  it("(unchanged) accepts a same-edition subclass", async () => {
+    const id = await createCharacter("EDITION_2024", "XEd Class 2024c");
+    const res = await setSubclass(id, subId2024);
+    expect(res.status).toBe(200);
+  });
+});
