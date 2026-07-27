@@ -585,4 +585,49 @@ describe("Shadow Arts source guard", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not found in catalog/);
   });
+
+  // #1345 (Chunk 5, plan audit — not named in the issue as filed): a
+  // transient cast, not a permanent snapshot, but still a wrong-edition rule
+  // applied to one cast and recorded in the audit event. Own fixture id (not
+  // FIXTURE_ID_2) — the sibling test above creates FIXTURE_ID_2 with no
+  // per-test cleanup (only this describe's afterAll clears it).
+  const FIXTURE_ID_3 = "test-shadow-source-monk-1345";
+
+  it("(#1345) rejects a 2014-tagged Shadow Art against the (default-2024) fixture", async () => {
+    const row = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: "XEd Shadow Art 2014", edition: "EDITION_2014" },
+      {
+        name: "XEd Shadow Art 2014",
+        source: "shadowArts",
+        edition: "EDITION_2014",
+        description: "Cross-edition guard test fixture.",
+        costKind: "pool",
+        costPoolKey: "focus",
+        costBase: 1,
+      },
+      { source: "shadowArts" },
+    );
+    try {
+      await prisma.character.create({
+        data: {
+          ...FIXTURE_BASE,
+          id: FIXTURE_ID_3,
+          experiencePoints: XP_L3,
+          ownerId: OWNER_ID,
+          resources: Prisma.JsonNull,
+          classEntries: { create: [{ name: "monk", subclass: "warrior of shadow", classId: sourceClassId, position: 0 }] },
+        },
+      });
+      const res = await agent()
+        .post(`/api/characters/${FIXTURE_ID_3}/abilities/shadow-arts/transactions`)
+        .send({ operations: [{ type: "castShadowArt", shadowArtId: row.id }] });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/2014 rules/);
+      expect(res.body.error).toMatch(/2024 rules/);
+    } finally {
+      await prisma.character.deleteMany({ where: { id: FIXTURE_ID_3 } });
+      await prisma.grantedAbility.delete({ where: { id: row.id } });
+    }
+  });
 });
