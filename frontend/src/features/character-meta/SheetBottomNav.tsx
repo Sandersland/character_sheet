@@ -39,7 +39,7 @@ export default function SheetBottomNav({ tabs, activeTab, onTabChange, livePipTa
   return (
     <nav
       aria-label="Sheet sections"
-      className="flex flex-none items-stretch border-t border-garnet-800 bg-gradient-to-b from-garnet-700 to-garnet-900 pb-[env(safe-area-inset-bottom)] text-parchment-50 md:hidden"
+      className="flex flex-none items-stretch border-t border-garnet-surface-hover bg-gradient-to-b from-garnet-surface to-garnet-surface-deep pb-[env(safe-area-inset-bottom)] text-garnet-on-surface md:hidden"
     >
       {tabs.map((tab) => {
         const Icon = TAB_ICONS[tab.id];
@@ -53,7 +53,9 @@ export default function SheetBottomNav({ tabs, activeTab, onTabChange, livePipTa
             onClick={() => onTabChange(tab.id)}
             className={[
               "relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-parchment-50",
-              active ? "bg-garnet-900 text-parchment-50" : "text-garnet-100 hover:text-parchment-50",
+              active
+                ? "bg-garnet-surface-deep text-garnet-on-surface"
+                : "text-garnet-on-surface-dim hover:text-garnet-on-surface",
             ].join(" ")}
           >
             <span className="relative">
@@ -61,7 +63,7 @@ export default function SheetBottomNav({ tabs, activeTab, onTabChange, livePipTa
               {pip && (
                 <span
                   aria-hidden
-                  className="absolute -right-1.5 -top-0.5 h-2 w-2 rounded-full bg-vitality-400 ring-2 ring-garnet-900"
+                  className="absolute -right-1.5 -top-0.5 h-2 w-2 rounded-full bg-vitality-400 ring-2 ring-garnet-surface-deep"
                 />
               )}
             </span>
