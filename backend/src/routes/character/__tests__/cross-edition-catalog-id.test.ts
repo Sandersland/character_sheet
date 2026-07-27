@@ -231,3 +231,92 @@ describe("Chunk 2 — Subclass / class.setSubclass (lib/classes/class.ts:83)", (
     expect(res.status).toBe(200);
   });
 });
+
+describe("Chunk 3 — Subclass / character-create.resolveSubclass (lib/character/character-create.ts:167)", () => {
+  const CLASS_NAME = "XEd Cleric";
+  const SUB_2014 = "XEd Domain 2014";
+  const SUB_2024 = "XEd Domain 2024";
+  const SUB_SHARED = "XEd Domain Shared";
+  let classId: string;
+  let subId2014: string;
+  let subId2024: string;
+  let subIdShared: string;
+
+  beforeAll(async () => {
+    // subclassLevel 1: subclassGateLevel(_, "EDITION_2024") returns 3
+    // UNCONDITIONALLY (effective-levels.ts), so ANY 2024 character 400s at
+    // the pre-existing gate check regardless of this guard — a 2024 fixture
+    // here would pass for the wrong reason. Only a 2014 character reaches
+    // creation-time subclass resolution at all (gate 1), so the cross-edition
+    // test below must use one, and must assert on the edition wording
+    // specifically (not just status 400) or it can't be told apart from the
+    // gate rejection.
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: {
+        name: CLASS_NAME,
+        hitDie: "d8",
+        subclassLevel: 1,
+        savingThrows: ["wisdom", "charisma"],
+        skillChoiceCount: 2,
+        skillChoices: ["insight", "religion"],
+        isSpellcaster: true,
+      },
+      update: { subclassLevel: 1 },
+    });
+    classId = cls.id;
+
+    const mk = (name: string, edition: "EDITION_2014" | "EDITION_2024" | null, slug: string) =>
+      upsertEditionRow(
+        prisma.subclass,
+        { classId, name, edition },
+        { classId, name, edition, description: "Cross-edition guard test fixture.", slug },
+        {},
+      );
+    [subId2014, subId2024, subIdShared] = await Promise.all([
+      mk(SUB_2014, "EDITION_2014", "xed-domain-2014"),
+      mk(SUB_2024, "EDITION_2024", "xed-domain-2024"),
+      mk(SUB_SHARED, null, "xed-domain-shared"),
+    ]).then((rows) => rows.map((r) => r.id));
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "XEd Create" } } });
+    await prisma.subclass.deleteMany({ where: { name: { in: [SUB_2014, SUB_2024, SUB_SHARED] } } });
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  async function createWithSubclass(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string, subclassId: string) {
+    return agent()
+      .post("/api/characters")
+      .send({
+        name,
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: CLASS_NAME, subclassId }],
+        abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 15, charisma: 8 },
+        rulesEdition,
+      });
+  }
+
+  it("(AC) rejects a 2024-tagged subclass for a 2014 character at creation, on edition wording — not the gate message", async () => {
+    const res = await createWithSubclass("EDITION_2014", "XEd Create 2014a", subId2024);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+    expect(res.body.error).not.toMatch(/not at creation/);
+  });
+
+  it("(NULL-row AC) accepts the shared subclass at creation, linking the catalog id", async () => {
+    const res = await createWithSubclass("EDITION_2014", "XEd Create 2014b", subIdShared);
+    expect(res.status).toBe(201);
+    const char = await agent().get(`/api/characters/${res.body.id}`);
+    expect(char.body.classes[0].subclass).toBe(SUB_SHARED);
+  });
+
+  it("(unchanged) accepts a same-edition subclass at creation", async () => {
+    const res = await createWithSubclass("EDITION_2014", "XEd Create 2014c", subId2014);
+    expect(res.status).toBe(201);
+  });
+});
