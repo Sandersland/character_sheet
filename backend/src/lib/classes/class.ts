@@ -14,6 +14,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel, subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
+import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -79,6 +80,11 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     throw new InvalidClassOperationError("Character has no class entry");
   }
 
+  // Hoisted above the subclass lookup so both the guard below and the
+  // subclass-gate check further down resolve the SAME edition (never call
+  // editionOf twice for one op).
+  const edition = editionOf(character);
+
   // Look up the requested subclass.
   const subclass = await tx.subclass.findUnique({
     where: { id: op.subclassId },
@@ -87,6 +93,11 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
   if (!subclass) {
     throw new InvalidClassOperationError(`Subclass not found: ${op.subclassId}`);
   }
+
+  // Before class-membership: a wrong-edition row is "not in this character's
+  // catalog at all", the same treatment resolveEditionRow gives it (#1345).
+  const mismatch = crossEditionRejection(subclass, `Subclass "${subclass.name}"`, edition);
+  if (mismatch) throw new InvalidClassOperationError(mismatch);
 
   // Validate the character has levels in the subclass's class.
   const entry = character.classEntries.find((e) => e.classId === subclass.classId);
@@ -104,7 +115,7 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
   );
   // Same gate the reconciler and the clamp-on-read use — without this the write
   // path would accept a subclass the sheet then refuses to show (#1285).
-  const required = subclassGateLevel(subclass.class.subclassLevel, editionOf(character));
+  const required = subclassGateLevel(subclass.class.subclassLevel, edition);
   if (level < required) {
     throw new InvalidClassOperationError(
       `Character is ${subclass.class.name} level ${level} but the subclass is not granted until level ${required}`

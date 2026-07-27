@@ -10,6 +10,7 @@ const rage: RollModifier[] = [
 const poisoned: RollModifier[] = [
   { mode: "disadvantage", kind: "attack", source: "Poisoned" },
   { mode: "disadvantage", kind: "check", source: "Poisoned" },
+  { mode: "disadvantage", kind: "initiative", source: "Poisoned" },
 ];
 // 2024 exhaustion level 2: a flat −4 on every d20 Test (#1136).
 const exhaustion2: RollModifier[] = [
@@ -66,6 +67,16 @@ describe("resolveRollMode (#486)", () => {
     const r = resolveRollMode([], { kind: "initiative" });
     expect(r).toEqual({ mode: "normal", modifier: 0, sources: [] });
   });
+
+  it("does NOT apply Rage's Strength-check advantage to an Initiative roll", () => {
+    const r = resolveRollMode(rage, { kind: "initiative" });
+    expect(r.mode).toBe("normal");
+    expect(r.sources).toEqual([]);
+  });
+
+  it("applies an explicit initiative disadvantage grant (Poisoned, #1327)", () => {
+    expect(resolveRollMode(poisoned, { kind: "initiative" }).mode).toBe("disadvantage");
+  });
 });
 
 describe("resolveRollMode flat modifiers (#1136)", () => {
@@ -91,6 +102,13 @@ describe("resolveRollMode flat modifiers (#1136)", () => {
     expect(r.modifier).toBe(-4);
     // The adv/dis grants are overridden away; only the flat penalty's source remains.
     expect(r.sources.map((s) => s.source)).toEqual(["Exhaustion"]);
+  });
+
+  // Regression guard for the resolver-widening approach REJECTED in #1327: if
+  // `applies` let a `check` grant match an initiative roll, sumFlat would add
+  // BOTH exhaustion entries and return −8 here instead of −4.
+  it("applies the flat exhaustion penalty to Initiative exactly once (−2×level, not doubled)", () => {
+    expect(resolveRollMode(exhaustion2, { kind: "initiative" }).modifier).toBe(-4);
   });
 });
 

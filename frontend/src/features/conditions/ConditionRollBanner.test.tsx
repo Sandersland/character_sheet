@@ -7,6 +7,7 @@ import type { RollModifier } from "@/types/character";
 const poisoned: RollModifier[] = [
   { mode: "disadvantage", kind: "attack", source: "Poisoned" },
   { mode: "disadvantage", kind: "check", source: "Poisoned" },
+  { mode: "disadvantage", kind: "initiative", source: "Poisoned" },
 ];
 const rage: RollModifier[] = [
   { mode: "advantage", kind: "check", ability: "strength", source: "Rage" },
@@ -19,7 +20,7 @@ describe("ConditionRollBanner (#984)", () => {
     // The two Poisoned grants collapse into ONE banner, stated once.
     expect(screen.getAllByText("Poisoned")).toHaveLength(1);
     expect(
-      screen.getByText("Disadvantage on attack rolls and ability checks"),
+      screen.getByText("Disadvantage on attack rolls, ability checks, and initiative"),
     ).toBeInTheDocument();
   });
 

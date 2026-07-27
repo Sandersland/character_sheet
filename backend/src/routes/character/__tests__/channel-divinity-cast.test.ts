@@ -16,6 +16,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-cd-cast";
 let COOKIE: string;
@@ -338,5 +339,38 @@ describe("Channel Divinity cast endpoint", () => {
     const res = await cast([{ type: "castChannelDivinity", abilityId: maneuver!.id }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not found in catalog/);
+  });
+
+  // #1345 (Chunk 5, plan audit — not named in the issue as filed): a
+  // transient cast, not a permanent snapshot, but still a wrong-edition rule
+  // applied to one cast and recorded in the audit event. The fixture's name
+  // is deliberately NOT one of CHANNEL_DIVINITY_OPTIONS' keys — the guard
+  // sits BEFORE that gate lookup (resolveChannelDivinityCast), so this must
+  // 400 on the edition mismatch, never on "Unknown Channel Divinity option".
+  it("(#1345) rejects a 2014-tagged Channel Divinity option before the option-name gate lookup", async () => {
+    const row = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: "XEd Channel Divinity 2014", edition: "EDITION_2014" },
+      {
+        name: "XEd Channel Divinity 2014",
+        source: "channelDivinity",
+        edition: "EDITION_2014",
+        description: "Cross-edition guard test fixture.",
+        costKind: "pool",
+        costPoolKey: "channelDivinity",
+        costBase: 1,
+      },
+      { source: "channelDivinity" },
+    );
+    try {
+      await createCharacter(XP_L2, "cleric", null);
+      const res = await cast([{ type: "castChannelDivinity", abilityId: row.id }]);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/2014 rules/);
+      expect(res.body.error).toMatch(/2024 rules/);
+      expect(res.body.error).not.toMatch(/Unknown Channel Divinity option/);
+    } finally {
+      await prisma.grantedAbility.delete({ where: { id: row.id } });
+    }
   });
 });

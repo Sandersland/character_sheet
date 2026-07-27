@@ -79,6 +79,11 @@ pre-commit:
     # Also a CI step.
     seed-data-modules:
       run: sh scripts/check-seed-data-modules.sh
+    # Every client-supplied catalog id (Feat/Subclass/GrantedAbility/
+    # Background/Action) must resolve through crossEditionRejection or be on
+    # the declared exemption list (#1345). Also a CI step.
+    catalog-id-edition-guard:
+      run: sh scripts/check-catalog-id-edition-guard.sh
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"

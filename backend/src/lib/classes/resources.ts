@@ -17,6 +17,8 @@ import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/exp
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "./class-features.js";
 import { editionOf } from "@/lib/rules/edition.js";
+import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 import { toolsByCategory } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
 // Cross-domain HP heal for Uncanny Metabolism's bonusHeal (#1243) — precedented
@@ -308,6 +310,7 @@ async function applyLearnManeuverOp(
   state: ResourcesMutableState,
   op: LearnManeuverOperation,
   derivedInfo: DerivedClassInfo | null,
+  edition: RulesEdition,
 ): Promise<ResourceOpAudit> {
   if (Boolean(op.maneuverId) === Boolean(op.custom)) {
     throw new InvalidResourceOperationError(
@@ -338,6 +341,13 @@ async function applyLearnManeuverOp(
         `Maneuver not found in catalog: ${op.maneuverId}`
       );
     }
+    // The maneuver's name/description/placement/actionSlot are snapshotted
+    // into maneuversKnown below, permanently — this is prevention, not just
+    // admission, the same failure mode #1345 guards against for Feat (#1345's
+    // audit found this site; the issue as filed named only three sites, all
+    // Feat/Subclass, and missed this one).
+    const mismatch = crossEditionRejection(catalogManeuver, `Maneuver "${catalogManeuver.name}"`, edition);
+    if (mismatch) throw new InvalidResourceOperationError(`learnManeuver: ${mismatch}`);
     newEntry = {
       id: randomUUID(),
       maneuverId: catalogManeuver.id,
@@ -454,6 +464,7 @@ async function resolveChoiceOption(
   op: LearnSubclassChoiceOperation,
   choice: NonNullable<DerivedClassInfo["subclassChoices"]>[number],
   known: ChoiceEntry[],
+  edition: RulesEdition,
 ): Promise<ChoiceEntry> {
   if (!op.optionId) {
     const custom = op.custom!;
@@ -468,6 +479,11 @@ async function resolveChoiceOption(
       `Option not found in the ${choice.label} catalog: ${op.optionId}`,
     );
   }
+  // Snapshotted into choicesKnown below, permanently — same prevention
+  // reasoning as applyLearnManeuverOp's guard above (#1345, found by this
+  // plan's audit, not named in the issue).
+  const mismatch = crossEditionRejection(option, `${choice.label} option "${option.name}"`, edition);
+  if (mismatch) throw new InvalidResourceOperationError(`learnSubclassChoice: ${mismatch}`);
   return { id: randomUUID(), optionId: option.id, name: option.name, description: option.description };
 }
 
@@ -476,6 +492,7 @@ async function applyLearnSubclassChoiceOp(
   state: ResourcesMutableState,
   op: LearnSubclassChoiceOperation,
   derivedInfo: DerivedClassInfo | null,
+  edition: RulesEdition,
 ): Promise<ResourceOpAudit> {
   if (Boolean(op.optionId) === Boolean(op.custom)) {
     throw new InvalidResourceOperationError(
@@ -497,7 +514,7 @@ async function applyLearnSubclassChoiceOp(
     );
   }
 
-  const newEntry = await resolveChoiceOption(tx, op, choice, known);
+  const newEntry = await resolveChoiceOption(tx, op, choice, known, edition);
   state.choicesKnown[op.choiceKey] = [...known, newEntry];
   return {
     eventType: "learnSubclassChoice",
@@ -547,6 +564,8 @@ interface ResourceOpContext {
   characterId: string;
   batchId: string;
   sessionId: string | null;
+  /** Gates a client-supplied maneuverId/optionId against the row's edition (#1345). */
+  edition: RulesEdition;
 }
 
 // The handler-map return type — async ops return a Promise. Unrelated to the
@@ -564,11 +583,11 @@ const RESOURCE_OP_HANDLERS: {
   restoreResource: (ctx, op) => applyRestoreResourceOp(ctx.state, op, ctx.derivedInfo),
   rollInitiative: (ctx) =>
     applyRollInitiativeOp(ctx.tx, ctx.characterId, ctx.state, ctx.derivedInfo, ctx.batchId, ctx.sessionId),
-  learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
+  learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
   forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
   learnToolProficiency: (ctx, op) => applyLearnToolProficiencyOp(ctx.state, op, ctx.derivedInfo),
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
-  learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
+  learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
   forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op),
 };
 
@@ -627,6 +646,10 @@ export async function applyResourceOpInTx(
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
+  // One read, two consumers: deriveEntryScopedResources' edition-aware
+  // derivation and the ctx.edition the cross-edition guard (#1345) checks a
+  // client-supplied maneuverId/optionId against.
+  const edition = editionOf(row);
   // Entry-scoped caps (#1177): a secondary Battle Master's maneuver cap must
   // come from THAT entry's own effective level, not the primary entry's.
   const { derived: derivedInfo } = deriveEntryScopedResources(
@@ -634,13 +657,13 @@ export async function applyResourceOpInTx(
     level,
     abilityScores,
     profBonus,
-    editionOf(row),
+    edition,
   );
 
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = await dispatchResourceOp({ tx, state, derivedInfo, characterId, batchId, sessionId }, op);
+  const audit = await dispatchResourceOp({ tx, state, derivedInfo, characterId, batchId, sessionId, edition }, op);
 
   // Write the updated state back — always via serializeResourcesState so
   // all keys round-trip (prevents clobbering toolProficienciesKnown when

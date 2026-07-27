@@ -55,6 +55,15 @@ export function resolveClassDie(source: string, info: DerivedClassInfo): number 
   return Number.isFinite(faces) && faces > 0 ? faces : null;
 }
 
+// The ONE place the edition rule for feature TEXT lives (#1374) — mirrors
+// subclassGateLevel's shape (edition last). Absent `edition` on a feature
+// means "both editions"; a feature tagged for the other edition is filtered
+// out here, before mergeLayers/collectEntryScopedFeatures ever see it, so
+// their dedup-by-name never has to arbitrate between a fork's two halves.
+export function featureAppliesToEdition(feature: DerivedFeature, edition: RulesEdition): boolean {
+  return feature.edition === undefined || feature.edition === edition;
+}
+
 interface ClassLayer {
   pools: DerivedResource[];
   features: DerivedFeature[];
@@ -66,10 +75,11 @@ function deriveBaseLayer(
   abilityScores: Record<string, number>,
   profBonus: number,
   subclassKey: string | undefined,
+  edition: RulesEdition,
 ): ClassLayer {
   return {
     pools: classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey) : [],
-    features: (classDef?.features ?? []).filter((f) => f.level <= level),
+    features: (classDef?.features ?? []).filter((f) => f.level <= level && featureAppliesToEdition(f, edition)),
   };
 }
 
@@ -110,7 +120,7 @@ function deriveSubclassLayer(
     active: true,
     def,
     pools: def.resourceFn ? def.resourceFn(level, abilityScores, profBonus) : [],
-    features: def.features.filter((f) => f.level <= level),
+    features: def.features.filter((f) => f.level <= level && featureAppliesToEdition(f, edition)),
   };
 }
 
@@ -145,7 +155,7 @@ export function deriveResources(
   const sub = deriveSubclassLayer(subclassKey, level, abilityScores, profBonus, edition);
   // Feed the active subclass into the base pool derivation so base-wins pool-key
   // collisions (e.g. druid wildShape) resolve to the subclass's variant (#906).
-  const base = deriveBaseLayer(CLASSES[classKey], level, abilityScores, profBonus, sub.active ? subclassKey : undefined);
+  const base = deriveBaseLayer(CLASSES[classKey], level, abilityScores, profBonus, sub.active ? subclassKey : undefined, edition);
   const { resources, features } = mergeLayers(base, sub);
 
   // Return null only for truly unknown/empty classes

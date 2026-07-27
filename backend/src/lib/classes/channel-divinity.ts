@@ -24,6 +24,9 @@ import { logEvent } from "@/lib/activity/events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { abilityModifier } from "@/lib/srd/srd.js";
+import { editionOf } from "@/lib/rules/edition.js";
+import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 export class InvalidChannelDivinityOperationError extends Error {}
 
@@ -186,12 +189,20 @@ function channelDivinityEffectSpec(kind: ChannelDivinityKind): EffectSpec {
 async function resolveChannelDivinityCast(
   tx: Prisma.TransactionClient,
   abilityId: string,
-  ctx: { entries: GateEntry[]; level: number; abilityScores: Record<string, number>; profBonus: number },
+  ctx: { entries: GateEntry[]; level: number; abilityScores: Record<string, number>; profBonus: number; edition: RulesEdition },
 ) {
   const catalog = await tx.grantedAbility.findUnique({ where: { id: abilityId } });
   if (!catalog || catalog.source !== "channelDivinity") {
     throw new InvalidChannelDivinityOperationError(`Channel Divinity option not found in catalog: ${abilityId}`);
   }
+
+  // Before the option-name gate lookup below, so a wrong-edition row (whose
+  // name may not even be one of CHANNEL_DIVINITY_OPTIONS' keys) reports its
+  // edition mismatch, never "Unknown Channel Divinity option" (#1345, found
+  // by this plan's audit). Transient cast, not a permanent snapshot — still
+  // a wrong-edition rule applied to one cast and recorded in the audit event.
+  const mismatch = crossEditionRejection(catalog, `Channel Divinity option "${catalog.name}"`, ctx.edition);
+  if (mismatch) throw new InvalidChannelDivinityOperationError(mismatch);
 
   const gate = CHANNEL_DIVINITY_OPTIONS[catalog.name];
   if (!gate) {
@@ -259,6 +270,7 @@ export async function applyChannelDivinityOperations(
       resources: true,
       experiencePoints: true,
       abilityScores: true,
+      rulesEdition: true,
       classEntries: {
         orderBy: { position: "asc" as const },
         select: { name: true, subclass: true, level: true },
@@ -275,6 +287,7 @@ export async function applyChannelDivinityOperations(
         level,
         abilityScores,
         profBonus,
+        edition: editionOf(row),
       });
 
       const spellState = normalizeSpellcastingMutable(row.spellcasting);

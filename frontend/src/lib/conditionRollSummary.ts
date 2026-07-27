@@ -1,10 +1,11 @@
 // Pure presenter for the ConditionRollBanner (#984). Turns the character's
 // derived `rollModifiers` (condition/exhaustion/buff-sourced advantage &
 // disadvantage grants — see backend buildRollModifiers) into ONE plain-English
-// line per source, e.g. "Poisoned → Disadvantage on attack rolls and ability
-// checks". This is the single home for the "why" the sheet used to stamp under
-// every ability box and all 18 skill rows; `resolveRollMode` still resolves the
-// mode per roll (unchanged). No JSX here — the banner component consumes this.
+// line per source, e.g. "Poisoned → Disadvantage on attack rolls, ability
+// checks, and initiative". This is the single home for the "why" the sheet
+// used to stamp under every ability box and all 18 skill rows; `resolveRollMode`
+// still resolves the mode per roll (unchanged). No JSX here — the banner
+// component consumes this.
 
 import { abilityLabel } from "@/lib/abilities";
 import type { FlatRollEffect, RollModifier } from "@/types/character";
@@ -15,7 +16,7 @@ export interface ConditionRollSummary {
   source: string;
   /** Overall tone — `mixed` when a source grants more than one direction; `penalty` for a flat modifier (#1136). */
   tone: "advantage" | "disadvantage" | "mixed" | "penalty";
-  /** e.g. "Disadvantage on attack rolls and ability checks" or "−4 on d20 Tests". */
+  /** e.g. "Disadvantage on attack rolls, ability checks, and initiative" or "−4 on d20 Tests". */
   effect: string;
 }
 
