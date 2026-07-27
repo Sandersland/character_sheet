@@ -292,11 +292,49 @@ function deriveEntryInfo(
   return deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus, edition);
 }
 
+// How a sanctioned shared pool key's contributions from multiple class entries
+// combine into one pool. "max" is the only member today: PHB'14 p.164
+// (multiclassing) — gaining a feature again from a second class grants that
+// class's effects but no additional use, so the pool's `total` is the greatest
+// any single contributing entry grants, never the sum. A future second shared
+// key would add a union member here plus one switch arm in mergeSharedPool.
+type PoolMergeStrategy = "max";
+
+// A pool key is class-scoped (each class appears at most once in classEntries)
+// UNLESS sanctioned here — an unsanctioned duplicate means two classes are
+// silently fighting over one persisted `used` counter, which stays a hard
+// error (collectEntryScopedPools below). channelDivinity is cleric 2+ and
+// paladin 3+ sharing one pool (#1340); it is the only cross-class key in the
+// catalog (pinned by entry-scoped-resources.test.ts's standing invariant).
+export const SHARED_POOL_MERGE: Record<string, PoolMergeStrategy> = {
+  channelDivinity: "max",
+};
+
+// Combines a newly-seen entry's pool into the already-accumulated one for the
+// same sanctioned key, per its declared strategy. Non-total fields (label,
+// recharge, description, …) stay the earlier (primary-wins) entry's — only
+// `total` is a 5e-mandated exception, mirroring mergeLayers' base-wins policy.
+function mergeSharedPool(existing: DerivedResource, incoming: DerivedResource, strategy: PoolMergeStrategy): DerivedResource {
+  switch (strategy) {
+    case "max":
+      return { ...existing, total: Math.max(existing.total, incoming.total) };
+  }
+}
+
 // Rebuilds the `resources` pool layer (#1071) from EVERY class entry at its own
 // effective level — focus/superiority-dice/rage/sorcery-points all scale to that
 // class's own level (PHB'24 p.163), not the primary entry's or the summed total.
-// Split out of deriveEntryScopedResources to keep that function's branching
-// budget for the (unrelated) choice-cap overlay loop.
+// A pool key repeated across entries merges via SHARED_POOL_MERGE when sanctioned
+// (#1340 — e.g. channelDivinity), else throws (see SHARED_POOL_MERGE's comment).
+// THE MERGE MUST STAY HERE, NOT in buildResourcesPayload (serialize/classes.ts):
+// this is also where applySpendResourceOp's write-side spend cap and rest.ts's
+// recharge both read `pool.total` from, so merging here — and only here — keeps
+// the read-side clamp and the write-side cap structurally unable to diverge
+// (CLAUDE.md's one-shared-rule-function invariant), with no
+// LEVEL_GATED_RECONCILERS entry needed (a merged pool's total is derived fresh
+// on every read/write, never persisted). Split out of deriveEntryScopedResources
+// to keep that function's branching budget for the (unrelated) choice-cap
+// overlay loop.
 function collectEntryScopedPools(
   classEntries: { name: string; subclass?: string | null; level: number }[],
   totalLevel: number,
@@ -304,20 +342,38 @@ function collectEntryScopedPools(
   profBonus: number,
   edition: RulesEdition,
 ): DerivedResource[] {
-  // Pool keys are class-scoped (each class appears at most once in classEntries).
-  const seenPoolKeys = new Set<string>();
+  const indexByKey = new Map<string, number>();
   const pools: DerivedResource[] = [];
   for (const entry of classEntries) {
     const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, edition);
     for (const pool of info?.resources ?? []) {
-      if (seenPoolKeys.has(pool.key)) {
-        throw new Error(`collectEntryScopedPools: duplicate pool key "${pool.key}" from entry "${entry.name}"`);
-      }
-      seenPoolKeys.add(pool.key);
-      pools.push(pool);
+      addOrMergeEntryPool(pools, indexByKey, pool, entry.name);
     }
   }
   return pools;
+}
+
+// One pool's contribution to the accumulator: merges into an already-seen
+// sanctioned key (SHARED_POOL_MERGE) in place, or throws on an unsanctioned
+// collision, or appends as a new pool. Extracted so collectEntryScopedPools
+// keeps its existing branching budget.
+function addOrMergeEntryPool(
+  pools: DerivedResource[],
+  indexByKey: Map<string, number>,
+  pool: DerivedResource,
+  entryName: string,
+): void {
+  const at = indexByKey.get(pool.key);
+  if (at === undefined) {
+    indexByKey.set(pool.key, pools.length);
+    pools.push(pool);
+    return;
+  }
+  const strategy = SHARED_POOL_MERGE[pool.key];
+  if (!strategy) {
+    throw new Error(`collectEntryScopedPools: duplicate pool key "${pool.key}" from entry "${entryName}"`);
+  }
+  pools[at] = mergeSharedPool(pools[at], pool, strategy);
 }
 
 // Entry-scoped `features` layer (#1206): each entry's static feature list at

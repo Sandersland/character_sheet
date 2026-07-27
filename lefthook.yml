@@ -58,6 +58,11 @@ pre-commit:
     # frontend/src. Also a CI step.
     comment-banners:
       run: sh scripts/check-comment-banners.sh
+    # SQL twin of the comment-banners grep (#1373): eslint doesn't read
+    # migration.sql, so this is the only place an enum-narrowing cast that
+    # aborts on populated rows can be caught before it lands. Also a CI step.
+    enum-narrowing:
+      run: sh scripts/check-enum-narrowing.sh
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"

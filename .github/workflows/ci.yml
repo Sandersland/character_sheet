@@ -20,6 +20,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Migration-shape gate (#1373): an enum-narrowing migration whose USING
+      # cast aborts on populated rows leaves the DB in P3009, which blocks every
+      # migration behind it. Deliberately in `lint`, not the `fallow` job where
+      # the other grep gates live: `fallow` needs: test, so this 10ms sh gate
+      # would otherwise wait on Postgres + vitest + coverage. Needs no node, so
+      # it runs before `npm ci`. Twin of the lefthook pre-commit job.
+      - name: enum-narrowing migrations guarded
+        run: sh scripts/check-enum-narrowing.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
