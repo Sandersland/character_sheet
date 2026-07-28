@@ -258,8 +258,8 @@ cmd_create() {
   # its slot with nothing left pointing at it, and `rm` is the one command that
   # still reaches it.
   if is_legacy_branch "$branch"; then
-    die "worktree '$branch' predates #1457 and is registered under $LEGACY_WT_DIR.
-  Tear it down first, then re-create it outside the repo:
+    die "worktree '$branch' has pre-#1457 state under $LEGACY_WT_DIR — an in-repo tree, a reserved slot, or both.
+  Clear it first ('rm' handles either), then re-create it outside the repo:
     ./.claude/skills/worktree/worktree.sh rm $branch
     ./.claude/skills/worktree/worktree.sh create $branch"
   fi
