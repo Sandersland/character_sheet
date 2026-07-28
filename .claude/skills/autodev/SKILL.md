@@ -75,7 +75,7 @@ Note the two-layer Bash contract: `allowedTools` prefix-matches the **whole** co
 
 ## Concurrent runs
 
-Concurrent runs are safe: `worktree.sh create` serializes slot assignment behind an mkdir lock (`.claude/worktrees/.slot.lock` — remove it by hand only if a create crashed while holding it), and each run **claims its issue by self-assigning** right after GetWork (the `ClaimIssue` script state). GetWork excludes assigned issues, so a `taken` claim loops back for a re-pick (≤3 tries). Failure paths (`Fail`, `ApplyFlag`) release the claim; a successful PR keeps the assignee as an ownership signal until merge.
+Concurrent runs are safe: `worktree.sh create` serializes slot assignment behind an mkdir lock (`.slot.lock`, beside the registry in `worktree.sh dir` — remove it by hand only if a create crashed while holding it), and each run **claims its issue by self-assigning** right after GetWork (the `ClaimIssue` script state). GetWork excludes assigned issues, so a `taken` claim loops back for a re-pick (≤3 tries). Failure paths (`Fail`, `ApplyFlag`) release the claim; a successful PR keeps the assignee as an ownership signal until merge.
 
 ## Batch mode (`batch.mjs` one-shot · `autodevd.mjs` daemon)
 
