@@ -53,10 +53,13 @@ export function levelUpSubmissionOf(
   return { ...rest, target, hp } as LevelUpSubmission;
 }
 
-// Every op-bearing LevelUpSubmission key except the three pruneDraftToPlan
-// never touches: target/hp are ceremony inputs, not staged picks; subclassId
-// is the prune's own input (useLevelUpPlan is keyed on it) so pruning it would
-// be self-referential. dependentPicksBySubclass (the #1323 stash) is on
+// Every op-bearing LevelUpSubmission key except the four pruneDraftToPlan
+// never prunes via this map: target/hp are ceremony inputs, not staged
+// picks; subclassId is the prune's own input (useLevelUpPlan is keyed on it)
+// so pruning it would be self-referential; subclassChoices is excluded here
+// because it gets per-entry pruning instead (filtered by choiceKey against
+// the served subclassChoice step meta.key, not all-or-nothing field pruning
+// — see pruneDraftToPlan). dependentPicksBySubclass (the #1323 stash) is on
 // LevelUpDraft, not LevelUpSubmission, so it can never appear here — that's
 // what keeps it un-prunable by construction, not by a runtime check.
 type PrunableDraftKey = Exclude<keyof LevelUpSubmission, "target" | "hp" | "subclassId" | "subclassChoices">;
@@ -114,8 +117,15 @@ export function pruneDraftToPlan(draft: LevelUpDraft, steps: LevelUpStep[]): Lev
 
   const rest: Partial<LevelUpDraft> = { ...draft };
   for (const key of droppedKeys) delete rest[key];
-  if (survivingChoices?.length) rest.subclassChoices = survivingChoices;
-  else delete rest.subclassChoices;
+  // Only rewrite subclassChoices when choicesChanged: when it's false, the
+  // spread above already carries draft.subclassChoices at its original
+  // reference, and overwriting it with a fresh (if content-identical)
+  // .filter() array would be a gratuitous identity change — one that could
+  // falsely invalidate a memo keyed on this field for no actual difference.
+  if (choicesChanged) {
+    if (survivingChoices?.length) rest.subclassChoices = survivingChoices;
+    else delete rest.subclassChoices;
+  }
   return rest as LevelUpDraft;
 }
 

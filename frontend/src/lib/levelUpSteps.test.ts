@@ -405,4 +405,27 @@ describe("pruneDraftToPlan (#1421)", () => {
     const next = pruneDraftToPlan(draft, [step]);
     expect(next.subclassChoices).toEqual(draft.subclassChoices);
   });
+
+  // Regression guard: the rebuild path must not manufacture a fresh
+  // subclassChoices array when every entry survives — only spellsLearned
+  // (a different field) is what should force the rebuild here.
+  it("preserves the subclassChoices array reference when another field is pruned but every choice survives", () => {
+    const steps: LevelUpStep[] = [
+      { kind: "hitPoints" },
+      { kind: "subclassChoice", count: 1, meta: { key: "huntersPrey", label: "Hunter's Prey" } },
+      { kind: "review" },
+    ];
+    const subclassChoices = [{ type: "learnSubclassChoice" as const, choiceKey: "huntersPrey", optionId: "o1" }];
+    const draft: LevelUpDraft = {
+      hp,
+      spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      subclassChoices,
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    // Vacuity guard: prove the rebuild path actually ran (a different field
+    // was in fact pruned) — otherwise this test would trivially pass via the
+    // same-reference early return, proving nothing about the rebuild path.
+    expect(next.spellsLearned).toBeUndefined();
+    expect(next.subclassChoices).toBe(subclassChoices);
+  });
 });
