@@ -63,8 +63,12 @@ export function formatDeflectAttacksMessage(
   redirectAvailable: boolean,
 ): string {
   const dexMod = abilityModifier(character.abilityScores.dexterity);
-  const clause = deflectAttacksDamageTypeClause(character);
+  // Hoisted so the template literal reads `monkLevel` directly rather than a
+  // second inline classEntryLevel call. deflectAttacksDamageTypeClause is
+  // exported and used independently elsewhere, so it deliberately keeps
+  // resolving its own copy rather than taking this value as a parameter.
   const monkLevel = classEntryLevel(character, "monk");
+  const clause = deflectAttacksDamageTypeClause(character);
   const base = `Deflect Attacks — reduce ${clause} by ${roll.total} (1d10 rolled ${roll.dice[0].value} + DEX ${formatModifier(dexMod)} + monk level ${monkLevel}).`;
   return redirectAvailable
     ? `${base} Reduced a ranged hit to 0 with a free hand? Spend 1 Focus to redirect.`
