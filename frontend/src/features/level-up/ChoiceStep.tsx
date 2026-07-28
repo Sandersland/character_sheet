@@ -1,19 +1,28 @@
 // Generic Choose-N ceremony body (#896): one component drives every
-// catalog-backed level-up pick — maneuvers, tool proficiencies,
-// and (single-select) fighting style — off the CHOICE_KIND_CONFIGS wiring.
+// catalog-backed level-up pick — maneuvers, tool proficiencies, fighting
+// style, and (repeatable) subclass choices — via choiceConfigForStep, which
+// resolves per STEP rather than per kind: a subclass's several choice tiers
+// (e.g. a Hunter Ranger's four) share one draft array, keyed on step.meta.key.
 // Enforces the plan's exact count; already-known options are hidden. The
 // catalog fetch, selection, and list rendering each live in their own unit.
+
+import { useMemo } from "react";
 
 import ChoiceOptionsList from "@/features/level-up/ChoiceOptionsList";
 import { useChoiceCatalog } from "@/features/level-up/useChoiceOptions";
 import { useChoiceSelection } from "@/features/level-up/useChoiceSelection";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
-import { CHOICE_KIND_CONFIGS } from "@/lib/levelUpChoices";
+import { choiceConfigForStep } from "@/lib/levelUpChoices";
 import type { LevelUpStep } from "@/types/character";
 
 export default function ChoiceStep({ step }: { step: LevelUpStep }) {
   const { character, plan } = useLevelUpStepContext();
-  const config = CHOICE_KIND_CONFIGS[step.kind];
+  // Keyed on the step's identity triple, never the step object itself:
+  // useChoiceOptions' effect depends on config identity, so a per-render
+  // config (choiceConfigForStep builds a new object every call) would refetch
+  // the catalog forever.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the step's identity triple, never the step object: useChoiceOptions' effect depends on config identity, so a per-render config would refetch the catalog forever
+  const config = useMemo(() => choiceConfigForStep(step), [step.kind, step.meta?.key, step.meta?.catalogSource]);
   const catalog = useChoiceCatalog(config, character, plan.target.newLevel);
   const { selectedIds, single, count, atCap, toggle } = useChoiceSelection(config, step);
 
