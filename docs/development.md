@@ -17,6 +17,8 @@ Root scripts fan out to both workspaces: `npm run dev | lint | typecheck | test 
 
 Running outside Docker: `docker compose up db -d`, then `npm run dev` in each workspace (backend needs `backend/.env` from `.env.example`; frontend defaults `VITE_API_URL` to `http://localhost:4000/api`).
 
+Nothing loads that `.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, and `prisma.config.ts` loads it itself; drop either and host-run dev breaks while Docker and CI keep working, because they inject `DATABASE_URL` directly (#1463).
+
 ## Guardrails (lefthook)
 
 Hooks install via the root `prepare` script; config is `lefthook.yml`.
