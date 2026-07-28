@@ -269,10 +269,13 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     expect(a.resources.pools).toEqual([
       expect.objectContaining({ key: "superiorityDice", label: "Superiority Dice", total: 4, die: "d8", recharge: "short-or-long", used: 1, remaining: 3 }),
     ]);
+    // #1381: each row now also serves `effect`, resolved dice tracking this
+    // Battle Master's current (d8) superiority die.
+    const maneuverEffect = expect.objectContaining({ dice: { count: 1, faces: 8, modifier: 0 } });
     expect(a.resources.maneuversKnown).toEqual([
-      { id: "m1", name: "Riposte", description: "Counter." },
-      { id: "m2", name: "Trip Attack", description: "Prone." },
-      { id: "m3", name: "Menacing Attack", description: "Frighten." },
+      { id: "m1", name: "Riposte", description: "Counter.", effect: maneuverEffect },
+      { id: "m2", name: "Trip Attack", description: "Prone.", effect: maneuverEffect },
+      { id: "m3", name: "Menacing Attack", description: "Frighten.", effect: maneuverEffect },
     ]);
     expect(a.resources.toolProficienciesKnown).toEqual([{ id: "tp1", name: "Smith's Tools" }]);
 

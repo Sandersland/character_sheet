@@ -61,7 +61,12 @@ async function post(operations: unknown[]) {
 
 // Serialized resource sub-state helpers (all read from the mutation response).
 interface Pool { key: string; used: number; remaining: number; total: number }
-interface Entry { id: string; name: string; maneuverId?: string }
+interface Entry {
+  id: string;
+  name: string;
+  maneuverId?: string;
+  effect?: { dice?: { faces: number } };
+}
 
 function pool(res: { body: { resources: { pools: Pool[] } } }, key: string): Pool {
   return res.body.resources.pools.find((p) => p.key === key)!;
@@ -448,5 +453,22 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(undo.status).toBe(200);
     expect(hasFs(undo.body.advancements)).toBe(true);
     expect(pool(undo, "superiorityDice").used).toBe(0);
+  });
+
+  // #1381: a maneuver's dice were previously unreachable to the client (the
+  // catalog row carries effectDieSource but no fixed effectDiceFaces) — this
+  // proves deriveManeuverEffect resolves them from the character's OWN
+  // superiority die, and that the resolution re-derives after a level-up.
+  it("serves a known maneuver's resolved effect, dice tracking the derived superiority die", async () => {
+    const learned = await post([{ type: "learnManeuver", maneuverId: catalogManeuverId }]);
+    expect(maneuvers(learned)[0].effect?.dice?.faces).toBe(8);
+
+    const res = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect(maneuvers(res)[0].effect?.dice?.faces).toBe(8);
+
+    // Level 10 (64000 XP) bumps the Battle Master superiority die to d10.
+    await prisma.character.update({ where: { id: FIXTURE_ID }, data: { experiencePoints: 64000 } });
+    const leveled = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect(maneuvers(leveled)[0].effect?.dice?.faces).toBe(10);
   });
 });

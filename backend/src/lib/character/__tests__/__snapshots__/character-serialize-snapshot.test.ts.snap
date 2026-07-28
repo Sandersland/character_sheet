@@ -834,16 +834,73 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     "maneuversKnown": [
       {
         "description": "Counter.",
+        "effect": {
+          "addAbilityModToHeal": false,
+          "attackType": null,
+          "buffModifier": null,
+          "buffTarget": null,
+          "concentration": undefined,
+          "damageType": null,
+          "dice": {
+            "count": 1,
+            "faces": 8,
+            "modifier": 0,
+          },
+          "effectType": "utility",
+          "saveAbility": null,
+          "saveEffect": null,
+          "scaling": {
+            "mode": "none",
+          },
+        },
         "id": "m1",
         "name": "Riposte",
       },
       {
         "description": "Prone.",
+        "effect": {
+          "addAbilityModToHeal": false,
+          "attackType": null,
+          "buffModifier": null,
+          "buffTarget": null,
+          "concentration": undefined,
+          "damageType": null,
+          "dice": {
+            "count": 1,
+            "faces": 8,
+            "modifier": 0,
+          },
+          "effectType": "utility",
+          "saveAbility": null,
+          "saveEffect": null,
+          "scaling": {
+            "mode": "none",
+          },
+        },
         "id": "m2",
         "name": "Trip Attack",
       },
       {
         "description": "Frighten.",
+        "effect": {
+          "addAbilityModToHeal": false,
+          "attackType": null,
+          "buffModifier": null,
+          "buffTarget": null,
+          "concentration": undefined,
+          "damageType": null,
+          "dice": {
+            "count": 1,
+            "faces": 8,
+            "modifier": 0,
+          },
+          "effectType": "utility",
+          "saveAbility": null,
+          "saveEffect": null,
+          "scaling": {
+            "mode": "none",
+          },
+        },
         "id": "m3",
         "name": "Menacing Attack",
       },

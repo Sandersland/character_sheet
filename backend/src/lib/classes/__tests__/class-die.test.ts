@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveResources, resolveClassDie, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { deriveManeuverEffect } from "@/lib/classes/maneuver-effect.js";
 import { readEffectSpec, resolveEffectSpec, type EffectRow } from "@/lib/combat/effects.js";
 
 const scores = { strength: 16, dexterity: 12 };
@@ -69,5 +70,12 @@ describe("readEffectSpec — class-die reference", () => {
     const spec = readEffectSpec(menacingAttack, resolve);
     expect(spec.scaling).toEqual({ mode: "none" });
     expect(resolveEffectSpec(spec, 0, { characterLevel: 18 })).toEqual({ count: 1, faces: 12, modifier: 0 });
+  });
+});
+
+describe("deriveManeuverEffect (#1381)", () => {
+  it("derives a maneuver's effect spec at 1× the current superiority die", () => {
+    expect(deriveManeuverEffect(battleMaster(3)).dice).toEqual({ count: 1, faces: 8, modifier: 0 });
+    expect(deriveManeuverEffect(battleMaster(18)).dice).toEqual({ count: 1, faces: 12, modifier: 0 });
   });
 });
