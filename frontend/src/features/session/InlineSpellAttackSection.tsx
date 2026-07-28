@@ -23,7 +23,7 @@ import { useRollLogger } from "@/features/session/useRollLogger";
 import SpellAttackRow from "@/features/session/SpellAttackRow";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
-import type { Character, Spell } from "@/types/character";
+import type { Spell } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
 interface InlineSpellAttackSectionProps {
@@ -32,9 +32,10 @@ interface InlineSpellAttackSectionProps {
   onLogChanged: () => void;
 }
 
-/** Formatted damage preview for a cantrip at character level (e.g. "1d10 fire"). */
-function damageLabelFor(spell: Spell, character: Character): string {
-  const spec = computeCastSpec(spell, character, 0);
+/** Formatted damage preview for a cantrip (e.g. "1d10 fire") — looks up the
+ *  served slotLevel-0 roll (#1381), so it doesn't need the character at all. */
+function damageLabelFor(spell: Spell): string {
+  const spec = computeCastSpec(spell, 0);
   if (!spec) return "—";
   return `${formatRollSpec(spec)}${spell.damageType ? ` ${spell.damageType}` : ""}`;
 }
@@ -81,7 +82,7 @@ export default function InlineSpellAttackSection({
   // Roll the cantrip's damage (if any), returning the total to send to the server.
   // A nat-20 to-hit auto-doubles the damage dice, mirroring the weapon attack sheet.
   function rollDamage(spell: Spell): number {
-    const base = computeCastSpec(spell, character, 0);
+    const base = computeCastSpec(spell, 0);
     if (!base) return 0;
     const spec = isNaturalTwenty(lastAttack[spell.id]) ? { ...base, crit: true } : base;
     const result = roll(spec, `${spell.name} — damage`);
@@ -121,7 +122,7 @@ export default function InlineSpellAttackSection({
           key={spell.id}
           spell={spell}
           attackBonus={attackBonus}
-          damageLabel={damageLabelFor(spell, character)}
+          damageLabel={damageLabelFor(spell)}
           attackRolled={attackRolled[spell.id] ?? false}
           busy={busyId === spell.id}
           lastAttack={lastAttack[spell.id] ?? null}

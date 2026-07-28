@@ -89,7 +89,8 @@ describe("LevelUpCeremony", () => {
     await user.click(cont);
 
     expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
-    // The placeholder can't satisfy the advancement step — Continue disables.
+    // AbilityScoreStep writes nothing to the draft until a pick is made, so
+    // draftSatisfies keeps Continue off.
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: /back/i }));

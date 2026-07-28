@@ -85,9 +85,9 @@ function makeSpell(overrides: Partial<Spell> = {}): Spell {
     duration: "Instantaneous",
     description: "",
     effectKind: "heal",
-    effectDiceCount: 1,
-    effectDiceFaces: 4,
-    effectModifier: 0,
+    // #1381: effectPreview is a lookup into the served effectRolls now, not a
+    // re-derivation from raw columns — the fixture must carry the resolved roll.
+    effectRolls: [{ slotLevel: 1, roll: { count: 1, faces: 4, modifier: 3 } }],
     ...overrides,
   } as Spell;
 }

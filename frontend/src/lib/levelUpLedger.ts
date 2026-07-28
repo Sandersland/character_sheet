@@ -97,8 +97,9 @@ function advancementRows(
   return featRows(advancement, scores, resolvers);
 }
 
-// Full option-name resolution for subclass features is out of scope — no
-// catalog-by-source endpoint exists — so a non-custom pick shows its step label.
+// ledgerRows is pure and synchronous with no catalog in hand, so a non-custom
+// pick shows its step label rather than the option's real name; resolving the
+// name would mean threading the loaded catalog into Review (#1422).
 function subclassChoiceName(op: LearnSubclassChoiceOperation, plan: LevelUpPlanResponse): string {
   if (op.custom) return op.custom.name;
   const step = plan.steps.find((s) => s.kind === "subclassChoice" && s.meta?.key === op.choiceKey);

@@ -1,0 +1,12 @@
+/* Applied to every toHaveScreenshot() render via playwright.config.ts's
+ * expect.toHaveScreenshot.stylePath. Hides the React Query devtools mount div
+ * (`.tsqd-parent-container`, @tanstack/react-query-devtools) so a local `vite
+ * dev` capture matches the committed baselines, which were captured against
+ * CI's `vite preview` build. App.tsx gates the devtools behind
+ * import.meta.env.DEV, so the class never exists in that build — this rule is
+ * a deliberate no-op there and changes no baseline pixel in CI. The element is
+ * fixed-position, so hiding it triggers no reflow of surrounding content.
+ */
+.tsqd-parent-container {
+  display: none !important;
+}

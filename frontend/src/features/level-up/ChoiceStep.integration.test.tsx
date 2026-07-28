@@ -21,6 +21,11 @@ vi.mock("@/api/client", () => ({
     { id: "archery", name: "Archery", description: "arch", category: "fighting_style" },
     { id: "defense", name: "Defense", description: "def", category: "fighting_style" },
   ]),
+  fetchSubclassChoiceOptions: vi.fn(async () => [
+    { id: "prey1", name: "Colossus Slayer", description: "colossus", minLevel: 3 },
+    { id: "prey2", name: "Giant Killer", description: "giant", minLevel: 3 },
+    { id: "prey3", name: "Horde Breaker", description: "horde", minLevel: 3 },
+  ]),
 }));
 
 const planMock = vi.mocked(fetchLevelUpPlan);
@@ -122,6 +127,47 @@ describe("ChoiceStep in the ceremony", () => {
         target: { kind: "existing", classEntryId: "entry-1" },
         hp: { method: "average" },
         fightingStyleFeat: { type: "takeFeat", featId: "archery", slot: "fightingStyle" },
+      }),
+    );
+  });
+
+  // #1422: the headline defect -- a subclassChoice step had no STEP_BODIES
+  // entry, so it rendered LevelUpStepPlaceholder (which writes nothing to the
+  // draft) and Continue stayed permanently disabled.
+  it("gates Continue on a subclassChoice step until an option is picked, then submits the op with its choiceKey", async () => {
+    planMock.mockResolvedValue(
+      plan([
+        { kind: "hitPoints" },
+        {
+          kind: "subclassChoice",
+          count: 1,
+          meta: { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey" },
+        },
+        { kind: "review" },
+      ]),
+    );
+    const user = userEvent.setup();
+    renderCeremony();
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(await screen.findByText("Colossus Slayer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+
+    await user.click(screen.getByText("Colossus Slayer"));
+    const cont = screen.getByRole("button", { name: /continue/i });
+    await waitFor(() => expect(cont).toBeEnabled());
+
+    await user.click(cont);
+    await user.click(await screen.findByRole("button", { name: /confirm level up/i }));
+
+    await waitFor(() =>
+      expect(submitMock).toHaveBeenCalledWith("c1", {
+        target: { kind: "existing", classEntryId: "entry-1" },
+        hp: { method: "average" },
+        subclassChoices: [{ type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "prey1" }],
       }),
     );
   });

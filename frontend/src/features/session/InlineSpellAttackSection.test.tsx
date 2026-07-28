@@ -20,13 +20,16 @@ beforeEach(() => {
   vi.mocked(logRoll).mockResolvedValue(undefined);
 });
 
+// #1381: effectRolls carries the served slotLevel-0 roll cantrips look up now.
 const fireBolt = {
   id: "fb", name: "Fire Bolt", level: 0, attackType: "attack",
-  effectKind: "damage", effectDiceCount: 1, effectDiceFaces: 10, damageType: "fire", cantripScaling: true,
+  effectKind: "damage", damageType: "fire",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 } }],
 } as unknown as Spell;
 const sacredFlame = {
   id: "sf", name: "Sacred Flame", level: 0, attackType: "save",
-  effectKind: "damage", effectDiceCount: 1, effectDiceFaces: 8, saveAbility: "dexterity",
+  effectKind: "damage", saveAbility: "dexterity",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 8, modifier: 0 } }],
 } as unknown as Spell;
 const scorchingRay = { id: "sr", name: "Scorching Ray", level: 2, attackType: "attack" } as unknown as Spell;
 

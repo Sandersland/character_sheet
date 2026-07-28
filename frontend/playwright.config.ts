@@ -33,11 +33,14 @@ export default defineConfig({
     // are set at each toHaveScreenshot call; this is the conservative default.
     // Fonts come from the pinned e2e image — the visual specs block the Google
     // Fonts network load so text falls back to the image's bundled fonts.
+    // stylePath is resolved against this config's directory, not the repo
+    // root, so the value is config-relative rather than "./frontend/e2e/...".
     toHaveScreenshot: {
       animations: "disabled",
       caret: "hide",
       scale: "css",
       maxDiffPixelRatio: 0.02,
+      stylePath: "./e2e/screenshot.css",
     },
   },
 });

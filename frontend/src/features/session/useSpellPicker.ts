@@ -23,7 +23,7 @@ import {
 import type { RollSpec } from "@/lib/dice";
 import {
   SCHOOL_TONE,
-  effectPreviewWithMod,
+  effectPreview,
   componentsLabel,
   saveDcLabel,
   defaultTarget,
@@ -209,7 +209,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     const isAttack = spell.attackType === "attack";
     const isSave = spell.attackType === "save";
     const dcLabel = isSave ? saveDcLabel(spell, spellSaveDC ?? 0) : null;
-    const preview = effectPreviewWithMod(spell, character, spellSlot);
+    const preview = effectPreview(spell, spellSlot);
     return {
       isCantrip,
       schoolTone: SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral",
@@ -293,7 +293,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     const ally = isAllyTarget(row.target) ? row.target : null;
     const targetNote = row.target === "self" ? " → your HP" : ally ? ` → ${ally.name}'s HP` : "";
 
-    const castSpec = computeCastSpec(spell, character, effectiveSlot);
+    const castSpec = computeCastSpec(spell, effectiveSlot);
     const { total: rollTotal, keptDice } = rollAndLogCast(spell, castSpec, targetNote);
 
     // Apply the rolled effect in the same transaction: self → own HP, an ally →
