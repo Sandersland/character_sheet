@@ -13,6 +13,7 @@
 #   ./.claude/skills/worktree/worktree.sh ls                       table of worktrees, slots, URLs, status
 #   ./.claude/skills/worktree/worktree.sh rm <branch>              down -v + remove worktree + free slot
 #   ./.claude/skills/worktree/worktree.sh prune [--yes]            report/remove artifacts of worktrees already gone
+#   ./.claude/skills/worktree/worktree.sh dir                      print where worktrees are placed
 #
 set -euo pipefail
 
@@ -20,18 +21,39 @@ set -euo pipefail
 # (.claude/skills/worktree/). Resolve symlinks for safety.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-WT_DIR="$ROOT/.claude/worktrees"
+
+# Worktrees live BESIDE the repo, never inside it (#1457). Node resolves
+# node_modules by walking UP, so a worktree nested in the checkout silently
+# borrows the main tree's install and tsc/eslint/prisma then report green for a
+# tree they never read; a sibling makes a missing install fail loudly instead.
+# It also keeps rg/git grep/fallow in the main checkout from walking N copies of
+# the codebase. Override for a different disk or layout.
+WT_DIR="${CS_WORKTREE_DIR:-$(dirname "$ROOT")/.character-sheet-worktrees}"
+# The registry travels WITH the trees it describes rather than staying in-repo:
+# slots, the mkdir mutex and the trees are one unit of state, and leaving it
+# behind would keep the repo needing the very ignore rule this move retires.
 REGISTRY="$WT_DIR/registry.json"
+
+# Worktrees created before #1457 still sit in-repo and still hold their slots, so
+# reads union both registries while writes only ever land in the new one — a
+# forgotten legacy entry that stopped reserving its slot would hand a create the
+# ports of a running stack.
+LEGACY_WT_DIR="$ROOT/.claude/worktrees"
+LEGACY_REGISTRY="$LEGACY_WT_DIR/registry.json"
 
 MAX_SLOT=9
 
 die() { echo "error: $*" >&2; exit 1; }
 
 # Compose project name: lowercase, non-alnum -> '-', collapse repeats, trim.
+# The trailing newline is load-bearing: `live_projects` feeds a line reader, and
+# without it every registered project ran together into one unterminated line
+# that `read` discarded at EOF — so `live_artifacts` came out empty and `prune`
+# saw every LIVE worktree's volumes as orphans.
 project_name() {
   local b="$1"
   b="$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
-  printf 'cs-%s' "$b"
+  printf 'cs-%s\n' "$b"
 }
 
 ensure_registry() {
@@ -39,21 +61,43 @@ ensure_registry() {
   [ -f "$REGISTRY" ] || echo '{}' > "$REGISTRY"
 }
 
-# Read the slot assigned to a branch, or empty string.
-slot_of() {
-  ensure_registry
-  node -e 'const r=require(process.argv[1]); process.stdout.write(String(r[process.argv[2]]??""))' "$REGISTRY" "$1"
-}
-
-# Lowest free slot in 1..MAX_SLOT not present in the registry.
-next_free_slot() {
+# Both registries as one object, current entries winning over legacy ones.
+registry_all() {
   ensure_registry
   node -e '
-    const r=require(process.argv[1]); const max=+process.argv[2];
+    const fs=require("fs");
+    const read=f=>{try{return JSON.parse(fs.readFileSync(f,"utf8"));}catch{return {};}};
+    process.stdout.write(JSON.stringify({...read(process.argv[2]), ...read(process.argv[1])}));
+  ' "$REGISTRY" "$LEGACY_REGISTRY"
+}
+
+registry_branches() {
+  node -e 'console.log(Object.keys(JSON.parse(process.argv[1])).join("\n"))' "$(registry_all)"
+}
+
+# Read the slot assigned to a branch, or empty string.
+slot_of() {
+  node -e 'process.stdout.write(String(JSON.parse(process.argv[1])[process.argv[2]]??""))' "$(registry_all)" "$1"
+}
+
+# Lowest free slot in 1..MAX_SLOT not present in either registry.
+next_free_slot() {
+  node -e '
+    const r=JSON.parse(process.argv[1]); const max=+process.argv[2];
     const used=new Set(Object.values(r).map(Number));
     for (let i=1;i<=max;i++) if(!used.has(i)){console.log(i);process.exit(0);}
     process.exit(1);
-  ' "$REGISTRY" "$MAX_SLOT" || die "no free slots (max $MAX_SLOT worktrees). Run 'rm' on an unused one."
+  ' "$(registry_all)" "$MAX_SLOT" || die "no free slots (max $MAX_SLOT worktrees). Run 'rm' on an unused one."
+}
+
+# True while the branch is still registered under the pre-#1457 in-repo path.
+is_legacy_branch() {
+  if [ -d "$LEGACY_WT_DIR/$1" ]; then return 0; fi
+  if [ ! -f "$LEGACY_REGISTRY" ]; then return 1; fi
+  node -e '
+    const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+    process.exit(process.argv[2] in r ? 0 : 1);
+  ' "$LEGACY_REGISTRY" "$1"
 }
 
 registry_set() {
@@ -68,10 +112,22 @@ registry_set() {
 registry_del() {
   ensure_registry
   node -e '
-    const fs=require("fs"); const f=process.argv[1];
-    const r=require(f); delete r[process.argv[2]];
-    fs.writeFileSync(f, JSON.stringify(r,null,2)+"\n");
-  ' "$REGISTRY" "$1"
+    const fs=require("fs");
+    for (const f of process.argv.slice(2)) {
+      if (!fs.existsSync(f)) continue;
+      const r=JSON.parse(fs.readFileSync(f,"utf8"));
+      if (!(process.argv[1] in r)) continue;
+      delete r[process.argv[1]];
+      fs.writeFileSync(f, JSON.stringify(r,null,2)+"\n");
+    }
+  ' "$1" "$REGISTRY" "$LEGACY_REGISTRY"
+  # Once the last pre-#1457 worktree is gone the in-repo state is dead; drop it
+  # so nothing here recreates a reason to ignore that directory.
+  if [ -f "$LEGACY_REGISTRY" ] \
+    && [ "$(node -e 'console.log(Object.keys(require(process.argv[1])).length)' "$LEGACY_REGISTRY")" = 0 ]; then
+    rm -f "$LEGACY_REGISTRY"
+    rmdir "$LEGACY_WT_DIR" 2>/dev/null || true
+  fi
 }
 
 # Slot assignment is read-registry -> pick-lowest-free -> write-registry; two
@@ -98,6 +154,27 @@ unlock_slots() {
 port_for() { echo $(( $2 + $1 * 10 )); }
 
 worktree_path() { echo "$WT_DIR/$1"; }
+
+# A branch name carries directories ("fix/issue-1"), and their empty husks
+# survive `rm` — enough of them to keep the retired in-repo root from ever
+# becoming removable. Stops at (and never removes) the root itself.
+prune_empty_parents() {
+  local dir="$1" root="$2"
+  while [ "$dir" != "$root" ] && [ "${dir#"$root"/}" != "$dir" ]; do
+    rmdir "$dir" 2>/dev/null || break
+    dir="$(dirname "$dir")"
+  done
+}
+
+# Where a branch's tree actually IS: pre-#1457 worktrees still sit in-repo, and
+# up/down/rm have to keep finding them or their slot leaks with no way to free it.
+existing_worktree_path() {
+  if [ ! -d "$WT_DIR/$1" ] && [ -d "$LEGACY_WT_DIR/$1" ]; then
+    echo "$LEGACY_WT_DIR/$1"
+  else
+    echo "$WT_DIR/$1"
+  fi
+}
 
 write_env() {
   local branch="$1" slot="$2" path="$3"
@@ -134,12 +211,12 @@ print_ports() {
 }
 
 # `git worktree add` checks out tracked files only, and node_modules is
-# gitignored — so a fresh worktree has none, and because worktrees live INSIDE
-# the repo, Node then resolves upward into the MAIN checkout. That is why host
-# tsc/eslint silently check the wrong tree and lefthook's fallow job can't find
-# its binary. Installing per worktree is the standard fix (#1452); symlinking
-# the main tree's copy is not, because it stops matching the lockfile the moment
-# package.json diverges.
+# gitignored — so a fresh worktree has none, and every tool there is dead until
+# this runs. Installing per worktree is the standard fix (#1452); symlinking the
+# main tree's copy is not, because it stops matching the lockfile the moment
+# package.json diverges. Since #1457 a missing install is at least LOUD: the
+# worktree is a sibling of the repo, so Node has no main checkout to walk up
+# into and silently type-check instead.
 #
 install_deps() {
   local path="$1"
@@ -177,6 +254,16 @@ cmd_create() {
   local path; path="$(worktree_path "$branch")"
   local slot; slot="$(slot_of "$branch")"
 
+  # Never silently re-create around a pre-#1457 entry: the old tree would keep
+  # its slot with nothing left pointing at it, and `rm` is the one command that
+  # still reaches it.
+  if is_legacy_branch "$branch"; then
+    die "worktree '$branch' predates #1457 and is registered under $LEGACY_WT_DIR.
+  Tear it down first, then re-create it outside the repo:
+    ./.claude/skills/worktree/worktree.sh rm $branch
+    ./.claude/skills/worktree/worktree.sh create $branch"
+  fi
+
   if [ -d "$path" ]; then
     [ -n "$slot" ] || die "worktree dir exists but no slot recorded; remove $path manually"
     echo "Worktree '$branch' already exists (slot $slot); refreshing .env."
@@ -203,6 +290,7 @@ cmd_create() {
   write_env "$branch" "$slot" "$path"
   install_deps "$path"
   echo "Worktree '$branch' ready:"
+  echo "  path:     $path"
   print_ports "$branch" "$slot"
 
   if [ "$do_up" = 1 ]; then
@@ -215,7 +303,7 @@ cmd_create() {
 cmd_up() {
   local branch="${1:-}"
   [ -n "$branch" ] || die "usage: worktree.sh up <branch>"
-  local path; path="$(worktree_path "$branch")"
+  local path; path="$(existing_worktree_path "$branch")"
   [ -d "$path" ] || die "no worktree '$branch' (run: create $branch)"
   echo "Starting '$branch'…"
   ( cd "$path" && docker compose up --build -d )
@@ -225,7 +313,7 @@ cmd_up() {
 cmd_down() {
   local branch="${1:-}"
   [ -n "$branch" ] || die "usage: worktree.sh down <branch>"
-  local path; path="$(worktree_path "$branch")"
+  local path; path="$(existing_worktree_path "$branch")"
   [ -d "$path" ] || die "no worktree '$branch'"
   ( cd "$path" && docker compose down )
 }
@@ -233,7 +321,7 @@ cmd_down() {
 cmd_rm() {
   local branch="${1:-}"
   [ -n "$branch" ] || die "usage: worktree.sh rm <branch>"
-  local path; path="$(worktree_path "$branch")"
+  local path; path="$(existing_worktree_path "$branch")"
   if [ -d "$path" ]; then
     # --profile e2e: compose will NOT remove volumes owned by a service in an
     # inactive profile, so a plain `down -v` left both e2e_*_node_modules behind
@@ -246,6 +334,10 @@ cmd_rm() {
     # the dir + pruning so the slot is still freed (the janitor relies on rm
     # never leaving a registry entry behind).
     git -C "$ROOT" worktree remove "$path" --force || { rm -rf "$path"; git -C "$ROOT" worktree prune; }
+    case "$path" in
+      "$LEGACY_WT_DIR"/*) prune_empty_parents "$(dirname "$path")" "$LEGACY_WT_DIR" ;;
+      *)                  prune_empty_parents "$(dirname "$path")" "$WT_DIR" ;;
+    esac
   fi
   registry_del "$branch"
   echo "Removed worktree '$branch' (containers, volumes, images, and slot freed)."
@@ -275,9 +367,7 @@ is_our_image() {
 # Projects still owning a registry entry. Anything else under the cs- prefix is
 # an orphan: its worktree is gone, so no `rm` will ever reclaim it.
 live_projects() {
-  ensure_registry
-  node -e 'const r=require(process.argv[1]);console.log(Object.keys(r).join("\n"))' "$REGISTRY" \
-    | while IFS= read -r b; do [ -n "$b" ] && project_name "$b"; done
+  registry_branches | while IFS= read -r b; do [ -n "$b" ] && project_name "$b"; done
   # An empty registry ends the loop on a failed `read`, and under `set -e` that
   # status propagates through the caller's command substitution and kills the
   # script. Return success explicitly.
@@ -361,13 +451,13 @@ cmd_prune() {
 }
 
 cmd_ls() {
-  ensure_registry
   local branches
-  branches="$(node -e 'const r=require(process.argv[1]);console.log(Object.keys(r).join("\n"))' "$REGISTRY")"
+  branches="$(registry_branches)"
   if [ -z "$branches" ]; then
     echo "No worktrees. Create one: ./.claude/skills/worktree/worktree.sh create <branch>"
     return
   fi
+  echo "Worktrees live in $WT_DIR"
   printf '%-28s %-5s %-26s %-26s %s\n' BRANCH SLOT FRONTEND BACKEND STATUS
   while IFS= read -r branch; do
     [ -n "$branch" ] || continue
@@ -379,6 +469,7 @@ cmd_ls() {
     else
       status="stopped"
     fi
+    if is_legacy_branch "$branch"; then status="$status, in-repo (pre-#1457)"; fi
     printf '%-28s %-5s %-26s %-26s %s\n' \
       "$branch" "$slot" \
       "http://localhost:$(port_for "$slot" 5173)" \
@@ -395,8 +486,9 @@ main() {
     down)   cmd_down "$@" ;;
     rm)     cmd_rm "$@" ;;
     prune)  cmd_prune "$@" ;;
+    dir)    echo "$WT_DIR" ;;
     ls|"")  cmd_ls "$@" ;;
-    *)      die "unknown command '$sub' (create|up|down|ls|rm|prune)" ;;
+    *)      die "unknown command '$sub' (create|up|down|ls|rm|prune|dir)" ;;
   esac
 }
 

@@ -46,15 +46,20 @@ Against a **running** stack, mints a session via `POST /api/auth/dev-login` (req
 
 ## Parallel worktrees
 
-`.claude/skills/worktree/worktree.sh` runs an isolated dockerized stack per git worktree. Each worktree gets a port slot N (main checkout = slot 0): `BACKEND_PORT 4000+10N`, `FRONTEND_PORT 5173+10N`, `POSTGRES_PORT 5432+10N`, and its own `COMPOSE_PROJECT_NAME` → own DB/node_modules volumes (migrations in one worktree are invisible to others). Registry: `.claude/worktrees/registry.json`.
+`.claude/skills/worktree/worktree.sh` runs an isolated dockerized stack per git worktree. Each worktree gets a port slot N (main checkout = slot 0): `BACKEND_PORT 4000+10N`, `FRONTEND_PORT 5173+10N`, `POSTGRES_PORT 5432+10N`, and its own `COMPOSE_PROJECT_NAME` → own DB/node_modules volumes (migrations in one worktree are invisible to others).
+
+**Worktrees live beside the repo, not inside it (#1457)** — `../.character-sheet-worktrees/<branch>` by default, `CS_WORKTREE_DIR` to relocate, `worktree.sh dir` to ask. Nesting them under the checkout is what let Node resolve `node_modules` *upward* into the main tree, so a worktree with a missing or half-finished install type-checked green against dependencies it never had. The slot registry (`registry.json`) and the create mutex live in that same directory, so nothing about a worktree is repo state. Worktrees predating the move keep their slots and stay reachable by `rm`; `create` refuses them until you do.
 
 ```bash
 ./.claude/skills/worktree/worktree.sh create <branch> --up | ls | up <branch> | down <branch> | rm <branch>
 ./.claude/skills/worktree/worktree.sh prune [--yes]   # artifacts of worktrees already gone
+./.claude/skills/worktree/worktree.sh dir             # where they are placed
 docker compose -p cs-<branch> logs -f
 ```
 
-**`create` installs into the worktree, and that is what makes host tooling trustworthy (#1452).** A worktree used to have no `node_modules` at all, so Node resolved upward into the main checkout and lefthook's `tsc` jobs type-checked a tree they were never pointed at. `create` now runs `npm ci` plus `prisma generate` there, so the pre-commit gate — including `fallow` — runs on its merits inside the worktree. **`--no-verify` in a worktree no longer has a justification.**
+`.claude/worktrees/` stays in `.git/info/exclude` (not `.gitignore`): Claude Code's own `EnterWorktree` still nests worktrees there and writes that exclude block itself, so deleting the line un-ignores its trees and the CLI restores it anyway. Those trees keep the upward-resolution problem — this repo's own tooling just no longer creates any.
+
+**`create` installs into the worktree, and that is what makes host tooling trustworthy (#1452).** It runs `npm ci` plus `prisma generate` there, so the pre-commit gate — including `fallow` — runs on its merits inside the worktree. **`--no-verify` in a worktree no longer has a justification.** A worktree whose install is missing now fails loudly (unresolved imports) rather than borrowing the main checkout's.
 
 `npm ci` runs the root `prepare` → `lefthook install`, which bakes an absolute path into `.git/hooks`, a directory every worktree *shares* ([lefthook #1398](https://github.com/evilmartians/lefthook/issues/1398)). `create` re-installs from the main checkout afterwards so the shim outlives the worktree; `LEFTHOOK=0` does **not** prevent this — it gates hook execution, not `lefthook install`.
 
