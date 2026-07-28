@@ -50,10 +50,15 @@ Against a **running** stack, mints a session via `POST /api/auth/dev-login` (req
 
 ```bash
 ./.claude/skills/worktree/worktree.sh create <branch> --up | ls | up <branch> | down <branch> | rm <branch>
+./.claude/skills/worktree/worktree.sh prune [--yes]   # artifacts of worktrees already gone
 docker compose -p cs-<branch> logs -f
 ```
 
-**A worktree's host tooling lies — run the gates in-container.** The worktree's `node_modules` are empty Docker-volume mountpoints, so lefthook's `tsc` jobs silently resolve against the *main* checkout and report green for code they never read. Both dev images carry `git` and a global `fallow` pinned to the root `devDependency` (#1450), so the pre-push gate that matters runs where the code actually is:
+**`create` installs into the worktree, and that is what makes host tooling trustworthy (#1452).** A worktree used to have no `node_modules` at all, so Node resolved upward into the main checkout and lefthook's `tsc` jobs type-checked a tree they were never pointed at. `create` now runs `npm ci` plus `prisma generate` there, so the pre-commit gate — including `fallow` — runs on its merits inside the worktree. **`--no-verify` in a worktree no longer has a justification.**
+
+`npm ci` runs the root `prepare` → `lefthook install`, which bakes an absolute path into `.git/hooks`, a directory every worktree *shares* ([lefthook #1398](https://github.com/evilmartians/lefthook/issues/1398)). `create` re-installs from the main checkout afterwards so the shim outlives the worktree; `LEFTHOOK=0` does **not** prevent this — it gates hook execution, not `lefthook install`.
+
+Both dev images also carry `git` and a global `fallow` pinned to the root `devDependency` (#1450). Use the in-container run for CI parity, or when you want the audit against the same image CI-adjacent work uses:
 
 ```bash
 docker compose exec -T backend  sh -c 'cd /app && fallow audit --base origin/staging --gate new-only --no-cache'
