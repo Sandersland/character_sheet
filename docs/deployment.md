@@ -4,20 +4,13 @@ Read this when packaging the app for hosting, deploying the dev environment (Rai
 
 ## Packaging model
 
-| Image | File | Use |
-|---|---|---|
-| Combined single-origin | `Dockerfile` (root) | API serves the built SPA on one origin. Railway dev + `docker-compose.prod.yml`. |
-| Backend (API-only) | `backend/Dockerfile.prod` | Split deploys. |
-| Frontend (nginx static) | `frontend/Dockerfile.prod` | Split deploys; SPA fallback. |
-
-Single-origin is deliberate: one hostname → one Cloudflare Access policy, same-origin fetch, no CORS/cookie problems.
-
-Every image builds from the **repo root context** — the npm-workspaces install must link `packages/*` (shared types, #820) — so split builds pass `-f`, never a subdirectory context:
+One deployable image: the root `Dockerfile`, combined single-origin — the API serves the built SPA. Railway dev and `docker-compose.prod.yml` both use it. It builds from the **repo root context**, because the npm-workspaces install must link `packages/*` (shared types, #820):
 
 ```bash
-docker build -f backend/Dockerfile.prod .
-docker build -f frontend/Dockerfile.prod --build-arg VITE_API_URL=https://api.example.com/api .
+docker build -f Dockerfile .
 ```
+
+Single-origin is a commitment, not a default: one hostname → one Cloudflare Access policy, same-origin fetch, no CORS/cookie problems. A split-mode pair of images existed until #1456 deleted them — nothing had ever built them, and the backend one had silently become a duplicate of this image's backend stage.
 
 ### Environment variables
 
@@ -109,7 +102,7 @@ Done when the step-1 query returns no unfinished row, `migrate status` reports a
 
 ### Catalog content ships in the seed, not in migrations (#1277)
 
-Every boot command runs `prisma migrate deploy && prisma db seed` as one step (root `Dockerfile`, `backend/Dockerfile`, `backend/Dockerfile.prod`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
+Every boot command runs `prisma migrate deploy && prisma db seed` as one step (root `Dockerfile`, `backend/Dockerfile`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
 
 1. **The failure mode is already structurally prevented** — there is no deployment path that runs `migrate deploy` without also running `db seed` (enforced above), so this is a defense-in-depth gate, not a live gap.
 2. **Data migrations can't express what the seed does.** Several seeders (`seedFeats`, `seedSpells`, `seedShadowArts`) prune stale rows, and spell seeding layers over `SPELL_COLUMN_DEFAULTS` so a removed optional field actually resets on re-seed (#1132's Barkskin fix) — an append-only migration history can only add UPDATEs, never re-derive a row.
