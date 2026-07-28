@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { hitPointStepMath } from "@/lib/hitDice";
 import { buildLevelUpLedger, type LedgerResolvers, type LedgerRow } from "@/lib/levelUpLedger";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
-import type { Character, LevelUpPlanResponse, LevelUpStep } from "@/types/character";
+import type { Character, ClassOption, LevelUpPlanResponse, LevelUpStep, LevelUpTarget } from "@/types/character";
 
 const resolvers: LedgerResolvers = {
   maneuver: (id) => ({ m1: "Riposte", m2: "Trip Attack" })[id],
@@ -32,7 +33,7 @@ function rowFor(rows: LedgerRow[], label: string): LedgerRow | undefined {
 
 describe("buildLevelUpLedger", () => {
   it("renders level and average-HP rows and the hit-dice bump", () => {
-    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers, 10);
 
     expect(rowFor(rows, "Level")).toMatchObject({ before: "7", after: "8", variant: "delta" });
     // Con 15 → +2; d10 average = floor(10/2)+1+2 = 8; max 52 → 60.
@@ -41,12 +42,12 @@ describe("buildLevelUpLedger", () => {
   });
 
   it("a bare hp draft yields exactly the level, HP, and hit-dice rows", () => {
-    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers, 10);
     expect(rows.map((r) => r.label)).toEqual(["Level", "Maximum HP", "Hit Dice"]);
   });
 
   it("uses the rolled die plus Con mod for a roll draft", () => {
-    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "roll", roll: 7 } }, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "roll", roll: 7 } }, makePlan(), resolvers, 10);
     // roll 7 + Con +2 = 9; max 52 → 61.
     expect(rowFor(rows, "Maximum HP")).toMatchObject({ after: "61" });
   });
@@ -56,7 +57,7 @@ describe("buildLevelUpLedger", () => {
       hp: { method: "average" },
       advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
 
     // abilityLabel must resolve, never a raw key.
     const str = rowFor(rows, "Strength");
@@ -72,7 +73,7 @@ describe("buildLevelUpLedger", () => {
       hp: { method: "average" },
       advancement: { type: "takeAsi", increases: [{ ability: "constitution", amount: 2 }] },
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
     // Con 15 (+2) is used for HP even though the ASI raises it to 17 (+3).
     expect(rowFor(rows, "Maximum HP")).toMatchObject({ after: "60" });
     expect(rowFor(rows, "Constitution")).toMatchObject({ before: "15", after: "17" });
@@ -87,7 +88,7 @@ describe("buildLevelUpLedger", () => {
         abilityChoice: "dexterity",
       },
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
 
     expect(rowFor(rows, "Feat")).toMatchObject({ after: "Custom Feat" });
     // Dex 14 → 15: modifier stays +2, so no note.
@@ -99,7 +100,7 @@ describe("buildLevelUpLedger", () => {
 
   it("resolves a catalog feat name through the feat resolver", () => {
     const draft: LevelUpDraft = { hp: { method: "average" }, advancement: { type: "takeFeat", featId: "f1" } };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
     expect(rowFor(rows, "Feat")).toMatchObject({ after: "Sentinel" });
   });
 
@@ -109,6 +110,7 @@ describe("buildLevelUpLedger", () => {
       { hp: { method: "average" }, subclassId: "sc-champion" },
       makePlan(),
       resolvers,
+      10,
     );
     expect(rowFor(rows, "Subclass")).toMatchObject({ after: "Champion" });
   });
@@ -119,6 +121,7 @@ describe("buildLevelUpLedger", () => {
       { hp: { method: "average" }, fightingStyleFeat: { type: "takeFeat", featId: "fs-archery", slot: "fightingStyle" } },
       makePlan(),
       resolvers,
+      10,
     );
     expect(rowFor(rows, "Fighting Style")).toMatchObject({ after: "Archery" });
   });
@@ -129,6 +132,7 @@ describe("buildLevelUpLedger", () => {
       { hp: { method: "average" }, toolProficiencies: [{ type: "learnToolProficiency", name: "Smith's Tools" }] },
       makePlan(),
       resolvers,
+      10,
     );
     expect(rowFor(rows, "Tool Proficiencies")).toMatchObject({ items: ["Smith's Tools"], variant: "list" });
   });
@@ -142,7 +146,7 @@ describe("buildLevelUpLedger", () => {
       ],
       spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
 
     expect(rowFor(rows, "Maneuvers")?.items).toEqual(["Riposte", "Homebrew Strike"]);
     expect(rowFor(rows, "New Spells")?.items).toEqual(["Fireball"]);
@@ -153,7 +157,7 @@ describe("buildLevelUpLedger", () => {
       hp: { method: "average" },
       cantripsLearned: [{ type: "learnSpell", spellId: "s1" }],
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
     expect(rowFor(rows, "New Cantrips")).toMatchObject({ items: ["Fireball"], variant: "list" });
     expect(rowFor(rows, "New Spells")).toBeUndefined();
   });
@@ -176,7 +180,7 @@ describe("buildLevelUpLedger", () => {
         },
       ],
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
     expect(rowFor(rows, "New Cantrips")).toMatchObject({ items: ["Homebrew Cantrip"] });
   });
 
@@ -186,7 +190,7 @@ describe("buildLevelUpLedger", () => {
       cantripsLearned: [{ type: "learnSpell", spellId: "s1" }],
       spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
     const labels = rows.map((r) => r.label);
     expect(rowFor(rows, "New Cantrips")).toBeDefined();
     expect(rowFor(rows, "New Spells")).toBeDefined();
@@ -202,18 +206,18 @@ describe("buildLevelUpLedger", () => {
       spellsForgotten: [{ type: "forgetSpell", entryId: "k-old" }],
       spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
     };
-    const rows = buildLevelUpLedger(character, draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(character, draft, makePlan(), resolvers, 10);
     expect(rowFor(rows, "Forgotten")).toMatchObject({ items: ["Charm Person"], variant: "list" });
   });
 
   it("falls back to the raw entry id when a forgotten spell is not in the book (#1101)", () => {
     const draft: LevelUpDraft = { hp: { method: "average" }, spellsForgotten: [{ type: "forgetSpell", entryId: "gone" }] };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers, 10);
     expect(rowFor(rows, "Forgotten")?.items).toEqual(["gone"]);
   });
 
   it("renders no Forgotten row when nothing is swapped (#1101)", () => {
-    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers, 10);
     expect(rowFor(rows, "Forgotten")).toBeUndefined();
   });
 
@@ -225,7 +229,7 @@ describe("buildLevelUpLedger", () => {
         { name: "Zone of Truth", level: 2, school: "enchantment" as const },
       ],
     };
-    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers, 10);
     expect(rowFor(rows, "Granted by Champion")).toMatchObject({
       variant: "grantedSpells",
       grantedSpells: [
@@ -237,7 +241,7 @@ describe("buildLevelUpLedger", () => {
 
   it("labels the granted-spells row generically when no subclass name is on the plan (#1139)", () => {
     const plan = { ...makePlan([], null), grantedSpells: [{ name: "Faerie Fire", level: 1, school: "evocation" as const }] };
-    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, plan, resolvers, 10);
     expect(rowFor(rows, "Granted Spells")).toMatchObject({
       variant: "grantedSpells",
       grantedSpells: [{ name: "Faerie Fire", level: 1, school: "evocation" }],
@@ -245,8 +249,32 @@ describe("buildLevelUpLedger", () => {
   });
 
   it("renders no granted-spells row when none are incoming (#1139)", () => {
-    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers, 10);
     expect(rows.some((r) => r.label.startsWith("Granted"))).toBe(false);
+  });
+
+  it("uses the advancing class's hit die, not the persisted primary die, for a multiclass HP gain (Wizard 5 -> first Fighter level)", () => {
+    // Wizard 5 (d6 hit dice persisted), first-ever Fighter level: the gain must
+    // use the Fighter's d10, not the persisted d6 (#1441).
+    const character = makeCharacter({
+      hitPoints: { max: 30 },
+      hitDice: { total: 5, die: "d6" },
+    } as unknown as Partial<Character>);
+    const rows = buildLevelUpLedger(character, { hp: { method: "average" } }, makePlan(), resolvers, 10);
+    // Con 15 → +2; d10 average = floor(10/2)+1+2 = 8; max 30 → 38 (not 36, the d6 answer).
+    expect(rowFor(rows, "Maximum HP")).toMatchObject({ before: "30", after: "38" });
+  });
+
+  it("agrees with hitPointStepMath's averageGain by construction — Review and the HP step cannot disagree", () => {
+    const REFERENCE_CLASSES = [{ id: "cls-fighter", name: "Fighter", hitDie: "d10" }] as ClassOption[];
+    const target: LevelUpTarget = { kind: "new", classId: "cls-fighter" };
+    const character = makeCharacter({
+      hitPoints: { max: 30 },
+      hitDice: { total: 5, die: "d6" },
+    } as unknown as Partial<Character>);
+    const { faces, averageGain } = hitPointStepMath(character, REFERENCE_CLASSES, target);
+    const rows = buildLevelUpLedger(character, { hp: { method: "average" } }, makePlan(), resolvers, faces);
+    expect(rowFor(rows, "Maximum HP")).toMatchObject({ before: "30", after: String(30 + averageGain) });
   });
 
   it("names subclass-feature picks by custom name, else the step's meta label", () => {
@@ -260,7 +288,7 @@ describe("buildLevelUpLedger", () => {
         { type: "learnSubclassChoice", choiceKey: "metamagic", optionId: "o1" },
       ],
     };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(steps), resolvers);
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(steps), resolvers, 10);
     expect(rowFor(rows, "Subclass Features")?.items).toEqual(["Quickened Spell", "Metamagic"]);
   });
 });

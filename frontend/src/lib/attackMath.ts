@@ -4,6 +4,7 @@
 import { formatRollSpec } from "@/lib/dice";
 import type { RollSpec } from "@/lib/dice";
 import { hasFeatImprovement } from "@/lib/featDisplay";
+import { classEntryLevel } from "@/lib/multiclass";
 import type { Character, InventoryItem, WeaponDetail } from "@/types/character";
 import type { RollEventAttackComponents, RollEventDamageComponents } from "@character-sheet/shared-types";
 
@@ -321,10 +322,16 @@ export function buildUnarmedOnlyForms(character: Character): AttackEntry[] {
 }
 
 // Flurry of Blows strike count (SRD 5.2 "Focus"): expend 1 Focus Point to make
-// two Unarmed Strikes as a bonus action — three at Heightened Focus (monk L10,
-// #1244).
+// two Unarmed Strikes as a bonus action — three at Heightened Focus, Monk
+// level 10 (#1244) — scaled on Monk level via classEntryLevel, not total
+// character level (#1441).
+//
+// PHB'14 Flurry of Blows is always two unarmed strikes at every level — there
+// is no 2014 three-strike upgrade. This mirrors the 2024-only DERIVED_ACTIONS
+// row (backend lib/classes/actions.ts carries no edition axis, so a 2014 Monk
+// is served this branch regardless); tracked on #1435 / #1313, not forked here.
 export function flurryStrikeCount(character: Character): number {
-  return character.level >= 10 ? 3 : 2;
+  return classEntryLevel(character, "monk") >= 10 ? 3 : 2;
 }
 
 // The "Attacking with" form options for the single attack card (#786): deduped

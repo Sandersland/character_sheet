@@ -1,17 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchReference, fetchSpells } from "@/api/client";
 import ReviewStep from "@/features/level-up/ReviewStep";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import { axe } from "@/test/axe";
-import type { Character, LevelUpPlanResponse } from "@/types/character";
+import type { Character, LevelUpPlanResponse, LevelUpTarget } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchManeuvers: vi.fn(),
   fetchSpells: vi.fn(),
   fetchFeats: vi.fn(),
+  fetchReference: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -24,6 +25,12 @@ beforeEach(() => {
     ReturnType<typeof fetchSpells>
   >);
   vi.mocked(fetchFeats).mockResolvedValue([]);
+  // No `rulesEdition` on the plain `character` fixture below → useReferenceData
+  // skipTokens and never calls this; the multiclass test overrides rulesEdition
+  // and needs a real resolved value.
+  vi.mocked(fetchReference).mockResolvedValue({
+    classes: [{ id: "cls-fighter", name: "Fighter", hitDie: "d10" }],
+  } as unknown as Awaited<ReturnType<typeof fetchReference>>);
 });
 
 const character = {
@@ -39,7 +46,10 @@ const plan: LevelUpPlanResponse = {
   grantedSpells: [],
 };
 
-function renderReview(draft: LevelUpDraft, over?: { character?: Character; plan?: LevelUpPlanResponse }) {
+function renderReview(
+  draft: LevelUpDraft,
+  over?: { character?: Character; plan?: LevelUpPlanResponse; target?: LevelUpTarget },
+) {
   return render(
     <LevelUpStepContext.Provider
       value={{
@@ -47,7 +57,7 @@ function renderReview(draft: LevelUpDraft, over?: { character?: Character; plan?
         draft,
         setDraft: () => {},
         plan: over?.plan ?? plan,
-        target: { kind: "existing", classEntryId: "entry-1" },
+        target: over?.target ?? { kind: "existing", classEntryId: "entry-1" },
       }}
     >
       <ReviewStep />
@@ -56,6 +66,23 @@ function renderReview(draft: LevelUpDraft, over?: { character?: Character; plan?
 }
 
 describe("ReviewStep", () => {
+  it("uses the advancing class's hit die, not the persisted primary die, for a multiclass HP row (Wizard 5 -> first Fighter level, #1441)", async () => {
+    const wizard = {
+      ...character,
+      rulesEdition: "EDITION_2024",
+      hitPoints: { max: 30 },
+      hitDice: { total: 5, die: "d6" },
+    } as unknown as Character;
+    renderReview(
+      { hp: { method: "average" } },
+      { character: wizard, target: { kind: "new", classId: "cls-fighter" } },
+    );
+    // Con 15 → +2; d10 average (Fighter, the advancing class) = 8; max 30 → 38.
+    // Known transient: reference starts null on first paint, so this can flash
+    // the stale d6 answer (36) for one frame — findByText, not getByText.
+    expect(await screen.findByText("38")).toBeInTheDocument();
+  });
+
   it("shows the level and HP before → after", () => {
     renderReview({ hp: { method: "average" } });
     expect(screen.getByText("Level")).toBeInTheDocument();

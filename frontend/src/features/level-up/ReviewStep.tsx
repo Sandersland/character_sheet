@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 
 import { fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
+import { useReferenceData } from "@/hooks/useReferenceData";
+import { hitPointStepMath } from "@/lib/hitDice";
 import { buildLevelUpLedger, type LedgerResolvers, type LedgerRow } from "@/lib/levelUpLedger";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import { schoolInk } from "@/lib/spellFlavor";
@@ -124,9 +126,14 @@ function LedgerRowView({ row, resolving }: { row: LedgerRow; resolving: boolean 
 }
 
 export default function ReviewStep() {
-  const { character, draft, plan } = useLevelUpStepContext();
+  const { character, draft, plan, target } = useLevelUpStepContext();
   const { resolvers, resolving } = useLedgerResolvers(draft);
-  const rows = buildLevelUpLedger(character, draft, plan, resolvers);
+  // Resolved via the same call HitPointsStep makes (useReferenceData +
+  // hitPointStepMath) so the Review HP row and the HP step's preview cannot
+  // disagree (#1441) — the builder itself stays pure and must not fetch.
+  const { reference } = useReferenceData(character.rulesEdition);
+  const { faces } = hitPointStepMath(character, reference?.classes ?? [], target);
+  const rows = buildLevelUpLedger(character, draft, plan, resolvers, faces);
 
   return (
     <div>
