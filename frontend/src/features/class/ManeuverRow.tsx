@@ -20,9 +20,20 @@ export default function ManeuverRow({ entry, busy, onForget }: Props) {
     onForget(entry.id);
   }
 
+  // #1381: the served superiority-die faces (deriveManeuverEffect, backend) —
+  // pure chrome over a resolved value, never re-derived here.
+  const dieFaces = entry.effect?.dice?.faces;
+
   return (
     <AbilityRowShell
       name={entry.name}
+      chips={
+        dieFaces !== undefined ? (
+          <span className="text-[10px] text-parchment-500" aria-hidden="true">
+            d{dieFaces}
+          </span>
+        ) : undefined
+      }
       actions={
         <button
           type="button"

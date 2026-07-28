@@ -55,7 +55,6 @@ export default function SpellsSection({
           sortedSpells={derived.sortedSpells}
           slots={slots}
           slotsArePactMagic={derived.slotsArePactMagic}
-          characterLevel={character.level}
           budget={budget}
           busy={busy}
           concentratingOnEntryId={concentratingOn?.entryId ?? null}
