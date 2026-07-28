@@ -108,6 +108,11 @@ const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 export function spellListsLabel(lists: string[] | null): string {
   if (lists === null) return "any class's";
   const names = lists.map(capitalize);
+  // Defensive, not reachable today: magicalSecretsSpellLists (backend) always
+  // returns at least [key] for a served list, never [] — but the signature
+  // accepts any string[], so a future caller (or test) hitting this shouldn't
+  // silently get ", or undefined".
+  if (names.length === 0) return "";
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} or ${names[1]}`;
   return `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;

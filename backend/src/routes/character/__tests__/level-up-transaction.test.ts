@@ -293,7 +293,9 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/not on .*spell list/i);
+    // Exact text, not just the substring — capitalized to match the frontend's
+    // spellListsLabel construction for the same served list (#1440 review).
+    expect(res.body.error).toBe("Cure Wounds is not on the Wizard spell list.");
     expect(await eventCount(CHAR_ID)).toBe(0);
     const after = await prisma.character.findUniqueOrThrow({ where: { id: CHAR_ID } });
     expect((after.spellcasting as { spells: unknown[] }).spells).toHaveLength(0);
@@ -445,7 +447,10 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
       cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/not on .*spell list/i);
+    // Exact text: the 4-list 2024 Magical Secrets rejection must name every
+    // served list — capitalized, Oxford-comma "or"-joined — matching the level-up
+    // banner's spellListsLabel (frontend) for this same served list (#1440 review).
+    expect(res.body.error).toBe("Ensnaring Strike is not on the Bard, Cleric, Druid, or Wizard spell lists.");
     expect(await eventCount(CHAR_ID)).toBe(0);
   });
 
@@ -461,7 +466,7 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
       spellsLearned: [{ type: "learnSpell", spellId: fireball.id }, { type: "learnSpell", spellId: bardSpell.id }],
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/not on .*spell list/i);
+    expect(res.body.error).toBe("Fireball is not on the Bard spell list.");
     expect(await eventCount(CHAR_ID)).toBe(0);
   });
 

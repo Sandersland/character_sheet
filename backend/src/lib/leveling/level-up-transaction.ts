@@ -236,12 +236,30 @@ function assertCantripVsLeveledPlacement(
   }
 }
 
+// Capitalizes one served class-list entry for display — matches the
+// capitalization the frontend's spellListsLabel applies to the same lists.
+function capitalizeClassName(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 // Message-only phrasing for the leveled-spell rejection below: names the single
-// class list normally, or the full served list when Magical Secrets widened it
-// (2024 Bard 10+, spellLists.length > 1) — "not on the bard spell list" would
-// read as wrong when the pick was actually checked against four lists.
-function classListPhrase(spellLists: string[], lowerClass: string): string {
-  return spellLists.length <= 1 ? `the ${lowerClass} spell list` : `the ${spellLists.join(", ")} spell lists`;
+// class list normally, or the full served list — capitalized, Oxford-comma
+// "or"-joined — when Magical Secrets widened it (2024 Bard 10+,
+// spellLists.length > 1). A player sees this text on the 400, in the same
+// moment the level-up banner would render spellListsLabel(spellLists)
+// (frontend) for that same served list — "not on the bard, cleric, druid,
+// wizard spell lists" would both misstate what was checked (it reads as if
+// only "bard" mattered) and visibly disagree with the banner's "Bard, Cleric,
+// Druid, or Wizard". Deliberately duplicated here rather than imported:
+// spellListsLabel lives in a frontend module, and backend rules code must not
+// depend across that tier boundary. Keep the two phrasings in sync by hand.
+function classListPhrase(spellLists: string[]): string {
+  const names = spellLists.map(capitalizeClassName);
+  if (names.length <= 1) return `the ${names[0]} spell list`;
+  const joined = names.length === 2
+    ? `${names[0]} or ${names[1]}`
+    : `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
+  return `the ${joined} spell lists`;
 }
 
 // A leveled pick's effective level: the catalog row's, or op.custom's own
@@ -264,9 +282,9 @@ function assertWithinCeiling(op: LearnSpellOperation, row: SpellPickRow | undefi
 // one of the served class lists. `null` means unrestricted — branch on
 // `=== null`, never truthiness, since `[]` is truthy. op.custom has no
 // `row`/`classes` and is exempt (checked only by assertWithinCeiling above).
-function assertOnSpellList(row: SpellPickRow | undefined, spellLists: string[] | null, lowerClass: string): void {
+function assertOnSpellList(row: SpellPickRow | undefined, spellLists: string[] | null): void {
   if (row && spellLists !== null && !row.classes.some((c) => spellLists.includes(c))) {
-    throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(spellLists, lowerClass)}.`);
+    throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(spellLists)}.`);
   }
 }
 
@@ -279,13 +297,12 @@ function assertLeveledSpellEligibility(
   rowById: Map<string, SpellPickRow>,
   maxSpellLevel: number,
   spellLists: string[] | null,
-  lowerClass: string,
 ): void {
   for (const op of spellOps) {
     const row = op.spellId ? rowById.get(op.spellId) : undefined;
     if (op.spellId && !row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
     assertWithinCeiling(op, row, maxSpellLevel);
-    assertOnSpellList(row, spellLists, lowerClass);
+    assertOnSpellList(row, spellLists);
   }
 }
 
@@ -293,9 +310,14 @@ function assertLeveledSpellEligibility(
 // served value from spellLists, because 2024 Magical Secrets broadens spells
 // but not cantrips (the trigger is the Prepared Spells number, level 1+ only)
 // while a qualifying 2014 Bard is unrestricted on both (PHB'14 p. 54 "...or a
-// cantrip"). cantripLists is always a single class or null — Magical Secrets
-// never widens it to several — so unlike the leveled message above, this one
-// never needs to name more than one list.
+// cantrip"). The `.some()` check below handles a multi-entry cantripLists
+// correctly regardless; per the current magicalSecretsSpellLists
+// implementation cantripLists is always a single class or null, so the
+// rejection message never needs to name more than one list — but that's an
+// implementation fact, not a type guarantee. If a future subclass seam (2024
+// College of Lore Magical Discoveries, PHB'14 Additional Magical Secrets)
+// widens it to several, this message needs the same treatment as the leveled
+// pick's rejection message (assertOnSpellList, via classListPhrase).
 function assertCantripEligibility(
   cantripOps: LearnSpellOperation[],
   rowById: Map<string, SpellPickRow>,
@@ -352,7 +374,7 @@ async function assertPickSpellEligibility(
   if (!gate) return;
 
   const lowerClass = className.toLowerCase();
-  assertLeveledSpellEligibility(spellOps, rowById, gate.maxSpellLevel, gate.spellLists, lowerClass);
+  assertLeveledSpellEligibility(spellOps, rowById, gate.maxSpellLevel, gate.spellLists);
   assertCantripEligibility(cantripOps, rowById, gate.cantripLists, lowerClass);
 }
 

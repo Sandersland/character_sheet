@@ -106,6 +106,12 @@ describe("spellListsLabel (#1440)", () => {
   it("renders null as the PHB'14 unrestricted phrase", () => {
     expect(spellListsLabel(null)).toBe("any class's");
   });
+
+  // Not reachable via magicalSecretsSpellLists today (it always returns at
+  // least [key]) — a defensive guard against a future caller passing [].
+  it("renders an empty list as an empty string, not ', or undefined'", () => {
+    expect(spellListsLabel([])).toBe("");
+  });
 });
 
 describe("swappableKnownSpells (#1101)", () => {
