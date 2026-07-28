@@ -255,6 +255,9 @@ function capitalizeClassName(name: string): string {
 // depend across that tier boundary. Keep the two phrasings in sync by hand.
 function classListPhrase(spellLists: string[]): string {
   const names = spellLists.map(capitalizeClassName);
+  // Defensive, not reachable today: magicalSecretsSpellLists always returns at
+  // least [key], never [] — mirrors the identical guard in spellListsLabel (frontend).
+  if (names.length === 0) return "the spell list";
   if (names.length <= 1) return `the ${names[0]} spell list`;
   const joined = names.length === 2
     ? `${names[0]} or ${names[1]}`
