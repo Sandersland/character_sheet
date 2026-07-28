@@ -1,7 +1,8 @@
 // Canonical 5e effect model (dice + save + scaling) wire type (#1272), single-
-// sourced here after it was hand-mirrored in backend/src/lib/combat/effects.ts
-// and frontend/src/lib/effects.ts. Extracted from Spell so it can describe any
-// activated ability, not just spells.
+// sourced here; backend/src/lib/combat/effects.ts is the only implementation
+// of the runtime resolution (readEffectSpec/resolveEffectSpec) — the former
+// frontend/src/lib/effects.ts mirror is deleted (#1381). Extracted from Spell
+// so it can describe any activated ability, not just spells.
 
 // Kind of thing an effect does. "utility" carries no roll today; "buff" applies
 // a passive stat modifier (no roll) while the granting concentration holds.
@@ -40,8 +41,10 @@ export interface EffectColumns {
   // Class-die reference (e.g. "superiorityDice") — supersedes effectDiceFaces
   // when it resolves. Backend-only resolution (a ClassDieResolver reads it via
   // resolveEffectDieFaces); kept in the wire type because it's a real catalog
-  // column that appears in backend snapshots. The frontend widens to accept it
-  // but never reads it — see resolveEffectDice's frontend twin.
+  // column that appears in backend snapshots (ManeuverEntry, pre-resolution).
+  // The frontend never sees this column: deriveManeuverEffect resolves it
+  // server-side, and the RESOLVED EffectSpec (dice.faces already a number) is
+  // what crosses the wire on the maneuver row (#1381).
   effectDieSource?: string | null;
   effectModifier?: number | null;
   damageType?: string | null;

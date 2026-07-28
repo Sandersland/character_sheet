@@ -163,6 +163,12 @@ interface CastableLevelsView {
   pact?: { slotLevel: number } | null;
 }
 
+// `entries`' levels ≥ minLevel — the shared filter behind the slots/arcana
+// arms of castableSlotLevels below.
+function levelsAtOrAbove(entries: { level: number }[] | undefined, minLevel: number): number[] {
+  return (entries ?? []).map((e) => e.level).filter((level) => level >= minLevel);
+}
+
 // Every slot level `spell` can be cast at, keyed by `chosenSlotLevel ?? spell.level`
 // (#1381): cantrips resolve once at slotLevel 0 (character-level scaling is
 // baked into resolveEffectSpec); a leveled spell adds every level ≥ its own
@@ -172,10 +178,12 @@ interface CastableLevelsView {
 // castLevel, which can exceed any slot the character owns.
 function castableSlotLevels(spell: SpellEntry, view: CastableLevelsView): number[] {
   if (spell.level === 0) return [0];
-  const levels = new Set<number>([spell.level]);
+  const levels = new Set<number>([
+    spell.level,
+    ...levelsAtOrAbove(view.slots, spell.level),
+    ...levelsAtOrAbove(view.arcana, spell.level),
+  ]);
   if (spell.item) levels.add(spell.item.castLevel);
-  for (const s of view.slots ?? []) if (s.level >= spell.level) levels.add(s.level);
-  for (const a of view.arcana ?? []) if (a.level >= spell.level) levels.add(a.level);
   if (view.pact && view.pact.slotLevel >= spell.level) levels.add(view.pact.slotLevel);
   return [...levels].sort((a, b) => a - b);
 }
