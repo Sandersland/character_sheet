@@ -240,6 +240,20 @@ export interface ToolProfEntry {
   name: string; // matches a TOOLS entry name
 }
 
+/**
+ * One picked option of a generic subclass "choose N" feature (#899), e.g. a
+ * Ranger's Hunter's Prey selection. Mirrors ManeuverEntry but carries no
+ * mechanics — the option catalog is GrantedAbility rows and this is just the
+ * snapshot. `optionId` is catalog provenance only, so it's absent for a
+ * custom (non-catalog) pick.
+ */
+export interface ChoiceEntry {
+  id: string;
+  optionId?: string;
+  name: string;
+  description: string;
+}
+
 /** Derived class/subclass resource data merged with stored mutable state. */
 export interface CharacterResources {
   features: ClassFeature[];
@@ -250,6 +264,11 @@ export interface CharacterResources {
   maneuversKnown: ManeuverEntry[];
   /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
+  // buildResourcesPayload always sends both of these (subclassChoices defaults
+  // to [] server-side), so required here — optional would let the drift these
+  // two fields close (#1422) reopen.
+  subclassChoices: { key: string; label: string; catalogSource: string; count: number }[];
+  choicesKnown: Record<string, ChoiceEntry[]>;
 }
 
 /** One entry in `Character.classes` — structured multiclass-aware view. */
