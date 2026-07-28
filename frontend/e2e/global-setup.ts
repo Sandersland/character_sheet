@@ -193,6 +193,28 @@ async function api(cookie: string, path: string, init?: RequestInit): Promise<Re
   });
 }
 
+// A container that predates the last migration (started before `docker compose
+// up --build` regenerated the Prisma client) throws here first: the generated
+// client selects columns the DB no longer matches. This must run right after
+// login and before any character write — a drifted stack should fail clean,
+// not half-seed the roster. It never migrates anything itself; the fix is
+// restarting the container, whose CMD chains generate + `migrate deploy` +
+// `db seed` (backend/Dockerfile). `subclassId` below hits the same route but
+// only for personas that declare a subclass, and only after
+// seedCharacterShell has already written — that's fine there because it's not
+// guarding against drift, just resolving a name.
+async function assertCatalogReady(cookie: string): Promise<void> {
+  const response = await api(cookie, "/api/reference?edition=EDITION_2024");
+  if (!response.ok) {
+    throw new Error(
+      `Catalog preflight failed: GET /api/reference?edition=EDITION_2024 returned ${response.status}. ` +
+        "The backend's generated Prisma client likely predates the current schema " +
+        "(a container started before the last migration). Run `docker compose restart backend` " +
+        "to re-run generate + migrate deploy + db seed, then retry.",
+    );
+  }
+}
+
 // Resolve a Fighter subclass id by name from the reference catalog.
 async function subclassId(cookie: string, className: string, subclassName: string): Promise<string> {
   // Every seeded persona here is EDITION_2024 (#1325) — every Subclass row is
@@ -353,6 +375,7 @@ async function createPersona(cookie: string, persona: Persona): Promise<void> {
 
 export default async function globalSetup(): Promise<void> {
   const cookie = await devLoginWithRetry();
+  await assertCatalogReady(cookie);
 
   const listResponse = await api(cookie, "/api/characters");
   if (!listResponse.ok) {
