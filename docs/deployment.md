@@ -45,7 +45,11 @@ Verify: `/` loads the SPA, `/api/health` returns ok, a deep link returns the SPA
 
 ## Railway dev + Cloudflare Access
 
-Railway: project with a `dev` environment → Postgres plugin (`DATABASE_URL`) → service from the repo using the root `Dockerfile`; healthcheck `GET /api/health`; boot runs `migrate deploy` + `db seed` + `node dist/index.js`. Add the custom domain and **disable the generated `*.up.railway.app` domain** (it would bypass Access).
+Railway: project with a `dev` environment → Postgres plugin (`DATABASE_URL`) → service from the repo. Build and deploy settings live in `railway.json`, which **overrides the dashboard** — change them there, not in the UI. Add the custom domain and **disable the generated `*.up.railway.app` domain** (it would bypass Access).
+
+**Migrations run as a pre-deploy command, not just at boot.** Railway runs `preDeployCommand` after the build and before the new version is allowed to serve, and a non-zero exit halts the deploy. That is the difference between a bad migration being a red deploy and being the crash-loop that cost 13 hours (#1373). The container `CMD` still applies migrations too — that path is what `docker-compose.prod.yml` relies on, and the re-run is a no-op migration plus an idempotent seed.
+
+Pre-deploy runs in a **separate container** from the app and cannot touch volumes or the filesystem, so nothing filesystem-bound may move into it.
 
 Cloudflare: move DNS to Cloudflare, CNAME `dev.<domain>` → the Railway target (proxied), then Zero Trust → Access → self-hosted app on that hostname with an email Allow policy (+ One-time PIN fallback). Verify incognito hits the Access login and the Railway URL no longer serves the app.
 
