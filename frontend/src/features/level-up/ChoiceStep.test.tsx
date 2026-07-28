@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchFeats, fetchManeuvers, fetchReference } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
 import ChoiceStep from "@/features/level-up/ChoiceStep";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -14,10 +14,14 @@ vi.mock("@/api/client", () => ({
   fetchManeuvers: vi.fn(),
   fetchReference: vi.fn(),
   fetchFeats: vi.fn(),
+  fetchSubclassChoiceOptions: vi.fn(),
 }));
 
-// Defaults restored per-test so a test's mockResolvedValue override can't leak.
+// Defaults restored per-test so a test's mockResolvedValue override can't
+// leak; clearAllMocks also resets call counts, needed for the memo
+// regression test below (fires exactly one catalog fetch...).
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(fetchManeuvers).mockResolvedValue([
     { id: "m1", name: "Riposte", description: "riposte" },
     { id: "m2", name: "Trip Attack", description: "trip" },
@@ -31,7 +35,20 @@ beforeEach(() => {
     { id: "defense", name: "Defense", description: "def", category: "fighting_style" },
     { id: "sentinel", name: "Sentinel", description: "sent", category: "general" },
   ] as unknown as Awaited<ReturnType<typeof fetchFeats>>);
+  // Hunter's Prey (L3, huntersPrey) rows, verified against
+  // backend/prisma/seed/subclass-choices.ts.
+  vi.mocked(fetchSubclassChoiceOptions).mockResolvedValue([
+    { id: "prey1", name: "Colossus Slayer", description: "colossus", minLevel: 3 },
+    { id: "prey2", name: "Giant Killer", description: "giant", minLevel: 3 },
+    { id: "prey3", name: "Horde Breaker", description: "horde", minLevel: 3 },
+  ]);
 });
+
+const preyStep: LevelUpStep = {
+  kind: "subclassChoice",
+  count: 1,
+  meta: { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey" },
+};
 
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Battle Master", newLevel: 3, isPrimary: true },
@@ -43,12 +60,14 @@ function Harness({
   step,
   character,
   plan: planOverride,
+  initialDraft,
 }: {
   step: LevelUpStep;
   character?: Character;
   plan?: LevelUpPlanResponse;
+  initialDraft?: LevelUpDraft;
 }) {
-  const [draft, setDraft] = useState<LevelUpDraft>({ hp: { method: "average" } });
+  const [draft, setDraft] = useState<LevelUpDraft>(initialDraft ?? { hp: { method: "average" } });
   return (
     <LevelUpStepContext.Provider
       value={{
@@ -183,5 +202,82 @@ describe("ChoiceStep", () => {
     );
 
     expect(await screen.findByText("Riposte")).toBeInTheDocument();
+  });
+
+  // #1422: subclassChoice's config is resolved per step (choiceConfigForStep),
+  // not looked up in the per-kind CHOICE_KIND_CONFIGS map.
+  it("renders the step's option catalog for a subclassChoice step", async () => {
+    render(<Harness step={preyStep} />);
+
+    expect(await screen.findByText("Colossus Slayer")).toBeInTheDocument();
+    expect(screen.getByText("Giant Killer")).toBeInTheDocument();
+    expect(screen.getByText("Horde Breaker")).toBeInTheDocument();
+  });
+
+  it("sends the character's edition to the catalog fetch", async () => {
+    const character = { rulesEdition: "EDITION_2014", resources: {}, advancements: [] } as unknown as Character;
+    render(<Harness step={preyStep} character={character} />);
+
+    await waitFor(() =>
+      expect(vi.mocked(fetchSubclassChoiceOptions)).toHaveBeenCalledWith("huntersPrey", "EDITION_2014"),
+    );
+  });
+
+  it("hides an option the character already picked", async () => {
+    const character = {
+      resources: { choicesKnown: { huntersPrey: [{ id: "e1", optionId: "prey1", name: "Colossus Slayer" }] } },
+      advancements: [],
+    } as unknown as Character;
+    render(<Harness step={preyStep} character={character} />);
+
+    // Assert the positive anchor FIRST -- without it this test passes
+    // vacuously today (nothing renders at all, so the "not present" assertion
+    // below is trivially true).
+    expect(await screen.findByText("Giant Killer")).toBeInTheDocument();
+    expect(screen.queryByText("Colossus Slayer")).not.toBeInTheDocument();
+  });
+
+  it("writes a learnSubclassChoice op carrying both choiceKey and optionId", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={preyStep} />);
+
+    await user.click(await screen.findByText("Colossus Slayer"));
+    await waitFor(() => {
+      const draft = JSON.parse(screen.getByTestId("draft").textContent!);
+      expect(draft.subclassChoices).toEqual([
+        { type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "prey1" },
+      ]);
+    });
+  });
+
+  it("fires exactly one catalog fetch when re-rendered with an equal-but-new step", async () => {
+    const { rerender } = render(<Harness step={{ ...preyStep }} />);
+    await screen.findByText("Colossus Slayer");
+
+    rerender(<Harness step={{ ...preyStep }} />);
+    await screen.findByText("Colossus Slayer");
+
+    expect(vi.mocked(fetchSubclassChoiceOptions)).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a pick under one choiceKey from consuming another key's cap", async () => {
+    const user = userEvent.setup();
+    const initialDraft: LevelUpDraft = {
+      hp: { method: "average" },
+      subclassChoices: [{ type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "dt1" }],
+    };
+    render(<Harness step={preyStep} initialDraft={initialDraft} />);
+
+    const card = (await screen.findByText("Colossus Slayer")).closest("button")!;
+    expect(card).toBeEnabled();
+
+    await user.click(card);
+    await waitFor(() => {
+      const draft = JSON.parse(screen.getByTestId("draft").textContent!);
+      expect(draft.subclassChoices).toEqual([
+        { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "dt1" },
+        { type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "prey1" },
+      ]);
+    });
   });
 });

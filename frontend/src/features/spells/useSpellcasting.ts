@@ -38,7 +38,7 @@ export function useSpellcasting(character: Character) {
   }
 
   function handleCast(spell: Spell, slotLevel?: number) {
-    const { ops, result } = planCast(spell, character, slotLevel);
+    const { ops, result } = planCast(spell, slotLevel);
     if (result) setCastResult(result);
     if (ops.length) send(ops);
   }

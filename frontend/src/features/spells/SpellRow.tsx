@@ -13,7 +13,6 @@ import type { Spell } from "@/types/character";
 
 interface SpellRowProps {
   spell: Spell;
-  characterLevel: number;
   /** True if the spellcasting section is busy (disables buttons). */
   busy: boolean;
   onPrepare: (spell: Spell) => void;
@@ -52,7 +51,6 @@ function prepareCta(
 
 export default function SpellRow({
   spell,
-  characterLevel,
   busy,
   onPrepare,
   onForget,
@@ -63,7 +61,7 @@ export default function SpellRow({
   const [detailOpen, setDetailOpen] = useState(false);
 
   const derived = deriveSpellRow(spell, availableSlots);
-  const effect = effectPreview(spell, characterLevel);
+  const effect = effectPreview(spell);
   const compStr = componentsLabel(spell);
 
   return (

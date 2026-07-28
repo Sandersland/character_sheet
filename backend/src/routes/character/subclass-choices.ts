@@ -4,8 +4,9 @@ import { prisma } from "@/lib/core/prisma.js";
 
 export const subclassChoicesRouter = Router({ mergeParams: true });
 
-// Feeds the level-up Choose-N step and the sheet's subclass-choice pickers (#899):
-// GET /api/subclass-choices/:source lists the option catalog for one generic
+// Feeds the level-up ceremony's subclassChoice step (#1422, via
+// fetchSubclassChoiceOptions) -- its only client today. GET
+// /api/subclass-choices/:source lists the option catalog for one generic
 // subclass choice (e.g. "huntersPrey"), as GrantedAbility rows keyed by `source`
 // = the SubclassChoice.catalogSource. Which choices a character can make and how
 // many is carried by the serialized character's resources.subclassChoices; this

@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { fetchReference } from "@/api/client";
+import { fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
 import {
   CHOICE_KIND_CONFIGS,
+  choiceConfigForStep,
   filterChoiceOptions,
   nextChoiceSelection,
   type ChoiceOption,
 } from "@/lib/levelUpChoices";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
-import type { Character } from "@/types/character";
+import type { Character, LevelUpStep } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchManeuvers: vi.fn(async () => [
@@ -20,6 +21,10 @@ vi.mock("@/api/client", () => ({
     { id: "archery", name: "Archery", description: "arch", category: "fighting_style" },
     { id: "defense", name: "Defense", description: "def", category: "fighting_style" },
     { id: "sentinel", name: "Sentinel", description: "sent", category: "general" },
+  ]),
+  fetchSubclassChoiceOptions: vi.fn(async () => [
+    { id: "prey1", name: "Colossus Slayer", description: "cs", minLevel: 3 },
+    { id: "prey2", name: "Giant Killer", description: "gk", minLevel: 3 },
   ]),
 }));
 
@@ -141,6 +146,81 @@ describe("CHOICE_KIND_CONFIGS", () => {
 
     it("blocks an (N+1)th pick at the cap (returns null)", () => {
       expect(nextChoiceSelection(["a", "b"], "c", { single: false, count: 2 })).toBeNull();
+    });
+  });
+
+  describe("choiceConfigForStep", () => {
+    const preyStep: LevelUpStep = {
+      kind: "subclassChoice",
+      count: 1,
+      meta: { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey" },
+    };
+
+    it("returns the kind config unchanged for the three per-kind steps", () => {
+      expect(choiceConfigForStep({ kind: "maneuvers", count: 2 })).toBe(CHOICE_KIND_CONFIGS.maneuvers);
+      expect(choiceConfigForStep({ kind: "fightingStyleFeat" })).toBe(CHOICE_KIND_CONFIGS.fightingStyleFeat);
+      expect(choiceConfigForStep({ kind: "toolProficiency", count: 1 })).toBe(CHOICE_KIND_CONFIGS.toolProficiency);
+    });
+
+    it("loads the step's catalogSource with the context edition", async () => {
+      const cfg = choiceConfigForStep(preyStep)!;
+      const result = await cfg.loadOptions({ targetLevel: 3, edition: "EDITION_2014" });
+
+      expect(vi.mocked(fetchSubclassChoiceOptions)).toHaveBeenCalledWith("huntersPrey", "EDITION_2014");
+      expect(result).toEqual([
+        { id: "prey1", name: "Colossus Slayer", description: "cs" },
+        { id: "prey2", name: "Giant Killer", description: "gk" },
+      ]);
+    });
+
+    it("scopes selected to this step's meta.key", () => {
+      const cfg = choiceConfigForStep(preyStep)!;
+      const draft: LevelUpDraft = {
+        hp: { method: "average" },
+        subclassChoices: [
+          { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "dt1" },
+          { type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "prey1" },
+        ],
+      };
+      expect(cfg.selected(draft)).toEqual(["prey1"]);
+    });
+
+    it("select replaces only this key's ops and preserves every other key's", () => {
+      const cfg = choiceConfigForStep(preyStep)!;
+      const draft: LevelUpDraft = {
+        hp: { method: "average" },
+        subclassChoices: [{ type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "dt1" }],
+      };
+      expect(cfg.select(draft, ["prey1"])).toEqual({
+        subclassChoices: [
+          { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "dt1" },
+          { type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "prey1" },
+        ],
+      });
+    });
+
+    it("reads already-picked options out of choicesKnown[key]", () => {
+      const cfg = choiceConfigForStep(preyStep)!;
+      const character = {
+        resources: {
+          choicesKnown: {
+            huntersPrey: [{ id: "e1", optionId: "prey1", name: "Colossus Slayer", description: "" }],
+          },
+        },
+      } as unknown as Character;
+      expect([...cfg.fromCharacter(character)]).toEqual(["prey1"]);
+    });
+
+    it("drops entries with no optionId (custom picks) from fromCharacter", () => {
+      const cfg = choiceConfigForStep(preyStep)!;
+      const character = {
+        resources: { choicesKnown: { huntersPrey: [{ id: "e1", name: "Homebrew Pick", description: "" }] } },
+      } as unknown as Character;
+      expect([...cfg.fromCharacter(character)]).toEqual([]);
+    });
+
+    it("returns undefined for a subclassChoice step with no string meta.key", () => {
+      expect(choiceConfigForStep({ kind: "subclassChoice", count: 1 })).toBeUndefined();
     });
   });
 

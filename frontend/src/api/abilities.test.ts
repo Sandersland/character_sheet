@@ -10,6 +10,7 @@ import {
   fetchChannelDivinity,
   fetchManeuvers,
   fetchShadowArts,
+  fetchSubclassChoiceOptions,
   imposeOpenHandRiderTransaction,
   rollSneakAttackTransaction,
   setQuiveringPalmTransaction,
@@ -138,6 +139,39 @@ describe("fetchManeuvers", () => {
 
     await expect(fetchManeuvers()).resolves.toEqual([{ id: "m1" }]);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/maneuvers"), expect.anything());
+  });
+});
+
+describe("fetchSubclassChoiceOptions", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("GETs the source's option catalog with the character's edition in the query", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ id: "prey1", name: "Colossus Slayer", description: "d", minLevel: 3 }],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchSubclassChoiceOptions("huntersPrey", "EDITION_2014")).resolves.toEqual([
+      { id: "prey1", name: "Colossus Slayer", description: "d", minLevel: 3 },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/subclass-choices/huntersPrey?edition=EDITION_2014"),
+      expect.anything(),
+    );
+  });
+
+  it("surfaces the server's error message", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: "unknown choice source" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchSubclassChoiceOptions("nope", "EDITION_2024")).rejects.toThrow("unknown choice source");
   });
 });
 

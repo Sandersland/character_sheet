@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { isAttackCantrip, partyHealAllies, schoolLabel } from "@/lib/spellMeta";
+import { effectPreview, isAttackCantrip, partyHealAllies, schoolLabel } from "@/lib/spellMeta";
 import type { Session, Spell } from "@/types/character";
 
 describe("schoolLabel", () => {
@@ -93,5 +93,64 @@ describe("partyHealAllies", () => {
     // match can never fire, so the friendly-heal picker stays empty.
     const solo = { id: "s", campaignId: null, status: "active", startedAt: "x", participants: [] } as unknown as Session;
     expect(partyHealAllies(solo, "me")).toEqual([]);
+  });
+});
+
+// Migrated from spellCast.test.ts (#1381): effectPreview is now a lookup into
+// the served effectRolls (rules resolve backend-side), and the cantrip-
+// scaling-across-levels golden case moved to the backend test that proves the
+// rule (spell-effect-rolls.test.ts). effectPreviewWithMod is deleted —
+// effectPreview absorbs it because the served roll always carries the heal
+// ability modifier now.
+function previewSpell(overrides: Partial<Spell>): Spell {
+  return {
+    id: "s",
+    name: "Spell",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "",
+    ...overrides,
+  } as Spell;
+}
+
+const previewFireball = previewSpell({
+  name: "Fireball",
+  level: 3,
+  effectKind: "damage",
+  damageType: "fire",
+  effectRolls: [{ slotLevel: 5, roll: { count: 10, faces: 6, modifier: 0 } }],
+});
+
+const previewCantrip = previewSpell({
+  name: "Fire Bolt",
+  level: 0,
+  effectKind: "damage",
+  damageType: "fire",
+  effectRolls: [{ slotLevel: 0, roll: { count: 2, faces: 10, modifier: 0 } }],
+});
+
+const previewHeal = previewSpell({
+  name: "Cure Wounds",
+  level: 1,
+  effectKind: "heal",
+  effectRolls: [{ slotLevel: 1, roll: { count: 2, faces: 8, modifier: 3 } }],
+});
+
+const previewUtility = previewSpell({ name: "Detect Magic", level: 1 });
+
+describe("effectPreview — golden string snapshots (#1381)", () => {
+  it("effectPreview strings", () => {
+    expect(effectPreview(previewFireball, 5)).toBe("10d6 fire");
+    expect(effectPreview(previewCantrip)).toBe("2d10 fire");
+    expect(effectPreview(previewHeal)).toBe("2d8 + 3 healing");
+    expect(effectPreview(previewUtility)).toBeNull();
+  });
+
+  it("the grimoire and the picker render the same heal string at the same slot (#1381)", () => {
+    expect(effectPreview(previewHeal)).toBe("2d8 + 3 healing");
+    expect(effectPreview(previewHeal, 1)).toBe(effectPreview(previewHeal));
   });
 });

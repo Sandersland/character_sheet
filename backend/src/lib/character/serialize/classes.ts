@@ -9,6 +9,7 @@ import {
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import type { DerivedFeature } from "@/lib/classes/types.js";
 import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
+import { deriveManeuverEffect } from "@/lib/classes/maneuver-effect.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -74,6 +75,10 @@ function buildResourcesPayload(
   const subclassChoices = derivedRes.subclassChoices ?? [];
   const choiceCaps = new Map(subclassChoices.map((c) => [c.key, c.count]));
   const { clamped: clampedChoicesKnown } = clampChoicesToCaps(stored.choicesKnown, choiceCaps);
+  // #1381: resolved once per response (not per maneuver) — the die is uniform
+  // across every known maneuver, keyed off the character's OWN superiority
+  // die (deriveManeuverEffect), not a per-maneuver catalog column.
+  const maneuverEffect = derivedRes.maneuverChoiceCount !== undefined ? deriveManeuverEffect(derivedRes) : undefined;
   return {
     features: toWireFeatures(derivedRes.features),
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
@@ -88,7 +93,9 @@ function buildResourcesPayload(
       used: Math.min(pool.total, stored.used[pool.key] ?? 0),
       remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
     })),
-    maneuversKnown: clampedManeuversKnown,
+    maneuversKnown: maneuverEffect
+      ? clampedManeuversKnown.map((m) => ({ ...m, effect: maneuverEffect }))
+      : clampedManeuversKnown,
     toolProficienciesKnown: clampedToolProfsKnown,
     // Generic subclass "choose N" surface (#899): the derived choices (key/label/
     // count/catalogSource) tell the level-up Choose-N step which pickers to render;

@@ -3,20 +3,27 @@ import { screen } from "@testing-library/react";
 
 import ClassResourceBlocks from "@/features/class/ClassResourceBlocks";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
-import type { Character } from "@/types/character";
+import type { Character, CharacterResources } from "@/types/character";
 import type { ClassFeatureView } from "@/lib/classFeatures";
+
+// #1422: explicitly typed so a drift between this fixture and the real
+// CharacterResources shape (e.g. a field the server always sends but the
+// frontend type omits) fails tsc instead of hiding behind the outer
+// `as unknown as Character` cast below.
+const resources: CharacterResources = {
+  features: [],
+  maneuverChoiceCount: 3,
+  pools: [],
+  maneuversKnown: [],
+  toolProficienciesKnown: [],
+  choicesKnown: {},
+  subclassChoices: [],
+};
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
-    resources: {
-      features: [],
-      maneuverChoiceCount: 3,
-      pools: [],
-      maneuversKnown: [],
-      toolProficienciesKnown: [],
-      choicesKnown: {},
-    },
+    resources,
     ...overrides,
   } as unknown as Character;
 }
