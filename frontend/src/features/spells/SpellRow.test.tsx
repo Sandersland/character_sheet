@@ -32,7 +32,6 @@ const UNBOUNDED = { count: 0, limit: null, atLimit: false };
 function defaultProps(spell: Spell, overrides = {}) {
   return {
     spell,
-    characterLevel: 5,
     busy: false,
     budget: UNBOUNDED,
     onPrepare: vi.fn(),

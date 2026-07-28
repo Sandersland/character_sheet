@@ -1,10 +1,12 @@
 // Canonical 5e effect model (dice + save + scaling), extracted from Spell so it
 // can describe any activated ability, not just spells. The type declarations
-// are single-sourced in shared-types (#1272); the two RUNTIME halves below
-// (resolution + roll math) are still hand-mirrored on the frontend in
-// frontend/src/lib/effects.ts — that mirror is follow-up work, not this file's
-// concern.
-export type { EffectColumns, EffectRow, EffectScaling, EffectSpec } from "@character-sheet/shared-types";
+// are single-sourced in shared-types (#1272); THIS file is now the only
+// implementation of the runtime halves (resolution + roll math) — the former
+// frontend/src/lib/effects.ts mirror is deleted (#1381). readEffectSpec /
+// resolveEffectSpec resolve here in buildSpellcastingView (spell rows) and
+// deriveManeuverEffect (maneuver rows); the resolved EffectSpec + EffectRoll[]
+// are what cross the wire, so the client never re-derives a roll.
+export type { EffectColumns, EffectRoll, EffectRow, EffectScaling, EffectSpec } from "@character-sheet/shared-types";
 
 import type { EffectRow, EffectScaling, EffectSpec, EffectType } from "@character-sheet/shared-types";
 
@@ -12,8 +14,9 @@ import type { EffectRow, EffectScaling, EffectSpec, EffectType } from "@characte
 export type ClassDieResolver = (source: string) => number | null;
 
 // Die faces: a class-die reference (effectDieSource + resolveDie) supersedes
-// the fixed effectDiceFaces. (Frontend twin lacks this arm — its rows never
-// carry effectDieSource.)
+// the fixed effectDiceFaces. deriveManeuverEffect (classes/maneuver-effect.ts)
+// is the reachable caller supplying resolveClassDie as the ClassDieResolver —
+// the only way a maneuver's die (e.g. superiorityDice) resolves to real faces.
 function resolveEffectDieFaces(row: EffectRow, resolveDie?: ClassDieResolver): number | null {
   const referencedFaces = row.effectDieSource ? resolveDie?.(row.effectDieSource) ?? null : null;
   return referencedFaces ?? row.effectDiceFaces ?? null;
@@ -50,10 +53,12 @@ function resolveEffectType(effectKind: string | null | undefined): EffectType {
   return "utility";
 }
 
-// Adapter over the existing flat columns — no schema migration. Reproduces the
-// null-guard and scaling-mode selection from the old computeCastSpec. When a row
+// Adapter over the existing flat columns — no schema migration. When a row
 // carries effectDieSource, `resolveDie` supplies the faces (superseding the fixed
-// effectDiceFaces); fixed-dice rows are unaffected.
+// effectDiceFaces); fixed-dice rows are unaffected. Callers: buildSpellcastingView
+// (spell rows, no resolveDie) and deriveManeuverEffect (maneuver rows, via
+// resolveClassDie) — both serializer-side, so the client only ever sees the
+// resolved EffectSpec, never these raw columns.
 export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): EffectSpec {
   return {
     effectType: resolveEffectType(row.effectKind),

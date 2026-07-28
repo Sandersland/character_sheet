@@ -29,7 +29,6 @@ interface SpellbookListProps {
   sortedSpells: Spell[];
   slots: SpellSlots[];
   slotsArePactMagic: boolean;
-  characterLevel: number;
   budget: PreparedBudget;
   busy: boolean;
   concentratingOnEntryId: string | null;
@@ -42,7 +41,7 @@ interface SpellbookListProps {
 
 type GroupProps = Pick<
   SpellbookListProps,
-  "slots" | "slotsArePactMagic" | "characterLevel" | "budget" | "busy" | "concentratingOnEntryId" | "onPrepare" | "onForget" | "availableSlotsFor"
+  "slots" | "slotsArePactMagic" | "budget" | "busy" | "concentratingOnEntryId" | "onPrepare" | "onForget" | "availableSlotsFor"
 > & { level: number; levelSpells: Spell[] };
 
 // The right-aligned slot line for a level group. A single-class warlock's one slot
@@ -55,7 +54,7 @@ function slotSummary(level: number, slotInfo: SpellSlots | undefined, pact: bool
 }
 
 function SpellLevelGroup({
-  level, levelSpells, slots, slotsArePactMagic, characterLevel, budget, busy,
+  level, levelSpells, slots, slotsArePactMagic, budget, busy,
   concentratingOnEntryId, onPrepare, onForget, availableSlotsFor,
 }: GroupProps) {
   const slotInfo = level === 0 ? undefined : slots.find((s) => s.level === level);
@@ -78,7 +77,6 @@ function SpellLevelGroup({
           <SpellRow
             key={spell.id}
             spell={spell}
-            characterLevel={characterLevel}
             budget={budget}
             busy={busy}
             onPrepare={onPrepare}
