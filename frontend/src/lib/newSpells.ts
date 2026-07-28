@@ -1,8 +1,11 @@
 // Pure logic for the level-up New Spells step (#890): reads the plan step's
 // meta, filters the catalog to the spells this level can scribe, and toggles the
-// draft's learnSpell ops under a hard cap. The spell-level ceiling itself is
-// derived on the backend (maxSpellLevelForClass) and rides in step.meta — never
-// re-encoded here.
+// draft's learnSpell ops under a hard cap. The spell-level ceiling and the class
+// lists (#1440: spellLists/cantripLists, Magical Secrets-aware and edition-forked
+// via magicalSecretsSpellLists) are both derived on the backend and ride in
+// step.meta — never re-encoded here. This module is a display filter over a
+// server-authoritative decision; the real enforcement is
+// assertPickSpellEligibility on the transaction endpoint.
 import type { CatalogSpell, ForgetSpellOperation, LearnSpellOperation, LevelUpStep, Spell } from "@/types/character";
 
 export interface NewSpellsMeta {
@@ -13,9 +16,19 @@ export interface NewSpellsMeta {
   canSwap: boolean;
   /** #1131: new cantrips to pick this level (0 when the cantrips-known column is flat). */
   cantrips: number;
+  /**
+   * #1440: class lists a leveled pick may come from, served by
+   * magicalSecretsSpellLists (backend). `null` = unrestricted (PHB'14 Bard "from
+   * any class"). Branch on `=== null`, never truthiness — `[]` is truthy.
+   */
+  spellLists: string[] | null;
+  /** #1440: class lists a cantrip pick may come from — a SEPARATE served value
+   * from spellLists (2024 Magical Secrets never broadens cantrips; a qualifying
+   * 2014 Bard is unrestricted on both facets). */
+  cantripLists: string[] | null;
 }
 
-/** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, and cantrip count. */
+/** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, cantrip count, and the served lists. */
 export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
   const max = step.meta?.maxSpellLevel;
   const cantrips = step.meta?.cantrips;
@@ -25,6 +38,8 @@ export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
     magicalSecrets: step.meta?.magicalSecrets === true,
     canSwap: step.meta?.canSwap === true,
     cantrips: typeof cantrips === "number" ? cantrips : 0,
+    spellLists: (step.meta?.spellLists as string[] | null | undefined) ?? null,
+    cantripLists: (step.meta?.cantripLists as string[] | null | undefined) ?? null,
   };
 }
 
@@ -32,11 +47,6 @@ export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
 export function swappableKnownSpells(spells: Spell[]): Spell[] {
   return spells.filter((s) => s.source == null && s.level > 0);
 }
-
-// Bard Magical Secrets (SRD 5.2): from level 10, picks may come from any of these
-// spell lists (not the whole multiverse as in 2014). The backend flags the level;
-// this is the display filter for the picker, mirroring the class-list filter below.
-const MAGICAL_SECRETS_LISTS = ["bard", "cleric", "druid", "wizard"];
 
 /**
  * Toggle the single optional swap forget (#1101). Selecting sets/replaces the one
@@ -58,23 +68,49 @@ export function toggleForgetSpell(
 
 /**
  * Catalog spells learnable at this level: a leveled spell (cantrips excluded) at
- * or below the ceiling, on the class's list — unless Magical Secrets broadens the
- * filter to the Bard/Cleric/Druid/Wizard lists (still level-gated).
+ * or below the ceiling, on ONE of the served `spellLists` — `null` admits any
+ * class (PHB'14 unrestricted Bard Magical Secrets). This is a DISPLAY FILTER over
+ * a server-authoritative list computed by `magicalSecretsSpellLists` (backend)
+ * and enforced by `assertPickSpellEligibility`; it never originates the rule.
  */
 export function eligibleNewSpells(
   catalog: CatalogSpell[] | null,
-  opts: { className: string; maxSpellLevel: number; magicalSecrets: boolean },
+  opts: { maxSpellLevel: number; spellLists: string[] | null },
 ): CatalogSpell[] {
-  const className = opts.className.toLowerCase();
   const onList = (s: CatalogSpell) =>
-    opts.magicalSecrets ? s.classes.some((c) => MAGICAL_SECRETS_LISTS.includes(c)) : s.classes.includes(className);
+    opts.spellLists === null || s.classes.some((c) => opts.spellLists!.includes(c));
   return (catalog ?? []).filter((s) => s.level >= 1 && s.level <= opts.maxSpellLevel && onList(s));
 }
 
-/** Catalog cantrips (level 0) on the class's list — the level-up cantrip picks (#1131). */
-export function eligibleNewCantrips(catalog: CatalogSpell[] | null, className: string): CatalogSpell[] {
-  const cls = className.toLowerCase();
-  return (catalog ?? []).filter((s) => s.level === 0 && s.classes.includes(cls));
+/**
+ * Catalog cantrips (level 0) on ONE of the served `cantripLists` — `null` admits
+ * any class (PHB'14 "...or a cantrip"). A display filter, same contract as
+ * `eligibleNewSpells` — `cantripLists` is a SEPARATE served value, never derived
+ * from `spellLists` (2024 Magical Secrets broadens spells but not cantrips).
+ */
+export function eligibleNewCantrips(
+  catalog: CatalogSpell[] | null,
+  opts: { cantripLists: string[] | null },
+): CatalogSpell[] {
+  return (catalog ?? []).filter(
+    (s) => s.level === 0 && (opts.cantripLists === null || s.classes.some((c) => opts.cantripLists!.includes(c))),
+  );
+}
+
+const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * Display label for a served class-list facet (spellLists or cantripLists):
+ * `null` → "any class's" (PHB'14 unrestricted); one class → its capitalized name;
+ * several → comma-joined with an Oxford "or" (matches the 2024 Magical Secrets
+ * "Bard, Cleric, Druid, or Wizard" phrasing).
+ */
+export function spellListsLabel(lists: string[] | null): string {
+  if (lists === null) return "any class's";
+  const names = lists.map(capitalize);
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} or ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
 }
 
 /** Toggle a catalog spell in the draft's learnSpell ops; refuses to add past `cap`. */
