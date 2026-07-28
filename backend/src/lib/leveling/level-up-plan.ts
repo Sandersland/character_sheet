@@ -11,6 +11,7 @@ import {
   bardMagicalSecretsAt,
   levelUpCantripPicks,
   levelUpSpellPicks,
+  magicalSecretsSpellLists,
   maxSpellLevelForClass,
   swapCadenceFor,
 } from "@/lib/srd/spellcasting-tables.js";
@@ -64,6 +65,9 @@ interface PlanContext {
   target: TargetClassEntry;
   now: DerivedClassInfo | null;
   prev: DerivedClassInfo | null;
+  // Threaded to newSpellsStep's magicalSecretsSpellLists call — Magical Secrets
+  // resolves differently per edition (#1440).
+  edition: RulesEdition;
 }
 
 // deriveResources at a given per-class level, holding the target subclass fixed.
@@ -125,19 +129,27 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
 // cantrips-known growth level (so Cleric/Druid get a cantrips-only step at 4/10),
 // and a fresh level-1 entry offers its full initial spell+cantrip picks with no
 // swap (a new entry may not swap other classes' spells). Bard picks from level 10
-// are Magical Secrets.
-function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
+// are Magical Secrets. `spellLists`/`cantripLists` (#1440) are the served
+// membership facts: the eligibility gate (assertPickSpellEligibility) and the
+// picker (eligibleNewSpells/eligibleNewCantrips) both read these rather than
+// re-deriving magicalSecretsSpellLists themselves — one rule, one call site,
+// emitted unconditionally (including when null) so "explicitly unrestricted"
+// stays distinguishable from "absent".
+function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
   const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass);
   const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
   const canSwap = swapCadenceFor(target.name, target.subclass) === "onLevelUp" && target.newLevel >= 2;
   if (count <= 0 && cantrips <= 0 && !canSwap) return null;
   const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass);
+  const lists = magicalSecretsSpellLists(target.name, target.newLevel, target.subclass, edition);
   return {
     kind: "newSpells",
     count,
     meta: {
       maxSpellLevel,
+      spellLists: lists.spells,
+      cantripLists: lists.cantrips,
       ...(magicalSecrets ? { magicalSecrets: true } : {}),
       ...(canSwap ? { canSwap: true } : {}),
       ...(cantrips > 0 ? { cantrips } : {}),
@@ -160,6 +172,7 @@ export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: Target
     target,
     now: derivedAt(target, character.abilityScores, target.newLevel, character.edition),
     prev: derivedAt(target, character.abilityScores, target.newLevel - 1, character.edition),
+    edition: character.edition,
   };
 
   const candidates: (LevelUpStep | null)[] = [
