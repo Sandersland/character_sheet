@@ -91,14 +91,10 @@ export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConf
   toolProficiency,
 };
 
-/**
- * Config for a Choose-N step. The three kinds above are one config each; a
- * subclassChoice step builds its own, scoped to this step's meta.key/
- * catalogSource, so several steps (a subclass's several tiers) can share the
- * one draft.subclassChoices array without leaking picks/caps across keys
- * (#1422). meta values arrive as `unknown` — narrowed with typeof, matching
- * stepKey/stepLabel (levelUpSteps.ts).
- */
+// Per-step, not per-kind: a subclass's several tiers share one
+// draft.subclassChoices array, so scoping to meta.key is what stops picks and
+// caps leaking across keys (#1422). meta arrives as `unknown` — narrowed with
+// typeof, as stepKey and stepLabel do.
 export function choiceConfigForStep(step: LevelUpStep): ChoiceKindConfig | undefined {
   if (step.kind !== "subclassChoice") return CHOICE_KIND_CONFIGS[step.kind];
 

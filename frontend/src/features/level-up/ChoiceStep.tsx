@@ -17,10 +17,6 @@ import type { LevelUpStep } from "@/types/character";
 
 export default function ChoiceStep({ step }: { step: LevelUpStep }) {
   const { character, plan } = useLevelUpStepContext();
-  // Keyed on the step's identity triple, never the step object itself:
-  // useChoiceOptions' effect depends on config identity, so a per-render
-  // config (choiceConfigForStep builds a new object every call) would refetch
-  // the catalog forever.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the step's identity triple, never the step object: useChoiceOptions' effect depends on config identity, so a per-render config would refetch the catalog forever
   const config = useMemo(() => choiceConfigForStep(step), [step.kind, step.meta?.key, step.meta?.catalogSource]);
   const catalog = useChoiceCatalog(config, character, plan.target.newLevel);

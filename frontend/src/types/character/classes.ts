@@ -240,16 +240,10 @@ export interface ToolProfEntry {
   name: string; // matches a TOOLS entry name
 }
 
-/**
- * One picked option of a generic subclass "choose N" feature (#899), e.g. a
- * Ranger's Hunter's Prey selection. Mirrors ManeuverEntry but carries no
- * mechanics — the option catalog is GrantedAbility rows and this is just the
- * snapshot. `optionId` is catalog provenance only, so it's absent for a
- * custom (non-catalog) pick.
- */
+/** One picked option of a subclass "choose N" feature (#899) — a snapshot, not mechanics. */
 export interface ChoiceEntry {
   id: string;
-  optionId?: string;
+  optionId?: string; // catalog provenance; absent for a custom (non-catalog) pick
   name: string;
   description: string;
 }
