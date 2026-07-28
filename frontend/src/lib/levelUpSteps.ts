@@ -5,10 +5,15 @@
 import type { LevelUpStep, LevelUpStepKind, LevelUpSubmission, LevelUpTarget } from "@/types/character";
 
 // Fields SubclassStep's re-pick stash (#1323) saves/restores per subclass id —
-// invalidated by an actual subclass change, so kept separate from the fields
-// that survive one (e.g. spellsLearned, F5 in the #1323 plan — a known,
-// out-of-scope leak). Named once so applySubclassPick's stash-write and
-// restore reads can't drift apart.
+// invalidated by an actual subclass change. The spell fields (spellsLearned/
+// cantripsLearned/spellsForgotten) deliberately stay OUT: a newSpells step is
+// class-driven (all six full casters get one at a spell-granting level
+// regardless of subclass), so stashing them per subclass would discard a
+// Wizard's still-valid picks on an Evocation→Abjuration switch. The
+// Eldritch-Knight case (a subclass switch that retires the newSpells step
+// entirely) is instead handled structurally by pruneDraftToPlan (#1421).
+// Named once so applySubclassPick's stash-write and restore reads can't drift
+// apart.
 const SUBCLASS_DEPENDENT_KEYS = ["maneuvers", "toolProficiencies", "subclassChoices"] as const satisfies readonly (keyof LevelUpSubmission)[];
 
 type SubclassDependentPicks = Pick<LevelUpSubmission, (typeof SUBCLASS_DEPENDENT_KEYS)[number]>;
@@ -46,6 +51,72 @@ export function levelUpSubmissionOf(
   const rest: Partial<LevelUpDraft> = { ...draft };
   for (const key of CEREMONY_LOCAL_DRAFT_KEYS) delete rest[key];
   return { ...rest, target, hp } as LevelUpSubmission;
+}
+
+// Every op-bearing LevelUpSubmission key except the three pruneDraftToPlan
+// never touches: target/hp are ceremony inputs, not staged picks; subclassId
+// is the prune's own input (useLevelUpPlan is keyed on it) so pruning it would
+// be self-referential. dependentPicksBySubclass (the #1323 stash) is on
+// LevelUpDraft, not LevelUpSubmission, so it can never appear here — that's
+// what keeps it un-prunable by construction, not by a runtime check.
+type PrunableDraftKey = Exclude<keyof LevelUpSubmission, "target" | "hp" | "subclassId" | "subclassChoices">;
+
+// Maps each prunable draft field to the step kind that licenses it, mirroring
+// the server's assertNoExcess sweep (level-up-submission.ts) client-side. The
+// exhaustive Record (not Partial<Record<...>>) is load-bearing: a new
+// LevelUpSubmission field with no entry here is a compile error, forcing a
+// classification decision instead of a silent gap. toolProficiencies (plural
+// field) is licensed by the singular step kind toolProficiency.
+const PRUNABLE_DRAFT_KEYS = {
+  advancement: "advancement",
+  fightingStyleFeat: "fightingStyleFeat",
+  maneuvers: "maneuvers",
+  toolProficiencies: "toolProficiency",
+  spellsLearned: "newSpells",
+  cantripsLearned: "newSpells",
+  spellsForgotten: "newSpells",
+} as const satisfies Record<PrunableDraftKey, LevelUpStepKind>;
+
+/**
+ * Drops any op-bearing draft field whose licensing step is absent from
+ * `steps` (the served plan). A subclass switch can retire a step while its
+ * picks still sit in the draft (e.g. Eldritch Knight → Champion leaves
+ * spellsLearned staged with no newSpells step to grant it) — left unpruned,
+ * the Review ledger (buildLevelUpLedger) enumerates spells the character
+ * never gets, and confirm 400s on the server's assertNoExcess/assertCantrips/
+ * assertForgets. This mirrors that server sweep client-side without moving
+ * the trust boundary: the server is still the sole authority on validity,
+ * this just stops staging work it will reject.
+ *
+ * subclassChoices is pruned per-entry (not all-or-nothing): an entry survives
+ * only if its choiceKey matches the meta.key of a subclassChoice step
+ * present in this same plan — several such steps can coexist (a Hunter
+ * Ranger's tiers), each writing to the one shared array (see
+ * choiceConfigForStep, #1422).
+ *
+ * Returns the input draft by reference when nothing is pruned — the caller
+ * is a setDraft inside an effect keyed on plan identity, and an always-new
+ * object would force a render on every plan fetch even when nothing changed.
+ */
+export function pruneDraftToPlan(draft: LevelUpDraft, steps: LevelUpStep[]): LevelUpDraft {
+  const kinds = new Set(steps.map((s) => s.kind));
+  const droppedKeys = (Object.keys(PRUNABLE_DRAFT_KEYS) as PrunableDraftKey[]).filter(
+    (key) => draft[key] !== undefined && !kinds.has(PRUNABLE_DRAFT_KEYS[key]),
+  );
+
+  const allowedChoiceKeys = new Set(
+    steps.filter((s) => s.kind === "subclassChoice").map((s) => s.meta?.key).filter((k) => typeof k === "string"),
+  );
+  const survivingChoices = draft.subclassChoices?.filter((c) => allowedChoiceKeys.has(c.choiceKey));
+  const choicesChanged = (draft.subclassChoices?.length ?? 0) !== (survivingChoices?.length ?? 0);
+
+  if (droppedKeys.length === 0 && !choicesChanged) return draft;
+
+  const rest: Partial<LevelUpDraft> = { ...draft };
+  for (const key of droppedKeys) delete rest[key];
+  if (survivingChoices?.length) rest.subclassChoices = survivingChoices;
+  else delete rest.subclassChoices;
+  return rest as LevelUpDraft;
 }
 
 function subclassDependentPicksOf(source: LevelUpDraft | SubclassDependentPicks | undefined): SubclassDependentPicks {

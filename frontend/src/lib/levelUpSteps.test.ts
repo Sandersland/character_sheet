@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { applySubclassPick, draftSatisfies, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
+import { choiceConfigForStep } from "@/lib/levelUpChoices";
+import { applySubclassPick, draftSatisfies, pruneDraftToPlan, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
 import type { LevelUpStep } from "@/types/character";
 
 describe("stepKey", () => {
@@ -246,5 +247,162 @@ describe("applySubclassPick (#1323)", () => {
     // fires unconditionally (even from no prior subclass) would pass a
     // toBeUndefined() check here just as readily as correct code (M4).
     expect(applySubclassPick(d, "bm").dependentPicksBySubclass).toEqual({});
+  });
+
+  // #1421: behavioural stand-in for "SUBCLASS_DEPENDENT_KEYS still contains
+  // exactly the three" — the constant is module-private, so this asserts the
+  // externally-visible contract instead of the private list itself.
+  it("clears only the subclass-dependent keys, never the spell fields", () => {
+    const d: LevelUpDraft = {
+      hp: { method: "average" },
+      subclassId: "bm",
+      maneuvers: [m1],
+      toolProficiencies: [t1],
+      subclassChoices: [c1],
+      spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      cantripsLearned: [{ type: "learnSpell", spellId: "c1" }],
+      spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }],
+    };
+    const next = applySubclassPick(d, "champ");
+    expect(next.maneuvers).toBeUndefined();
+    expect(next.toolProficiencies).toBeUndefined();
+    expect(next.subclassChoices).toBeUndefined();
+    expect(next.spellsLearned).toEqual([{ type: "learnSpell", spellId: "s1" }]);
+    expect(next.cantripsLearned).toEqual([{ type: "learnSpell", spellId: "c1" }]);
+    expect(next.spellsForgotten).toEqual([{ type: "forgetSpell", entryId: "e1" }]);
+  });
+});
+
+describe("pruneDraftToPlan (#1421)", () => {
+  const hp: LevelUpDraft["hp"] = { method: "average" };
+  const m1 = { type: "learnManeuver" as const, maneuverId: "m1" };
+  const t1 = { type: "learnToolProficiency" as const, name: "Smith's Tools" };
+
+  it("drops the three spell fields when the plan has no newSpells step", () => {
+    const steps: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "review" }];
+    const draft: LevelUpDraft = {
+      hp,
+      spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      cantripsLearned: [{ type: "learnSpell", spellId: "c1" }],
+      spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }],
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    expect(next.spellsLearned).toBeUndefined();
+    expect(next.cantripsLearned).toBeUndefined();
+    expect(next.spellsForgotten).toBeUndefined();
+  });
+
+  it("keeps all three spell fields when a newSpells step is present (a full caster's subclass switch)", () => {
+    const steps: LevelUpStep[] = [
+      { kind: "hitPoints" },
+      { kind: "newSpells", count: 2, meta: { cantrips: 1, canSwap: true } },
+      { kind: "review" },
+    ];
+    const draft: LevelUpDraft = {
+      hp,
+      spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      cantripsLearned: [{ type: "learnSpell", spellId: "c1" }],
+      spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }],
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    expect(next.spellsLearned).toEqual(draft.spellsLearned);
+    expect(next.cantripsLearned).toEqual(draft.cantripsLearned);
+    expect(next.spellsForgotten).toEqual(draft.spellsForgotten);
+  });
+
+  it("returns the same draft object when nothing needs pruning", () => {
+    const steps: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "review" }];
+    const d: LevelUpDraft = { hp };
+    expect(pruneDraftToPlan(d, steps)).toBe(d);
+  });
+
+  it("never drops dependentPicksBySubclass, even when every other field is pruned", () => {
+    const steps: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "review" }];
+    const draft: LevelUpDraft = {
+      hp,
+      maneuvers: [m1],
+      dependentPicksBySubclass: { bm: { maneuvers: [m1] } },
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    // Vacuity guard: prove something was actually dropped, not just untouched.
+    expect(next.maneuvers).toBeUndefined();
+    expect(next.dependentPicksBySubclass).toEqual({ bm: { maneuvers: [m1] } });
+  });
+
+  it("drops advancement, fightingStyleFeat, maneuvers and toolProficiencies when their step kinds are absent (#1148)", () => {
+    const steps: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "review" }];
+    const draft: LevelUpDraft = {
+      hp,
+      advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
+      fightingStyleFeat: { type: "takeFeat", featId: "defense", slot: "fightingStyle" },
+      maneuvers: [m1],
+      toolProficiencies: [t1],
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    expect(next.advancement).toBeUndefined();
+    expect(next.fightingStyleFeat).toBeUndefined();
+    expect(next.maneuvers).toBeUndefined();
+    expect(next.toolProficiencies).toBeUndefined();
+  });
+
+  it("keeps advancement, fightingStyleFeat, maneuvers and toolProficiencies when their step kinds are present", () => {
+    // Note: the singular step kind `toolProficiency` licenses the plural
+    // draft field `toolProficiencies`.
+    const steps: LevelUpStep[] = [
+      { kind: "hitPoints" },
+      { kind: "advancement", count: 1 },
+      { kind: "fightingStyleFeat" },
+      { kind: "maneuvers", count: 3 },
+      { kind: "toolProficiency", count: 1 },
+      { kind: "review" },
+    ];
+    const draft: LevelUpDraft = {
+      hp,
+      advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
+      fightingStyleFeat: { type: "takeFeat", featId: "defense", slot: "fightingStyle" },
+      maneuvers: [m1],
+      toolProficiencies: [t1],
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    expect(next.advancement).toEqual(draft.advancement);
+    expect(next.fightingStyleFeat).toEqual(draft.fightingStyleFeat);
+    expect(next.maneuvers).toEqual([m1]);
+    expect(next.toolProficiencies).toEqual([t1]);
+  });
+
+  it("drops only the subclassChoices entries whose choiceKey has no matching step meta.key", () => {
+    const steps: LevelUpStep[] = [
+      { kind: "hitPoints" },
+      { kind: "subclassChoice", count: 1, meta: { key: "metamagic", label: "Metamagic" } },
+      { kind: "review" },
+    ];
+    const draft: LevelUpDraft = {
+      hp,
+      subclassChoices: [
+        { type: "learnSubclassChoice", choiceKey: "metamagic", optionId: "o1" },
+        { type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "o2" },
+      ],
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    expect(next.subclassChoices).toEqual([{ type: "learnSubclassChoice", choiceKey: "metamagic", optionId: "o1" }]);
+  });
+
+  it("drops the subclassChoices field entirely when no entry survives", () => {
+    const steps: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "review" }];
+    const draft: LevelUpDraft = {
+      hp,
+      subclassChoices: [{ type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "o2" }],
+    };
+    const next = pruneDraftToPlan(draft, steps);
+    expect("subclassChoices" in next).toBe(false);
+  });
+
+  it("keeps the subclassChoices a subclassChoice step wrote (#1422 cross-check)", () => {
+    const step: LevelUpStep = { kind: "subclassChoice", count: 1, meta: { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "ranger-conclave" } };
+    const config = choiceConfigForStep(step);
+    const written = config!.select({}, ["o1"]);
+    const draft: LevelUpDraft = { hp, ...written };
+    const next = pruneDraftToPlan(draft, [step]);
+    expect(next.subclassChoices).toEqual(draft.subclassChoices);
   });
 });
