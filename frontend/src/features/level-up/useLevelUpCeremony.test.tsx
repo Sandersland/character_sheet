@@ -552,3 +552,57 @@ describe("useLevelUpCeremony — pruning the draft to the served plan (#1421)", 
     expect(result.current.draft.spellsLearned).toBeUndefined();
   });
 });
+
+// #1421: useLevelUpPlan sets plan to null while the class-chooser and the
+// level-again interstitial own the screen (see useLevelUpPlan's `skip`), and
+// useLevelUpCeremony falls back to `plan?.steps ?? []` — pruning against that
+// empty fallback would wipe the entire draft mid-ceremony.
+describe("useLevelUpCeremony — never prune before a plan has arrived (#1421)", () => {
+  const multiChar = {
+    ...character,
+    classes: [
+      { id: "entry-1", name: "fighter", level: 7 },
+      { id: "entry-2", name: "wizard", level: 3 },
+    ],
+  } as unknown as Character;
+
+  // Honest status: this is GREEN both before and after the guard — the
+  // effect's dependency is [plan], and plan never becomes non-null while the
+  // chooser owns the screen, so there's nothing yet to (wrongly) prune
+  // against. Kept for the AC's literal wording and to catch a future refactor
+  // to a steps-keyed effect; the level-again test below is the real driver.
+  it("does not prune while the class chooser owns the screen (no plan has arrived)", async () => {
+    const { result } = renderHook(() => useLevelUpCeremony(multiChar), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.classChoice).not.toBeNull());
+
+    act(() =>
+      result.current.setDraft(() => ({
+        hp: { method: "average" },
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      })),
+    );
+
+    expect(result.current.draft.spellsLearned).toEqual([{ type: "learnSpell", spellId: "s1" }]);
+  });
+
+  it("does not prune while the level-again interstitial owns the screen", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "newSpells", count: 1 }, { kind: "review" }]));
+    submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
+    const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.plan).not.toBeNull());
+
+    act(() =>
+      result.current.setDraft(() => ({
+        hp: { method: "average" },
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      })),
+    );
+    await act(() => result.current.confirm());
+    expect(result.current.levelAgain).not.toBeNull();
+
+    // The submit flips skipPlan true → useLevelUpPlan sets plan to null → the
+    // [plan] effect fires again — proving the guard, not just its absence of
+    // a crash.
+    expect(result.current.draft.spellsLearned).toEqual([{ type: "learnSpell", spellId: "s1" }]);
+  });
+});

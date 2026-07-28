@@ -246,9 +246,13 @@ export function useLevelUpCeremony(character: Character): LevelUpCeremony {
   // stash restore) and never [plan, draft] (draft is what this writes).
   // Keying on the plan object fires this once per served plan, which is
   // correct because useLevelUpPlan leaves the previous plan in place for the
-  // whole duration of a subclass-driven refetch.
+  // whole duration of a subclass-driven refetch. Guard on plan == null:
+  // useLevelUpPlan clears plan to null while the class chooser and the
+  // level-again interstitial own the screen, and steps falls back to [] —
+  // pruning against that empty list would wipe the entire draft.
   useEffect(() => {
-    setDraft((d) => pruneDraftToPlan(d, plan?.steps ?? []));
+    if (plan == null) return;
+    setDraft((d) => pruneDraftToPlan(d, plan.steps));
   }, [plan]);
 
   const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, choice.target, draft, reportSubmitted);
