@@ -7,11 +7,12 @@
 # OWN Postgres volume (migrations in one are invisible to the others). Slot 0 is
 # reserved for the main checkout on default ports.
 #
-#   ./.claude/skills/worktree/worktree.sh create <branch> [--up]   create worktree, assign slot, write .env
+#   ./.claude/skills/worktree/worktree.sh create <branch> [--up]   create worktree, assign slot, .env, npm ci
 #   ./.claude/skills/worktree/worktree.sh up <branch>              docker compose up -d (build)
 #   ./.claude/skills/worktree/worktree.sh down <branch>            docker compose down (keep volumes)
 #   ./.claude/skills/worktree/worktree.sh ls                       table of worktrees, slots, URLs, status
 #   ./.claude/skills/worktree/worktree.sh rm <branch>              down -v + remove worktree + free slot
+#   ./.claude/skills/worktree/worktree.sh prune [--yes]            report/remove artifacts of worktrees already gone
 #
 set -euo pipefail
 
@@ -132,6 +133,37 @@ print_ports() {
   echo "  postgres: localhost:$(port_for "$slot" 5432)"
 }
 
+# `git worktree add` checks out tracked files only, and node_modules is
+# gitignored — so a fresh worktree has none, and because worktrees live INSIDE
+# the repo, Node then resolves upward into the MAIN checkout. That is why host
+# tsc/eslint silently check the wrong tree and lefthook's fallow job can't find
+# its binary. Installing per worktree is the standard fix (#1452); symlinking
+# the main tree's copy is not, because it stops matching the lockfile the moment
+# package.json diverges.
+#
+install_deps() {
+  local path="$1"
+  [ -d "$path/node_modules" ] && return 0
+
+  echo "Installing dependencies (this is what keeps host tsc/eslint/fallow honest)…"
+  ( cd "$path" && npm ci ) || die "npm ci failed in $path"
+
+  # npm ci runs the root `prepare` → `lefthook install`, which bakes an absolute
+  # path into `.git/hooks` — a directory every worktree SHARES. Left alone, the
+  # shim points into THIS worktree, so deleting it makes the shim fall through
+  # to a silent `exit 0` and disables every hook everywhere, including the main
+  # checkout (upstream lefthook #1398, open; the baked path is deliberate since
+  # 2.0.6). Re-installing from the main checkout points it at a tree that
+  # outlives every worktree. LEFTHOOK=0 does NOT prevent this — it gates hook
+  # execution, not `lefthook install` (measured).
+  ( cd "$ROOT" && npx lefthook install >/dev/null 2>&1 ) || die "could not restore the shared lefthook shim"
+  # The Prisma client is gitignored too, so without this the worktree's own tsc
+  # can't resolve @/generated/prisma. generate never connects; prisma.config.ts
+  # only validates that DATABASE_URL parses.
+  ( cd "$path/backend" && DATABASE_URL="postgresql://unused:unused@localhost:5432/unused" npx prisma generate >/dev/null ) \
+    || die "prisma generate failed in $path/backend"
+}
+
 cmd_create() {
   local branch="${1:-}"; shift || true
   [ -n "$branch" ] || die "usage: worktree.sh create <branch> [base] [--up]"
@@ -169,6 +201,7 @@ cmd_create() {
   fi
 
   write_env "$branch" "$slot" "$path"
+  install_deps "$path"
   echo "Worktree '$branch' ready:"
   print_ports "$branch" "$slot"
 
@@ -202,7 +235,12 @@ cmd_rm() {
   [ -n "$branch" ] || die "usage: worktree.sh rm <branch>"
   local path; path="$(worktree_path "$branch")"
   if [ -d "$path" ]; then
-    ( cd "$path" && docker compose down -v ) || true
+    # --profile e2e: compose will NOT remove volumes owned by a service in an
+    # inactive profile, so a plain `down -v` left both e2e_*_node_modules behind
+    # on every teardown — 74 of them (~16 GB) had accumulated by #1452.
+    # --rmi local: drops the project's own built images (<project>-backend/
+    # -frontend) while leaving pulled ones (postgres, playwright) alone.
+    ( cd "$path" && docker compose --profile e2e down -v --rmi local ) || true
     # A half-torn-down dir (git worktree metadata already pruned) makes
     # `worktree remove` die with "not a working tree" — fall back to removing
     # the dir + pruning so the slot is still freed (the janitor relies on rm
@@ -210,7 +248,98 @@ cmd_rm() {
     git -C "$ROOT" worktree remove "$path" --force || { rm -rf "$path"; git -C "$ROOT" worktree prune; }
   fi
   registry_del "$branch"
-  echo "Removed worktree '$branch' (containers, volumes, and slot freed)."
+  echo "Removed worktree '$branch' (containers, volumes, images, and slot freed)."
+}
+
+# Every volume compose creates for this stack, so an orphan can be mapped back
+# to the project that made it. Keep in sync with docker-compose.yml's `volumes:`.
+VOLUME_SUFFIXES="backend_node_modules backend_ws_node_modules frontend_node_modules frontend_ws_node_modules e2e_node_modules e2e_ws_node_modules postgres_data pgadmin_data"
+
+# Compose names volumes "<project>_<suffix>" and built images "<project>-<service>".
+# Strip a KNOWN suffix rather than splitting on the separator — project names
+# contain both '-' and (via branch slugs) no reliable delimiter of their own.
+project_of_volume() {
+  local v="$1" s
+  for s in $VOLUME_SUFFIXES; do
+    case "$v" in *"_$s") printf '%s' "${v%_"$s"}"; return 0 ;; esac
+  done
+  return 1
+}
+
+project_of_image() {
+  case "$1" in
+    *-backend)  printf '%s' "${1%-backend}" ;;
+    *-frontend) printf '%s' "${1%-frontend}" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Projects still owning a registry entry. Anything else under the cs- prefix is
+# an orphan: its worktree is gone, so no `rm` will ever reclaim it.
+live_projects() {
+  ensure_registry
+  node -e 'const r=require(process.argv[1]);console.log(Object.keys(r).join("\n"))' "$REGISTRY" \
+    | while IFS= read -r b; do [ -n "$b" ] && project_name "$b"; done
+  # An empty registry ends the loop on a failed `read`, and under `set -e` that
+  # status propagates through the caller's command substitution and kills the
+  # script. Return success explicitly.
+  return 0
+}
+
+cmd_prune() {
+  local apply=0
+  for arg in "$@"; do [ "$arg" = "--yes" ] && apply=1; done
+
+  local live; live="$(live_projects)"
+  is_live() { [ -n "$live" ] && printf '%s\n' "$live" | grep -qx "$1"; }
+
+  local vols="" imgs="" skipped=0 proj
+  while IFS= read -r v; do
+    [ -n "$v" ] || continue
+    case "$v" in cs-*) ;; *) skipped=$((skipped + 1)); continue ;; esac
+    proj="$(project_of_volume "$v")" || { skipped=$((skipped + 1)); continue; }
+    is_live "$proj" || vols="$vols$v
+"
+  done <<< "$(docker volume ls -q 2>/dev/null)"
+
+  while IFS= read -r i; do
+    [ -n "$i" ] || continue
+    case "$i" in cs-*) ;; *) continue ;; esac
+    proj="$(project_of_image "$i")" || continue
+    is_live "$proj" || imgs="$imgs$i
+"
+  done <<< "$(docker images --format '{{.Repository}}' 2>/dev/null | sort -u)"
+
+  local nv ni
+  nv="$(printf '%s' "$vols" | grep -c . || true)"
+  ni="$(printf '%s' "$imgs" | grep -c . || true)"
+
+  # Every branch below is a full `if`: under `set -e` a bare `[ … ] && cmd` whose
+  # test fails returns 1 and aborts the script.
+  if [ "$nv" -eq 0 ] && [ "$ni" -eq 0 ]; then
+    echo "Nothing to prune."
+  else
+    echo "Orphaned artifacts (no registry entry): $nv volume(s), $ni image(s)."
+    if [ "$nv" -gt 0 ]; then printf '%s' "$vols" | sed 's/^/  volume /'; fi
+    if [ "$ni" -gt 0 ]; then printf '%s' "$imgs" | sed 's/^/  image  /'; fi
+  fi
+
+  # Only cs-* is provably ours; pre-prefix projects and unrelated stacks are
+  # reported, never removed, because the naming can't distinguish them.
+  if [ "$skipped" -gt 0 ]; then
+    echo "Skipped $skipped volume(s) outside the cs-* naming — inspect and remove by hand if they're yours."
+  fi
+
+  if [ "$apply" != 1 ]; then
+    if [ "$nv" -gt 0 ] || [ "$ni" -gt 0 ]; then echo "Dry run. Re-run with --yes to remove."; fi
+    return 0
+  fi
+
+  # A volume still attached to a running container fails to remove; that is the
+  # safe outcome, so the failure is reported rather than forced.
+  if [ "$nv" -gt 0 ]; then printf '%s' "$vols" | xargs docker volume rm >/dev/null 2>&1 || true; fi
+  if [ "$ni" -gt 0 ]; then printf '%s' "$imgs" | xargs docker image rm >/dev/null 2>&1 || true; fi
+  echo "Pruned. Anything still in use by a running container is left alone — stop it and re-run."
 }
 
 cmd_ls() {
@@ -247,8 +376,9 @@ main() {
     up)     cmd_up "$@" ;;
     down)   cmd_down "$@" ;;
     rm)     cmd_rm "$@" ;;
+    prune)  cmd_prune "$@" ;;
     ls|"")  cmd_ls "$@" ;;
-    *)      die "unknown command '$sub' (create|up|down|ls|rm)" ;;
+    *)      die "unknown command '$sub' (create|up|down|ls|rm|prune)" ;;
   esac
 }
 

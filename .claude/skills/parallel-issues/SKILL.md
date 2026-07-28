@@ -131,7 +131,9 @@ Launch one background subagent per issue (`run_in_background: true`), so they bu
    Both must be clean.
 4. Commit each green chunk with a conventional message: `feat(<domain>): <summary> (#<#>)`.
 
-> **Host git hooks lie in a worktree — replicate their gates in-container before you push.** Lefthook fires on the host, where the worktree has no real `node_modules`, so its `tsc` jobs resolve against the **primary checkout** and report green for code they never read. CI's `fallow` job is a required check on `staging`, so a bypassed audit surfaces on the PR instead — and `fallow` is the check that most often fails. Both dev images carry `git` and a global `fallow` (#1450), so run these before pushing:
+> **The worktree's own gates are trustworthy now — do not reach for `--no-verify`.** Since #1452 `worktree.sh create` runs `npm ci` + `prisma generate` in the worktree, so lefthook's `tsc` jobs check that tree (not the primary checkout) and its `fallow` job runs instead of hard-failing. A blocked commit in a worktree is a real finding. CI's `fallow` job is a required check on `staging`, so a bypassed audit surfaces on the PR anyway — and `fallow` is the check that most often fails.
+>
+> For CI parity, both dev images also carry `git` and a global `fallow` (#1450):
 >
 > ```bash
 > docker compose exec -T backend  sh -c 'cd /app && fallow audit --base <integration-branch> --gate new-only --no-cache'
