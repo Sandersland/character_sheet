@@ -131,7 +131,15 @@ Launch one background subagent per issue (`run_in_background: true`), so they bu
    Both must be clean.
 4. Commit each green chunk with a conventional message: `feat(<domain>): <summary> (#<#>)`.
 
-> **Host git hooks lie in a worktree — replicate their gates in-container before you push.** Lefthook fires on the host, where the worktree has no real `node_modules`: `fallow` is missing entirely, and the `tsc` jobs resolve against the **primary checkout**, so they report green for code they never read. CI's `fallow` job is a required check on `staging`, so a bypassed audit surfaces on the PR instead. Run `npx tsc --noEmit` per workspace and `npx fallow audit --base <integration-branch> --no-cache` **inside the containers** before pushing. Likewise, the `post-checkout` prisma-regen hook can write a client for the wrong branch after a rebase — regenerate in-container (false red, ~65 tests) rather than trusting it.
+> **Host git hooks lie in a worktree — replicate their gates in-container before you push.** Lefthook fires on the host, where the worktree has no real `node_modules`, so its `tsc` jobs resolve against the **primary checkout** and report green for code they never read. CI's `fallow` job is a required check on `staging`, so a bypassed audit surfaces on the PR instead — and `fallow` is the check that most often fails. Both dev images carry `git` and a global `fallow` (#1450), so run these before pushing:
+>
+> ```bash
+> docker compose exec -T backend  sh -c 'cd /app && fallow audit --base <integration-branch> --gate new-only --no-cache'
+> docker compose exec -T backend  sh -c 'cd /app/backend  && npx tsc --noEmit'
+> docker compose exec -T frontend sh -c 'cd /app/frontend && npx tsc --noEmit'
+> ```
+>
+> `cd /app` is required for fallow — it loads `.fallowrc.jsonc` from the repo root — and forbidden for vitest, which needs the workspace dir or the `@/` alias goes unresolved. CRAP scores read differently in-container than in CI (no coverage artifact); dead code, complexity and duplication match. Likewise, the `post-checkout` prisma-regen hook can write a client for the wrong branch after a rebase — regenerate in-container (false red, ~65 tests) rather than trusting it.
 
 **After the last chunk — UI gate (if the issue has a UI surface):**
 Run the **verify-frontend** skill, adapted to this worktree — run the frontend unit tests as usual, but point the browser verification at the **worktree's** frontend URL (`http://localhost:<5173+slot*10>`), not the hardcoded 5173. Screenshots go under `/tmp/` only — never the project tree.
