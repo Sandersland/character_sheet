@@ -1,12 +1,23 @@
-// Idempotent persona seeding for the e2e suite. Runs once before all specs:
-// signs in via dev-login, then creates each roster persona if it's missing
-// (matched by name). Personas are (re)built every suite start because the
-// backend auth.test.ts wipes dev-user-local as cleanup — so we can't assume any
-// survive between a vitest run and this suite.
+// Verify-or-recreate persona seeding for the e2e suite. Runs once before all
+// specs: signs in via dev-login, then for each roster persona already present
+// by name, compares the live character against ROSTER's declared fingerprint
+// (personaFingerprint/characterFingerprint/diffFingerprints below) and
+// DELETEs + recreates it on any mismatch. In-place repair can't land on the
+// declared state — e.g. applySetSubclass (backend/src/lib/classes/class.ts)
+// overwrites subclass/subclassId but leaves the previous subclass's
+// choicesKnown, granted spells, and maneuvers in place, so a "fixed" persona
+// would be a hybrid no spec's expectations describe. A persona that already
+// matches is never touched. Each vitest worker gets its own DB clone (#1269),
+// so backend's auth.test.ts wiping dev-user-local cannot reach this suite's
+// dev DB — the roster survives across runs, which is exactly what makes this
+// verify step load-bearing (a stale persona would otherwise go undetected
+// forever).
 //
-// ── Roster (all idempotent: created only when absent, matched by name) ─────────
+// ── Roster (verify-or-recreate: matched by name; a mismatch deletes and
+//    recreates from the declaration below) ─────────────────────────────
 //   Smoke Fighter   — Fighter L1. Baseline sheet + HP/rest flows.
 //   Wizard L5       — Wizard, 6500 XP (L5). Derived spell slots.
+//   Warlock L1      — Warlock L1. Level-1 creation cantrip/spell picks.
 //   Battle Master   — Fighter, 6500 XP (L5) + Battle Master subclass + one
 //                     effect maneuver (Evasive Footwork). Attached to its own
 //                     solo campaign so maneuvers.spec can run an in-session
@@ -31,6 +42,9 @@
 // Per-spec state (fresh throwaway characters, learned spells, awarded XP) is
 // created inside the specs via e2e/helpers/api.ts — never here — so every spec
 // stays independently runnable and these shared personas are never mutated.
+// (precision-attack.spec.ts is the one known exception — it learnManeuver()s
+// onto the Battle Master persona directly. maneuverNames is a subset check
+// below specifically so that doesn't trigger a recreate on every run.)
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:5173";
 
@@ -215,6 +229,90 @@ async function assertCatalogReady(cookie: string): Promise<void> {
   }
 }
 
+// Shape both a declared Persona and a live character reduce to, so the two
+// can be diffed field-by-field without either side reaching into the other's
+// representation (ids vs. names, raw vs. clamped level, etc.).
+interface CharacterFingerprint {
+  className: string;
+  subclassName: string | undefined;
+  experiencePoints: number;
+  classLevel: number;
+  campaignName: string | undefined;
+  maneuverNames: string[];
+  cantripNames: string[];
+  spellNames: string[];
+}
+
+// Pure. Normalizes the optionals to the same defaults characterFingerprint
+// resolves live state to (no XP / no level-ups declared reads as 0 / L1), so
+// an unset field compares equal to its absence rather than always mismatching.
+function personaFingerprint(persona: Persona): CharacterFingerprint {
+  return {
+    className: persona.className,
+    subclassName: persona.subclassName,
+    experiencePoints: persona.experiencePoints ?? 0,
+    classLevel: persona.classLevel ?? 1,
+    campaignName: persona.campaignName,
+    maneuverNames: persona.maneuverName ? [persona.maneuverName] : [],
+    cantripNames: persona.spells?.cantripNames ?? [],
+    spellNames: persona.spells?.spellNames ?? [],
+  };
+}
+
+interface CharacterDetail {
+  experiencePoints: number;
+  campaignId: string | null;
+  classes: { name: string; level: number; subclass: string | null }[];
+  resources?: { maneuversKnown?: { name: string }[] } | null;
+  spellcasting?: { spells?: { name: string; level: number }[] } | null;
+}
+
+// Reads the same shape off GET /api/characters/:id. classes[0]'s level/subclass
+// are buildResourcesView's/buildClassesView's clamp-on-read (#125) view, not the
+// raw class-entry columns — comparing against the clamped values is what makes a
+// level-clamped subclass or level read as the mismatch it is. campaignName is
+// resolved by id rather than threaded through personaFingerprint so the latter
+// stays pure (no ensureCampaign find-or-create side effect during a read-only
+// comparison).
+function characterFingerprint(
+  character: CharacterDetail,
+  campaignNameById: Map<string, string>,
+): CharacterFingerprint {
+  const primary = character.classes[0];
+  const spells = character.spellcasting?.spells ?? [];
+  return {
+    className: primary.name,
+    subclassName: primary.subclass ?? undefined,
+    experiencePoints: character.experiencePoints,
+    classLevel: primary.level,
+    campaignName: character.campaignId ? campaignNameById.get(character.campaignId) : undefined,
+    maneuverNames: (character.resources?.maneuversKnown ?? []).map((m) => m.name),
+    cantripNames: spells.filter((s) => s.level === 0).map((s) => s.name),
+    spellNames: spells.filter((s) => s.level > 0).map((s) => s.name),
+  };
+}
+
+// className/subclassName/experiencePoints/classLevel/campaignName are EXACT
+// (undefined === undefined counts as a match). maneuverNames/cantripNames/
+// spellNames are SUBSET — every declared pick must be present, extras are
+// ignored. Subset semantics are load-bearing for two live cases: a spec
+// appending to the Battle Master's maneuversKnown (see the docblock above),
+// and subclass/item-granted spells (mergeGrantedSpells) appended to
+// spellcasting.spells beyond what the roster declares — neither is a
+// staleness signal, only a MISSING declared pick is. Returns the names of the
+// mismatched fields (empty ⇒ no recreate needed).
+function diffFingerprints(declared: CharacterFingerprint, actual: CharacterFingerprint): string[] {
+  const mismatches: string[] = [];
+  for (const field of ["className", "subclassName", "experiencePoints", "classLevel", "campaignName"] as const) {
+    if (declared[field] !== actual[field]) mismatches.push(field);
+  }
+  for (const field of ["maneuverNames", "cantripNames", "spellNames"] as const) {
+    const actualNames = new Set(actual[field]);
+    if (declared[field].some((name) => !actualNames.has(name))) mismatches.push(field);
+  }
+  return mismatches;
+}
+
 // Resolve a Fighter subclass id by name from the reference catalog.
 async function subclassId(cookie: string, className: string, subclassName: string): Promise<string> {
   // Every seeded persona here is EDITION_2024 (#1325) — every Subclass row is
@@ -373,6 +471,67 @@ async function createPersona(cookie: string, persona: Persona): Promise<void> {
   await attachToCampaign(cookie, id, persona);
 }
 
+// First occurrence per name: the route orders by name asc and
+// findCharacterByName (helpers/api.ts) resolves the same duplicate the same
+// way via .find() — first-wins is the only tie-break that keeps this loop
+// and the specs looking at the same row. Extra rows are logged, never
+// deleted; a human- or spec-made duplicate is not this loop's to clean up.
+function indexCharactersByName(existing: { id: string; name: string }[]): Map<string, string> {
+  const idByName = new Map<string, string>();
+  const duplicateNames = new Set<string>();
+  for (const character of existing) {
+    if (idByName.has(character.name)) {
+      duplicateNames.add(character.name);
+      continue;
+    }
+    idByName.set(character.name, character.id);
+  }
+  for (const name of duplicateNames) {
+    console.warn(`global-setup: multiple characters named "${name}" found; using the first, ignoring the rest`);
+  }
+  return idByName;
+}
+
+// Verify one already-present roster persona against its live character and
+// recreate on a fingerprint mismatch (a no-op skip when it already matches).
+async function verifyOrRecreatePersona(
+  cookie: string,
+  persona: Persona,
+  id: string,
+  campaignNameById: Map<string, string>,
+  rosterNames: Set<string>,
+): Promise<void> {
+  const detailResponse = await api(cookie, `/api/characters/${id}`);
+  if (!detailResponse.ok) {
+    // A 500 here, right after a passing catalog preflight, is a real defect
+    // on this specific row — not a reason to blow it away and reseed.
+    throw new Error(`Failed to load "${persona.name}" (${id}): ${detailResponse.status}`);
+  }
+  const character = (await detailResponse.json()) as CharacterDetail;
+  const declared = personaFingerprint(persona);
+  const actual = characterFingerprint(character, campaignNameById);
+  const mismatches = diffFingerprints(declared, actual);
+  if (mismatches.length === 0) return;
+
+  // Tautological as written (this is only ever called for a ROSTER persona,
+  // so persona.name is trivially a member) — kept as a latch against a future
+  // refactor that iterates GET /api/characters instead, which must not be
+  // able to reach a DELETE on a "<persona name> <suffix>" debris row.
+  if (!rosterNames.has(persona.name)) {
+    throw new Error(`Refusing to delete "${persona.name}": not a declared ROSTER persona`);
+  }
+  const detail = mismatches
+    .map((field) => `${field}: ${JSON.stringify(declared[field as keyof CharacterFingerprint])} vs ${JSON.stringify(actual[field as keyof CharacterFingerprint])}`)
+    .join(", ");
+  console.warn(`global-setup: recreating "${persona.name}" — stale ${detail}`);
+
+  const deleteResponse = await api(cookie, `/api/characters/${id}`, { method: "DELETE" });
+  if (!deleteResponse.ok) {
+    throw new Error(`Failed to delete stale "${persona.name}" (${id}): ${deleteResponse.status}`);
+  }
+  await createPersona(cookie, persona);
+}
+
 export default async function globalSetup(): Promise<void> {
   const cookie = await devLoginWithRetry();
   await assertCatalogReady(cookie);
@@ -381,11 +540,22 @@ export default async function globalSetup(): Promise<void> {
   if (!listResponse.ok) {
     throw new Error(`Failed to list characters: ${listResponse.status}`);
   }
-  const existing = (await listResponse.json()) as { name: string }[];
-  const existingNames = new Set(existing.map((c) => c.name));
+  const existing = (await listResponse.json()) as { id: string; name: string }[];
+  const idByName = indexCharactersByName(existing);
+
+  const campaignsResponse = await api(cookie, "/api/campaigns");
+  if (!campaignsResponse.ok) {
+    throw new Error(`Failed to list campaigns: ${campaignsResponse.status}`);
+  }
+  const campaigns = (await campaignsResponse.json()) as { id: string; name: string }[];
+  const campaignNameById = new Map(campaigns.map((c) => [c.id, c.name]));
+  const rosterNames = new Set(ROSTER.map((p) => p.name));
 
   for (const persona of ROSTER) {
-    if (!existingNames.has(persona.name)) {
+    const id = idByName.get(persona.name);
+    if (id) {
+      await verifyOrRecreatePersona(cookie, persona, id, campaignNameById, rosterNames);
+    } else {
       await createPersona(cookie, persona);
     }
   }

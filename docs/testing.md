@@ -52,10 +52,11 @@ Real-browser verification hits `requireAuth` and OAuth can't complete headless. 
 
 Specs live in `frontend/e2e/`; run via `npm run e2e` (→ `docker compose --profile e2e run --rm e2e`, a pinned Playwright image on host networking that derives its base URL from `FRONTEND_PORT`, so it works against the main stack or any worktree slot).
 
-- `global-setup.ts` signs in via dev-login and idempotently recreates the shared personas (Smoke Fighter, Wizard L5, Battle Master, Session Fighter).
+- `global-setup.ts` signs in via dev-login, then per persona verifies the live character against its declared fingerprint (class, subclass, XP, class-entry level, campaign, maneuver/spell picks), deleting and recreating on any mismatch — in-place repair can't reach the declared state (a repaired subclass leaves the old one's residue behind). See `ROSTER` in `frontend/e2e/global-setup.ts` for the roster itself.
 - Per-spec state is created **inside each spec** via `e2e/helpers/api.ts`, never in globalSetup — every spec is independently runnable and personas stay unmutated.
 - Session-driving personas get their own campaigns (one active session per campaign); `workers: 1` runs serially.
 - The stack sets `RATE_LIMIT_DISABLED=true` (compose + CI) so repeated runs never trip the limiter.
 - Selectors are role/name-based; specs assert zero console errors (`e2e/helpers/console.ts`).
+- Debris characters left by specs (`<prefix> <suffix>` names, e.g. `Nav Hero …`) are never touched — only exact `ROSTER` names can be recreated — and accumulate across runs; clean them up manually via pgAdmin (`docker compose --profile tools up pgadmin`, see `docs/development.md`).
 
 **Visual regression** (`e2e/visual.spec.ts`): pixel baselines are checked-in source fixtures under `frontend/e2e/__screenshots__/` (allowlisted in the artifact-blocking hook). Determinism: animations disabled, fixed viewport, fonts pinned to the e2e image (Google Fonts blocked), per-run-unique pixels masked. Regenerate **only for intentional visual changes**, from inside the container (`docker compose --profile e2e run --rm e2e npm run e2e:update-snapshots`) and review the PNGs — blanket `--update-snapshots` launders regressions into the baseline.
