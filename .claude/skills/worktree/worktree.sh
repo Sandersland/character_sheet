@@ -255,23 +255,21 @@ cmd_rm() {
 # to the project that made it. Keep in sync with docker-compose.yml's `volumes:`.
 VOLUME_SUFFIXES="backend_node_modules backend_ws_node_modules frontend_node_modules frontend_ws_node_modules e2e_node_modules e2e_ws_node_modules postgres_data pgadmin_data"
 
-# Compose names volumes "<project>_<suffix>" and built images "<project>-<service>".
-# Strip a KNOWN suffix rather than splitting on the separator — project names
-# contain both '-' and (via branch slugs) no reliable delimiter of their own.
-project_of_volume() {
-  local v="$1" s
+# Compose names volumes "<project>_<suffix>" and built images "<project>-<service>",
+# and neither is invertible in general — a project name has no delimiter of its own,
+# so recovering one by stripping a suffix is a guess. These two only answer "is this
+# shaped like one of ours at all", which costs nothing when wrong; liveness is
+# decided by `live_artifacts` building the names forward instead.
+is_our_volume() {
+  local s
   for s in $VOLUME_SUFFIXES; do
-    case "$v" in *"_$s") printf '%s' "${v%_"$s"}"; return 0 ;; esac
+    case "$1" in *"_$s") return 0 ;; esac
   done
   return 1
 }
 
-project_of_image() {
-  case "$1" in
-    *-backend)  printf '%s' "${1%-backend}" ;;
-    *-frontend) printf '%s' "${1%-frontend}" ;;
-    *) return 1 ;;
-  esac
+is_our_image() {
+  case "$1" in *-backend|*-frontend) return 0 ;; *) return 1 ;; esac
 }
 
 # Projects still owning a registry entry. Anything else under the cs- prefix is
@@ -286,27 +284,41 @@ live_projects() {
   return 0
 }
 
+# Every artifact name a registered worktree owns, composed FORWARD from the
+# project name. Matching a candidate against this exact set is what keeps a
+# misparse from ever deleting a live project's Postgres data — the direction
+# compose's naming actually supports (#1452).
+live_artifacts() {
+  local p s
+  live_projects | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    for s in $VOLUME_SUFFIXES; do printf '%s_%s\n' "$p" "$s"; done
+    printf '%s-backend\n%s-frontend\n' "$p" "$p"
+  done
+  return 0
+}
+
 cmd_prune() {
   local apply=0
   for arg in "$@"; do [ "$arg" = "--yes" ] && apply=1; done
 
-  local live; live="$(live_projects)"
-  is_live() { [ -n "$live" ] && printf '%s\n' "$live" | grep -qx "$1"; }
+  local live; live="$(live_artifacts)"
+  is_live() { [ -n "$live" ] && printf '%s\n' "$live" | grep -qxF "$1"; }
 
-  local vols="" imgs="" skipped=0 proj
+  local vols="" imgs="" skipped=0
   while IFS= read -r v; do
     [ -n "$v" ] || continue
     case "$v" in cs-*) ;; *) skipped=$((skipped + 1)); continue ;; esac
-    proj="$(project_of_volume "$v")" || { skipped=$((skipped + 1)); continue; }
-    is_live "$proj" || vols="$vols$v
+    if ! is_our_volume "$v"; then skipped=$((skipped + 1)); continue; fi
+    is_live "$v" || vols="$vols$v
 "
   done <<< "$(docker volume ls -q 2>/dev/null)"
 
   while IFS= read -r i; do
     [ -n "$i" ] || continue
     case "$i" in cs-*) ;; *) continue ;; esac
-    proj="$(project_of_image "$i")" || continue
-    is_live "$proj" || imgs="$imgs$i
+    if ! is_our_image "$i"; then continue; fi
+    is_live "$i" || imgs="$imgs$i
 "
   done <<< "$(docker images --format '{{.Repository}}' 2>/dev/null | sort -u)"
 
@@ -336,10 +348,16 @@ cmd_prune() {
   fi
 
   # A volume still attached to a running container fails to remove; that is the
-  # safe outcome, so the failure is reported rather than forced.
-  if [ "$nv" -gt 0 ]; then printf '%s' "$vols" | xargs docker volume rm >/dev/null 2>&1 || true; fi
-  if [ "$ni" -gt 0 ]; then printf '%s' "$imgs" | xargs docker image rm >/dev/null 2>&1 || true; fi
-  echo "Pruned. Anything still in use by a running container is left alone — stop it and re-run."
+  # safe outcome, so the failure is reported rather than forced — and reported
+  # honestly, because "Pruned." over a failed `rm` is how a leak stays invisible.
+  local failed=0
+  if [ "$nv" -gt 0 ]; then printf '%s' "$vols" | xargs docker volume rm >/dev/null 2>&1 || failed=1; fi
+  if [ "$ni" -gt 0 ]; then printf '%s' "$imgs" | xargs docker image rm >/dev/null 2>&1 || failed=1; fi
+  if [ "$failed" -eq 1 ]; then
+    echo "Pruned what it could — some artifacts are still in use by a running container. Stop it and re-run."
+  else
+    echo "Pruned."
+  fi
 }
 
 cmd_ls() {
