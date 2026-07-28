@@ -21,6 +21,7 @@ import type {
   WarriorOfElementsResult,
 } from "@/types/character";
 import { jsonBody, request } from "@/api/http";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 // The single seam onto the shared ability endpoint (#1275): every automated
 // class/subclass feature POSTs the same { operations } batch, choosing the
@@ -99,6 +100,22 @@ export async function applyChannelDivinityTransactions(
 // alphabetically server-side; no client-side re-sort needed.
 export async function fetchManeuvers(): Promise<CatalogManeuver[]> {
   return request<CatalogManeuver[]>("/maneuvers", undefined, "Failed to fetch maneuver catalog");
+}
+
+// Feeds the level-up ceremony's subclassChoice step (choiceConfigForStep, #1422)
+// — its only client. A query param, not a header (mirrors fetchReference,
+// #1325): there is no Cache-Control in backend/src and Express's weak ETag is
+// on, so a header could hand a 2014 payload to a 2024 request. The route
+// ignores `edition` today; #1412 makes it required, so it's sent from day one.
+export async function fetchSubclassChoiceOptions(
+  source: string,
+  edition: RulesEdition,
+): Promise<{ id: string; name: string; description: string; minLevel: number }[]> {
+  return request(
+    `/subclass-choices/${source}?edition=${edition}`,
+    undefined,
+    "Failed to fetch subclass choice options",
+  );
 }
 
 // Casts a known maneuver: the server spends one superiority die, rolls it, and

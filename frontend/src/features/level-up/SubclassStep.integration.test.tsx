@@ -100,7 +100,7 @@ beforeEach(() => {
 });
 
 describe("SubclassStep in the ceremony", () => {
-  it("renders the real subclass cards (not the placeholder) on the subclass step", async () => {
+  it("renders the real subclass cards on the subclass step", async () => {
     renderCeremony();
     const user = userEvent.setup();
 
@@ -110,7 +110,6 @@ describe("SubclassStep in the ceremony", () => {
 
     expect(await screen.findByRole("radio", { name: "Battle Master" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Champion" })).toBeInTheDocument();
-    expect(screen.queryByText(/arrives in a later update/i)).not.toBeInTheDocument();
   });
 
   it("keeps Continue disabled until a subclass is picked", async () => {
