@@ -115,6 +115,11 @@ FRONTEND_PORT=$frontend
 POSTGRES_PORT=$pg
 PGADMIN_PORT=$pgadmin
 VITE_API_URL=http://localhost:$backend/api
+# This worktree's .git is a FILE pointing into the main checkout's .git, so the
+# containers need that directory mounted at its own absolute path or git — and
+# with it \`fallow --base\` — reports "not a git repository" (#1450).
+MAIN_GIT_SRC=$ROOT/.git
+MAIN_GIT_DST=$ROOT/.git
 EOF
 }
 

@@ -53,6 +53,16 @@ Against a **running** stack, mints a session via `POST /api/auth/dev-login` (req
 docker compose -p cs-<branch> logs -f
 ```
 
+**A worktree's host tooling lies — run the gates in-container.** The worktree's `node_modules` are empty Docker-volume mountpoints, so lefthook's `tsc` jobs silently resolve against the *main* checkout and report green for code they never read. Both dev images carry `git` and a global `fallow` pinned to the root `devDependency` (#1450), so the pre-push gate that matters runs where the code actually is:
+
+```bash
+docker compose exec -T backend sh -c 'cd /app && fallow audit --base origin/staging --gate new-only --no-cache'
+docker compose exec -T backend  sh -c 'cd /app/backend  && npx tsc --noEmit'
+docker compose exec -T frontend sh -c 'cd /app/frontend && npx tsc --noEmit'
+```
+
+`cd /app` for fallow (it loads `.fallowrc.jsonc` from the repo root) but **never** for vitest — `/app` is the root, and running the suites there leaves the `@/` alias unresolved and fails every file. The in-container audit is a smoke gate, not a CI replacement: CI feeds fallow the Istanbul coverage artifact for exact CRAP, which a local run has no way to produce, so CRAP numbers differ there. Dead code, complexity and duplication match.
+
 ## How to add a new domain / feature
 
 The repeatable pattern (inventory → HP → XP → spellcasting …):

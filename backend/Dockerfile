@@ -6,10 +6,20 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# fallow resolves `--base` by shelling out to git, and node:22-alpine ships none.
+RUN apk add --no-cache git
+
 COPY package.json package-lock.json ./
 COPY packages/ packages/
 COPY backend/package.json backend/
 RUN npm install --workspace backend
+
+# fallow is pinned as a ROOT devDependency, which the workspace-scoped install
+# above skips — and a local install would be shadowed by the node_modules named
+# volumes regardless. The global bin escapes both, while reading the version
+# from that one pin keeps CI, the lefthook hook and this container on the same
+# binary. If you move the pin, this line moves with it (#1450).
+RUN npm install -g "fallow@$(node -p 'require("/app/package.json").devDependencies.fallow')"
 
 COPY . .
 
