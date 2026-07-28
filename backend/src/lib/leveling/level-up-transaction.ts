@@ -197,19 +197,37 @@ const LEVEL_UP_OP_APPLIERS: Record<
 };
 
 // #1131: cantrip picks must reference level-0 spells and leveled picks level-1+.
-// One catalog read validates both id lists before the tx opens (the count check
-// in validateLevelUpSubmission can't see spell levels). Unknown ids fall through
-// to applyLearnSpellOp's own not-found error. Custom ops carry their own level.
-async function assertPickSpellLevels(submission: LevelUpSubmission): Promise<void> {
+// #1440: leveled picks must also be on the served class list (meta.spellLists)
+// and at or below the served ceiling (meta.maxSpellLevel); cantrip picks must be
+// on the served meta.cantripLists — a SEPARATE served value from spellLists,
+// because 2024 Magical Secrets broadens spells but not cantrips (the trigger is
+// the Prepared Spells number, level 1+ only) while a qualifying 2014 Bard is
+// unrestricted on both (PHB'14 p. 54 "...or a cantrip"). Both facets come from
+// the one magicalSecretsSpellLists call already baked into the plan builder's
+// newSpells step — this function only reads what was served, never re-derives
+// the rule (CLAUDE.md: never let a client-computed value be trusted by a
+// transaction endpoint). `null` means unrestricted; branch on `=== null`, never
+// on truthiness, since `[]` is truthy.
+//
+// One catalog read validates every id list before the tx opens (the count check
+// in validateLevelUpSubmission can't see spell levels/classes). Unknown ids fall
+// through to applyLearnSpellOp's own not-found error (the atomicity test depends
+// on this). op.custom picks are exempt from the class-list check (a DM-authored
+// spell has no catalog `classes` array) but are subject to the ceiling.
+async function assertPickSpellEligibility(
+  submission: LevelUpSubmission,
+  steps: LevelUpStep[],
+  className: string,
+): Promise<void> {
   const cantripOps = submission.cantripsLearned ?? [];
   const spellOps = submission.spellsLearned ?? [];
   const ids = [...cantripOps, ...spellOps].map((o) => o.spellId).filter((id): id is string => Boolean(id));
   const rows = ids.length
-    ? await prisma.spell.findMany({ where: { id: { in: ids } }, select: { id: true, level: true } })
+    ? await prisma.spell.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, level: true, classes: true } })
     : [];
-  const levelById = new Map(rows.map((r) => [r.id, r.level]));
+  const rowById = new Map(rows.map((r) => [r.id, r]));
   const levelOf = (op: LearnSpellOperation): number | undefined =>
-    op.spellId ? levelById.get(op.spellId) : op.custom?.level;
+    op.spellId ? rowById.get(op.spellId)?.level : op.custom?.level;
   for (const op of cantripOps) {
     if (levelOf(op) !== undefined && levelOf(op) !== 0) {
       throw new InvalidLevelUpError("Only cantrips (level 0) may be chosen as new cantrips.");
@@ -220,6 +238,36 @@ async function assertPickSpellLevels(submission: LevelUpSubmission): Promise<voi
       throw new InvalidLevelUpError("A cantrip cannot be chosen as a leveled spell.");
     }
   }
+
+  const step = steps.find((s): s is LevelUpStep & { kind: "newSpells" } => s.kind === "newSpells");
+  // No newSpells step means assertNoExcess/assertCantrips already rejected any
+  // pick — nothing left to gate here.
+  if (!step) return;
+
+  const maxSpellLevel = typeof step.meta?.maxSpellLevel === "number" ? step.meta.maxSpellLevel : 0;
+  const spellLists = (step.meta?.spellLists as string[] | null | undefined) ?? null;
+  const cantripLists = (step.meta?.cantripLists as string[] | null | undefined) ?? null;
+  const lowerClass = className.toLowerCase();
+
+  for (const op of spellOps) {
+    const row = op.spellId ? rowById.get(op.spellId) : undefined;
+    if (op.spellId && !row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
+    const level = row?.level ?? op.custom?.level;
+    if (level !== undefined && level > maxSpellLevel) {
+      throw new InvalidLevelUpError(`${row?.name ?? "That spell"} exceeds the highest spell level you can learn (${maxSpellLevel}).`);
+    }
+    if (row && spellLists !== null && !row.classes.some((c) => spellLists.includes(c))) {
+      throw new InvalidLevelUpError(`${row.name} is not on the ${lowerClass} spell list.`);
+    }
+  }
+
+  for (const op of cantripOps) {
+    const row = op.spellId ? rowById.get(op.spellId) : undefined;
+    if (op.spellId && !row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
+    if (row && cantripLists !== null && !row.classes.some((c) => cantripLists.includes(c))) {
+      throw new InvalidLevelUpError(`${row.name} is not on the ${lowerClass} cantrip list.`);
+    }
+  }
 }
 
 /**
@@ -228,6 +276,11 @@ async function assertPickSpellLevels(submission: LevelUpSubmission): Promise<voi
  * choices, new spells) atomically under one batchId. Throws InvalidLevelUpError
  * for any resolution/validation failure; each seam throws its own domain error on
  * an invalid op, rolling back the whole batch.
+ *
+ * #1440: assertPickSpellEligibility gates spellsLearned/cantripsLearned against
+ * the server-BUILT `steps` (the same plan the GET /plan route served) — never a
+ * client-supplied field — satisfying CLAUDE.md's "never let a client-computed
+ * value be trusted by a transaction endpoint".
  */
 export async function applyLevelUpTransaction(
   characterId: string,
@@ -238,7 +291,7 @@ export async function applyLevelUpTransaction(
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
-  await assertPickSpellLevels(submission);
+  await assertPickSpellEligibility(submission, steps, targetEntry.name);
 
   const ops = buildLevelUpOps(steps, submission);
 

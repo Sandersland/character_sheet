@@ -220,7 +220,7 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 
   it("learns 2 spells + 1 cantrip alongside hp + ASI under one batchId", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0 } }, take: 2, select: { id: true, name: true } });
+    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 2, select: { id: true, name: true } });
     expect(spells).toHaveLength(2);
     // #1131: wizard gains its 4th cantrip at level 4, so the newSpells step now
     // demands exactly one cantrip pick alongside the two scribed spells.
@@ -253,7 +253,7 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
   // ceremony covers the two domains the Battle Master undo test can't.
   it("single revert restores hp, ability delta, hit die, and unlearns the spells", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0 } }, take: 2, select: { id: true } });
+    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 2, select: { id: true } });
     const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
 
     const ceremony = await post(CHAR_ID, {
@@ -274,6 +274,263 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
     expect(res.body.abilityScores.intelligence).toBe(16);
     expect(res.body.spellcasting.spells).toHaveLength(0);
     expect(res.body.pendingLevelUps).toBe(1);
+  });
+
+  // #1440 — the exploit threat model: a crafted request bypassing the UI/picker
+  // entirely. These are direct hand-crafted POSTs, not client-filtered picks.
+  it("crafted request: a Wizard 3→4 cannot scribe off-class Cure Wounds (400, nothing in the spellbook)", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const cureWounds = await prisma.spell.findFirstOrThrow({ where: { name: "Cure Wounds" }, select: { id: true } });
+    const [wizardSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 }, name: { not: "Cure Wounds" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: cureWounds.id }, { type: "learnSpell", spellId: wizardSpell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not on .*spell list/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+    const after = await prisma.character.findUniqueOrThrow({ where: { id: CHAR_ID } });
+    expect((after.spellcasting as { spells: unknown[] }).spells).toHaveLength(0);
+  });
+
+  it("crafted request: a Wizard 3→4 cannot scribe Fireball, above the level-2 ceiling (400)", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
+    const [wizardSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: fireball.id }, { type: "learnSpell", spellId: wizardSpell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/highest spell level/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("an op.custom pick at the ceiling succeeds; above it is rejected", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+    const customSpell = (level: number) => ({
+      type: "learnSpell" as const,
+      custom: {
+        name: `Homebrew L${level} Bolt`,
+        level,
+        school: "evocation",
+        castingTime: "1 action",
+        range: "30 ft",
+        duration: "Instantaneous",
+        description: "A homebrew bolt.",
+      },
+    });
+
+    const ok = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] },
+      spellsLearned: [customSpell(2), customSpell(1)],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+    expect(ok.status).toBe(200);
+  });
+
+  it("an op.custom pick above the ceiling is rejected (400)", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] },
+      spellsLearned: [
+        {
+          type: "learnSpell",
+          custom: {
+            name: "Homebrew L3 Bolt",
+            level: 3,
+            school: "evocation",
+            castingTime: "1 action",
+            range: "30 ft",
+            duration: "Instantaneous",
+            description: "Above the level-2 ceiling.",
+          },
+        },
+        {
+          type: "learnSpell",
+          custom: {
+            name: "Homebrew L1 Bolt",
+            level: 1,
+            school: "evocation",
+            castingTime: "1 action",
+            range: "30 ft",
+            duration: "Instantaneous",
+            description: "Below the ceiling.",
+          },
+        },
+      ],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/highest spell level/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+});
+
+// #1440: the server-side gate is the only thing standing between a crafted
+// request and an off-list / above-ceiling spell. These fixtures reach Bard
+// Magical Secrets (level 10) — the one case where the class-list gate must
+// widen rather than just enforce, and where the 2014/2024 fork must reach the
+// gate (not just the plan builder).
+describe("POST …/level-up/transactions — Bard Magical Secrets eligibility gate (#1440)", () => {
+  async function makeBard(id: string, opts: { hitDiceTotal: number; xp: number; edition?: "EDITION_2014" | "EDITION_2024" }): Promise<string> {
+    const bard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Bard" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id,
+        name: "LevelUpTx Bard",
+        ...(opts.edition ? { rulesEdition: opts.edition } : {}),
+        experiencePoints: opts.xp,
+        hitPoints: { current: 50, max: 50, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: opts.hitDiceTotal, die: "d8", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: {
+          create: [{ name: "bard", subclass: "College of Lore", classId: bard.id, position: 0, level: opts.hitDiceTotal }],
+        },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
+    return entry.id;
+  }
+
+  it("a Bard reaching 10 may take Fireball via Magical Secrets (200)", async () => {
+    const CHAR_ID = "lvtx-bard-10";
+    const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: fireball.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain("Fireball");
+  });
+
+  it("a Bard reaching 10 may NOT take ranger-only Ensnaring Strike (400)", async () => {
+    const CHAR_ID = "lvtx-bard-10-ensnaring";
+    const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not on .*spell list/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("a Bard reaching 9 (no Magical Secrets yet) may NOT take Fireball (400)", async () => {
+    const CHAR_ID = "lvtx-bard-9";
+    const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 8, xp: 48000 });
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
+    const [bardSpell] = await prisma.spell.findMany({ where: { classes: { has: "bard" }, level: { gt: 0 }, name: { not: "Fireball" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: fireball.id }, { type: "learnSpell", spellId: bardSpell.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not on .*spell list/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("a 2014 Bard reaching 10 may take ranger-only Ensnaring Strike (unrestricted, PHB'14)", async () => {
+    const CHAR_ID = "lvtx-bard-10-2014";
+    const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000, edition: "EDITION_2014" });
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain("Ensnaring Strike");
+  });
+
+  it("a 2024 Bard reaching 10 may NOT take a wizard-only cantrip — 2024 Magical Secrets never broadens cantrips (400)", async () => {
+    const CHAR_ID = "lvtx-bard-10-cantrip-2024";
+    const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" }, select: { id: true } });
+    const [bardSpell] = await prisma.spell.findMany({ where: { classes: { has: "bard" }, level: { gt: 0 } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: bardSpell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: fireBolt.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/cantrip list/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("a 2014 Bard reaching 10 MAY take a wizard-only cantrip (PHB'14 \"…or a cantrip\")", async () => {
+    const CHAR_ID = "lvtx-bard-10-cantrip-2014";
+    const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000, edition: "EDITION_2014" });
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" }, select: { id: true } });
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: fireBolt.id }],
+    });
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain("Ensnaring Strike");
+    expect(names).toContain("Fire Bolt");
+  });
+
+  it("an unknown spellId still falls through to the catalog not-found error, not the eligibility gate", async () => {
+    const CHAR_ID = "lvtx-bard-10-unknown";
+    const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: "bogus-but-well-formed-spell-id" }],
+      cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/spell not found in catalog/i);
+    expect(await eventCount(CHAR_ID)).toBe(0);
   });
 });
 
@@ -468,7 +725,7 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
 
   it("rolls back hp + ASI + the first (valid) spell when the LAST spell id is bogus", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const [realSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0 } }, take: 1, select: { id: true, name: true } });
+    const [realSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 1, select: { id: true, name: true } });
     expect(realSpell).toBeDefined();
     // #1131: wizard L4 also demands one cantrip; a valid one keeps the failure in
     // the LAST leveled spell so the atomicity assertion still exercises the rollback.
