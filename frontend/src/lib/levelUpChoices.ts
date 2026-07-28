@@ -1,10 +1,13 @@
-// Data-only wiring for the ceremony's Choose-N steps (#896): one config per
-// choice kind maps a shared UI (ChoiceStep) to its catalog source, the
-// character's already-known set, and the draft field it writes. No JSX.
+// Data-only wiring for the ceremony's Choose-N steps (#896): a config maps a
+// shared UI (ChoiceStep) to its catalog source, the character's already-known
+// set, and the draft field it writes. Three kinds have one config each
+// (CHOICE_KIND_CONFIGS); the repeatable subclassChoice kind resolves PER STEP
+// via choiceConfigForStep, since one draft array (subclassChoices) is shared
+// by several steps keyed on meta.key (a Hunter Ranger's four tiers, e.g.). No JSX.
 
-import { fetchFeats, fetchManeuvers, fetchReference } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
-import type { Character, LevelUpStepKind } from "@/types/character";
+import type { Character, LevelUpStep, LevelUpStepKind } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 export interface ChoiceOption {
@@ -87,6 +90,46 @@ export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConf
   fightingStyleFeat,
   toolProficiency,
 };
+
+/**
+ * Config for a Choose-N step. The three kinds above are one config each; a
+ * subclassChoice step builds its own, scoped to this step's meta.key/
+ * catalogSource, so several steps (a subclass's several tiers) can share the
+ * one draft.subclassChoices array without leaking picks/caps across keys
+ * (#1422). meta values arrive as `unknown` — narrowed with typeof, matching
+ * stepKey/stepLabel (levelUpSteps.ts).
+ */
+export function choiceConfigForStep(step: LevelUpStep): ChoiceKindConfig | undefined {
+  if (step.kind !== "subclassChoice") return CHOICE_KIND_CONFIGS[step.kind];
+
+  const key = step.meta?.key;
+  const catalogSource = step.meta?.catalogSource;
+  if (typeof key !== "string" || typeof catalogSource !== "string") return undefined;
+
+  return {
+    loadOptions: (ctx) =>
+      fetchSubclassChoiceOptions(catalogSource, ctx.edition).then((list) =>
+        list.map((o) => ({ id: o.id, name: o.name, description: o.description })),
+      ),
+    fromCharacter: (character) =>
+      new Set(
+        (character.resources?.choicesKnown?.[key] ?? [])
+          .map((e) => e.optionId)
+          .filter((id): id is string => id != null),
+      ),
+    selected: (draft) =>
+      (draft.subclassChoices ?? [])
+        .filter((op) => op.choiceKey === key)
+        .map((op) => op.optionId)
+        .filter((id): id is string => id != null),
+    select: (draft, ids) => ({
+      subclassChoices: [
+        ...(draft.subclassChoices ?? []).filter((op) => op.choiceKey !== key),
+        ...ids.map((optionId) => ({ type: "learnSubclassChoice" as const, choiceKey: key, optionId })),
+      ],
+    }),
+  };
+}
 
 /**
  * Next selection after toggling `id`, or null when the pick is blocked. Single-
