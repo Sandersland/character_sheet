@@ -14,7 +14,13 @@
   // ESTIMATES their CRAP from export references, which inflates under the honest
   // `maxCrap: 30` bar (#717) even though their cyclomatic/cognitive are trivial.
   // Excluding them keeps the coverage-driven health gate scoped to real runtime.
-  "ignorePatterns": ["backend/scripts/**"],
+  //
+  // frontend/e2e/screenshot.css (#1420) is loaded only via playwright.config.ts's
+  // stylePath string, never imported, so the reachability graph reports it as an
+  // unused file — the CSS twin of the pino-pretty string-load case above. A
+  // literal `// fallow-ignore-file` comment isn't usable here: `//` isn't a valid
+  // CSS comment token and risks swallowing the real rule below it during parsing.
+  "ignorePatterns": ["backend/scripts/**", "frontend/e2e/screenshot.css"],
   // Error classes carry a numeric `status` read duck-typed by the Express error
   // middleware (backend/src/lib/auth/errors.ts, lib/inventory/inventory.ts) — never a static reference.
   "usedClassMembers": ["status"],
