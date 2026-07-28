@@ -244,12 +244,36 @@ function classListPhrase(spellLists: string[], lowerClass: string): string {
   return spellLists.length <= 1 ? `the ${lowerClass} spell list` : `the ${spellLists.join(", ")} spell lists`;
 }
 
-// #1440: leveled picks must be at/below the served ceiling (meta.maxSpellLevel)
-// and, unless spellLists is unrestricted, on one of the served class lists.
-// `null` means unrestricted — branch on `=== null`, never truthiness, since
-// `[]` is truthy. Unknown ids `continue` so applyLearnSpellOp's own not-found
-// error stays the one thrown when the tx runs (the atomicity test depends on
-// this: a bogus id must reach the tx, not be pre-empted here).
+// A leveled pick's effective level: the catalog row's, or op.custom's own
+// (a DM-authored custom pick carries no catalog row).
+function pickLevel(op: LearnSpellOperation, row: SpellPickRow | undefined): number | undefined {
+  return row?.level ?? op.custom?.level;
+}
+
+// #1440: the served ceiling (meta.maxSpellLevel) applies to every leveled pick,
+// including op.custom (a DM-authored spell has no catalog `classes` array, so
+// it's exempt from assertOnSpellList below, but not from this).
+function assertWithinCeiling(op: LearnSpellOperation, row: SpellPickRow | undefined, maxSpellLevel: number): void {
+  const level = pickLevel(op, row);
+  if (level !== undefined && level > maxSpellLevel) {
+    throw new InvalidLevelUpError(`${row?.name ?? "That spell"} exceeds the highest spell level you can learn (${maxSpellLevel}).`);
+  }
+}
+
+// #1440: unless spellLists is unrestricted, a catalog leveled pick must be on
+// one of the served class lists. `null` means unrestricted — branch on
+// `=== null`, never truthiness, since `[]` is truthy. op.custom has no
+// `row`/`classes` and is exempt (checked only by assertWithinCeiling above).
+function assertOnSpellList(row: SpellPickRow | undefined, spellLists: string[] | null, lowerClass: string): void {
+  if (row && spellLists !== null && !row.classes.some((c) => spellLists.includes(c))) {
+    throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(spellLists, lowerClass)}.`);
+  }
+}
+
+// #1440: leveled picks must clear both assertWithinCeiling and assertOnSpellList.
+// Unknown ids `continue` so applyLearnSpellOp's own not-found error stays the
+// one thrown when the tx runs (the atomicity test depends on this: a bogus id
+// must reach the tx, not be pre-empted here).
 function assertLeveledSpellEligibility(
   spellOps: LearnSpellOperation[],
   rowById: Map<string, SpellPickRow>,
@@ -259,14 +283,9 @@ function assertLeveledSpellEligibility(
 ): void {
   for (const op of spellOps) {
     const row = op.spellId ? rowById.get(op.spellId) : undefined;
-    if (op.spellId && !row) continue;
-    const level = row?.level ?? op.custom?.level;
-    if (level !== undefined && level > maxSpellLevel) {
-      throw new InvalidLevelUpError(`${row?.name ?? "That spell"} exceeds the highest spell level you can learn (${maxSpellLevel}).`);
-    }
-    if (row && spellLists !== null && !row.classes.some((c) => spellLists.includes(c))) {
-      throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(spellLists, lowerClass)}.`);
-    }
+    if (op.spellId && !row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
+    assertWithinCeiling(op, row, maxSpellLevel);
+    assertOnSpellList(row, spellLists, lowerClass);
   }
 }
 
@@ -292,14 +311,33 @@ function assertCantripEligibility(
   }
 }
 
+interface NewSpellsGate {
+  maxSpellLevel: number;
+  spellLists: string[] | null;
+  cantripLists: string[] | null;
+}
+
+// Reads the served eligibility facts off the newSpells step — the server-BUILT
+// plan step, never a client-supplied field (CLAUDE.md: never let a
+// client-computed value be trusted by a transaction endpoint), and never
+// re-deriving magicalSecretsSpellLists here. Returns null when the level-up has
+// no newSpells step (assertNoExcess/assertCantrips already rejected any pick in
+// that case, so there's nothing left to gate).
+function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
+  const step = steps.find((s): s is LevelUpStep & { kind: "newSpells" } => s.kind === "newSpells");
+  if (!step) return null;
+  return {
+    maxSpellLevel: typeof step.meta?.maxSpellLevel === "number" ? step.meta.maxSpellLevel : 0,
+    spellLists: (step.meta?.spellLists as string[] | null | undefined) ?? null,
+    cantripLists: (step.meta?.cantripLists as string[] | null | undefined) ?? null,
+  };
+}
+
 // Orchestrates the #1440 eligibility gate: read the catalog once, apply the
-// pre-existing cantrip/leveled placement check, then — reading only what the
-// plan builder already served on the newSpells step's meta (never re-deriving
-// magicalSecretsSpellLists here; CLAUDE.md: never let a client-computed value
-// be trusted by a transaction endpoint) — gate leveled picks on the ceiling +
-// spellLists and cantrip picks on cantripLists. op.custom picks are exempt from
-// the class-list checks (a DM-authored spell has no catalog `classes` array)
-// but are still subject to the ceiling.
+// pre-existing cantrip/leveled placement check, then gate leveled picks on the
+// served ceiling + spellLists and cantrip picks on cantripLists. op.custom picks
+// are exempt from the class-list checks (a DM-authored spell has no catalog
+// `classes` array) but are still subject to the ceiling.
 async function assertPickSpellEligibility(
   submission: LevelUpSubmission,
   steps: LevelUpStep[],
@@ -310,18 +348,12 @@ async function assertPickSpellEligibility(
   const { rowById, levelOf } = await loadPickCatalogRows(cantripOps, spellOps);
   assertCantripVsLeveledPlacement(cantripOps, spellOps, levelOf);
 
-  const step = steps.find((s): s is LevelUpStep & { kind: "newSpells" } => s.kind === "newSpells");
-  // No newSpells step means assertNoExcess/assertCantrips already rejected any
-  // pick — nothing left to gate here.
-  if (!step) return;
+  const gate = resolveNewSpellsGate(steps);
+  if (!gate) return;
 
-  const maxSpellLevel = typeof step.meta?.maxSpellLevel === "number" ? step.meta.maxSpellLevel : 0;
-  const spellLists = (step.meta?.spellLists as string[] | null | undefined) ?? null;
-  const cantripLists = (step.meta?.cantripLists as string[] | null | undefined) ?? null;
   const lowerClass = className.toLowerCase();
-
-  assertLeveledSpellEligibility(spellOps, rowById, maxSpellLevel, spellLists, lowerClass);
-  assertCantripEligibility(cantripOps, rowById, cantripLists, lowerClass);
+  assertLeveledSpellEligibility(spellOps, rowById, gate.maxSpellLevel, gate.spellLists, lowerClass);
+  assertCantripEligibility(cantripOps, rowById, gate.cantripLists, lowerClass);
 }
 
 /**
