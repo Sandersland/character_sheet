@@ -531,7 +531,7 @@ describe("useLevelUpCeremony — pruning the draft to the served plan (#1421)", 
     act(() => result.current.setDraft((d) => ({ ...d, subclassId: "sub-champion" })));
     await waitFor(() => expect(result.current.plan?.target.subclass).toBe("Champion"));
 
-    const rows = buildLevelUpLedger(wizardFighter, result.current.draft, result.current.plan!, LEDGER_RESOLVERS);
+    const rows = buildLevelUpLedger(wizardFighter, result.current.draft, result.current.plan!, LEDGER_RESOLVERS, 6);
     const labels = rows.map((r) => r.label);
     expect(labels).toContain("Level"); // vacuity guard: the ledger call itself works.
     expect(labels).not.toContain("New Spells");
