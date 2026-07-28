@@ -19,7 +19,7 @@ import {
   selectableClassChoiceCount,
   type ClassChoiceOption,
 } from "@/lib/levelUpClassChoice";
-import { draftSatisfies, levelUpSubmissionOf, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
+import { draftSatisfies, levelUpSubmissionOf, pruneDraftToPlan, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
 import type {
   Character,
   LevelUpPlanResponse,
@@ -236,6 +236,20 @@ export function useLevelUpCeremony(character: Character): LevelUpCeremony {
 
   const skipPlan = choice.status !== "resolved" || levelAgain != null;
   const { plan, planError } = useLevelUpPlan(character.id, choice.target, draft.subclassId, skipPlan);
+
+  // A subclass switch can retire a step (e.g. Eldritch Knight → Champion
+  // drops newSpells) while its picks still sit in the draft — pruneDraftToPlan
+  // (#1421) keeps the draft honest so the Review ledger and confirm() agree
+  // with what the server will actually accept. Deliberate-coupling latch: the
+  // dependency array must stay exactly [plan], never [plan.steps] (a fresh
+  // array identity every render would re-prune constantly and eat the #1323
+  // stash restore) and never [plan, draft] (draft is what this writes).
+  // Keying on the plan object fires this once per served plan, which is
+  // correct because useLevelUpPlan leaves the previous plan in place for the
+  // whole duration of a subclass-driven refetch.
+  useEffect(() => {
+    setDraft((d) => pruneDraftToPlan(d, plan?.steps ?? []));
+  }, [plan]);
 
   const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, choice.target, draft, reportSubmitted);
 
