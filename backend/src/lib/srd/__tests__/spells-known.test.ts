@@ -10,6 +10,7 @@ import {
   cantripsKnownAtLevel,
   preparedSpellCountAt,
   maxSpellLevelForClass,
+  magicalSecretsSpellLists,
 } from "@/lib/srd/spellcasting-tables.js";
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
@@ -124,5 +125,64 @@ describe("maxSpellLevelForClass", () => {
   it("is 0 for a non-caster (no derived slots)", () => {
     expect(maxSpellLevelForClass("fighter", 5)).toBe(0);
     expect(maxSpellLevelForClass("barbarian", 20)).toBe(0);
+  });
+});
+
+describe("magicalSecretsSpellLists — Bard Magical Secrets, edition-forked", () => {
+  it("2024 Bard at level 10 broadens SPELLS to the Bard/Cleric/Druid/Wizard lists (SRD 5.2)", () => {
+    expect(magicalSecretsSpellLists("bard", 10, null, "EDITION_2024").spells).toEqual([
+      "bard", "cleric", "druid", "wizard",
+    ]);
+  });
+
+  it("2024 Bard at level 10 does NOT broaden cantrips — the trigger is the Prepared Spells number", () => {
+    expect(magicalSecretsSpellLists("bard", 10, null, "EDITION_2024").cantrips).toEqual(["bard"]);
+  });
+
+  it("2024 Bard keeps the broadened spell lists at every level above 10 (level >= 10, not === 10)", () => {
+    for (const level of [11, 14, 20]) {
+      expect(magicalSecretsSpellLists("bard", level, null, "EDITION_2024").spells).toEqual([
+        "bard", "cleric", "druid", "wizard",
+      ]);
+    }
+  });
+
+  it("2024 Bard below level 10 is restricted to its own list on both facets", () => {
+    expect(magicalSecretsSpellLists("bard", 9, null, "EDITION_2024")).toEqual({
+      spells: ["bard"],
+      cantrips: ["bard"],
+    });
+  });
+
+  it('2014 Bard from level 10 is unrestricted on BOTH facets (PHB\'14 p. 54 "from any class … or a cantrip")', () => {
+    for (const level of [10, 14, 18, 20]) {
+      expect(magicalSecretsSpellLists("bard", level, null, "EDITION_2014")).toEqual({
+        spells: null,
+        cantrips: null,
+      });
+    }
+  });
+
+  it("2014 Bard below level 10 is restricted to its own list on both facets", () => {
+    expect(magicalSecretsSpellLists("bard", 9, null, "EDITION_2014")).toEqual({
+      spells: ["bard"],
+      cantrips: ["bard"],
+    });
+  });
+
+  it("every non-Bard class is its own list on both facets, in both editions", () => {
+    expect(magicalSecretsSpellLists("wizard", 20, null, "EDITION_2024")).toEqual({ spells: ["wizard"], cantrips: ["wizard"] });
+    expect(magicalSecretsSpellLists("cleric", 10, null, "EDITION_2024")).toEqual({ spells: ["cleric"], cantrips: ["cleric"] });
+    expect(magicalSecretsSpellLists("sorcerer", 10, null, "EDITION_2014")).toEqual({ spells: ["sorcerer"], cantrips: ["sorcerer"] });
+  });
+
+  it("matches the class name case-insensitively and returns lowercase", () => {
+    expect(magicalSecretsSpellLists("Bard", 10, null, "EDITION_2024").spells).toEqual([
+      "bard", "cleric", "druid", "wizard",
+    ]);
+    expect(magicalSecretsSpellLists("Warlock", 20, null, "EDITION_2024")).toEqual({
+      spells: ["warlock"],
+      cantrips: ["warlock"],
+    });
   });
 });

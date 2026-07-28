@@ -5,6 +5,7 @@ import {
   eligibleNewSpells,
   readNewSpellsMeta,
   selectedSpellIds,
+  spellListsLabel,
   swappableKnownSpells,
   toggleForgetSpell,
   toggleLearnSpell,
@@ -26,17 +27,28 @@ const CATALOG: CatalogSpell[] = [
   spell("fireball", 3, ["wizard", "sorcerer"]),   // above a level-2 ceiling
   spell("cureWounds", 1, ["bard", "cleric"]),     // off-class for a wizard
   spell("chaosBolt", 1, ["sorcerer"]),            // sorcerer-only — off every Magical Secrets list
+  spell("huntersMark", 1, ["ranger"]),            // ranger-only — off every served list except null
 ];
 
 describe("readNewSpellsMeta", () => {
-  it("reads count, ceiling, and the secrets flag", () => {
-    const step: LevelUpStep = { kind: "newSpells", count: 2, meta: { maxSpellLevel: 5, magicalSecrets: true } };
-    expect(readNewSpellsMeta(step)).toEqual({ count: 2, maxSpellLevel: 5, magicalSecrets: true, canSwap: false, cantrips: 0 });
+  it("reads count, ceiling, the secrets flag, and the served lists", () => {
+    const step: LevelUpStep = {
+      kind: "newSpells",
+      count: 2,
+      meta: { maxSpellLevel: 5, magicalSecrets: true, spellLists: ["bard", "wizard"], cantripLists: ["bard"] },
+    };
+    expect(readNewSpellsMeta(step)).toEqual({
+      count: 2, maxSpellLevel: 5, magicalSecrets: true, canSwap: false, cantrips: 0,
+      spellLists: ["bard", "wizard"], cantripLists: ["bard"],
+    });
   });
 
-  it("defaults ceiling to 0 and secrets to false when meta is absent", () => {
+  it("defaults ceiling to 0, secrets to false, and lists to null when meta is absent", () => {
     const step: LevelUpStep = { kind: "newSpells", count: 1 };
-    expect(readNewSpellsMeta(step)).toEqual({ count: 1, maxSpellLevel: 0, magicalSecrets: false, canSwap: false, cantrips: 0 });
+    expect(readNewSpellsMeta(step)).toEqual({
+      count: 1, maxSpellLevel: 0, magicalSecrets: false, canSwap: false, cantrips: 0,
+      spellLists: null, cantripLists: null,
+    });
   });
 
   it("reads canSwap from meta (#1101)", () => {
@@ -48,19 +60,57 @@ describe("readNewSpellsMeta", () => {
     expect(readNewSpellsMeta({ kind: "newSpells", count: 1, meta: { cantrips: 1 } }).cantrips).toBe(1);
     expect(readNewSpellsMeta({ kind: "newSpells", count: 0 }).cantrips).toBe(0);
   });
+
+  it("reads spellLists/cantripLists as explicitly null when the server served null (#1440)", () => {
+    const step: LevelUpStep = { kind: "newSpells", count: 1, meta: { spellLists: null, cantripLists: null } };
+    expect(readNewSpellsMeta(step).spellLists).toBeNull();
+    expect(readNewSpellsMeta(step).cantripLists).toBeNull();
+  });
 });
 
-describe("eligibleNewCantrips (#1131)", () => {
-  it("keeps only the class's cantrips (level 0)", () => {
-    expect(eligibleNewCantrips(CATALOG, "wizard").map((s) => s.id)).toEqual(["firebolt"]);
+describe("eligibleNewCantrips (#1440: takes cantripLists, not className)", () => {
+  it("keeps only the served list's cantrips (level 0)", () => {
+    expect(eligibleNewCantrips(CATALOG, { cantripLists: ["wizard"] }).map((s) => s.id)).toEqual(["firebolt"]);
   });
 
-  it("is case-insensitive on the class name and excludes leveled spells", () => {
-    expect(eligibleNewCantrips(CATALOG, "Sorcerer").map((s) => s.id)).toEqual(["firebolt"]);
+  it("admits a cantrip on ANY of several served lists, and excludes leveled spells", () => {
+    expect(eligibleNewCantrips(CATALOG, { cantripLists: ["sorcerer"] }).map((s) => s.id)).toEqual(["firebolt"]);
+  });
+
+  it("cantripLists === null (PHB'14 Bard) offers a wizard-only cantrip", () => {
+    expect(eligibleNewCantrips(CATALOG, { cantripLists: null }).map((s) => s.id)).toEqual(["firebolt"]);
+  });
+
+  it("cantripLists ['bard'] excludes a wizard-only cantrip", () => {
+    expect(eligibleNewCantrips(CATALOG, { cantripLists: ["bard"] }).map((s) => s.id)).toEqual([]);
   });
 
   it("returns [] for a null catalog", () => {
-    expect(eligibleNewCantrips(null, "wizard")).toEqual([]);
+    expect(eligibleNewCantrips(null, { cantripLists: ["wizard"] })).toEqual([]);
+  });
+});
+
+describe("spellListsLabel (#1440)", () => {
+  it("renders the four 2024 Magical Secrets lists with an Oxford 'or'", () => {
+    expect(spellListsLabel(["bard", "cleric", "druid", "wizard"])).toBe("Bard, Cleric, Druid, or Wizard");
+  });
+
+  it("renders a single list as just the capitalized class name", () => {
+    expect(spellListsLabel(["wizard"])).toBe("Wizard");
+  });
+
+  it("renders two lists joined by 'or', no comma", () => {
+    expect(spellListsLabel(["bard", "wizard"])).toBe("Bard or Wizard");
+  });
+
+  it("renders null as the PHB'14 unrestricted phrase", () => {
+    expect(spellListsLabel(null)).toBe("any class's");
+  });
+
+  // Not reachable via magicalSecretsSpellLists today (it always returns at
+  // least [key]) — a defensive guard against a future caller passing [].
+  it("renders an empty list as an empty string, not ', or undefined'", () => {
+    expect(spellListsLabel([])).toBe("");
   });
 });
 
@@ -113,25 +163,26 @@ describe("toggleForgetSpell (#1101)", () => {
   });
 });
 
-describe("eligibleNewSpells", () => {
-  it("keeps on-class spells of level 1..ceiling, dropping cantrips and above-ceiling", () => {
-    const eligible = eligibleNewSpells(CATALOG, { className: "wizard", maxSpellLevel: 2, magicalSecrets: false });
+describe("eligibleNewSpells (#1440: takes the served spellLists, not className/magicalSecrets)", () => {
+  it("keeps spells of level 1..ceiling on the served list, dropping cantrips and above-ceiling", () => {
+    const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: ["wizard"] });
     expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep"]);
   });
 
-  it("matches the class name case-insensitively", () => {
-    const eligible = eligibleNewSpells(CATALOG, { className: "Wizard", maxSpellLevel: 1, magicalSecrets: false });
-    expect(eligible.map((s) => s.id)).toEqual(["shield"]);
-  });
-
-  it("with Magical Secrets admits only the Bard/Cleric/Druid/Wizard lists (2024), still level-gated", () => {
-    const eligible = eligibleNewSpells(CATALOG, { className: "bard", maxSpellLevel: 2, magicalSecrets: true });
-    // shield/mistyStep (wizard) + cureWounds (bard/cleric) admitted; chaosBolt (sorcerer-only) excluded.
+  it("admits a spell on ANY of several served lists (the 2024 Magical Secrets case), still level-gated", () => {
+    const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: ["bard", "cleric", "druid", "wizard"] });
+    // shield/mistyStep (wizard) + cureWounds (bard/cleric) admitted; chaosBolt
+    // (sorcerer-only) and huntersMark (ranger-only) excluded — off every served list.
     expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep", "cureWounds"]);
   });
 
+  it("spellLists === null (PHB'14 unrestricted Bard) admits a ranger-only spell, still level-gated", () => {
+    const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: null });
+    expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep", "cureWounds", "chaosBolt", "huntersMark"]);
+  });
+
   it("handles a null catalog", () => {
-    expect(eligibleNewSpells(null, { className: "wizard", maxSpellLevel: 2, magicalSecrets: false })).toEqual([]);
+    expect(eligibleNewSpells(null, { maxSpellLevel: 2, spellLists: ["wizard"] })).toEqual([]);
   });
 });
 

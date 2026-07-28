@@ -302,6 +302,14 @@ async function resolveCatalogSpellEntry(
   return catalogSpellToEntry(catalogSpell);
 }
 
+// #1440: deliberately NOT class- or spell-level-gated. This op is the
+// manual/homebrew scribing surface (scroll-scribing, DM grants via
+// SpellCatalogTab/AddSpellPanel, name+level filters only) — the same op also
+// accepts a fully DM-authored `op.custom` spell with no catalog row at all, so a
+// class gate here would be inconsistent with that path and would break
+// scroll-scribing/DM-grant flows. The level-up ceremony's own eligibility gate
+// (class list + spell-level ceiling) lives in `assertPickSpellEligibility`,
+// which validates against the server-built plan step before this op ever runs.
 async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
   const { tx, state } = ctx;
   if (Boolean(op.spellId) === Boolean(op.custom)) {

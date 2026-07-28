@@ -26,6 +26,7 @@ const CATALOG: CatalogSpell[] = [
   spell("MistyStep", 2, ["wizard"]),
   spell("Fireball", 3, ["wizard"]),        // above a level-2 ceiling
   spell("CureWounds", 1, ["cleric"]),      // off-class for a wizard
+  spell("EnsnaringStrike", 1, ["ranger"]), // ranger-only — off every served list except null (#1440)
 ];
 
 function caster(learnedSpellId?: string): Character {
@@ -47,7 +48,13 @@ function casterWithBook(book: Array<{ id: string; name: string; level: number; s
   } as unknown as Character;
 }
 
-function newSpellsStep(count = 2, meta: Record<string, unknown> = { maxSpellLevel: 2 }): LevelUpStep {
+// #1440: spellLists/cantripLists default to ["wizard"] — without this, absent
+// meta now reads as unrestricted (null), which would silently offer CureWounds/
+// EnsnaringStrike in every plain test that doesn't opt into Magical Secrets.
+function newSpellsStep(
+  count = 2,
+  meta: Record<string, unknown> = { maxSpellLevel: 2, spellLists: ["wizard"], cantripLists: ["wizard"] },
+): LevelUpStep {
   return { kind: "newSpells", count, meta };
 }
 
@@ -114,10 +121,30 @@ describe("NewSpellsStep", () => {
     expect(screen.getByRole("button", { name: "Add MistyStep" })).toBeDisabled();
   });
 
-  it("under Magical Secrets, off-class spells are offered", async () => {
-    render(<Harness step={newSpellsStep(2, { maxSpellLevel: 2, magicalSecrets: true })} character={caster()} />);
+  it("under 2024 Magical Secrets, off-class spells on the served list are offered (the banner renders the SERVED lists)", async () => {
+    render(
+      <Harness
+        step={newSpellsStep(2, {
+          maxSpellLevel: 2, magicalSecrets: true, spellLists: ["bard", "cleric", "druid", "wizard"],
+        })}
+        character={caster()}
+      />,
+    );
     expect(await screen.findByText("CureWounds")).toBeInTheDocument();
+    expect(screen.queryByText("EnsnaringStrike")).not.toBeInTheDocument(); // ranger-only — off every served list
     expect(screen.getByText(/Bard, Cleric, Druid, or Wizard/i)).toBeInTheDocument();
+  });
+
+  it("a 2014 Bard's unrestricted Magical Secrets renders 'any class's spell list' and offers a ranger-only spell", async () => {
+    render(
+      <Harness
+        step={newSpellsStep(2, { maxSpellLevel: 2, magicalSecrets: true, spellLists: null })}
+        character={caster()}
+      />,
+    );
+    expect(await screen.findByText("EnsnaringStrike")).toBeInTheDocument();
+    expect(screen.getByText(/any class's/i)).toBeInTheDocument();
+    expect(screen.getByText(/spell list/i)).toBeInTheDocument();
   });
 
   it("states the learn count and, when swaps are allowed, that the swap is separate (#1139)", async () => {

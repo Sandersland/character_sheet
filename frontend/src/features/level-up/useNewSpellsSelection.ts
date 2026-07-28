@@ -21,11 +21,14 @@ export interface NewSpellsSelection {
   cantrips: number;
   cantripSelectedIds: string[];
   toggleCantrip: (spellId: string) => void;
+  /** #1440: the server-served class-list facts (null = unrestricted). */
+  spellLists: string[] | null;
+  cantripLists: string[] | null;
 }
 
 export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
   const { draft, setDraft } = useLevelUpStepContext();
-  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips } = readNewSpellsMeta(step);
+  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips, spellLists, cantripLists } = readNewSpellsMeta(step);
   const selectedIds = selectedSpellIds(draft.spellsLearned);
   const cantripSelectedIds = selectedSpellIds(draft.cantripsLearned);
   const forgottenEntryId = draft.spellsForgotten?.[0]?.entryId ?? null;
@@ -54,5 +57,6 @@ export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
     count, maxSpellLevel, magicalSecrets, canSwap,
     selectedIds, forgottenEntryId, toggle, toggleForget,
     cantrips, cantripSelectedIds, toggleCantrip,
+    spellLists, cantripLists,
   };
 }
