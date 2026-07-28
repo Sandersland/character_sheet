@@ -1,10 +1,11 @@
 // New Spells ceremony body (#890): scribe the level's new spells into the book,
-// gated to the plan's count and the class's spell-level ceiling (both from the
-// backend via step.meta). Eligibility + the hard cap live in lib/newSpells and
-// useNewSpellsSelection; this component only wires the catalog fetch, search, and
-// the tri-state rows. Rows + the full-description detail card (#1158) are the
-// same shared SpellPickerRow/SpellDetailCard the creation Spells step (#1160)
-// uses — never a level-up-specific copy.
+// gated to the plan's count, spell-level ceiling, and class list (#1440: served
+// via step.meta.spellLists/cantripLists, edition-correct by construction since
+// they come from the backend's magicalSecretsSpellLists). Eligibility + the hard
+// cap live in lib/newSpells and useNewSpellsSelection; this component only wires
+// the catalog fetch, search, and the tri-state rows. Rows + the full-description
+// detail card (#1158) are the same shared SpellPickerRow/SpellDetailCard the
+// creation Spells step (#1160) uses — never a level-up-specific copy.
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
@@ -15,7 +16,7 @@ import { useNewSpellsSelection, type NewSpellsSelection } from "@/features/level
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
 import { INPUT_CLS, filterCatalog } from "@/lib/addSpell";
-import { eligibleNewCantrips, eligibleNewSpells, swappableKnownSpells } from "@/lib/newSpells";
+import { eligibleNewCantrips, eligibleNewSpells, spellListsLabel, swappableKnownSpells } from "@/lib/newSpells";
 import { deriveSpellList } from "@/lib/spellList";
 import { pickDetailCtaLabel, pickRowState } from "@/lib/spellPickerView";
 import type { CatalogSpell, Character, LevelUpStep } from "@/types/character";
@@ -174,20 +175,19 @@ function CantripSection({
 // note, search + results. Split from NewSpellsStep so the cantrip subsection can
 // sit above it without pushing the parent past the complexity gate.
 function LeveledSpellsSection({
-  selection, character, className, catalog, error, showSpinner, learnedSpellIds, framed,
+  selection, character, catalog, error, showSpinner, learnedSpellIds, framed,
 }: {
   selection: NewSpellsSelection;
   character: Character;
-  className: string;
   catalog: CatalogSpell[] | null;
   error: string | null;
   showSpinner: boolean;
   learnedSpellIds: ReadonlySet<string>;
   framed: boolean;
 }) {
-  const { count, maxSpellLevel, magicalSecrets, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget } = selection;
+  const { count, maxSpellLevel, magicalSecrets, spellLists, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget } = selection;
   const [search, setSearch] = useState("");
-  const eligible = eligibleNewSpells(catalog, { className, maxSpellLevel, magicalSecrets });
+  const eligible = eligibleNewSpells(catalog, { maxSpellLevel, spellLists });
   const filtered = filterCatalog(eligible, search, "");
   const swapCandidates = swappableKnownSpells(character.spellcasting?.spells ?? []);
   const learnCopy = learnSummary(count, canSwap);
@@ -205,7 +205,11 @@ function LeveledSpellsSection({
       )}
       {magicalSecrets && (
         <p className="mt-1 text-center text-xs text-arcane-700">
-          Magical Secrets — pick from the <strong>Bard, Cleric, Druid, or Wizard</strong> spell lists.
+          Magical Secrets — pick from {spellLists === null ? (
+            <><strong>any class&apos;s</strong> spell list.</>
+          ) : (
+            <>the <strong>{spellListsLabel(spellLists)}</strong> spell lists.</>
+          )}
         </p>
       )}
       <input
@@ -232,13 +236,13 @@ function LeveledSpellsSection({
 }
 
 export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
-  const { character, plan } = useLevelUpStepContext();
+  const { character } = useLevelUpStepContext();
   const selection = useNewSpellsSelection(step);
   const { catalog, error, showSpinner } = useSpellCatalog();
   const [cantripSearch, setCantripSearch] = useState("");
 
   const learnedSpellIds = character.spellcasting ? deriveSpellList(character).learnedSpellIds : NO_KNOWN;
-  const eligibleCantrips = eligibleNewCantrips(catalog, plan.target.className);
+  const eligibleCantrips = eligibleNewCantrips(catalog, { cantripLists: selection.cantripLists });
   const filteredCantrips = filterCatalog(eligibleCantrips, cantripSearch, "");
   // A cantrips-only level (Cleric/Druid at 4/10) has no leveled picker or swap.
   const showLeveled = selection.count > 0 || selection.canSwap;
@@ -262,7 +266,6 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
         <LeveledSpellsSection
           selection={selection}
           character={character}
-          className={plan.target.className}
           catalog={catalog}
           error={error}
           showSpinner={showSpinner}
