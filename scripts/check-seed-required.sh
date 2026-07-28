@@ -7,10 +7,11 @@
 # 500s at runtime the moment a route reads a catalog row (#1370's lesson,
 # generalized): this is the boot-contract half of that guarantee.
 #
-# Anti-vacuity: fail unless exactly 3 files matched `prisma migrate deploy` —
-# today's Dockerfile / backend/Dockerfile / backend/Dockerfile.prod. A count
-# drift (a new deploy path added a fourth, or one was deleted) means this
-# check's premise changed and needs a human look, not a silent pass.
+# Anti-vacuity: fail unless exactly 2 files matched `prisma migrate deploy` —
+# today's Dockerfile / backend/Dockerfile. A count drift (a new deploy path
+# added a third, or one was deleted) means this check's premise changed and
+# needs a human look, not a silent pass. Was 3 until #1456 deleted the
+# split-mode backend image, which nothing had ever built.
 set -eu
 
 MATCHED=0
@@ -29,8 +30,8 @@ for f in $(git grep -lF 'prisma migrate deploy' -- ':(glob)**/Dockerfile*'); do
   fi
 done
 
-if [ "$MATCHED" -ne 3 ]; then
-  echo "error: check-seed-required.sh expected exactly 3 Dockerfiles running 'prisma migrate deploy', found $MATCHED (anti-vacuity — a deploy path was added or removed; update this script's expectation deliberately)" >&2
+if [ "$MATCHED" -ne 2 ]; then
+  echo "error: check-seed-required.sh expected exactly 2 Dockerfiles running 'prisma migrate deploy', found $MATCHED (anti-vacuity — a deploy path was added or removed; update this script's expectation deliberately)" >&2
   exit 1
 fi
 
