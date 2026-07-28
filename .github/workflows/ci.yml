@@ -252,6 +252,49 @@ jobs:
       - name: zod absent from client bundle
         run: sh scripts/check-no-zod-in-client-bundle.sh
 
+  docker-build:
+    # Proves the root Dockerfile — the image Railway deploys — still assembles
+    # (#1454). `build` above type-checks and bundles on the runner's own tree,
+    # which never exercises the three-stage COPY chain, the workspace links, or
+    # .dockerignore: a stage rename, a moved COPY or a dropped context path used
+    # to surface at DEPLOY time, against the real database, because nothing in
+    # CI ever built this file. Deliberately absent from every job's `needs:` —
+    # it duplicates no other gate, so it runs alongside them rather than
+    # extending the critical path.
+    #
+    # This job is also the only thing that ever executes stage 2's contracts
+    # barrel load assertion (#1370), which fails the build below 12 *Schema
+    # exports. It prints `contracts: N schemas loaded` whenever that layer is
+    # cold, which is exactly when packages/ or the root manifests changed — the
+    # only way a barrel regression can enter. A run whose layers all hit the
+    # cache logs CACHED instead, and that is not a gap.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # The default docker driver cannot export to a remote cache at all;
+      # buildx's container driver is what makes cache-to below work.
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          # Repo root, never a subdirectory: `npm ci --workspace` has to link
+          # packages/* (#820), so a narrower context can't resolve the install.
+          context: .
+          file: Dockerfile
+          # Proving the image assembles is the whole win here. Railway builds
+          # from the repo itself, so there is nothing to publish to; wiring a
+          # registry is a separate decision.
+          push: false
+          # mode=max also caches the frontend + backend stages. Under the default
+          # mode=min only the final stage's layers survive, and that stage is
+          # three COPY lines — every npm ci, vite build and tsc would rerun in
+          # full on every PR.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   test:
     runs-on: ubuntu-latest
 
