@@ -29,8 +29,12 @@ export default function ManeuverRow({ entry, busy, onForget }: Props) {
       name={entry.name}
       chips={
         dieFaces !== undefined ? (
-          <span className="text-[10px] text-parchment-500" aria-hidden="true">
-            d{dieFaces}
+          <span className="text-[10px] text-parchment-500">
+            {/* The bare "d8" is the sighted affordance; the die size appears nowhere
+                else in the row, so screen readers get the spelled-out equivalent
+                rather than losing the value entirely. */}
+            <span aria-hidden="true">d{dieFaces}</span>
+            <span className="sr-only">Superiority die d{dieFaces}</span>
           </span>
         ) : undefined
       }
