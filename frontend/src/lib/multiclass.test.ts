@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { classSummary, isMulticlass, multiclassPrereqMet } from "@/lib/multiclass";
-import type { AbilityScores, ClassOption } from "@/types/character";
+import { classEntryLevel, classSummary, isMulticlass, multiclassPrereqMet } from "@/lib/multiclass";
+import type { AbilityScores, Character, ClassOption } from "@/types/character";
 
 const scores = (over: Partial<AbilityScores> = {}): AbilityScores => ({
   strength: 10,
@@ -55,6 +55,49 @@ describe("classSummary", () => {
         { name: "Wizard" },
       ),
     ).toBe("Wizard 5 (Evocation) / Cleric 3");
+  });
+});
+
+describe("classEntryLevel", () => {
+  it("returns the entry's own level for a multiclass character", () => {
+    const character = {
+      level: 13,
+      class: "Monk",
+      classes: [
+        { name: "Monk", level: 3 },
+        { name: "Fighter", level: 10 },
+      ],
+    } as unknown as Character;
+    expect(classEntryLevel(character, "monk")).toBe(3);
+    expect(classEntryLevel(character, "fighter")).toBe(10);
+  });
+
+  it("matches case-insensitively against title-case served names", () => {
+    const character = { level: 3, classes: [{ name: "Monk", level: 3 }] } as unknown as Character;
+    expect(classEntryLevel(character, "monk")).toBe(3);
+  });
+
+  it("uses the XP-derived character level for a single-class character, even when the entry's own level column is stale", () => {
+    const character = {
+      level: 7,
+      classes: [{ name: "Monk", level: 1 }],
+    } as unknown as Character;
+    expect(classEntryLevel(character, "monk")).toBe(7);
+  });
+
+  it("falls back to character.class + character.level when classes is absent", () => {
+    const character = { level: 7, class: "Monk" } as unknown as Character;
+    expect(classEntryLevel(character, "monk")).toBe(7);
+  });
+
+  it("returns 0 for a class the character does not have", () => {
+    const character = { level: 13, classes: [{ name: "Fighter", level: 10 }] } as unknown as Character;
+    expect(classEntryLevel(character, "monk")).toBe(0);
+  });
+
+  it("returns 0 when classes is absent and the name doesn't match character.class", () => {
+    const character = { level: 7, class: "Rogue" } as unknown as Character;
+    expect(classEntryLevel(character, "monk")).toBe(0);
   });
 });
 

@@ -1,8 +1,38 @@
-import type { AbilityScores, ClassOption } from "@/types/character";
+import type { AbilityScores, Character, ClassOption } from "@/types/character";
 
 /** True when the character has more than one class entry. */
 export function isMulticlass(classes: readonly unknown[] | undefined): boolean {
   return (classes?.length ?? 0) > 1;
+}
+
+/**
+ * A character's level *in one class* (PHB'14 ch.6 p.163–164 / SRD 5.2
+ * Multiclassing — a class feature scales on class level; XP cost and
+ * proficiency bonus are the only character-level exceptions, neither of which
+ * this helper serves). No `edition` parameter: both texts agree.
+ *
+ * Mirrors backend `effectiveEntryLevel`'s policy exactly (single-class ⇒ the
+ * XP-derived `character.level`, because the per-entry `level` column can be
+ * stale and self-heals lazily on HP level-up; multiclass ⇒ the entry's own
+ * level) — if one changes, change the other. The absent-`classes` fallback
+ * reproduces `deriveRoster`'s (classFeatures.ts) synthesized single entry
+ * rather than importing it, since that helper isn't exported.
+ *
+ * Matching is case-insensitive: served `classes[].name` / `character.class`
+ * are catalog display names (title case, e.g. "Monk"), while callers here
+ * pass a lowercase key.
+ *
+ * #1379/#1380/#1435 are expected to move these reads server-side onto
+ * `DERIVED_ACTIONS`/the level-up HP meta — this helper keeps that move an
+ * honest "no behaviour change" refactor by being correct in the meantime.
+ */
+export function classEntryLevel(character: Character, className: string): number {
+  const roster = character.classes?.length
+    ? character.classes
+    : [{ name: character.class, level: character.level }];
+  const entry = roster.find((e) => e.name?.toLowerCase() === className.toLowerCase());
+  if (!entry) return 0;
+  return roster.length <= 1 ? character.level : entry.level;
 }
 
 /**
