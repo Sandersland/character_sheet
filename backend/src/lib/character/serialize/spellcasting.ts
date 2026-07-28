@@ -12,6 +12,7 @@ import {
   deriveItemSpells,
   type AbilityScores,
 } from "@/lib/spellcasting/granted-spells.js";
+import { readEffectSpec, resolveEffectSpec, type EffectRoll } from "@/lib/combat/effects.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
@@ -153,6 +154,55 @@ function buildFallbackSpellcastingBlob(row: CharacterWithRelations): object | un
   return undefined;
 }
 
+// The subset of the view needed to enumerate castable slot levels — shared by
+// every view builder (single-class caster, multiclass, granted-only).
+interface CastableLevelsView {
+  ability?: string;
+  slots?: { level: number }[];
+  arcana?: { level: number }[];
+  pact?: { slotLevel: number } | null;
+}
+
+// Every slot level `spell` can be cast at, keyed by `chosenSlotLevel ?? spell.level`
+// (#1381): cantrips resolve once at slotLevel 0 (character-level scaling is
+// baked into resolveEffectSpec); a leveled spell adds every level ≥ its own
+// from the view's OWN slots/arcana/pact — not availableSlotLevels' `used <
+// total` filter, which would empty out (and hide the grimoire preview for) a
+// caster who has spent every slot. An item-granted spell also adds its fixed
+// castLevel, which can exceed any slot the character owns.
+function castableSlotLevels(spell: SpellEntry, view: CastableLevelsView): number[] {
+  if (spell.level === 0) return [0];
+  const levels = new Set<number>([spell.level]);
+  if (spell.item) levels.add(spell.item.castLevel);
+  for (const s of view.slots ?? []) if (s.level >= spell.level) levels.add(s.level);
+  for (const a of view.arcana ?? []) if (a.level >= spell.level) levels.add(a.level);
+  if (view.pact && view.pact.slotLevel >= spell.level) levels.add(view.pact.slotLevel);
+  return [...levels].sort((a, b) => a - b);
+}
+
+// Decorate each spell with its resolved EffectSpec plus one resolved roll per
+// castable slot level (#1381) — the rules (cantrip ladder, upcast dice, heal
+// ability-modifier) resolve here so the client never re-derives them. A spec
+// with no dice (a utility spell) yields effectRolls: [], matching the prior
+// client-side computeCastSpec/effectPreview behaviour of returning null.
+function decorateSpellEffects(
+  spells: SpellEntry[],
+  view: CastableLevelsView,
+  characterLevel: number,
+  abilityMod: number,
+): SpellEntry[] {
+  return spells.map((spell) => {
+    const effect = readEffectSpec(spell);
+    const effectRolls: EffectRoll[] = [];
+    for (const slotLevel of castableSlotLevels(spell, view)) {
+      const effectiveStep = spell.level === 0 ? 0 : Math.max(0, slotLevel - spell.level);
+      const roll = resolveEffectSpec(effect, effectiveStep, { characterLevel, abilityMod });
+      if (roll) effectRolls.push({ slotLevel, roll });
+    }
+    return { ...spell, effect, effectRolls };
+  });
+}
+
 // Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
 // class+level+scores, then layer the stored mutable state (slotsUsed, spells,
 // concentration) clamped to the derived caps. Same derive-don't-persist pattern
@@ -171,7 +221,15 @@ export function buildSpellcastingView(
   const limit = derivePreparedSpellLimit(preparedLimitEntries(row, primaryClass, level));
   const raw = (view as { spells?: unknown }).spells;
   const clamped = clampPreparedToLimit(Array.isArray(raw) ? (raw as SpellEntry[]) : [], limit).spells;
-  const clampedView = { ...view, spells: clamped };
+  // #1381: `abilityScores` here is the same raw row.abilityScores that
+  // deriveSpellcasting already used above to compute spellSaveDC/
+  // spellAttackBonus (not serializeCharacter's effectiveScores) — the served
+  // heal modifier agrees with the served save DC for an unreconciled over-cap
+  // character rather than silently drifting from it.
+  const castableView = view as CastableLevelsView;
+  const abilityMod = abilityModifier(abilityScores[castableView.ability ?? ""] ?? 10);
+  const decorated = decorateSpellEffects(clamped, castableView, level, abilityMod);
+  const clampedView = { ...view, spells: decorated };
   return { ...clampedView, ...derivePreparedFields(clampedView, limit) };
 }
 

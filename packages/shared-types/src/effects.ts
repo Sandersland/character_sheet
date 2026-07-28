@@ -56,3 +56,13 @@ export interface EffectColumns {
 
 // A row carrying effect columns plus the level that decides the scaling axis.
 export type EffectRow = EffectColumns & { level: number; concentration?: boolean };
+
+// A resolved roll at one castable slot level (#1381). A single resolved roll
+// can't work: the picker, the cast sheet, and the grimoire preview all key off
+// the slot level the player is CURRENTLY selecting, so the server enumerates
+// every level a spell can be cast at (chosenSlotLevel ?? spell.level, plus any
+// higher slot/arcanum/pact level) and resolves one roll per entry.
+export interface EffectRoll {
+  slotLevel: number;
+  roll: { count: number; faces: number; modifier: number };
+}

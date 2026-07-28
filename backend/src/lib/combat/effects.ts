@@ -4,7 +4,7 @@
 // (resolution + roll math) are still hand-mirrored on the frontend in
 // frontend/src/lib/effects.ts — that mirror is follow-up work, not this file's
 // concern.
-export type { EffectColumns, EffectRow, EffectScaling, EffectSpec } from "@character-sheet/shared-types";
+export type { EffectColumns, EffectRoll, EffectRow, EffectScaling, EffectSpec } from "@character-sheet/shared-types";
 
 import type { EffectRow, EffectScaling, EffectSpec, EffectType } from "@character-sheet/shared-types";
 
