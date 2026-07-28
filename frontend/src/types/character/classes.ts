@@ -2,7 +2,7 @@
  * Class-feature wire types: resources, maneuvers, fighting styles, and their operations.
  */
 
-import type { EffectSpec } from "@/lib/effects";
+import type { EffectSpec } from "@character-sheet/shared-types";
 // OpenHandRider is used below (OpenHandRiderResult.rider) as well as
 // re-exported (the `export type` block further down) — a bare `export …
 // from` doesn't bind a local name, so it needs its own `import type` too.
@@ -132,6 +132,10 @@ export interface ManeuverEntry {
   // → session components treat as "damageRoll").
   placement?: ManeuverPlacement;
   actionSlot?: "bonusAction" | "reaction" | null;
+  // #1381: resolved by deriveManeuverEffect (backend), dice tracking the
+  // character's current superiority die via resolveClassDie — never re-derived
+  // client-side. Undefined for a custom/legacy entry with no catalog provenance.
+  effect?: EffectSpec;
 }
 
 /** Catalog maneuver served by GET /api/maneuvers. */

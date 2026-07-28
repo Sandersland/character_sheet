@@ -2,7 +2,7 @@
  * Spellcasting wire types: spell entries, catalog spells, slots, and spellcasting operations.
  */
 
-import type { SpellComponents, SpellSchool } from "@character-sheet/shared-types";
+import type { EffectRoll, EffectSpec, SpellComponents, SpellSchool } from "@character-sheet/shared-types";
 
 import type { ItemSpellMeta } from "./inventory";
 
@@ -60,6 +60,12 @@ export interface Spell {
   // spell as no-roll (its AC change shows in armorClassBreakdown).
   buffTarget?: string | null;
   buffModifier?: number | null;
+  // #1381: the resolved rule (cantrip ladder, upcast dice, heal ability
+  // modifier — never re-derived client-side) plus one resolved roll per
+  // castable slot level, keyed by chosenSlotLevel ?? spell.level. Optional:
+  // a non-caster ability row or a locally-constructed test Spell has neither.
+  effect?: EffectSpec;
+  effectRolls?: EffectRoll[];
 }
 
 /**

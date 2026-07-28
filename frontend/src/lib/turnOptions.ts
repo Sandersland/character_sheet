@@ -12,7 +12,7 @@
 import { buildAttackEntries, buildOffHandEntry } from "@/lib/attackMath";
 import { formatRollSpec } from "@/lib/dice";
 import { hasFeatImprovement } from "@/lib/featDisplay";
-import { effectPreviewWithMod } from "@/lib/spellMeta";
+import { effectPreview } from "@/lib/spellMeta";
 import {
   availableArcanaLevels,
   availableSlotLevels,
@@ -192,7 +192,7 @@ export function bonusSpellOptions(
     actionLimitedToCantrips,
   });
   return sortSpells(castable).map((spell) => {
-    const preview = effectPreviewWithMod(spell, character);
+    const preview = effectPreview(spell);
     return {
       spellId: spell.id,
       name: spell.name,

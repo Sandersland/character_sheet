@@ -19,22 +19,28 @@ vi.mock("@/api/client", () => ({
 const mockApply = vi.mocked(applySpellcastingTransactions);
 const mockLogRoll = vi.mocked(logRoll);
 
+// #1381: effectRolls carries the served rolls the picker now looks up (rules
+// resolve backend-side) — one entry per slot level a test actually casts at.
 const cantrip: Spell = {
   id: "sp-cantrip", name: "Sacred Flame", level: 0, school: "evocation",
   castingTime: "1 action", range: "60 feet", duration: "Instantaneous", description: "",
-  effectKind: "damage", effectDiceCount: 1, effectDiceFaces: 8, attackType: "save",
-  saveAbility: "dexterity", cantripScaling: true,
+  effectKind: "damage", attackType: "save", saveAbility: "dexterity",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 8, modifier: 0 } }],
 };
 const attackSpell: Spell = {
   id: "sp-attack", name: "Chromatic Orb", level: 1, prepared: true, school: "conjuration",
   castingTime: "1 action", range: "90 feet", duration: "Instantaneous", description: "",
-  effectKind: "damage", effectDiceCount: 3, effectDiceFaces: 8, damageType: "fire",
-  attackType: "attack", upcastDicePerLevel: 1,
+  effectKind: "damage", damageType: "fire", attackType: "attack",
+  effectRolls: [{ slotLevel: 1, roll: { count: 3, faces: 8, modifier: 0 } }],
 };
 const healSpell: Spell = {
   id: "sp-heal", name: "Cure Wounds", level: 1, prepared: true, school: "evocation",
   castingTime: "1 action", range: "Touch", duration: "Instantaneous", description: "",
-  effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 8, upcastDicePerLevel: 1,
+  effectKind: "heal",
+  effectRolls: [
+    { slotLevel: 1, roll: { count: 1, faces: 8, modifier: 0 } },
+    { slotLevel: 2, roll: { count: 2, faces: 8, modifier: 0 } },
+  ],
 };
 const buffSpell: Spell = {
   id: "sp-buff", name: "Mage Armor", level: 1, prepared: true, school: "abjuration",

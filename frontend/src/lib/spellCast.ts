@@ -1,21 +1,19 @@
 /**
- * spellCast.ts — pure computation helpers for spell casting rolls.
+ * spellCast.ts — pure lookup/planning helpers for spell casting.
  *
  * Extracted from SpellsSection.handleCast so session-mode components
- * (TurnHub's InlineSpellPicker) can produce the same roll without
- * duplicating the cantrip-scaling / upcast-dice / heal-modifier math.
+ * (TurnHub's InlineSpellPicker) share one cast plan. The dice math itself
+ * (cantrip scaling / upcast dice / heal ability-modifier) resolves
+ * backend-side (#1381) — this module only looks up the served roll and
+ * shapes the op + banner, so both surfaces stay byte-identical for free.
  *
  * No React, no JSX, no side effects — output is deterministic given the inputs.
  */
 
 import { rollSpec } from "@/lib/dice";
-import { abilityModifier } from "@/lib/abilities";
-import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
 import { isAllyTarget, saveDcLabel, type Target } from "@/lib/spellMeta";
 import type {
-  AbilityName,
   CastSpellOperation,
-  Character,
   Spell,
   SpellcastingOperation,
 } from "@/types/character";
@@ -57,21 +55,21 @@ function bannerFor(
 
 // Item-granted spell (#528): cast from the item's own resource at its configured
 // slot level (may upcast above the spell's base level), never a spell slot.
-function planItemCast(spell: Spell, character: Character): CastPlan {
+function planItemCast(spell: Spell): CastPlan {
   const castLevel = spell.item?.castLevel ?? spell.level;
-  const castRoll = computeCastRoll(spell, character, castLevel);
+  const castRoll = computeCastRoll(spell, castLevel);
   const result = castRoll ? bannerFor(spell, castRoll, undefined) : null;
   return { ops: [{ type: "castItemSpell", entryId: spell.id, roll: castRoll?.total ?? 0 }], result };
 }
 
 // Plan a cast: which ops to send and whether to show a roll banner. Rolls dice
 // via computeCastRoll but holds no React state — SpellsSection wires the result.
-export function planCast(spell: Spell, character: Character, slotLevel?: number): CastPlan {
-  if (spell.source === "item") return planItemCast(spell, character);
+export function planCast(spell: Spell, slotLevel?: number): CastPlan {
+  if (spell.source === "item") return planItemCast(spell);
 
   const isCantrip = spell.level === 0;
   const resolvedSlotLevel = slotLevel ?? spell.level;
-  const castRoll = computeCastRoll(spell, character, resolvedSlotLevel);
+  const castRoll = computeCastRoll(spell, resolvedSlotLevel);
 
   if (!castRoll) {
     // No effect dice — just expend the slot (cantrips expend nothing).
@@ -89,29 +87,20 @@ export function planCast(spell: Spell, character: Character, slotLevel?: number)
 }
 
 /**
- * Compute the dice spec for casting `spell` at `slotLevel` — pure, no side
- * effects and no actual rolling. Returns null when the spell has no effect
- * dice (e.g. a utility spell like Detect Magic).
+ * The dice spec for casting `spell` at `slotLevel` — a lookup into the spell's
+ * served `effectRolls` (#1381), not a re-derivation. The rules (cantrip
+ * scaling, upcast dice, heal ability-modifier) resolve backend-side in
+ * buildSpellcastingView; this only finds the entry keyed by the slot level the
+ * player picked. Returns null when the spell has no served roll at that level
+ * (a utility spell, or a level with no matching effectRolls entry).
  *
- *  - Cantrip scaling: ×2 at char level 5, ×3 at 11, ×4 at 17.
- *  - Upcast bonus: extraLevels × spell.upcastDicePerLevel added to diceCount.
- *  - Heal spells add the spellcasting ability modifier as a flat bonus.
+ * Hands back a COPY of the served roll: the entry lives in shared react-query
+ * cache state, and callers (e.g. InlineSpellAttackSection's crit path) mutate
+ * their local copy (`{ ...spec, crit: true }`) rather than the cached object.
  */
-export function computeCastSpec(
-  spell: Spell,
-  character: Character,
-  slotLevel: number,
-): RollSpec | null {
-  // Heal spells add the spellcasting ability modifier as a flat bonus.
-  const ability = character.spellcasting?.ability;
-  const abilityScore = ability
-    ? (character.abilityScores[ability as AbilityName] ?? 10)
-    : 10;
-  const abilityMod = abilityModifier(abilityScore);
-
-  const spec = readEffectSpec(spell);
-  const effectiveStep = spell.level === 0 ? 0 : Math.max(0, slotLevel - spell.level);
-  return resolveEffectSpec(spec, effectiveStep, { characterLevel: character.level, abilityMod });
+export function computeCastSpec(spell: Spell, slotLevel: number): RollSpec | null {
+  const entry = spell.effectRolls?.find((e) => e.slotLevel === slotLevel);
+  return entry ? { ...entry.roll } : null;
 }
 
 // Roll the effect dice for casting `spell` at `slotLevel` — null when the spell
@@ -119,10 +108,9 @@ export function computeCastSpec(
 // RollContext.roll() so the result surfaces in the shared toast.
 function computeCastRoll(
   spell: Spell,
-  character: Character,
   slotLevel: number,
 ): { spec: RollSpec; total: number; result: RollResult } | null {
-  const spec = computeCastSpec(spell, character, slotLevel);
+  const spec = computeCastSpec(spell, slotLevel);
   if (!spec) return null;
   const result = rollSpec(spec);
   return { spec, total: result.total, result };

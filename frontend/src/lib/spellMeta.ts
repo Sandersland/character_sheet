@@ -8,9 +8,8 @@
  * No React, no JSX, no side effects.
  */
 
-import { abilityLabel, abilityModifier } from "@/lib/abilities";
-import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
-import type { AbilityName, Character, Session, Spell, SpellComponents, SpellSchool } from "@/types/character";
+import { abilityLabel } from "@/lib/abilities";
+import type { Session, Spell, SpellComponents, SpellSchool } from "@/types/character";
 
 /** Title-case display label for a spell school (never render the raw key). */
 const SCHOOL_LABELS: Record<SpellSchool, string> = {
@@ -105,49 +104,22 @@ export function slotOrdinal(n: number): string {
 }
 
 /**
- * Returns the effect preview string for a spell at a given slot level
- * (e.g. "8d6 fire damage" / "2d4 healing").
- *
- * Respects cantrip scaling at `characterLevel` and upcast dice when a
- * higher slot is chosen. Returns null for utility spells with no effect dice.
+ * Effect preview string for a spell at a given slot level (e.g. "8d6 fire
+ * damage" / "2d8 + 3 healing") — a lookup into the spell's served
+ * `effectRolls` (#1381), not a re-derivation. The served roll always carries
+ * the spellcasting ability modifier for a heal (SRD 5.2/5.1 Cure Wounds:
+ * "plus your spellcasting ability modifier"), so this single function now
+ * renders identically for the grimoire and the in-session picker — collapsing
+ * the former effectPreview/effectPreviewWithMod split, which used to omit the
+ * modifier here and understate the grimoire's heal preview.
  *
  * Set `chosenSlotLevel` to the slot the player picked; omit for the base
- * display (uses spell.level as the slot level so no upcast bonus).
+ * display (looks up spell.level, i.e. no upcast bonus). Returns null when the
+ * spell has no served roll at that level (a utility spell, or an unlisted level).
  */
-export function effectPreview(
-  spell: Spell,
-  characterLevel: number,
-  chosenSlotLevel?: number,
-): string | null {
-  const effectiveStep =
-    spell.level !== 0 && chosenSlotLevel ? Math.max(0, chosenSlotLevel - spell.level) : 0;
-  const roll = resolveEffectSpec(readEffectSpec(spell), effectiveStep, { characterLevel });
-  if (!roll) return null;
-
-  return `${roll.count}d${roll.faces}${modifierLabel(roll.modifier ?? 0)} ${effectKindLabel(spell)}`;
-}
-
-/**
- * Like effectPreview but adds the spellcasting ability modifier to healing
- * (mirrors computeCastRoll). Intended for the "after you cast" result display.
- */
-export function effectPreviewWithMod(
-  spell: Spell,
-  character: Character,
-  chosenSlotLevel?: number,
-): string | null {
-  const ability = character.spellcasting?.ability;
-  const abilityScore = ability
-    ? (character.abilityScores[ability as AbilityName] ?? 10)
-    : 10;
-  const abilityMod = abilityModifier(abilityScore);
-
-  const effectiveStep =
-    spell.level !== 0 && chosenSlotLevel ? Math.max(0, chosenSlotLevel - spell.level) : 0;
-  const roll = resolveEffectSpec(readEffectSpec(spell), effectiveStep, {
-    characterLevel: character.level,
-    abilityMod,
-  });
+export function effectPreview(spell: Spell, chosenSlotLevel?: number): string | null {
+  const slotLevel = chosenSlotLevel ?? spell.level;
+  const roll = spell.effectRolls?.find((e) => e.slotLevel === slotLevel)?.roll;
   if (!roll) return null;
 
   return `${roll.count}d${roll.faces}${modifierLabel(roll.modifier ?? 0)} ${effectKindLabel(spell)}`;
