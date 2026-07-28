@@ -9,7 +9,6 @@ import AbilityScoreStep from "@/features/level-up/AbilityScoreStep";
 import ChoiceStep from "@/features/level-up/ChoiceStep";
 import ClassChoiceStep from "@/features/level-up/ClassChoiceStep";
 import HitPointsStep from "@/features/level-up/HitPointsStep";
-import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
 import NewSpellsStep from "@/features/level-up/NewSpellsStep";
 import ReviewStep from "@/features/level-up/ReviewStep";
 import SubclassStep from "@/features/level-up/SubclassStep";
@@ -24,21 +23,23 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { stepKey, stepLabel } from "@/lib/levelUpSteps";
 import type { LevelUpStep, LevelUpStepKind, LevelUpTarget } from "@/types/character";
 
-// Step-body slot: #887–#891 register their real bodies per kind here; anything
-// unregistered renders the placeholder.
-const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>>> = {
+// Step-body slot: #887–#891 register their real bodies per kind here. Total
+// over LevelUpStepKind (#1422) so an unregistered kind is a compile error
+// here rather than an unsatisfiable placeholder shipping to a player.
+const STEP_BODIES: Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>> = {
   hitPoints: HitPointsStep,
   advancement: AbilityScoreStep,
   maneuvers: ChoiceStep,
   fightingStyleFeat: ChoiceStep,
   toolProficiency: ChoiceStep,
   subclass: SubclassStep,
+  subclassChoice: ChoiceStep,
   newSpells: NewSpellsStep,
   review: ReviewStep,
 };
 
 function StepBody({ step }: { step: LevelUpStep }) {
-  const Body = STEP_BODIES[step.kind] ?? LevelUpStepPlaceholder;
+  const Body = STEP_BODIES[step.kind];
   return <Body step={step} />;
 }
 
