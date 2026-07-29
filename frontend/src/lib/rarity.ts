@@ -3,20 +3,12 @@ import type { ItemRarity, ItemRarityOption } from "@/types/character";
 
 /**
  * Pure helpers over the rarity rows GET /api/reference serves (#1437). This
- * module declares no table keyed by rarity — labels and gp values are the
- * backend's and arrive as `rarities` arguments. The only rarity-key literals
- * left here are rarityTone's `case` arms, for the reason stated on it.
+ * module declares no object or array literal keyed by rarity — labels and gp
+ * values are the backend's and arrive as `rarities` arguments. Three rarity-key
+ * literals survive, each a presentation decision rather than rules data:
+ * rarityTone's `case` arms, paperDollRarityLabel's COMMON suppression, and
+ * rarityValueHint's "Priceless" for ARTIFACT. Each says why on itself.
  */
-
-/** Standard buy value in gp per tier; null for priceless (Artifact). */
-const RARITY_STANDARD_VALUE_GP: Record<ItemRarity, number | null> = {
-  COMMON: 100,
-  UNCOMMON: 400,
-  RARE: 4000,
-  VERY_RARE: 40000,
-  LEGENDARY: 200000,
-  ARTIFACT: null,
-};
 
 /**
  * Display label for a rarity key, or null when the served rows haven't arrived
@@ -66,25 +58,36 @@ export function rarityTone(key: ItemRarity): BadgeTone {
   }
 }
 
-// Standard gp value for a rarity; a consumable is worth half (Artifact is always
-// priceless). Null rarity or unknown tier → null.
+// The tier's standard gp value off the served rows; a consumable is worth half
+// (Artifact is always priceless). Null rarity, unknown tier, or rows not yet
+// resolved → null.
 export function standardValueForRarity(
   rarity: ItemRarity | null | undefined,
+  rarities: readonly ItemRarityOption[],
   { isConsumable = false }: { isConsumable?: boolean } = {},
 ): number | null {
-  const value = rarity ? RARITY_STANDARD_VALUE_GP[rarity] : null;
+  const value = rarities.find((r) => r.key === rarity)?.standardValueGp ?? null;
   if (value == null) return null;
   return isConsumable ? value / 2 : value;
 }
 
-/** Human hint for the form's Value field, e.g. "Standard value: 2,000 gp". */
+/**
+ * Human hint for the DM form's Value field, e.g. "Standard value: 2,000 gp".
+ *
+ * Sanctioned exception to the backend-owns-the-rules rule: the halving, the
+ * "Priceless"/"Standard value: … gp" wording and the en-US grouping stay
+ * client-side because this runs over UNSAVED form state as the DM works the
+ * dropdown — there is no server row to hang a resolved string on, and no server
+ * decision reads it (what persists is whatever the DM types into Value).
+ */
 export function rarityValueHint(
   rarity: ItemRarity | null | undefined,
+  rarities: readonly ItemRarityOption[],
   { isConsumable = false }: { isConsumable?: boolean } = {},
 ): string | null {
   if (!rarity) return null;
   if (rarity === "ARTIFACT") return "Priceless";
-  const value = standardValueForRarity(rarity, { isConsumable });
+  const value = standardValueForRarity(rarity, rarities, { isConsumable });
   if (value == null) return null;
   return `Standard value: ${value.toLocaleString("en-US")} gp`;
 }

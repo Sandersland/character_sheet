@@ -306,7 +306,9 @@ function AttunementPrereqFields({ form, set }: { form: FormState; set: SetField 
 export function MagicFieldset({ form, setters, rarities }: FieldsProps & { rarities: ItemRarityOption[] }) {
   const { set } = setters;
   const isMagic = form.rarity !== "";
-  const rarityHint = rarityValueHint(form.rarity || undefined, { isConsumable: form.category === "consumable" });
+  const rarityHint = rarityValueHint(form.rarity || undefined, rarities, {
+    isConsumable: form.category === "consumable",
+  });
 
   return (
     <fieldset className={fieldsetCls}>
@@ -327,6 +329,13 @@ export function MagicFieldset({ form, setters, rarities }: FieldsProps & { rarit
               {o.label}
             </option>
           ))}
+          {/* An existing magic item's tier before the rows land: without an
+              option carrying it, the select would fall back to the first one and
+              tell the DM a Very Rare item is Mundane. The raw enum key still
+              never paints — the label waits for the wire. */}
+          {form.rarity !== "" && rarities.length === 0 && (
+            <option value={form.rarity}>Loading…</option>
+          )}
         </Select>
       </Field>
       {isMagic && (

@@ -571,6 +571,25 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
     ]);
   });
 
+  // The gp figures are the server's too (#1437) — with no rows there is nothing
+  // to quote, so the hint stays absent rather than guessing. The select must
+  // still hold the item's real tier instead of falling back to "Mundane (none)".
+  it("keeps an existing magic item's tier, and no value hint, while the rows are unresolved", async () => {
+    renderPanel({ seedRarities: false });
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    const rarity = screen.getByLabelText("Rarity") as HTMLSelectElement;
+    expect(rarity).toHaveValue("VERY_RARE");
+    expect(rarity).toBeDisabled();
+    expect([...rarity.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+      "Mundane (none)",
+      "Loading…",
+    ]);
+    expect(screen.queryByText("VERY_RARE")).toBeNull();
+    expect(screen.queryByText(/Standard value:/)).toBeNull();
+  });
+
   it("hides attunement/unique and the value hint when rarity is Mundane", async () => {
     renderPanel();
     await screen.findByText("Flametongue");
