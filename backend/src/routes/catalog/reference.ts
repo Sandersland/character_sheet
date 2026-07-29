@@ -143,6 +143,26 @@ referenceRouter.get("/reference", async (req, res) => {
   // needs to hold any of its own.
   const conditions = conditionRulesText(edition);
 
+  // The universal turn actions (#1430), same precedent as conditions above: the
+  // rows are catalog content identical for every character of an edition, so
+  // they ride this endpoint rather than ~105 lines of static copy on every
+  // character payload. Only `universal: true` rows are served — the
+  // class-specific Action rows carry gates and effect dispatch and reach the
+  // sheet through DERIVED_ACTIONS instead.
+  const universalActionRows = await prisma.action.findMany({
+    where: withEditionOrShared({ universal: true }, edition),
+    select: { key: true, name: true, cost: true, description: true, edition: true },
+  });
+  // Sorted AFTER resolution, never as an `orderBy`: resolveEditionCatalog
+  // preserves each group's FIRST-occurrence position, so a name-ordered
+  // findMany would place the 2024 "Magic" row at "Cast a Spell"'s alphabetical
+  // slot. `edition` is selected only so the resolution can run and must not
+  // reach the wire — same rule as originFeatByName above. Alphabetical by name
+  // is also SRD 5.2's own Actions-table order, so no `sortOrder` column.
+  const universalActions = resolveEditionCatalog(universalActionRows, edition, (a) => a.key)
+    .map(({ key, name, cost, description }) => ({ key, name, cost, description }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   res.json({
     races: racesWithTools,
     classes,
@@ -150,6 +170,7 @@ referenceRouter.get("/reference", async (req, res) => {
     alignments: ALIGNMENTS,
     artisanTools,
     conditions,
+    universalActions,
     // The six magic-item rarity tiers (#1437). Unlike conditions above these are
     // edition-INVARIANT: ITEM_RARITIES takes no edition parameter, and spreading
     // the module const straight into the response — no intermediate const — is

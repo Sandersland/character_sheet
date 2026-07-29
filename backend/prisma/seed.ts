@@ -128,9 +128,10 @@ async function seedSubclassGrantedSpells(prisma: PrismaClient, classIds: Map<str
   for (const g of SUBCLASS_GRANTED_SPELLS) await upsertGrantedSpell(prisma, classIds, g);
 }
 
-// Upsert the action catalog by unique key.
+// Upsert the action catalog by (key, edition), then drop stale rows.
 async function seedActions(prisma: PrismaClient) {
   for (const action of ACTIONS) {
+    const edition = orNull(action.edition);
     const fields = {
       name: action.name,
       description: action.description,
@@ -141,16 +142,38 @@ async function seedActions(prisma: PrismaClient) {
       grantLevel: orNull(action.grantLevel),
       resourceKey: orNull(action.resourceKey),
       resourceAmount: orNull(action.resourceAmount),
-      // NULL = shared (#1306). Action.key stays plain @unique (no divergent
-      // action exists yet), so this is data-only — not part of the where key.
-      edition: orNull(action.edition),
+      // NULL = shared (#1306) — every class row. Part of the where key since
+      // #1430 forked the universal rows; writing by `key` alone would have the
+      // 2024 row overwrite its 2014 twin on every reseed.
+      edition,
     };
-    await prisma.action.upsert({
-      where: { key: action.key },
-      create: { key: action.key, ...fields },
-      update: fields,
-    });
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't
+    // express a null edition (which every class row has).
+    await upsertEditionRow(prisma.action, { key: action.key, edition }, { key: action.key, ...fields }, fields);
   }
+  // Drops the 12 pre-fork NULL-edition universal rows on the first reseed after
+  // #1430 — intentional, and the reason the prune wiring and the seed fork must
+  // land in the SAME deploy: a half-deployed pair leaves the universal catalog
+  // empty and the Action sheet's tile grid blank.
+  //
+  // "key", not the model's other identity column: Action has BOTH `name` and
+  // `key`, and `name` is NOT unique here ("Channel Divinity" is two rows), so
+  // pruning on it would delete live catalog content. No extraWhere — this
+  // seeder owns every Action row.
+  //
+  // Each row's OWN edition goes into the seeded list, not a flat null: an
+  // edition absent from it gets `notIn: []`, which matches every row in that
+  // partition, so a forked row listed as shared would be deleted by the very
+  // next reseed (both directions proven in action-fork-reseed.test.ts).
+  const staleWhere = staleCatalogRowsWhere(
+    "key",
+    ACTIONS.map((a) => ({ identity: a.key, edition: a.edition ?? null })),
+  );
+  const stale = await prisma.action.findMany({ where: staleWhere, select: { key: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedActions: dropping stale catalog rows: ${stale.map((a) => `${a.key} (${a.edition ?? "shared"})`).join(", ")}`);
+  }
+  await prisma.action.deleteMany({ where: staleWhere });
 }
 
 // Seed maneuver catalog as GrantedAbility rows (source "maneuver"). Every
@@ -214,7 +237,8 @@ async function seedShadowArts(prisma: PrismaClient) {
   // partition — so a 2014 art listed as shared would be deleted by the very
   // next reseed (proven in granted-ability-fork-reseed.test.ts).
   const staleWhere = staleCatalogRowsWhere(
-    SHADOW_ARTS.map((a) => ({ name: a.name, edition: a.edition ?? null })),
+    "name",
+    SHADOW_ARTS.map((a) => ({ identity: a.name, edition: a.edition ?? null })),
     { source: "shadowArts" },
   );
   const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true } });
@@ -288,7 +312,7 @@ async function seedFeats(prisma: PrismaClient) {
       },
     );
   }
-  const staleWhere = staleCatalogRowsWhere(FEATS.map((f) => ({ name: f.name, edition: f.edition ?? null })));
+  const staleWhere = staleCatalogRowsWhere("name", FEATS.map((f) => ({ identity: f.name, edition: f.edition ?? null })));
   // Log before the destructive drop so the operator sees what's removed (a future
   // homebrew feat row not in FEATS would be dropped here — intentional for a
   // genuinely retired row of either edition).

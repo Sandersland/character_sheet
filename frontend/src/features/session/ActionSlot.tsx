@@ -1,15 +1,19 @@
 import BottomSheet from "@/components/ui/BottomSheet";
 import { GiCrossedSwords } from "@/components/ui/icons";
-import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
 import ActionSheetBody from "@/features/session/ActionSheetBody";
 import { TurnSlotCard, AttackCounter } from "@/features/session/TurnControls";
 import type { AttackState } from "@/features/session/useTurnState";
 import type { ActionSheetModel } from "@/lib/turnOptions";
-import type { AvailableAction } from "@/types/character";
+import type { AvailableAction, UniversalActionOption } from "@/types/character";
 
 // Pure slot derivations, extracted so the component stays a composition layer.
-function slotView(actionsRemaining: number, attack: AttackState | null, classActions: AvailableAction[]) {
-  const universalActions = UNIVERSAL_ACTIONS.filter(
+function slotView(
+  actionsRemaining: number,
+  attack: AttackState | null,
+  classActions: AvailableAction[],
+  served: UniversalActionOption[],
+) {
+  const universalActions = served.filter(
     (u) => u.cost === "action" && u.key !== "attack" && !classActions.some((c) => c.key === u.key),
   );
   const available = actionsRemaining > 0;
@@ -17,7 +21,9 @@ function slotView(actionsRemaining: number, attack: AttackState | null, classAct
   // without touching the action economy.
   const resuming = attack !== null && attack.used > 0 && attack.used < attack.total;
   return {
-    preview: ["Attack", ...classActions.map((a) => a.name), ...universalActions.map((u) => u.label)]
+    // Reads the SERVED name, so a 2024 character's preview says "Magic", not
+    // "Cast a Spell" — and follows the served (alphabetical) order.
+    preview: ["Attack", ...classActions.map((a) => a.name), ...universalActions.map((u) => u.name)]
       .slice(0, 4)
       .join(" · "),
     available,
@@ -63,7 +69,7 @@ export default function ActionSlot({
   handleResumeAttack: () => void;
   handleActionClick: (key: string, cost: "action" | "bonusAction" | "reaction") => void;
 }) {
-  const view = slotView(actionsRemaining, attack, classActions);
+  const view = slotView(actionsRemaining, attack, classActions, sheetModel.universalActions);
 
   return (
     <>

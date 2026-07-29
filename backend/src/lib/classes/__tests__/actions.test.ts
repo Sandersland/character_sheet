@@ -119,8 +119,9 @@ describe("deriveActions — class gates", () => {
 
 describe("deriveActions — universal actions excluded", () => {
   it("does not include generic actions like attack/dodge/dash", () => {
-    // Universal actions (attack, castSpell, dodge, etc.) are handled client-side
-    // by turnRules.ts UNIVERSAL_ACTIONS and must NOT appear in availableActions.
+    // Universal actions (attack, castSpell, dodge, etc.) are served per edition
+    // by referenceRouter's universalActions (#1430) and must NOT also appear in
+    // availableActions, or TurnHub would render each of them twice.
     const result = keys(at("fighter", undefined, 5, []));
     const universalKeys = ["attack", "castSpell", "dodge", "dash", "disengage", "help", "hide", "search", "ready"];
     for (const key of universalKeys) {
