@@ -1,4 +1,4 @@
-import type { CatalogFeat, CatalogSpell, Item, ReferenceData } from "@/types/character";
+import type { CatalogFeat, CatalogSpell, EditionsResponse, Item, ReferenceData } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import { request } from "@/api/http";
 
@@ -27,4 +27,12 @@ export async function fetchSpells(): Promise<CatalogSpell[]> {
 // query param rather than a header.
 export async function fetchFeats(edition: RulesEdition): Promise<CatalogFeat[]> {
   return request<CatalogFeat[]>(`/feats?edition=${edition}`, undefined, "Failed to fetch feat catalog");
+}
+
+// The only catalog call in this module that takes NO edition, and deliberately
+// so (#1436): it is what the client reads in order to CHOOSE one, so it must be
+// answerable before any edition is settled. Adding a param here "for symmetry"
+// would make the edition picker depend on the answer it exists to produce.
+export async function fetchEditions(): Promise<EditionsResponse> {
+  return request<EditionsResponse>("/editions", undefined, "Failed to fetch rules editions");
 }
