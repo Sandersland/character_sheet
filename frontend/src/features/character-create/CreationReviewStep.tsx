@@ -4,9 +4,9 @@
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import { useEditions } from "@/hooks/useEditions";
 import { formatModifier } from "@/lib/abilities";
 import type { CreationPreview } from "@/lib/characterCreation";
-import { EDITION_LABELS } from "@/lib/editionCopy";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -33,6 +33,13 @@ export default function CreationReviewStep({
   /** Resolved by CreationEntryGate — always set by Review; null only defensively. */
   rulesEdition: RulesEdition | null;
 }) {
+  // Mid-creation there is no server row to hang a rulesEditionLabel on, so the
+  // label is resolved out of the served rows (#1436). Null until they arrive —
+  // the fragment below then renders nothing while the rest of the line still
+  // does, rather than flashing a raw EDITION_* key.
+  const { editions } = useEditions();
+  const editionLabel = editions?.editions.find((row) => row.key === rulesEdition)?.label ?? null;
+
   return (
     <div className="flex flex-col gap-4 p-1">
       <div>
@@ -49,10 +56,10 @@ export default function CreationReviewStep({
           otherwise it's invisible here and only changeable via Start Over. */}
       <p className="text-sm text-parchment-700">
         {campaignName ? `Joining ${campaignName}` : "Solo character"}
-        {rulesEdition && (
+        {editionLabel && (
           <>
             {" · "}
-            <span className="font-semibold text-parchment-900">{EDITION_LABELS[rulesEdition]}</span>
+            <span className="font-semibold text-parchment-900">{editionLabel}</span>
           </>
         )}
       </p>

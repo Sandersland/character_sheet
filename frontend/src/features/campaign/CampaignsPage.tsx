@@ -10,12 +10,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import Spinner from "@/components/ui/Spinner";
 import { createCampaign, fetchCampaigns } from "@/api/client";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
-import { RULES_EDITIONS } from "@/lib/editionCopy";
-import type { Campaign } from "@/types/character";
-
-// RULES_EDITIONS[0] is EDITION_2024 (mirrors Campaign.rulesEdition's Prisma
-// column default) — the picker's pre-checked card, not a hardcoded literal here.
-const DEFAULT_EDITION = RULES_EDITIONS[0];
+import { useEditions } from "@/hooks/useEditions";
+import type { Campaign, EditionsResponse } from "@/types/character";
 
 const inputCls =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
@@ -23,15 +19,98 @@ const labelCls = "block text-xs font-semibold text-parchment-700";
 const primaryBtn =
   "rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-40";
 
+// The create surface, extracted so CampaignsPage's own render stays a plain
+// switch over list-load state — #1436's editions gating pushed the combined
+// function past fallow's complexity gate. `editions` arrives as a prop rather
+// than from a second useEditions call so the page's error banner and this form
+// can never disagree about whether the rows have landed.
+function CreateCampaignForm({
+  editions,
+  onCreated,
+  onError,
+}: {
+  editions: EditionsResponse | null;
+  onCreated: () => Promise<void>;
+  /** null clears the page's banner — called before each attempt. */
+  onError: (message: string | null) => void;
+}) {
+  const [name, setName] = useState("");
+  // null = "the DM hasn't touched the picker", not "2024". A campaign's edition
+  // can never be changed, so a UI-side fallback would silently decide a field the
+  // DM can't undo (#1436) — the served default is the only default, and a reset
+  // back to null re-derives it rather than restating a second literal.
+  const [rulesEdition, setRulesEdition] = useState<RulesEdition | null>(null);
+  const [pending, setPending] = useState(false);
+  const selectedEdition = rulesEdition ?? editions?.defaultEdition ?? null;
+
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault();
+    // Submit is disabled without both, so this is the type narrowing plus a
+    // belt-and-braces guard against ever posting a guessed edition.
+    if (!name.trim() || !selectedEdition) return;
+    setPending(true);
+    onError(null);
+    try {
+      await createCampaign(name.trim(), selectedEdition);
+      setName("");
+      setRulesEdition(null);
+      await onCreated();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to create campaign");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form className="flex flex-col gap-3 p-4" onSubmit={handleCreate}>
+      <div className="flex flex-col gap-1.5">
+        <label className={labelCls} htmlFor="campaign-name">
+          Campaign name
+        </label>
+        <input
+          id="campaign-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="The Sunless Citadel"
+          className={inputCls}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className={labelCls}>Rules edition</span>
+        {/* No picker at all until the rows arrive (#1436) — not a fallback-valued
+            one, not a raw EDITION_* key. The label and the irreversibility notice
+            still render so the field doesn't pop in. */}
+        {editions && selectedEdition && (
+          <EditionPicker
+            rows={editions.editions}
+            value={selectedEdition}
+            onChange={setRulesEdition}
+            label="Rules edition"
+          />
+        )}
+        <p className="text-xs text-parchment-500">
+          Sets the rules every character joining this campaign must use. Can't be changed after the campaign
+          is created.
+        </p>
+      </div>
+      {/* Disabled until an edition is actually known: a submit that fell back to
+          a literal would write an unchangeable field the DM never saw. */}
+      <button type="submit" className={primaryBtn} disabled={pending || !name.trim() || !selectedEdition}>
+        Create campaign
+      </button>
+    </form>
+  );
+}
+
 // Campaigns hub: lists the campaigns the caller belongs to (real list endpoint),
 // plus a create surface. Each card links to the management detail page.
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
-  const [name, setName] = useState("");
-  const [rulesEdition, setRulesEdition] = useState<RulesEdition>(DEFAULT_EDITION);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
   const showSpinner = useDelayedFlag(campaigns === null);
+  const { editions, error: editionsFailed } = useEditions();
 
   async function load() {
     try {
@@ -46,23 +125,6 @@ export default function CampaignsPage() {
     void load();
   }, []);
 
-  async function handleCreate(event: React.FormEvent) {
-    event.preventDefault();
-    if (!name.trim()) return;
-    setPending(true);
-    setError(null);
-    try {
-      await createCampaign(name.trim(), rulesEdition);
-      setName("");
-      setRulesEdition(DEFAULT_EDITION);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create campaign");
-    } finally {
-      setPending(false);
-    }
-  }
-
   return (
     <div className="flex-1 bg-parchment-100">
       <div className="border-b border-parchment-200 bg-parchment-50">
@@ -75,39 +137,14 @@ export default function CampaignsPage() {
       </div>
 
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
-        {error && (
+        {(error ?? editionsFailed) && (
           <p className="rounded-control bg-garnet-50 px-3 py-2 text-sm font-semibold text-garnet-700">
-            {error}
+            {error ?? "Couldn't load the rules editions — a campaign's edition can't be changed later, so we won't guess. Check your connection and reload."}
           </p>
         )}
 
         <Card title="Create a campaign" className="p-4">
-          <form className="flex flex-col gap-3 p-4" onSubmit={handleCreate}>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls} htmlFor="campaign-name">
-                Campaign name
-              </label>
-              <input
-                id="campaign-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="The Sunless Citadel"
-                className={inputCls}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className={labelCls}>Rules edition</span>
-              <EditionPicker value={rulesEdition} onChange={setRulesEdition} label="Rules edition" />
-              <p className="text-xs text-parchment-500">
-                Sets the rules every character joining this campaign must use. Can't be changed after the
-                campaign is created.
-              </p>
-            </div>
-            <button type="submit" className={primaryBtn} disabled={pending || !name.trim()}>
-              Create campaign
-            </button>
-          </form>
+          <CreateCampaignForm editions={editions} onCreated={load} onError={setError} />
         </Card>
 
         {campaigns === null ? (
