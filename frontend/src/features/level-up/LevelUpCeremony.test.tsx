@@ -25,6 +25,10 @@ const character = {
   hitDice: { total: 7, die: "d10", spent: 0 },
 } as unknown as Character;
 
+// The hitPoints step arrives with its numbers already resolved (#1380);
+// this fixture is what the planner serves for a d10 class at Con 10.
+const HP_META = { die: "d10", faces: 10, conMod: 0, fixedAverage: 6, averageGain: 6, minRoll: 1, maxRoll: 10 };
+
 function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target"]>): LevelUpPlanResponse {
   return {
     target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true, ...target },
@@ -60,7 +64,7 @@ beforeEach(() => {
 
 describe("LevelUpCeremony", () => {
   it("renders the plan's rail, the level transition, and the step kicker", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "advancement", count: 1 }, { kind: "review" }]));
     renderCeremony();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
@@ -76,7 +80,7 @@ describe("LevelUpCeremony", () => {
   });
 
   it("Continue advances, then disables on a step the draft can't satisfy; Back returns", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "advancement", count: 1 }, { kind: "review" }]));
     renderCeremony();
     const user = userEvent.setup();
 
@@ -98,7 +102,7 @@ describe("LevelUpCeremony", () => {
   });
 
   it("Cancel returns to the sheet without submitting", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     renderCeremony();
     const user = userEvent.setup();
 
@@ -110,7 +114,7 @@ describe("LevelUpCeremony", () => {
   });
 
   it("Confirm on the last step submits and navigates to the sheet", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1" } as Character);
     renderCeremony();
     const user = userEvent.setup();
@@ -128,7 +132,7 @@ describe("LevelUpCeremony", () => {
   });
 
   it("renders a rejected submission's error inline and stays in the ceremony", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockRejectedValue(new Error("this level-up requires choosing a subclass"));
     renderCeremony();
     const user = userEvent.setup();
@@ -143,7 +147,7 @@ describe("LevelUpCeremony", () => {
   });
 
   it("scrolls the step body within a viewport-locked card, footer outside the scroller (#1171)", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "advancement", count: 1 }, { kind: "review" }]));
     renderCeremony();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
@@ -156,7 +160,7 @@ describe("LevelUpCeremony", () => {
   });
 
   it("has no axe violations", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "advancement", count: 1 }, { kind: "review" }]));
     const { container } = renderCeremony();
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
     expect(await axe(container)).toHaveNoViolations();
@@ -218,7 +222,7 @@ describe("LevelUpCeremony — class choice (#1170)", () => {
       ],
     } as unknown as ReferenceData);
     planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "review" }], {
+      plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }], {
         isPrimary: false,
         newLevel: 1,
         className: "Rogue",
@@ -268,7 +272,7 @@ describe("LevelUpCeremony — class choice (#1170)", () => {
 // pending offers "Level up again" instead of leaving the ceremony.
 describe("LevelUpCeremony — level up again (#1170)", () => {
   it("shows the interstitial (not the sheet) when levels remain, and writes the submitted character to the cache", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
     const user = userEvent.setup();
     renderCeremony();
@@ -285,7 +289,7 @@ describe("LevelUpCeremony — level up again (#1170)", () => {
   });
 
   it("'Level up again' re-enters the ceremony's first step with a clean draft", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     // Unlike the previous test, this one re-enters the ceremony after the
     // submit response lands in the cache — LevelUpCeremony now reads the
     // character via useCurrentCharacter(), so the response must carry the
@@ -302,7 +306,7 @@ describe("LevelUpCeremony — level up again (#1170)", () => {
     await screen.findByText(/level applied/i);
 
     planMock.mockClear();
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     await user.click(screen.getByRole("button", { name: /level up again/i }));
 
     await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
@@ -311,7 +315,7 @@ describe("LevelUpCeremony — level up again (#1170)", () => {
   });
 
   it("'Finish for now' returns to the sheet, keeping the level already applied", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
     const user = userEvent.setup();
     renderCeremony();

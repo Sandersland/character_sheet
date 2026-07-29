@@ -24,6 +24,10 @@ const character = {
   abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
 } as unknown as Character;
 
+// The hitPoints step arrives with its numbers already resolved (#1380);
+// this fixture is what the planner serves for a d10 class at Con 10.
+const HP_META = { die: "d10", faces: 10, conMod: 0, fixedAverage: 6, averageGain: 6, minRoll: 1, maxRoll: 10 };
+
 function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target"]>): LevelUpPlanResponse {
   return {
     target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true, ...target },
@@ -32,7 +36,7 @@ function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target
   };
 }
 
-const HP_ADV_REVIEW: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }];
+const HP_ADV_REVIEW: LevelUpStep[] = [{ kind: "hitPoints", meta: HP_META }, { kind: "advancement", count: 1 }, { kind: "review" }];
 
 function makeWrapper(url = "/characters/c1/level-up") {
   return function Wrapper({ children }: { children: React.ReactNode }) {
@@ -91,7 +95,7 @@ describe("useLevelUpCeremony", () => {
   });
 
   it("tracks position by stepKey so a subclass re-plan doesn't move the user", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], { subclass: null }));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "subclass" }, { kind: "review" }], { subclass: null }));
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
 
@@ -102,7 +106,7 @@ describe("useLevelUpCeremony", () => {
     planMock.mockResolvedValue(
       plan(
         [
-          { kind: "hitPoints" },
+          { kind: "hitPoints", meta: HP_META },
           { kind: "subclass" },
           { kind: "maneuvers", count: 3 },
           { kind: "toolProficiency", count: 1 },
@@ -120,7 +124,7 @@ describe("useLevelUpCeremony", () => {
   });
 
   it("confirm submits exactly { target, ...draft }", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1" } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
@@ -141,7 +145,7 @@ describe("useLevelUpCeremony", () => {
   // stash, #1323) and must never reach the wire — the endpoint strips unknown
   // keys silently (no 400), so this frontend assertion is the only guard.
   it("strips ceremony-local draft state from the submitted body (#1323)", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1" } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
@@ -165,7 +169,7 @@ describe("useLevelUpCeremony", () => {
 
   it("honors ?classId= for a multiclass add — plans and submits {kind:'new'} (#1131)", async () => {
     planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "review" }], { isPrimary: false, newLevel: 1, className: "warlock" }),
+      plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }], { isPrimary: false, newLevel: 1, className: "warlock" }),
     );
     submitMock.mockResolvedValue({ id: "c1" } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(character), {
@@ -186,7 +190,7 @@ describe("useLevelUpCeremony", () => {
   });
 
   it("surfaces a submit failure as submitError", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockRejectedValue(new Error("expected 1 advancement for this level-up, got 0"));
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
@@ -252,7 +256,7 @@ describe("useLevelUpCeremony — class choice (#1170)", () => {
       },
     ]);
     planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "review" }], { isPrimary: false, newLevel: 1, className: "Rogue" }),
+      plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }], { isPrimary: false, newLevel: 1, className: "Rogue" }),
     );
     const { result } = renderHook(() => useLevelUpCeremony(rogueEligibleCharacter), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.classChoice).not.toBeNull());
@@ -347,7 +351,7 @@ describe("useLevelUpCeremony — class choice (#1170)", () => {
 // of leaving the ceremony while pendingLevelUps remain.
 describe("useLevelUpCeremony — level up again (#1170)", () => {
   it("shows the level-again interstitial instead of navigating away when levels remain", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(character), {
       wrapper: makeWrapper(),
@@ -362,7 +366,7 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
   });
 
   it("does not show the interstitial and calls onDone-equivalent (navigates) when nothing is left pending", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 0 } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
@@ -374,7 +378,7 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
   });
 
   it("'Level up again' resets the draft and re-triggers a fresh plan fetch for the next level", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());
@@ -384,7 +388,7 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     expect(result.current.levelAgain).not.toBeNull();
 
     planMock.mockClear();
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     act(() => result.current.levelAgain!.onContinue());
 
     expect(result.current.levelAgain).toBeNull();
@@ -404,7 +408,7 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
         { id: "entry-2", name: "wizard", level: 3 },
       ],
     } as unknown as Character;
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(multiChar), { wrapper: makeWrapper() });
 
@@ -418,7 +422,7 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     expect(result.current.levelAgain).not.toBeNull();
 
     planMock.mockClear();
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     act(() => result.current.levelAgain!.onContinue());
 
     // The headline scenario: the chooser reappears for the next pending level
@@ -458,12 +462,12 @@ describe("useLevelUpCeremony — pruning the draft to the served plan (#1421)", 
   } as unknown as Character;
 
   const EK_STEPS: LevelUpStep[] = [
-    { kind: "hitPoints" },
+    { kind: "hitPoints", meta: HP_META },
     { kind: "subclass" },
     { kind: "newSpells", count: 3, meta: { maxSpellLevel: 1, canSwap: true, cantrips: 2 } },
     { kind: "review" },
   ];
-  const CHAMPION_STEPS: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }];
+  const CHAMPION_STEPS: LevelUpStep[] = [{ kind: "hitPoints", meta: HP_META }, { kind: "subclass" }, { kind: "review" }];
 
   const LEDGER_RESOLVERS: LedgerResolvers = {
     maneuver: () => undefined,
@@ -586,7 +590,7 @@ describe("useLevelUpCeremony — never prune before a plan has arrived (#1421)",
   });
 
   it("does not prune while the level-again interstitial owns the screen", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "newSpells", count: 1 }, { kind: "review" }]));
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "newSpells", count: 1 }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.plan).not.toBeNull());

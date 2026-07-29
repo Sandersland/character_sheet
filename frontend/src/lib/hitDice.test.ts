@@ -6,8 +6,31 @@ import {
   dieFaces,
   hitPointGainRange,
   hitPointStepMath,
+  readHitPointsMeta,
 } from "@/lib/hitDice";
 import type { Character, ClassOption, LevelUpTarget } from "@/types/character";
+
+describe("readHitPointsMeta", () => {
+  const served = { die: "d10", faces: 10, conMod: 3, fixedAverage: 6, averageGain: 9, minRoll: 4, maxRoll: 13 };
+
+  it("reads the served numbers off the hitPoints step", () => {
+    expect(readHitPointsMeta({ kind: "hitPoints", meta: served })).toEqual(served);
+  });
+
+  it("falls back to inert defaults for an absent step or absent meta", () => {
+    const inert = { die: "", faces: 0, conMod: 0, fixedAverage: 0, averageGain: 0, minRoll: 0, maxRoll: 0 };
+    expect(readHitPointsMeta(undefined)).toEqual(inert);
+    expect(readHitPointsMeta({ kind: "hitPoints" })).toEqual(inert);
+  });
+
+  it("rejects wrongly-typed values rather than propagating NaN into the preview", () => {
+    expect(readHitPointsMeta({ kind: "hitPoints", meta: { die: 10, faces: "10", conMod: null } })).toMatchObject({
+      die: "",
+      faces: 0,
+      conMod: 0,
+    });
+  });
+});
 
 describe("dieFaces", () => {
   it("parses a hit-die string to its face count", () => {
