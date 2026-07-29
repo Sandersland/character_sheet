@@ -5,8 +5,10 @@ import { fetchCampaignItems, fetchItems } from "@/api/client";
 import { campaignKeys, catalogKeys } from "@/api/queryKeys";
 import { useCampaignItemMutations } from "@/features/entities/useCampaignItemMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useItemRarities } from "@/hooks/useItemRarities";
 import { buildInput, emptyForm, formFromItem, type FormState } from "@/lib/campaignItemForm";
 import type { CampaignItem } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 /**
  * All of CampaignItemsPanel's non-render state + handlers (#1299), split out
@@ -14,8 +16,11 @@ import type { CampaignItem } from "@/types/character";
  * gate — try/catch branching in five inline handlers was the cost driver, not
  * raw line count. The panel becomes a template over what this returns.
  */
-export function useCampaignItemsPanelController(campaignId: string) {
+export function useCampaignItemsPanelController(campaignId: string, edition: RulesEdition) {
   const { entities } = useCampaignEntities(campaignId);
+  // The single query observer for the served rarity tiers (#1437) — the rows are
+  // threaded to the row/form leaves as props so an N-item list stays at one.
+  const rarities = useItemRarities(edition);
   const [creating, setCreating] = useState(false);
   // Non-null while editing an existing item; drives the shared form's mode.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -143,6 +148,7 @@ export function useCampaignItemsPanelController(campaignId: string) {
   return {
     items,
     catalog,
+    rarities,
     creating,
     editingId,
     form,

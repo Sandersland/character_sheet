@@ -1,31 +1,12 @@
 import type { BadgeTone } from "@/components/ui/Badge";
-import type { ItemRarity } from "@/types/character";
+import type { ItemRarity, ItemRarityOption } from "@/types/character";
 
 /**
- * Display labels + standard gp values for the six 5e magic-item rarity tiers.
- * Mirrors the backend rules data ITEM_RARITIES — the backend
- * stays the single source of truth; this is presentation metadata only (labels +
- * the derived value hint). Never render a raw rarity key; resolve via rarityLabel().
+ * Pure helpers over the rarity rows GET /api/reference serves (#1437). This
+ * module declares no table keyed by rarity — labels and gp values are the
+ * backend's and arrive as `rarities` arguments. The only rarity-key literals
+ * left here are rarityTone's `case` arms, for the reason stated on it.
  */
-
-export const ITEM_RARITY_LABELS: Record<ItemRarity, string> = {
-  COMMON: "Common",
-  UNCOMMON: "Uncommon",
-  RARE: "Rare",
-  VERY_RARE: "Very Rare",
-  LEGENDARY: "Legendary",
-  ARTIFACT: "Artifact",
-};
-
-/** Ascending tier order for pickers/badges. */
-const RARITY_ORDER: readonly ItemRarity[] = [
-  "COMMON",
-  "UNCOMMON",
-  "RARE",
-  "VERY_RARE",
-  "LEGENDARY",
-  "ARTIFACT",
-];
 
 /** Standard buy value in gp per tier; null for priceless (Artifact). */
 const RARITY_STANDARD_VALUE_GP: Record<ItemRarity, number | null> = {
@@ -37,16 +18,38 @@ const RARITY_STANDARD_VALUE_GP: Record<ItemRarity, number | null> = {
   ARTIFACT: null,
 };
 
-export const RARITY_OPTIONS: readonly { key: ItemRarity; label: string }[] = RARITY_ORDER.map(
-  (key) => ({ key, label: ITEM_RARITY_LABELS[key] }),
-);
-
-/** Display label for a rarity key. Tolerant: unknown keys degrade to self. */
-export function rarityLabel(key: string): string {
-  return ITEM_RARITY_LABELS[key as ItemRarity] ?? key;
+/**
+ * Display label for a rarity key, or null when the served rows haven't arrived
+ * (or don't contain the key). Deliberately never degrades to the raw key: a
+ * badge renders nothing rather than flashing `VERY_RARE` on a cold cache.
+ */
+export function rarityLabel(key: string, rarities: readonly ItemRarityOption[]): string | null {
+  return rarities.find((r) => r.key === key)?.label ?? null;
 }
 
-/** Soft badge tone per tier for optional visual tiering. */
+/** rarityLabel with the paper doll's extra rule: COMMON is deliberately silent,
+ *  because every mundane worn or bag item would otherwise carry a badge that
+ *  says nothing. Shared by the worn rows and the slot picker so the two can't
+ *  disagree about which items get a badge. */
+export function paperDollRarityLabel(
+  rarity: ItemRarity | undefined,
+  rarities: readonly ItemRarityOption[],
+): string | null {
+  return rarity && rarity !== "COMMON" ? rarityLabel(rarity, rarities) : null;
+}
+
+/** The rarity picker's options, narrowed to what a `<select>` renders and left
+ *  in the server's ascending tier order — never re-sorted client-side. */
+export function rarityOptions(
+  rarities: readonly ItemRarityOption[],
+): { key: ItemRarity; label: string }[] {
+  return rarities.map(({ key, label }) => ({ key, label }));
+}
+
+/** Soft badge tone per tier. A visual-design token decision, not rules content:
+ *  the backend has no notion of a BadgeTone and is never going to grow one, so
+ *  this switch is the source of truth for it and stays client-side permanently
+ *  (#1437). */
 export function rarityTone(key: ItemRarity): BadgeTone {
   switch (key) {
     case "UNCOMMON":

@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 
-import type { EquipSlot, InventoryItem, InventoryOperation } from "@/types/character";
+import type { EquipSlot, InventoryItem, InventoryOperation, ItemRarityOption } from "@/types/character";
 import { EQUIP_SLOT_ICONS, Lock, MoreHorizontal, TriangleAlert } from "@/components/ui/icons";
 import Badge from "@/components/ui/Badge";
 import Popover from "@/components/ui/Popover";
 import SlotPickerPanel from "@/features/inventory/SlotPickerPanel";
 import AttuneToggle from "@/features/inventory/AttuneToggle";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import { useItemRarities } from "@/hooks/useItemRarities";
 import { bagItemsForSlot } from "@/lib/paperDoll";
 import { attunementSummary, buildLoadoutGroups, type FilledLoadoutRow } from "@/lib/loadout";
-import { rarityLabel, rarityTone } from "@/lib/rarity";
+import { paperDollRarityLabel, rarityTone } from "@/lib/rarity";
 
 interface LoadoutListProps {
   pending: boolean;
@@ -20,12 +21,13 @@ interface FilledRowProps {
   row: FilledLoadoutRow;
   candidates: InventoryItem[];
   pending: boolean;
+  rarities: ItemRarityOption[];
   onUnequip: (item: InventoryItem) => void;
   onReplace: (incoming: InventoryItem, outgoing: InventoryItem) => void;
 }
 
 // A filled row's trailing action popover: Unequip, or Swap → SlotPickerPanel.
-function FilledRowActions({ row, candidates, pending, onUnequip, onReplace }: FilledRowProps) {
+function FilledRowActions({ row, candidates, pending, rarities, onUnequip, onReplace }: FilledRowProps) {
   const [swapping, setSwapping] = useState(false);
   return (
     <Popover
@@ -45,6 +47,7 @@ function FilledRowActions({ row, candidates, pending, onUnequip, onReplace }: Fi
             candidates={candidates}
             pending={pending}
             action="replace"
+            rarities={rarities}
             onPick={(incoming) => {
               setSwapping(false);
               onReplace(incoming, row.item);
@@ -84,6 +87,7 @@ function FilledRowActions({ row, candidates, pending, onUnequip, onReplace }: Fi
 export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
   const { character } = useCurrentCharacter();
   const inventory = character.inventory;
+  const rarities = useItemRarities(character.rulesEdition);
   const groups = buildLoadoutGroups(character);
   const attunement = attunementSummary(inventory);
   const [toast, setToast] = useState<string | null>(null);
@@ -165,6 +169,7 @@ export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
                             candidates={bagItemsForSlot(inventory, row.slot)}
                             pending={pending}
                             action="equip"
+                            rarities={rarities}
                             onPick={(picked) => {
                               close();
                               equip(picked, row.slot);
@@ -178,6 +183,8 @@ export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
                 );
               }
               const { item, notProficient, grip } = row;
+              // Null until the served rows land (#1437), so no raw enum key ever paints.
+              const rarityText = paperDollRarityLabel(item.rarity, rarities);
               return (
                 <li
                   key={row.key}
@@ -197,8 +204,8 @@ export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
                     <span className="text-xs uppercase tracking-wide text-parchment-400">{row.label}</span>
                   </div>
                   {grip && <Badge tone="neutral">{grip.short}</Badge>}
-                  {item.rarity && item.rarity !== "COMMON" && (
-                    <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>
+                  {item.rarity && rarityText && (
+                    <Badge tone={rarityTone(item.rarity)}>{rarityText}</Badge>
                   )}
                   {item.requiresAttunement && (
                     <AttuneToggle
@@ -212,6 +219,7 @@ export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
                     row={row}
                     candidates={bagItemsForSlot(inventory, row.slot)}
                     pending={pending}
+                    rarities={rarities}
                     onUnequip={unequip}
                     onReplace={(incoming, outgoing) => void replace(incoming, outgoing, row.slot)}
                   />

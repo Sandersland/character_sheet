@@ -1,27 +1,44 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ITEM_RARITY_LABELS,
-  RARITY_OPTIONS,
-  rarityLabel,
-  rarityValueHint,
-  standardValueForRarity,
-} from "@/lib/rarity";
+import { rarityLabel, rarityOptions, rarityTone, rarityValueHint, standardValueForRarity } from "@/lib/rarity";
+import { SERVED_RARITIES } from "@/test/rarities";
 
 describe("rarityLabel", () => {
-  it("resolves enum keys to human labels", () => {
-    expect(rarityLabel("VERY_RARE")).toBe("Very Rare");
-    expect(rarityLabel("LEGENDARY")).toBe("Legendary");
+  it("resolves enum keys to the served labels", () => {
+    expect(rarityLabel("VERY_RARE", SERVED_RARITIES)).toBe("Very Rare");
+    expect(rarityLabel("LEGENDARY", SERVED_RARITIES)).toBe("Legendary");
   });
 
-  it("degrades unknown keys to themselves", () => {
-    expect(rarityLabel("MYTHIC")).toBe("MYTHIC");
+  it("returns null — never the raw key — for an unknown tier", () => {
+    expect(rarityLabel("MYTHIC", SERVED_RARITIES)).toBeNull();
   });
 
-  it("covers all six tiers", () => {
-    expect(Object.keys(ITEM_RARITY_LABELS)).toHaveLength(6);
-    expect(RARITY_OPTIONS).toHaveLength(6);
-    expect(RARITY_OPTIONS[0]).toEqual({ key: "COMMON", label: "Common" });
+  it("returns null while the served rows are unresolved", () => {
+    expect(rarityLabel("VERY_RARE", [])).toBeNull();
+  });
+});
+
+describe("rarityOptions", () => {
+  it("keeps the server's ascending tier order and narrows to key + label", () => {
+    expect(rarityOptions(SERVED_RARITIES)).toEqual([
+      { key: "COMMON", label: "Common" },
+      { key: "UNCOMMON", label: "Uncommon" },
+      { key: "RARE", label: "Rare" },
+      { key: "VERY_RARE", label: "Very Rare" },
+      { key: "LEGENDARY", label: "Legendary" },
+      { key: "ARTIFACT", label: "Artifact" },
+    ]);
+  });
+
+  it("is empty while the served rows are unresolved", () => {
+    expect(rarityOptions([])).toEqual([]);
+  });
+});
+
+describe("rarityTone", () => {
+  it("stays a client-side design token, resolved from the key alone", () => {
+    expect(rarityTone("LEGENDARY")).toBe("gold");
+    expect(rarityTone("COMMON")).toBe("neutral");
   });
 });
 

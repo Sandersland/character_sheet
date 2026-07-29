@@ -16,7 +16,15 @@ export default function CampaignTabPanels({ campaign, active, onCampaignChange }
     return (
       <>
         <CampaignManagePanel campaignId={campaign.id} />
-        <CampaignItemsPanel campaignId={campaign.id} characters={campaign.characters ?? []} />
+        {/* Campaign.rulesEdition is legitimate here and is NOT a rules-authority
+            regression: this is a DM campaign surface, not a sheet, and the rarity
+            tiers it selects are edition-invariant — the parameter only picks a
+            /reference cache slot (#1437). A sheet still reads Character.rulesEdition. */}
+        <CampaignItemsPanel
+          campaignId={campaign.id}
+          characters={campaign.characters ?? []}
+          edition={campaign.rulesEdition}
+        />
       </>
     );
   }

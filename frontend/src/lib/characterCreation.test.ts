@@ -51,6 +51,7 @@ const reference: ReferenceData = {
   alignments: ["Neutral Good"],
   artisanTools: [],
   conditions: [],
+  itemRarities: [],
 };
 
 function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
