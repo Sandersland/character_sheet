@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import CampaignItemCard from "@/features/entities/CampaignItemCard";
+import { SERVED_RARITIES } from "@/test/rarities";
 import type { CampaignItem } from "@/types/character";
 
 function item(overrides: Partial<CampaignItem> = {}): CampaignItem {
@@ -27,7 +28,7 @@ function item(overrides: Partial<CampaignItem> = {}): CampaignItem {
 
 describe("CampaignItemCard (#380)", () => {
   it("renders the full card: rarity, attunement, damage, and description", () => {
-    render(<CampaignItemCard item={item()} isOwner={false} />);
+    render(<CampaignItemCard item={item()} isOwner={false} rarities={SERVED_RARITIES} />);
     expect(screen.getByText("Rare")).toBeInTheDocument();
     expect(screen.queryByText("RARE")).not.toBeInTheDocument();
     expect(screen.getByText("Requires attunement")).toBeInTheDocument();
@@ -35,13 +36,26 @@ describe("CampaignItemCard (#380)", () => {
     expect(screen.getByText("A blade wreathed in fire.")).toBeInTheDocument();
   });
 
+  // #1437: serve-only labels — the Codex item card is the cold-cache surface, so
+  // it must paint no rarity badge at all rather than the raw enum key.
+  it("renders no rarity badge while the served rows are unresolved", () => {
+    const { container } = render(
+      <CampaignItemCard item={item({ rarity: "VERY_RARE" })} isOwner={false} rarities={[]} />,
+    );
+    expect(screen.queryByText("VERY_RARE")).toBeNull();
+    expect(screen.queryByText("Very Rare")).toBeNull();
+    expect(container.querySelector(".bg-arcane-50")).toBeNull();
+    // The rest of the card still renders — only the badge waits on the rows.
+    expect(screen.getByText("Requires attunement")).toBeInTheDocument();
+  });
+
   it("shows dmNotes to the owner", () => {
-    render(<CampaignItemCard item={item()} isOwner />);
+    render(<CampaignItemCard item={item()} isOwner rarities={SERVED_RARITIES} />);
     expect(screen.getByText("Crypt reward.")).toBeInTheDocument();
   });
 
   it("never shows dmNotes to a non-owner (even if present in props)", () => {
-    render(<CampaignItemCard item={item()} isOwner={false} />);
+    render(<CampaignItemCard item={item()} isOwner={false} rarities={SERVED_RARITIES} />);
     expect(screen.queryByText("Crypt reward.")).not.toBeInTheDocument();
     expect(screen.queryByText(/DM notes/)).not.toBeInTheDocument();
   });
@@ -51,6 +65,7 @@ describe("CampaignItemCard (#380)", () => {
       <CampaignItemCard
         item={item({ holders: [{ characterId: "c1", characterName: "Bruenor", quantity: 2 }] })}
         isOwner={false}
+        rarities={SERVED_RARITIES}
       />,
     );
     expect(screen.getByText("Held by")).toBeInTheDocument();
@@ -66,6 +81,7 @@ describe("CampaignItemCard (#380)", () => {
           armor: { armorCategory: "heavy", baseArmorClass: 20, dexModifierApplies: false, stealthDisadvantage: true },
         })}
         isOwner={false}
+        rarities={SERVED_RARITIES}
       />,
     );
     expect(screen.getByText("20")).toBeInTheDocument();
@@ -82,6 +98,7 @@ describe("CampaignItemCard (#380)", () => {
           consumable: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 2, effectDescription: "Regain HP" },
         })}
         isOwner={false}
+        rarities={SERVED_RARITIES}
       />,
     );
     expect(screen.getByText("Effect")).toBeInTheDocument();
@@ -97,6 +114,7 @@ describe("CampaignItemCard (#380)", () => {
           consumable: { effectDescription: "Cures poison" },
         })}
         isOwner={false}
+        rarities={SERVED_RARITIES}
       />,
     );
     expect(screen.getByText("Cures poison")).toBeInTheDocument();
@@ -107,6 +125,7 @@ describe("CampaignItemCard (#380)", () => {
       <CampaignItemCard
         item={item({ category: "consumable", weapon: undefined, consumable: {} })}
         isOwner={false}
+        rarities={SERVED_RARITIES}
       />,
     );
     expect(screen.queryByText("Effect")).not.toBeInTheDocument();
@@ -133,6 +152,7 @@ describe("CampaignItemCard (#380)", () => {
           },
         })}
         isOwner={false}
+        rarities={SERVED_RARITIES}
       />,
     );
     expect(screen.getByText("1d8 - 1 slashing")).toBeInTheDocument();
@@ -141,7 +161,7 @@ describe("CampaignItemCard (#380)", () => {
   });
 
   it("renders weight and value rows, and the Unique badge", () => {
-    render(<CampaignItemCard item={item({ isUnique: true })} isOwner={false} />);
+    render(<CampaignItemCard item={item({ isUnique: true })} isOwner={false} rarities={SERVED_RARITIES} />);
     expect(screen.getByText("Weight")).toBeInTheDocument();
     expect(screen.getByText("3 lb")).toBeInTheDocument();
     expect(screen.getByText("Value")).toBeInTheDocument();
@@ -162,6 +182,7 @@ describe("CampaignItemCard (#380)", () => {
           dmNotes: undefined,
         })}
         isOwner
+        rarities={SERVED_RARITIES}
       />,
     );
     expect(screen.getByText("Weapons")).toBeInTheDocument(); // itemCategoryLabel is plural

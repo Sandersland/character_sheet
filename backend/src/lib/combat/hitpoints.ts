@@ -1,6 +1,6 @@
 // Domain façade for the hit-points cluster. Concerns live in sibling modules
-// (hp-core / hp-operations / hp-context / hp-ops / rest / concentration /
-// hp-in-tx / hp-transaction); this file re-exports the public surface so
+// (hp-core / hp-operations / hp-context / hp-ops / advancing-hit-die / rest /
+// concentration / hp-in-tx / hp-transaction); this file re-exports the public surface so
 // import sites outside lib/combat/ never reference the internal split. New
 // same-domain code imports the concern module directly; the operation-shape
 // and concentration types live in hp-operations.js / concentration.js.
@@ -16,6 +16,8 @@ export {
   applyDeathSaveRoll,
 } from "./hp-core.js";
 export type { HitPoints, HitDice } from "./hp-core.js";
+
+export { advancingHitDie } from "./advancing-hit-die.js";
 
 export { applyHitPointOperations, applyLevelUpHpInTx } from "./hp-transaction.js";
 

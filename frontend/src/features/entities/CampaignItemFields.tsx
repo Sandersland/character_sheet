@@ -29,7 +29,7 @@ import {
 } from "@/lib/campaignItemForm";
 import { formatCurrency, fromCopper, toCopper } from "@/lib/currency";
 import { allowedSlotsForItem, equipSlotLabel, WORN_SLOTS, wornSlotItemKindLabel } from "@/lib/paperDoll";
-import { RARITY_OPTIONS, rarityValueHint } from "@/lib/rarity";
+import { rarityOptions, rarityValueHint } from "@/lib/rarity";
 import type {
   ArmorCategory,
   AttunementPrereqKind,
@@ -37,6 +37,7 @@ import type {
   InventoryItem,
   Item,
   ItemRarity,
+  ItemRarityOption,
 } from "@/types/character";
 
 const legendCls = "text-sm font-semibold text-parchment-800";
@@ -302,22 +303,39 @@ function AttunementPrereqFields({ form, set }: { form: FormState; set: SetField 
   );
 }
 
-export function MagicFieldset({ form, setters }: FieldsProps) {
+export function MagicFieldset({ form, setters, rarities }: FieldsProps & { rarities: ItemRarityOption[] }) {
   const { set } = setters;
   const isMagic = form.rarity !== "";
-  const rarityHint = rarityValueHint(form.rarity || undefined, { isConsumable: form.category === "consumable" });
+  const rarityHint = rarityValueHint(form.rarity || undefined, rarities, {
+    isConsumable: form.category === "consumable",
+  });
 
   return (
     <fieldset className={fieldsetCls}>
       <legend className={legendCls}>Magic</legend>
+      {/* Disabled until the served tiers land (#1437): an enabled dropdown whose
+          only selectable value is "Mundane (none)" would let one click strip an
+          existing magic item's rarity, attunement gating and this whole fieldset. */}
       <Field label="Rarity" htmlFor="item-rarity" hint={isMagic ? rarityHint : undefined}>
-        <Select id="item-rarity" value={form.rarity} onChange={(e) => set("rarity", e.target.value as ItemRarity | "")}>
+        <Select
+          id="item-rarity"
+          value={form.rarity}
+          disabled={rarities.length === 0}
+          onChange={(e) => set("rarity", e.target.value as ItemRarity | "")}
+        >
           <option value="">Mundane (none)</option>
-          {RARITY_OPTIONS.map((o) => (
+          {rarityOptions(rarities).map((o) => (
             <option key={o.key} value={o.key}>
               {o.label}
             </option>
           ))}
+          {/* An existing magic item's tier before the rows land: without an
+              option carrying it, the select would fall back to the first one and
+              tell the DM a Very Rare item is Mundane. The raw enum key still
+              never paints — the label waits for the wire. */}
+          {form.rarity !== "" && rarities.length === 0 && (
+            <option value={form.rarity}>Loading…</option>
+          )}
         </Select>
       </Field>
       {isMagic && (

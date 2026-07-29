@@ -4,7 +4,8 @@ import {
 } from "./active-effects.js";
 import { itemImmuneDamageTypes, itemResistedDamageTypes } from "@/lib/inventory/capabilities.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
-import { hitDieFace, multiclassPrerequisitesMet } from "@/lib/srd/srd.js";
+import { multiclassPrerequisitesMet } from "@/lib/srd/srd.js";
+import { advancingHitDie } from "./advancing-hit-die.js";
 import {
   InvalidHitPointOperationError,
   applyDeathSaveRoll,
@@ -197,7 +198,7 @@ async function applyNewClassLevelUp(
       `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`
     );
   }
-  const newFaces = hitDieFace(catalog.hitDie);
+  const { faces: newFaces } = advancingHitDie(catalog.hitDie, ctx.hd.die);
   requireLevelUpRoll(op, newFaces);
   const gain = bumpHpForLevelUp(ctx, op, newFaces);
   const position = row.classEntries.reduce((max, e) => Math.max(max, e.position), -1) + 1;
@@ -223,12 +224,12 @@ async function applyExistingClassLevelUp(
   op: LevelUpOperation,
   target: { classEntryId: string },
 ): Promise<HpOpResult> {
-  const { tx, row, conMod, faces } = ctx;
+  const { tx, row, conMod } = ctx;
   const entry = row.classEntries.find((e) => e.id === target.classEntryId);
   if (!entry) {
     throw new InvalidHitPointOperationError(`Class entry not found: ${target.classEntryId}`);
   }
-  const entryFaces = entry.class ? hitDieFace(entry.class.hitDie) : faces;
+  const { faces: entryFaces } = advancingHitDie(entry.class?.hitDie, ctx.hd.die);
   requireLevelUpRoll(op, entryFaces);
   const gain = bumpHpForLevelUp(ctx, op, entryFaces);
   const newEntryLevel = entry.level + 1;

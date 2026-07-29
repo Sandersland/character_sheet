@@ -9,11 +9,12 @@
 # same failure mode the issue described for feats.
 #
 # ALLOWLIST pairs each real occurrence's `path:line` with why it needs no
-# guard here: the seven "guarded" sites call crossEditionRejection
-# (backend/src/lib/rules/catalog-edition.ts) immediately after the lookup;
-# the other two are read-only or re-validated downstream and would falsely
-# reject legitimate ALREADY-PERSISTED state if guarded (maneuvers.ts's
-# loadManeuver carries its own why-comment — R2 in the #1345 plan).
+# guard here: the eight "guarded" sites call crossEditionRejection
+# (backend/src/lib/rules/catalog-edition.ts) immediately after the lookup.
+# The two exemptions differ in kind: maneuvers.ts's loadManeuver reads an
+# ALREADY-PERSISTED id and would falsely reject legitimate state if guarded
+# (its own why-comment — R2 in the #1345 plan), while level-up.ts's
+# pickedGrantSource is exempt by call ordering (#1414).
 #
 # Anti-vacuity: fails if fewer than MIN_OCCURRENCES real occurrences are
 # found at all (the glob/pattern broke silently), AND fails if any allowlist
@@ -29,8 +30,8 @@ backend/src/lib/classes/resources.ts:476:guarded by crossEditionRejection (Grant
 backend/src/lib/classes/shadow-arts.ts:95:guarded by crossEditionRejection (GrantedAbility, #1345 Chunk 5)
 backend/src/lib/classes/channel-divinity.ts:194:guarded by crossEditionRejection (GrantedAbility, #1345 Chunk 5)
 backend/src/lib/classes/maneuvers.ts:99:persisted id, deliberately unguarded — see the why-comment at loadManeuver (#1345 R2)
-backend/src/lib/leveling/level-up-transaction.ts:138:resolves to a name for the pure validator; applySetSubclass re-validates in-tx (#1345 Group 4)
-backend/src/routes/character/level-up.ts:58:read-only ?subclassId= plan preview; the commit path (class.ts) rejects (#1345 Group 4)"
+backend/src/lib/leveling/level-up-transaction.ts:155:guarded by crossEditionRejection (Subclass, #1414)
+backend/src/routes/character/level-up.ts:62:reachable only after resolveLevelUpContext admitted the id — see the why-comment at pickedGrantSource (#1414)"
 
 MIN_OCCURRENCES=9
 PATTERN='\.(feat|subclass|grantedAbility|background|action)\.(findUnique|findFirst)\('

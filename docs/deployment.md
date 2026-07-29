@@ -25,12 +25,12 @@ CI builds this image on every PR (#1454), so a stage rename or a broken `COPY` f
 | `APP_BASE_URL` | Browser-facing origin; builds the OAuth `redirect_uri` + post-login redirect. Dev default `http://localhost:5173` (the SPA proxies `/api`). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Provider enabled only when both set; absent → app boots with no providers. |
 | `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. |
-| `ALLOW_DEV_LOGIN` | Enables `POST /api/auth/dev-login`. Hard-forced off when `NODE_ENV=production`. Dev compose defaults it on. |
+| `ALLOW_DEV_LOGIN` | Enables `POST /api/auth/dev-login`. Hard-forced off when `NODE_ENV=production`, which is why `.env.example` ships it on for local dev. |
 | `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_CREATE_MAX`, `RATE_LIMIT_DISABLED` | Logging + rate-limit knobs; limiter auto-off under test. |
 | `VITE_API_URL` | Frontend build/dev: `/api` for single-origin, absolute API URL for split. |
-| `VITE_PROXY_TARGET` | Vite dev proxy target (compose: `http://backend:4000`). |
+| `VITE_PROXY_TARGET` | Vite dev proxy target; defaults to `http://localhost:4000`. A worktree slot's `frontend/.env` points it at that slot's backend port. |
 
-**OAuth setup (dev):** Google Cloud Console → Web application client, redirect URI `http://localhost:5173/api/auth/google/callback` (= `${APP_BASE_URL}/api/auth/google/callback`); put the id/secret in a gitignored root `.env` and recreate the containers.
+**OAuth setup (dev):** Google Cloud Console → Web application client, redirect URI `http://localhost:5173/api/auth/google/callback` (= `${APP_BASE_URL}/api/auth/google/callback`); put the id/secret in the gitignored `backend/.env` (the only file the host-run backend loads) and restart `npm run dev`.
 
 ### CSP notes (single-origin mode)
 

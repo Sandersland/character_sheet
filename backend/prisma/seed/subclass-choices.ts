@@ -9,6 +9,8 @@
 // Invocations) is added by declaring a SubclassChoice on its subclass and adding
 // its options here — no new reconciler or state key.
 
+import type { SeedEdition } from "./edition.js";
+
 export interface SubclassChoiceOptionSeed {
   name: string;
   /** Matches the SubclassChoice.catalogSource that groups these options. */
@@ -16,6 +18,9 @@ export interface SubclassChoiceOptionSeed {
   description: string;
   /** Minimum character level to pick this option (the choice's grant level). */
   minLevel: number;
+  // Omitted = shared (NULL column, valid in both editions, #1306); only a
+  // mechanically diverging row forks, which #1415 made expressible.
+  edition?: SeedEdition;
 }
 
 export const SUBCLASS_CHOICE_OPTIONS: SubclassChoiceOptionSeed[] = [

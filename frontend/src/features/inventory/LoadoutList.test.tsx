@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import LoadoutList from "@/features/inventory/LoadoutList";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
+import { seedItemRarities } from "@/test/rarities";
 import type { Character, InventoryItem } from "@/types/character";
 
 function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
@@ -58,10 +59,14 @@ interface Profs {
   armor?: { category: string }[];
 }
 
+// LoadoutList resolves rarity labels through useItemRarities(character
+// .rulesEdition) (#1437), so the fixture carries an edition and every render
+// seeds that edition's reference cache.
 function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character {
   return {
     id: "char-1",
     name: "Aria",
+    rulesEdition: "EDITION_2024",
     armorClass: 15,
     inventory,
     weaponProficiencies: profs.weapon ?? [],
@@ -77,6 +82,7 @@ function renderList(
   profs: Profs = {},
 ) {
   const character = makeCharacter(inventory, profs);
+  seedItemRarities("EDITION_2024");
   renderWithCharacter(<LoadoutList pending={false} onSubmit={onSubmit} />, character);
   return { onSubmit };
 }
@@ -123,6 +129,35 @@ describe("LoadoutList groups & rows", () => {
 
     renderList([martial], vi.fn(), { weapon: [{ name: "Martial Weapons" }] });
     expect(screen.queryByText("Not proficient")).toBeNull();
+  });
+
+  // #1437: labels come off the wire, so seeded → the label + its tone, and a
+  // cold cache → no badge at all rather than a flash of the raw enum key.
+  it("badges an equipped magic item with the served label and its tone", () => {
+    renderList([ring({ id: "band", name: "Ring of Protection", rarity: "VERY_RARE", equippedSlot: "RING" })]);
+    const badge = screen.getByText("Very Rare");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass("bg-arcane-50");
+    expect(screen.queryByText("VERY_RARE")).toBeNull();
+  });
+
+  it("renders no rarity badge while the served rows are unresolved", () => {
+    // No seedItemRarities() — the reference query is still pending.
+    renderWithCharacter(
+      <LoadoutList pending={false} onSubmit={vi.fn()} />,
+      makeCharacter([ring({ id: "band", name: "Ring of Protection", rarity: "VERY_RARE", equippedSlot: "RING" })]),
+    );
+    expect(screen.getByText("Ring of Protection")).toBeInTheDocument();
+    expect(screen.queryByText("VERY_RARE")).toBeNull();
+    expect(screen.queryByText("Very Rare")).toBeNull();
+  });
+
+  // COMMON is deliberately suppressed on the paper doll — every mundane row
+  // would otherwise carry a badge that says nothing.
+  it("suppresses the COMMON badge even once the rows have resolved", () => {
+    renderList([ring({ id: "band", name: "Plain Band", rarity: "COMMON", equippedSlot: "RING" })]);
+    expect(screen.getByText("Plain Band")).toBeInTheDocument();
+    expect(screen.queryByText("Common")).toBeNull();
   });
 
   it("shows the versatile grip badge on the main-hand row", () => {

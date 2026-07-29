@@ -3,10 +3,11 @@
 // injects catalog id→name lookups as `resolvers` so this never fetches.
 
 import { abilityLabel, abilityModifier, formatModifier } from "@/lib/abilities";
-import { averageHitPointGain } from "@/lib/hitDice";
+import { hpGainForRoll, readHitPointsMeta } from "@/lib/hitDice";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type {
   Character,
+  HitPointsStepMeta,
   LearnSubclassChoiceOperation,
   LevelUpPlanResponse,
   SpellSchool,
@@ -48,18 +49,13 @@ function resolvedName(
   return "Unknown";
 }
 
-// HP is applied before the ASI on the backend, so it uses the PRE-level Con mod —
-// an ASI that bumps Con this same level must not retroactively raise the gain.
-//
-// `advancingDieFaces` is the ADVANCING class's die, not `character.hitDice.die`
-// (the persisted position-0 die) — a multiclass character's next level can be in
-// a class other than the one that die belongs to (#1441). Resolved by the
-// caller (ReviewStep, via hitPointStepMath) exactly as HitPointsStep resolves
-// it, so the two screens can't disagree.
-function hpGain(hp: NonNullable<LevelUpDraft["hp"]>, character: Character, advancingDieFaces: number): number {
-  const conMod = abilityModifier(character.abilityScores.constitution);
-  if (hp.method === "roll") return Math.max(1, (hp.roll ?? 0) + conMod);
-  return averageHitPointGain(advancingDieFaces, conMod);
+// Both branches read the SERVED meta, which is why HP is still on the PRE-level
+// Con mod (the backend applies HP before the ASI, so a Con bump this same level
+// must not retroactively raise the gain) and why the die is the ADVANCING
+// class's rather than the persisted position-0 one (#1441).
+function hpGain(hp: NonNullable<LevelUpDraft["hp"]>, meta: HitPointsStepMeta): number {
+  if (hp.method === "roll") return hpGainForRoll(meta, hp.roll ?? 0);
+  return meta.averageGain;
 }
 
 function abilityRow(ability: string, before: number, amount: number): LedgerRow {
@@ -157,20 +153,19 @@ function learnedListRows(
 /**
  * Ordered ledger rows for the draft; absent draft fields drop their rows.
  *
- * `advancingDieFaces` is required, not defaulted — a default would silently
- * reproduce the class-level HP bug (#1441) at any future call site that
- * forgets to resolve it. Callers resolve it the same way HitPointsStep does
- * (hitPointStepMath), which is what keeps Review and the HP step agreeing by
- * construction.
+ * The HP numbers come off the plan's own hitPoints step (#1380) — the same
+ * served meta HitPointsStep renders — so Review and the HP step cannot disagree
+ * about the gain or the advancing die without the server having disagreed with
+ * itself.
  */
 export function buildLevelUpLedger(
   character: Character,
   draft: LevelUpDraft,
   plan: LevelUpPlanResponse,
   resolvers: LedgerResolvers,
-  advancingDieFaces: number,
 ): LedgerRow[] {
   const advancement = advancementRows(character, draft.advancement, resolvers);
+  const hpMeta = readHitPointsMeta(plan.steps.find((s) => s.kind === "hitPoints"));
   const max = character.hitPoints.max;
   const { total, die } = character.hitDice;
   const rows: (LedgerRow | null)[] = [
@@ -181,7 +176,7 @@ export function buildLevelUpLedger(
       ? {
           label: "Maximum HP",
           before: String(max),
-          after: String(max + hpGain(draft.hp, character, advancingDieFaces)),
+          after: String(max + hpGain(draft.hp, hpMeta)),
           variant: "delta",
         }
       : null,

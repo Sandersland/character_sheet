@@ -23,8 +23,13 @@ function char(
   return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], spellEntries, edition: "EDITION_2024" };
 }
 
+// This suite validates SUBMISSIONS against step counts and never reads the HP
+// meta, so the die is required (#1380) but arbitrary here. Anything asserting on
+// HP numbers belongs in level-up-plan.test.ts, where each case names its own die.
+const ANY_DIE = "d10";
+
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {
-  return { name, newLevel, subclass, subclassLevel };
+  return { name, newLevel, subclass, subclassLevel, hitDie: ANY_DIE };
 }
 
 const takeAsi: LevelUpSubmission["advancement"] = {

@@ -355,6 +355,41 @@ async function ensureCampaign(cookie: string, name: string): Promise<string> {
   return id;
 }
 
+// Every run leaks a live session per session-using campaign (#1466): specs start
+// them via enterLiveCombat and never leave, so maybeAutoClose can't fire — and a
+// recreate cascades SessionParticipant away, leaving a zero-participant session
+// it early-returns on. A campaign left live makes CastSpellDoor defer the cast
+// door to Combat, failing the NEXT run's cast specs. Filter on `status`, not
+// `endedAt`: `status` is what activeSessionForCampaign reads and closeSession
+// claims atomically. The re-read is the only regression guard here (e2e/** is
+// excluded from vitest), so an ineffective end fails naming the campaign rather
+// than as a locator timeout several specs later.
+async function endActiveSessions(cookie: string, campaignId: string, campaignName: string): Promise<void> {
+  const activeSessions = async (): Promise<{ id: string }[]> => {
+    const response = await api(cookie, `/api/campaigns/${campaignId}/sessions`);
+    if (!response.ok) {
+      throw new Error(`Failed to list sessions for "${campaignName}": ${response.status}`);
+    }
+    const sessions = (await response.json()) as { id: string; status: string }[];
+    return sessions.filter((session) => session.status === "active");
+  };
+
+  for (const session of await activeSessions()) {
+    const response = await api(cookie, `/api/campaigns/${campaignId}/sessions/${session.id}/end`, { method: "POST" });
+    if (!response.ok) {
+      throw new Error(`Failed to end stale session ${session.id} in "${campaignName}": ${response.status}`);
+    }
+    console.warn(`global-setup: ended stale active session ${session.id} in "${campaignName}"`);
+  }
+
+  const remaining = await activeSessions();
+  if (remaining.length > 0) {
+    throw new Error(
+      `Campaign "${campaignName}" still has an active session after the sweep: ${remaining.map((s) => s.id).join(", ")}`,
+    );
+  }
+}
+
 // Resolve spell names → catalog ids via GET /api/spells (#1131 create-body picks).
 async function resolveSpellIds(cookie: string, names: string[]): Promise<string[]> {
   const response = await api(cookie, "/api/spells");
@@ -558,5 +593,17 @@ export default async function globalSetup(): Promise<void> {
     } else {
       await createPersona(cookie, persona);
     }
+  }
+
+  // Top-level AFTER the loop, never inside createPersona: ensureCampaign is
+  // reachable only from attachToCampaign ← createPersona, so a sweep hung off it
+  // would never fire on the common path where every persona matches — the exact
+  // case #1466 is about. Running last also catches the zero-participant orphan a
+  // recreate above just manufactured, and resolving through ensureCampaign (not
+  // the stale campaignNameById) targets the same first-wins row attachToCampaign
+  // used. ROSTER campaigns only: per-spec throwaways accumulate unboundedly.
+  const sessionCampaignNames = new Set(ROSTER.flatMap((p) => (p.campaignName ? [p.campaignName] : [])));
+  for (const campaignName of sessionCampaignNames) {
+    await endActiveSessions(cookie, await ensureCampaign(cookie, campaignName), campaignName);
   }
 }

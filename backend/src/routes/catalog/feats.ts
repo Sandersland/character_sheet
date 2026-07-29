@@ -10,32 +10,30 @@ export const featsRouter = Router();
 // Feeds the advancement section's feat picker — same role as GET /api/maneuvers.
 // Ordered alphabetically server-side.
 //
-// `?edition=` is OPTIONAL and unused by today's frontend caller (useFeatCatalog
-// fetches once, flat, with no character in view — the same "genuinely no
-// per-request character" gap reference.ts documents for subclassLevel), so
-// omitting it returns every row exactly as before: a real regression risk
-// otherwise. When PRESENT it must be a real edition — a typo silently falling
-// back to unfiltered would give the caller no signal at all — so an
-// unrecognized value 400s rather than degrading to the omitted-param
-// behavior. When valid, resolves through resolveEditionCatalog — the same
-// exact-then-NULL-fallback ordering every other catalog read uses — rather
-// than leaving this route to hand-roll a second copy once a picker actually
-// threads a character's edition through (#1310/#1286).
+// `?edition=` is REQUIRED (#1411), following referenceRouter's precedent
+// (#1325): absent 400s, unrecognized 400s, and every served response goes
+// through resolveEditionCatalog's exact-then-NULL-fallback ordering. Optional
+// -with-unfiltered-fallback was rejected even though it reads as the safer
+// migration: it makes the guard conventional rather than structural, because
+// the next `fetchFeats()`-shaped caller silently reintroduces a flat cross
+// -edition picker and nothing anywhere fails. A required param moves that
+// mistake to compile time on the client and to a 400 on the wire.
 featsRouter.get("/feats", async (req, res) => {
   const rawEdition = req.query.edition;
-  let edition: RulesEdition | undefined;
-  if (rawEdition !== undefined) {
-    if (!isRulesEdition(rawEdition)) {
-      res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
-      return;
-    }
-    edition = rawEdition;
+  if (rawEdition === undefined) {
+    res.status(400).json({ error: "Missing required query parameter: edition" });
+    return;
   }
+  if (!isRulesEdition(rawEdition)) {
+    res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
+    return;
+  }
+  const edition: RulesEdition = rawEdition;
 
   const feats = await prisma.feat.findMany({
     orderBy: { name: "asc" },
   });
-  const resolved = edition ? resolveEditionCatalog(feats, edition, (f) => f.name) : feats;
+  const resolved = resolveEditionCatalog(feats, edition, (f) => f.name);
 
   res.json(
     resolved.map((row) => ({

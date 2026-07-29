@@ -359,5 +359,7 @@ export type InventoryOperation =
  * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
  * from every player response.
  */
-/** The six 5e magic-item rarity tiers; labels/values live in `@/lib/rarity`. */
+/** The six 5e magic-item rarity tiers. Their labels and standard gp values are
+ *  served as ItemRarityOption rows on GET /api/reference (#1437), never held
+ *  client-side; rarityLabel resolves a key against those rows. */
 export type ItemRarity = "COMMON" | "UNCOMMON" | "RARE" | "VERY_RARE" | "LEGENDARY" | "ARTIFACT";

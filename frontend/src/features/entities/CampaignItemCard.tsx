@@ -4,12 +4,14 @@ import { Lock } from "@/components/ui/icons";
 import { itemDetailRows } from "@/lib/itemCard";
 import { itemCategoryLabel } from "@/lib/items";
 import { rarityLabel, rarityTone } from "@/lib/rarity";
-import type { CampaignItem } from "@/types/character";
+import type { CampaignItem, ItemRarityOption } from "@/types/character";
 
 interface CampaignItemCardProps {
   item: CampaignItem;
   /** dmNotes render only for the owner — never present in a player payload. */
   isOwner: boolean;
+  /** Served rarity rows (#1437), passed in so this card holds no query observer. */
+  rarities: ItemRarityOption[];
 }
 
 const labelCls = "block text-xs font-semibold text-parchment-700";
@@ -26,16 +28,25 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 // The Codex item card: badges (rarity/attunement/unique), category-specific
 // mechanical detail (rows derived in itemDetailRows), description, and —
 // owner only — the DM's private notes.
-export default function CampaignItemCard({ item, isOwner }: CampaignItemCardProps) {
+function ItemBadges({ item, rarities }: Pick<CampaignItemCardProps, "item" | "rarities">) {
+  // Null until the served rows land (#1437): the badge renders nothing rather
+  // than flashing the raw enum key on a cold Codex page.
+  const rarityText = item.rarity ? rarityLabel(item.rarity, rarities) : null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
+      {item.rarity && rarityText && <Badge tone={rarityTone(item.rarity)}>{rarityText}</Badge>}
+      {item.requiresAttunement && <Badge tone="garnet">Requires attunement</Badge>}
+      {item.isUnique && <Badge tone="neutral">Unique</Badge>}
+    </div>
+  );
+}
+
+export default function CampaignItemCard({ item, isOwner, rarities }: CampaignItemCardProps) {
   return (
     <Card title="Item" headingLevel={2} className="p-4">
       <div className="flex flex-col gap-3 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
-          {item.rarity && <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>}
-          {item.requiresAttunement && <Badge tone="garnet">Requires attunement</Badge>}
-          {item.isUnique && <Badge tone="neutral">Unique</Badge>}
-        </div>
+        <ItemBadges item={item} rarities={rarities} />
 
         <div className="rounded-control border border-parchment-200 bg-parchment-50 px-3 py-1">
           {itemDetailRows(item).map((row) => (

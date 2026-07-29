@@ -208,4 +208,33 @@ describe("GET /api/reference", () => {
     // One of the five edition-invariant conditions resolves identically.
     expect(findCond(res2014.body, "poisoned").description).toBe(findCond(res2024.body, "poisoned").description);
   });
+
+  // #1437: the six magic-item rarity tiers with their standard gp values. Unlike
+  // conditions above this is edition-INVARIANT, so the last assertion is a latch:
+  // it fails the day someone routes ITEM_RARITIES through resolveEditionCatalog.
+  it("ships the item rarity tiers, identically for both editions (#1437)", async () => {
+    const app = createApp();
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    expect(res2014.status).toBe(200);
+    expect(res2024.status).toBe(200);
+
+    expect(res2024.body.itemRarities.map((r: { key: string }) => r.key)).toEqual([
+      "COMMON",
+      "UNCOMMON",
+      "RARE",
+      "VERY_RARE",
+      "LEGENDARY",
+      "ARTIFACT",
+    ]);
+    expect(res2024.body.itemRarities.map((r: { standardValueGp: number | null }) => r.standardValueGp)).toEqual([
+      100, 400, 4000, 40000, 200000, null,
+    ]);
+    expect(res2024.body.itemRarities[3]).toEqual({ key: "VERY_RARE", label: "Very Rare", standardValueGp: 40000 });
+    for (const row of res2024.body.itemRarities) {
+      expect(Object.keys(row).sort()).toEqual(["key", "label", "standardValueGp"]);
+    }
+
+    expect(res2024.body.itemRarities).toEqual(res2014.body.itemRarities);
+  });
 });

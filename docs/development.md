@@ -6,7 +6,7 @@ Read this when you need commands, the Prisma workflow, worktree stacks, or the a
 
 ```bash
 npm ci                                       # once per clone
-cp .env.example backend/.env                 # supplies DATABASE_URL
+cp .env.example backend/.env                 # DATABASE_URL + the dev-login/rate-limit defaults
 docker compose up -d db                      # Postgres :5432
 cd backend && npx prisma generate && npx prisma migrate deploy && npx prisma db seed && cd ..
 npm run dev                                  # backend :4000 + frontend :5173

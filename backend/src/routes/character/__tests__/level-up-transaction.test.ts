@@ -1502,3 +1502,79 @@ describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)
     expect(res.body.advancements.some((a: { slot?: string; featName?: string }) => a.slot === "fightingStyle" && a.featName === "Defense")).toBe(true);
   });
 });
+
+// #1380: the ceremony previews the HP gain from the plan's `hitPoints` meta, so
+// preview and commit must be the same number by construction — one resolved die
+// through one levelUpHpGain. These read the real GET response rather than a
+// recomputed expectation, which is what makes drift observable.
+describe("POST …/level-up/transactions — the served HP meta equals the committed gain (#1380)", () => {
+  async function servedHpMeta(characterId: string, query = ""): Promise<{ die: string; averageGain: number }> {
+    const res = await supertest(app)
+      .get(`/api/characters/${characterId}/level-up/plan${query}`)
+      .set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    const step = (res.body.steps as { kind: string; meta?: Record<string, unknown> }[]).find((s) => s.kind === "hitPoints");
+    return { die: String(step?.meta?.die), averageGain: Number(step?.meta?.averageGain) };
+  }
+
+  it("single-class Fighter 6→7: hitPoints.max rises by exactly meta.averageGain", async () => {
+    const CHAR_ID = "lvtx-hp-meta-single";
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx HpMeta Single",
+        experiencePoints: 23000, // level 7; hitDice.total 6 → 1 pending
+        hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 6, die: "d10", spent: 0 },
+        abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ name: "fighter", subclass: "Champion", classId: fighter.id, position: 0, level: 6 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+
+    const meta = await servedHpMeta(CHAR_ID, `?classEntryId=${entry.id}`);
+    expect(meta.die).toBe("d10");
+
+    const res = await post(CHAR_ID, { target: { kind: "existing", classEntryId: entry.id }, hp: { method: "average" } });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.max).toBe(60 + meta.averageGain);
+  });
+
+  it("multiclass Fighter 1→2 under a d6 Wizard primary: the d10 preview is the d10 commit", async () => {
+    const CHAR_ID = "lvtx-hp-meta-multi";
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx HpMeta Multi",
+        experiencePoints: 23000, // level 7; hitDice.total 6 → 1 pending
+        hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        // The persisted (position-0) die is the Wizard's d6 — the wrong answer here.
+        hitDice: { total: 6, die: "d6", spent: 0 },
+        abilityScores: { strength: 14, dexterity: 14, constitution: 14, intelligence: 16, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, spells: [] } as Prisma.InputJsonValue,
+        classEntries: {
+          create: [
+            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 5 },
+            { name: "fighter", subclass: null, classId: fighter.id, position: 1, level: 1 },
+          ],
+        },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+
+    const meta = await servedHpMeta(CHAR_ID, `?classEntryId=${entry.id}`);
+    expect(meta.die).toBe("d10");
+
+    const res = await post(CHAR_ID, { target: { kind: "existing", classEntryId: entry.id }, hp: { method: "average" } });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.max).toBe(40 + meta.averageGain);
+  });
+});

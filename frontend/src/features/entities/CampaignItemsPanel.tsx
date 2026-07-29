@@ -4,11 +4,14 @@ import { GiKnapsack, Plus } from "@/components/ui/icons";
 import CampaignItemForm from "@/features/entities/CampaignItemForm";
 import CampaignItemRow from "@/features/entities/CampaignItemRow";
 import { useCampaignItemsPanelController } from "@/features/entities/useCampaignItemsPanelController";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface CampaignItemsPanelProps {
   campaignId: string;
   /** Member characters, so the DM can pick an award target. */
   characters: { id: string; name: string; ownerId: string }[];
+  /** The campaign's edition, used only to pick a /reference cache slot (#1437). */
+  edition: RulesEdition;
 }
 
 // Owner-only Manage-tab panel (#380): authors DM campaign items via two paths —
@@ -18,10 +21,11 @@ interface CampaignItemsPanelProps {
 // a HIDDEN ITEM entity; reveal/edit/delete here keep the shared Codex cache in sync.
 // All state, queries (#1299) and mutations live in useCampaignItemsPanelController
 // — this component is a template over what it returns.
-export default function CampaignItemsPanel({ campaignId, characters }: CampaignItemsPanelProps) {
+export default function CampaignItemsPanel({ campaignId, characters, edition }: CampaignItemsPanelProps) {
   const {
     items,
     catalog,
+    rarities,
     creating,
     editingId,
     form,
@@ -38,7 +42,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
     handleDelete,
     handleAward,
     handleRevoke,
-  } = useCampaignItemsPanelController(campaignId);
+  } = useCampaignItemsPanelController(campaignId, edition);
 
   return (
     <Card
@@ -71,6 +75,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
             editingId={editingId}
             catalog={catalog}
             busyId={busyId}
+            rarities={rarities}
             onSubmit={handleSubmit}
             onCancel={cancelForm}
           />
@@ -91,6 +96,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                 campaignId={campaignId}
                 characters={characters}
                 busyId={busyId}
+                rarities={rarities}
                 awardTargetValue={awardTarget[item.id] ?? ""}
                 onToggleReveal={toggleReveal}
                 onEdit={startEdit}

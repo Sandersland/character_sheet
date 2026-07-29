@@ -4,16 +4,15 @@
 // name lookups are fetched here (only when a matching draft list is non-empty)
 // and injected into the pure buildLevelUpLedger.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
-import { useReferenceData } from "@/hooks/useReferenceData";
-import { hitPointStepMath } from "@/lib/hitDice";
 import { buildLevelUpLedger, type LedgerResolvers, type LedgerRow } from "@/lib/levelUpLedger";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import { schoolInk } from "@/lib/spellFlavor";
 import { levelLabel, schoolLabel } from "@/lib/spellMeta";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 type CatalogFetcher = (() => Promise<{ id: string; name: string }[]>) | undefined;
 
@@ -38,16 +37,30 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
 }
 
 // fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/spells/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
-function useLedgerResolvers(draft: LevelUpDraft): { resolvers: LedgerResolvers; resolving: boolean } {
+function useLedgerResolvers(draft: LevelUpDraft, edition: RulesEdition): { resolvers: LedgerResolvers; resolving: boolean } {
   const maneuvers = useCatalogNames(draft.maneuvers?.length ? fetchManeuvers : undefined);
   // Cantrips share the spell catalog, so either list gates the same fetch (#1157).
   const spells = useCatalogNames(draft.spellsLearned?.length || draft.cantripsLearned?.length ? fetchSpells : undefined);
   // Any taken feat fetches the catalog — a custom feat resolves by its own name,
   // so this needs no second (featId) guard. A Fighting Style feat (#1137) resolves
   // through the same catalog.
-  const feats = useCatalogNames(
-    draft.advancement?.type === "takeFeat" || draft.fightingStyleFeat ? fetchFeats : undefined,
+  //
+  // The edition is threaded here for the wire contract, not as an admission gate:
+  // this site resolves an id→name for an ALREADY-COMMITTED pick, so no
+  // cross-edition row can be introduced through it (#1411).
+  //
+  // Keyed on the BOOLEAN, never on draft.fightingStyleFeat's object identity, and
+  // never an inline arrow: useCatalogNames's effect depends on [fetcher], so a
+  // fresh identity every render means fetch → setMap → re-render → fetch, forever.
+  // The sibling maneuver/spell resolvers get away with bare module refs only
+  // because they take no argument — that asymmetry is deliberate, not an
+  // oversight to tidy up.
+  const needsFeats = draft.advancement?.type === "takeFeat" || !!draft.fightingStyleFeat;
+  const featFetcher = useMemo(
+    () => (needsFeats ? () => fetchFeats(edition) : undefined),
+    [needsFeats, edition],
   );
+  const feats = useCatalogNames(featFetcher);
   return {
     resolvers: { maneuver: maneuvers.lookup, spell: spells.lookup, feat: feats.lookup },
     resolving: [maneuvers, spells, feats].some((c) => c.pending),
@@ -126,14 +139,13 @@ function LedgerRowView({ row, resolving }: { row: LedgerRow; resolving: boolean 
 }
 
 export default function ReviewStep() {
-  const { character, draft, plan, target } = useLevelUpStepContext();
-  const { resolvers, resolving } = useLedgerResolvers(draft);
-  // Resolved via the same call HitPointsStep makes (useReferenceData +
-  // hitPointStepMath) so the Review HP row and the HP step's preview cannot
-  // disagree (#1441) — the builder itself stays pure and must not fetch.
-  const { reference } = useReferenceData(character.rulesEdition);
-  const { faces } = hitPointStepMath(character, reference?.classes ?? [], target);
-  const rows = buildLevelUpLedger(character, draft, plan, resolvers, faces);
+  const { character, draft, plan } = useLevelUpStepContext();
+  const { resolvers, resolving } = useLedgerResolvers(draft, character.rulesEdition);
+  // The HP row's numbers come out of `plan` itself (#1380) — the very meta
+  // HitPointsStep renders — so the two screens agree because they read one
+  // served value, a stronger guarantee than the matching client-side
+  // resolutions that used to stand in for it (#1441).
+  const rows = buildLevelUpLedger(character, draft, plan, resolvers);
 
   return (
     <div>
