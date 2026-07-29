@@ -52,9 +52,9 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
     await prisma.feat.create({ data: { name: NAME, description: "2024", edition: "EDITION_2024" } });
     await prisma.feat.create({ data: { name: UNSEEDED_NAME, description: "stale", edition: "EDITION_2014" } });
 
-    const seeded = [{ name: NAME, edition: "EDITION_2014" as const }];
-    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded, ONLY_THIS_FILES_ROWS) });
-    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded, ONLY_THIS_FILES_ROWS) }); // idempotent — no-op the second time
+    const seeded = [{ identity: NAME, edition: "EDITION_2014" as const }];
+    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere("name", seeded, ONLY_THIS_FILES_ROWS) });
+    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere("name", seeded, ONLY_THIS_FILES_ROWS) }); // idempotent — no-op the second time
 
     const survivingNames = (await prisma.feat.findMany({ where: { name: { in: [NAME, UNSEEDED_NAME] } } }))
       .map((r) => `${r.name}::${r.edition}`);
@@ -65,8 +65,8 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
     await prisma.feat.create({ data: { name: NAME, description: "shared", edition: null } });
     await prisma.feat.create({ data: { name: NAME, description: "2024-only", edition: "EDITION_2024" } });
 
-    const seeded = [{ name: NAME, edition: null }];
-    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere(seeded, ONLY_THIS_FILES_ROWS) });
+    const seeded = [{ identity: NAME, edition: null }];
+    await prisma.feat.deleteMany({ where: staleCatalogRowsWhere("name", seeded, ONLY_THIS_FILES_ROWS) });
 
     const survivingEditions = (await prisma.feat.findMany({ where: { name: NAME } })).map((r) => r.edition);
     expect(survivingEditions).toEqual([null]);
@@ -80,9 +80,9 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
     await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2014", edition: "EDITION_2014" } });
     await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2024", edition: "EDITION_2024" } });
 
-    const seeded = [{ name: NAME, edition: "EDITION_2014" as const }];
+    const seeded = [{ identity: NAME, edition: "EDITION_2014" as const }];
     await prisma.grantedAbility.deleteMany({
-      where: staleCatalogRowsWhere(seeded, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
+      where: staleCatalogRowsWhere("name", seeded, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
     });
 
     const surviving = (await prisma.grantedAbility.findMany({ where: { name: NAME } })).map((r) => r.edition);

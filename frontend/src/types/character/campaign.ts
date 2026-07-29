@@ -37,6 +37,10 @@ export interface Campaign {
   /** The DM's default edition for characters created into this campaign (#1285).
    *  Never authoritative for a sheet — Character.rulesEdition is. */
   rulesEdition: RulesEdition;
+  /** The edition's display label, resolved server-side (#1436). REQUIRED, not
+   *  optional: it is always served, and optional would let a fixture omit it and
+   *  the badge silently render empty. */
+  rulesEditionLabel: string;
   inviteCode: string;
   createdAt: string;
   members: CampaignMember[];

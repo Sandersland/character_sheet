@@ -15,6 +15,9 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: ["HEAD"],
+    proficient: true,
     ...overrides,
   };
 }

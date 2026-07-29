@@ -21,6 +21,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-subclass-choices";
 let COOKIE: string;
@@ -112,16 +113,58 @@ afterEach(async () => {
 
 describe("GET /api/subclass-choices/:source", () => {
   it("lists the Hunter's Prey option catalog", async () => {
-    const res = await agent().get("/api/subclass-choices/huntersPrey");
+    const res = await agent().get("/api/subclass-choices/huntersPrey?edition=EDITION_2024");
     expect(res.status).toBe(200);
     const names = (res.body as { name: string }[]).map((o) => o.name).sort();
     expect(names).toEqual(["Colossus Slayer", "Giant Killer", "Horde Breaker"]);
   });
 
   it("returns an empty array for an unknown source", async () => {
-    const res = await agent().get("/api/subclass-choices/notAChoice");
+    const res = await agent().get("/api/subclass-choices/notAChoice?edition=EDITION_2024");
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
+  });
+
+  it("400s an absent or unrecognized ?edition= (#1412)", async () => {
+    const bare = await agent().get("/api/subclass-choices/huntersPrey");
+    expect(bare.status).toBe(400);
+    expect(bare.body.error).toBe("Missing required query parameter: edition");
+
+    const unknown = await agent().get("/api/subclass-choices/huntersPrey?edition=bogus");
+    expect(unknown.status).toBe(400);
+    expect(unknown.body.error).toMatch(/^Unknown edition: /);
+  });
+
+  // #1412: fixture deleted by NAME in the finally, never by an id var that would
+  // read to Prisma as "no filter" if the create threw partway.
+  it("(#1412) silently omits a 2014-tagged option from a 2024 request and serves it to a 2014 one", async () => {
+    const FIXTURE_NAME = "XEd Hunters Prey 2014";
+    const row = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: FIXTURE_NAME, edition: "EDITION_2014" },
+      {
+        name: FIXTURE_NAME,
+        source: "huntersPrey",
+        edition: "EDITION_2014",
+        description: "Edition-filter test fixture.",
+        minLevel: 3,
+      },
+      { source: "huntersPrey" },
+    );
+    try {
+      const as2024 = await agent().get("/api/subclass-choices/huntersPrey?edition=EDITION_2024");
+      expect(as2024.status).toBe(200);
+      expect((as2024.body as { id: string }[]).some((o) => o.id === row.id)).toBe(false);
+      // The NULL-edition seeded options still reach both editions.
+      expect((as2024.body as { name: string }[]).map((o) => o.name)).toContain("Colossus Slayer");
+
+      const as2014 = await agent().get("/api/subclass-choices/huntersPrey?edition=EDITION_2014");
+      expect(as2014.status).toBe(200);
+      expect((as2014.body as { id: string }[]).some((o) => o.id === row.id)).toBe(true);
+      expect((as2014.body as { name: string }[]).map((o) => o.name)).toContain("Colossus Slayer");
+    } finally {
+      await prisma.grantedAbility.deleteMany({ where: { name: FIXTURE_NAME } });
+    }
   });
 });
 

@@ -8,11 +8,11 @@ import { useEffect, useRef, useState } from "react";
 
 import { fetchManeuvers } from "@/api/client";
 import Spinner from "@/components/ui/Spinner";
+import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { CatalogManeuver, LearnManeuverOperation } from "@/types/character";
 
 interface Props {
-  characterId: string;
   knownIds: string[];
   choiceCount: number;
   knownCount: number;
@@ -27,6 +27,7 @@ export default function AddManeuverPanel({
   busy,
   onLearn,
 }: Props) {
+  const { character } = useCurrentCharacter();
   const [open, setOpen] = useState(false);
   const [catalog, setCatalog] = useState<CatalogManeuver[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -36,16 +37,18 @@ export default function AddManeuverPanel({
 
   const atCap = knownCount >= choiceCount;
 
-  // Fetch catalog the first time the panel is opened.
+  // Fetch catalog the first time the panel is opened. The edition is in the deps
+  // for the lint rule's sake only — Character.rulesEdition is write-once, and
+  // hasFetched latches the fetch to the first expand regardless.
   useEffect(() => {
     if (!open || hasFetched.current) return;
     hasFetched.current = true;
     let mounted = true;
-    fetchManeuvers()
+    fetchManeuvers(character.rulesEdition)
       .then((maneuvers) => { if (mounted) setCatalog(maneuvers); })
       .catch(() => { if (mounted) setCatalogError("Couldn't load maneuver catalog."); });
     return () => { mounted = false; };
-  }, [open]);
+  }, [open, character.rulesEdition]);
 
   const knownIdSet = new Set(knownIds);
   const filteredCatalog = (catalog ?? []).filter((m) => {

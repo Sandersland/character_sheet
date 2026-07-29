@@ -7,7 +7,8 @@ import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
-import { editionOf } from "@/lib/rules/edition.js";
+import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
+import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
 import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
@@ -264,11 +265,26 @@ export function serializeCharacter(row: CharacterWithRelations) {
   // Archery Fighting Style feat (#1137): +2 to ranged attack rolls, summed from
   // the kept advancements' rangedAttackRoll improvements.
   const rangedAttackRollBonus = deriveRangedAttackRollBonus(clampedAdvancements);
+  // Bound here rather than inline in the response literal below because the
+  // per-inventory-row `proficient` flag has to read exactly the lists rendered
+  // beside it (#1433) — passing the un-merged `weaponGrants` would re-warn on an
+  // item-granted proficiency the wire array already shows.
+  const armorGrants = buildMergedArmorProficiencies(
+    row.classEntries,
+    row.raceSelection?.name,
+    featProficiencies.armor,
+  );
+  const itemMergedWeaponGrants = mergeItemWeaponProficiencies(
+    weaponGrants,
+    itemGrants.proficiencies.filter((p) => p.profType === "weapon"),
+  );
   const inventoryContext = buildInventoryContext(
     row,
     effectiveScores,
     progress.proficiencyBonus,
     weaponGrants,
+    itemMergedWeaponGrants,
+    armorGrants,
     rangedAttackRollBonus,
     buffTargets,
   );
@@ -321,6 +337,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
     rulesEdition: row.rulesEdition,
+    // Served alongside the key (#1436, the #1322 precedent) so the sheet's
+    // edition badge stays synchronous — no client copy of the label table, and
+    // no /api/editions round-trip just to render a badge.
+    rulesEditionLabel: RULES_EDITION_LABELS[editionOf(row)],
     // Campaign-scoped play prefs (#537), or undefined when unattached.
     campaignPreferences: buildCampaignPreferencesView(row),
 
@@ -359,15 +379,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // any feat-granted additions are already tracked in advancements. Deduped
     // with precedence class > race > feat so a feat re-granting an existing
     // class proficiency renders as a single class-sourced entry.
-    armorProficiencies: buildMergedArmorProficiencies(
-      row.classEntries,
-      row.raceSelection?.name,
-      featProficiencies.armor,
-    ),
-    weaponProficiencies: mergeItemWeaponProficiencies(
-      weaponGrants,
-      itemGrants.proficiencies.filter((p) => p.profType === "weapon"),
-    ),
+    armorProficiencies: armorGrants,
+    weaponProficiencies: itemMergedWeaponGrants,
     inventory: row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext)),
     currency: row.currency,
     spellcasting,
@@ -415,8 +428,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
       used: usedFightingStyleSlots,
     },
 
-    // Class-specific available actions for the turn tracker (universal ones
-    // render client-side from UNIVERSAL_ACTIONS).
+    // Class-specific available actions for the turn tracker (universal ones ride
+    // GET /api/reference instead, resolved per edition — #1430).
     availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded),
 
     // Combat attack rows — derived at read time; the frontend renders these
@@ -425,6 +438,12 @@ export function serializeCharacter(row: CharacterWithRelations) {
     improvisedWeapon,
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.
     attacksPerAction: deriveAttacksPerAction(row.classEntries),
+    // A two-handed weapon in MAIN_HAND locks OFF_HAND (#1433) — a property of the
+    // whole loadout, hence one top-level boolean rather than a per-row flag. NOT
+    // the same rule as `offHandBusy` (an internal of buildInventoryContext):
+    // that one is true for a shield OR a second weapon and only picks a versatile
+    // weapon's die, while this one says nothing may occupy the off-hand at all.
+    offHandLocked: isOffHandLocked(row.inventoryItems),
     // Riders (#1316): sneakAttack/stunningStrike/openHandTechnique/
     // quiveringPalm/maneuvers, each present only when the character has it.
     ...riders,

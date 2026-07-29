@@ -6,7 +6,7 @@
  * when the pool is empty, and the not-known error path.
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "@/app.js";
@@ -15,6 +15,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-maneuvers";
 let COOKIE: string;
@@ -48,6 +49,62 @@ async function learn(op: unknown): Promise<{ id: string; name: string; maneuverI
   const list = res.body.resources.maneuversKnown as Array<{ id: string; name: string; maneuverId?: string }>;
   return list[list.length - 1];
 }
+
+// #1412: the picker catalog itself. Fixture built through upsertEditionRow (a
+// compound key containing `edition` rejects a literal null on
+// findUnique/upsert) and deleted by NAME, never by an id var that would read to
+// Prisma as "no filter" had beforeAll thrown partway.
+describe("GET /api/maneuvers — required ?edition= + silent cross-edition omission", () => {
+  const FIXTURE_NAME = "XEd Maneuver 2014";
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: FIXTURE_NAME, edition: "EDITION_2014" },
+      {
+        name: FIXTURE_NAME,
+        source: "maneuver",
+        edition: "EDITION_2014",
+        description: "Edition-filter test fixture.",
+      },
+      { source: "maneuver" },
+    );
+  });
+
+  afterAll(async () => {
+    await prisma.grantedAbility.deleteMany({ where: { name: FIXTURE_NAME } });
+  });
+
+  async function names(query: string): Promise<string[]> {
+    const res = await agent().get(`/api/maneuvers${query}`);
+    expect(res.status).toBe(200);
+    return (res.body as { name: string }[]).map((m) => m.name);
+  }
+
+  it("400s an absent ?edition= rather than serving a flat cross-edition catalog", async () => {
+    const res = await agent().get("/api/maneuvers");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Missing required query parameter: edition");
+  });
+
+  it("400s an unrecognized ?edition= with a message distinct from the missing-param one", async () => {
+    const res = await agent().get("/api/maneuvers?edition=bogus");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/^Unknown edition: /);
+  });
+
+  it("omits a 2014-tagged row for a 2024 request and serves it for a 2014 one — no error, no marker", async () => {
+    expect(await names("?edition=EDITION_2024")).not.toContain(FIXTURE_NAME);
+    expect(await names("?edition=EDITION_2014")).toContain(FIXTURE_NAME);
+  });
+
+  it("serves the NULL-edition seeded rows to both editions", async () => {
+    expect(await names("?edition=EDITION_2014")).toContain("Trip Attack");
+    expect(await names("?edition=EDITION_2024")).toContain("Trip Attack");
+  });
+});
 
 describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
   let tripId: string;

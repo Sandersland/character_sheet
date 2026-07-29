@@ -58,7 +58,18 @@ export function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
 
 // Other currently-equipped rows, with just the two-handed flag needed for the
 // off-hand lock. Excludes the item being (re)placed so a re-slot never self-collides.
-type EquippedRow = { equippedSlot: EquipSlot | null; weaponDetail: { twoHanded: boolean } | null };
+export type EquippedRow = { equippedSlot: EquipSlot | null; weaponDetail: { twoHanded: boolean } | null };
+
+// A two-handed weapon in MAIN_HAND owns both hands, so nothing may occupy
+// OFF_HAND. Exported (#1433) so `serializeCharacter` can serve the flag instead
+// of the client re-deriving it. Keys on `weaponDetail?.twoHanded` alone without
+// re-checking `category === "weapon"` — equivalent because only weapon rows ever
+// get a weaponDetail row, but that is a schema-level guarantee (see
+// InventoryItem's per-category detail relations in schema.prisma), not one the
+// type checker enforces on this shape.
+export function isOffHandLocked(rows: EquippedRow[]): boolean {
+  return rows.some((r) => r.equippedSlot === "MAIN_HAND" && Boolean(r.weaponDetail?.twoHanded));
+}
 
 export async function fetchEquippedRows(
   tx: Prisma.TransactionClient,
@@ -78,9 +89,8 @@ function placementError(rows: EquippedRow[], item: PlaceableItem, slot: EquipSlo
   if (allowed.length === 0) return `${item.category} items cannot be equipped`;
   if (!allowed.includes(slot)) return `This item cannot be equipped in the ${slotLabel(slot)} slot`;
 
-  const mainHandTwoHanded = rows.some((r) => r.equippedSlot === "MAIN_HAND" && r.weaponDetail?.twoHanded);
   const offHandOccupied = rows.some((r) => r.equippedSlot === "OFF_HAND");
-  if (slot === "OFF_HAND" && mainHandTwoHanded) {
+  if (slot === "OFF_HAND" && isOffHandLocked(rows)) {
     return "The off-hand is locked by a two-handed weapon — unequip it first";
   }
   if (isTwoHandedWeapon(item) && offHandOccupied) {

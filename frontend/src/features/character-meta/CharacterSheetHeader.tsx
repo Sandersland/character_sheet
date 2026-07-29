@@ -10,7 +10,6 @@ import OverflowMenu from "@/components/ui/OverflowMenu";
 import PreferencesSheet from "@/features/preferences/PreferencesSheet";
 import Tabs from "@/components/ui/Tabs";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
-import { EDITION_LABELS } from "@/lib/editionCopy";
 import { classSummary } from "@/lib/multiclass";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
 
@@ -227,8 +226,10 @@ function DesktopBanner({
                 <span>
                   {character.background} · {character.alignment}
                 </span>
-                {/* Sheet header + campaign header only (#1286) — not the character-list card. */}
-                <Badge tone="neutral">{EDITION_LABELS[character.rulesEdition]}</Badge>
+                {/* Sheet header + campaign header only (#1286) — not the character-list card.
+                    Reads the label served with the sheet (#1436), so the badge needs no
+                    /api/editions round-trip and can never render an empty first paint. */}
+                <Badge tone="neutral">{character.rulesEditionLabel}</Badge>
                 <CampaignIndicator />
               </p>
             </div>

@@ -14,9 +14,8 @@ import {
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
+import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
-import { isRulesEdition } from "@/lib/rules/edition.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
 
 export const referenceRouter = Router();
 
@@ -26,16 +25,8 @@ export const referenceRouter = Router();
 // Proficiencies-card dropdown (creation tool pickers derive from per-class
 // toolChoices, not this list).
 referenceRouter.get("/reference", async (req, res) => {
-  const rawEdition = req.query.edition;
-  if (rawEdition === undefined) {
-    res.status(400).json({ error: "Missing required query parameter: edition" });
-    return;
-  }
-  if (!isRulesEdition(rawEdition)) {
-    res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
-    return;
-  }
-  const edition: RulesEdition = rawEdition;
+  const edition = requireEditionOr400(req, res);
+  if (edition === undefined) return;
 
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
@@ -152,6 +143,26 @@ referenceRouter.get("/reference", async (req, res) => {
   // needs to hold any of its own.
   const conditions = conditionRulesText(edition);
 
+  // The universal turn actions (#1430), same precedent as conditions above: the
+  // rows are catalog content identical for every character of an edition, so
+  // they ride this endpoint rather than ~105 lines of static copy on every
+  // character payload. Only `universal: true` rows are served — the
+  // class-specific Action rows carry gates and effect dispatch and reach the
+  // sheet through DERIVED_ACTIONS instead.
+  const universalActionRows = await prisma.action.findMany({
+    where: withEditionOrShared({ universal: true }, edition),
+    select: { key: true, name: true, cost: true, description: true, edition: true },
+  });
+  // Sorted AFTER resolution, never as an `orderBy`: resolveEditionCatalog
+  // preserves each group's FIRST-occurrence position, so a name-ordered
+  // findMany would place the 2024 "Magic" row at "Cast a Spell"'s alphabetical
+  // slot. `edition` is selected only so the resolution can run and must not
+  // reach the wire — same rule as originFeatByName above. Alphabetical by name
+  // is also SRD 5.2's own Actions-table order, so no `sortOrder` column.
+  const universalActions = resolveEditionCatalog(universalActionRows, edition, (a) => a.key)
+    .map(({ key, name, cost, description }) => ({ key, name, cost, description }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   res.json({
     races: racesWithTools,
     classes,
@@ -159,6 +170,7 @@ referenceRouter.get("/reference", async (req, res) => {
     alignments: ALIGNMENTS,
     artisanTools,
     conditions,
+    universalActions,
     // The six magic-item rarity tiers (#1437). Unlike conditions above these are
     // edition-INVARIANT: ITEM_RARITIES takes no edition parameter, and spreading
     // the module const straight into the response — no intermediate const — is

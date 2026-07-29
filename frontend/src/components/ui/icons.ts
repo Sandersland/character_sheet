@@ -64,6 +64,7 @@ export { GiCrossedSwords, GiSparkles, GiCycle } from "react-icons/gi";
 // fallow-ignore-next-line unused-export -- public re-export kept available for the attack sheet; no current importer yet
 export { GiSwordWound } from "react-icons/gi";
 // Turn-picker option-card glyphs: universal actions on the Action sheet.
+// GiOpenBook/GiPublicSpeaker are the 2024-only Study/Influence tiles (#1430).
 export {
   GiRun,
   GiDodging,
@@ -74,6 +75,8 @@ export {
   GiSandsOfTime,
   GiGrab,
   GiPush,
+  GiOpenBook,
+  GiPublicSpeaker,
 } from "react-icons/gi";
 export {
   ArrowUp,

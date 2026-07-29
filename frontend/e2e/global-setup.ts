@@ -328,9 +328,10 @@ async function subclassId(cookie: string, className: string, subclassName: strin
   return sub.id;
 }
 
-// Resolve a maneuver id by name from the catalog.
+// Resolve a maneuver id by name from the catalog. `?edition=` is required
+// (#1412) and every persona built here is a default-2024 character.
 async function maneuverId(cookie: string, name: string): Promise<string> {
-  const response = await api(cookie, "/api/maneuvers");
+  const response = await api(cookie, "/api/maneuvers?edition=EDITION_2024");
   if (!response.ok) throw new Error(`Failed to load maneuvers: ${response.status}`);
   const maneuvers = (await response.json()) as { id: string; name: string }[];
   const match = maneuvers.find((m) => m.name === name);

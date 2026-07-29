@@ -5,11 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  canTwoWeaponFight,
-  universalActionsForCost,
-  UNIVERSAL_ACTIONS,
-} from "@/lib/turnRules";
+import { canTwoWeaponFight } from "@/lib/turnRules";
 
 // deriveAttacksPerAction moved to the backend (srd.ts); Extra Attack counts now
 // arrive on the serialized character as `attacksPerAction`.
@@ -78,60 +74,5 @@ describe("canTwoWeaponFight", () => {
   it("two light weapons stay valid regardless of the improvement", () => {
     expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], false)).toBe(true);
     expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], true)).toBe(true);
-  });
-});
-
-describe("UNIVERSAL_ACTIONS", () => {
-  it("has exactly 15 entries (lock the list)", () => {
-    expect(UNIVERSAL_ACTIONS).toHaveLength(15);
-  });
-
-  it("cost distribution: 12 action, 1 bonusAction, 2 reaction, 0 free/special", () => {
-    const byCost = UNIVERSAL_ACTIONS.reduce<Record<string, number>>((acc, a) => {
-      acc[a.cost] = (acc[a.cost] ?? 0) + 1;
-      return acc;
-    }, {});
-
-    expect(byCost["action"]).toBe(12);
-    expect(byCost["bonusAction"]).toBe(1);
-    expect(byCost["reaction"]).toBe(2);
-    expect(byCost["free"]).toBeUndefined();
-    expect(byCost["special"]).toBeUndefined();
-  });
-
-  it("every entry has a non-empty key, label, cost, and description", () => {
-    for (const a of UNIVERSAL_ACTIONS) {
-      expect(a.key.length, `key empty on entry "${a.label}"`).toBeGreaterThan(0);
-      expect(a.label.length, `label empty on key "${a.key}"`).toBeGreaterThan(0);
-      expect(a.cost.length, `cost empty on key "${a.key}"`).toBeGreaterThan(0);
-      expect(a.description.length, `description empty on key "${a.key}"`).toBeGreaterThan(0);
-    }
-  });
-});
-
-describe("universalActionsForCost", () => {
-  it("returns only entries for the requested cost", () => {
-    const actions = universalActionsForCost("action");
-    expect(actions.length).toBe(12);
-    expect(actions.every((a) => a.cost === "action")).toBe(true);
-  });
-
-  it("returns bonusAction entries", () => {
-    const actions = universalActionsForCost("bonusAction");
-    expect(actions.length).toBe(1);
-    expect(actions[0].key).toBe("castSpellBonus");
-  });
-
-  it("returns reaction entries", () => {
-    const actions = universalActionsForCost("reaction");
-    expect(actions.length).toBe(2);
-    expect(actions.map((a) => a.key).sort()).toEqual(
-      ["opportunityAttack", "castSpellReaction"].sort(),
-    );
-  });
-
-  it("returns [] for a cost with no matching entries", () => {
-    expect(universalActionsForCost("free")).toEqual([]);
-    expect(universalActionsForCost("special")).toEqual([]);
   });
 });

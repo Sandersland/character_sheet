@@ -80,12 +80,12 @@ describe("the converse: an undeclared fork is pruned (#1313's remaining work)", 
       data: { name: ART_NAME, source: "shadowArts", description: "2024", edition: "EDITION_2024" },
     });
 
-    // The shape seedShadowArts passes today: `SHADOW_ARTS.map(a => ({ name: a.name, edition: null }))`.
+    // The shape seedShadowArts passes today: `SHADOW_ARTS.map(a => ({ identity: a.name, edition: null }))`.
     // The name IS declared, but only in the null partition — the 2014/2024
     // partitions get `notIn: []`, which matches everything in them.
-    const seededAsToday = [{ name: ART_NAME, edition: null }];
+    const seededAsToday = [{ identity: ART_NAME, edition: null }];
     await prisma.grantedAbility.deleteMany({
-      where: staleCatalogRowsWhere(seededAsToday, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
+      where: staleCatalogRowsWhere("name", seededAsToday, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
     });
 
     const surviving = (await prisma.grantedAbility.findMany({ where: { name: ART_NAME } })).map((r) => r.edition);
@@ -101,13 +101,13 @@ describe("the converse: an undeclared fork is pruned (#1313's remaining work)", 
     });
 
     // What #1313 must do: ShadowArtSeed gains `edition?: SeedEdition` and
-    // seedShadowArts maps `{ name: a.name, edition: a.edition ?? null }`.
+    // seedShadowArts maps `{ identity: a.name, edition: a.edition ?? null }`.
     const seededWithEditions = [
-      { name: ART_NAME, edition: "EDITION_2014" as const },
-      { name: ART_NAME, edition: "EDITION_2024" as const },
+      { identity: ART_NAME, edition: "EDITION_2014" as const },
+      { identity: ART_NAME, edition: "EDITION_2024" as const },
     ];
     await prisma.grantedAbility.deleteMany({
-      where: staleCatalogRowsWhere(seededWithEditions, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
+      where: staleCatalogRowsWhere("name", seededWithEditions, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
     });
 
     const surviving = (await prisma.grantedAbility.findMany({ where: { name: ART_NAME } })).map((r) => r.edition);

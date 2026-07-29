@@ -1,6 +1,8 @@
 import { Router } from "express";
 
 import { prisma } from "@/lib/core/prisma.js";
+import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 
 export const subclassChoicesRouter = Router({ mergeParams: true });
 
@@ -11,12 +13,21 @@ export const subclassChoicesRouter = Router({ mergeParams: true });
 // = the SubclassChoice.catalogSource. Which choices a character can make and how
 // many is carried by the serialized character's resources.subclassChoices; this
 // route supplies the pickable options. Alphabetical.
+//
+// Mounted top-level, so `?edition=` is REQUIRED and a cross-edition row is
+// omitted SILENTLY (#1412) — both for the reasons spelled out at maneuversRouter,
+// including the deliberate asymmetry with crossEditionRejection: a list read has
+// no player intent to contradict, a supplied id does.
 subclassChoicesRouter.get("/:source", async (req, res) => {
+  const edition = requireEditionOr400(req, res);
+  if (edition === undefined) return;
+
   const { source } = req.params;
-  const options = await prisma.grantedAbility.findMany({
-    where: { source },
+  const rows = await prisma.grantedAbility.findMany({
+    where: withEditionOrShared({ source }, edition),
     orderBy: { name: "asc" },
   });
+  const options = resolveEditionCatalog(rows, edition, (row) => row.name);
 
   res.json(
     options.map((row) => ({

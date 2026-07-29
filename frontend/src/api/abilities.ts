@@ -57,9 +57,14 @@ export async function applyWarriorOfElementsTransactions(
 }
 
 // Feeds the Warrior of Shadow monk's Shadow Arts picker — the single flat
-// 1-focus Darkness cast (2024 rewrite, #1246).
-export async function fetchShadowArts(): Promise<CatalogShadowArt[]> {
-  return request<CatalogShadowArt[]>("/shadow-arts", undefined, "Failed to fetch shadow arts catalog");
+// 1-focus Darkness cast (2024 rewrite, #1246). `edition` is required for the
+// same reason as fetchManeuvers below (#1412).
+export async function fetchShadowArts(edition: RulesEdition): Promise<CatalogShadowArt[]> {
+  return request<CatalogShadowArt[]>(
+    `/shadow-arts?edition=${edition}`,
+    undefined,
+    "Failed to fetch shadow arts catalog",
+  );
 }
 
 // Applies a batch of Warrior of Shadow operations atomically: castShadowArt
@@ -98,8 +103,13 @@ export async function applyChannelDivinityTransactions(
 
 // Feeds the class-features section's "learn a maneuver" picker. Ordered
 // alphabetically server-side; no client-side re-sort needed.
-export async function fetchManeuvers(): Promise<CatalogManeuver[]> {
-  return request<CatalogManeuver[]>("/maneuvers", undefined, "Failed to fetch maneuver catalog");
+//
+// `edition` is required, not optional (#1412): the route 400s without it, so an
+// omission is a compile error at every call site rather than a picker that
+// silently degrades to empty. Same query-param-not-header reasoning as
+// fetchSubclassChoiceOptions below.
+export async function fetchManeuvers(edition: RulesEdition): Promise<CatalogManeuver[]> {
+  return request<CatalogManeuver[]>(`/maneuvers?edition=${edition}`, undefined, "Failed to fetch maneuver catalog");
 }
 
 // Feeds the level-up ceremony's subclassChoice step (choiceConfigForStep, #1422)
