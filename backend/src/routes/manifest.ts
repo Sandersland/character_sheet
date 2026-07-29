@@ -11,6 +11,7 @@ import { campaignsRouter } from "@/routes/campaign/campaigns.js";
 import { classRouter } from "@/routes/character/class.js";
 import { charactersRouter } from "@/routes/character/characters.js";
 import { conditionsRouter } from "@/routes/character/conditions.js";
+import { editionsRouter } from "@/routes/catalog/editions.js";
 import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
 import { experienceRouter } from "@/routes/character/experience.js";
@@ -59,6 +60,9 @@ export const routeManifest: RouteMount[] = [
   { router: itemsRouter, mount: "/api", scope: "authed" },
   { router: spellsRouter, mount: "/api", scope: "authed" },
   { router: featsRouter, mount: "/api", scope: "authed" },
+  // Edition-independent by construction (#1436): the only catalog route that
+  // takes no `?edition=`, because it is what the client reads to CHOOSE one.
+  { router: editionsRouter, mount: "/api", scope: "authed" },
 
   // Character-scoped routers own their sub-path under /characters/:id and read
   // :id via mergeParams (see each Router({ mergeParams: true })).
