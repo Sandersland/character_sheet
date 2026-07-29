@@ -219,8 +219,21 @@ EOF
 $gen
 FRONTEND_PORT=$frontend
 VITE_PROXY_TARGET=http://localhost:$backend
+EOF
+
+  # VITE_API_URL is mode-scoped, NOT in the file above, because vitest runs as
+  # mode "test" and would otherwise inherit it: the api layer falls back to an
+  # absolute URL, and two leveling tests parse what it builds with `new URL()`,
+  # which throws on a relative "/api". Runtime wants relative so the SPA rides
+  # the Vite proxy and stays same-origin; unit tests want the absolute default.
+  # Scoping by mode gives each what it needs (#1458).
+  local mode
+  for mode in development production; do
+    cat > "$path/frontend/.env.$mode" <<EOF
+$gen
 VITE_API_URL=/api
 EOF
+  done
 }
 
 print_ports() {

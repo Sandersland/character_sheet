@@ -3,6 +3,9 @@ dist/
 build/
 coverage/
 .env
+# Vite's mode-scoped variants, generated per worktree slot (#1458).
+.env.development
+.env.production
 *.log
 .DS_Store
 backend/src/generated/
