@@ -119,7 +119,7 @@ describe("Shadow Arts cast endpoint", () => {
       update: { gateLevel: 3, castingAbility: "wisdom" },
     });
 
-    darknessId = (await prisma.grantedAbility.findUnique({ where: { name: "Shadow Arts: Darkness" } }))!.id;
+    darknessId = (await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness" } }))!.id;
   });
 
   afterAll(async () => {
@@ -446,7 +446,7 @@ describe("resolveConcentration clamp for multiclass Warrior of Shadow", () => {
       update: {},
     });
     mcClassId = cls.id;
-    mcDarknessId = (await prisma.grantedAbility.findUnique({ where: { name: "Shadow Arts: Darkness" } }))!.id;
+    mcDarknessId = (await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness" } }))!.id;
   });
 
   afterAll(async () => {
@@ -547,11 +547,12 @@ describe("Shadow Arts source guard", () => {
       update: {},
     });
     sourceClassId = cls.id;
-    const row = await prisma.grantedAbility.upsert({
-      where: { name: NON_SHADOW_NAME },
-      create: { name: NON_SHADOW_NAME, description: "A maneuver, not a Shadow Art.", source: "maneuver", minLevel: 3, costKind: "pool", costPoolKey: "focus", costBase: 2 },
-      update: { source: "maneuver" },
-    });
+    const row = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: NON_SHADOW_NAME, edition: null },
+      { name: NON_SHADOW_NAME, description: "A maneuver, not a Shadow Art.", source: "maneuver", minLevel: 3, costKind: "pool", costPoolKey: "focus", costBase: 2 },
+      { source: "maneuver" },
+    );
     nonShadowId = row.id;
   });
 

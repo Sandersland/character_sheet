@@ -16,11 +16,14 @@ import type { SeedEdition } from "./edition.js";
 //
 // Model-agnostic by shape (any table with `name`/`edition` columns), so
 // seedFeats and seedShadowArts's GrantedAbility prune share this one function
-// rather than two copies. GrantedAbility.name stays plain @unique today (no
-// divergent row CAN exist to disambiguate — that needs a migration widening
-// the constraint first, not just a code change), so partitioning changes no
-// observable behavior there yet; it only stops being a no-op once that
-// migration lands and a row actually forks.
+// rather than two copies. Both are now genuinely partitioned: #1415 widened
+// GrantedAbility to @@unique([name, edition]), so a divergent row CAN exist
+// there and the partitioning stopped being a no-op.
+//
+// A caller passing only `edition: null` entries gives the 2014/2024 partitions
+// an empty `notIn: []`, which matches EVERY row in them — correct for a source
+// that authors no forked content, fatal for one that does. So a source gaining
+// forked rows must thread their editions into `seeded` in the same change.
 export function staleCatalogRowsWhere(
   seeded: { name: string; edition: SeedEdition | null }[],
   extraWhere: object = {},
