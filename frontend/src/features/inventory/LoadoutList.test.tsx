@@ -7,6 +7,9 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import { seedItemRarities } from "@/test/rarities";
 import type { Character, InventoryItem } from "@/types/character";
 
+// equippable/allowedSlots/proficient are served per row (#1433) — the fixtures
+// set them rather than letting the component re-derive from category/twoHanded,
+// which is exactly the behaviour this suite now pins.
 function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
   return {
     id: "i",
@@ -16,6 +19,9 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     ...overrides,
   };
 }
@@ -23,6 +29,8 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
 const weapon = (twoHanded: boolean, o: Partial<InventoryItem> = {}) =>
   item({
     category: "weapon",
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 8,
@@ -52,25 +60,22 @@ const versatileWeapon = (grip: "one-handed" | "versatile-two-handed", faces: num
     ...o,
   });
 
-const ring = (o: Partial<InventoryItem> = {}) => item({ category: "gear", slot: "RING", ...o });
-
-interface Profs {
-  weapon?: { name: string }[];
-  armor?: { category: string }[];
-}
+const ring = (o: Partial<InventoryItem> = {}) => item({ category: "gear", slot: "RING", allowedSlots: ["RING"], ...o });
 
 // LoadoutList resolves rarity labels through useItemRarities(character
 // .rulesEdition) (#1437), so the fixture carries an edition and every render
 // seeds that edition's reference cache.
-function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character {
+function makeCharacter(inventory: InventoryItem[], over: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Aria",
     rulesEdition: "EDITION_2024",
     armorClass: 15,
     inventory,
-    weaponProficiencies: profs.weapon ?? [],
-    armorProficiencies: profs.armor ?? [],
+    weaponProficiencies: [],
+    armorProficiencies: [],
+    offHandLocked: false,
+    ...over,
   } as unknown as Character;
 }
 
@@ -79,9 +84,9 @@ function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character
 function renderList(
   inventory: InventoryItem[],
   onSubmit = vi.fn().mockResolvedValue(undefined),
-  profs: Profs = {},
+  over: Partial<Character> = {},
 ) {
-  const character = makeCharacter(inventory, profs);
+  const character = makeCharacter(inventory, over);
   seedItemRarities("EDITION_2024");
   renderWithCharacter(<LoadoutList pending={false} onSubmit={onSubmit} />, character);
   return { onSubmit };
@@ -127,7 +132,7 @@ describe("LoadoutList groups & rows", () => {
     expect(screen.getByText("Not proficient")).toBeInTheDocument();
     unmount();
 
-    renderList([martial], vi.fn(), { weapon: [{ name: "Martial Weapons" }] });
+    renderList([martial], vi.fn(), { weaponProficiencies: [{ name: "Martial Weapons", source: "class" }] });
     expect(screen.queryByText("Not proficient")).toBeNull();
   });
 
@@ -161,11 +166,7 @@ describe("LoadoutList groups & rows", () => {
   });
 
   it("shows the versatile grip badge on the main-hand row", () => {
-    renderList(
-      [versatileWeapon("versatile-two-handed", 10, { id: "ls", equippedSlot: "MAIN_HAND" })],
-      vi.fn(),
-      { weapon: [{ name: "Martial Weapons" }] },
-    );
+    renderList([versatileWeapon("versatile-two-handed", 10, { id: "ls", equippedSlot: "MAIN_HAND" })]);
     expect(screen.getByText("1d10")).toBeInTheDocument();
   });
 });

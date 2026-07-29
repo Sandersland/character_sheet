@@ -17,6 +17,9 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     ...overrides,
   };
 }
@@ -24,6 +27,8 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
 const weapon = (twoHanded: boolean, o: Partial<InventoryItem> = {}) =>
   item({
     category: "weapon",
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 8,

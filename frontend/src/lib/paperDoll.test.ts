@@ -25,6 +25,9 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     ...overrides,
   };
 }
@@ -32,6 +35,8 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
 const weapon = (twoHanded = false, o: Partial<InventoryItem> = {}) =>
   item({
     category: "weapon",
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 8,
@@ -49,10 +54,10 @@ const weapon = (twoHanded = false, o: Partial<InventoryItem> = {}) =>
   });
 
 const shield = (o: Partial<InventoryItem> = {}) =>
-  item({ category: "armor", armor: { armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false, stealthDisadvantage: false }, ...o });
+  item({ category: "armor", equippable: true, allowedSlots: ["OFF_HAND"], armor: { armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false, stealthDisadvantage: false }, ...o });
 
 const bodyArmor = (o: Partial<InventoryItem> = {}) =>
-  item({ category: "armor", armor: { armorCategory: "medium", baseArmorClass: 14, dexModifierApplies: true, stealthDisadvantage: false }, ...o });
+  item({ category: "armor", equippable: true, allowedSlots: ["BODY"], armor: { armorCategory: "medium", baseArmorClass: 14, dexModifierApplies: true, stealthDisadvantage: false }, ...o });
 
 describe("equipSlotLabel", () => {
   it("humanizes underscored slot keys", () => {

@@ -13,6 +13,9 @@ const mockItem: InventoryItem = {
   equipped: false,
   attuned: false,
   requiresAttunement: false,
+  equippable: true,
+  allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+  proficient: true,
   weapon: {
     damageDiceCount: 1,
     damageDiceFaces: 4,
@@ -165,6 +168,9 @@ describe("InventoryRow (edit mode)", () => {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: true,
+    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+    proficient: true,
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 4,
@@ -188,6 +194,9 @@ describe("InventoryRow (edit mode)", () => {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: true,
+    allowedSlots: ["BODY"],
+    proficient: true,
     armor: {
       armorCategory: "light",
       baseArmorClass: 11,
@@ -204,6 +213,9 @@ describe("InventoryRow (edit mode)", () => {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     consumable: {
       effectDiceCount: 2,
       effectDiceFaces: 4,
