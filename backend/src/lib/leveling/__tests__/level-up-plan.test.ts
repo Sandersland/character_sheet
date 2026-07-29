@@ -21,12 +21,20 @@ function char(
   return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], edition };
 }
 
+// Placeholder for the ~50 cases below that assert on step KINDS and never on HP
+// numbers: `hitDie` is required (#1380) so they need a value, but which one is
+// irrelevant to them and pinning each class's real die would be noise.
+// **If you add an HP-meta assertion to a kinds-only test, pass that class's real
+// die** — every case that reads meta does so explicitly (see the hitPoints-meta
+// describe), and this default would silently give a Wizard the Fighter's d10.
+const ANY_DIE = "d10";
+
 function target(
   name: string,
   newLevel: number,
   subclass: string | null = null,
   subclassLevel?: number,
-  hitDie = "d10",
+  hitDie = ANY_DIE,
 ): TargetClassEntry {
   return { name, newLevel, subclass, subclassLevel, hitDie };
 }
