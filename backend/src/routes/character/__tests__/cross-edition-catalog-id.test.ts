@@ -19,6 +19,8 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
+import { InvalidLevelUpError } from "@/lib/leveling/level-up-submission.js";
 
 const OWNER_ID = "owner-cross-edition-catalog-id";
 let COOKIE: string;
@@ -609,5 +611,81 @@ describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", ()
     expect(res.status).toBe(200);
     expect(res.body.classes[0].subclass).toBe(SUB_SHARED);
     expect(res.body.hitDice.total).toBe(3);
+  });
+
+  it("(AC) the preview rejects a 2014-tagged subclass for a 2024 character instead of naming it", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024d");
+    const res = await getPlan(id, classEntryId, subId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+    expect(res.body.target).toBeUndefined();
+  });
+
+  it("(symmetry) the preview rejects a 2024-tagged subclass for a 2014 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2014", "XEd LevelUp 2014c");
+    const res = await getPlan(id, classEntryId, subId2024);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+    expect(res.body.target).toBeUndefined();
+  });
+
+  // AC 4a (rewritten): the issue's original AC asked for the commit 400 to be
+  // TELLABLE APART from the preview's by message text, which is unsatisfiable —
+  // both now come from the same crossEditionRejection call in
+  // resolveLevelUpContext and surface through `{ error: error.message }`, so
+  // they are byte-identical over HTTP by construction. Identity is the property
+  // worth pinning: one rejection, one wording, wherever the player meets it.
+  it("(AC 4a) the commit path's rejection is string-equal to the preview's", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024e");
+    const preview = await getPlan(id, classEntryId, subId2014);
+    const commit = await commitLevelUp(id, classEntryId, subId2014);
+    expect(commit.status).toBe(400);
+    expect(commit.body.error).toBe(preview.body.error);
+  });
+
+  // AC 4b (rewritten): the ordering proof the message text can't give. At
+  // newLevel 5 the plan carries NO subclass step, so resolveEffectivePlan's
+  // "does not include a subclass choice" is what a submission carrying a
+  // subclassId gets today. Seeing the cross-edition message instead proves
+  // resolveLevelUpContext ran — and rejected — before validateLevelUpSubmission.
+  it("(AC 4b) rejects on edition before the plan's no-subclass-step check", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024f", {
+      xp: 6500,
+      entryLevel: 4,
+      hitDiceTotal: 4,
+    });
+    const res = await commitLevelUp(id, classEntryId, subId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).not.toMatch(/does not include a subclass choice/);
+  });
+
+  // AC 4c (rewritten): the error CLASS is what distinguishes this rejection from
+  // applySetSubclass's InvalidClassOperationError — over HTTP both are a 400
+  // with the same text, so only a direct lib call can assert which one threw.
+  it("(AC 4c) resolveLevelUpContext itself rejects with InvalidLevelUpError", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024g");
+    await expect(
+      resolveLevelUpContext(id, { kind: "existing", classEntryId }, subId2014),
+    ).rejects.toBeInstanceOf(InvalidLevelUpError);
+  });
+
+  // AC 5 (kept, re-labelled): a REGRESSION guard, not data-loss prevention. The
+  // level-up batch is already atomic, so this passed before the guard too — it
+  // exists so a future refactor that moves the rejection inside the write
+  // transaction (or splits the batch) turns red here.
+  it("(AC 5 regression guard) a rejected commit leaves level, hit dice and subclass untouched", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024h");
+    const res = await commitLevelUp(id, classEntryId, subId2014);
+    expect(res.status).toBe(400);
+    const character = await prisma.character.findUniqueOrThrow({
+      where: { id },
+      select: { hitDice: true, classEntries: { select: { level: true, subclassId: true } } },
+    });
+    expect((character.hitDice as { total: number }).total).toBe(2);
+    expect(character.classEntries[0].level).toBe(2);
+    expect(character.classEntries[0].subclassId).toBeNull();
   });
 });
