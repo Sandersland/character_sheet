@@ -10,6 +10,7 @@ import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
 import { getActiveSession } from "@/lib/session/sessions.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 // Shared-campaign backbone (#246). Plain-REST (like journal.ts): no audit log,
 // no transaction-op pattern. Membership is identity state, access is gated via
@@ -30,6 +31,15 @@ const attachCharacterSchema = z.object({ characterId: z.string().min(1) }).stric
 // Same opaque-token recipe as session.ts.
 function generateInviteCode(): string {
   return crypto.randomBytes(12).toString("base64url");
+}
+
+// Every campaign row on the wire carries its resolved edition label next to the
+// key (#1436, the #1322 precedent), so the client's edition badge needs neither a
+// label table of its own nor a /api/editions round-trip. Applied at each
+// campaign-returning res.json below — serializeCharacter carries its own, so the
+// attach handler's response needs nothing here.
+function withEditionLabel<T extends { rulesEdition: RulesEdition }>(row: T) {
+  return { ...row, rulesEditionLabel: RULES_EDITION_LABELS[row.rulesEdition] };
 }
 
 // Standard include for campaign reads: members (with user) + their characters.
@@ -68,7 +78,7 @@ campaignsRouter.post("/campaigns", async (req, res) => {
     include: campaignInclude,
   });
 
-  res.status(201).json(campaign);
+  res.status(201).json(withEditionLabel(campaign));
 });
 
 /**
@@ -85,7 +95,7 @@ campaignsRouter.get("/campaigns", async (req, res) => {
 
   res.json(
     campaigns.map((campaign) => ({
-      ...campaign,
+      ...withEditionLabel(campaign),
       // The membership always exists (the WHERE filters to it); ?? satisfies the type.
       role: campaign.members.find((m) => m.userId === userId)?.role ?? "PLAYER",
     })),
@@ -111,7 +121,7 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
     },
   });
 
-  res.json({ ...campaign, role });
+  res.json({ ...withEditionLabel(campaign), role });
 });
 
 /**
@@ -147,7 +157,7 @@ campaignsRouter.post("/campaigns/join", async (req, res) => {
     where: { id: campaign.id },
     include: campaignInclude,
   });
-  res.json(joined);
+  res.json(withEditionLabel(joined));
 });
 
 /**

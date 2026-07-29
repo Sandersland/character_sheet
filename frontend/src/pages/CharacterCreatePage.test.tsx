@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import CharacterCreatePage from "@/pages/CharacterCreatePage";
 import { createCharacter, fetchCampaigns, fetchItems, fetchReference, fetchSpells } from "@/api/client";
+import { seedEditions } from "@/test/editions";
 import type { Campaign, ReferenceData } from "@/types/character";
 
 // Real: useCharacterDraft, useReferenceData, the ability/skill/tool DOM. Mock the
@@ -23,6 +24,9 @@ vi.mock("@/api/client", () => ({
   fetchCampaigns: vi.fn(),
   createCharacter: vi.fn(),
   addCharacterToCampaign: vi.fn(),
+  // CreationEntryGate calls useEditions (#1436); a full-factory mock must list it
+  // or the query fn is undefined and the gate throws on mount.
+  fetchEditions: vi.fn(),
 }));
 
 const mockFetchReference = vi.mocked(fetchReference);
@@ -113,6 +117,9 @@ beforeEach(() => {
   // gate goes straight to the edition picker.
   mockFetchCampaigns.mockResolvedValue([]);
   mockCreateCharacter.mockResolvedValue({ id: "new-1" } as never);
+  // The entry gate waits on /api/editions too (#1436); seeding the cache resolves
+  // it with no request, so no spec here needs to await a second round-trip.
+  seedEditions();
 });
 
 function renderPage() {
@@ -341,6 +348,7 @@ describe("CharacterCreatePage — subclass gate per edition (#1325)", () => {
       name: "Old Ways Table",
       ownerId: "u1",
       rulesEdition: "EDITION_2014",
+      rulesEditionLabel: "2014 rules",
       inviteCode: "abc123",
       createdAt: new Date().toISOString(),
       role: "OWNER",

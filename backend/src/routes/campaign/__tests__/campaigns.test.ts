@@ -102,6 +102,39 @@ describe("campaigns (#246)", () => {
     expect(created.body.rulesEdition).toBe("EDITION_2014");
   });
 
+  // #1436: the label rides every campaign row so the client's edition badge is
+  // synchronous and holds no copy of the label table. All four campaign-returning
+  // responses are covered in one spec because withEditionLabel is applied per
+  // res.json site — a missed site is invisible from any single one of them.
+  it("carries rulesEditionLabel on create, list, detail and join", async () => {
+    const created = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "Label Table", rulesEdition: "EDITION_2014" });
+    expect(created.status).toBe(201);
+    expect(created.body.rulesEditionLabel).toBe("2014 rules");
+
+    const id = created.body.id as string;
+
+    const list = await supertest(createApp()).get("/api/campaigns").set("Cookie", cookieA);
+    const listed = (list.body as { id: string; rulesEditionLabel: string; role: string }[]).find(
+      (c) => c.id === id,
+    );
+    expect(listed?.rulesEditionLabel).toBe("2014 rules");
+    // The list spread must not have clobbered `role` (#1436's wrap-don't-replace).
+    expect(listed?.role).toBe("OWNER");
+
+    const detail = await supertest(createApp()).get(`/api/campaigns/${id}`).set("Cookie", cookieA);
+    expect(detail.body.rulesEditionLabel).toBe("2014 rules");
+    expect(detail.body.role).toBe("OWNER");
+
+    const joined = await supertest(createApp())
+      .post("/api/campaigns/join")
+      .set("Cookie", cookieB)
+      .send({ inviteCode: created.body.inviteCode });
+    expect(joined.body.rulesEditionLabel).toBe("2014 rules");
+  });
+
   it("400s an unknown rulesEdition value on create", async () => {
     const res = await supertest(createApp())
       .post("/api/campaigns")

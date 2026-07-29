@@ -207,6 +207,10 @@ export interface Character {
   campaignPreferences?: CampaignPreferences;
   /** Authoritative rules edition for this sheet (#1285); write-once at creation. */
   rulesEdition: RulesEdition;
+  /** The edition's display label, resolved server-side (#1436). REQUIRED, not
+   *  optional: it is always served, and optional would let a fixture omit it and
+   *  the badge silently render empty. */
+  rulesEditionLabel: string;
 }
 
 export interface CharacterSummary {

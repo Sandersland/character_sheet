@@ -12,7 +12,6 @@ import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import PreferencesSheet from "@/features/preferences/PreferencesSheet";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { EDITION_LABELS } from "@/lib/editionCopy";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
 
 type HeaderVariant = "expanded" | "collapsed";
@@ -375,9 +374,10 @@ function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps
               {character.race} · {classLine}
             </span>
             {/* Same Badge as the desktop banner (#1286) — kept out of the race/class
-                text node above so existing exact-text assertions don't need touching. */}
+                text node above so existing exact-text assertions don't need touching.
+                Label served with the sheet (#1436), never resolved client-side. */}
             <Badge tone="neutral" className="mt-0.5">
-              {EDITION_LABELS[character.rulesEdition]}
+              {character.rulesEditionLabel}
             </Badge>
           </span>
         </button>

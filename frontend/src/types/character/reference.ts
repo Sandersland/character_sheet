@@ -130,6 +130,24 @@ export interface ItemRarityOption {
   standardValueGp: number | null;
 }
 
+/** One selectable rules edition, served by `GET /api/editions` (#1436) with its
+ *  copy already resolved — the frontend holds no edition label/description table.
+ *  `unavailableReason` present means visible but unselectable (#1371). */
+export interface EditionOption {
+  key: RulesEdition;
+  label: string;
+  description: string;
+  unavailableReason?: string;
+}
+
+/** `GET /api/editions` (#1436). `editions` is in display order and `defaultEdition`
+ *  is served explicitly: never re-derive it from `editions[0]` — that positional
+ *  coupling is what this endpoint exists to delete. */
+export interface EditionsResponse {
+  defaultEdition: RulesEdition;
+  editions: EditionOption[];
+}
+
 export interface ReferenceData {
   races: RaceOption[];
   classes: ClassOption[];

@@ -21,6 +21,7 @@ import { campaignsRouter } from "@/routes/campaign/campaigns.js";
 import { classRouter } from "@/routes/character/class.js";
 import { charactersRouter } from "@/routes/character/characters.js";
 import { conditionsRouter } from "@/routes/character/conditions.js";
+import { editionsRouter } from "@/routes/catalog/editions.js";
 import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
 import { experienceRouter } from "@/routes/character/experience.js";
@@ -79,6 +80,7 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   { name: "itemsRouter", router: itemsRouter, probe: { method: "get", path: "/api/items" } },
   { name: "spellsRouter", router: spellsRouter, probe: { method: "get", path: "/api/spells" } },
   { name: "featsRouter", router: featsRouter, probe: { method: "get", path: "/api/feats" } },
+  { name: "editionsRouter", router: editionsRouter, probe: { method: "get", path: "/api/editions" } },
   // No GET on hitPointsRouter — only POST "/".
   {
     name: "hitPointsRouter",

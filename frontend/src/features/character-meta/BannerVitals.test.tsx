@@ -11,6 +11,7 @@ const mockCharacter: Character = {
   id: "char-1",
   ownerId: "user-1",
   rulesEdition: "EDITION_2024",
+  rulesEditionLabel: "2024 rules",
   name: "Aria Swiftwind",
   race: "Elf",
   class: "Ranger",

@@ -24,6 +24,9 @@ vi.mock("@/api/client", () => ({
   unmergeEntityMerge: vi.fn(),
   fetchCampaignItems: vi.fn(),
   fetchItems: vi.fn(),
+  // Listed only so the edition-badge spec can prove it is NEVER called — the
+  // badge reads the label served with the campaign row (#1436).
+  fetchEditions: vi.fn(),
 }));
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
@@ -32,6 +35,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     name: "The Sunless Citadel",
     ownerId: "u1",
     rulesEdition: "EDITION_2024",
+    rulesEditionLabel: "2024 rules",
     inviteCode: "abc123",
     createdAt: new Date().toISOString(),
     role: "OWNER",
@@ -147,14 +151,21 @@ describe("CampaignDetailPage (#246)", () => {
   });
 
   // #1286: displayed on the campaign header (not the character-list card).
-  it("shows the campaign's rules edition in the header", async () => {
-    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ rulesEdition: "EDITION_2014" }));
+  // The editions cache is deliberately unseeded: after #1436 this page never
+  // calls useEditions, so "never requested" is the observable claim.
+  it("shows the campaign's rules edition in the header, with no /api/editions request", async () => {
+    // Both fields set explicitly — a fixture that derived the label from the key
+    // would be a re-implementation of the very mapping this issue moved server-side.
+    vi.mocked(client.fetchCampaign).mockResolvedValue(
+      makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    );
     vi.mocked(client.fetchCharacters).mockResolvedValue([]);
 
     renderDetail();
 
     await screen.findByText("The Sunless Citadel");
     expect(screen.getByText("2014 rules")).toBeInTheDocument();
+    expect(vi.mocked(client.fetchEditions)).not.toHaveBeenCalled();
   });
 
   it("excludes a character already in a different campaign from the dropdown", async () => {
