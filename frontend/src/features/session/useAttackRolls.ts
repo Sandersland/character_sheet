@@ -12,6 +12,7 @@ import { useRef, useState } from "react";
 import { critDamageSpec } from "@/lib/attackMath";
 import { autoVerdict, isCritRow } from "@/lib/attackTallySummary";
 import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
+import { randomId } from "@/lib/ids";
 import { resolveRollMode, rollModeChip } from "@/lib/rollMode";
 import { useRoll } from "@/features/dice/RollContext";
 import type { useRollLogger } from "@/features/session/useRollLogger";
@@ -117,7 +118,7 @@ export function useAttackRolls({
       nat1: isNaturalOne(result),
     };
     // Fresh id per attack (#1235) — the damage roll below reads it back via entry.id.
-    const swingId = crypto.randomUUID();
+    const swingId = randomId();
     swingIdRef.current[entry.id] = swingId;
     logRollSafe("attack", entry.logSource, result, attackSpec, undefined, {
       swingId,
