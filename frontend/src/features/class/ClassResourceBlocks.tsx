@@ -55,7 +55,6 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
 
       {view.hasManeuvers && (
         <ManeuversSection
-          characterId={character.id}
           resources={resources!}
           maneuverSaveDC={character.maneuvers?.saveDC}
           maneuverKnownIds={view.maneuverKnownIds}

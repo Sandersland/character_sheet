@@ -213,7 +213,8 @@ export async function learnManeuver(
   };
   if (character.resources?.maneuversKnown?.some((m) => m.name === maneuverName)) return;
 
-  const catalogResponse = await request.get("/api/maneuvers");
+  // `?edition=` is required (#1412); every e2e persona is a default-2024 character.
+  const catalogResponse = await request.get("/api/maneuvers?edition=EDITION_2024");
   expect(catalogResponse.ok(), `list maneuvers: ${catalogResponse.status()}`).toBeTruthy();
   const catalog = (await catalogResponse.json()) as { id: string; name: string }[];
   const match = catalog.find((m) => m.name === maneuverName);

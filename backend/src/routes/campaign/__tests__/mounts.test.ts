@@ -28,10 +28,12 @@ function agent() {
 }
 
 describe("catalog routers stay top-level", () => {
+  // `?edition=` is required on both (#1412) — a bare GET is a 400 by design, so
+  // this mount probe carries one. What it pins is the MOUNT, not the filtering.
   it.each(["/api/maneuvers", "/api/shadow-arts"])(
     "GET %s returns a catalog array",
     async (url) => {
-      const res = await agent().get(url);
+      const res = await agent().get(`${url}?edition=EDITION_2024`);
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
     },

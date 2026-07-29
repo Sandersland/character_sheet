@@ -3,7 +3,6 @@ import AddManeuverPanel from "@/features/class/AddManeuverPanel";
 import ManeuverRow from "@/features/class/ManeuverRow";
 
 interface Props {
-  characterId: string;
   resources: CharacterResources;
   /** The `maneuvers` rider's saveDC (#1316) — a top-level Character field, not part of `resources`. */
   maneuverSaveDC?: number;
@@ -14,7 +13,6 @@ interface Props {
 }
 
 export default function ManeuversSection({
-  characterId,
   resources,
   maneuverSaveDC,
   maneuverKnownIds,
@@ -49,7 +47,6 @@ export default function ManeuversSection({
       )}
 
       <AddManeuverPanel
-        characterId={characterId}
         knownIds={maneuverKnownIds}
         choiceCount={resources.maneuverChoiceCount!}
         knownCount={resources.maneuversKnown.length}

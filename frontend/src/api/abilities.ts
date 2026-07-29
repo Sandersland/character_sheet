@@ -98,8 +98,13 @@ export async function applyChannelDivinityTransactions(
 
 // Feeds the class-features section's "learn a maneuver" picker. Ordered
 // alphabetically server-side; no client-side re-sort needed.
-export async function fetchManeuvers(): Promise<CatalogManeuver[]> {
-  return request<CatalogManeuver[]>("/maneuvers", undefined, "Failed to fetch maneuver catalog");
+//
+// `edition` is required, not optional (#1412): the route 400s without it, so an
+// omission is a compile error at every call site rather than a picker that
+// silently degrades to empty. Same query-param-not-header reasoning as
+// fetchSubclassChoiceOptions below.
+export async function fetchManeuvers(edition: RulesEdition): Promise<CatalogManeuver[]> {
+  return request<CatalogManeuver[]>(`/maneuvers?edition=${edition}`, undefined, "Failed to fetch maneuver catalog");
 }
 
 // Feeds the level-up ceremony's subclassChoice step (choiceConfigForStep, #1422)
