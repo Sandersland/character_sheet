@@ -551,7 +551,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
 
   describe("GET /api/feats", () => {
     it("returns improvements on catalog feats", async () => {
-      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats");
+      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats?edition=EDITION_2024");
       expect(res.status).toBe(200);
       const alert = res.body.find((f: { name: string }) => f.name === "Alert (Advancement Suite)");
       expect(alert).toBeDefined();
@@ -559,7 +559,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
 
     it("exposes category, levelPrerequisite, and repeatable", async () => {
-      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats");
+      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats?edition=EDITION_2024");
       const boon = res.body.find((f: { name: string }) => f.name === "Boon Test Feat (Advancement Suite)");
       expect(boon).toMatchObject({ category: "epic_boon", levelPrerequisite: 19, repeatable: false });
       const origin = res.body.find((f: { name: string }) => f.name === "Origin Test Feat (Advancement Suite)");
@@ -568,7 +568,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
 
     it("round-trips a scaling improvement (proficiencyBonus) unchanged", async () => {
-      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats");
+      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats?edition=EDITION_2024");
       const scaling = res.body.find((f: { name: string }) => f.name === "Scaling Test Feat (Advancement Suite)");
       expect(scaling.improvements).toEqual([{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]);
     });
