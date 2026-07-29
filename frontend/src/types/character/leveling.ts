@@ -145,6 +145,26 @@ export interface LevelUpStep {
   meta?: Record<string, unknown>;
 }
 
+/**
+ * The `hitPoints` step's served meta (#1380). Every number is resolved by the
+ * backend planner from the functions the level-up transaction commits with, for
+ * the class this level-up actually advances — the client renders them and never
+ * re-derives them. Read through `readHitPointsMeta`.
+ */
+export interface HitPointsStepMeta {
+  die: string;
+  faces: number;
+  conMod: number;
+  /**
+   * The die's Con-free fixed average (d6→4 … d12→7). Served separately because
+   * the max(1, …) level-up floor makes it unrecoverable as averageGain − conMod.
+   */
+  fixedAverage: number;
+  averageGain: number;
+  minRoll: number;
+  maxRoll: number;
+}
+
 /** GET /api/characters/:id/level-up/plan — the derived ceremony plan (#886). */
 export interface LevelUpPlanResponse {
   target: {

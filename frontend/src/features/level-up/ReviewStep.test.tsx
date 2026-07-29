@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchFeats, fetchManeuvers, fetchReference, fetchSpells } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
 import ReviewStep from "@/features/level-up/ReviewStep";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -12,7 +12,6 @@ vi.mock("@/api/client", () => ({
   fetchManeuvers: vi.fn(),
   fetchSpells: vi.fn(),
   fetchFeats: vi.fn(),
-  fetchReference: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -25,9 +24,6 @@ beforeEach(() => {
     ReturnType<typeof fetchSpells>
   >);
   vi.mocked(fetchFeats).mockResolvedValue([]);
-  vi.mocked(fetchReference).mockResolvedValue({
-    classes: [{ id: "cls-fighter", name: "Fighter", hitDie: "d10" }],
-  } as unknown as Awaited<ReturnType<typeof fetchReference>>);
 });
 
 const character = {
@@ -38,9 +34,14 @@ const character = {
   abilityScores: { strength: 16, dexterity: 14, constitution: 15, intelligence: 10, wisdom: 12, charisma: 8 },
 } as unknown as Character;
 
+// The HP row's numbers ride on the plan's own hitPoints step (#1380): the
+// ADVANCING class's d10 at Con 15 (+2), which is what the backend planner
+// resolves and serves.
+const HP_META = { die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12 };
+
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Champion", newLevel: 8, isPrimary: true },
-  steps: [],
+  steps: [{ kind: "hitPoints", meta: HP_META }],
   grantedSpells: [],
 };
 
@@ -64,21 +65,17 @@ function renderReview(
 }
 
 describe("ReviewStep", () => {
-  it("uses the advancing class's hit die, not the persisted primary die, for a multiclass HP row (Wizard 5 -> first Fighter level, #1441)", async () => {
+  it("uses the advancing class's hit die, not the persisted primary die, for a multiclass HP row (Wizard 5 -> first Fighter level, #1441)", () => {
     const wizard = {
       ...character,
-      rulesEdition: "EDITION_2024",
       hitPoints: { max: 30 },
       hitDice: { total: 5, die: "d6" },
     } as unknown as Character;
-    renderReview(
-      { hp: { method: "average" } },
-      { character: wizard, target: { kind: "new", classId: "cls-fighter" } },
-    );
+    renderReview({ hp: { method: "average" } }, { character: wizard });
     // Con 15 → +2; d10 average (Fighter, the advancing class) = 8; max 30 → 38.
-    // Known transient: reference starts null on first paint, so this can flash
-    // the stale d6 answer (36) for one frame — findByText, not getByText.
-    expect(await screen.findByText("38")).toBeInTheDocument();
+    // No first-paint flash of the stale d6 answer any more: the die arrives with
+    // the plan rather than resolving asynchronously from the reference catalog.
+    expect(screen.getByText("38")).toBeInTheDocument();
   });
 
   it("shows the level and HP before → after", () => {
