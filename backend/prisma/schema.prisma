@@ -961,7 +961,7 @@ model Action {
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // emit it), so a class row's NULL edition still admits at most one row per
-  // key — see 20260729_widen_action_key_edition.
+  // key — see 20260729120000_widen_action_key_edition.
   @@unique([key, edition])
 }
 
