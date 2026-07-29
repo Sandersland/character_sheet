@@ -7,6 +7,9 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import { seedItemRarities } from "@/test/rarities";
 import type { Character, InventoryItem } from "@/types/character";
 
+// equippable/allowedSlots/proficient are served per row (#1433) — the fixtures
+// set them rather than letting the component re-derive from category/twoHanded,
+// which is exactly the behaviour this suite now pins.
 function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
   return {
     id: "i",
@@ -16,6 +19,9 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     ...overrides,
   };
 }
@@ -23,6 +29,8 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
 const weapon = (twoHanded: boolean, o: Partial<InventoryItem> = {}) =>
   item({
     category: "weapon",
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 8,
@@ -52,25 +60,22 @@ const versatileWeapon = (grip: "one-handed" | "versatile-two-handed", faces: num
     ...o,
   });
 
-const ring = (o: Partial<InventoryItem> = {}) => item({ category: "gear", slot: "RING", ...o });
-
-interface Profs {
-  weapon?: { name: string }[];
-  armor?: { category: string }[];
-}
+const ring = (o: Partial<InventoryItem> = {}) => item({ category: "gear", slot: "RING", allowedSlots: ["RING"], ...o });
 
 // LoadoutList resolves rarity labels through useItemRarities(character
 // .rulesEdition) (#1437), so the fixture carries an edition and every render
 // seeds that edition's reference cache.
-function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character {
+function makeCharacter(inventory: InventoryItem[], over: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Aria",
     rulesEdition: "EDITION_2024",
     armorClass: 15,
     inventory,
-    weaponProficiencies: profs.weapon ?? [],
-    armorProficiencies: profs.armor ?? [],
+    weaponProficiencies: [],
+    armorProficiencies: [],
+    offHandLocked: false,
+    ...over,
   } as unknown as Character;
 }
 
@@ -79,9 +84,9 @@ function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character
 function renderList(
   inventory: InventoryItem[],
   onSubmit = vi.fn().mockResolvedValue(undefined),
-  profs: Profs = {},
+  over: Partial<Character> = {},
 ) {
-  const character = makeCharacter(inventory, profs);
+  const character = makeCharacter(inventory, over);
   seedItemRarities("EDITION_2024");
   renderWithCharacter(<LoadoutList pending={false} onSubmit={onSubmit} />, character);
   return { onSubmit };
@@ -107,27 +112,41 @@ describe("LoadoutList groups & rows", () => {
     expect(screen.getByRole("button", { name: "Equip Ring 2" })).toBeInTheDocument();
   });
 
-  it("shows a locked off-hand row (no picker) when a two-handed weapon is main-hand", () => {
-    renderList([weapon(true, { id: "gs", name: "Greatsword", equippedSlot: "MAIN_HAND" })]);
-    expect(screen.getByText("Held by Greatsword (two-handed)")).toBeInTheDocument();
+  // The served character flag drives the lock, not the row's own twoHanded bit:
+  // a ONE-handed main-hand weapon still locks the off-hand when the server says so.
+  it("shows a locked off-hand row (no picker) from the served offHandLocked flag", () => {
+    renderList([weapon(false, { id: "ls", name: "Longsword", equippedSlot: "MAIN_HAND" })], vi.fn(), {
+      offHandLocked: true,
+    });
+    expect(screen.getByText("Held by Longsword (two-handed)")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Equip Off hand" })).toBeNull();
   });
 
-  it("warns on a non-proficient equipped item but not a proficient one", () => {
-    const martial = weapon(false, {
-      id: "axe",
-      name: "Greataxe",
-      equippedSlot: "MAIN_HAND",
-      weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
-    });
+  it("leaves the off-hand pickable when offHandLocked is false, even for a two-handed row", () => {
+    renderList([weapon(true, { id: "gs", name: "Greatsword", equippedSlot: "MAIN_HAND" })]);
+    expect(screen.queryByText(/Held by/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Equip Off hand" })).toBeInTheDocument();
+  });
+
+  // The served per-row flag drives the warning, not character.weaponProficiencies:
+  // the proficient case keeps that array EMPTY, which would warn on staging.
+  it("warns from the served proficient flag, not the character's grant list", () => {
+    const martial = (proficient: boolean) =>
+      weapon(false, {
+        id: "axe",
+        name: "Greataxe",
+        equippedSlot: "MAIN_HAND",
+        proficient,
+        weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
+      });
     const { unmount } = renderWithCharacter(
       <LoadoutList pending={false} onSubmit={vi.fn()} />,
-      makeCharacter([martial]),
+      makeCharacter([martial(false)], { weaponProficiencies: [{ name: "Martial Weapons", source: "class" }] }),
     );
     expect(screen.getByText("Not proficient")).toBeInTheDocument();
     unmount();
 
-    renderList([martial], vi.fn(), { weapon: [{ name: "Martial Weapons" }] });
+    renderList([martial(true)]);
     expect(screen.queryByText("Not proficient")).toBeNull();
   });
 
@@ -161,11 +180,7 @@ describe("LoadoutList groups & rows", () => {
   });
 
   it("shows the versatile grip badge on the main-hand row", () => {
-    renderList(
-      [versatileWeapon("versatile-two-handed", 10, { id: "ls", equippedSlot: "MAIN_HAND" })],
-      vi.fn(),
-      { weapon: [{ name: "Martial Weapons" }] },
-    );
+    renderList([versatileWeapon("versatile-two-handed", 10, { id: "ls", equippedSlot: "MAIN_HAND" })]);
     expect(screen.getByText("1d10")).toBeInTheDocument();
   });
 });

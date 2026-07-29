@@ -4,27 +4,8 @@ import {
   ITEM_CATEGORY_LABELS,
   ITEM_CATEGORY_OPTIONS,
   ITEM_CATEGORY_ORDER,
-  isEquippable,
   itemCategoryLabel,
 } from "@/lib/items";
-
-describe("isEquippable", () => {
-  it("treats weapons as equippable", () => {
-    expect(isEquippable("weapon")).toBe(true);
-  });
-
-  it("treats armor as equippable", () => {
-    expect(isEquippable("armor")).toBe(true);
-  });
-
-  it("treats gear as not equippable", () => {
-    expect(isEquippable("gear")).toBe(false);
-  });
-
-  it("treats consumables as not equippable", () => {
-    expect(isEquippable("consumable")).toBe(false);
-  });
-});
 
 describe("item category labels", () => {
   it("maps all four categories to plural labels", () => {

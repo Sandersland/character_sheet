@@ -38,7 +38,14 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
 
 // fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/spells/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
 function useLedgerResolvers(draft: LevelUpDraft, edition: RulesEdition): { resolvers: LedgerResolvers; resolving: boolean } {
-  const maneuvers = useCatalogNames(draft.maneuvers?.length ? fetchManeuvers : undefined);
+  // Keyed on the BOOLEAN, never on draft.maneuvers' array identity — see the
+  // [fetcher]-identity hazard spelled out at featFetcher below (#1412).
+  const needsManeuvers = !!draft.maneuvers?.length;
+  const maneuverFetcher = useMemo(
+    () => (needsManeuvers ? () => fetchManeuvers(edition) : undefined),
+    [needsManeuvers, edition],
+  );
+  const maneuvers = useCatalogNames(maneuverFetcher);
   // Cantrips share the spell catalog, so either list gates the same fetch (#1157).
   const spells = useCatalogNames(draft.spellsLearned?.length || draft.cantripsLearned?.length ? fetchSpells : undefined);
   // Any taken feat fetches the catalog — a custom feat resolves by its own name,
@@ -52,9 +59,9 @@ function useLedgerResolvers(draft: LevelUpDraft, edition: RulesEdition): { resol
   // Keyed on the BOOLEAN, never on draft.fightingStyleFeat's object identity, and
   // never an inline arrow: useCatalogNames's effect depends on [fetcher], so a
   // fresh identity every render means fetch → setMap → re-render → fetch, forever.
-  // The sibling maneuver/spell resolvers get away with bare module refs only
-  // because they take no argument — that asymmetry is deliberate, not an
-  // oversight to tidy up.
+  // Only fetchSpells still gets away with a bare module ref, because it alone
+  // takes no argument — every edition-scoped fetcher must be memoised, and
+  // #1412 moved maneuvers across that line.
   const needsFeats = draft.advancement?.type === "takeFeat" || !!draft.fightingStyleFeat;
   const featFetcher = useMemo(
     () => (needsFeats ? () => fetchFeats(edition) : undefined),

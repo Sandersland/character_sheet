@@ -77,7 +77,9 @@ describe("ClassFeaturesSection — Fighting Style", () => {
     render(makeFighter({ total: 1 }));
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
-    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014");
+    // No asiLevel (#1438): the server's ASI gate rejects every fighting_style row,
+    // so a level here would render this picker permanently empty.
+    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014", undefined);
     // A general-category feat must not leak into the fighting-style picker.
     expect(await screen.findByText("Archery")).toBeInTheDocument();
     expect(screen.queryByText("Sentinel")).not.toBeInTheDocument();

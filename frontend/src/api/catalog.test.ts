@@ -106,6 +106,22 @@ describe("fetchFeats", () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/feats\?edition=EDITION_2014$/);
   });
 
+  it("appends ?asiLevel= only when a level is given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchFeats("EDITION_2024", 19);
+    await fetchFeats("EDITION_2024");
+    await fetchFeats("EDITION_2024", undefined);
+
+    // The absent cases must not send `asiLevel=undefined`: the route treats any
+    // present-but-unparseable value as a 400 (#1438), so a stringified undefined
+    // would break the non-ASI consumers rather than serving them the full catalog.
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/feats\?edition=EDITION_2024&asiLevel=19$/);
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/feats\?edition=EDITION_2024$/);
+    expect(fetchMock.mock.calls[2][0]).toMatch(/\/feats\?edition=EDITION_2024$/);
+  });
+
   it("throws on a non-ok response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 

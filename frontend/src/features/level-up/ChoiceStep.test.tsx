@@ -96,6 +96,13 @@ describe("ChoiceStep", () => {
     expect(screen.queryByText("Trip Attack")).not.toBeInTheDocument();
   });
 
+  it("sends the character's edition to the maneuver catalog fetch (#1412)", async () => {
+    const character = { rulesEdition: "EDITION_2014", resources: {}, advancements: [] } as unknown as Character;
+    render(<Harness step={{ kind: "maneuvers", count: 2 }} character={character} />);
+
+    await waitFor(() => expect(vi.mocked(fetchManeuvers)).toHaveBeenCalledWith("EDITION_2014"));
+  });
+
   it("pushes a learnManeuver op when an option is clicked", async () => {
     const user = userEvent.setup();
     render(<Harness step={{ kind: "maneuvers", count: 2 }} />);

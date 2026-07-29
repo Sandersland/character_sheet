@@ -7,9 +7,10 @@ import {
 } from "@/lib/srd/proficiencies.js";
 import * as barrel from "@/lib/srd/srd.js";
 
-// Pure unit tests — no DB. Pins the proficiency rules now that they are
-// exported for reuse (#1432); the assertions mirror the frontend mirror's
-// `isProficientWithItem` block so a divergence shows up here.
+// Pure unit tests — no DB. Pins the proficiency rules now that they are exported
+// for reuse (#1432) and served per inventory row as `proficient` (#1433): these
+// assertions decide whether the sheet shows a "Not proficient" warning, so a
+// divergence here is a visible regression, not just a refactor.
 
 const simpleWeapon = { category: "weapon", name: "Club", weaponClass: "simple" } as const;
 const martialWeapon = { category: "weapon", name: "Longsword", weaponClass: "martial" } as const;

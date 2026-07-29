@@ -14,9 +14,8 @@ import {
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
+import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
-import { isRulesEdition } from "@/lib/rules/edition.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
 
 export const referenceRouter = Router();
 
@@ -26,16 +25,8 @@ export const referenceRouter = Router();
 // Proficiencies-card dropdown (creation tool pickers derive from per-class
 // toolChoices, not this list).
 referenceRouter.get("/reference", async (req, res) => {
-  const rawEdition = req.query.edition;
-  if (rawEdition === undefined) {
-    res.status(400).json({ error: "Missing required query parameter: edition" });
-    return;
-  }
-  if (!isRulesEdition(rawEdition)) {
-    res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
-    return;
-  }
-  const edition: RulesEdition = rawEdition;
+  const edition = requireEditionOr400(req, res);
+  if (edition === undefined) return;
 
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.

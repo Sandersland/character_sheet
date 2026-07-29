@@ -163,6 +163,31 @@ describe("ReviewStep", () => {
     expect(fetchFeats).toHaveBeenCalledWith("EDITION_2014");
   });
 
+  // The maneuver twin of the feat case above (#1412), and needed for the same
+  // two reasons: fetchManeuvers now takes an argument, so its fetcher can no
+  // longer be a bare module ref and is one inline arrow away from an infinite
+  // refetch. Without it the Review ledger silently degrades to raw ids — a 400
+  // that useCatalogNames swallows into {}.
+  it("fetches the maneuver catalog once across a re-render, for the character's edition", async () => {
+    const draft: LevelUpDraft = {
+      hp: { method: "average" },
+      maneuvers: [{ type: "learnManeuver", maneuverId: "m1" }],
+    };
+    const { rerender } = renderReview(draft);
+    expect(await screen.findByText("Riposte")).toBeInTheDocument();
+
+    rerender(
+      <LevelUpStepContext.Provider
+        value={{ character, draft, setDraft: () => {}, plan, target: { kind: "existing", classEntryId: "entry-1" } }}
+      >
+        <ReviewStep />
+      </LevelUpStepContext.Provider>,
+    );
+
+    expect(fetchManeuvers).toHaveBeenCalledTimes(1);
+    expect(fetchManeuvers).toHaveBeenCalledWith("EDITION_2014");
+  });
+
   it("resolves cantrip names via the spell catalog (#1157)", async () => {
     renderReview({
       hp: { method: "average" },

@@ -13,6 +13,9 @@ const mockItem: InventoryItem = {
   equipped: false,
   attuned: false,
   requiresAttunement: false,
+  equippable: true,
+  allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+  proficient: true,
   weapon: {
     damageDiceCount: 1,
     damageDiceFaces: 4,
@@ -63,10 +66,19 @@ describe("InventoryRow (view mode)", () => {
     expect(toggle).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("hides the Equip toggle for a non-equippable (gear) item", () => {
-    renderRow({ item: { ...mockItem, category: "gear", weapon: undefined } });
+  // The toggle is gated on the SERVED `equippable` flag, not on the category —
+  // worn gear with a declared slot is placeable yet still gets no toggle (#1433).
+  it("hides the Equip toggle for a non-equippable item", () => {
+    renderRow({ item: { ...mockItem, category: "gear", weapon: undefined, equippable: false, allowedSlots: [] } });
     expect(screen.queryByRole("button", { name: "Equip" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Equipped" })).toBeNull();
+  });
+
+  it("hides the Equip toggle on worn gear that still declares a slot", () => {
+    renderRow({
+      item: { ...mockItem, category: "gear", weapon: undefined, slot: "RING", equippable: false, allowedSlots: ["RING"] },
+    });
+    expect(screen.queryByRole("button", { name: "Equip" })).toBeNull();
   });
 
   it("shows the charge-pool pill with the recharge tooltip (#555)", () => {
@@ -165,6 +177,9 @@ describe("InventoryRow (edit mode)", () => {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: true,
+    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+    proficient: true,
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 4,
@@ -188,6 +203,9 @@ describe("InventoryRow (edit mode)", () => {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: true,
+    allowedSlots: ["BODY"],
+    proficient: true,
     armor: {
       armorCategory: "light",
       baseArmorClass: 11,
@@ -204,6 +222,9 @@ describe("InventoryRow (edit mode)", () => {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     consumable: {
       effectDiceCount: 2,
       effectDiceFaces: 4,

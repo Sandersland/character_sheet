@@ -1,4 +1,5 @@
-const MAX_LEVEL = 20;
+/** Edition-invariant: both SRD 5.1 and SRD 5.2 cap a character at 20. */
+export const MAX_LEVEL = 20;
 
 // Index 0 = XP required for level 1 (always 0) ... index 19 = level 20.
 const XP_THRESHOLDS: readonly number[] = [

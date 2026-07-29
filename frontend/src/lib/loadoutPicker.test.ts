@@ -11,18 +11,23 @@ import {
 } from "@/lib/loadoutPicker";
 import type { InventoryItem } from "@/types/character";
 
+// `allowedSlots` is served (#1433) and `bagItemsForSlot` reads it — a fixture
+// omitting it throws rather than degrading, so the cast must still supply it.
 function weapon(over: Partial<InventoryItem>, twoHanded = false): InventoryItem {
   return {
     category: "weapon",
     quantity: 1,
     equipped: false,
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
+    proficient: true,
     weapon: { twoHanded },
     ...over,
   } as unknown as InventoryItem;
 }
 
 const longsword = weapon({ id: "ls", name: "Longsword", equipped: true, equippedSlot: "MAIN_HAND" });
-const shield = { ...weapon({ id: "sh", name: "Shield", equipped: true, equippedSlot: "OFF_HAND" }), category: "armor", armor: { armorCategory: "shield" } } as unknown as InventoryItem;
+const shield = { ...weapon({ id: "sh", name: "Shield", equipped: true, equippedSlot: "OFF_HAND" }), category: "armor", allowedSlots: ["OFF_HAND"], armor: { armorCategory: "shield" } } as unknown as InventoryItem;
 const bagDagger1 = weapon({ id: "d1", name: "Dagger" });
 const bagDagger2 = weapon({ id: "d2", name: "Dagger" });
 const bagGreataxe = weapon({ id: "ga", name: "Greataxe" }, true);

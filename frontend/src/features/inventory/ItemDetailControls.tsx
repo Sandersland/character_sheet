@@ -2,7 +2,6 @@ import ActivateControl from "@/features/inventory/ActivateControl";
 import AttuneToggle from "@/features/inventory/AttuneToggle";
 import EquipToggle from "@/features/inventory/EquipToggle";
 import UseConsumableButton from "@/features/inventory/UseConsumableButton";
-import { isEquippable } from "@/lib/items";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
 
 interface ItemDetailControlsProps {
@@ -16,7 +15,7 @@ interface ItemDetailControlsProps {
 // use, attune, activate — each gated by the item's shape, same as the row.
 export default function ItemDetailControls({ item, pending, atCap, onSubmit }: ItemDetailControlsProps) {
   const hasControls =
-    isEquippable(item.category) ||
+    item.equippable ||
     item.category === "consumable" ||
     item.requiresAttunement ||
     Boolean(item.activated);
@@ -24,7 +23,7 @@ export default function ItemDetailControls({ item, pending, atCap, onSubmit }: I
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {isEquippable(item.category) && <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />}
+      {item.equippable && <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />}
       {item.category === "consumable" && (
         <UseConsumableButton item={item} pending={pending} onSubmit={onSubmit} />
       )}

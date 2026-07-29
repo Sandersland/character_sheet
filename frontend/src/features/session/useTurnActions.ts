@@ -139,7 +139,7 @@ export function useTurnActions({
     consumableCount: consumableCount(character),
     hasSpellcasting: character.spellcasting !== undefined,
     classActionOptions: classActions.map(enrich),
-    loadoutLabel: equippedLoadoutLabel(character.inventory),
+    loadoutLabel: equippedLoadoutLabel(character.inventory, character.offHandLocked),
     interactionBudgetRemaining: interactionBudgetRemaining({
       attackEquipCredits: turnState.attackEquipCredits,
       freeInteractionUsed: turnState.freeInteractionUsed,

@@ -19,12 +19,13 @@ import type { Character, InventoryItem } from "@/types/character";
 // Cast to avoid satisfying the full ~50-field Character interface.
 
 function makeCharacter(
-  overrides: Partial<Pick<Character, "attacksPerAction" | "inventory">> = {},
+  overrides: Partial<Pick<Character, "attacksPerAction" | "inventory" | "offHandLocked">> = {},
 ): Character {
   return {
     attacksPerAction: 1,
     inventory: [],
     advancements: [],
+    offHandLocked: false,
     ...overrides,
   } as unknown as Character;
 }
@@ -37,6 +38,9 @@ function lightWeapon(id: string): InventoryItem {
     category: "weapon",
     quantity: 1,
     equipped: true,
+    equippable: true,
+    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+    proficient: true,
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 6,
@@ -58,6 +62,9 @@ function heavyWeapon(id: string): InventoryItem {
     category: "weapon",
     quantity: 1,
     equipped: true,
+    equippable: true,
+    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+    proficient: true,
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 8,
@@ -1569,7 +1576,7 @@ describe("localStorage persistence", () => {
 
 /** Character with a current-HP value, for the damage watcher. */
 function withHp(current: number): Character {
-  return { attacksPerAction: 1, inventory: [], advancements: [], hitPoints: { current, max: 20, temp: 0 } } as unknown as Character;
+  return { attacksPerAction: 1, inventory: [], advancements: [], offHandLocked: false, hitPoints: { current, max: 20, temp: 0 } } as unknown as Character;
 }
 
 describe("turn-hook activity window (#457)", () => {

@@ -7,6 +7,7 @@ import {
   formFromItem,
   hasRange,
   num,
+  previewEquipSlots,
   str,
   unitForCost,
   weaponFields,
@@ -183,5 +184,24 @@ describe("formFromItem", () => {
     const f = formFromItem({ ...base, cost: { cp: 0, sp: 50, gp: 0, pp: 0 } });
     expect(f.valueUnit).toBe("sp");
     expect(f.costSp).toBe("50");
+  });
+});
+
+describe("previewEquipSlots (#1433)", () => {
+  it("splits a weapon by grip", () => {
+    expect(previewEquipSlots(form({ category: "weapon", twoHanded: false }))).toEqual(["MAIN_HAND", "OFF_HAND"]);
+    expect(previewEquipSlots(form({ category: "weapon", twoHanded: true }))).toEqual(["MAIN_HAND"]);
+  });
+
+  it("splits armor by shield vs body", () => {
+    expect(previewEquipSlots(form({ category: "armor", armorCategory: "shield" }))).toEqual(["OFF_HAND"]);
+    expect(previewEquipSlots(form({ category: "armor", armorCategory: "heavy" }))).toEqual(["BODY"]);
+  });
+
+  // Gear authors its slot with a picker and a consumable has none, so the
+  // preview line never renders for them — no branch here to keep in sync.
+  it("has no preview for gear or a consumable", () => {
+    expect(previewEquipSlots(form({ category: "gear", slot: "HEAD" }))).toEqual([]);
+    expect(previewEquipSlots(form({ category: "consumable" }))).toEqual([]);
   });
 });

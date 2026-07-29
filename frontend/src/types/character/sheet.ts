@@ -166,6 +166,12 @@ export interface Character {
   /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
   attacksPerAction: number;
 
+  /** Server-resolved (#1433): a two-handed weapon in MAIN_HAND locks OFF_HAND, so
+   *  nothing may occupy it. A property of the whole loadout, hence one boolean
+   *  rather than a per-item flag. Distinct from the backend-internal "off-hand
+   *  busy" notion (shield or second weapon) that only picks a versatile die. */
+  offHandLocked: boolean;
+
   /** Rogue Sneak Attack Nd6, absent for a non-rogue. See the `Rider` type. */
   sneakAttack?: DiceRider;
 

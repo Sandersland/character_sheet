@@ -54,6 +54,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     subclass: "Battle Master",
     level: 5,
     inventory: [],
+    offHandLocked: false,
     hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
     unarmedStrike: {
       attackBonus: 2,
@@ -972,6 +973,10 @@ describe("TurnHub — mid-turn weapon change (#815, interaction-budget model #11
       category: "weapon",
       quantity: 1,
       equipped: false,
+      equippable: true,
+      // Served (#1433) — bagItemsForSlot filters on it, so a cast omitting it throws.
+      allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+      proficient: true,
       weapon: { twoHanded: false, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing" },
       ...over,
     } as unknown as Character["inventory"][number];
