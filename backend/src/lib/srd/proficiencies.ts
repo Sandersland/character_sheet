@@ -1,5 +1,6 @@
 import type { RollEventAttackComponents } from "@character-sheet/shared-types";
 
+import type { ArmorCategory, ItemCategory } from "@/lib/inventory/item-detail-inputs.js";
 import { abilityModifier } from "@/lib/srd/math.js";
 
 /** Armor categories that a character can be proficient with. */
@@ -65,7 +66,7 @@ export const RACE_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
  * Tolerates `null`/`undefined` weaponClass (no category match; falls back to
  * name matching only).
  */
-function isProficientWithWeapon(
+export function isProficientWithWeapon(
   weapon: { name: string; weaponClass?: string | null },
   grants: ReadonlyArray<{ name: string }>,
 ): boolean {
@@ -78,6 +79,55 @@ function isProficientWithWeapon(
     if (grantSingular === lcName) return true;
   }
   return false;
+}
+
+/**
+ * Returns true if the character is proficient with the given armor category.
+ *
+ * Armor grants are category-keyed only — there is no plural specific-name form
+ * to fall back on the way `isProficientWithWeapon` has one, so a category match
+ * is the whole rule.
+ */
+export function isProficientWithArmor(
+  armorCategory: ArmorCategory | null | undefined,
+  grants: ReadonlyArray<{ category: string }>,
+): boolean {
+  if (!armorCategory) return true;
+  return grants.some((grant) => grant.category === armorCategory);
+}
+
+/**
+ * Proficiency for any inventory item, dispatching to the weapon or armor rule
+ * by category (#554).
+ *
+ * An item with no derivable requirement — gear, a consumable, a weapon with no
+ * `weaponClass`, armor with no `armorCategory` — is reported proficient. That is
+ * a **no-warn display policy, not a rules claim**: the sheet must not flag an
+ * item it cannot classify.
+ *
+ * Edition-invariant, so no `edition` parameter: both PHB'14 p.144–145 and
+ * SRD 5.2 (Equipment) resolve proficiency by matching the item's category or
+ * name against granted proficiencies.
+ */
+export function isProficientWithItem(
+  item: {
+    category: ItemCategory;
+    name: string;
+    weaponClass?: string | null;
+    armorCategory?: ArmorCategory | null;
+  },
+  weaponGrants: ReadonlyArray<{ name: string }>,
+  armorGrants: ReadonlyArray<{ category: string }>,
+): boolean {
+  if (item.category === "weapon") {
+    // The no-warn default lives here rather than in `isProficientWithWeapon`,
+    // which must keep returning false for an unclassifiable weapon so
+    // `deriveWeaponAttackComponents` withholds the proficiency bonus.
+    if (!item.weaponClass) return true;
+    return isProficientWithWeapon(item, weaponGrants);
+  }
+  if (item.category === "armor") return isProficientWithArmor(item.armorCategory, armorGrants);
+  return true;
 }
 
 /**
