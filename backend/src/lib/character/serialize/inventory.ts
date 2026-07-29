@@ -12,6 +12,7 @@ import {
   activatedMaxUses,
   chargePoolOf,
   describeActivatedReminder,
+  describeAttunementPrereq,
   describeChargeRecharge,
   deriveItemGrants,
   readCapability,
@@ -71,6 +72,9 @@ function buildInventoryItemPlacement(row: CharacterWithRelations["inventoryItems
     requiresAttunement: row.requiresAttunement,
     attunementPrereqKind: row.attunementPrereqKind ?? undefined,
     attunementPrereqValue: row.attunementPrereqValue ?? undefined,
+    attunementPrereqText: row.attunementPrereqKind
+      ? describeAttunementPrereq({ kind: row.attunementPrereqKind, value: row.attunementPrereqValue })
+      : undefined,
     notes: row.notes ?? undefined,
   };
 }

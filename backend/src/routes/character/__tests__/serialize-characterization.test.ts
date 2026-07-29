@@ -7,7 +7,9 @@
  * lists, multiclass-aware classes with subclass visibility, attacksPerAction,
  * advancementSlots, conditions). It is the byte-parity oracle for the
  * view-builder extraction: green now, and must stay green UNEDITED after the
- * inline derivations become named per-domain builders.
+ * inline derivations become named per-domain builders. That latch is about
+ * *refactors* — a deliberate wire-shape change (e.g. #1382 adding a field) does
+ * update the expectations here, and the strict toEqual is what forces it to.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -538,6 +540,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         requiresAttunement: true,
         attunementPrereqKind: "class",
         attunementPrereqValue: "Fighter",
+        attunementPrereqText: "a Fighter",
         notes: "Keep polished.",
         weapon: {
           damageDiceCount: 1,
