@@ -26,6 +26,7 @@ import {
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
 import { equippedLoadoutLabel } from "@/lib/paperDoll";
 import { interactionBudgetRemaining } from "@/lib/loadoutPicker";
+import { useUniversalActions } from "@/hooks/useUniversalActions";
 import { useManeuverActions } from "@/features/session/useManeuverActions";
 import { useTurnActionMutations } from "@/features/session/useTurnActionMutations";
 import { resolverFor, type ResolutionKind } from "@/features/session/actionResolvers";
@@ -127,8 +128,14 @@ export function useTurnActions({
   // derivations) — built here so the slot components stay presentational and
   // `character` never flows into them.
   const enrich = (a: AvailableAction) => classActionOption(a, resolverFor(a.key), character);
+  // Universal actions are served per edition (#1430), not held client-side, and
+  // are read HERE rather than in the sheet bodies so those stay presentational
+  // ("all data arrives via the ActionSheetModel") and `character` never flows
+  // into them.
+  const universalActions = useUniversalActions(character.rulesEdition);
   const actionSheetModel = {
     attackSummary: mainWeaponSummary(character),
+    universalActions,
     consumableCount: consumableCount(character),
     hasSpellcasting: character.spellcasting !== undefined,
     classActionOptions: classActions.map(enrich),
@@ -146,6 +153,7 @@ export function useTurnActions({
   };
   const reactionSheetModel = {
     attackSummary: mainWeaponSummary(character),
+    universalActions,
     hasSpellcasting: character.spellcasting !== undefined,
     classReactionOptions: classReactions.map(enrich),
   };

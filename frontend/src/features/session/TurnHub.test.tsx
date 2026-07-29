@@ -18,6 +18,7 @@ import {
   logRoll,
   rollInitiativeTransaction,
 } from "@/api/client";
+import { seedUniversalActions } from "@/test/universalActions";
 import { axe } from "@/test/axe";
 import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
@@ -34,12 +35,21 @@ vi.mock("@/api/client", () => ({
   applyInventoryTransactions: vi.fn(),
   logRoll: vi.fn(),
   rollInitiativeTransaction: vi.fn(),
+  // Must be present even though every test seeds the reference cache directly
+  // and never calls it (#1430): useTurnActions' useUniversalActions imports it
+  // from this same barrel, and an omitted export here is `undefined`, which the
+  // query CALLS the moment it enables — the trap ConditionsStrip.test.tsx
+  // documents.
+  fetchReference: vi.fn(),
 }));
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Tester",
+    // useUniversalActions keys the reference query on this, so it must be a real
+    // edition or the query stays pending (skipToken) and no universal card renders.
+    rulesEdition: "EDITION_2024",
     class: "Fighter",
     subclass: "Battle Master",
     level: 5,
@@ -129,6 +139,9 @@ function echoCharacter(): Character {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  // Both editions, so a test can render either without re-seeding.
+  seedUniversalActions("EDITION_2024");
+  seedUniversalActions("EDITION_2014");
   vi.mocked(applyActionTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(applyResourceTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(castManeuverTransaction).mockImplementation(async () => ({
@@ -1224,5 +1237,72 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
     await user.click(screen.getByRole("button", { name: "Deflect Attacks" }));
 
     expect(screen.getByText(/Deflect Attacks — reduce any damage type/)).toBeInTheDocument();
+  });
+});
+
+// #1430: the universal cards are served per edition now, not held client-side.
+// These are the surfaces where the 2014/2024 divergence is actually visible.
+describe("TurnHub — universal actions come from GET /api/reference (#1430)", () => {
+  const openActionSheet = async (character: Character) => {
+    const user = userEvent.setup();
+    renderHub(character);
+    await startTurn(user);
+    await user.click(screen.getByRole("button", { name: "Use Action" }));
+    return user;
+  };
+
+  // slotView takes ["Attack", …class actions, …served action-cost rows except
+  // attack].slice(0, 4). With no class actions that is Attack plus the first
+  // three served names — and because the route sorts by name AFTER resolution,
+  // the 2024 rename moves "Magic" out of the window entirely while 2014's "Cast
+  // a Spell" sits inside it. That asymmetry IS the rename reaching the UI.
+  it("the collapsed Action-slot preview uses the SERVED names and order — 2024 has no Cast a Spell", async () => {
+    const user = userEvent.setup();
+    renderHub(makeCharacter({ availableActions: [] } as unknown as Partial<Character>));
+    await startTurn(user);
+    expect(screen.getByText("Attack · Dash · Disengage · Dodge")).toBeInTheDocument();
+    expect(screen.queryByText(/Cast a Spell/)).toBeNull();
+  });
+
+  it("the 2014 preview still reads Cast a Spell", async () => {
+    const user = userEvent.setup();
+    renderHub(
+      makeCharacter({ rulesEdition: "EDITION_2014", availableActions: [] } as unknown as Partial<Character>),
+    );
+    await startTurn(user);
+    expect(screen.getByText("Attack · Cast a Spell · Dash · Disengage")).toBeInTheDocument();
+  });
+
+  it("2024 gains the Study and Influence tiles; the hardcoded primary cards are unchanged", async () => {
+    const user = await openActionSheet(makeCharacter());
+    await user.click(screen.getByRole("button", { name: /More actions/ }));
+
+    expect(screen.getByRole("button", { name: "Study" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Influence" })).toBeInTheDocument();
+    // Primary titles are literals in ActionSheetBody, so the renames never reach them.
+    expect(screen.getByRole("button", { name: "Use an item" })).toBeInTheDocument();
+  });
+
+  it("2014 gains neither", async () => {
+    const user = await openActionSheet(makeCharacter({ rulesEdition: "EDITION_2014" } as unknown as Partial<Character>));
+    await user.click(screen.getByRole("button", { name: /More actions/ }));
+
+    expect(screen.queryByRole("button", { name: "Study" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Influence" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Grapple" })).toBeInTheDocument();
+  });
+
+  // The reaction sheet's card set is the same in both editions — only the
+  // spell-card's name forks, since SRD 5.2 has no "Cast a Spell" action.
+  it("serves the reaction cards for both editions", async () => {
+    const user = userEvent.setup();
+    // opportunityAttack is a class action on the default fixture, so the
+    // universal OA row is filtered out; drop it to see the served one.
+    renderHub(makeCharacter({ availableActions: [], spellcasting: { spells: [] } } as unknown as Partial<Character>));
+    await startTurn(user);
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+
+    expect(screen.getByRole("button", { name: "Opportunity Attack" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cast a Reaction Spell" })).toBeInTheDocument();
   });
 });

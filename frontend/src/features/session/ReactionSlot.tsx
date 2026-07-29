@@ -3,9 +3,8 @@ import { GiCrossedSwords, GiCycle, GiSpellBook, MoreHorizontal } from "@/compone
 import { ClassActionCard } from "@/features/session/ActionSheetBody";
 import OptionCard from "@/features/session/OptionCard";
 import { TurnSlotCard, ReactionResult } from "@/features/session/TurnControls";
-import { UNIVERSAL_ACTIONS, type TurnActionOption } from "@/lib/turnRules";
 import type { ReactionSheetModel } from "@/lib/turnOptions";
-import type { AvailableAction } from "@/types/character";
+import type { AvailableAction, UniversalActionOption } from "@/types/character";
 
 /** One universal reaction as an option card — OA gets the weapon summary,
  *  reaction-speed casting is gated on the character being a caster. */
@@ -14,7 +13,7 @@ function UniversalReactionCard({
   sheetModel,
   onClick,
 }: {
-  action: TurnActionOption;
+  action: UniversalActionOption;
   sheetModel: ReactionSheetModel;
   onClick: () => void;
 }) {
@@ -23,7 +22,7 @@ function UniversalReactionCard({
     return (
       <OptionCard
         icon={GiSpellBook}
-        title={action.label}
+        title={action.name}
         subtitle="Shield, Counterspell & other reaction-speed spells"
         tone="arcane"
         onClick={onClick}
@@ -34,14 +33,14 @@ function UniversalReactionCard({
     return (
       <OptionCard
         icon={GiCrossedSwords}
-        title={action.label}
+        title={action.name}
         subtitle={sheetModel.attackSummary}
         tone="garnet"
         onClick={onClick}
       />
     );
   }
-  return <OptionCard icon={GiCycle} title={action.label} onClick={onClick} />;
+  return <OptionCard icon={GiCycle} title={action.name} onClick={onClick} />;
 }
 
 /** Battle Master reaction maneuver (Parry, Riposte) — spends a superiority die. */
@@ -139,14 +138,15 @@ function ReactionSlotResult({
 function deriveReactionOptions(
   classReactions: AvailableAction[],
   reactionManeuvers: Array<{ id: string; name: string }>,
-): { universalReactions: TurnActionOption[]; preview: string } {
-  const universalReactions = UNIVERSAL_ACTIONS.filter(
+  served: UniversalActionOption[],
+): { universalReactions: UniversalActionOption[]; preview: string } {
+  const universalReactions = served.filter(
     (u) => u.cost === "reaction" && !classReactions.some((c) => c.key === u.key),
   );
   const preview =
     [
       ...classReactions.map((a) => a.name),
-      ...universalReactions.map((u) => u.label),
+      ...universalReactions.map((u) => u.name),
       ...reactionManeuvers.map((m) => m.name),
     ]
       .slice(0, 4)
@@ -168,7 +168,7 @@ function ReactionSheetBody({
   onOther,
 }: {
   sheetModel: ReactionSheetModel;
-  universalReactions: TurnActionOption[];
+  universalReactions: UniversalActionOption[];
   reactionManeuvers: Array<{ id: string; name: string }>;
   superiorityRemaining: number;
   dieLabel: string;
@@ -264,7 +264,11 @@ export default function ReactionSlot({
   deflectRedirectAvailable: boolean;
   handleDeflectAttacksRedirect: () => Promise<void>;
 }) {
-  const { universalReactions, preview } = deriveReactionOptions(classReactions, reactionManeuvers);
+  const { universalReactions, preview } = deriveReactionOptions(
+    classReactions,
+    reactionManeuvers,
+    sheetModel.universalActions,
+  );
 
   return (
     <>
