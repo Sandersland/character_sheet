@@ -21,6 +21,7 @@ import {
   flagLabel,
   formFromCatalog,
   hasRange,
+  previewEquipSlots,
   WEAPON_CLASS_OPTIONS,
   WEAPON_FLAGS,
   WEAPON_RANGE_OPTIONS,
@@ -28,13 +29,12 @@ import {
   type FormState,
 } from "@/lib/campaignItemForm";
 import { formatCurrency, fromCopper, toCopper } from "@/lib/currency";
-import { allowedSlotsForItem, equipSlotLabel, WORN_SLOTS, wornSlotItemKindLabel } from "@/lib/paperDoll";
+import { equipSlotLabel, WORN_SLOTS, wornSlotItemKindLabel } from "@/lib/paperDoll";
 import { rarityOptions, rarityValueHint } from "@/lib/rarity";
 import type {
   ArmorCategory,
   AttunementPrereqKind,
   EquipSlot,
-  InventoryItem,
   Item,
   ItemRarity,
   ItemRarityOption,
@@ -237,12 +237,9 @@ export function IdentityFieldset({ form, setters }: FieldsProps) {
 export function CategoryDetailsFieldset({ form, setters }: FieldsProps) {
   const { set } = setters;
   // Weapon/armor placement is derived from detail data — show it read-only so the
-  // DM sees where it lands without a picker. Reuses the backend-mirroring rule.
-  const equipsToSlots = allowedSlotsForItem({
-    category: form.category,
-    weapon: form.category === "weapon" ? { twoHanded: form.twoHanded } : undefined,
-    armor: form.category === "armor" ? { armorCategory: form.armorCategory as ArmorCategory } : undefined,
-  } as InventoryItem);
+  // DM sees where it lands without a picker. No character and no saved row exists
+  // yet, so this previews the form state rather than reading a served flag.
+  const equipsToSlots = previewEquipSlots(form);
 
   return (
     <fieldset className={fieldsetCls}>

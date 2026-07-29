@@ -256,6 +256,21 @@ export function formFromItem(item: CampaignItem): FormState {
 // Range is shown/sent only for a ranged or thrown weapon.
 export const hasRange = (f: FormState): boolean => f.weaponRange === "ranged" || f.thrown;
 
+/**
+ * The slots a weapon/armor item BEING AUTHORED would equip to, for the DM form's
+ * read-only "Equips to" line. The only surviving client-side copy of the
+ * backend's `allowedSlotsForItem` (#1433): it previews UNSAVED form state, so
+ * there is no character and no inventory row to ask, and no payload flag can
+ * serve it — the same shape as `rarityValueHint`. Weapon/armor only, because the
+ * preview line renders for exactly those two categories (gear authors its slot
+ * with a picker; consumables have none).
+ */
+export function previewEquipSlots(f: FormState): EquipSlot[] {
+  if (f.category === "weapon") return f.twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
+  if (f.category === "armor") return f.armorCategory === "shield" ? ["OFF_HAND"] : ["BODY"];
+  return [];
+}
+
 // Highest populated denomination, so the single Value field faithfully shows an
 // existing cost on edit (e.g. {sp:50} → "sp"). Defaults to gp for a blank cost.
 const UNIT_ORDER: readonly CurrencyUnit[] = ["pp", "gp", "sp", "cp"];
