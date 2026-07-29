@@ -29,7 +29,10 @@ const INERT_HP_META: HitPointsStepMeta = {
 export function readHitPointsMeta(step: LevelUpStep | undefined): HitPointsStepMeta {
   const meta = step?.meta;
   if (!meta) return INERT_HP_META;
-  const num = (key: keyof HitPointsStepMeta): number => (typeof meta[key] === "number" ? meta[key] : 0);
+  // `die` is excluded from the key type deliberately: it is the one non-numeric
+  // field, and num("die") would quietly read 0 instead of failing to compile.
+  const num = (key: Exclude<keyof HitPointsStepMeta, "die">): number =>
+    typeof meta[key] === "number" ? meta[key] : 0;
   return {
     die: typeof meta.die === "string" ? meta.die : "",
     faces: num("faces"),
