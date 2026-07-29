@@ -29,7 +29,7 @@ export default function AbilityScoreStep() {
   const asi = useAsiDraft();
 
   // Gate the feat picker on the level being reached, not the current one.
-  const feats = useFeatCatalog(branch === "feat", plan.target.newLevel);
+  const feats = useFeatCatalog(branch === "feat", plan.target.newLevel, character.rulesEdition);
   const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
   const custom = useCustomFeatDraft();
 

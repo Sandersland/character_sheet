@@ -53,6 +53,10 @@ async function persistedGrantSource(target: LevelUpTarget): Promise<GrantedSpell
   return entry?.subclassRef ?? null;
 }
 
+// Unguarded by design (#1414): the handler below awaits resolveLevelUpContext
+// first, and that rejects a cross-edition ?subclassId= — so this lookup is only
+// ever reached with an id the character's edition already admits. A second
+// crossEditionRejection here would be a duplicate copy of that one rule.
 async function pickedGrantSource(subclassId: string | undefined): Promise<GrantedSpellSource | null> {
   if (!subclassId) return null;
   return prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true, ...GRANT_SOURCE_INCLUDE } });

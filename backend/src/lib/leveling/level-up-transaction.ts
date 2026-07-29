@@ -34,6 +34,7 @@ import type {
   TargetClassEntry,
 } from "./level-up-plan.js";
 import { editionOf } from "@/lib/rules/edition.js";
+import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { subclassGateLevel } from "./effective-levels.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
@@ -133,10 +134,18 @@ export async function resolveLevelUpContext(
 
   let chosenSubclassName: string | null = null;
   if (subclassId) {
-    // applySetSubclass re-validates subclass-belongs-to-class in-tx; here we only
-    // resolve id → name for the pure validator (one copy of the membership rule).
-    const sub = await prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true } });
+    // Cross-edition before membership: a wrong-edition row is "not in this
+    // character's catalog at all" (#1414), the ordering applySetSubclass also
+    // carries. Reuses the `edition` const bound above — never resolve edition
+    // twice for one resolution. Membership stays one copy of the rule
+    // (applySetSubclass re-validates it in-tx); here we only resolve id → name.
+    const sub = await prisma.subclass.findUnique({
+      where: { id: subclassId },
+      select: { name: true, edition: true },
+    });
     if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
+    const mismatch = crossEditionRejection(sub, `Subclass "${sub.name}"`, edition);
+    if (mismatch) throw new InvalidLevelUpError(mismatch);
     chosenSubclassName = sub.name;
   }
 

@@ -1,14 +1,21 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
+import { fetchFeats } from "@/api/client";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
+import type { RulesEdition } from "@character-sheet/shared-types";
 import type { AdvancementEntry, Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchFeats: vi.fn().mockResolvedValue([]),
   applyAdvancementTransactions: vi.fn(),
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 // AdvancementSection reads useCurrentCharacter(), so every render seeds the
 // cache and mounts CurrentCharacterProvider via renderWithCharacter.
@@ -19,6 +26,8 @@ function render(character: Character) {
 function makeCharacter(advancements: AdvancementEntry[]): Character {
   return {
     id: "char-1",
+    rulesEdition: "EDITION_2014",
+    level: 4,
     advancements,
     advancementSlots: { total: 0, used: 0 },
     abilityScores: {
@@ -30,6 +39,17 @@ function makeCharacter(advancements: AdvancementEntry[]): Character {
       charisma: 10,
     },
     skills: [],
+  } as unknown as Character;
+}
+
+// Separate from makeCharacter, which the entryDetail cases below depend on
+// holding zero slots — an open slot swaps the disabled button those render for
+// a live picker with a tab bar.
+function makeCharacterWithSlot(rulesEdition: RulesEdition): Character {
+  return {
+    ...makeCharacter([]),
+    rulesEdition,
+    advancementSlots: { total: 1, used: 0 },
   } as unknown as Character;
 }
 
@@ -99,5 +119,24 @@ describe("AdvancementSection entryDetail rendering", () => {
   it("renders no detail line for an all-zero ASI", () => {
     const { container } = render(makeCharacter([asiEmpty]));
     expect(container.querySelectorAll("p.leading-relaxed").length).toBe(0);
+  });
+});
+
+describe("AdvancementSection — feat picker edition (#1411)", () => {
+  async function openFeatTab(rulesEdition: RulesEdition) {
+    const user = userEvent.setup();
+    render(makeCharacterWithSlot(rulesEdition));
+    await user.click(screen.getByRole("button", { name: /choose advancement/i }));
+    await user.click(screen.getByRole("button", { name: "Feat" }));
+  }
+
+  it("fetches the 2014 catalog for a 2014 character", async () => {
+    await openFeatTab("EDITION_2014");
+    expect(fetchFeats).toHaveBeenCalledWith("EDITION_2014");
+  });
+
+  it("fetches the 2024 catalog for a 2024 character", async () => {
+    await openFeatTab("EDITION_2024");
+    expect(fetchFeats).toHaveBeenCalledWith("EDITION_2024");
   });
 });

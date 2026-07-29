@@ -41,7 +41,7 @@ function FeatPicker({
   const [open, setOpen] = useState(false);
   // Fighting Style feats never appear in the ASI picker, so useFeatCatalog.filter
   // (which mirrors that gate) is bypassed — we filter the raw catalog by category.
-  const feats = useFeatCatalog(open, character.level);
+  const feats = useFeatCatalog(open, character.level, character.rulesEdition);
   const options = (feats.catalog ?? []).filter(
     (f) => f.category === "fighting_style" && !takenIds.has(f.id),
   );
