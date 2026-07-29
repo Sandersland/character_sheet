@@ -30,7 +30,7 @@ const CATALOG: CatalogFeat[] = [
 const character = {
   id: "c1",
   rulesEdition: "EDITION_2014",
-  abilityScores:{ strength: 19, dexterity: 14, constitution: 16, intelligence: 10, wisdom: 12, charisma: 8 },
+  abilityScores: { strength: 19, dexterity: 14, constitution: 16, intelligence: 10, wisdom: 12, charisma: 8 },
   skills: [
     { name: "athletics", ability: "strength", proficient: true },
     { name: "stealth", ability: "dexterity", proficient: false },

@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { fetchFeats } from "@/api/client";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
+import type { RulesEdition } from "@character-sheet/shared-types";
 import type { AdvancementEntry, Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -44,7 +45,7 @@ function makeCharacter(advancements: AdvancementEntry[]): Character {
 // Separate from makeCharacter, which the entryDetail cases below depend on
 // holding zero slots — an open slot swaps the disabled button those render for
 // a live picker with a tab bar.
-function makeCharacterWithSlot(rulesEdition: string): Character {
+function makeCharacterWithSlot(rulesEdition: RulesEdition): Character {
   return {
     ...makeCharacter([]),
     rulesEdition,
@@ -122,7 +123,7 @@ describe("AdvancementSection entryDetail rendering", () => {
 });
 
 describe("AdvancementSection — feat picker edition (#1411)", () => {
-  async function openFeatTab(rulesEdition: string) {
+  async function openFeatTab(rulesEdition: RulesEdition) {
     const user = userEvent.setup();
     render(makeCharacterWithSlot(rulesEdition));
     await user.click(screen.getByRole("button", { name: /choose advancement/i }));
