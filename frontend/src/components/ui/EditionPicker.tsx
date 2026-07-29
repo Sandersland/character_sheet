@@ -78,7 +78,12 @@ export default function EditionPicker({ rows, value, onChange, label = "Rules ed
           );
         }
 
-        const rovingIndex = selectable.indexOf(row);
+        // Keyed rather than indexOf(row) for the same reason as checkedIndex
+        // above: `key` is what makes a row unique, so neither lookup depends on
+        // object identity. (indexOf would also work — `selectable` is filtered
+        // from this same `rows` array — but two different strategies within 40
+        // lines invites "fixing" the one that looks wrong.)
+        const rovingIndex = selectable.findIndex((candidate) => candidate.key === row.key);
         return (
           <button
             key={row.key}
