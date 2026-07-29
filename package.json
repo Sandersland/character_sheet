@@ -12,7 +12,7 @@
   "packageManager": "npm@11.15.0",
   "scripts": {
     "prepare": "lefthook install || true",
-    "dev": "npm run dev --workspaces --if-present",
+    "dev": "npm run dev --workspace backend & npm run dev --workspace frontend & wait",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

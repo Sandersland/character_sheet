@@ -5,19 +5,23 @@ Read this when you need commands, the Prisma workflow, worktree stacks, or the a
 ## Quickstart
 
 ```bash
-docker compose up --build                    # db :5432 + backend :4000 + frontend :5173
+npm ci                                       # once per clone
+cp .env.example backend/.env                 # supplies DATABASE_URL
+docker compose up -d db                      # Postgres :5432
+cd backend && npx prisma generate && npx prisma migrate deploy && npx prisma db seed && cd ..
+npm run dev                                  # backend :4000 + frontend :5173
 docker compose --profile tools up pgadmin    # pgAdmin :5050 (opt-in)
 ```
 
-On container start both dev containers run `npm install`, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` — all idempotent. The seed is **catalog-only** (no users/characters); use `npm run seed:verify` for a signed-in user + representative character. Adding a dependency: edit `package.json` and `docker compose up --build` (the startup install reconciles the `node_modules` volume).
+**The app runs on the host; only Postgres and the Playwright e2e runner are containers (#1458).** The dev images existed to make `docker compose up` boot everything, and paid for it with `node_modules` volumes shadowing the source mount — the split that made host `tsc` check the wrong tree, hid `fallow` from lefthook, and cost a rebuild per dependency change. CI has always run this way (`ci.yml` boots the same servers on a bare runner with a Postgres service), so the containerless path is the tested one.
 
-Root scripts fan out to both workspaces: `npm run dev | lint | typecheck | test | build | e2e`.
+The seed is **catalog-only** (no users/characters); use `npm run seed:verify` for a signed-in user + representative character. After a schema change, re-run `prisma migrate deploy` yourself — nothing does it on boot any more.
+
+`npm run dev` runs the two servers **concurrently** (`&` + `wait`); npm workspaces are otherwise sequential, so a plain `--workspaces` fan-out would start the backend's watcher and never reach Vite. The other root scripts (`lint | typecheck | test | build`) do fan out per workspace.
 
 `typecheck` (`tsc --noEmit`) catches the shape-drift class that lint/test miss — vitest transpiles without type-checking. Run it after touching code, before declaring done.
 
-Running outside Docker: `docker compose up db -d`, then `npm run dev` in each workspace (backend needs `backend/.env` from `.env.example`; frontend defaults `VITE_API_URL` to `http://localhost:4000/api`).
-
-Nothing loads that `.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, and `prisma.config.ts` loads it itself; drop either and host-run dev breaks while Docker and CI keep working, because they inject `DATABASE_URL` directly (#1463).
+Nothing loads `backend/.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, `prisma.config.ts` loads it itself, and Vite reads `frontend/.env` through `loadEnv`; drop any of them and host dev breaks while CI keeps working, because CI injects the variables directly (#1463). Vite also pins `strictPort`, so a busy port fails loudly instead of silently serving on the next one.
 
 ## Guardrails (lefthook)
 
