@@ -332,6 +332,23 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(learned!.prepared).toBe(false);
   });
 
+  // #1440: the level-up path gates on class list (assertPickSpellEligibility);
+  // this manual/homebrew scribing path deliberately does not — see the why-comment
+  // on applyLearnSpellOp. This replaces the issue's proposed "existing test" AC,
+  // which turned out not to exist (the prior coverage used an ON-class spell).
+  it("learnSpell accepts an OFF-CLASS catalog spell — the grimoire path is deliberately unfiltered (#1440)", async () => {
+    // Cure Wounds' classes (cleric/bard/druid/paladin/ranger) exclude wizard —
+    // the fixture character below is a wizard.
+    const cureWounds = await prisma.spell.findFirstOrThrow({ where: { name: "Cure Wounds" }, select: { id: true } });
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+      .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+      .send({ operations: [{ type: "learnSpell", spellId: cureWounds.id }] });
+
+    expect(res.status).toBe(200);
+    const spells = res.body.spellcasting.spells as Array<{ name: string; spellId: string }>;
+    expect(spells.some((s) => s.spellId === cureWounds.id)).toBe(true);
+  });
+
   it("learnSpell with a custom payload creates a spell without a spellId", async () => {
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)

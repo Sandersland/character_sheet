@@ -2,10 +2,10 @@
 # server (SERVE_STATIC_DIR=/app/public). One container, one origin, one
 # Cloudflare Access policy. This is the image the Railway dev environment uses.
 #
-# For independent/portable deploys, use backend/Dockerfile.prod and
-# frontend/Dockerfile.prod instead (split mode, wired by CORS_ORIGIN +
-# VITE_API_URL). All three images build from the REPO ROOT context so the
-# npm-workspaces install can link packages/* (shared-types, #820): root
+# Split mode (SPA and API on separate hosts) had two images here until #1456
+# deleted them unbuilt: single-origin is a commitment, not a default. The
+# image builds from the REPO ROOT context so the npm-workspaces install can
+# link packages/* (shared-types, #820): root
 # manifests + packages/ first (cache-friendly — they change rarely), then
 # `npm ci --workspace <ws>` against the single root lockfile, then sources.
 

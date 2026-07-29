@@ -19,7 +19,9 @@ Run from the **main checkout** root:
 ./.claude/skills/worktree/worktree.sh create <branch> --up
 ```
 
-This creates the worktree under `.claude/worktrees/<branch>` (new branch from HEAD, or attaches an existing branch), assigns the lowest free slot (1–9), writes a gitignored `.env` with the slot's ports + `COMPOSE_PROJECT_NAME`, and (with `--up`) builds and starts `db + backend + frontend` detached. Drop `--up` to set up without starting; start later with `up <branch>`.
+This creates the worktree **beside the repo**, under `../.character-sheet-worktrees/<branch>` (new branch from HEAD, or attaches an existing branch) — `worktree.sh dir` prints the location, `CS_WORKTREE_DIR` overrides it. It assigns the lowest free slot (1–9), writes a gitignored `.env` with the slot's ports + `COMPOSE_PROJECT_NAME`, and (with `--up`) builds and starts `db + backend + frontend` detached. Drop `--up` to set up without starting; start later with `up <branch>`.
+
+> Placement is load-bearing, not cosmetic: Node resolves `node_modules` by walking **up**, so a worktree nested inside the checkout silently borrows the main tree's install and every host tool reports green for a tree it never read (#1457). A worktree created before the move keeps its slot and stays reachable by `rm`, but `create` refuses it until it is torn down.
 
 > First boot builds images and runs `prisma migrate deploy && prisma db seed` against the worktree's private DB — give it a moment before the URLs respond.
 
@@ -43,7 +45,7 @@ Worktree 'spell-upcasting' (slot 1) is up:
 
 ### 4. Work inside a worktree
 
-Each worktree is a normal checkout on its own branch and ports. To drive development there, `cd .claude/worktrees/<branch>` and run commands (or open a separate `claude` session in that directory). Prisma commands target that worktree's DB via its port, e.g. slot 1:
+Each worktree is a normal checkout on its own branch and ports. To drive development there, `cd "$(./.claude/skills/worktree/worktree.sh dir)/<branch>"` and run commands (or open a separate `claude` session in that directory). Prisma commands target that worktree's DB via its port, e.g. slot 1:
 
 ```bash
 DATABASE_URL=postgresql://character_sheet:character_sheet@localhost:5442/character_sheet npx prisma migrate dev --name <change>
@@ -53,4 +55,4 @@ DATABASE_URL=postgresql://character_sheet:character_sheet@localhost:5442/charact
 
 - Slot 0 is the main checkout (default ports 4000/5173/5432/5050). Worktrees use slots 1–9.
 - pgAdmin is gated behind the `tools` Compose profile, so worktrees stay lean. To inspect a DB visually, run `docker compose --profile tools up pgadmin` in that directory (its pgAdmin lands on `5050 + slot*10`).
-- The slot registry lives at `.claude/worktrees/registry.json` (gitignored). If a worktree is abandoned without `rm`, its slot stays reserved until you `rm` it.
+- The slot registry (`registry.json`) sits in the worktree directory itself, outside the repo. If a worktree is abandoned without `rm`, its slot stays reserved until you `rm` it.

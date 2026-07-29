@@ -1,18 +1,46 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
+
+// Config-time settings can't read `import.meta.env` (that exists only in client
+// code) and Vite never copies .env into process.env, so loadEnv is the bridge —
+// empty prefix because none of these are VITE_-prefixed client vars, and a real
+// environment variable still wins so CI stays authoritative over a stray .env.
+// The mode is fixed because only a mode-agnostic `.env` exists; adding an
+// `.env.<mode>` means switching to defineConfig's function form to see the real
+// mode (#1458).
+const env = {
+  ...loadEnv("development", fileURLToPath(new URL(".", import.meta.url)), ""),
+  ...process.env,
+};
 
 // The SPA serves `/api/*` from its own origin and forwards to the backend, so the
 // browser sees a single origin. This makes the session cookie same-origin (no CORS)
 // and lets Google OAuth redirect back to the SPA. Target is env-driven:
-// `http://backend:4000` inside Compose, `http://localhost:4000` for a bare host run.
+// the host backend's port, which differs per worktree slot.
 // Shared by dev (`server`) and the built-asset preview used by e2e CI (`preview`).
 const apiProxy = {
   "/api": {
-    target: process.env.VITE_PROXY_TARGET ?? "http://localhost:4000",
+    target: env.VITE_PROXY_TARGET ?? "http://localhost:4000",
     changeOrigin: true,
   },
+};
+
+// strictPort is the point, not the port. Vite's default is to silently take the
+// next free one, so a second stack would answer on 5174 while every URL the
+// tooling printed — and E2E_BASE_URL — still said 5183. Fail loudly instead;
+// the dev containers used to give each slot its own network, and nothing does
+// now (#1458).
+const server = {
+  host: true,
+  port: Number(env.FRONTEND_PORT ?? 5173),
+  strictPort: true,
+  // The Playwright container reaches this server as host.docker.internal, and
+  // Vite rejects an unrecognised Host header with 403 — which surfaces as a
+  // blanket e2e failure rather than anything mentioning hostnames (#1458).
+  allowedHosts: ["localhost", "host.docker.internal"],
+  proxy: apiProxy,
 };
 
 export default defineConfig({
@@ -20,16 +48,10 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
-  server: {
-    host: true,
-    proxy: apiProxy,
-  },
+  server,
   // `vite preview` serves the production build with the same proxy — e2e CI runs
   // against this (not the dev server) so on-demand compilation never slows renders.
-  preview: {
-    host: true,
-    proxy: apiProxy,
-  },
+  preview: server,
   build: {
     // #1279: Vite's default (500 kB) — every eager/route/tab chunk sits well
     // under it (largest is react-vendor at ~187 kB). `dice-vendor` (the

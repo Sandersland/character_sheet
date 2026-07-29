@@ -5,17 +5,23 @@ Read this when you need commands, the Prisma workflow, worktree stacks, or the a
 ## Quickstart
 
 ```bash
-docker compose up --build                    # db :5432 + backend :4000 + frontend :5173
+npm ci                                       # once per clone
+cp .env.example backend/.env                 # supplies DATABASE_URL
+docker compose up -d db                      # Postgres :5432
+cd backend && npx prisma generate && npx prisma migrate deploy && npx prisma db seed && cd ..
+npm run dev                                  # backend :4000 + frontend :5173
 docker compose --profile tools up pgadmin    # pgAdmin :5050 (opt-in)
 ```
 
-On container start both dev containers run `npm install`, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` — all idempotent. The seed is **catalog-only** (no users/characters); use `npm run seed:verify` for a signed-in user + representative character. Adding a dependency: edit `package.json` and `docker compose up --build` (the startup install reconciles the `node_modules` volume).
+**The app runs on the host; only Postgres and the Playwright e2e runner are containers (#1458).** The dev images existed to make `docker compose up` boot everything, and paid for it with `node_modules` volumes shadowing the source mount — the split that made host `tsc` check the wrong tree, hid `fallow` from lefthook, and cost a rebuild per dependency change. CI has always run this way (`ci.yml` boots the same servers on a bare runner with a Postgres service), so the containerless path is the tested one.
 
-Root scripts fan out to both workspaces: `npm run dev | lint | typecheck | test | build | e2e`.
+The seed is **catalog-only** (no users/characters); use `npm run seed:verify` for a signed-in user + representative character. After a schema change, re-run `prisma migrate deploy` yourself — nothing does it on boot any more.
+
+`npm run dev` runs the two servers **concurrently** (`&` + `wait`); npm workspaces are otherwise sequential, so a plain `--workspaces` fan-out would start the backend's watcher and never reach Vite. The other root scripts (`lint | typecheck | test | build`) do fan out per workspace.
 
 `typecheck` (`tsc --noEmit`) catches the shape-drift class that lint/test miss — vitest transpiles without type-checking. Run it after touching code, before declaring done.
 
-Running outside Docker: `docker compose up db -d`, then `npm run dev` in each workspace (backend needs `backend/.env` from `.env.example`; frontend defaults `VITE_API_URL` to `http://localhost:4000/api`).
+Nothing loads `backend/.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, `prisma.config.ts` loads it itself, and Vite reads `frontend/.env` through `loadEnv`; drop any of them and host dev breaks while CI keeps working, because CI injects the variables directly (#1463). Vite also pins `strictPort`, so a busy port fails loudly instead of silently serving on the next one.
 
 ## Guardrails (lefthook)
 
@@ -46,12 +52,32 @@ Against a **running** stack, mints a session via `POST /api/auth/dev-login` (req
 
 ## Parallel worktrees
 
-`.claude/skills/worktree/worktree.sh` runs an isolated dockerized stack per git worktree. Each worktree gets a port slot N (main checkout = slot 0): `BACKEND_PORT 4000+10N`, `FRONTEND_PORT 5173+10N`, `POSTGRES_PORT 5432+10N`, and its own `COMPOSE_PROJECT_NAME` → own DB/node_modules volumes (migrations in one worktree are invisible to others). Registry: `.claude/worktrees/registry.json`.
+`.claude/skills/worktree/worktree.sh` runs an isolated dockerized stack per git worktree. Each worktree gets a port slot N (main checkout = slot 0): `BACKEND_PORT 4000+10N`, `FRONTEND_PORT 5173+10N`, `POSTGRES_PORT 5432+10N`, and its own `COMPOSE_PROJECT_NAME` → own DB/node_modules volumes (migrations in one worktree are invisible to others).
+
+**Worktrees live beside the repo, not inside it (#1457)** — `../.character-sheet-worktrees/<branch>` by default, `CS_WORKTREE_DIR` to relocate, `worktree.sh dir` to ask. Nesting them under the checkout is what let Node resolve `node_modules` *upward* into the main tree, so a worktree with a missing or half-finished install type-checked green against dependencies it never had. The slot registry (`registry.json`) and the create mutex live in that same directory, so nothing about a worktree is repo state. Worktrees predating the move keep their slots and stay reachable by `rm`; `create` refuses them until you do.
 
 ```bash
 ./.claude/skills/worktree/worktree.sh create <branch> --up | ls | up <branch> | down <branch> | rm <branch>
+./.claude/skills/worktree/worktree.sh prune [--yes]   # artifacts of worktrees already gone
+./.claude/skills/worktree/worktree.sh dir             # where they are placed
 docker compose -p cs-<branch> logs -f
 ```
+
+`.claude/worktrees/` stays in `.git/info/exclude` (not `.gitignore`): Claude Code's own `EnterWorktree` still nests worktrees there and writes that exclude block itself, so deleting the line un-ignores its trees and the CLI restores it anyway. Those trees keep the upward-resolution problem — this repo's own tooling just no longer creates any.
+
+**`create` installs into the worktree, and that is what makes host tooling trustworthy (#1452).** It runs `npm ci` plus `prisma generate` there, so the pre-commit gate — including `fallow` — runs on its merits inside the worktree. **`--no-verify` in a worktree no longer has a justification.** A worktree whose install is missing now fails loudly (unresolved imports) rather than borrowing the main checkout's.
+
+`npm ci` runs the root `prepare` → `lefthook install`, which bakes an absolute path into `.git/hooks`, a directory every worktree *shares* ([lefthook #1398](https://github.com/evilmartians/lefthook/issues/1398)). `create` re-installs from the main checkout afterwards so the shim outlives the worktree; `LEFTHOOK=0` does **not** prevent this — it gates hook execution, not `lefthook install`.
+
+To re-run the gates by hand, from the repo root (#1458):
+
+```bash
+npx fallow audit --base origin/staging --gate new-only --no-cache
+npx tsc --noEmit -p backend
+npx tsc --noEmit -p frontend
+```
+
+Run `fallow` from the repo root (it loads `.fallowrc.jsonc` there). CRAP scores read differently here than in CI (no coverage artifact); dead code, complexity and duplication match.
 
 ## How to add a new domain / feature
 

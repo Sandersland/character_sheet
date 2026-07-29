@@ -50,7 +50,9 @@ Real-browser verification hits `requireAuth` and OAuth can't complete headless. 
 
 ## End-to-end (Playwright)
 
-Specs live in `frontend/e2e/`; run via `npm run e2e` (→ `docker compose --profile e2e run --rm e2e`, a pinned Playwright image on host networking that derives its base URL from `FRONTEND_PORT`, so it works against the main stack or any worktree slot).
+Specs live in `frontend/e2e/`; run via `npm run e2e` (→ `docker compose --profile e2e run --rm e2e`, a pinned Playwright image that reaches the host-run dev servers via `host.docker.internal` and derives its base URL from `FRONTEND_PORT`, so it works against the main checkout or any worktree slot).
+
+**Start `npm run dev` first.** The runner used to `depends_on` the frontend container; that container is gone (#1458), so it now dials servers it does not start. A suite that fails instantly with connection refused means the dev servers aren't up.
 
 - `global-setup.ts` signs in via dev-login, then per persona verifies the live character against its declared fingerprint (class, subclass, XP, class-entry level, campaign, maneuver/spell picks), deleting and recreating on any mismatch — in-place repair can't reach the declared state (a repaired subclass leaves the old one's residue behind). See `ROSTER` in `frontend/e2e/global-setup.ts` for the roster itself.
 - Per-spec state is created **inside each spec** via `e2e/helpers/api.ts`, never in globalSetup — every spec is independently runnable and personas stay unmutated.

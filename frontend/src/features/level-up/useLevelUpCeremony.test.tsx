@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { fetchLevelUpPlan, fetchReference, submitLevelUp } from "@/api/client";
 import { useLevelUpCeremony } from "@/features/level-up/useLevelUpCeremony";
+import { buildLevelUpLedger, type LedgerResolvers } from "@/lib/levelUpLedger";
 import { cachedCharacter } from "@/test/renderWithCharacter";
 import type { Character, LevelUpPlanResponse, LevelUpStep, ReferenceData } from "@/types/character";
 
@@ -431,5 +432,177 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     await waitFor(() =>
       expect(planMock).toHaveBeenCalledWith("c1", { kind: "existing", classEntryId: "entry-2" }, undefined),
     );
+  });
+});
+
+// #1421: a subclass switch away from Eldritch Knight retires the newSpells
+// step, but spellsLearned/cantripsLearned/spellsForgotten survive in the
+// draft unless pruned — leaving a dead-end Review screen and a 400 on confirm.
+describe("useLevelUpCeremony — pruning the draft to the served plan (#1421)", () => {
+  // Multiclass Wizard 5 / Fighter 2→3 taking Eldritch Knight: needs a real
+  // spellbook entry so the Forgotten-row ledger assertion (test 3) resolves a
+  // name rather than covering nothing, per the issue's fixture note.
+  const wizardFighter = {
+    id: "c1",
+    rulesEdition: "EDITION_2024",
+    pendingLevelUps: 1,
+    level: 8,
+    hitPoints: { max: 44 },
+    hitDice: { total: 7, die: "d6" },
+    classes: [
+      { id: "entry-wiz", name: "wizard", level: 5 },
+      { id: "entry-ftr", name: "fighter", level: 2 },
+    ],
+    abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 16, wisdom: 10, charisma: 8 },
+    spellcasting: { slots: [], arcana: [], spells: [{ id: "k-charm", name: "Charm Person", level: 1 }] },
+  } as unknown as Character;
+
+  const EK_STEPS: LevelUpStep[] = [
+    { kind: "hitPoints" },
+    { kind: "subclass" },
+    { kind: "newSpells", count: 3, meta: { maxSpellLevel: 1, canSwap: true, cantrips: 2 } },
+    { kind: "review" },
+  ];
+  const CHAMPION_STEPS: LevelUpStep[] = [{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }];
+
+  const LEDGER_RESOLVERS: LedgerResolvers = {
+    maneuver: () => undefined,
+    spell: (id) =>
+      ({ s1: "Fire Bolt", s2: "Shield", s3: "Absorb Elements", c1: "Booming Blade", c2: "Green-Flame Blade" })[id],
+    feat: () => undefined,
+  };
+
+  // Drives the ceremony to "EK plan loaded, spell picks staged", ready for a
+  // subclass switch to Champion.
+  async function setupWithStagedSpells() {
+    planMock.mockResolvedValue(plan(EK_STEPS, { className: "fighter", newLevel: 3, subclass: "Eldritch Knight" }));
+    const { result } = renderHook(() => useLevelUpCeremony(wizardFighter), { wrapper: makeWrapper() });
+
+    await waitFor(() => expect(result.current.classChoice).not.toBeNull());
+    act(() => result.current.classChoice!.onChoose({ kind: "existing", classEntryId: "entry-ftr" }));
+    await waitFor(() => expect(result.current.plan?.target.subclass).toBe("Eldritch Knight"));
+
+    act(() =>
+      result.current.setDraft((d) => ({
+        ...d,
+        hp: { method: "average" },
+        subclassId: "sub-ek",
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }, { type: "learnSpell", spellId: "s2" }],
+        cantripsLearned: [{ type: "learnSpell", spellId: "c1" }, { type: "learnSpell", spellId: "c2" }],
+        spellsForgotten: [{ type: "forgetSpell", entryId: "k-charm" }],
+      })),
+    );
+
+    return result;
+  }
+
+  it("drops the spell picks when a subclass switch retires the newSpells step", async () => {
+    const result = await setupWithStagedSpells();
+    // Vacuity guard: prove the picks were actually staged before the switch.
+    expect(result.current.draft.spellsLearned).toHaveLength(2);
+
+    planMock.mockResolvedValue(plan(CHAMPION_STEPS, { className: "fighter", newLevel: 3, subclass: "Champion" }));
+    act(() => result.current.setDraft((d) => ({ ...d, subclassId: "sub-champion" })));
+    await waitFor(() => expect(result.current.plan?.target.subclass).toBe("Champion"));
+
+    expect(result.current.draft.spellsLearned).toBeUndefined();
+    expect(result.current.draft.cantripsLearned).toBeUndefined();
+    expect(result.current.draft.spellsForgotten).toBeUndefined();
+  });
+
+  it("confirm posts a body with none of the retired spell fields", async () => {
+    const result = await setupWithStagedSpells();
+    planMock.mockResolvedValue(plan(CHAMPION_STEPS, { className: "fighter", newLevel: 3, subclass: "Champion" }));
+    act(() => result.current.setDraft((d) => ({ ...d, subclassId: "sub-champion" })));
+    await waitFor(() => expect(result.current.plan?.target.subclass).toBe("Champion"));
+
+    submitMock.mockResolvedValue({ id: "c1" } as Character);
+    await act(() => result.current.confirm());
+
+    const body = submitMock.mock.calls[0][1];
+    expect(Object.keys(body)).not.toContain("spellsLearned");
+    expect(Object.keys(body)).not.toContain("cantripsLearned");
+    expect(Object.keys(body)).not.toContain("spellsForgotten");
+  });
+
+  it("the Review ledger shows no New Spells, New Cantrips or Forgotten row after the switch", async () => {
+    const result = await setupWithStagedSpells();
+    planMock.mockResolvedValue(plan(CHAMPION_STEPS, { className: "fighter", newLevel: 3, subclass: "Champion" }));
+    act(() => result.current.setDraft((d) => ({ ...d, subclassId: "sub-champion" })));
+    await waitFor(() => expect(result.current.plan?.target.subclass).toBe("Champion"));
+
+    const rows = buildLevelUpLedger(wizardFighter, result.current.draft, result.current.plan!, LEDGER_RESOLVERS, 6);
+    const labels = rows.map((r) => r.label);
+    expect(labels).toContain("Level"); // vacuity guard: the ledger call itself works.
+    expect(labels).not.toContain("New Spells");
+    expect(labels).not.toContain("New Cantrips");
+    expect(labels).not.toContain("Forgotten");
+  });
+
+  it("switching back to Eldritch Knight requires re-picking the spells (#1323 stashes subclass-dependent picks, not class-driven ones)", async () => {
+    const result = await setupWithStagedSpells();
+    planMock.mockResolvedValue(plan(CHAMPION_STEPS, { className: "fighter", newLevel: 3, subclass: "Champion" }));
+    act(() => result.current.setDraft((d) => ({ ...d, subclassId: "sub-champion" })));
+    await waitFor(() => expect(result.current.plan?.target.subclass).toBe("Champion"));
+
+    planMock.mockResolvedValue(plan(EK_STEPS, { className: "fighter", newLevel: 3, subclass: "Eldritch Knight" }));
+    act(() => result.current.setDraft((d) => ({ ...d, subclassId: "sub-ek" })));
+    await waitFor(() => expect(result.current.plan?.target.subclass).toBe("Eldritch Knight"));
+
+    expect(result.current.draft.spellsLearned).toBeUndefined();
+  });
+});
+
+// #1421: useLevelUpPlan sets plan to null while the class-chooser and the
+// level-again interstitial own the screen (see useLevelUpPlan's `skip`), and
+// useLevelUpCeremony falls back to `plan?.steps ?? []` — pruning against that
+// empty fallback would wipe the entire draft mid-ceremony.
+describe("useLevelUpCeremony — never prune before a plan has arrived (#1421)", () => {
+  const multiChar = {
+    ...character,
+    classes: [
+      { id: "entry-1", name: "fighter", level: 7 },
+      { id: "entry-2", name: "wizard", level: 3 },
+    ],
+  } as unknown as Character;
+
+  // Honest status: this is GREEN both before and after the guard — the
+  // effect's dependency is [plan], and plan never becomes non-null while the
+  // chooser owns the screen, so there's nothing yet to (wrongly) prune
+  // against. Kept for the AC's literal wording and to catch a future refactor
+  // to a steps-keyed effect; the level-again test below is the real driver.
+  it("does not prune while the class chooser owns the screen (no plan has arrived)", async () => {
+    const { result } = renderHook(() => useLevelUpCeremony(multiChar), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.classChoice).not.toBeNull());
+
+    act(() =>
+      result.current.setDraft(() => ({
+        hp: { method: "average" },
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      })),
+    );
+
+    expect(result.current.draft.spellsLearned).toEqual([{ type: "learnSpell", spellId: "s1" }]);
+  });
+
+  it("does not prune while the level-again interstitial owns the screen", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "newSpells", count: 1 }, { kind: "review" }]));
+    submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
+    const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.plan).not.toBeNull());
+
+    act(() =>
+      result.current.setDraft(() => ({
+        hp: { method: "average" },
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      })),
+    );
+    await act(() => result.current.confirm());
+    expect(result.current.levelAgain).not.toBeNull();
+
+    // The submit flips skipPlan true → useLevelUpPlan sets plan to null → the
+    // [plan] effect fires again — proving the guard, not just its absence of
+    // a crash.
+    expect(result.current.draft.spellsLearned).toEqual([{ type: "learnSpell", spellId: "s1" }]);
   });
 });

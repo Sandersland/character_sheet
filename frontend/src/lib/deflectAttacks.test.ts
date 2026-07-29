@@ -14,6 +14,9 @@ import type { Character } from "@/types/character";
 function monk(overrides: Partial<Character> = {}): Character {
   return {
     level: 5,
+    // classEntryLevel's single-class path needs a class to match against
+    // (#1441) — without this every assertion here read `classEntryLevel` as 0.
+    class: "Monk",
     abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10 },
     unarmedStrike: {
       attackBonus: 6,
@@ -23,11 +26,37 @@ function monk(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
+// Monk 3 / Fighter 10 (character.level 13) — Deflect Attacks must scale on the
+// Monk *entry* level (3), not the total character level (13).
+function monkFighter(overrides: Partial<Character> = {}): Character {
+  return monk({
+    level: 13,
+    class: "Monk",
+    classes: [
+      { name: "Monk", level: 3 },
+      { name: "Fighter", level: 10 },
+    ],
+    ...overrides,
+  } as unknown as Partial<Character>);
+}
+
 describe("hasDeflectEnergy", () => {
   it("is false below monk L13 and true at L13+", () => {
     expect(hasDeflectEnergy(monk({ level: 12 }))).toBe(false);
     expect(hasDeflectEnergy(monk({ level: 13 }))).toBe(true);
     expect(hasDeflectEnergy(monk({ level: 20 }))).toBe(true);
+  });
+
+  it("reads the Monk entry level, not total character level, for a multiclass character (Monk 3 / Fighter 10)", () => {
+    expect(hasDeflectEnergy(monkFighter())).toBe(false);
+  });
+
+  it("single-class Monk 13 (no multiclassing) still gets Deflect Energy — regression guard", () => {
+    expect(hasDeflectEnergy(monk({ level: 13, classes: [{ name: "Monk", level: 13 }] } as unknown as Partial<Character>))).toBe(
+      true,
+    );
+    // The no-`classes` fallback path (deriveRoster) must behave identically.
+    expect(hasDeflectEnergy(monk({ level: 13, class: "Monk" } as unknown as Partial<Character>))).toBe(true);
   });
 });
 
@@ -46,6 +75,17 @@ describe("deflectAttacksReductionRoll", () => {
 
   it("scales the flat modifier with monk level", () => {
     expect(deflectAttacksReductionRoll(monk({ level: 13 }))).toEqual({ count: 1, faces: 10, modifier: 16 });
+  });
+
+  it("scales the flat modifier with the Monk entry level, not total character level (Monk 3 / Fighter 10)", () => {
+    // Dex 16 → +3 modifier; Monk entry level 3 → spec modifier is 3 + 3 = 6 (not 3 + 13 = 16).
+    expect(deflectAttacksReductionRoll(monkFighter())).toEqual({ count: 1, faces: 10, modifier: 6 });
+  });
+
+  it("single-class Monk 13 still scales on the full character level — regression guard", () => {
+    expect(
+      deflectAttacksReductionRoll(monk({ level: 13, classes: [{ name: "Monk", level: 13 }] } as unknown as Partial<Character>)),
+    ).toEqual({ count: 1, faces: 10, modifier: 16 });
   });
 });
 
@@ -74,6 +114,13 @@ describe("formatDeflectAttacksMessage", () => {
     const msg = formatDeflectAttacksMessage(monk({ level: 13 }), roll, false);
     expect(msg).toMatch(/reduce any damage type/);
     expect(msg).not.toMatch(/redirect/i);
+  });
+
+  it("reports the Monk entry level, not total character level, and the B/P/S clause for a multiclass character below Monk 13", () => {
+    const roll = summarizeRoll([6], { count: 1, faces: 10, modifier: 6 });
+    const msg = formatDeflectAttacksMessage(monkFighter(), roll, true);
+    expect(msg).toContain("monk level 3)");
+    expect(msg).not.toMatch(/any damage type/);
   });
 });
 

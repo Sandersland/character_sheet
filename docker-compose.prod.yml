@@ -6,9 +6,9 @@
 #   cp .env.production.example .env.production   # then edit secrets
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up --build
 #
-# Split mode (frontend + API as separate hosts) is also supported via
-# backend/Dockerfile.prod + frontend/Dockerfile.prod, wired by CORS_ORIGIN and
-# VITE_API_URL — see .env.production.example.
+# There is no split-mode alternative: the two images that described one were
+# deleted unbuilt in #1456. CORS_ORIGIN and VITE_API_URL remain real runtime
+# knobs, but no packaged image pairs them.
 
 services:
   db:

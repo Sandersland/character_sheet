@@ -17,7 +17,7 @@ import { spawn, spawnSync, execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync, renameSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { reconcile as janitorReconcile } from "./janitor.mjs";
+import { reconcile as janitorReconcile, WORKTREES_DIR } from "./janitor.mjs";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SKILL_DIR, "../../..");
@@ -493,7 +493,7 @@ async function attachWorktreeStack(run, branch) {
       throw err;
     }
   }
-  const registry = JSON.parse(readFileSync(join(ROOT, ".claude", "worktrees", "registry.json"), "utf8"));
+  const registry = JSON.parse(readFileSync(join(WORKTREES_DIR, "registry.json"), "utf8"));
   const slot = registry[branch];
   if (!slot) throw new Error(`worktree.sh did not register a slot for ${branch}`);
   const backendUrl = `http://localhost:${4000 + slot * 10}/api`;
@@ -503,7 +503,7 @@ async function attachWorktreeStack(run, branch) {
   Object.assign(run.ctx, {
     branch,
     slot,
-    worktree: join(ROOT, ".claude", "worktrees", branch),
+    worktree: join(WORKTREES_DIR, branch),
     backendUrl,
     frontendUrl: `http://localhost:${5173 + slot * 10}`,
   });

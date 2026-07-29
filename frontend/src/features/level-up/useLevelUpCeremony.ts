@@ -2,8 +2,9 @@
 // step, the plan fetch, and the submit into one API. Position is keyed by
 // stepKey (never index) so a subclass re-plan that inserts steps doesn't move
 // the player. Split into small sub-hooks (useClassChoice, useLevelAgain,
-// useLevelUpPlan, useLevelUpSubmit) so each stays independently simple rather
-// than piling every branch into one function.
+// usePruneDraftToPlan, useLevelUpPlan, useLevelUpSubmit, useDeepLinkTarget) so
+// each stays independently simple rather than piling every branch into one
+// function.
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -19,7 +20,7 @@ import {
   selectableClassChoiceCount,
   type ClassChoiceOption,
 } from "@/lib/levelUpClassChoice";
-import { draftSatisfies, levelUpSubmissionOf, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
+import { draftSatisfies, levelUpSubmissionOf, pruneDraftToPlan, stepKey, type LevelUpDraft } from "@/lib/levelUpSteps";
 import type {
   Character,
   LevelUpPlanResponse,
@@ -134,6 +135,32 @@ function useLevelAgain(goToSheet: () => void, resetForNextLevel: () => void) {
   return { levelAgain, reportSubmitted };
 }
 
+// A subclass switch can retire a step (e.g. Eldritch Knight → Champion
+// drops newSpells) while its picks still sit in the draft — pruneDraftToPlan
+// (#1421) keeps the draft honest so the Review ledger and confirm() agree
+// with what the server will actually accept. Deliberate-coupling latch: the
+// dependency array must stay exactly [plan, setDraft], never [plan.steps]
+// (a fresh array identity every render would re-prune constantly and eat the
+// #1323 stash restore) and never [plan, draft] (draft is what this writes).
+// Keying on the plan object fires this once per served plan, which is
+// correct because useLevelUpPlan leaves the previous plan in place for the
+// whole duration of a subclass-driven refetch. setDraft is a useState setter
+// and is stable across renders, so its presence in the deps array (required
+// once it's a parameter rather than a same-scope closure) doesn't change
+// firing behaviour. Guard on plan == null: useLevelUpPlan clears plan to
+// null while the class chooser and the level-again interstitial own the
+// screen, and steps falls back to [] — pruning against that empty list
+// would wipe the entire draft.
+function usePruneDraftToPlan(
+  plan: LevelUpPlanResponse | null,
+  setDraft: React.Dispatch<React.SetStateAction<LevelUpDraft>>,
+): void {
+  useEffect(() => {
+    if (plan == null) return;
+    setDraft((d) => pruneDraftToPlan(d, plan.steps));
+  }, [plan, setDraft]);
+}
+
 // Fetches the served plan, refetching when the pending subclass pick changes
 // (the server re-plans around it). `skip` pauses fetching (and clears any prior
 // plan) while the class-choice chooser or the "level up again" interstitial is
@@ -206,21 +233,24 @@ function useLevelUpSubmit(
   return { confirm, submitting: mutation.isPending, submitError: mutation.error };
 }
 
-export function useLevelUpCeremony(character: Character): LevelUpCeremony {
-  const navigate = useNavigate();
+// #1131/#1170: `?classId=` seeds a NEW class, `?entry=` seeds a specific
+// existing entry (defaulting to the primary) — both are now just the class
+// chooser's *initial* selection, not a bypass of it.
+function useDeepLinkTarget(character: Character): LevelUpTarget | null {
   const [searchParams] = useSearchParams();
-  // #1131/#1170: `?classId=` seeds a NEW class, `?entry=` seeds a specific
-  // existing entry (defaulting to the primary) — both are now just the class
-  // chooser's *initial* selection, not a bypass of it.
   const classIdParam = searchParams.get("classId");
   const entryParam = searchParams.get("entry");
   const primaryEntryId = character.classes?.[0]?.id ?? null;
-  const deepLinkTarget = useMemo<LevelUpTarget | null>(() => {
+  return useMemo<LevelUpTarget | null>(() => {
     if (classIdParam) return { kind: "new", classId: classIdParam };
     const classEntryId = entryParam ?? primaryEntryId;
     return classEntryId ? { kind: "existing", classEntryId } : null;
   }, [classIdParam, entryParam, primaryEntryId]);
+}
 
+export function useLevelUpCeremony(character: Character): LevelUpCeremony {
+  const navigate = useNavigate();
+  const deepLinkTarget = useDeepLinkTarget(character);
   const choice = useClassChoice(character, deepLinkTarget);
 
   const [draft, setDraft] = useState<LevelUpDraft>({});
@@ -236,6 +266,7 @@ export function useLevelUpCeremony(character: Character): LevelUpCeremony {
 
   const skipPlan = choice.status !== "resolved" || levelAgain != null;
   const { plan, planError } = useLevelUpPlan(character.id, choice.target, draft.subclassId, skipPlan);
+  usePruneDraftToPlan(plan, setDraft);
 
   const { confirm, submitting, submitError } = useLevelUpSubmit(character.id, choice.target, draft, reportSubmitted);
 

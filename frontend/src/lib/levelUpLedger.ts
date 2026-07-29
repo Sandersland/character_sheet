@@ -3,7 +3,7 @@
 // injects catalog id→name lookups as `resolvers` so this never fetches.
 
 import { abilityLabel, abilityModifier, formatModifier } from "@/lib/abilities";
-import { averageHitPointGain, dieFaces } from "@/lib/hitDice";
+import { averageHitPointGain } from "@/lib/hitDice";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type {
   Character,
@@ -50,10 +50,16 @@ function resolvedName(
 
 // HP is applied before the ASI on the backend, so it uses the PRE-level Con mod —
 // an ASI that bumps Con this same level must not retroactively raise the gain.
-function hpGain(hp: NonNullable<LevelUpDraft["hp"]>, character: Character): number {
+//
+// `advancingDieFaces` is the ADVANCING class's die, not `character.hitDice.die`
+// (the persisted position-0 die) — a multiclass character's next level can be in
+// a class other than the one that die belongs to (#1441). Resolved by the
+// caller (ReviewStep, via hitPointStepMath) exactly as HitPointsStep resolves
+// it, so the two screens can't disagree.
+function hpGain(hp: NonNullable<LevelUpDraft["hp"]>, character: Character, advancingDieFaces: number): number {
   const conMod = abilityModifier(character.abilityScores.constitution);
   if (hp.method === "roll") return Math.max(1, (hp.roll ?? 0) + conMod);
-  return averageHitPointGain(dieFaces(character.hitDice.die), conMod);
+  return averageHitPointGain(advancingDieFaces, conMod);
 }
 
 function abilityRow(ability: string, before: number, amount: number): LedgerRow {
@@ -148,12 +154,21 @@ function learnedListRows(
   return rows.filter((row): row is LedgerRow => row !== null);
 }
 
-/** Ordered ledger rows for the draft; absent draft fields drop their rows. */
+/**
+ * Ordered ledger rows for the draft; absent draft fields drop their rows.
+ *
+ * `advancingDieFaces` is required, not defaulted — a default would silently
+ * reproduce the class-level HP bug (#1441) at any future call site that
+ * forgets to resolve it. Callers resolve it the same way HitPointsStep does
+ * (hitPointStepMath), which is what keeps Review and the HP step agreeing by
+ * construction.
+ */
 export function buildLevelUpLedger(
   character: Character,
   draft: LevelUpDraft,
   plan: LevelUpPlanResponse,
   resolvers: LedgerResolvers,
+  advancingDieFaces: number,
 ): LedgerRow[] {
   const advancement = advancementRows(character, draft.advancement, resolvers);
   const max = character.hitPoints.max;
@@ -163,10 +178,18 @@ export function buildLevelUpLedger(
     // level-up is pending); the applied "before" is one below the target.
     { label: "Level", before: String(plan.target.newLevel - 1), after: String(plan.target.newLevel), variant: "delta" },
     draft.hp
-      ? { label: "Maximum HP", before: String(max), after: String(max + hpGain(draft.hp, character)), variant: "delta" }
+      ? {
+          label: "Maximum HP",
+          before: String(max),
+          after: String(max + hpGain(draft.hp, character, advancingDieFaces)),
+          variant: "delta",
+        }
       : null,
     ...advancement.rows,
     advancement.affected.length ? { label: "Recalculated", note: advancement.affected.join(", "), variant: "note" } : null,
+    // #1075: `die` is knowingly the position-0 die from the persisted hitDice
+    // blob — a multiclass character has no single correct die to render until
+    // hit dice are pooled per die type. Deliberately not half-fixed here.
     { label: "Hit Dice", before: `${total}${die}`, after: `${total + 1}${die}`, variant: "delta" },
     draft.subclassId ? { label: "Subclass", after: plan.target.subclass ?? "New subclass", variant: "delta" } : null,
     draft.fightingStyleFeat

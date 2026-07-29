@@ -23,91 +23,41 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
-  backend:
-    # Root context so the workspaces install links packages/* (shared-types,
-    # #820); the whole repo is bind-mounted with per-service node_modules
-    # volumes shadowing both the hoisted root tree and the workspace-local one
-    # (two containers must never npm-install into a shared volume).
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    working_dir: /app/backend
-    ports:
-      - "${BACKEND_PORT:-4000}:4000"
-    environment:
-      PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-character_sheet}:${POSTGRES_PASSWORD:-character_sheet}@db:5432/${POSTGRES_DB:-character_sheet}
-      # OAuth: provider auto-enables once both id+secret are set (put real values
-      # in a root .env). APP_BASE_URL is the browser-facing origin — the SPA at
-      # :5173, which proxies /api to this backend (see frontend below) — so the
-      # OAuth redirect_uri and the post-login redirect both land on the app.
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
-      # Enables POST /api/auth/dev-login so UI verification (Playwright, worktree
-      # stacks, manual review) can mint a session without Google. Hard-disabled
-      # when NODE_ENV=production regardless of this value; never set in prod.
-      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
-      # Disables request rate limiting so back-to-back e2e/dev runs never hit 429s
-      # (the alphabetical-tail specs otherwise time out on throttled dev-logins).
-      RATE_LIMIT_DISABLED: ${RATE_LIMIT_DISABLED:-true}
-    volumes:
-      - .:/app
-      - backend_node_modules:/app/node_modules
-      - backend_ws_node_modules:/app/backend/node_modules
-    depends_on:
-      - db
-
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    working_dir: /app/frontend
-    ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    environment:
-      # Same-origin via the dev proxy: the SPA calls "/api/*" and Vite forwards
-      # to the backend (VITE_PROXY_TARGET). Keeps the session cookie same-origin.
-      VITE_API_URL: ${VITE_API_URL:-/api}
-      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:4000}
-    volumes:
-      - .:/app
-      - frontend_node_modules:/app/node_modules
-      - frontend_ws_node_modules:/app/frontend/node_modules
-    depends_on:
-      - backend
-
   # Playwright e2e runner (opt-in: `docker compose --profile e2e run e2e`, or
   # `npm run e2e`). Pinned image so browsers match the @playwright/test version.
-  # Uses host networking so it reaches the stack on its published host ports —
-  # the one address space where the SPA's baked VITE_API_URL resolves in every
-  # stack (a worktree bakes an absolute host URL like http://localhost:4010/api).
-  # E2E_BASE_URL derives from FRONTEND_PORT, so main (5173) and each worktree
-  # slot (5183, …) run the same command with no hardcoded port. Mounts the
-  # frontend workspace so specs/config edits are live; its own node_modules
+  # E2E_BASE_URL derives from FRONTEND_PORT, so the main checkout (5173) and each
+  # worktree slot (5183, …) run the same command with no hardcoded port. Mounts
+  # the frontend workspace so specs/config edits are live; its own node_modules
   # volume keeps the install off the host tree.
+  #
+  # This is the ONE container the dev loop keeps (#1458): the visual baselines are
+  # `*-linux.png` and the fonts are pinned to this image, so running Playwright on
+  # a mac host would invalidate every one of them. Start the dev servers yourself
+  # first — the app no longer has a container to depend on.
+  #
+  # host.docker.internal, NOT host networking. `network_mode: host` puts the
+  # container in the Linux VM's namespace on Docker Desktop, where a dev server
+  # running on the mac host simply is not bound — measured: host networking gets
+  # a connection failure, host.docker.internal gets 200. It worked before only
+  # because the thing it dialled was itself a container. The host-gateway alias
+  # keeps this working on native Linux, where the name is not built in.
   e2e:
     image: mcr.microsoft.com/playwright:v1.49.1-noble
     profiles: ["e2e"]
-    network_mode: host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      E2E_BASE_URL: ${E2E_BASE_URL:-http://localhost:${FRONTEND_PORT:-5173}}
+      E2E_BASE_URL: ${E2E_BASE_URL:-http://host.docker.internal:${FRONTEND_PORT:-5173}}
     working_dir: /app/frontend
     volumes:
       - .:/app
       - e2e_node_modules:/app/node_modules
       - e2e_ws_node_modules:/app/frontend/node_modules
-    depends_on:
-      - frontend
     # Workspace install from the repo root (links packages/*, #820), then run
     # the suite from the frontend workspace.
     command: sh -c "cd /app && npm install --workspace frontend --no-package-lock && cd /app/frontend && npx playwright test"
 
 volumes:
-  backend_node_modules:
-  backend_ws_node_modules:
-  frontend_node_modules:
-  frontend_ws_node_modules:
   e2e_node_modules:
   e2e_ws_node_modules:
   postgres_data:

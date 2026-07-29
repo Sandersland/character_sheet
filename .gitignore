@@ -3,12 +3,12 @@ dist/
 build/
 coverage/
 .env
+# Vite's mode-scoped variants, generated per worktree slot (#1458).
+.env.development
+.env.production
 *.log
 .DS_Store
 backend/src/generated/
-
-# Git worktrees used for parallel feature branches
-.claude/worktrees/
 
 # autodev FSM run ledgers (see .claude/skills/autodev)
 .claude/autodev/

@@ -1,3 +1,5 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { abilityModifier } from "@/lib/srd/math.js";
 
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
@@ -523,6 +525,61 @@ export function levelUpCantripPicks(className: string, level: number, subclass?:
 /** Bard Magical Secrets (SRD 5.2): from level 10, level-up picks may come from the Bard/Cleric/Druid/Wizard lists. */
 export function bardMagicalSecretsAt(className: string, level: number): boolean {
   return className.toLowerCase() === "bard" && level >= 10;
+}
+
+/** Class lists a Magical Secrets-eligible level-up pick may come from, per facet. `null` = unrestricted. */
+export interface MagicalSecretsLists {
+  /** Class lists a leveled pick may come from; null = unrestricted (PHB'14 "from any class"). */
+  spells: string[] | null;
+  /** Class lists a cantrip pick may come from; null = unrestricted (PHB'14 "…or a cantrip"). */
+  cantrips: string[] | null;
+}
+
+/**
+ * Bard Magical Secrets, edition-forked. Governs BOTH the leveled-spell and the
+ * cantrip facet of a level-up pick — one rule, `edition` last (`subclassGateLevel`
+ * pattern) — because the two editions disagree on whether it broadens cantrips.
+ *
+ * SRD 5.2 / PHB'24 p. 53, *Magical Secrets* (Bard, level 10): "Whenever you reach
+ * a Bard level (including this level) and the Prepared Spells number in the Bard
+ * Features table increases, you can choose any of your new prepared spells from
+ * the Bard, Cleric, Druid, and Wizard spell lists" — a standing broadening from
+ * level 10 up (`>= 10`, not `=== 10`), hence `spells` widens but `cantrips` does
+ * not: the trigger is the Prepared Spells number, which only covers level 1+
+ * spells — the Cantrips column is a separate table untouched by this feature.
+ *
+ * PHB'14 p. 54, *Magical Secrets* (Bard, 10th/14th/18th level): "Choose two
+ * spells from any class, including this one. A spell you choose must be of a
+ * level you can cast, as shown on the Bard table, or a cantrip." Both facets are
+ * therefore unrestricted (`null`) under 2014.
+ *
+ * Recorded limitation: PHB'14 grants this as *two of* the picks at 10th/14th/
+ * 18th, drawn from one shared two-pick budget (a cantrip taken this way comes
+ * out of the same budget as a leveled spell). This codebase models
+ * `spellsLearned`/`cantripsLearned` as separate buckets sized by the 2024 tables
+ * (`levelUpSpellPicks`/`levelUpCantripPicks`/`CANTRIP_BREAKPOINTS`), which are not
+ * forked per edition — epic #1281 owns that fork. With no single budget to draw
+ * from, the closest available mapping is: at a qualifying 2014 Bard level,
+ * neither facet is class-restricted. This is not full PHB'14 fidelity.
+ *
+ * Also known: `Spell.classes` is un-editioned, 2024-seeded catalog content — see
+ * `Spell.classes` in schema.prisma.
+ *
+ * `subclass` is currently unused but is the deliberate seam for PHB'24 College of
+ * Lore *Magical Discoveries* (level 6, Cleric/Druid/Wizard cantrip) and PHB'14
+ * *Additional Magical Secrets* (6th level, any class) — both are content debt for
+ * #1281, not implemented here.
+ */
+export function magicalSecretsSpellLists(
+  className: string,
+  level: number,
+  subclass: string | null | undefined,
+  edition: RulesEdition,
+): MagicalSecretsLists {
+  const key = className.toLowerCase();
+  if (key !== "bard" || level < 10) return { spells: [key], cantrips: [key] };
+  if (edition === "EDITION_2014") return { spells: null, cantrips: null };
+  return { spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] };
 }
 
 /**

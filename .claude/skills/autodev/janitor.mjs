@@ -44,7 +44,12 @@ import { fileURLToPath } from "node:url";
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SKILL_DIR, "../../..");
 const RUNS_DIR = process.env.AUTODEV_RUNS_DIR ?? join(ROOT, ".claude", "autodev", "runs");
-const WORKTREES_DIR = process.env.AUTODEV_WORKTREES_DIR ?? join(ROOT, ".claude", "worktrees");
+// Mirrors WT_DIR in worktree.sh — that script owns the placement, and a mismatch
+// here makes the janitor reap nothing while reporting success (#1457).
+export const WORKTREES_DIR =
+  process.env.AUTODEV_WORKTREES_DIR ??
+  process.env.CS_WORKTREE_DIR ??
+  join(dirname(ROOT), ".character-sheet-worktrees");
 const WORKTREE = process.env.AUTODEV_WORKTREE_BIN ?? join(SKILL_DIR, "..", "worktree", "worktree.sh");
 const HEARTBEAT_STALE_MS = Number(process.env.AUTODEV_HEARTBEAT_STALE_MS ?? 15 * 60_000);
 

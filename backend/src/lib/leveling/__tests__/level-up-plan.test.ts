@@ -12,8 +12,13 @@ const ABILITIES = { strength: 16, dexterity: 14, constitution: 14, intelligence:
 // this suite's fixture-level TargetClassEntry.subclassLevel values already
 // stand in for the edition-resolved gate (#1308's comment on TargetClassEntry);
 // deriveResources' OWN edition threading (#1291) is covered separately.
-function char(name: string, level: number, subclass: string | null = null): LevelUpPlanCharacter {
-  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], edition: "EDITION_2024" };
+function char(
+  name: string,
+  level: number,
+  subclass: string | null = null,
+  edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
+): LevelUpPlanCharacter {
+  return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], edition };
 }
 
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {
@@ -245,6 +250,34 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     expect(normal?.count).toBe(1);
     expect(normal?.meta?.magicalSecrets).toBeUndefined();
     expect(normal?.meta?.maxSpellLevel).toBe(2);
+  });
+
+  it("carries meta.spellLists/meta.cantripLists — [className] for an ordinary caster", () => {
+    const step = buildLevelUpPlan(char("wizard", 3), target("wizard", 4)).find((s) => s.kind === "newSpells");
+    expect(step?.meta?.spellLists).toEqual(["wizard"]);
+    expect(step?.meta?.cantripLists).toEqual(["wizard"]);
+  });
+
+  it("2024 Bard reaching 10 carries the four lists on spellLists and only bard on cantripLists (and stays at 11)", () => {
+    const at10 = buildLevelUpPlan(char("bard", 9, null, "EDITION_2024"), target("bard", 10)).find((s) => s.kind === "newSpells");
+    expect(at10?.meta?.spellLists).toEqual(["bard", "cleric", "druid", "wizard"]);
+    expect(at10?.meta?.cantripLists).toEqual(["bard"]);
+
+    const at11 = buildLevelUpPlan(char("bard", 10, null, "EDITION_2024"), target("bard", 11)).find((s) => s.kind === "newSpells");
+    expect(at11?.meta?.spellLists).toEqual(["bard", "cleric", "druid", "wizard"]);
+    expect(at11?.meta?.cantripLists).toEqual(["bard"]);
+  });
+
+  it("2014 Bard reaching 10 carries null on BOTH spellLists and cantripLists (PHB'14 p. 54)", () => {
+    const step = buildLevelUpPlan(char("bard", 9, null, "EDITION_2014"), target("bard", 10)).find((s) => s.kind === "newSpells");
+    expect(step?.meta?.spellLists).toBeNull();
+    expect(step?.meta?.cantripLists).toBeNull();
+  });
+
+  it("2014 Bard below level 10 carries [\"bard\"] on both facets", () => {
+    const step = buildLevelUpPlan(char("bard", 2, null, "EDITION_2014"), target("bard", 3)).find((s) => s.kind === "newSpells");
+    expect(step?.meta?.spellLists).toEqual(["bard"]);
+    expect(step?.meta?.cantripLists).toEqual(["bard"]);
   });
 
   it("third-caster subclasses (Eldritch Knight / Arcane Trickster) offer a delta pick + swap (#1101)", () => {

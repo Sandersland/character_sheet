@@ -47,6 +47,10 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Tester",
+    // classEntryLevel's single-class fallback needs a class to match against
+    // (#1441) — inert for every other test in this file, which reads no other
+    // `character.class`-derived field.
+    class: "Monk",
     inventory: [],
     unarmedStrike: {
       attackBonus: 2,
@@ -422,6 +426,28 @@ describe("flurryStrikeCount (#1217, Heightened Focus upgrade #1244)", () => {
 
   it("is 3 at monk L10+ (Heightened Focus)", () => {
     expect(flurryStrikeCount(makeCharacter({ level: 10 }))).toBe(3);
+  });
+
+  it("reads the Monk entry level, not total character level, for a multiclass character (Monk 9 / Rogue 3)", () => {
+    const character = makeCharacter({
+      level: 12,
+      classes: [
+        { name: "Monk", level: 9 },
+        { name: "Rogue", level: 3 },
+      ],
+    } as unknown as Partial<Character>);
+    expect(flurryStrikeCount(character)).toBe(2);
+  });
+
+  it("is 3 for a multiclass character whose Monk entry itself reaches L10 (Monk 10 / Rogue 2)", () => {
+    const character = makeCharacter({
+      level: 12,
+      classes: [
+        { name: "Monk", level: 10 },
+        { name: "Rogue", level: 2 },
+      ],
+    } as unknown as Partial<Character>);
+    expect(flurryStrikeCount(character)).toBe(3);
   });
 });
 
