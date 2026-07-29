@@ -4,6 +4,7 @@
 
 import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 
+import type { ActionCost } from "./actions";
 import type { ConditionKey } from "./combat";
 import type { ItemRarity } from "./inventory";
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
@@ -109,6 +110,17 @@ export interface ConditionOption {
   description: string;
 }
 
+/** One universal turn action, resolved for the requested edition (#1430) —
+ *  `description` is that edition's actual rules text, and `key` is
+ *  edition-stable (the 2024 "Magic" row keeps `key: "castSpell"`). No
+ *  `edition`: which row won the resolution is an implementation detail. */
+export interface UniversalActionOption {
+  key: string;
+  name: string;
+  cost: ActionCost;
+  description: string;
+}
+
 /** One of the six magic-item rarity tiers (#1437), in ascending tier order.
  *  Edition-invariant: the same six rows answer both editions. */
 export interface ItemRarityOption {
@@ -145,6 +157,9 @@ export interface ReferenceData {
   artisanTools: ToolOption[];
   /** The 14 conditions' rules text, resolved for the requested edition (#1322). */
   conditions: ConditionOption[];
+  /** The universal turn actions, resolved for the requested edition and ordered
+   *  by name (#1430). 15 rows for 2014, 17 for 2024 (Study + Influence). */
+  universalActions: UniversalActionOption[];
   /** The six magic-item rarity tiers, ascending (#1437). */
   itemRarities: ItemRarityOption[];
 }

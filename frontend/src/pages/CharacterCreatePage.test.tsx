@@ -103,6 +103,7 @@ const referenceFixture: ReferenceData = {
   alignments: ["Lawful Good"],
   artisanTools: [{ name: "Smith's Tools", category: "artisan" }],
   conditions: [],
+  universalActions: [],
   itemRarities: [],
 };
 

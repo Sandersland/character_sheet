@@ -21,9 +21,9 @@ import {
   spellRestrictionFlags,
   type SpellCastThisTurn,
 } from "@/lib/spellPicker";
-import { canTwoWeaponFight, type TurnActionOption } from "@/lib/turnRules";
+import { canTwoWeaponFight } from "@/lib/turnRules";
 import { resolverFor, type ActionResolver } from "@/features/session/actionResolvers";
-import type { AvailableAction, Character, ResourcePool } from "@/types/character";
+import type { AvailableAction, Character, ResourcePool, UniversalActionOption } from "@/types/character";
 
 /** "Longsword · +7 to hit · 1d8 + 4 slashing" for the first attack row
  *  (first equipped weapon, falling back naturally to Unarmed Strike). */
@@ -224,7 +224,12 @@ export function twfHint(character: Character): string | null {
 }
 
 /** Which universal actions render as primary rich cards on the Action sheet;
- *  everything else falls into the "More actions" disclosure grid. */
+ *  everything else falls into the "More actions" disclosure grid.
+ *
+ *  Keys, not names, so this survives the 2024 renames (Magic / Utilize) — and
+ *  this set plus MICRO_CAPTIONS are the two client-side key lists that would
+ *  silently not cover a future 2014-ONLY universal action. No such action
+ *  exists in either SRD; every fork today is a rename or a 2024 addition. */
 export const PRIMARY_ACTION_KEYS: ReadonlySet<string> = new Set([
   "attack",
   "castSpell",
@@ -233,27 +238,36 @@ export const PRIMARY_ACTION_KEYS: ReadonlySet<string> = new Set([
   "dodge",
 ]);
 
-/** Micro-captions for the compact card variants (Dash/Dodge pair + More grid). */
+/** Micro-captions for the compact card variants (Dash/Dodge pair + More grid).
+ *  `search`'s caption stays edition-neutral: SRD 5.1 offers Perception OR
+ *  Investigation, SRD 5.2 a Wisdom check the GM picks a skill for. */
 export const MICRO_CAPTIONS: Record<string, string> = {
   dash: "×2 move",
   dodge: "defensive",
   disengage: "no OA",
   help: "adv. ally",
   hide: "stealth",
-  search: "perception",
+  search: "notice",
   ready: "trigger",
   grapple: "grab",
   shove: "push/prone",
+  study: "recall",
+  influence: "persuade",
 };
 
 /** Collapsed-row preview line: "Disengage · Hide · Help · …" (CSS truncates). */
-export function moreActionsPreview(actions: TurnActionOption[]): string {
-  return actions.map((a) => a.label).join(" · ");
+export function moreActionsPreview(actions: UniversalActionOption[]): string {
+  return actions.map((a) => a.name).join(" · ");
 }
 
 /** Sheet models built in useTurnActions, consumed by the sheet bodies. */
 export interface ActionSheetModel {
   attackSummary: string;
+  /** Universal actions for the requested edition, served by GET /api/reference
+   *  (#1430) and threaded through the model so the sheet bodies stay
+   *  presentational — they never call the hook themselves. Empty until the
+   *  reference query resolves. */
+  universalActions: UniversalActionOption[];
   consumableCount: number;
   hasSpellcasting: boolean;
   classActionOptions: ClassActionOption[];
@@ -272,6 +286,8 @@ export interface BonusSheetModel {
 
 export interface ReactionSheetModel {
   attackSummary: string;
+  /** See ActionSheetModel.universalActions. */
+  universalActions: UniversalActionOption[];
   hasSpellcasting: boolean;
   classReactionOptions: ClassActionOption[];
 }

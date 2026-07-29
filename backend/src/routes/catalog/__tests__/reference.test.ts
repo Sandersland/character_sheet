@@ -209,6 +209,61 @@ describe("GET /api/reference", () => {
     expect(findCond(res2014.body, "poisoned").description).toBe(findCond(res2024.body, "poisoned").description);
   });
 
+  // #1430: the universal turn actions, forked per edition — the client held this
+  // copy in turnRules.ts until this slice, so these assertions are what stops it
+  // regressing to one edition's text for both.
+  it("ships universal actions resolved for the requested edition (#1430)", async () => {
+    const app = createApp();
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    expect(res2014.status).toBe(200);
+    expect(res2024.status).toBe(200);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const byKey = (body: any, key: string) => body.universalActions.find((a: { key: string }) => a.key === key);
+    const keys = (body: { universalActions: { key: string }[] }) => body.universalActions.map((a) => a.key);
+
+    // The 2024-only pair, and its absence from 2014.
+    expect(keys(res2024.body)).toContain("study");
+    expect(keys(res2024.body)).toContain("influence");
+    expect(keys(res2014.body)).not.toContain("study");
+    expect(keys(res2014.body)).not.toContain("influence");
+
+    // `key` is edition-stable identity; only name/description fork.
+    expect(byKey(res2024.body, "useObject").name).toBe("Utilize");
+    expect(byKey(res2014.body, "useObject").name).toBe("Use an Object");
+    expect(byKey(res2024.body, "castSpell").name).toBe("Magic");
+    expect(byKey(res2014.body, "castSpell").name).toBe("Cast a Spell");
+
+    // `edition` must not reach the wire — same rule as originFeatByName.
+    for (const row of [...res2024.body.universalActions, ...res2014.body.universalActions]) {
+      expect(Object.keys(row).sort()).toEqual(["cost", "description", "key", "name"]);
+    }
+
+    // Ordered by NAME after resolution, not by the findMany — a name-ordered
+    // query would leave 2024's "Magic" at "Cast a Spell"'s alphabetical slot.
+    const names2024: string[] = res2024.body.universalActions.map((a: { name: string }) => a.name);
+    expect(names2024).toEqual([...names2024].sort((a, b) => a.localeCompare(b)));
+    expect(names2024).toContain("Magic");
+
+    // The live rules bug this fork fixes: the client shipped SRD 5.1's contest
+    // to every character, 2024 ones included.
+    for (const key of ["grapple", "shove"]) {
+      expect(byKey(res2014.body, key).description).toContain("Strength (Athletics) check contested by");
+      expect(byKey(res2024.body, key).description).toContain(
+        "Strength or Dexterity saving throw (it chooses which)",
+      );
+      expect(byKey(res2024.body, key).description).toContain("8 plus your Strength modifier and Proficiency Bonus");
+      expect(byKey(res2024.body, key).description).not.toContain("Athletics");
+    }
+
+    // Both cost partitions are served, so ActionSlot and ReactionSlot each have rows.
+    const costs = (body: { universalActions: { cost: string }[] }) =>
+      [...new Set(body.universalActions.map((a) => a.cost))].sort();
+    expect(costs(res2014.body)).toEqual(["action", "bonusAction", "reaction"]);
+    expect(costs(res2024.body)).toEqual(["action", "bonusAction", "reaction"]);
+  });
+
   // #1437: the six magic-item rarity tiers with their standard gp values. Unlike
   // conditions above this is edition-INVARIANT, so the last assertion is a latch:
   // it fails the day someone routes ITEM_RARITIES through resolveEditionCatalog.

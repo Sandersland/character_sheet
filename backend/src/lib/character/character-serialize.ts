@@ -428,8 +428,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
       used: usedFightingStyleSlots,
     },
 
-    // Class-specific available actions for the turn tracker (universal ones
-    // render client-side from UNIVERSAL_ACTIONS).
+    // Class-specific available actions for the turn tracker (universal ones ride
+    // GET /api/reference instead, resolved per edition — #1430).
     availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded),
 
     // Combat attack rows — derived at read time; the frontend renders these
