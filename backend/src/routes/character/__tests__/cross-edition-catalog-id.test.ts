@@ -474,3 +474,140 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
     expect(res.body.resources.choicesKnown.huntersPrey[0].optionId).toBe(choiceIdShared);
   });
 });
+
+describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", () => {
+  // Deliberately shares no substring with a real class name: buildLevelUpPlan
+  // derives every step from the class NAME, so an "XEd Fighter" would pull in
+  // real Fighter features (fighting style, Extra Attack) and the assertions
+  // would stop being about this guard. Nothing here asserts on the `steps`
+  // array or a step's `meta` — the plan's step shape is another issue's
+  // surface, and coupling to it buys no coverage of the edition guard.
+  const CLASS_NAME = "XEd Vanguard";
+  const SUB_2014 = "XEd LvlSub 2014";
+  const SUB_2024 = "XEd LvlSub 2024";
+  const SUB_SHARED = "XEd LvlSub Shared";
+  let classId: string;
+  let subId2014: string;
+  let subId2024: string;
+  let subIdShared: string;
+
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: {
+        name: CLASS_NAME,
+        hitDie: "d10",
+        subclassLevel: 3,
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: { subclassLevel: 3 },
+    });
+    classId = cls.id;
+
+    const mk = (name: string, edition: "EDITION_2014" | "EDITION_2024" | null, slug: string) =>
+      upsertEditionRow(
+        prisma.subclass,
+        { classId, name, edition },
+        { classId, name, edition, description: "Cross-edition guard test fixture.", slug },
+        {},
+      );
+    [subId2014, subId2024, subIdShared] = await Promise.all([
+      mk(SUB_2014, "EDITION_2014", "xed-lvlsub-2014"),
+      mk(SUB_2024, "EDITION_2024", "xed-lvlsub-2024"),
+      mk(SUB_SHARED, null, "xed-lvlsub-shared"),
+    ]).then((rows) => rows.map((r) => r.id));
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "XEd LevelUp" } } });
+    await prisma.subclass.deleteMany({ where: { name: { in: [SUB_2014, SUB_2024, SUB_SHARED] } } });
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  // Defaults put newLevel at 3 — equal to subclassGateLevel under BOTH editions
+  // (the catalog column is 3 and 2024 hardcodes 3), so the plan carries a
+  // subclass step for either fixture. `level: 5` overrides give a level-up whose
+  // plan has NO subclass step (the ordering proof below).
+  async function createCharacter(
+    rulesEdition: "EDITION_2014" | "EDITION_2024",
+    name: string,
+    opts: { xp: number; entryLevel: number; hitDiceTotal: number } = { xp: 900, entryLevel: 2, hitDiceTotal: 2 },
+  ) {
+    const res = await agent()
+      .post("/api/characters")
+      .send({
+        name,
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: CLASS_NAME }],
+        abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
+        rulesEdition,
+        experiencePoints: opts.xp,
+      });
+    expect(res.status).toBe(201);
+    const id = res.body.id as string;
+    await prisma.characterClassEntry.updateMany({ where: { characterId: id }, data: { level: opts.entryLevel } });
+    await prisma.character.update({
+      where: { id },
+      data: { hitDice: { total: opts.hitDiceTotal, die: "d10", spent: 0 } },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
+    return { id, classEntryId: entry.id };
+  }
+
+  async function getPlan(characterId: string, classEntryId: string, subclassId: string) {
+    return agent().get(
+      `/api/characters/${characterId}/level-up/plan?classEntryId=${classEntryId}&subclassId=${subclassId}`,
+    );
+  }
+
+  async function commitLevelUp(characterId: string, classEntryId: string, subclassId: string) {
+    return agent()
+      .post(`/api/characters/${characterId}/level-up/transactions`)
+      .send({
+        target: { kind: "existing", classEntryId },
+        hp: { method: "average" },
+        subclassId,
+      });
+  }
+
+  it("(NULL-row AC) the preview accepts the shared subclass for a 2024 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024a");
+    const res = await getPlan(id, classEntryId, subIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_SHARED);
+  });
+
+  it("(NULL-row AC) the preview accepts the shared subclass for a 2014 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2014", "XEd LevelUp 2014a");
+    const res = await getPlan(id, classEntryId, subIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_SHARED);
+  });
+
+  it("(unchanged) the preview accepts a same-edition subclass for a 2024 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024b");
+    const res = await getPlan(id, classEntryId, subId2024);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_2024);
+  });
+
+  it("(unchanged) the preview accepts a same-edition subclass for a 2014 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2014", "XEd LevelUp 2014b");
+    const res = await getPlan(id, classEntryId, subId2014);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_2014);
+  });
+
+  it("(NULL-row AC) the commit path applies a shared subclass", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024c");
+    const res = await commitLevelUp(id, classEntryId, subIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.classes[0].subclass).toBe(SUB_SHARED);
+    expect(res.body.hitDice.total).toBe(3);
+  });
+});
