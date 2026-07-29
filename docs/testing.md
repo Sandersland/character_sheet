@@ -46,7 +46,7 @@ Colocated next to their source (no `__tests__/` dir): `*.test.ts` for pure logic
 
 ## Browser / UI verification (behind auth)
 
-Real-browser verification hits `requireAuth` and OAuth can't complete headless. Path: bring the stack up → `npm run seed:verify` (dev-login session + a representative "Verify Dummy" character; needs `ALLOW_DEV_LOGIN=true`, the dev-compose default) → in Playwright, sign in with an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload (the cookie is HttpOnly). The `verify-frontend` skill automates all of this.
+Real-browser verification hits `requireAuth` and OAuth can't complete headless. Path: bring the stack up → `npm run seed:verify` (dev-login session + a representative "Verify Dummy" character; needs `ALLOW_DEV_LOGIN=true`, which `.env.example` ships uncommented) → in Playwright, sign in with an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload (the cookie is HttpOnly). The `verify-frontend` skill automates all of this.
 
 ## End-to-end (Playwright)
 
@@ -57,7 +57,7 @@ Specs live in `frontend/e2e/`; run via `npm run e2e` (→ `docker compose --prof
 - `global-setup.ts` signs in via dev-login, then per persona verifies the live character against its declared fingerprint (class, subclass, XP, class-entry level, campaign, maneuver/spell picks), deleting and recreating on any mismatch — in-place repair can't reach the declared state (a repaired subclass leaves the old one's residue behind). See `ROSTER` in `frontend/e2e/global-setup.ts` for the roster itself.
 - Per-spec state is created **inside each spec** via `e2e/helpers/api.ts`, never in globalSetup — every spec is independently runnable and personas stay unmutated.
 - Session-driving personas get their own campaigns (one active session per campaign); `workers: 1` runs serially.
-- The stack sets `RATE_LIMIT_DISABLED=true` (compose + CI) so repeated runs never trip the limiter.
+- `RATE_LIMIT_DISABLED=true` keeps repeated runs from tripping the limiter. Nothing injects it: host dev reads it from `backend/.env` (seeded by `.env.example`), CI sets it in `ci.yml`, worktrees get it from `worktree.sh write_env` — same for `ALLOW_DEV_LOGIN` (#1468).
 - Selectors are role/name-based; specs assert zero console errors (`e2e/helpers/console.ts`).
 - Debris characters left by specs (`<prefix> <suffix>` names, e.g. `Nav Hero …`) are never touched — only exact `ROSTER` names can be recreated — and accumulate across runs; clean them up manually via pgAdmin (`docker compose --profile tools up pgadmin`, see `docs/development.md`).
 
