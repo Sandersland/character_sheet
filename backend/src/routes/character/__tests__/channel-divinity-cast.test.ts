@@ -71,17 +71,27 @@ async function activity(): Promise<ActivityEvent[]> {
 let classId: string;
 const optionId: Record<string, string> = {};
 
+// `edition: null` is load-bearing, not defensive: the #1412 test below forks
+// "Channel Divinity: Turn Undead" into a same-name EDITION_2014 row, and a bare
+// findFirst({ where: { name } }) would then be ambiguous — every cast test
+// reading optionId would silently pick whichever row Postgres returned first.
 async function loadOption(name: string) {
-  optionId[name] = (await prisma.grantedAbility.findFirst({ where: { name } }))!.id;
+  optionId[name] = (await prisma.grantedAbility.findFirst({ where: { name, edition: null } }))!.id;
 }
 
-async function createCharacter(experiencePoints: number, className: string, subclass: string | null) {
+async function createCharacter(
+  experiencePoints: number,
+  className: string,
+  subclass: string | null,
+  rulesEdition?: "EDITION_2014" | "EDITION_2024",
+) {
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
       experiencePoints,
       ownerId: OWNER_ID,
       resources: Prisma.JsonNull,
+      ...(rulesEdition ? { rulesEdition } : {}),
       classEntries: { create: [{ name: className, subclass, classId, position: 0 }] },
     },
   });
@@ -331,6 +341,56 @@ describe("Channel Divinity cast endpoint", () => {
     )!;
     // Charisma-based DC: 8 + prof(2) + chaMod(+3) = 13.
     expect(abjure).toMatchObject({ kind: "announce", saveDc: 13 });
+  });
+
+  // #1412: the route derives the edition from the character row (editionOf), so
+  // there is no query param here. The fixture shares Turn Undead's EXACT name on
+  // purpose — CHANNEL_DIVINITY_OPTIONS is a literal-name map, so a distinctly
+  // named row is dropped by the pre-existing `o.gate &&` guard regardless of
+  // edition, and the test would be green before and after the change. Cleric,
+  // not the paladin fixture: Turn Undead is cleric-gated.
+  //
+  // Built inside the test with try/finally rather than in beforeAll — a beforeAll
+  // fixture races loadOption's own beforeAll and would corrupt the cast tests'
+  // optionId map.
+  it("(#1412) GET /channel-divinity resolves a same-name 2014/NULL Turn Undead fork per the character's edition", async () => {
+    const fork = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: "Channel Divinity: Turn Undead", edition: "EDITION_2014" },
+      {
+        name: "Channel Divinity: Turn Undead",
+        source: "channelDivinity",
+        edition: "EDITION_2014",
+        description: "2014 Turn Undead fixture.",
+        saveAbility: "wisdom",
+        costKind: "pool",
+        costPoolKey: "channelDivinity",
+        costBase: 1,
+      },
+      { source: "channelDivinity" },
+    );
+    try {
+      await createCharacter(XP_L2, "cleric", null, "EDITION_2024");
+      const as2024 = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(as2024.status).toBe(200);
+      const turn2024 = (as2024.body as { id: string; name: string }[]).filter(
+        (o) => o.name === "Channel Divinity: Turn Undead",
+      );
+      expect(turn2024).toHaveLength(1);
+      expect(turn2024[0].id).toBe(optionId["Channel Divinity: Turn Undead"]);
+
+      await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+      await createCharacter(XP_L2, "cleric", null, "EDITION_2014");
+      const as2014 = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(as2014.status).toBe(200);
+      const turn2014 = (as2014.body as { id: string; name: string }[]).filter(
+        (o) => o.name === "Channel Divinity: Turn Undead",
+      );
+      expect(turn2014).toHaveLength(1);
+      expect(turn2014[0].id).toBe(fork.id);
+    } finally {
+      await prisma.grantedAbility.delete({ where: { id: fork.id } });
+    }
   });
 
   it("rejects a castChannelDivinity against a non-channelDivinity id", async () => {
