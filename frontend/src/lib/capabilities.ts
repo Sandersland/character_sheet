@@ -231,20 +231,3 @@ export function capabilitySummary(cap: ItemCapability): string {
   const core = `${valuePhrase(cap)} ${targetPhrase(cap)}`.trim();
   return cap.condition ? `${core} (when ${cap.condition})` : core;
 }
-
-/** 5e phrasing for an attunement prerequisite (mirrors backend describeAttunementPrereq). */
-export function describeAttunementPrereq(
-  kind: AttunementPrereqKind,
-  value?: string | null,
-): string {
-  switch (kind) {
-    case "spellcaster":
-      return "a spellcaster";
-    case "class":
-      return `a ${value ?? "specific class"}`;
-    case "species":
-      return `a ${value ?? "specific species"}`;
-    case "alignment":
-      return `a ${value ?? "specific alignment"} creature`;
-  }
-}
