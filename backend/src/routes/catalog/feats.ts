@@ -1,9 +1,8 @@
 import { Router } from "express";
 
 import { prisma } from "@/lib/core/prisma.js";
+import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog } from "@/lib/rules/catalog-edition.js";
-import { isRulesEdition } from "@/lib/rules/edition.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
 
 export const featsRouter = Router();
 
@@ -19,16 +18,8 @@ export const featsRouter = Router();
 // -edition picker and nothing anywhere fails. A required param moves that
 // mistake to compile time on the client and to a 400 on the wire.
 featsRouter.get("/feats", async (req, res) => {
-  const rawEdition = req.query.edition;
-  if (rawEdition === undefined) {
-    res.status(400).json({ error: "Missing required query parameter: edition" });
-    return;
-  }
-  if (!isRulesEdition(rawEdition)) {
-    res.status(400).json({ error: `Unknown edition: ${String(rawEdition)}` });
-    return;
-  }
-  const edition: RulesEdition = rawEdition;
+  const edition = requireEditionOr400(req, res);
+  if (edition === undefined) return;
 
   const feats = await prisma.feat.findMany({
     orderBy: { name: "asc" },

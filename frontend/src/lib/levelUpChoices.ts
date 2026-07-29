@@ -21,7 +21,7 @@ export interface ChoiceOption {
 export interface ChoiceLoadContext {
   /** Post-level-up class level (LevelUpPlanResponse.target.newLevel), for gates keyed on it. */
   targetLevel: number;
-  /** The advancing character's edition — toolProficiency's fetchReference call needs it (#1325). */
+  /** The advancing character's edition — every catalog fetch below is edition-scoped (#1325, #1412). */
   edition: RulesEdition;
 }
 
@@ -38,8 +38,8 @@ export interface ChoiceKindConfig {
 }
 
 const maneuvers: ChoiceKindConfig = {
-  loadOptions: () =>
-    fetchManeuvers().then((list) =>
+  loadOptions: (ctx) =>
+    fetchManeuvers(ctx.edition).then((list) =>
       list.map((m) => ({ id: m.id, name: m.name, description: m.description })),
     ),
   fromCharacter: (character) =>
