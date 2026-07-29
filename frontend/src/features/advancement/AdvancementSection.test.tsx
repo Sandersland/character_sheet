@@ -130,13 +130,15 @@ describe("AdvancementSection — feat picker edition (#1411)", () => {
     await user.click(screen.getByRole("button", { name: "Feat" }));
   }
 
+  // The second argument is the sheet's own level (#1438): the Overview panel asks
+  // the server for the set legal at the level the character is already at.
   it("fetches the 2014 catalog for a 2014 character", async () => {
     await openFeatTab("EDITION_2014");
-    expect(fetchFeats).toHaveBeenCalledWith("EDITION_2014");
+    expect(fetchFeats).toHaveBeenCalledWith("EDITION_2014", 4);
   });
 
   it("fetches the 2024 catalog for a 2024 character", async () => {
     await openFeatTab("EDITION_2024");
-    expect(fetchFeats).toHaveBeenCalledWith("EDITION_2024");
+    expect(fetchFeats).toHaveBeenCalledWith("EDITION_2024", 4);
   });
 });

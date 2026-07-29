@@ -23,7 +23,9 @@ const CATALOG: CatalogFeat[] = [
     abilityIncrease: 1,
     improvements: [],
   },
-  // Origin feats come from backgrounds, never the ASI picker (#1129).
+  // A category the real /api/feats?asiLevel= would never return (#1129: Origin
+  // feats come from backgrounds). Kept deliberately unrealistic so the picker
+  // renders it iff no client-side copy of that rule survives (#1438).
   { id: "lucky", name: "Lucky", description: "Luck points.", category: "origin", abilityOptions: [], abilityIncrease: 0, improvements: [] },
 ];
 
@@ -168,18 +170,23 @@ describe("AbilityScoreStep — feat branch", () => {
     expect(feats).not.toHaveBeenCalled();
   });
 
-  it("lists catalog feats after switching to the feat branch, fetched for the advancing character's edition", async () => {
+  it("lists catalog feats after switching to the feat branch, fetched for the advancing character's edition and target level", async () => {
     await toFeatBranch();
-    expect(feats).toHaveBeenCalledWith("EDITION_2014");
+    // The level being REACHED (plan.target.newLevel = 8), not the current one —
+    // this is the whole reason the ceremony can offer a feat the sheet can't yet.
+    expect(feats).toHaveBeenCalledWith("EDITION_2014", 8);
     expect(screen.getByText("Alert")).toBeInTheDocument();
     expect(screen.getByText("Resilient")).toBeInTheDocument();
   });
 
-  it("hides Origin feats from the ASI picker but shows General feats (#1129)", async () => {
-    // plan.target.newLevel is 8, so General feats are offered; Origin never is.
+  it("renders every row the server returned, including one the deleted client mirror dropped (#1438)", async () => {
+    // Was `hides Origin feats` (#1129) — that gate is server-side now, so the old
+    // assertion only tested the mock. Inverted: CATALOG's Origin row is one
+    // featOfferedForAsiSlot always rejects, so it renders here iff nothing on the
+    // client re-applies the rule.
     await toFeatBranch();
     expect(screen.getByText("Resilient")).toBeInTheDocument();
-    expect(screen.queryByText("Lucky")).not.toBeInTheDocument();
+    expect(screen.getByText("Lucky")).toBeInTheDocument();
   });
 
   it("stages a full-feat op", async () => {
