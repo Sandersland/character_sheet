@@ -22,7 +22,7 @@ import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
 
 import { CLASSES, ITEMS } from "../catalog-data.js";
-import { ACTIONS } from "../actions.js";
+import { ACTIONS, TWENTY_FOUR_ONLY_ACTION_KEYS } from "../actions.js";
 import { SUBCLASSES } from "../subclasses.js";
 import { MANEUVERS } from "../maneuvers.js";
 import { SHADOW_ARTS } from "../shadow-arts.js";
@@ -92,8 +92,31 @@ describe("CLASSES — 2014 subclass gate levels (#1308)", () => {
 });
 
 describe("per-domain business-key uniqueness", () => {
-  it("ACTIONS have unique keys", () => {
-    expect(duplicates(ACTIONS.map((a) => a.key))).toEqual([]);
+  // Keyed on (key, edition) rather than key alone: since #1430 every universal
+  // action repeats its key once per edition, so only a same-key/same-edition
+  // collision (including two `undefined` = shared rows) would collapse in
+  // seedActions' upsert. Replaces the old "ACTIONS have unique keys".
+  it("ACTIONS have unique (key, edition) pairs", () => {
+    expect(duplicates(ACTIONS.map((a) => `${a.key}::${a.edition ?? "shared"}`))).toEqual([]);
+  });
+
+  // No universal row may stay edition-NULL: resolveEditionCatalog would then
+  // fall back to it for BOTH editions and the fork would be invisible.
+  it("every universal ACTION carries an edition; every class action stays shared", () => {
+    expect(ACTIONS.filter((a) => a.universal && !a.edition).map((a) => a.key)).toEqual([]);
+    expect(ACTIONS.filter((a) => !a.universal && a.edition).map((a) => a.key)).toEqual([]);
+  });
+
+  // The two editions must offer the same universal affordances apart from the
+  // declared 2024-only ones — a key seeded for one edition only would silently
+  // vanish from the other's Action sheet.
+  it("the 2014 and 2024 universal key sets differ only by TWENTY_FOUR_ONLY_ACTION_KEYS", () => {
+    const keysFor = (edition: string) =>
+      ACTIONS.filter((a) => a.universal && a.edition === edition).map((a) => a.key).sort();
+    const keys2014 = keysFor("EDITION_2014");
+    const keys2024 = keysFor("EDITION_2024");
+    expect(keys2024.filter((k) => !keys2014.includes(k))).toEqual([...TWENTY_FOUR_ONLY_ACTION_KEYS].sort());
+    expect(keys2014.filter((k) => !keys2024.includes(k))).toEqual([]);
   });
 
   it("SUBCLASSES have unique (className, name) pairs", () => {
