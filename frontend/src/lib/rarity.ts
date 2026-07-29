@@ -22,7 +22,9 @@ export function rarityLabel(key: string, rarities: readonly ItemRarityOption[]):
 /** rarityLabel with the paper doll's extra rule: COMMON is deliberately silent,
  *  because every mundane worn or bag item would otherwise carry a badge that
  *  says nothing. Shared by the worn rows and the slot picker so the two can't
- *  disagree about which items get a badge. */
+ *  disagree about which items get a badge. The rule is paper-doll-scoped, not
+ *  app-wide: the DM's campaign surfaces call rarityLabel directly and DO badge
+ *  a Common item, because there the tier is the thing being authored. */
 export function paperDollRarityLabel(
   rarity: ItemRarity | undefined,
   rarities: readonly ItemRarityOption[],
