@@ -6,12 +6,17 @@
 // the row carries only description, cost, save ability, and buff target. Sacred
 // Weapon's buff modifier is derived from Charisma at cast time (left null here).
 // Descriptions are absorbed from the SUBCLASS_FEATURE_LIST lines.
+import type { SeedEdition } from "./edition.js";
+
 export interface ChannelDivinitySeed {
   name: string;
   description: string;
   saveAbility?: string;
   effectKind?: "buff";
   buffTarget?: string;
+  // Omitted = shared (NULL column, valid in both editions, #1306); only a
+  // mechanically diverging row forks, which #1415 made expressible.
+  edition?: SeedEdition;
 }
 
 export const CHANNEL_DIVINITIES: ChannelDivinitySeed[] = [

@@ -43,7 +43,7 @@ function isTwoHandedWeapon(item: PlaceableItem): boolean {
 
 // The slots an item may legally occupy. Weapons/body armor derive from detail
 // data; gear declares its slot (null = bag-only). Empty = not equippable.
-function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
+export function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
   if (item.category === "weapon") {
     return isTwoHandedWeapon(item) ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
   }
