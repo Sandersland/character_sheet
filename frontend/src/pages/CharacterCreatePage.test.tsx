@@ -340,6 +340,7 @@ describe("CharacterCreatePage — subclass gate per edition (#1325)", () => {
       name: "Old Ways Table",
       ownerId: "u1",
       rulesEdition: "EDITION_2014",
+      rulesEditionLabel: "2014 rules",
       inviteCode: "abc123",
       createdAt: new Date().toISOString(),
       role: "OWNER",

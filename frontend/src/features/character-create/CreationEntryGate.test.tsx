@@ -19,6 +19,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     name: "The Sunless Citadel",
     ownerId: "u1",
     rulesEdition: "EDITION_2024",
+    rulesEditionLabel: "2024 rules",
     inviteCode: "abc123",
     createdAt: new Date().toISOString(),
     role: "PLAYER",
@@ -84,7 +85,11 @@ describe("CreationEntryGate (#1286)", () => {
   });
 
   it("picking a campaign displays its inherited edition instead of asking", async () => {
-    mockFetchCampaigns.mockResolvedValue([makeCampaign({ rulesEdition: "EDITION_2014" })]);
+    // Both fields set explicitly — deriving the label from the key in a fixture
+    // would re-implement the mapping #1436 moved server-side.
+    mockFetchCampaigns.mockResolvedValue([
+      makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    ]);
     const onResolved = vi.fn();
     render(<CreationEntryGate onResolved={onResolved} />);
 
@@ -104,7 +109,9 @@ describe("CreationEntryGate (#1286)", () => {
   });
 
   it("switching back to Solo after picking a campaign re-reveals the edition picker", async () => {
-    mockFetchCampaigns.mockResolvedValue([makeCampaign({ rulesEdition: "EDITION_2014" })]);
+    mockFetchCampaigns.mockResolvedValue([
+      makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    ]);
     render(<CreationEntryGate onResolved={vi.fn()} />);
 
     await userEvent.click(await screen.findByRole("radio", { name: /the sunless citadel/i }));

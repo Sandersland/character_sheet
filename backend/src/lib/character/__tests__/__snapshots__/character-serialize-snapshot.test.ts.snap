@@ -536,6 +536,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     },
   ],
   "rulesEdition": "EDITION_2024",
+  "rulesEditionLabel": "2024 rules",
   "savingThrowProficiencies": [
     "intelligence",
     "wisdom",
@@ -979,6 +980,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   },
   "rollModifiers": [],
   "rulesEdition": "EDITION_2024",
+  "rulesEditionLabel": "2024 rules",
   "savingThrowProficiencies": [
     "strength",
     "constitution",

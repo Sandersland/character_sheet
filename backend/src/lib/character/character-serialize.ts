@@ -8,7 +8,7 @@ import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/s
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
-import { editionOf } from "@/lib/rules/edition.js";
+import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
 import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
@@ -337,6 +337,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
     rulesEdition: row.rulesEdition,
+    // Served alongside the key (#1436, the #1322 precedent) so the sheet's
+    // edition badge stays synchronous — no client copy of the label table, and
+    // no /api/editions round-trip just to render a badge.
+    rulesEditionLabel: RULES_EDITION_LABELS[editionOf(row)],
     // Campaign-scoped play prefs (#537), or undefined when unattached.
     campaignPreferences: buildCampaignPreferencesView(row),
 

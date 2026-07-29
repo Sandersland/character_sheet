@@ -32,6 +32,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     name: "The Sunless Citadel",
     ownerId: "u1",
     rulesEdition: "EDITION_2024",
+    rulesEditionLabel: "2024 rules",
     inviteCode: "abc123",
     createdAt: new Date().toISOString(),
     role: "OWNER",
@@ -148,7 +149,11 @@ describe("CampaignDetailPage (#246)", () => {
 
   // #1286: displayed on the campaign header (not the character-list card).
   it("shows the campaign's rules edition in the header", async () => {
-    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ rulesEdition: "EDITION_2014" }));
+    // Both fields set explicitly — a fixture that derived the label from the key
+    // would be a re-implementation of the very mapping this issue moved server-side.
+    vi.mocked(client.fetchCampaign).mockResolvedValue(
+      makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    );
     vi.mocked(client.fetchCharacters).mockResolvedValue([]);
 
     renderDetail();
