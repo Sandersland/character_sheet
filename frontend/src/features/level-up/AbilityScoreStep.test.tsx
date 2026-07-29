@@ -168,9 +168,9 @@ describe("AbilityScoreStep — feat branch", () => {
     expect(feats).not.toHaveBeenCalled();
   });
 
-  it("lists catalog feats after switching to the feat branch", async () => {
+  it("lists catalog feats after switching to the feat branch, fetched for the advancing character's edition", async () => {
     await toFeatBranch();
-    expect(feats).toHaveBeenCalled();
+    expect(feats).toHaveBeenCalledWith("EDITION_2014");
     expect(screen.getByText("Alert")).toBeInTheDocument();
     expect(screen.getByText("Resilient")).toBeInTheDocument();
   });

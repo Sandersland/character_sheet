@@ -30,6 +30,7 @@ describe("AdvancementPanel accessibility", () => {
         slotsRemaining={2}
         busy={false}
         characterLevel={4}
+        rulesEdition="EDITION_2014"
         skillNames={[]}
         onSubmit={noop}
       />

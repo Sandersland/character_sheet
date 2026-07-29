@@ -137,6 +137,35 @@ describe("ReviewStep", () => {
     expect(await screen.findByText("Archery")).toBeInTheDocument();
   });
 
+  // Two assertions, two jobs, neither redundant (#1411). `toHaveBeenCalledWith`
+  // is the red-first proof that the edition is threaded at all;
+  // `toHaveBeenCalledTimes(1)` after an explicit rerender is the standing guard
+  // that the fetcher keeps a stable identity — an inline arrow would re-fire
+  // useCatalogNames's [fetcher] effect forever, and it would still pass a
+  // calledWith-only test.
+  it("fetches the feat catalog once across a re-render, for the character's edition", async () => {
+    vi.mocked(fetchFeats).mockResolvedValue([
+      { id: "archery", name: "Archery", description: "" },
+    ] as unknown as Awaited<ReturnType<typeof fetchFeats>>);
+    const draft: LevelUpDraft = {
+      hp: { method: "average" },
+      fightingStyleFeat: { type: "takeFeat", featId: "archery", slot: "fightingStyle" },
+    };
+    const { rerender } = renderReview(draft);
+    expect(await screen.findByText("Archery")).toBeInTheDocument();
+
+    rerender(
+      <LevelUpStepContext.Provider
+        value={{ character, draft, setDraft: () => {}, plan, target: { kind: "existing", classEntryId: "entry-1" } }}
+      >
+        <ReviewStep />
+      </LevelUpStepContext.Provider>,
+    );
+
+    expect(fetchFeats).toHaveBeenCalledTimes(1);
+    expect(fetchFeats).toHaveBeenCalledWith("EDITION_2014");
+  });
+
   it("resolves cantrip names via the spell catalog (#1157)", async () => {
     renderReview({
       hp: { method: "average" },

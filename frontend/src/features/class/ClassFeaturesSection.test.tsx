@@ -77,6 +77,7 @@ describe("ClassFeaturesSection — Fighting Style", () => {
     render(makeFighter({ total: 1 }));
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
+    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014");
     // A general-category feat must not leak into the fighting-style picker.
     expect(await screen.findByText("Archery")).toBeInTheDocument();
     expect(screen.queryByText("Sentinel")).not.toBeInTheDocument();
