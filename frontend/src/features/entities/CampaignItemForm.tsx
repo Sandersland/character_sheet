@@ -10,7 +10,7 @@ import {
 } from "@/features/entities/CampaignItemFields";
 import { buildFormSetters } from "@/features/entities/campaignItemFormSetters";
 import { type FormState } from "@/lib/campaignItemForm";
-import type { Item } from "@/types/character";
+import type { Item, ItemRarityOption } from "@/types/character";
 
 interface CampaignItemFormProps {
   form: FormState;
@@ -18,6 +18,8 @@ interface CampaignItemFormProps {
   editingId: string | null;
   catalog: Item[];
   busyId: string | null;
+  /** Served rarity rows (#1437), passed in so the form holds no query observer. */
+  rarities: ItemRarityOption[];
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -28,6 +30,7 @@ export default function CampaignItemForm({
   editingId,
   catalog,
   busyId,
+  rarities,
   onSubmit,
   onCancel,
 }: CampaignItemFormProps) {
@@ -39,7 +42,7 @@ export default function CampaignItemForm({
 
       <IdentityFieldset form={form} setters={setters} />
       <CategoryDetailsFieldset form={form} setters={setters} />
-      <MagicFieldset form={form} setters={setters} />
+      <MagicFieldset form={form} setters={setters} rarities={rarities} />
       <ValueWeightFieldset form={form} setters={setters} />
       <DescriptionFieldset form={form} setters={setters} />
 

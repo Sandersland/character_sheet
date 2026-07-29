@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
@@ -21,10 +21,12 @@ import type {
   EntityConnection,
   EntityType,
 } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface DetailSetters {
   role: (r: CampaignRole | undefined) => void;
   characters: (c: NonNullable<Campaign["characters"]>) => void;
+  rulesEdition: (e: RulesEdition | undefined) => void;
   listed: (l: CampaignEntity[]) => void;
   entity: (e: CampaignEntity | null) => void;
   form: (found: CampaignEntity) => void;
@@ -69,6 +71,10 @@ function loadEntityDetail(campaignId: string, entityId: string, set: DetailSette
       if (!active) return;
       set.role(c.role);
       set.characters(c.characters ?? []);
+      // Rides the campaign read this effect already makes — an ITEM entity's
+      // card needs an edition to pick a /reference cache slot (#1437), not a
+      // second request.
+      set.rulesEdition(c.rulesEdition);
     })
     .catch(() => active && set.role(undefined));
   fetchEntities(campaignId, { includeStats: true })
@@ -127,6 +133,22 @@ async function runMutation(
   } finally {
     setBusy(false);
   }
+}
+
+// The slice of the campaign read this page keeps: the viewer's role, the member
+// characters, and the edition an ITEM card resolves rarity labels against
+// (#1437). One sub-hook because all three land from the same fetchCampaign.
+function useCampaignMeta() {
+  const [role, setRole] = useState<CampaignRole | undefined>(undefined);
+  const [characters, setCharacters] = useState<NonNullable<Campaign["characters"]>>([]);
+  const [rulesEdition, setRulesEdition] = useState<RulesEdition | undefined>(undefined);
+  // Stable so the load effect can depend on it without re-running per render —
+  // same reason useEntityForm memoizes `fill`.
+  const set = useMemo(
+    () => ({ role: setRole, characters: setCharacters, rulesEdition: setRulesEdition }),
+    [],
+  );
+  return { role, characters, rulesEdition, set };
 }
 
 // The edit-form field state; `fill` seeds it from a freshly loaded entity.
@@ -220,8 +242,7 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
 
   const [entity, setEntity] = useState<CampaignEntity | null | undefined>(undefined);
   const [listed, setListed] = useState<CampaignEntity[]>([]);
-  const [role, setRole] = useState<CampaignRole | undefined>(undefined);
-  const [characters, setCharacters] = useState<NonNullable<Campaign["characters"]>>([]);
+  const meta = useCampaignMeta();
   const [item, setItem] = useState<CampaignItem | null>(null);
   const [backlinks, setBacklinks] = useState<EntityBacklink[]>([]);
   const [connections, setConnections] = useState<EntityConnection[]>([]);
@@ -237,15 +258,14 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
     setConnections([]);
     setEditing(wantsEditRef.current);
     return loadEntityDetail(campaignId, entityId, {
-      role: setRole,
-      characters: setCharacters,
+      ...meta.set,
       listed: setListed,
       entity: setEntity,
       form: fill,
       backlinks: setBacklinks,
       connections: setConnections,
     });
-  }, [campaignId, entityId, fill]);
+  }, [campaignId, entityId, fill, meta.set]);
 
   // ITEM entities front a DM-authored CampaignItem — load its card data. The
   // by-entity read 404s for a non-owner while the entity is hidden (setItem null).
@@ -277,8 +297,9 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
     byId,
     entity,
     listed,
-    role,
-    characters,
+    role: meta.role,
+    characters: meta.characters,
+    rulesEdition: meta.rulesEdition,
     item,
     backlinks,
     connections,

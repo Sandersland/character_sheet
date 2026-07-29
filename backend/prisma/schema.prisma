@@ -972,7 +972,7 @@ enum ActionCost {
 // AbilityCost. Provenance pointer in ManeuverEntry.maneuverId.
 model GrantedAbility {
   id          String  @id @default(uuid())
-  name        String  @unique
+  name        String
   source      String  @default("maneuver")
   description String
   minLevel    Int     @default(3) // minimum level to learn/use
@@ -1011,11 +1011,18 @@ model GrantedAbility {
   buffTarget         String?
   buffModifier       Int?
 
-  // NULL = valid in both editions (#1306). `name` stays plainly @unique for now
-  // — no divergent maneuver/shadow-art/channel-divinity content exists yet, so
-  // widening it to an edition-aware compound (like Feat/Subclass/Background) is
-  // deferred to whichever future issue actually forks one of these by edition.
+  // NULL = valid in both editions; a diverging maneuver / shadow art / channel
+  // divinity / subclass-choice option forks into one row per edition sharing
+  // this name (#1306, widened by #1415 ahead of #1313). The migration's unique
+  // index on (name, edition) uses NULLS NOT DISTINCT so two NULL-edition rows
+  // sharing a name are still rejected — see resolveEditionRow, the single place
+  // the exact/NULL fallback ordering is expressed.
   edition RulesEdition?
+
+  // `source` is deliberately NOT in the key: a name identifies exactly one row
+  // across maneuver/shadowArts/channelDivinity/choice sources, and every
+  // name-keyed lookup relies on that. Widening by `edition` alone preserves it.
+  @@unique([name, edition])
 }
 
 // Feat catalog — seeded from a curated SRD subset. Provenance pointer in

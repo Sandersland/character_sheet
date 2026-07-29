@@ -157,8 +157,10 @@ async function seedActions(prisma: PrismaClient) {
 // maneuver costs 1 superiority die and rolls it (effectDieSource).
 async function seedManeuvers(prisma: PrismaClient) {
   for (const maneuver of MANEUVERS) {
+    const edition = maneuver.edition ?? null;
     const data = {
       name: maneuver.name,
+      edition,
       source: "maneuver",
       description: maneuver.description,
       minLevel: 3,
@@ -172,22 +174,22 @@ async function seedManeuvers(prisma: PrismaClient) {
       costBase: 1,
       effectDieSource: "superiorityDice",
     };
-    await prisma.grantedAbility.upsert({
-      where: { name: maneuver.name },
-      create: data,
-      update: data,
-    });
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't express
+    // a null edition (see its docstring).
+    await upsertEditionRow(prisma.grantedAbility, { name: maneuver.name, edition }, data, data);
   }
 }
 
-// Seed the Shadow Arts catalog — upsert by unique name. Flat 1-focus, no scaling
+// Seed the Shadow Arts catalog — upsert by (name, edition). Flat 1-focus, no scaling
 // (2024 rewrite, #1246: was flat 2-focus across a 4-spell menu; now a single
 // always-concentrating Darkness cast, so effectKind/buffTarget/buffModifier are
 // fixed nulls rather than per-row fields).
 async function seedShadowArts(prisma: PrismaClient) {
   for (const art of SHADOW_ARTS) {
+    const edition = art.edition ?? null;
     const data = {
       name: art.name,
+      edition,
       source: "shadowArts",
       description: art.description,
       minLevel: 3,
@@ -200,18 +202,19 @@ async function seedShadowArts(prisma: PrismaClient) {
       buffTarget: null,
       buffModifier: null,
     };
-    await prisma.grantedAbility.upsert({
-      where: { name: art.name },
-      create: data,
-      update: data,
-    });
+    await upsertEditionRow(prisma.grantedAbility, { name: art.name, edition }, data, data);
   }
   // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — same
   // edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306); source:
   // "shadowArts" passed in as extraWhere so this never touches
   // maneuvers/channelDivinity rows sharing the same table.
+  //
+  // Each row's OWN edition goes into the seeded list, not a flat null: an
+  // edition absent from it gets `notIn: []`, which matches every row in that
+  // partition — so a 2014 art listed as shared would be deleted by the very
+  // next reseed (proven in granted-ability-fork-reseed.test.ts).
   const staleWhere = staleCatalogRowsWhere(
-    SHADOW_ARTS.map((a) => ({ name: a.name, edition: null })),
+    SHADOW_ARTS.map((a) => ({ name: a.name, edition: a.edition ?? null })),
     { source: "shadowArts" },
   );
   const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true } });
@@ -224,26 +227,26 @@ async function seedShadowArts(prisma: PrismaClient) {
 // cost/effect columns.
 async function seedSubclassChoiceOptions(prisma: PrismaClient) {
   for (const option of SUBCLASS_CHOICE_OPTIONS) {
+    const edition = option.edition ?? null;
     const data = {
       name: option.name,
+      edition,
       source: option.source,
       description: option.description,
       minLevel: option.minLevel,
       alwaysKnown: false,
     };
-    await prisma.grantedAbility.upsert({
-      where: { name: option.name },
-      create: data,
-      update: data,
-    });
+    await upsertEditionRow(prisma.grantedAbility, { name: option.name, edition }, data, data);
   }
 }
 
-// Seed Channel Divinity catalog — upsert by unique name. Each spends 1 CD charge.
+// Seed Channel Divinity catalog — upsert by (name, edition). Each spends 1 CD charge.
 async function seedChannelDivinities(prisma: PrismaClient) {
   for (const cd of CHANNEL_DIVINITIES) {
+    const edition = cd.edition ?? null;
     const data = {
       name: cd.name,
+      edition,
       source: "channelDivinity",
       description: cd.description,
       minLevel: 2,
@@ -257,11 +260,7 @@ async function seedChannelDivinities(prisma: PrismaClient) {
       buffTarget: orNull(cd.buffTarget),
       buffModifier: null,
     };
-    await prisma.grantedAbility.upsert({
-      where: { name: cd.name },
-      create: data,
-      update: data,
-    });
+    await upsertEditionRow(prisma.grantedAbility, { name: cd.name, edition }, data, data);
   }
 }
 

@@ -6,6 +6,9 @@
  *    at the Postgres constraint level, not just in application code.
  * 2. The worked example (Alert forks by edition; Grappler stays one shared
  *    row) resolves correctly against the REAL seeded catalog, not a fixture.
+ *
+ * #1415 widened GrantedAbility to the same (name, edition) shape, so its block
+ * lives here rather than in a second file — one constraint, one proof surface.
  */
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -42,6 +45,53 @@ describe("NULLS NOT DISTINCT — Feat(name, edition) rejects a duplicate NULL ro
     await prisma.feat.create({ data: { name: NAME, description: "2024", edition: "EDITION_2024" } });
     const rows = await prisma.feat.findMany({ where: { name: NAME } });
     expect(rows.map((r) => r.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
+  });
+});
+
+describe("NULLS NOT DISTINCT — GrantedAbility(name, edition) admits one row per edition (#1415)", () => {
+  const NAME = "Zzz GrantedAbility Edition Probe (#1415)";
+
+  afterEach(async () => {
+    await prisma.grantedAbility.deleteMany({ where: { name: NAME } });
+  });
+
+  it("a same-named 2014/2024 pair is allowed — the fork #1313 needs", async () => {
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2014", edition: "EDITION_2014" } });
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2024", edition: "EDITION_2024" } });
+    const rows = await prisma.grantedAbility.findMany({ where: { name: NAME } });
+    expect(rows.map((r) => r.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
+  });
+
+  it("a THIRD row re-using an edition already taken for that name is rejected", async () => {
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2014", edition: "EDITION_2014" } });
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2024", edition: "EDITION_2024" } });
+
+    let error: unknown;
+    try {
+      await prisma.grantedAbility.create({ data: { name: NAME, source: "maneuver", description: "third", edition: "EDITION_2024" } });
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect((error as Prisma.PrismaClientKnownRequestError).code).toBe("P2002");
+  });
+
+  // Green both before and after #1415 (`name` was singly @unique before), so
+  // this is a REGRESSION GUARD on the hand-written ` NULLS NOT DISTINCT` in
+  // 20260728…_widen_granted_ability_name_edition: a plain compound index would
+  // admit unboundedly many (name, NULL) rows and make resolveEditionRow's
+  // shared-row fallback pick a nondeterministic one.
+  it("two NULL-edition rows sharing a name are still rejected", async () => {
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "first", edition: null } });
+
+    let error: unknown;
+    try {
+      await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "second", edition: null } });
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect((error as Prisma.PrismaClientKnownRequestError).code).toBe("P2002");
   });
 });
 
