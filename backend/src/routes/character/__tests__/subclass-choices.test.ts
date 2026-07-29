@@ -97,7 +97,7 @@ beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   COOKIE = await authCookie(OWNER_ID);
   const byName = async (name: string) => {
-    const row = await prisma.grantedAbility.findUnique({ where: { name } });
+    const row = await prisma.grantedAbility.findFirst({ where: { name } });
     if (!row) throw new Error(`Seed missing GrantedAbility "${name}" — run prisma db seed`);
     return row.id;
   };

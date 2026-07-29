@@ -61,8 +61,8 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
       create: { name: CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"], skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false },
       update: {},
     });
-    tripId = (await prisma.grantedAbility.findUnique({ where: { name: "Trip Attack" } }))!.id;
-    rallyId = (await prisma.grantedAbility.findUnique({ where: { name: "Rally" } }))!.id;
+    tripId = (await prisma.grantedAbility.findFirst({ where: { name: "Trip Attack" } }))!.id;
+    rallyId = (await prisma.grantedAbility.findFirst({ where: { name: "Rally" } }))!.id;
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
