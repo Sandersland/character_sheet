@@ -2,7 +2,6 @@ import { ChevronDown } from "lucide-react";
 import { useReducer } from "react";
 
 import { hasItemProse, itemDetailParts } from "@/lib/itemDetails";
-import { isEquippable } from "@/lib/items";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import ActivateControl from "@/features/inventory/ActivateControl";
@@ -97,7 +96,7 @@ export default function InventoryRow({
           {item.category === "consumable" && (
             <UseConsumableButton item={item} pending={pending} onSubmit={onSubmit} />
           )}
-          {isEquippable(item.category) && (
+          {item.equippable && (
             <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />
           )}
           {item.requiresAttunement && (

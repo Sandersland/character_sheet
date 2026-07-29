@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 
-import { equipSlotLabel, equippedLoadoutLabel, isOffHandLocked, itemsInSlot } from "@/lib/paperDoll";
+import { equipSlotLabel, equippedLoadoutLabel, itemsInSlot } from "@/lib/paperDoll";
 import {
   handButtonDisabledReason,
   handContext,
@@ -113,7 +113,7 @@ export default function InlineLoadoutPicker({ turnState, loadout }: InlineLoadou
   const [expandedHand, setExpandedHand] = useState<EquipSlot | null>(null);
   const { busy, error, lastSwap, swap, stow, refund } = loadout;
 
-  const offHandLocked = isOffHandLocked(character.inventory);
+  const offHandLocked = character.offHandLocked;
   const ctx = handContext(character.inventory, turnState.actionsRemaining, {
     attackEquipCredits: turnState.attackEquipCredits,
     freeInteractionUsed: turnState.freeInteractionUsed,
@@ -129,7 +129,7 @@ export default function InlineLoadoutPicker({ turnState, loadout }: InlineLoadou
   return (
     <div className="flex flex-col gap-1">
       <p className="text-xs text-parchment-600">
-        Now wielding <span className="font-semibold text-parchment-800">{equippedLoadoutLabel(character.inventory)}</span>.
+        Now wielding <span className="font-semibold text-parchment-800">{equippedLoadoutLabel(character.inventory, offHandLocked)}</span>.
       </p>
 
       {lastSwap && (

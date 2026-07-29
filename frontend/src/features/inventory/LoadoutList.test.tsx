@@ -112,27 +112,41 @@ describe("LoadoutList groups & rows", () => {
     expect(screen.getByRole("button", { name: "Equip Ring 2" })).toBeInTheDocument();
   });
 
-  it("shows a locked off-hand row (no picker) when a two-handed weapon is main-hand", () => {
-    renderList([weapon(true, { id: "gs", name: "Greatsword", equippedSlot: "MAIN_HAND" })]);
-    expect(screen.getByText("Held by Greatsword (two-handed)")).toBeInTheDocument();
+  // The served character flag drives the lock, not the row's own twoHanded bit:
+  // a ONE-handed main-hand weapon still locks the off-hand when the server says so.
+  it("shows a locked off-hand row (no picker) from the served offHandLocked flag", () => {
+    renderList([weapon(false, { id: "ls", name: "Longsword", equippedSlot: "MAIN_HAND" })], vi.fn(), {
+      offHandLocked: true,
+    });
+    expect(screen.getByText("Held by Longsword (two-handed)")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Equip Off hand" })).toBeNull();
   });
 
-  it("warns on a non-proficient equipped item but not a proficient one", () => {
-    const martial = weapon(false, {
-      id: "axe",
-      name: "Greataxe",
-      equippedSlot: "MAIN_HAND",
-      weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
-    });
+  it("leaves the off-hand pickable when offHandLocked is false, even for a two-handed row", () => {
+    renderList([weapon(true, { id: "gs", name: "Greatsword", equippedSlot: "MAIN_HAND" })]);
+    expect(screen.queryByText(/Held by/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Equip Off hand" })).toBeInTheDocument();
+  });
+
+  // The served per-row flag drives the warning, not character.weaponProficiencies:
+  // the proficient case keeps that array EMPTY, which would warn on staging.
+  it("warns from the served proficient flag, not the character's grant list", () => {
+    const martial = (proficient: boolean) =>
+      weapon(false, {
+        id: "axe",
+        name: "Greataxe",
+        equippedSlot: "MAIN_HAND",
+        proficient,
+        weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
+      });
     const { unmount } = renderWithCharacter(
       <LoadoutList pending={false} onSubmit={vi.fn()} />,
-      makeCharacter([martial]),
+      makeCharacter([martial(false)], { weaponProficiencies: [{ name: "Martial Weapons", source: "class" }] }),
     );
     expect(screen.getByText("Not proficient")).toBeInTheDocument();
     unmount();
 
-    renderList([martial], vi.fn(), { weaponProficiencies: [{ name: "Martial Weapons", source: "class" }] });
+    renderList([martial(true)]);
     expect(screen.queryByText("Not proficient")).toBeNull();
   });
 
