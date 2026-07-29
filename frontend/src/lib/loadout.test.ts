@@ -17,6 +17,9 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     ...overrides,
   };
 }
@@ -24,6 +27,8 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
 const weapon = (twoHanded: boolean, o: Partial<InventoryItem> = {}) =>
   item({
     category: "weapon",
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 8,
@@ -53,19 +58,16 @@ const versatileWeapon = (grip: "one-handed" | "versatile-two-handed", faces: num
     ...o,
   });
 
-interface Profs {
-  weapon?: { name: string }[];
-  armor?: { category: string }[];
-}
-
-function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character {
+function makeCharacter(inventory: InventoryItem[], over: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Aria",
     armorClass: 15,
     inventory,
-    weaponProficiencies: profs.weapon ?? [],
-    armorProficiencies: profs.armor ?? [],
+    weaponProficiencies: [],
+    armorProficiencies: [],
+    offHandLocked: false,
+    ...over,
   } as unknown as Character;
 }
 
@@ -121,29 +123,45 @@ describe("buildLoadoutGroups", () => {
     expect(rowsByKind(rings, "filled")).toHaveLength(2);
   });
 
-  it("locks the off-hand when a two-handed weapon is main-hand", () => {
+  // The served character flag locks the row, not the main-hand item's own
+  // twoHanded bit — a ONE-handed weapon here proves the client stopped deriving it.
+  it("locks the off-hand from the served offHandLocked flag", () => {
     const groups = buildLoadoutGroups(
-      makeCharacter([weapon(true, { id: "gs", name: "Greatsword", equippedSlot: "MAIN_HAND" })]),
+      makeCharacter([weapon(false, { id: "ls", name: "Longsword", equippedSlot: "MAIN_HAND" })], {
+        offHandLocked: true,
+      }),
     );
     const hands = groups.find((g) => g.key === "hands")!;
     const off = hands.rows.find((r) => r.slot === "OFF_HAND")!;
     expect(off.kind).toBe("locked");
-    expect(off).toMatchObject({ lockedByName: "Greatsword" });
+    expect(off).toMatchObject({ lockedByName: "Longsword" });
   });
 
-  it("propagates notProficient from isProficientWithItem", () => {
-    const martial = weapon(false, {
-      id: "axe",
-      name: "Greataxe",
-      equippedSlot: "MAIN_HAND",
-      weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
-    });
-    const warns = buildLoadoutGroups(makeCharacter([martial]))
+  it("leaves the off-hand unlocked for a two-handed row when the flag is false", () => {
+    const groups = buildLoadoutGroups(
+      makeCharacter([weapon(true, { id: "gs", name: "Greatsword", equippedSlot: "MAIN_HAND" })]),
+    );
+    const off = groups.find((g) => g.key === "hands")!.rows.find((r) => r.slot === "OFF_HAND")!;
+    expect(off.kind).toBe("empty");
+  });
+
+  // notProficient is the negation of the served per-row flag; the proficient case
+  // deliberately leaves character.weaponProficiencies EMPTY.
+  it("propagates notProficient from the served proficient flag", () => {
+    const martial = (proficient: boolean) =>
+      weapon(false, {
+        id: "axe",
+        name: "Greataxe",
+        equippedSlot: "MAIN_HAND",
+        proficient,
+        weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
+      });
+    const warns = buildLoadoutGroups(makeCharacter([martial(false)], { weaponProficiencies: [{ name: "Martial Weapons", source: "class" }] }))
       .flatMap((g) => g.rows)
       .find((r) => r.slot === "MAIN_HAND") as FilledLoadoutRow;
     expect(warns.notProficient).toBe(true);
 
-    const ok = buildLoadoutGroups(makeCharacter([martial], { weapon: [{ name: "Martial Weapons" }] }))
+    const ok = buildLoadoutGroups(makeCharacter([martial(true)]))
       .flatMap((g) => g.rows)
       .find((r) => r.slot === "MAIN_HAND") as FilledLoadoutRow;
     expect(ok.notProficient).toBe(false);
@@ -151,10 +169,7 @@ describe("buildLoadoutGroups", () => {
 
   it("propagates the versatile grip only to the main-hand row", () => {
     const groups = buildLoadoutGroups(
-      makeCharacter(
-        [versatileWeapon("versatile-two-handed", 10, { id: "ls", equippedSlot: "MAIN_HAND" })],
-        { weapon: [{ name: "Martial Weapons" }] },
-      ),
+      makeCharacter([versatileWeapon("versatile-two-handed", 10, { id: "ls", equippedSlot: "MAIN_HAND" })]),
     );
     const main = groups.flatMap((g) => g.rows).find((r) => r.slot === "MAIN_HAND") as FilledLoadoutRow;
     expect(main.grip?.short).toBe("1d10");

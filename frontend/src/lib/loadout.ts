@@ -1,15 +1,13 @@
 /**
  * Loadout-list model (#925) — the grouped-rows replacement for the rejected
- * tile-grid paper doll. Pure logic (no JSX): walks the shared slot taxonomy in
- * paperDoll.ts into ordered Weapons / Armor / Accessories groups of filled,
- * empty, or locked rows. The server still owns placement validation; this only
- * drives the loadout UI.
+ * tile-grid paper doll. Pure logic (no JSX): walks `SLOT_GROUPS` into ordered
+ * Weapons / Armor / Accessories groups of filled, empty, or locked rows. Every
+ * rule it reports (`notProficient`, the off-hand lock) is a served flag, not a
+ * local derivation; the server owns placement validation too.
  */
 import type { Character, EquipSlot, InventoryItem } from "@/types/character";
 import {
   equipSlotLabel,
-  isOffHandLocked,
-  isProficientWithItem,
   itemsInSlot,
   RING_CAPACITY,
   SLOT_GROUP_ORDER,
@@ -62,31 +60,19 @@ export interface LoadoutGroup {
   rows: LoadoutRow[];
 }
 
-function filledRow(
-  character: Character,
-  slot: EquipSlot,
-  key: string,
-  label: string,
-  item: InventoryItem,
-): FilledLoadoutRow {
-  const notProficient = !isProficientWithItem(
-    item,
-    character.weaponProficiencies,
-    character.armorProficiencies,
-  );
+function filledRow(slot: EquipSlot, key: string, label: string, item: InventoryItem): FilledLoadoutRow {
   const grip = slot === "MAIN_HAND" ? versatileGrip(item) : null;
-  return { kind: "filled", key, slot, label, item, notProficient, grip };
+  return { kind: "filled", key, slot, label, item, notProficient: !item.proficient, grip };
 }
 
 // The rows a single slot contributes: RING expands to RING_CAPACITY numbered
 // rows; a two-handed main-hand locks the off-hand into a static held-by row.
 function rowsForSlot(
-  character: Character,
+  inventory: InventoryItem[],
   slot: EquipSlot,
   offHandLocked: boolean,
   mainHandItem: InventoryItem | null,
 ): LoadoutRow[] {
-  const inventory = character.inventory;
   const baseLabel = equipSlotLabel(slot);
   if (slot === "RING") {
     const rings = itemsInSlot(inventory, "RING");
@@ -95,7 +81,7 @@ function rowsForSlot(
       const label = `${baseLabel} ${i + 1}`;
       const item = rings[i] ?? null;
       return item
-        ? filledRow(character, slot, key, label, item)
+        ? filledRow(slot, key, label, item)
         : ({ kind: "empty", key, slot, label } satisfies EmptyLoadoutRow);
     });
   }
@@ -105,7 +91,7 @@ function rowsForSlot(
   const item = itemsInSlot(inventory, slot)[0] ?? null;
   return [
     item
-      ? filledRow(character, slot, slot, baseLabel, item)
+      ? filledRow(slot, slot, baseLabel, item)
       : ({ kind: "empty", key: slot, slot, label: baseLabel } satisfies EmptyLoadoutRow),
   ];
 }
@@ -113,13 +99,13 @@ function rowsForSlot(
 // The full loadout, grouped Weapons / Armor / Accessories in slot-taxonomy order.
 export function buildLoadoutGroups(character: Character): LoadoutGroup[] {
   const inventory = character.inventory;
-  const offHandLocked = isOffHandLocked(inventory);
+  const offHandLocked = character.offHandLocked;
   const mainHandItem = offHandLocked ? (itemsInSlot(inventory, "MAIN_HAND")[0] ?? null) : null;
   return SLOT_GROUP_ORDER.map((group) => ({
     key: group,
     label: LOADOUT_GROUP_LABELS[group],
     rows: SLOT_GROUPS[group].slots.flatMap((slot) =>
-      rowsForSlot(character, slot, offHandLocked, mainHandItem),
+      rowsForSlot(inventory, slot, offHandLocked, mainHandItem),
     ),
   }));
 }

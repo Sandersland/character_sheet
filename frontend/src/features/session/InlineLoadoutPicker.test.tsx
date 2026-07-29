@@ -20,11 +20,16 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// `allowedSlots` is served (#1433) and `bagItemsForSlot` reads it — a fixture
+// omitting it throws rather than degrading, so the cast must still supply it.
 function weapon(over: Partial<InventoryItem>, twoHanded = false): InventoryItem {
   return {
     category: "weapon",
     quantity: 1,
     equipped: false,
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
+    proficient: true,
     weapon: { twoHanded, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing" },
     ...over,
   } as unknown as InventoryItem;
@@ -35,11 +40,12 @@ const dagger = weapon({ id: "dg", name: "Dagger" }); // bag, one-handed
 const shield = {
   ...weapon({ id: "sh", name: "Shield", equipped: true, equippedSlot: "OFF_HAND" }),
   category: "armor",
+  allowedSlots: ["OFF_HAND"],
   armor: { armorCategory: "shield" },
 } as unknown as InventoryItem;
 
-function makeChar(inventory: InventoryItem[]): Character {
-  return { id: "c1", inventory } as unknown as Character;
+function makeChar(inventory: InventoryItem[], over: Partial<Character> = {}): Character {
+  return { id: "c1", inventory, offHandLocked: false, ...over } as unknown as Character;
 }
 
 /** budget defaults to a FRESH turn: the once-per-turn free interaction unspent, no attack credits. */

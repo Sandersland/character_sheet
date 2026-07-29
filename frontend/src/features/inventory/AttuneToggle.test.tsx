@@ -16,6 +16,9 @@ const mockItem: InventoryItem = {
   attuned: false,
   requiresAttunement: true,
   attunementPrereqText: "a spellcaster",
+  equippable: false,
+  allowedSlots: [],
+  proficient: true,
 };
 
 function renderToggle(overrides: Partial<Parameters<typeof AttuneToggle>[0]> = {}) {
