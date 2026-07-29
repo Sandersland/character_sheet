@@ -8,8 +8,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { fetchFeats, fetchManeuvers, fetchSpells } from "@/api/client";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
-import { useReferenceData } from "@/hooks/useReferenceData";
-import { hitPointStepMath } from "@/lib/hitDice";
 import { buildLevelUpLedger, type LedgerResolvers, type LedgerRow } from "@/lib/levelUpLedger";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import { schoolInk } from "@/lib/spellFlavor";
@@ -141,14 +139,13 @@ function LedgerRowView({ row, resolving }: { row: LedgerRow; resolving: boolean 
 }
 
 export default function ReviewStep() {
-  const { character, draft, plan, target } = useLevelUpStepContext();
+  const { character, draft, plan } = useLevelUpStepContext();
   const { resolvers, resolving } = useLedgerResolvers(draft, character.rulesEdition);
-  // Resolved via the same call HitPointsStep makes (useReferenceData +
-  // hitPointStepMath) so the Review HP row and the HP step's preview cannot
-  // disagree (#1441) — the builder itself stays pure and must not fetch.
-  const { reference } = useReferenceData(character.rulesEdition);
-  const { faces } = hitPointStepMath(character, reference?.classes ?? [], target);
-  const rows = buildLevelUpLedger(character, draft, plan, resolvers, faces);
+  // The HP row's numbers come out of `plan` itself (#1380) — the very meta
+  // HitPointsStep renders — so the two screens agree because they read one
+  // served value, a stronger guarantee than the matching client-side
+  // resolutions that used to stand in for it (#1441).
+  const rows = buildLevelUpLedger(character, draft, plan, resolvers);
 
   return (
     <div>
