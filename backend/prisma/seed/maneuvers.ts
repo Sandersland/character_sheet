@@ -5,6 +5,8 @@
 // the server owns the roll on castManeuver. `placement` routes the session UI;
 // `actionSlot` is the economy slot consumed; `saveAbility` is the announced DC
 // ability; `selfTempHp` marks Rally (die + Cha mod as self temp HP).
+import type { SeedEdition } from "./edition.js";
+
 export type ManeuverPlacement = "attackRoll" | "damageRoll" | "reaction" | "effect" | "attackOption";
 
 export interface ManeuverSeed {
@@ -14,6 +16,9 @@ export interface ManeuverSeed {
   actionSlot?: "bonusAction" | "reaction";
   saveAbility?: "strength" | "dexterity" | "wisdom" | "constitution";
   selfTempHp?: boolean;
+  // Omitted = shared (NULL column, valid in both editions, #1306); only a
+  // mechanically diverging row forks, which #1415 made expressible.
+  edition?: SeedEdition;
 }
 
 export const MANEUVERS: ManeuverSeed[] = [

@@ -5,9 +5,15 @@
 // (shadow-arts.ts shadowArtEffectSpec). Minor Illusion (the feature's other
 // grant) is a granted cantrip, seeded in subclass-granted-spells.ts; Darkvision
 // is flavor text (this app tracks no senses).
+import type { SeedEdition } from "./edition.js";
+
 export interface ShadowArtSeed {
   name: string;
   description: string;
+  // Omitted = shared (NULL column, valid in both editions, #1306); only a
+  // mechanically diverging row forks, which #1415 made expressible. #1313
+  // authors the 2014 four-spell menu here.
+  edition?: SeedEdition;
 }
 
 export const SHADOW_ARTS: ShadowArtSeed[] = [
