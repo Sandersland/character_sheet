@@ -22,7 +22,9 @@ export async function fetchSpells(): Promise<CatalogSpell[]> {
 }
 
 // Feeds the advancement section's feat picker — same role as fetchManeuvers.
-// Ordered alphabetically server-side.
-export async function fetchFeats(): Promise<CatalogFeat[]> {
-  return request<CatalogFeat[]>("/feats", undefined, "Failed to fetch feat catalog");
+// Ordered alphabetically server-side. `edition` is required and the route 400s
+// without it (#1411), for the same reason fetchReference above carries it as a
+// query param rather than a header.
+export async function fetchFeats(edition: RulesEdition): Promise<CatalogFeat[]> {
+  return request<CatalogFeat[]>(`/feats?edition=${edition}`, undefined, "Failed to fetch feat catalog");
 }

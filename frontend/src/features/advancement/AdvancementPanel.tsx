@@ -9,6 +9,7 @@ import { useAsiDraft } from "@/features/advancement/useAsiDraft";
 import { useCustomFeatDraft } from "@/features/advancement/useCustomFeatDraft";
 import { useFeatCatalog } from "@/features/advancement/useFeatCatalog";
 import type { AdvancementOperation } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface Props {
   currentScores: Record<string, number>;
@@ -16,6 +17,8 @@ interface Props {
   busy: boolean;
   /** Character level — gates which feats the picker offers (General 4+, Epic Boon 19+). */
   characterLevel: number;
+  /** The character's rules edition — decides which edition's feat rows the picker offers (#1411). */
+  rulesEdition: RulesEdition;
   /** Ordered list of skill names from the character (avoids duplicating SRD skill list). */
   skillNames: string[];
   onSubmit: (op: AdvancementOperation) => void;
@@ -26,6 +29,7 @@ export default function AdvancementPanel({
   slotsRemaining,
   busy,
   characterLevel,
+  rulesEdition,
   skillNames,
   onSubmit,
 }: Props) {
@@ -34,7 +38,7 @@ export default function AdvancementPanel({
 
   const asi = useAsiDraft();
 
-  const feats = useFeatCatalog(open && tab === "feat", characterLevel);
+  const feats = useFeatCatalog(open && tab === "feat", characterLevel, rulesEdition);
   const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
   const { selectedFeat, abilityChoice, customMode } = view;
 

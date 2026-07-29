@@ -55,8 +55,8 @@ const maneuvers: ChoiceKindConfig = {
 
 const fightingStyleFeat: ChoiceKindConfig = {
   single: true,
-  loadOptions: () =>
-    fetchFeats().then((list) =>
+  loadOptions: (ctx) =>
+    fetchFeats(ctx.edition).then((list) =>
       list
         .filter((f) => f.category === "fighting_style")
         .map((f) => ({ id: f.id, name: f.name, description: f.description })),
