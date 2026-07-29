@@ -15,7 +15,8 @@ import EntityPaneRail from "@/features/entities/EntityPaneRail";
 import { useEntityBackTo } from "@/features/entities/useEntityBackTo";
 import { useEntityDetail } from "@/features/entities/useEntityDetail";
 import { useEntityMerges } from "@/features/entities/useEntityMerges";
-import type { CampaignEntity } from "@/types/character";
+import { useItemRarities } from "@/hooks/useItemRarities";
+import type { CampaignEntity, ItemRarityOption } from "@/types/character";
 
 type Detail = ReturnType<typeof useEntityDetail>;
 
@@ -40,6 +41,7 @@ function ArticleBody({
   entityId,
   viewerId,
   formerIdentityIds,
+  rarities,
   nameFor,
 }: {
   detail: Detail;
@@ -48,6 +50,7 @@ function ArticleBody({
   entityId?: string;
   viewerId?: string;
   formerIdentityIds: string[];
+  rarities: ItemRarityOption[];
   nameFor: (id: string) => string;
 }) {
   return (
@@ -68,7 +71,11 @@ function ArticleBody({
       )}
 
       {entity.type === "ITEM" && detail.item && (
-        <CampaignItemCard item={detail.item} isOwner={detail.role === "OWNER"} />
+        <CampaignItemCard
+          item={detail.item}
+          isOwner={detail.role === "OWNER"}
+          rarities={rarities}
+        />
       )}
 
       <FormerIdentitiesCard
@@ -102,6 +109,7 @@ function EntityArticle({
   viewerId,
   survivorChain,
   formerIdentityIds,
+  rarities,
   nameFor,
 }: {
   detail: Detail;
@@ -112,6 +120,7 @@ function EntityArticle({
   viewerId?: string;
   survivorChain: string[];
   formerIdentityIds: string[];
+  rarities: ItemRarityOption[];
   nameFor: (id: string) => string;
 }) {
   return (
@@ -157,6 +166,7 @@ function EntityArticle({
           entityId={entityId}
           viewerId={viewerId}
           formerIdentityIds={formerIdentityIds}
+          rarities={rarities}
           nameFor={nameFor}
         />
       </div>
@@ -173,6 +183,10 @@ export default function EntityDetailPage() {
   const detail = useEntityDetail(campaignId, entityId);
   const { entity } = detail;
   const { user } = useAuth();
+  // The campaign's edition only picks a /reference cache slot here — the rarity
+  // tiers it resolves are edition-invariant (#1437). Undefined until the campaign
+  // read lands, which keeps the query skipped rather than fetching for a guess.
+  const rarities = useItemRarities(detail.rulesEdition);
   const { survivorChain, formerIdentityIds, nameFor } = useEntityMerges(
     campaignId,
     entityId,
@@ -193,6 +207,7 @@ export default function EntityDetailPage() {
         viewerId={user?.id}
         survivorChain={survivorChain}
         formerIdentityIds={formerIdentityIds}
+        rarities={rarities}
         nameFor={nameFor}
       />
     );

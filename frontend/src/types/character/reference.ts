@@ -5,6 +5,7 @@
 import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 
 import type { ConditionKey } from "./combat";
+import type { ItemRarity } from "./inventory";
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 
 // The starting-equipment shapes are the single cross-tier source of truth in
@@ -108,6 +109,15 @@ export interface ConditionOption {
   description: string;
 }
 
+/** One of the six magic-item rarity tiers (#1437), in ascending tier order.
+ *  Edition-invariant: the same six rows answer both editions. */
+export interface ItemRarityOption {
+  key: ItemRarity;
+  label: string;
+  /** Standard buy value in gp; null for priceless (Artifact). */
+  standardValueGp: number | null;
+}
+
 export interface ReferenceData {
   races: RaceOption[];
   classes: ClassOption[];
@@ -117,6 +127,8 @@ export interface ReferenceData {
   artisanTools: ToolOption[];
   /** The 14 conditions' rules text, resolved for the requested edition (#1322). */
   conditions: ConditionOption[];
+  /** The six magic-item rarity tiers, ascending (#1437). */
+  itemRarities: ItemRarityOption[];
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
