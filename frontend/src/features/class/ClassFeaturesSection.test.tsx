@@ -38,6 +38,7 @@ function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Chara
   return {
     id: "char-1",
     class: "Fighter",
+    rulesEdition: "EDITION_2014",
     level: 5,
     fightingStyleSlots: { total: opts.total, used: taken.length },
     advancements: taken,

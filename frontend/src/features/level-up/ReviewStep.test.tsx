@@ -25,9 +25,6 @@ beforeEach(() => {
     ReturnType<typeof fetchSpells>
   >);
   vi.mocked(fetchFeats).mockResolvedValue([]);
-  // No `rulesEdition` on the plain `character` fixture below → useReferenceData
-  // skipTokens and never calls this; the multiclass test overrides rulesEdition
-  // and needs a real resolved value.
   vi.mocked(fetchReference).mockResolvedValue({
     classes: [{ id: "cls-fighter", name: "Fighter", hitDie: "d10" }],
   } as unknown as Awaited<ReturnType<typeof fetchReference>>);
@@ -35,6 +32,7 @@ beforeEach(() => {
 
 const character = {
   level: 7,
+  rulesEdition: "EDITION_2014",
   hitPoints: { max: 52 },
   hitDice: { total: 7, die: "d10" },
   abilityScores: { strength: 16, dexterity: 14, constitution: 15, intelligence: 10, wisdom: 12, charisma: 8 },

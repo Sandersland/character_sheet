@@ -19,6 +19,8 @@ function render(character: Character) {
 function makeCharacter(advancements: AdvancementEntry[]): Character {
   return {
     id: "char-1",
+    rulesEdition: "EDITION_2014",
+    level: 4,
     advancements,
     advancementSlots: { total: 0, used: 0 },
     abilityScores: {
