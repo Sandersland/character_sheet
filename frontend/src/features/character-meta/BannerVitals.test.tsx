@@ -46,6 +46,7 @@ const mockCharacter: Character = {
   armorProficiencies: [],
   weaponProficiencies: [],
   inventory: [],
+  offHandLocked: false,
   currency: { cp: 0, sp: 0, gp: 25, pp: 0 },
   conditions: { active: [], exhaustion: 0 },
   exhaustionEffectText: "No exhaustion.",

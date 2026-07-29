@@ -6,6 +6,7 @@ import {
 import {
   deriveWeaponAttackComponents,
   deriveWeaponDamage,
+  isProficientWithItem,
 } from "@/lib/srd/srd.js";
 import type { RollEventAttackComponents } from "@character-sheet/shared-types";
 import {
@@ -20,10 +21,16 @@ import {
   type ActivatedEffectCapability,
 } from "@/lib/inventory/capabilities.js";
 import { itemBuffKey } from "@/lib/inventory/inventory.js";
+import { isEquippable } from "@/lib/inventory/items.js";
+import { allowedSlotsForItem } from "@/lib/inventory/inventory-placement.js";
 import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { TargetModifierMap } from "./effects.js";
-import type { buildMergedWeaponProficiencies } from "./proficiencies.js";
+import type {
+  buildMergedArmorProficiencies,
+  buildMergedWeaponProficiencies,
+  mergeItemWeaponProficiencies,
+} from "./proficiencies.js";
 
 interface InventoryItemContext {
   /** The character's effective ability scores (post-advancement-clamp). */
@@ -32,6 +39,17 @@ interface InventoryItemContext {
   proficiencyBonus: number;
   /** The character's merged weapon proficiency grants (class + race + feat). */
   weaponGrants: ReadonlyArray<{ name: string }>;
+  /**
+   * `weaponGrants` PLUS item-granted weapon proficiencies (#529) — i.e. exactly
+   * the wire `weaponProficiencies` array. The per-row `proficient` flag reads
+   * this and never `weaponGrants`, so the flag can't contradict the list
+   * rendered beside it: an item granting "Martial Weapons" must silence the
+   * sheet's warning. `deriveWeaponAttackComponents` deliberately keeps the
+   * un-merged list, so the two must stay separate fields (#1433).
+   */
+  itemMergedWeaponGrants: ReadonlyArray<{ name: string }>;
+  /** The character's merged armor proficiency grants (class + race + feat). */
+  armorGrants: ReadonlyArray<{ category: string }>;
   /** Shield equipped or ≥2 weapons equipped — picks the versatile-weapon die (2H when off-hand free). */
   offHandBusy: boolean;
   /** Archery Fighting Style feat bonus (#1137) — +2 to ranged weapon attack rolls. */
@@ -133,6 +151,32 @@ function buildInventoryWeaponView(
   };
 }
 
+// Placement/proficiency flags the client used to re-derive from the row's
+// category + detail snapshot (#1433). `equippable` and `allowedSlots` are NOT
+// the same rule and must not be collapsed: worn gear declaring a slot is
+// placeable (`allowedSlots: ["RING"]`) but not `equippable`, which is what keeps
+// the inventory row's equip toggle off a ring while the loadout's RING picker
+// still offers it.
+function buildInventoryItemFlags(
+  row: CharacterWithRelations["inventoryItems"][number],
+  context: InventoryItemContext,
+) {
+  return {
+    equippable: isEquippable(row.category),
+    allowedSlots: allowedSlotsForItem(row),
+    proficient: isProficientWithItem(
+      {
+        category: row.category,
+        name: row.name,
+        weaponClass: row.weaponDetail?.weaponClass,
+        armorCategory: row.armorDetail?.armorCategory,
+      },
+      context.itemMergedWeaponGrants,
+      context.armorGrants,
+    ),
+  };
+}
+
 export function serializeInventoryItem(
   row: CharacterWithRelations["inventoryItems"][number],
   context: InventoryItemContext,
@@ -140,6 +184,7 @@ export function serializeInventoryItem(
   return {
     ...buildInventoryItemIdentity(row),
     ...buildInventoryItemPlacement(row),
+    ...buildInventoryItemFlags(row, context),
     weapon: buildInventoryWeaponView(row, context),
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
@@ -212,6 +257,8 @@ export function buildInventoryContext(
   effectiveScores: Record<string, number>,
   proficiencyBonus: number,
   weaponGrants: ReturnType<typeof buildMergedWeaponProficiencies>,
+  itemMergedWeaponGrants: ReturnType<typeof mergeItemWeaponProficiencies>,
+  armorGrants: ReturnType<typeof buildMergedArmorProficiencies>,
   rangedAttackRollBonus: number,
   buffTargets: TargetModifierMap,
 ): InventoryItemContext {
@@ -232,7 +279,7 @@ export function buildInventoryContext(
   // Active-item buff keys — an activatedEffect item is "active" when its item:<id> buff is present.
   const activeItemBuffKeys = new Set(normalizeActiveEffectsMutable(row.activeEffects).buffs.map((b) => b.key));
 
-  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, rangedAttackRollBonus, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
+  return { effectiveScores, proficiencyBonus, weaponGrants, itemMergedWeaponGrants, armorGrants, offHandBusy, rangedAttackRollBonus, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
 }
 
 // Item-granted traits (#529): resistances/immunities/conditionImmunities/

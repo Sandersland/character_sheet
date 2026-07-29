@@ -2,13 +2,9 @@ import { describe, it, expect } from "vitest";
 
 import type { InventoryItem } from "@/types/character";
 import {
-  allowedSlotsForItem,
   bagItemsForSlot,
   equippedLoadoutLabel,
   equipSlotLabel,
-  hasEquipSlots,
-  isOffHandLocked,
-  isProficientWithItem,
   itemsInSlot,
   SLOT_GROUPS,
   versatileGrip,
@@ -25,6 +21,9 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     equipped: false,
     attuned: false,
     requiresAttunement: false,
+    equippable: false,
+    allowedSlots: [],
+    proficient: true,
     ...overrides,
   };
 }
@@ -32,6 +31,8 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
 const weapon = (twoHanded = false, o: Partial<InventoryItem> = {}) =>
   item({
     category: "weapon",
+    equippable: true,
+    allowedSlots: twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"],
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 8,
@@ -49,10 +50,7 @@ const weapon = (twoHanded = false, o: Partial<InventoryItem> = {}) =>
   });
 
 const shield = (o: Partial<InventoryItem> = {}) =>
-  item({ category: "armor", armor: { armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false, stealthDisadvantage: false }, ...o });
-
-const bodyArmor = (o: Partial<InventoryItem> = {}) =>
-  item({ category: "armor", armor: { armorCategory: "medium", baseArmorClass: 14, dexModifierApplies: true, stealthDisadvantage: false }, ...o });
+  item({ category: "armor", equippable: true, allowedSlots: ["OFF_HAND"], armor: { armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false, stealthDisadvantage: false }, ...o });
 
 describe("equipSlotLabel", () => {
   it("humanizes underscored slot keys", () => {
@@ -66,7 +64,7 @@ describe("equippedLoadoutLabel (#733)", () => {
     ({ ...o, equipped: true, equippedSlot: slot }) as InventoryItem;
 
   it("returns Unarmed when both hands are empty", () => {
-    expect(equippedLoadoutLabel([])).toBe("Unarmed");
+    expect(equippedLoadoutLabel([], false)).toBe("Unarmed");
   });
 
   it("joins main + off with an ampersand", () => {
@@ -74,7 +72,7 @@ describe("equippedLoadoutLabel (#733)", () => {
       inSlot("MAIN_HAND", weapon(false, { name: "Longsword" })),
       inSlot("OFF_HAND", shield({ name: "Shield" })),
     ];
-    expect(equippedLoadoutLabel(inv)).toBe("Longsword & Shield");
+    expect(equippedLoadoutLabel(inv, false)).toBe("Longsword & Shield");
   });
 
   it("collapses two identical weapons", () => {
@@ -82,41 +80,18 @@ describe("equippedLoadoutLabel (#733)", () => {
       inSlot("MAIN_HAND", weapon(false, { name: "Dagger" })),
       inSlot("OFF_HAND", weapon(false, { name: "Dagger" })),
     ];
-    expect(equippedLoadoutLabel(inv)).toBe("Two daggers");
+    expect(equippedLoadoutLabel(inv, false)).toBe("Two daggers");
   });
 
-  it("labels a two-handed weapon and omits the off-hand", () => {
-    const inv = [inSlot("MAIN_HAND", weapon(true, { name: "Greatsword" }))];
-    expect(equippedLoadoutLabel(inv)).toBe("Greatsword (two-handed)");
+  // The served flag decides, not the row's own twoHanded bit: a one-handed
+  // main-hand weapon still collapses to the two-handed label when locked.
+  it("omits the off-hand segment when the served flag says the hands are locked", () => {
+    const inv = [inSlot("MAIN_HAND", weapon(false, { name: "Greatsword" }))];
+    expect(equippedLoadoutLabel(inv, true)).toBe("Greatsword (two-handed)");
   });
 
   it("handles a lone main-hand weapon (empty off-hand)", () => {
-    expect(equippedLoadoutLabel([inSlot("MAIN_HAND", weapon(false, { name: "Rapier" }))])).toBe("Rapier");
-  });
-});
-
-describe("allowedSlotsForItem", () => {
-  it("one-handed weapon fits both hands", () => {
-    expect(allowedSlotsForItem(weapon(false))).toEqual(["MAIN_HAND", "OFF_HAND"]);
-  });
-
-  it("two-handed weapon is main-hand only", () => {
-    expect(allowedSlotsForItem(weapon(true))).toEqual(["MAIN_HAND"]);
-  });
-
-  it("shield is off-hand; body armor is body", () => {
-    expect(allowedSlotsForItem(shield())).toEqual(["OFF_HAND"]);
-    expect(allowedSlotsForItem(bodyArmor())).toEqual(["BODY"]);
-  });
-
-  it("gear uses its declared slot; slotless gear has none", () => {
-    expect(allowedSlotsForItem(item({ slot: "HEAD" }))).toEqual(["HEAD"]);
-    expect(allowedSlotsForItem(item())).toEqual([]);
-  });
-
-  it("consumables are never equippable", () => {
-    expect(allowedSlotsForItem(item({ category: "consumable" }))).toEqual([]);
-    expect(hasEquipSlots(item({ category: "consumable" }))).toBe(false);
+    expect(equippedLoadoutLabel([inSlot("MAIN_HAND", weapon(false, { name: "Rapier" }))], false)).toBe("Rapier");
   });
 });
 
@@ -136,21 +111,9 @@ describe("itemsInSlot", () => {
   });
 });
 
-describe("isOffHandLocked", () => {
-  it("true only when a two-handed weapon holds the main hand", () => {
-    expect(isOffHandLocked([weapon(true, { equippedSlot: "MAIN_HAND" })])).toBe(true);
-  });
-
-  it("false for a one-handed main-hand weapon", () => {
-    expect(isOffHandLocked([weapon(false, { equippedSlot: "MAIN_HAND" })])).toBe(false);
-  });
-
-  it("false when the two-hander is still in the bag", () => {
-    expect(isOffHandLocked([weapon(true)])).toBe(false);
-  });
-});
-
 describe("bagItemsForSlot", () => {
+  // Filters the SERVED allowedSlots, so a row's category/detail data no longer
+  // decides candidacy — this is what the fixtures below set.
   it("lists only unequipped, slot-compatible items", () => {
     const inv = [
       weapon(false, { id: "sword", name: "Sword" }),
@@ -162,8 +125,18 @@ describe("bagItemsForSlot", () => {
   });
 
   it("excludes an already-equipped candidate", () => {
-    const inv = [item({ id: "hat", slot: "HEAD", equippedSlot: "HEAD" })];
+    const inv = [item({ id: "hat", slot: "HEAD", allowedSlots: ["HEAD"], equippedSlot: "HEAD" })];
     expect(bagItemsForSlot(inv, "HEAD")).toEqual([]);
+  });
+
+  it("honours the served flag over the row's own category/detail data", () => {
+    // A two-handed greatsword the server reports as off-hand-legal IS offered:
+    // the client no longer second-guesses allowedSlots.
+    const inv = [weapon(true, { id: "gs", name: "Greatsword", allowedSlots: ["MAIN_HAND", "OFF_HAND"] })];
+    expect(bagItemsForSlot(inv, "OFF_HAND").map((i) => i.id)).toEqual(["gs"]);
+    // And a one-handed sword the server reports as main-hand-only is NOT.
+    const restricted = [weapon(false, { id: "ls", name: "Longsword", allowedSlots: ["MAIN_HAND"] })];
+    expect(bagItemsForSlot(restricted, "OFF_HAND")).toEqual([]);
   });
 });
 
@@ -182,40 +155,6 @@ describe("WORN_SLOTS (#572)", () => {
     expect(wornSlotItemKindLabel("HEAD")).toBe("Headwear");
     expect(wornSlotItemKindLabel("FEET")).toBe("Boots");
     expect(wornSlotItemKindLabel("RING")).toBe("Ring");
-  });
-});
-
-describe("isProficientWithItem (#554)", () => {
-  const simpleSword = weapon(false, { name: "Club", weapon: { ...weapon().weapon!, weaponClass: "simple" } });
-  const martialSword = weapon(false, { name: "Longsword", weapon: { ...weapon().weapon!, weaponClass: "martial" } });
-
-  it("matches weapon category grants against weaponClass", () => {
-    expect(isProficientWithItem(simpleSword, [{ name: "Simple Weapons" }], [])).toBe(true);
-    expect(isProficientWithItem(martialSword, [{ name: "Simple Weapons" }], [])).toBe(false);
-    expect(isProficientWithItem(martialSword, [{ name: "Martial Weapons" }], [])).toBe(true);
-  });
-
-  it("matches a pluralised specific-weapon grant against the singular catalog name", () => {
-    expect(isProficientWithItem(martialSword, [{ name: "Longswords" }], [])).toBe(true);
-    expect(isProficientWithItem(martialSword, [{ name: "Shortswords" }], [])).toBe(false);
-  });
-
-  it("warns (false) when no grant covers the weapon", () => {
-    expect(isProficientWithItem(martialSword, [{ name: "Simple Weapons" }], [])).toBe(false);
-    expect(isProficientWithItem(simpleSword, [], [])).toBe(false);
-  });
-
-  it("matches armor by category, including shields", () => {
-    expect(isProficientWithItem(bodyArmor(), [], [{ category: "medium" }])).toBe(true);
-    expect(isProficientWithItem(bodyArmor(), [], [{ category: "light" }])).toBe(false);
-    expect(isProficientWithItem(shield(), [], [{ category: "shield" }])).toBe(true);
-  });
-
-  it("never warns on items that carry no proficiency requirement", () => {
-    expect(isProficientWithItem(item(), [], [])).toBe(true); // gear
-    expect(isProficientWithItem(item({ category: "consumable" }), [], [])).toBe(true);
-    // A weapon with no derivable class (e.g. homebrew) carries no requirement.
-    expect(isProficientWithItem(weapon(false), [], [])).toBe(true);
   });
 });
 
