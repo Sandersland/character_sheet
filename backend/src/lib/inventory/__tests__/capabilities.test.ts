@@ -524,8 +524,21 @@ describe("attunement prerequisites", () => {
     expect(meetsAttunementPrereq({ kind: "class", value: "Fighter" }, subject)).toBe(false);
   });
 
+  // One phrasing serves both the attune rejection message and the served
+  // attunementPrereqText, so every kind is pinned here (#1382) — the client no
+  // longer has a copy of this switch to fall back on.
   it("describes the prerequisite for the error message", () => {
     expect(describeAttunementPrereq({ kind: "spellcaster", value: null })).toBe("a spellcaster");
     expect(describeAttunementPrereq({ kind: "class", value: "Wizard" })).toBe("a Wizard");
+    // "a Elf" is deliberate, not a typo: no a/an agreement, matching what the
+    // deleted client-side copy produced and what applyAttune already rejects with.
+    expect(describeAttunementPrereq({ kind: "species", value: "Elf" })).toBe("a Elf");
+    expect(describeAttunementPrereq({ kind: "alignment", value: "Lawful Good" })).toBe("a Lawful Good creature");
+  });
+
+  it("degrades to a generic phrase when the kind carries no value", () => {
+    expect(describeAttunementPrereq({ kind: "class", value: null })).toBe("a specific class");
+    expect(describeAttunementPrereq({ kind: "species", value: null })).toBe("a specific species");
+    expect(describeAttunementPrereq({ kind: "alignment", value: null })).toBe("a specific alignment creature");
   });
 });

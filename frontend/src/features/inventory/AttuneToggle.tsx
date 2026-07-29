@@ -1,4 +1,3 @@
-import { describeAttunementPrereq } from "@/lib/capabilities";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
 
 interface AttuneToggleProps {
@@ -14,8 +13,8 @@ interface AttuneToggleProps {
 // enforces the snapshotted prerequisite and surfaces the reason on attempt.
 export default function AttuneToggle({ item, pending, atCap, onSubmit }: AttuneToggleProps) {
   const blocked = !item.attuned && atCap;
-  const prereq = item.attunementPrereqKind
-    ? `Requires attunement by ${describeAttunementPrereq(item.attunementPrereqKind, item.attunementPrereqValue)}`
+  const prereq = item.attunementPrereqText
+    ? `Requires attunement by ${item.attunementPrereqText}`
     : "Requires attunement";
   const title = blocked ? "At attunement limit (3/3) — unattune one first" : prereq;
   return (

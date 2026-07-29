@@ -250,6 +250,13 @@ export interface InventoryItem {
   requiresAttunement: boolean;
   attunementPrereqKind?: AttunementPrereqKind;
   attunementPrereqValue?: string;
+  /**
+   * Server-resolved 5e phrasing of the prerequisite ("a Wizard"), byte-identical
+   * to the string an unmet-prerequisite attune is rejected with (#1382). Absent
+   * when there is no prerequisite; never composed client-side from the two fields
+   * above, which remain on the wire for the DM item form's round-trip.
+   */
+  attunementPrereqText?: string;
 
   notes?: string;
   weapon?: WeaponDetail;
