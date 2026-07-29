@@ -60,3 +60,86 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
     expect(res.body.error).toMatch(/^Unknown edition: /);
   });
 });
+
+/**
+ * Every case here runs against the REAL SEEDED catalog (backend/prisma/seed/feats.ts)
+ * — no fixture rows, which is why it can assert absolute category counts. The
+ * `?? 4` / `?? 19` category defaults are unreachable from the seed (all 19 general
+ * rows carry an explicit levelPrerequisite 4 and all 7 epic_boon rows an explicit
+ * 19), so those branches are covered by the fixture rows in
+ * feats-asi-level-defaults.test.ts instead.
+ */
+describe("GET /api/feats?asiLevel= — server-side ASI eligibility (#1438)", () => {
+  async function get(query: string): Promise<{ name: string; category: string }[]> {
+    const res = await supertest(createApp()).get(`/api/feats?${query}`).set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    return res.body;
+  }
+
+  const names = (rows: { name: string }[]) => rows.map((f) => f.name);
+  const countOf = (rows: { category: string }[], category: string) =>
+    rows.filter((f) => f.category === category).length;
+
+  it("gates the seeded General feats on their explicit levelPrerequisite 4", async () => {
+    const atThree = await get("edition=EDITION_2024&asiLevel=3");
+    const atFour = await get("edition=EDITION_2024&asiLevel=4");
+
+    expect(names(atThree)).not.toContain("Grappler");
+    expect(names(atFour)).toContain("Grappler");
+    // Absolute counts, not just the named row: a filter that drops everything
+    // satisfies the two assertions above at level 3 and must still fail here.
+    expect(countOf(atThree, "general")).toBe(0);
+    expect(countOf(atFour, "general")).toBe(19);
+  });
+
+  it("gates the seeded Epic Boons on their explicit levelPrerequisite 19", async () => {
+    const atEighteen = await get("edition=EDITION_2024&asiLevel=18");
+    const atNineteen = await get("edition=EDITION_2024&asiLevel=19");
+
+    expect(names(atEighteen)).not.toContain("Boon of Truesight");
+    expect(names(atNineteen)).toContain("Boon of Truesight");
+    expect(countOf(atEighteen, "epic_boon")).toBe(0);
+    expect(countOf(atNineteen, "epic_boon")).toBe(7);
+  });
+
+  it("never offers an Origin or Fighting Style feat at any level", async () => {
+    for (const asiLevel of [1, 3, 4, 18, 19, 20]) {
+      const rows = await get(`edition=EDITION_2024&asiLevel=${asiLevel}`);
+      expect(names(rows)).not.toContain("Magic Initiate"); // origin
+      expect(names(rows)).not.toContain("Archery"); // fighting_style
+      expect(countOf(rows, "origin")).toBe(0);
+      expect(countOf(rows, "fighting_style")).toBe(0);
+    }
+  });
+
+  it("at asiLevel=20 offers every seeded General and Epic Boon and nothing else", async () => {
+    const rows = await get("edition=EDITION_2024&asiLevel=20");
+    expect(countOf(rows, "general")).toBe(19);
+    expect(countOf(rows, "epic_boon")).toBe(7);
+    expect(rows).toHaveLength(26);
+  });
+
+  it("without ?asiLevel= still serves Origin rows, so the non-ASI consumers are unaffected", async () => {
+    const rows = await get("edition=EDITION_2024");
+    expect(countOf(rows, "origin")).toBeGreaterThan(0);
+    expect(countOf(rows, "fighting_style")).toBeGreaterThan(0);
+    expect(names(rows)).toContain("Magic Initiate");
+  });
+
+  it("400s on a non-numeric ?asiLevel=", async () => {
+    const res = await supertest(createApp())
+      .get("/api/feats?edition=EDITION_2024&asiLevel=abc")
+      .set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/^Invalid asiLevel: /);
+  });
+
+  it("400s on an out-of-range ?asiLevel= rather than clamping it", async () => {
+    for (const bad of ["0", "21", "-3", "4.5"]) {
+      const res = await supertest(createApp())
+        .get(`/api/feats?edition=EDITION_2024&asiLevel=${bad}`)
+        .set("Cookie", COOKIE);
+      expect(res.status, `asiLevel=${bad}`).toBe(400);
+    }
+  });
+});
