@@ -11,8 +11,8 @@ export interface ShadowArtSeed {
   name: string;
   description: string;
   // Omitted = shared (NULL column, valid in both editions, #1306); only a
-  // mechanically diverging row forks, which #1415 made expressible. #1313
-  // authors the 2014 four-spell menu here.
+  // mechanically diverging row forks, which #1415 made expressible. Nothing
+  // forks yet — #1313 will author the 2014 four-spell menu here.
   edition?: SeedEdition;
 }
 
