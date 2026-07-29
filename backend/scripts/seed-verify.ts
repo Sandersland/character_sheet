@@ -98,7 +98,7 @@ async function devLogin(): Promise<{ cookie: string; token: string }> {
   if (login.status === 404) {
     die(
       "POST /api/auth/dev-login returned 404 — ALLOW_DEV_LOGIN is off on this stack. " +
-        "Set ALLOW_DEV_LOGIN=true (the dev compose does this by default) and retry.",
+        "Set ALLOW_DEV_LOGIN=true in backend/.env (see .env.example) and restart the backend.",
     );
   }
   if (login.status !== 200) die(`dev-login returned ${login.status}: ${JSON.stringify(login.body)}`);

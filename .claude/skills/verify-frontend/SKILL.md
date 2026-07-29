@@ -13,13 +13,13 @@ Run this skill after making frontend changes to gate a PR. It runs four lanes in
 
 Every `/api` route is behind `requireAuth`, so the browser surface shows the `LoginPage` until a session exists. OAuth can't complete headless, so provision a dev session instead:
 
-1. **Make sure the stack is running** (`docker compose up -d`, or `… worktree.sh up <branch>` for a worktree) and the backend is healthy (`curl -s localhost:4000/api/health`).
+1. **Make sure the stack is running** — `docker compose up -d db` then `npm run dev` (or `… worktree.sh up <branch>` then `npm run dev` for a worktree; the app has run on the host since #1458) — and the backend is healthy (`curl -s localhost:4000/api/health`).
 2. **Seed a user + representative character** (idempotent — reuses an existing "Verify Dummy"):
    ```bash
    npm run seed:verify
    # worktree slot N: BACKEND_URL=http://localhost:40<N>0 FRONTEND_URL=http://localhost:51<N>3 npm run seed:verify
    ```
-   This needs `ALLOW_DEV_LOGIN=true` (the dev compose sets it by default).
+   This needs `ALLOW_DEV_LOGIN=true` in `backend/.env` — `.env.example` ships it on, and `worktree.sh write_env` writes it into every worktree.
 3. **Sign in inside Playwright** — `cs_session` is HttpOnly, so don't try to set it from `document.cookie`. Instead `browser_navigate` to the frontend, then run an in-page fetch and reload:
    ```js
    await fetch('/api/auth/dev-login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
