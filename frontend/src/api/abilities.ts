@@ -57,9 +57,14 @@ export async function applyWarriorOfElementsTransactions(
 }
 
 // Feeds the Warrior of Shadow monk's Shadow Arts picker — the single flat
-// 1-focus Darkness cast (2024 rewrite, #1246).
-export async function fetchShadowArts(): Promise<CatalogShadowArt[]> {
-  return request<CatalogShadowArt[]>("/shadow-arts", undefined, "Failed to fetch shadow arts catalog");
+// 1-focus Darkness cast (2024 rewrite, #1246). `edition` is required for the
+// same reason as fetchManeuvers below (#1412).
+export async function fetchShadowArts(edition: RulesEdition): Promise<CatalogShadowArt[]> {
+  return request<CatalogShadowArt[]>(
+    `/shadow-arts?edition=${edition}`,
+    undefined,
+    "Failed to fetch shadow arts catalog",
+  );
 }
 
 // Applies a batch of Warrior of Shadow operations atomically: castShadowArt

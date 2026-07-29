@@ -563,10 +563,53 @@ describe("Shadow Arts source guard", () => {
   });
 
   it("excludes non-shadowArts rows from GET /api/shadow-arts", async () => {
-    const res = await agent().get("/api/shadow-arts");
+    const res = await agent().get("/api/shadow-arts?edition=EDITION_2024");
     expect(res.status).toBe(200);
     expect((res.body as { id: string }[]).some((d) => d.id === nonShadowId)).toBe(false);
     expect((res.body as { name: string }[]).length).toBe(1);
+  });
+
+  // #1412: the read-side counterpart to the cast guard below. Own fixture,
+  // deleted by NAME in the finally — this describe's afterAll can't clean up a
+  // row it doesn't know about.
+  it("(#1412) requires ?edition= and silently omits a 2014-tagged Shadow Art from a 2024 request", async () => {
+    const FIXTURE_NAME = "XEd Shadow Art 2014 read";
+    const row = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: FIXTURE_NAME, edition: "EDITION_2014" },
+      {
+        name: FIXTURE_NAME,
+        source: "shadowArts",
+        edition: "EDITION_2014",
+        description: "Edition-filter test fixture.",
+        costKind: "pool",
+        costPoolKey: "focus",
+        costBase: 1,
+      },
+      { source: "shadowArts" },
+    );
+    try {
+      const bare = await agent().get("/api/shadow-arts");
+      expect(bare.status).toBe(400);
+      expect(bare.body.error).toBe("Missing required query parameter: edition");
+
+      const unknown = await agent().get("/api/shadow-arts?edition=bogus");
+      expect(unknown.status).toBe(400);
+      expect(unknown.body.error).toMatch(/^Unknown edition: /);
+
+      const as2024 = await agent().get("/api/shadow-arts?edition=EDITION_2024");
+      expect(as2024.status).toBe(200);
+      expect((as2024.body as { id: string }[]).some((a) => a.id === row.id)).toBe(false);
+      // The NULL-edition seeded Darkness row still reaches both editions.
+      expect((as2024.body as { name: string }[]).length).toBe(1);
+
+      const as2014 = await agent().get("/api/shadow-arts?edition=EDITION_2014");
+      expect(as2014.status).toBe(200);
+      expect((as2014.body as { id: string }[]).some((a) => a.id === row.id)).toBe(true);
+      expect((as2014.body as { name: string }[]).length).toBe(2);
+    } finally {
+      await prisma.grantedAbility.deleteMany({ where: { name: FIXTURE_NAME } });
+    }
   });
 
   it("rejects castShadowArt against a non-shadowArts id", async () => {

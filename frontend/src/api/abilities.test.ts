@@ -66,12 +66,15 @@ describe("fetchShadowArts", () => {
     vi.unstubAllGlobals();
   });
 
-  it("GETs the shadow arts catalog", async () => {
+  it("GETs the shadow arts catalog with the character's edition in the query", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [{ id: "sa1" }] });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchShadowArts()).resolves.toEqual([{ id: "sa1" }]);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/shadow-arts"), expect.anything());
+    await expect(fetchShadowArts("EDITION_2014")).resolves.toEqual([{ id: "sa1" }]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/shadow-arts?edition=EDITION_2014"),
+      expect.anything(),
+    );
   });
 });
 
