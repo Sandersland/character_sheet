@@ -542,6 +542,12 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         attunementPrereqValue: "Fighter",
         attunementPrereqText: "a Fighter",
         notes: "Keep polished.",
+        equippable: true,
+        allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+        // Served flags (#1433). `proficient` is true where attackBonusComponents
+        // withholds the proficiency bonus: this weapon has no weaponClass, and
+        // the no-warn display policy differs from the attack rule on purpose.
+        proficient: true,
         weapon: {
           damageDiceCount: 1,
           damageDiceFaces: 8,
@@ -570,6 +576,10 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         slot: "FEET",
         attuned: false,
         requiresAttunement: false,
+        // Worn gear: placeable but not equippable — the two flags are separate rules.
+        equippable: false,
+        allowedSlots: ["FEET"],
+        proficient: true,
       },
       {
         id: expect.any(String),
@@ -579,6 +589,11 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         equipped: false,
         attuned: false,
         requiresAttunement: false,
+        equippable: true,
+        allowedSlots: ["BODY"],
+        // False because this fixture's class name is a suite-local catalog row that
+        // CLASS_PROFICIENCY_GRANTS doesn't key on (#1388), so armorProficiencies is empty.
+        proficient: false,
         armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true, stealthDisadvantage: false },
       },
       {
@@ -589,6 +604,9 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         equipped: false,
         attuned: false,
         requiresAttunement: false,
+        equippable: false,
+        allowedSlots: [],
+        proficient: true,
         consumable: {
           effectDiceCount: 2,
           effectDiceFaces: 4,
