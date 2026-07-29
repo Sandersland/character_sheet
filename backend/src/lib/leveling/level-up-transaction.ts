@@ -18,6 +18,7 @@ import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resou
 import { applySpellcastingOpInTx, type LearnSpellOperation, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
+  advancingHitDie,
   applyLevelUpHpInTx,
   normalizeHitDice,
 } from "@/lib/combat/hitpoints.js";
@@ -64,6 +65,9 @@ const TARGET_ENTRY_SELECT = {
   level: true,
   position: true,
   classId: true,
+  // #1380: the advancing class's catalog hit die, the same shape buildHpOpContext
+  // selects for the commit path.
+  class: { select: { hitDie: true } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 // Fetch the target class's catalog subclassLevel and resolve it through the
@@ -103,24 +107,28 @@ export async function resolveLevelUpContext(
   const edition = editionOf(character);
 
   const isMulticlass = character.classEntries.length > 1;
+  const hitDice = normalizeHitDice(character.hitDice);
   let targetClassName: string;
   let persistedSubclass: string | null;
   let newLevel: number;
   let classId: string | null;
   let targetIsPrimary: boolean;
+  // The advancing class's own catalog die; null falls back to hitDice.die below.
+  let catalogHitDie: string | null;
 
   if (target.kind === "existing") {
     const entry = character.classEntries.find((e) => e.id === target.classEntryId);
     if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
     targetClassName = entry.name;
     persistedSubclass = entry.subclass;
-    newLevel = isMulticlass ? entry.level + 1 : normalizeHitDice(character.hitDice).total + 1;
+    newLevel = isMulticlass ? entry.level + 1 : hitDice.total + 1;
     classId = entry.classId;
     targetIsPrimary = entry.position === 0;
+    catalogHitDie = entry.class?.hitDie ?? null;
   } else {
     const catalog = await prisma.characterClass.findUnique({
       where: { id: target.classId },
-      select: { name: true },
+      select: { name: true, hitDie: true },
     });
     if (!catalog) throw new InvalidLevelUpError(`Class not found: ${target.classId}`);
     targetClassName = catalog.name;
@@ -128,7 +136,12 @@ export async function resolveLevelUpContext(
     newLevel = 1;
     classId = target.classId;
     targetIsPrimary = false; // a new multiclass entry is never the primary
+    catalogHitDie = catalog.hitDie;
   }
+
+  // #1380: resolved through the same function applyLevelUpOp uses, so the plan's
+  // previewed gain and the committed gain can't be resolved off different dice.
+  const { die: hitDie } = advancingHitDie(catalogHitDie, hitDice.die);
 
   const subclassLevel = await subclassLevelFor(classId, targetClassName, edition);
 
@@ -157,7 +170,7 @@ export async function resolveLevelUpContext(
       spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
       edition,
     },
-    targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel },
+    targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel, hitDie },
     chosenSubclassName,
     targetIsPrimary,
   };

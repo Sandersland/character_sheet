@@ -97,6 +97,36 @@ async function makePaladin(opts: { id: string; hitDiceTotal: number; entryLevel:
   return entry.id;
 }
 
+// A Wizard whose persisted hitDice.die (d6) differs from the class the plan will
+// advance — `classId` is optional so the detached-entry fallback can be exercised.
+async function makeWizard(opts: { id: string; entryLevel: number; withClassId?: boolean }): Promise<string> {
+  const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+  await prisma.character.create({
+    data: {
+      ...BASE,
+      ownerId: OWNER_ID,
+      id: opts.id,
+      name: `LevelUpPlan ${opts.id}`,
+      experiencePoints: 100000,
+      hitPoints: { current: 25, max: 25, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+      hitDice: { total: opts.entryLevel, die: "d6", spent: 0 },
+      abilityScores: { strength: 14, dexterity: 14, constitution: 16, intelligence: 16, wisdom: 10, charisma: 10 },
+      spellcasting: { slotsUsed: {}, spells: [] } as Prisma.InputJsonValue,
+      classEntries: {
+        create: [{
+          name: "wizard",
+          subclass: "School of Evocation",
+          classId: opts.withClassId === false ? null : wizard.id,
+          position: 0,
+          level: opts.entryLevel,
+        }],
+      },
+    },
+  });
+  const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: opts.id } });
+  return entry.id;
+}
+
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   await ensureTestOwner(OWNER_ID_2);
@@ -178,6 +208,39 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     // A kind:"new" target reads className from the catalog row (capitalized),
     // unlike kind:"existing" which reads the entry's persisted name.
     expect(res.body.target).toMatchObject({ className: "Wizard", newLevel: 1, isPrimary: false });
+  });
+
+  // #1380: the ceremony reads these numbers off the wire instead of rebuilding
+  // them from /api/reference plus the level-up target.
+  it("carries the advancing class's HP meta on the hitPoints step", async () => {
+    await makeFighter({ id: "lvplan-hp-meta", xp: 34000, hitDiceTotal: 7, entryLevel: 7, subclass: "Champion" });
+    const res = await getPlan("lvplan-hp-meta");
+    expect(res.status).toBe(200);
+    const step = (res.body.steps as { kind: string; meta?: Record<string, number | string> }[])
+      .find((s) => s.kind === "hitPoints");
+    // Fighter d10, Con 14 → +2.
+    expect(step?.meta).toEqual({ die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12 });
+  });
+
+  it("serves the ADVANCING class's die for a multiclass target, not the character's persisted one", async () => {
+    await makeWizard({ id: "lvplan-hp-meta-multi", entryLevel: 5 });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+
+    const res = await getPlan("lvplan-hp-meta-multi", `?classId=${fighter.id}`);
+    expect(res.status).toBe(200);
+    const step = (res.body.steps as { kind: string; meta?: Record<string, number | string> }[])
+      .find((s) => s.kind === "hitPoints");
+    // Wizard 5 persists hitDice.die "d6"; the first Fighter level rolls a d10.
+    expect(step?.meta).toMatchObject({ die: "d10", faces: 10 });
+  });
+
+  it("falls back to the character's own die when the target entry has no catalog class row", async () => {
+    const entryId = await makeWizard({ id: "lvplan-hp-meta-detached", entryLevel: 5, withClassId: false });
+    const res = await getPlan("lvplan-hp-meta-detached", `?classEntryId=${entryId}`);
+    expect(res.status).toBe(200);
+    const step = (res.body.steps as { kind: string; meta?: Record<string, number | string> }[])
+      .find((s) => s.kind === "hitPoints");
+    expect(step?.meta).toMatchObject({ die: "d6", faces: 6 });
   });
 
   it("lists the granted spells a gate level newly turns on, with level + school (#1139, #1159)", async () => {

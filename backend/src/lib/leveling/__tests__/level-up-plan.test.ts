@@ -21,8 +21,14 @@ function char(
   return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], edition };
 }
 
-function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {
-  return { name, newLevel, subclass, subclassLevel };
+function target(
+  name: string,
+  newLevel: number,
+  subclass: string | null = null,
+  subclassLevel?: number,
+  hitDie = "d10",
+): TargetClassEntry {
+  return { name, newLevel, subclass, subclassLevel, hitDie };
 }
 
 // Extracts just the step kinds in order (the plan's ordered shape).
@@ -34,6 +40,52 @@ describe("buildLevelUpPlan — skeleton", () => {
   it("always brackets a plain level with hitPoints … review", () => {
     const plan = buildLevelUpPlan(char("fighter", 4), target("fighter", 5, "champion"));
     expect(kinds(plan)).toEqual(["hitPoints", "review"]);
+  });
+});
+
+// #1380: the ceremony no longer reconstructs this from the reference catalog —
+// these cases are the coverage that moved off the frontend's deleted hitDice.ts
+// rule half (averageHitPointGain / hitPointGainRange / hitPointStepMath).
+describe("buildLevelUpPlan — hitPoints meta", () => {
+  function hitPointsMeta(constitution: number | undefined, hitDie: string): Record<string, unknown> {
+    const abilityScores: Record<string, number> = { strength: 10, dexterity: 10, intelligence: 10, wisdom: 10, charisma: 10 };
+    if (constitution !== undefined) abilityScores.constitution = constitution;
+    const character: LevelUpPlanCharacter = {
+      abilityScores,
+      classEntries: [{ name: "fighter", level: 4, subclass: "champion" }],
+      edition: "EDITION_2024",
+    };
+    const plan = buildLevelUpPlan(character, target("fighter", 5, "champion", undefined, hitDie));
+    const step = plan.find((s) => s.kind === "hitPoints");
+    if (!step?.meta) throw new Error("no hitPoints meta on the plan");
+    return step.meta;
+  }
+
+  it("serves the die, faces, Con mod, fixed base, average gain and roll range (d10, Con 16)", () => {
+    expect(hitPointsMeta(16, "d10")).toEqual({
+      die: "d10",
+      faces: 10,
+      conMod: 3,
+      fixedAverage: 6,
+      averageGain: 9,
+      minRoll: 4,
+      maxRoll: 13,
+    });
+  });
+
+  it("applies a negative Con modifier to the average and both range ends (d6, Con 6)", () => {
+    expect(hitPointsMeta(6, "d6")).toMatchObject({ conMod: -2, fixedAverage: 4, averageGain: 2, minRoll: 1, maxRoll: 4 });
+  });
+
+  // fixedAverage is served rather than left to the client because the max(1, …)
+  // level-up floor makes it unrecoverable as averageGain − conMod: that would
+  // read 1 − (−5) = 6 here, when the d6 fixed average is 4.
+  it("floors averageGain at 1 while still serving the unfloored fixed average (d6, Con 1)", () => {
+    expect(hitPointsMeta(1, "d6")).toMatchObject({ conMod: -5, fixedAverage: 4, averageGain: 1, minRoll: 1, maxRoll: 1 });
+  });
+
+  it("treats a missing constitution score as 10, exactly as the commit path does", () => {
+    expect(hitPointsMeta(undefined, "d8")).toMatchObject({ conMod: 0, fixedAverage: 5, averageGain: 5 });
   });
 });
 

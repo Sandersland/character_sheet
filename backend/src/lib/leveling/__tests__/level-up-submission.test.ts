@@ -24,7 +24,7 @@ function char(
 }
 
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {
-  return { name, newLevel, subclass, subclassLevel };
+  return { name, newLevel, subclass, subclassLevel, hitDie: "d10" };
 }
 
 const takeAsi: LevelUpSubmission["advancement"] = {
