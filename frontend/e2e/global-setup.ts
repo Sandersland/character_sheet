@@ -355,19 +355,15 @@ async function ensureCampaign(cookie: string, name: string): Promise<string> {
   return id;
 }
 
-// End every live session the previous run left behind in one roster campaign
-// (#1466). The suite starts sessions via enterLiveCombat and ends none: no spec
-// clicks End Session, the Playwright config declares no globalTeardown, and
-// maybeAutoClose can't fire because no participant ever leaves. A recreate makes
-// the leak permanent — deleting the character cascades its SessionParticipant
-// rows away and maybeAutoClose early-returns on a zero-participant session. A
-// campaign left live makes CastSpellDoor's handleDoorClick defer to Combat
-// instead of opening the picker, so the leak deterministically fails the NEXT
-// run's cast specs. Filter on `status`, not `endedAt` — `status` is what
-// activeSessionForCampaign reads and what closeSession claims atomically. The
-// re-read at the end is the only regression guard this has (the vitest config
-// excludes e2e/**), so a silently-ineffective end must fail here, naming the
-// campaign, rather than as a locator timeout several specs later.
+// Every run leaks a live session per session-using campaign (#1466): specs start
+// them via enterLiveCombat and never leave, so maybeAutoClose can't fire — and a
+// recreate cascades SessionParticipant away, leaving a zero-participant session
+// it early-returns on. A campaign left live makes CastSpellDoor defer the cast
+// door to Combat, failing the NEXT run's cast specs. Filter on `status`, not
+// `endedAt`: `status` is what activeSessionForCampaign reads and closeSession
+// claims atomically. The re-read is the only regression guard here (e2e/** is
+// excluded from vitest), so an ineffective end fails naming the campaign rather
+// than as a locator timeout several specs later.
 async function endActiveSessions(cookie: string, campaignId: string, campaignName: string): Promise<void> {
   const activeSessions = async (): Promise<{ id: string }[]> => {
     const response = await api(cookie, `/api/campaigns/${campaignId}/sessions`);
@@ -599,16 +595,13 @@ export default async function globalSetup(): Promise<void> {
     }
   }
 
-  // Deliberately a top-level pass AFTER the loop, not a step inside
-  // createPersona: ensureCampaign is reachable only from attachToCampaign ←
-  // createPersona, so a sweep hung off it would never fire on the common path
-  // where every persona matches its fingerprint — the exact case #1466 is
-  // about. Running last also catches the zero-participant orphan a recreate in
-  // the loop above just manufactured. Resolving the id through ensureCampaign
-  // (rather than campaignNameById, read before the loop) is what makes the
-  // sweep provably target the same first-wins row attachToCampaign used. Only
-  // ROSTER campaigns: the per-spec throwaway campaigns are unique per run and
-  // accumulate unboundedly.
+  // Top-level AFTER the loop, never inside createPersona: ensureCampaign is
+  // reachable only from attachToCampaign ← createPersona, so a sweep hung off it
+  // would never fire on the common path where every persona matches — the exact
+  // case #1466 is about. Running last also catches the zero-participant orphan a
+  // recreate above just manufactured, and resolving through ensureCampaign (not
+  // the stale campaignNameById) targets the same first-wins row attachToCampaign
+  // used. ROSTER campaigns only: per-spec throwaways accumulate unboundedly.
   const sessionCampaignNames = new Set(ROSTER.flatMap((p) => (p.campaignName ? [p.campaignName] : [])));
   for (const campaignName of sessionCampaignNames) {
     await endActiveSessions(cookie, await ensureCampaign(cookie, campaignName), campaignName);
