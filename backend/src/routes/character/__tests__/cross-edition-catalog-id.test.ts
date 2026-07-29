@@ -19,6 +19,8 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
+import { InvalidLevelUpError } from "@/lib/leveling/level-up-submission.js";
 
 const OWNER_ID = "owner-cross-edition-catalog-id";
 let COOKIE: string;
@@ -472,5 +474,218 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
     const res = await learnSubclassChoice(choiceIdShared);
     expect(res.status).toBe(200);
     expect(res.body.resources.choicesKnown.huntersPrey[0].optionId).toBe(choiceIdShared);
+  });
+});
+
+describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", () => {
+  // Deliberately shares no substring with a real class name: buildLevelUpPlan
+  // derives every step from the class NAME, so an "XEd Fighter" would pull in
+  // real Fighter features (fighting style, Extra Attack) and the assertions
+  // would stop being about this guard. Nothing here asserts on the `steps`
+  // array or a step's `meta` — the plan's step shape is another issue's
+  // surface, and coupling to it buys no coverage of the edition guard.
+  const CLASS_NAME = "XEd Vanguard";
+  const SUB_2014 = "XEd LvlSub 2014";
+  const SUB_2024 = "XEd LvlSub 2024";
+  const SUB_SHARED = "XEd LvlSub Shared";
+  let classId: string;
+  let subId2014: string;
+  let subId2024: string;
+  let subIdShared: string;
+
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: {
+        name: CLASS_NAME,
+        hitDie: "d10",
+        subclassLevel: 3,
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: { subclassLevel: 3 },
+    });
+    classId = cls.id;
+
+    const mk = (name: string, edition: "EDITION_2014" | "EDITION_2024" | null, slug: string) =>
+      upsertEditionRow(
+        prisma.subclass,
+        { classId, name, edition },
+        { classId, name, edition, description: "Cross-edition guard test fixture.", slug },
+        {},
+      );
+    [subId2014, subId2024, subIdShared] = await Promise.all([
+      mk(SUB_2014, "EDITION_2014", "xed-lvlsub-2014"),
+      mk(SUB_2024, "EDITION_2024", "xed-lvlsub-2024"),
+      mk(SUB_SHARED, null, "xed-lvlsub-shared"),
+    ]).then((rows) => rows.map((r) => r.id));
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "XEd LevelUp" } } });
+    await prisma.subclass.deleteMany({ where: { name: { in: [SUB_2014, SUB_2024, SUB_SHARED] } } });
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  // Defaults put newLevel at 3 — equal to subclassGateLevel under BOTH editions
+  // (the catalog column is 3 and 2024 hardcodes 3), so the plan carries a
+  // subclass step for either fixture. `level: 5` overrides give a level-up whose
+  // plan has NO subclass step (the ordering proof below).
+  async function createCharacter(
+    rulesEdition: "EDITION_2014" | "EDITION_2024",
+    name: string,
+    opts: { xp: number; entryLevel: number; hitDiceTotal: number } = { xp: 900, entryLevel: 2, hitDiceTotal: 2 },
+  ) {
+    const res = await agent()
+      .post("/api/characters")
+      .send({
+        name,
+        alignment: "True Neutral",
+        race: "Hill Dwarf",
+        background: "Sage",
+        classes: [{ name: CLASS_NAME }],
+        abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
+        rulesEdition,
+        experiencePoints: opts.xp,
+      });
+    expect(res.status).toBe(201);
+    const id = res.body.id as string;
+    await prisma.characterClassEntry.updateMany({ where: { characterId: id }, data: { level: opts.entryLevel } });
+    await prisma.character.update({
+      where: { id },
+      data: { hitDice: { total: opts.hitDiceTotal, die: "d10", spent: 0 } },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
+    return { id, classEntryId: entry.id };
+  }
+
+  async function getPlan(characterId: string, classEntryId: string, subclassId: string) {
+    return agent().get(
+      `/api/characters/${characterId}/level-up/plan?classEntryId=${classEntryId}&subclassId=${subclassId}`,
+    );
+  }
+
+  async function commitLevelUp(characterId: string, classEntryId: string, subclassId: string) {
+    return agent()
+      .post(`/api/characters/${characterId}/level-up/transactions`)
+      .send({
+        target: { kind: "existing", classEntryId },
+        hp: { method: "average" },
+        subclassId,
+      });
+  }
+
+  it("(NULL-row AC) the preview accepts the shared subclass for a 2024 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024a");
+    const res = await getPlan(id, classEntryId, subIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_SHARED);
+  });
+
+  it("(NULL-row AC) the preview accepts the shared subclass for a 2014 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2014", "XEd LevelUp 2014a");
+    const res = await getPlan(id, classEntryId, subIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_SHARED);
+  });
+
+  it("(unchanged) the preview accepts a same-edition subclass for a 2024 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024b");
+    const res = await getPlan(id, classEntryId, subId2024);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_2024);
+  });
+
+  it("(unchanged) the preview accepts a same-edition subclass for a 2014 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2014", "XEd LevelUp 2014b");
+    const res = await getPlan(id, classEntryId, subId2014);
+    expect(res.status).toBe(200);
+    expect(res.body.target.subclass).toBe(SUB_2014);
+  });
+
+  it("(NULL-row AC) the commit path applies a shared subclass", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024c");
+    const res = await commitLevelUp(id, classEntryId, subIdShared);
+    expect(res.status).toBe(200);
+    expect(res.body.classes[0].subclass).toBe(SUB_SHARED);
+    expect(res.body.hitDice.total).toBe(3);
+  });
+
+  it("(AC) the preview rejects a 2014-tagged subclass for a 2024 character instead of naming it", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024d");
+    const res = await getPlan(id, classEntryId, subId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+    expect(res.body.target).toBeUndefined();
+  });
+
+  it("(symmetry) the preview rejects a 2024-tagged subclass for a 2014 character", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2014", "XEd LevelUp 2014c");
+    const res = await getPlan(id, classEntryId, subId2024);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).toMatch(/2024 rules/);
+    expect(res.body.target).toBeUndefined();
+  });
+
+  // AC 4a (rewritten): the issue's original AC asked for the commit 400 to be
+  // TELLABLE APART from the preview's by message text, which is unsatisfiable —
+  // both now come from the same crossEditionRejection call in
+  // resolveLevelUpContext and surface through `{ error: error.message }`, so
+  // they are byte-identical over HTTP by construction. Identity is the property
+  // worth pinning: one rejection, one wording, wherever the player meets it.
+  it("(AC 4a) the commit path's rejection is string-equal to the preview's", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024e");
+    const preview = await getPlan(id, classEntryId, subId2014);
+    const commit = await commitLevelUp(id, classEntryId, subId2014);
+    expect(commit.status).toBe(400);
+    expect(commit.body.error).toBe(preview.body.error);
+  });
+
+  // AC 4b (rewritten): the ordering proof the message text can't give. At
+  // newLevel 5 the plan carries NO subclass step, so resolveEffectivePlan's
+  // "does not include a subclass choice" is what a submission carrying a
+  // subclassId gets today. Seeing the cross-edition message instead proves
+  // resolveLevelUpContext ran — and rejected — before validateLevelUpSubmission.
+  it("(AC 4b) rejects on edition before the plan's no-subclass-step check", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024f", {
+      xp: 6500,
+      entryLevel: 4,
+      hitDiceTotal: 4,
+    });
+    const res = await commitLevelUp(id, classEntryId, subId2014);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/2014 rules/);
+    expect(res.body.error).not.toMatch(/does not include a subclass choice/);
+  });
+
+  // AC 4c (rewritten): the error CLASS is what distinguishes this rejection from
+  // applySetSubclass's InvalidClassOperationError — over HTTP both are a 400
+  // with the same text, so only a direct lib call can assert which one threw.
+  it("(AC 4c) resolveLevelUpContext itself rejects with InvalidLevelUpError", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024g");
+    await expect(
+      resolveLevelUpContext(id, { kind: "existing", classEntryId }, subId2014),
+    ).rejects.toBeInstanceOf(InvalidLevelUpError);
+  });
+
+  // AC 5 (kept, re-labelled): a REGRESSION guard, not data-loss prevention. The
+  // level-up batch is already atomic, so this passed before the guard too — it
+  // exists so a future refactor that moves the rejection inside the write
+  // transaction (or splits the batch) turns red here.
+  it("(AC 5 regression guard) a rejected commit leaves level, hit dice and subclass untouched", async () => {
+    const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024h");
+    const res = await commitLevelUp(id, classEntryId, subId2014);
+    expect(res.status).toBe(400);
+    const character = await prisma.character.findUniqueOrThrow({
+      where: { id },
+      select: { hitDice: true, classEntries: { select: { level: true, subclassId: true } } },
+    });
+    expect((character.hitDice as { total: number }).total).toBe(2);
+    expect(character.classEntries[0].level).toBe(2);
+    expect(character.classEntries[0].subclassId).toBeNull();
   });
 });
