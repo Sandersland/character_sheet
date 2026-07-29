@@ -62,6 +62,7 @@ const reference: ReferenceData = {
   alignments: ["Neutral Good"],
   artisanTools: [],
   conditions: [],
+  universalActions: [],
   itemRarities: [],
 };
 
