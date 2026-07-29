@@ -20,11 +20,12 @@ Three commitments follow from that goal and decide most arguments below:
 ## Quickstart
 
 ```bash
-docker compose up --build   # db (5432) + backend (4000) + frontend (5173)
-npm run dev | lint | test | typecheck | build   # root scripts fan out to both workspaces
+docker compose up -d db                        # Postgres on 5432 — the only container the dev loop needs
+npm run dev                                    # backend :4000 + frontend :5173, both on the host
+npm run lint | test | typecheck | build        # root scripts fan out to both workspaces
 ```
 
-See `docs/development.md` for per-workspace commands, running outside Docker, and the Prisma workflow.
+The app does **not** run in a container in dev (#1458). Postgres and the Playwright e2e runner do; nothing else. See `docs/development.md` for first-run setup, per-workspace commands, and the Prisma workflow.
 
 ## Non-negotiables (always apply)
 

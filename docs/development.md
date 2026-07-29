@@ -5,19 +5,23 @@ Read this when you need commands, the Prisma workflow, worktree stacks, or the a
 ## Quickstart
 
 ```bash
-docker compose up --build                    # db :5432 + backend :4000 + frontend :5173
+npm ci                                       # once per clone
+cp .env.example backend/.env                 # supplies DATABASE_URL
+docker compose up -d db                      # Postgres :5432
+cd backend && npx prisma generate && npx prisma migrate deploy && npx prisma db seed && cd ..
+npm run dev                                  # backend :4000 + frontend :5173
 docker compose --profile tools up pgadmin    # pgAdmin :5050 (opt-in)
 ```
 
-On container start both dev containers run `npm install`, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` — all idempotent. The seed is **catalog-only** (no users/characters); use `npm run seed:verify` for a signed-in user + representative character. Adding a dependency: edit `package.json` and `docker compose up --build` (the startup install reconciles the `node_modules` volume).
+**The app runs on the host; only Postgres and the Playwright e2e runner are containers (#1458).** The dev images existed to make `docker compose up` boot everything, and paid for it with `node_modules` volumes shadowing the source mount — the split that made host `tsc` check the wrong tree, hid `fallow` from lefthook, and cost a rebuild per dependency change. CI has always run this way (`ci.yml` boots the same servers on a bare runner with a Postgres service), so the containerless path is the tested one.
 
-Root scripts fan out to both workspaces: `npm run dev | lint | typecheck | test | build | e2e`.
+The seed is **catalog-only** (no users/characters); use `npm run seed:verify` for a signed-in user + representative character. After a schema change, re-run `prisma migrate deploy` yourself — nothing does it on boot any more.
+
+`npm run dev` runs the two servers **concurrently** (`&` + `wait`); npm workspaces are otherwise sequential, so a plain `--workspaces` fan-out would start the backend's watcher and never reach Vite. The other root scripts (`lint | typecheck | test | build`) do fan out per workspace.
 
 `typecheck` (`tsc --noEmit`) catches the shape-drift class that lint/test miss — vitest transpiles without type-checking. Run it after touching code, before declaring done.
 
-Running outside Docker: `docker compose up db -d`, then `npm run dev` in each workspace (backend needs `backend/.env` from `.env.example`; frontend defaults `VITE_API_URL` to `http://localhost:4000/api`).
-
-Nothing loads that `.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, and `prisma.config.ts` loads it itself; drop either and host-run dev breaks while Docker and CI keep working, because they inject `DATABASE_URL` directly (#1463).
+Nothing loads `backend/.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, `prisma.config.ts` loads it itself, and Vite reads `frontend/.env` through `loadEnv`; drop any of them and host dev breaks while CI keeps working, because CI injects the variables directly (#1463). Vite also pins `strictPort`, so a busy port fails loudly instead of silently serving on the next one.
 
 ## Guardrails (lefthook)
 
@@ -65,15 +69,15 @@ docker compose -p cs-<branch> logs -f
 
 `npm ci` runs the root `prepare` → `lefthook install`, which bakes an absolute path into `.git/hooks`, a directory every worktree *shares* ([lefthook #1398](https://github.com/evilmartians/lefthook/issues/1398)). `create` re-installs from the main checkout afterwards so the shim outlives the worktree; `LEFTHOOK=0` does **not** prevent this — it gates hook execution, not `lefthook install`.
 
-Both dev images also carry `git` and a global `fallow` pinned to the root `devDependency` (#1450). Use the in-container run for CI parity, or when you want the audit against the same image CI-adjacent work uses:
+To re-run the gates by hand, from the repo root (#1458):
 
 ```bash
-docker compose exec -T backend  sh -c 'cd /app && fallow audit --base origin/staging --gate new-only --no-cache'
-docker compose exec -T backend  sh -c 'cd /app/backend  && npx tsc --noEmit'
-docker compose exec -T frontend sh -c 'cd /app/frontend && npx tsc --noEmit'
+npx fallow audit --base origin/staging --gate new-only --no-cache
+npx tsc --noEmit -p backend
+npx tsc --noEmit -p frontend
 ```
 
-`cd /app` for fallow (it loads `.fallowrc.jsonc` from the repo root) but **never** for vitest — `/app` is the root, and running the suites there leaves the `@/` alias unresolved and fails every file. The in-container audit is a smoke gate, not a CI replacement: CI feeds fallow the Istanbul coverage artifact for exact CRAP, which a local run has no way to produce, so CRAP numbers differ there. Dead code, complexity and duplication match.
+Run `fallow` from the repo root (it loads `.fallowrc.jsonc` there). CRAP scores read differently here than in CI (no coverage artifact); dead code, complexity and duplication match.
 
 ## How to add a new domain / feature
 

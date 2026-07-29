@@ -12,10 +12,12 @@
 # version is allowed to serve (#1455). Gating only container CMDs would leave
 # the deployment path this repo actually ships through outside the invariant.
 #
-# Anti-vacuity: fail unless exactly 3 files matched `prisma migrate deploy` —
-# today's Dockerfile / backend/Dockerfile / railway.json. A count drift (a new
-# deploy path added a fourth, or one was deleted) means this check's premise
-# changed and needs a human look, not a silent pass.
+# Anti-vacuity: fail unless exactly 2 files matched `prisma migrate deploy` —
+# today's Dockerfile / railway.json, the deploy image and the Railway hook that
+# gates it. A count drift (a new deploy path added a third, or one was deleted)
+# means this check's premise changed and needs a human look, not a silent pass.
+# Was 3 until #1458 retired the dev backend image; the dev database is migrated
+# by hand now, and a developer's shell is not a deploy path.
 set -eu
 
 MATCHED=0
@@ -34,8 +36,8 @@ for f in $(git grep -lF 'prisma migrate deploy' -- ':(glob)**/Dockerfile*' 'rail
   fi
 done
 
-if [ "$MATCHED" -ne 3 ]; then
-  echo "error: check-seed-required.sh expected exactly 3 deploy paths running 'prisma migrate deploy', found $MATCHED (anti-vacuity — a deploy path was added or removed; update this script's expectation deliberately)" >&2
+if [ "$MATCHED" -ne 2 ]; then
+  echo "error: check-seed-required.sh expected exactly 2 deploy paths running 'prisma migrate deploy', found $MATCHED (anti-vacuity — a deploy path was added or removed; update this script's expectation deliberately)" >&2
   exit 1
 fi
 

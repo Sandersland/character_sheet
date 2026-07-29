@@ -100,48 +100,44 @@ Launch one background subagent per issue (`run_in_background: true`), so they bu
 >
 > Tailor the list to the issue's surface (drop the backend rules for a frontend-only issue, etc.), but keep the comment-style and `@/`-import rules in every brief — those are the ones delegated agents most often miss.
 
-> **Prefer running tooling _inside the containers_ — that is the CI-parity path.** (Host runs work too since #1452 installs into the worktree, and #1457 put the worktree outside the repo so a broken install can no longer masquerade as a passing one; but the containers are what CI resembles, and the backend suite needs the container's DB.) Each container bind-mounts the **repo root** at `/app` (root-context build since #820, so the workspaces install can link `packages/*`), with the workspace at `/app/backend` / `/app/frontend` and `node_modules` named volumes shadowing both the hoisted root tree and the workspace-local one. The backend container already has `DATABASE_URL` preset to the internal `db:5432`. Because source is bind-mounted, your host file edits are live in-container immediately, and any migration files / generated Prisma client land back in the worktree (so they get committed). Run everything below from the worktree dir.
->
-> **`cd` to the workspace, not to `/app`.** `/app` is the repo root, so running vitest there leaves the `@/` alias unresolved and every test file fails to collect — a total false red (~475 failed files) that looks catastrophic and is purely a wrong working directory. `docker compose exec` already lands in the workspace via the service's `working_dir`; the explicit `cd` below is belt-and-braces.
->
-> **Wait for the boot install before running anything.** Both containers run `npm install` on every start so the named volume reconciles with `package.json`. Tooling fired before it finishes reports `Failed to resolve import "<pkg>"` for any dependency the branch added — indistinguishable from a real breakage. Poll the logs for the dev-server ready line (`docker compose logs frontend | grep -q "ready in"`) or the backend's `/api/health` → `200` first.
+> **Run tooling on the host, from the worktree directory.** There are no backend/frontend containers to exec into since #1458 — the worktree has its own `node_modules` (#1452), sits outside the repo so a broken install fails loudly instead of borrowing the main checkout's (#1457), and reads its `DATABASE_URL`/ports from the generated `backend/.env` + `frontend/.env` (#1463). `worktree.sh up` starts and prepares that slot's database; `npm run dev` runs both servers.
 
 **Per chunk — test first:**
 1. Write the unit tests from the plan **first** (they should fail).
 2. Implement until they pass.
-   - **Backend tests** (DB already wired via container env — no `DATABASE_URL` needed):
+   - **Backend tests** (`backend/.env` supplies `DATABASE_URL`; `worktree.sh up` must have run):
      ```bash
-     docker compose exec -T backend sh -c 'cd /app/backend && npx vitest run <test-file>'
+     cd backend && npx vitest run <test-file>
      ```
-     Run the **whole** backend suite with a plain `npx vitest run` — **never** `--fileParallelism=false`. Since #1269 each vitest worker gets its own database cloned from a migrated+seeded template, so cross-file interference is a leaking fixture, not pool contention, and the override only hides it (`docs/testing.md`, and the latch comment in `backend/vitest.config.ts`). If the container OOMs instead, `--maxWorkers=2` is the right lever.
+     Run the **whole** backend suite with a plain `npx vitest run` — **never** `--fileParallelism=false`. Since #1269 each vitest worker gets its own database cloned from a migrated+seeded template, so cross-file interference is a leaking fixture, not pool contention, and the override only hides it (`docs/testing.md`, and the latch comment in `backend/vitest.config.ts`). If it OOMs instead, `--maxWorkers=2` is the right lever.
    - **Schema changes** — migrate **and regenerate the client in the same step** (a stale client after `migrate dev` causes confusing runtime errors like `Invalid value for argument 'type'. Expected <Enum>` even though the migration succeeded):
      ```bash
-     docker compose exec -T backend sh -c 'cd /app/backend && npx prisma migrate dev --name <change> && npx prisma generate'
+     cd backend && npx prisma migrate dev --name <change> && npx prisma generate
      ```
-     Then `docker compose restart backend` so the running server picks up the regenerated client; wait for `/api/health` → `200` again.
+     `tsx watch` picks the regenerated client up on its own.
    - **Frontend tests** need no DB:
      ```bash
-     docker compose exec -T frontend sh -c 'cd /app/frontend && npx vitest run <test-file>'
+     cd frontend && npx vitest run <test-file>
      ```
 3. **Lint before committing** — `ci.yml` runs lint, so a missed lint error fails CI even when tests pass:
    ```bash
-   docker compose exec -T backend  sh -c 'cd /app/backend  && npm run lint'
-   docker compose exec -T frontend sh -c 'cd /app/frontend && npm run lint'
+   npm run lint --workspace backend
+   npm run lint --workspace frontend
    ```
    Both must be clean.
 4. Commit each green chunk with a conventional message: `feat(<domain>): <summary> (#<#>)`.
 
 > **The worktree's own gates are trustworthy now — do not reach for `--no-verify`.** Since #1452 `worktree.sh create` runs `npm ci` + `prisma generate` in the worktree, so lefthook's `tsc` jobs check that tree (not the primary checkout) and its `fallow` job runs instead of hard-failing. A blocked commit in a worktree is a real finding. CI's `fallow` job is a required check on `staging`, so a bypassed audit surfaces on the PR anyway — and `fallow` is the check that most often fails.
 >
-> For CI parity, both dev images also carry `git` and a global `fallow` (#1450):
+> To re-run the gates by hand, from the worktree root:
 >
 > ```bash
-> docker compose exec -T backend  sh -c 'cd /app && fallow audit --base <integration-branch> --gate new-only --no-cache'
-> docker compose exec -T backend  sh -c 'cd /app/backend  && npx tsc --noEmit'
-> docker compose exec -T frontend sh -c 'cd /app/frontend && npx tsc --noEmit'
+> npx fallow audit --base <integration-branch> --gate new-only --no-cache
+> npx tsc --noEmit -p backend
+> npx tsc --noEmit -p frontend
 > ```
 >
-> `cd /app` is required for fallow — it loads `.fallowrc.jsonc` from the repo root — and forbidden for vitest, which needs the workspace dir or the `@/` alias goes unresolved. CRAP scores read differently in-container than in CI (no coverage artifact); dead code, complexity and duplication match. Likewise, the `post-checkout` prisma-regen hook can write a client for the wrong branch after a rebase — regenerate in-container (false red, ~65 tests) rather than trusting it.
+> Run `fallow` from the worktree **root** — it loads `.fallowrc.jsonc` from there — and vitest from a workspace dir, or the `@/` alias goes unresolved. CRAP scores read differently here than in CI (no coverage artifact); dead code, complexity and duplication match. The `post-checkout` prisma-regen hook can also write a client for the wrong branch after a rebase — `npx prisma generate` in `backend/` rather than trusting it (false red, ~65 tests).
 
 **After the last chunk — UI gate (if the issue has a UI surface):**
 Run the **verify-frontend** skill, adapted to this worktree — run the frontend unit tests as usual, but point the browser verification at the **worktree's** frontend URL (`http://localhost:<5173+slot*10>`), not the hardcoded 5173. Screenshots go under `/tmp/` only — never the project tree.
