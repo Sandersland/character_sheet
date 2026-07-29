@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  advancingHitDie,
   applyDeathSaveRoll,
   fixedAverageForDie,
   hitDieHeal,
@@ -91,6 +92,21 @@ describe("normalizeHitDice", () => {
       die: "d8",
       spent: 0,
     });
+  });
+});
+
+describe("advancingHitDie (#1380)", () => {
+  it("prefers the advancing class's catalog die over the character's persisted one", () => {
+    expect(advancingHitDie("d10", "d6")).toEqual({ die: "d10", faces: 10 });
+  });
+
+  it("falls back to the character's own die when the entry has no catalog row", () => {
+    expect(advancingHitDie(null, "d8")).toEqual({ die: "d8", faces: 8 });
+    expect(advancingHitDie(undefined, "d12")).toEqual({ die: "d12", faces: 12 });
+  });
+
+  it("parses the face count case-insensitively", () => {
+    expect(advancingHitDie("D8", "d6")).toEqual({ die: "D8", faces: 8 });
   });
 });
 
