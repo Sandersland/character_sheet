@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   ALIGNMENTS,
+  ITEM_RARITIES,
   MULTICLASS_PREREQUISITES,
   cantripsKnownAtLevel,
   conditionRulesText,
@@ -158,5 +159,13 @@ referenceRouter.get("/reference", async (req, res) => {
     alignments: ALIGNMENTS,
     artisanTools,
     conditions,
+    // The six magic-item rarity tiers (#1437). Unlike conditions above these are
+    // edition-INVARIANT: ITEM_RARITIES takes no edition parameter, and spreading
+    // the module const straight into the response — no intermediate const — is
+    // what makes it provable at a glance that the requested edition cannot reach
+    // it. The client holds the whole table rather than a resolved value per row
+    // because the DM item form computes its value hint over UNSAVED form state,
+    // with no server row to hang a resolved string on.
+    itemRarities: ITEM_RARITIES,
   });
 });

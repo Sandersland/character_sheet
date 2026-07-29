@@ -13,6 +13,7 @@ import supertest from "supertest";
 import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
@@ -116,9 +117,10 @@ describe("POST /api/characters/:id/resources/transactions", () => {
       update: {},
     });
 
-    const maneuver = await prisma.grantedAbility.upsert({
-      where: { name: MANEUVER_CATALOG_NAME },
-      create: {
+    const maneuver = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: MANEUVER_CATALOG_NAME, edition: null },
+      {
         name: MANEUVER_CATALOG_NAME,
         source: "maneuver",
         description: "Knock a target prone on a hit.",
@@ -129,8 +131,8 @@ describe("POST /api/characters/:id/resources/transactions", () => {
         costBase: 1,
         effectDieSource: "superiorityDice",
       },
-      update: {},
-    });
+      {},
+    );
     catalogManeuverId = maneuver.id;
 
     await prisma.character.create({

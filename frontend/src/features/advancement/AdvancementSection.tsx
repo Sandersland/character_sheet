@@ -153,6 +153,7 @@ export default function AdvancementSection() {
         slotsRemaining={slotsRemaining}
         busy={busy}
         characterLevel={character.level}
+        rulesEdition={character.rulesEdition}
         skillNames={(character.skills as { name: string }[]).map((s) => s.name)}
         onSubmit={handleSubmit}
       />

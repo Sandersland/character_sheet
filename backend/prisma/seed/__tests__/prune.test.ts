@@ -72,23 +72,20 @@ describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
     expect(survivingEditions).toEqual([null]);
   });
 
-  // GrantedAbility.name stays plain @unique — no divergent row CAN exist there
-  // yet (that needs a migration widening the constraint first), so this can't
-  // use the same-name-pair shape the two Feat tests above do. It still proves
-  // real discrimination without one: seed a single row tagged EDITION_2024,
-  // but list it in the seeded set under `edition: null`. A naive name-only
-  // notIn keeps it (the name string is present in the seeded list, full stop);
-  // the correct partitioned form puts it in the EDITION_2024 partition, whose
-  // seeded-names list is empty for this run, and deletes it.
-  it("GrantedAbility: a row seeded under the WRONG edition is still pruned (partitioning discriminates without a same-name pair)", async () => {
-    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "d", edition: "EDITION_2024" } });
+  // Uses the same same-name-pair shape as the two Feat tests above — which
+  // #1415 made expressible (the second create P2002'd against the old plain
+  // @unique on `name`), so the partitioning is now proven on GrantedAbility by
+  // the same argument, not by a weaker wrong-edition-only stand-in.
+  it("GrantedAbility: a same-named 2014/2024 pair — only the seeded edition survives", async () => {
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2014", edition: "EDITION_2014" } });
+    await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "2024", edition: "EDITION_2024" } });
 
-    const seeded = [{ name: NAME, edition: null }];
+    const seeded = [{ name: NAME, edition: "EDITION_2014" as const }];
     await prisma.grantedAbility.deleteMany({
       where: staleCatalogRowsWhere(seeded, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
     });
 
-    const survivor = await prisma.grantedAbility.findFirst({ where: { name: NAME } });
-    expect(survivor).toBeNull();
+    const surviving = (await prisma.grantedAbility.findMany({ where: { name: NAME } })).map((r) => r.edition);
+    expect(surviving).toEqual(["EDITION_2014"]);
   });
 });

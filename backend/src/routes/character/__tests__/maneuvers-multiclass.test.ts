@@ -48,7 +48,7 @@ describe("castManeuver — Battle Master as a SECONDARY class entry (#1072)", ()
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
-    tripId = (await prisma.grantedAbility.findUnique({ where: { name: "Trip Attack" } }))!.id;
+    tripId = (await prisma.grantedAbility.findFirst({ where: { name: "Trip Attack" } }))!.id;
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,

@@ -72,7 +72,7 @@ let classId: string;
 const optionId: Record<string, string> = {};
 
 async function loadOption(name: string) {
-  optionId[name] = (await prisma.grantedAbility.findUnique({ where: { name } }))!.id;
+  optionId[name] = (await prisma.grantedAbility.findFirst({ where: { name } }))!.id;
 }
 
 async function createCharacter(experiencePoints: number, className: string, subclass: string | null) {

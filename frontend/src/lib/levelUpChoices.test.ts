@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
+import { fetchFeats, fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
 import {
   CHOICE_KIND_CONFIGS,
   choiceConfigForStep,
@@ -27,6 +27,10 @@ vi.mock("@/api/client", () => ({
     { id: "prey2", name: "Giant Killer", description: "gk", minLevel: 3 },
   ]),
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 function characterWith(resources: Partial<Character["resources"]>): Character {
   return { resources } as Character;
@@ -77,6 +81,14 @@ describe("CHOICE_KIND_CONFIGS", () => {
         { id: "archery", name: "Archery", description: "arch" },
         { id: "defense", name: "Defense", description: "def" },
       ]);
+    });
+
+    // Without this the test above still passes if the edition never reaches the
+    // wire — the mock ignores its argument — and the picker silently offers the
+    // other edition's styles (#1411).
+    it("passes the context edition through to fetchFeats", async () => {
+      await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014" });
+      expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014");
     });
 
     it("writes a slot:fightingStyle takeFeat op and replaces on re-pick", () => {

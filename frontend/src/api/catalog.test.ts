@@ -94,20 +94,21 @@ describe("fetchFeats", () => {
   });
 
   it("returns the parsed feat catalog on success", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => [{ id: "f1", name: "Alert" }],
-      })
-    );
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ id: "f1", name: "Alert" }],
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchFeats()).resolves.toMatchObject([{ name: "Alert" }]);
+    await expect(fetchFeats("EDITION_2014")).resolves.toMatchObject([{ name: "Alert" }]);
+    // Same pin as fetchReference above: the route 400s without it (#1411), and
+    // Alert is the seeded row that actually forks by edition.
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/feats\?edition=EDITION_2014$/);
   });
 
   it("throws on a non-ok response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
-    await expect(fetchFeats()).rejects.toThrow();
+    await expect(fetchFeats("EDITION_2024")).rejects.toThrow();
   });
 });

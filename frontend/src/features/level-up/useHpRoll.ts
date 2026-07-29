@@ -2,7 +2,7 @@
 // die locally so toggling average↔roll reuses the same roll — HitPointsStep
 // keeps the reveal mounted (hidden, not torn down) so a settled die lingers.
 // Drops a held roll when the advancing class (hence the die) changes, so a d10
-// roll never carries onto a d6 class; the reveal's `key={math.faces}` then
+// roll never carries onto a d6 class; the reveal's `key={meta.faces}` then
 // forces the one legitimate remount, re-rolling the new die. Owns every draft
 // write for the step.
 
@@ -10,7 +10,8 @@ import { useEffect, useState } from "react";
 
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { RollResult } from "@/lib/dice";
-import type { HitPointStepMath } from "@/lib/hitDice";
+import { hpGainForRoll } from "@/lib/hitDice";
+import type { HitPointsStepMeta } from "@/types/character";
 
 export interface HpRoll {
   roll: number | null;
@@ -22,14 +23,14 @@ export interface HpRoll {
   chooseRoll: () => void;
 }
 
-export function useHpRoll(math: HitPointStepMath): HpRoll {
+export function useHpRoll(meta: HitPointsStepMeta): HpRoll {
   const { draft, setDraft } = useLevelUpStepContext();
   const [roll, setRoll] = useState<number | null>(null);
-  useEffect(() => setRoll(null), [math.faces]);
+  useEffect(() => setRoll(null), [meta.faces]);
 
   const method = draft.hp?.method;
   const gain =
-    method === "average" ? math.averageGain : method === "roll" && roll != null ? roll + math.conMod : null;
+    method === "average" ? meta.averageGain : method === "roll" && roll != null ? hpGainForRoll(meta, roll) : null;
 
   function handleRoll(result: RollResult) {
     const value = result.dice[0]?.value ?? 1;

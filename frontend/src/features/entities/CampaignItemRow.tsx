@@ -4,12 +4,15 @@ import Badge from "@/components/ui/Badge";
 import { Lock } from "@/components/ui/icons";
 import { itemCategoryLabel } from "@/lib/items";
 import { rarityLabel, rarityTone } from "@/lib/rarity";
-import type { CampaignItem } from "@/types/character";
+import type { CampaignItem, ItemRarityOption } from "@/types/character";
 
 interface CampaignItemRowProps {
   item: CampaignItem;
   campaignId: string;
   characters: { id: string; name: string; ownerId: string }[];
+  /** Served rarity rows (#1437), passed in rather than fetched: one observer on
+   *  the panel beats one per row in an N-item list. */
+  rarities: ItemRarityOption[];
   busyId: string | null;
   awardTargetValue: string;
   onToggleReveal: (item: CampaignItem) => void;
@@ -93,8 +96,11 @@ function AwardControl({
 function RowBadges({
   item,
   campaignId,
+  rarities,
   hidden,
-}: Pick<CampaignItemRowProps, "item" | "campaignId"> & { hidden: boolean }) {
+}: Pick<CampaignItemRowProps, "item" | "campaignId" | "rarities"> & { hidden: boolean }) {
+  // Null until the served rows land (#1437) — no raw enum key ever paints.
+  const rarityText = item.rarity ? rarityLabel(item.rarity, rarities) : null;
   return (
     <>
       {item.entity ? (
@@ -108,7 +114,7 @@ function RowBadges({
         <span className="text-sm font-semibold text-parchment-900">{item.name}</span>
       )}
       <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
-      {item.rarity && <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>}
+      {item.rarity && rarityText && <Badge tone={rarityTone(item.rarity)}>{rarityText}</Badge>}
       {item.isUnique && <Badge tone="arcane">Unique</Badge>}
       {hidden && (
         <Badge tone="neutral">
@@ -151,7 +157,7 @@ function RowActions({
 }
 
 export default function CampaignItemRow(props: CampaignItemRowProps) {
-  const { item, campaignId, characters, busyId } = props;
+  const { item, campaignId, characters, busyId, rarities } = props;
   const hidden = item.entity?.visibility === "HIDDEN";
   const holders = item.holders ?? [];
   const held = item.isUnique && holders.length > 0;
@@ -159,7 +165,7 @@ export default function CampaignItemRow(props: CampaignItemRowProps) {
   return (
     <li className="flex flex-col gap-2 py-2">
       <div className="flex flex-wrap items-center gap-2">
-        <RowBadges item={item} campaignId={campaignId} hidden={hidden} />
+        <RowBadges item={item} campaignId={campaignId} rarities={rarities} hidden={hidden} />
         <RowActions
           item={item}
           busyId={busyId}

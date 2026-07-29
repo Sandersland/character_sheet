@@ -12,9 +12,14 @@ vi.mock("@/hooks/useCampaignEntities", () => ({
   primeCampaignEntities: vi.fn(),
 }));
 
+// fetchReference must be present even though renderPanel seeds the reference
+// cache directly (never calling it): useItemRarities imports it from this same
+// barrel, and an omitted export is `undefined`, which the query would call the
+// moment a test renders without a seed.
 vi.mock("@/api/client", () => ({
   fetchCampaignItems: vi.fn(),
   fetchItems: vi.fn(() => Promise.resolve([])),
+  fetchReference: vi.fn(),
   awardCampaignItem: vi.fn(),
   revokeCampaignItem: vi.fn(),
   createCampaignItem: vi.fn(),
@@ -33,6 +38,7 @@ import {
 import { getQueryClient } from "@/api/queryClient";
 import { campaignKeys } from "@/api/queryKeys";
 import { primeCampaignEntities } from "@/hooks/useCampaignEntities";
+import { seedItemRarities } from "@/test/rarities";
 
 const baseItem: CampaignItem = {
   id: "item-1",
@@ -49,10 +55,13 @@ const baseItem: CampaignItem = {
 
 const characters = [{ id: "c1", name: "Bruenor", ownerId: "u1" }];
 
-function renderPanel() {
+// `seedRarities: false` leaves the reference query pending — the cold-cache
+// state the serve-only labels have to survive (#1437).
+function renderPanel({ seedRarities = true } = {}) {
+  if (seedRarities) seedItemRarities("EDITION_2024");
   return render(
     <MemoryRouter>
-      <CampaignItemsPanel campaignId="camp-1" characters={characters} />
+      <CampaignItemsPanel campaignId="camp-1" characters={characters} edition="EDITION_2024" />
     </MemoryRouter>,
   );
 }
@@ -508,8 +517,19 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
   it("renders the rarity badge via a human label, never the raw enum key", async () => {
     renderPanel();
     await screen.findByText("Flametongue");
-    expect(screen.getByText("Very Rare")).toBeInTheDocument();
+    const badge = screen.getByText("Very Rare");
+    expect(badge).toHaveClass("bg-arcane-50");
     expect(screen.queryByText("VERY_RARE")).not.toBeInTheDocument();
+  });
+
+  // #1437: labels are serve-only, so a cold cache paints no badge rather than
+  // flashing the raw key while /reference is in flight.
+  it("renders no rarity badge on a row while the served rows are unresolved", async () => {
+    const { container } = renderPanel({ seedRarities: false });
+    await screen.findByText("Flametongue");
+    expect(screen.queryByText("VERY_RARE")).toBeNull();
+    expect(screen.queryByText("Very Rare")).toBeNull();
+    expect(container.querySelector(".bg-arcane-50")).toBeNull();
   });
 
   it("offers rarity as a dropdown with a mundane option and shows the value hint", async () => {
@@ -519,12 +539,55 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
 
     const rarity = screen.getByLabelText("Rarity") as HTMLSelectElement;
     expect(rarity.tagName).toBe("SELECT");
-    // Mundane empty option + the six tiers.
-    expect(rarity.querySelectorAll("option")).toHaveLength(7);
+    expect(rarity).toBeEnabled();
+    // Mundane empty option + the six tiers, ascending.
+    expect([...rarity.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+      "Mundane (none)",
+      "Common",
+      "Uncommon",
+      "Rare",
+      "Very Rare",
+      "Legendary",
+      "Artifact",
+    ]);
     expect(screen.queryByText("Standard value: 4,000 gp")).not.toBeInTheDocument();
 
     await userEvent.selectOptions(rarity, "RARE");
     expect(screen.getByText("Standard value: 4,000 gp")).toBeInTheDocument();
+  });
+
+  // Data-loss guard (#1437): with only "Mundane (none)" selectable, editing an
+  // existing magic item and touching the dropdown would strip rarity,
+  // attunement gating and the whole Magic fieldset in one click.
+  it("disables the rarity dropdown until the served rows resolve", async () => {
+    renderPanel({ seedRarities: false });
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    const rarity = screen.getByLabelText("Rarity") as HTMLSelectElement;
+    expect(rarity).toBeDisabled();
+    expect([...rarity.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+      "Mundane (none)",
+    ]);
+  });
+
+  // The gp figures are the server's too (#1437) — with no rows there is nothing
+  // to quote, so the hint stays absent rather than guessing. The select must
+  // still hold the item's real tier instead of falling back to "Mundane (none)".
+  it("keeps an existing magic item's tier, and no value hint, while the rows are unresolved", async () => {
+    renderPanel({ seedRarities: false });
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    const rarity = screen.getByLabelText("Rarity") as HTMLSelectElement;
+    expect(rarity).toHaveValue("VERY_RARE");
+    expect(rarity).toBeDisabled();
+    expect([...rarity.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+      "Mundane (none)",
+      "Loading…",
+    ]);
+    expect(screen.queryByText("VERY_RARE")).toBeNull();
+    expect(screen.queryByText(/Standard value:/)).toBeNull();
   });
 
   it("hides attunement/unique and the value hint when rarity is Mundane", async () => {

@@ -38,6 +38,7 @@ function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Chara
   return {
     id: "char-1",
     class: "Fighter",
+    rulesEdition: "EDITION_2014",
     level: 5,
     fightingStyleSlots: { total: opts.total, used: taken.length },
     advancements: taken,
@@ -76,6 +77,7 @@ describe("ClassFeaturesSection — Fighting Style", () => {
     render(makeFighter({ total: 1 }));
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
+    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014");
     // A general-category feat must not leak into the fighting-style picker.
     expect(await screen.findByText("Archery")).toBeInTheDocument();
     expect(screen.queryByText("Sentinel")).not.toBeInTheDocument();
