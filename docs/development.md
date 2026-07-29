@@ -69,15 +69,15 @@ docker compose -p cs-<branch> logs -f
 
 `npm ci` runs the root `prepare` → `lefthook install`, which bakes an absolute path into `.git/hooks`, a directory every worktree *shares* ([lefthook #1398](https://github.com/evilmartians/lefthook/issues/1398)). `create` re-installs from the main checkout afterwards so the shim outlives the worktree; `LEFTHOOK=0` does **not** prevent this — it gates hook execution, not `lefthook install`.
 
-Both dev images also carry `git` and a global `fallow` pinned to the root `devDependency` (#1450). Use the in-container run for CI parity, or when you want the audit against the same image CI-adjacent work uses:
+To re-run the gates by hand, from the repo root (#1458):
 
 ```bash
-docker compose exec -T backend  sh -c 'cd /app && fallow audit --base origin/staging --gate new-only --no-cache'
-docker compose exec -T backend  sh -c 'cd /app/backend  && npx tsc --noEmit'
-docker compose exec -T frontend sh -c 'cd /app/frontend && npx tsc --noEmit'
+npx fallow audit --base origin/staging --gate new-only --no-cache
+npx tsc --noEmit -p backend
+npx tsc --noEmit -p frontend
 ```
 
-`cd /app` for fallow (it loads `.fallowrc.jsonc` from the repo root) but **never** for vitest — `/app` is the root, and running the suites there leaves the `@/` alias unresolved and fails every file. The in-container audit is a smoke gate, not a CI replacement: CI feeds fallow the Istanbul coverage artifact for exact CRAP, which a local run has no way to produce, so CRAP numbers differ there. Dead code, complexity and duplication match.
+Run `fallow` from the repo root (it loads `.fallowrc.jsonc` there). CRAP scores read differently here than in CI (no coverage artifact); dead code, complexity and duplication match.
 
 ## How to add a new domain / feature
 
