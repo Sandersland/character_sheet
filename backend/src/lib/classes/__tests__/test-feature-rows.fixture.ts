@@ -27,6 +27,14 @@ const TEST_CLASSES: Record<string, ClassDefinition> = {
   barbarian, bard, cleric, druid, fighter, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
 };
 
+// Flat map keyed by subclass name ACROSS all twelve classes, mirroring
+// registry.ts's SUBCLASSES table — so testFeatureRowsFor("fighter", "life
+// domain") would silently hand back Cleric rows, and any cross-class
+// subclass-name collision resolves last-write-wins by TEST_CLASSES iteration
+// order. Harmless here: this is a test-fixture convenience keyed the same way
+// production's lookup table is (subclass names are unique across the seeded
+// catalog today), and production itself never resolves a subclass this way —
+// it goes through the FK relation (Character.subclassId), not a name lookup.
 const TEST_SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const classDef of Object.values(TEST_CLASSES)) {
   for (const [key, subclassDef] of Object.entries(classDef.subclasses ?? {})) {

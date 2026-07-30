@@ -134,6 +134,39 @@ function mergeLayers(base: ClassLayer, sub: ClassLayer): { resources: DerivedRes
   return { resources, features };
 }
 
+interface SubclassExtras {
+  extras: ClassExtras | undefined;
+  subclassChoices: DerivedSubclassChoice[] | undefined;
+  hasExtras: boolean;
+}
+
+// Subclass-specific bespoke choice-cap fields (ClassExtras) and the generic
+// subclass "choose N" list (#899). Extracted out of deriveResources (#1524's
+// null-flip fix inlined this and tripped the fallow complexity gate — see
+// deriveResources' own comment for why `hasExtras` must be computed BEFORE
+// that function's null check, not folded into it here).
+function deriveSubclassExtras(
+  sub: SubclassLayer,
+  level: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+  edition: RulesEdition,
+): SubclassExtras {
+  let extras: ClassExtras | undefined;
+  if (sub.active && sub.def?.deriveExtras) {
+    extras = sub.def.deriveExtras(level, abilityScores, profBonus, edition);
+  }
+  let subclassChoices: DerivedSubclassChoice[] | undefined;
+  if (sub.active && sub.def?.choices) {
+    const computed = sub.def.choices
+      .map((c) => ({ key: c.key, label: c.label, catalogSource: c.catalogSource, count: c.count(level) }))
+      .filter((c) => c.count > 0);
+    if (computed.length > 0) subclassChoices = computed;
+  }
+  const hasExtras = (extras !== undefined && Object.keys(extras).length > 0) || subclassChoices !== undefined;
+  return { extras, subclassChoices, hasExtras };
+}
+
 /**
  * Derives trackable resources (pools with totals/die/recharge) and static
  * feature descriptions for a character's class and subclass. Returns null
@@ -173,8 +206,6 @@ export function deriveResources(
   );
   const { resources, features } = mergeLayers(base, sub);
 
-  // Subclass-specific bespoke choice-cap fields (ClassExtras) and the generic
-  // subclass "choose N" list (#899) — computed BEFORE the null check below.
   // #1524: with an absent featureRows carrier (every narrow-select caller —
   // e.g. RESOURCES_SELECT's applyResourceOpInTx, which learnSubclassChoice
   // itself runs through), `features` is now empty for classes whose TS array
@@ -182,20 +213,9 @@ export function deriveResources(
   // class/subclass, e.g. Ranger/Hunter). Deciding null-ness on resources+
   // features alone — as pre-#1524 code safely could, since features was never
   // actually empty for a known class — would silently drop a subclass's
-  // deriveExtras/choices contribution for exactly those classes. Extras must
-  // be computed first and folded into the null decision.
-  let extras: ClassExtras | undefined;
-  if (sub.active && sub.def?.deriveExtras) {
-    extras = sub.def.deriveExtras(level, abilityScores, profBonus, edition);
-  }
-  let subclassChoices: DerivedSubclassChoice[] | undefined;
-  if (sub.active && sub.def?.choices) {
-    const computed = sub.def.choices
-      .map((c) => ({ key: c.key, label: c.label, catalogSource: c.catalogSource, count: c.count(level) }))
-      .filter((c) => c.count > 0);
-    if (computed.length > 0) subclassChoices = computed;
-  }
-  const hasExtras = (extras !== undefined && Object.keys(extras).length > 0) || subclassChoices !== undefined;
+  // deriveExtras/choices contribution for exactly those classes, so `hasExtras`
+  // must be computed BEFORE the null check below, never folded into it.
+  const { extras, subclassChoices, hasExtras } = deriveSubclassExtras(sub, level, abilityScores, profBonus, edition);
 
   // Return null only for truly unknown/empty classes
   if (resources.length === 0 && features.length === 0 && !hasExtras) return null;
