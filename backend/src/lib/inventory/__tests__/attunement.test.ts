@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -44,6 +46,23 @@ async function makeItem(
   });
   return row.id;
 }
+
+// #1377: the served `attunementCap` and the 409 that rejects the 4th attune must
+// resolve to ONE constant. No behavioural test can prove that — attune-3-then-409
+// passes identically against two independent `3`s — so this is a structural check
+// on the module source instead: exactly one numeric 3 in the whole file, which is
+// ATTUNEMENT_LIMIT's initializer. If you legitimately need another 3 in here,
+// name it; don't loosen this.
+describe("ATTUNEMENT_LIMIT is the file's only 3", () => {
+  it("has exactly one numeric 3 outside comments", async () => {
+    const source = await readFile(
+      new URL("../inventory-attunement.ts", import.meta.url),
+      "utf8",
+    );
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(code.match(/\b3\b/g)).toHaveLength(1);
+  });
+});
 
 describe("attune / unattune operations (#545)", () => {
   let characterId: string;

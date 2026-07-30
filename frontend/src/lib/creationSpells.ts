@@ -1,29 +1,28 @@
-// Pure logic for the character-creation spell/cantrip picker (#1131). Pick counts
-// come ONLY from the reference payload's level1SpellPicks — the frontend never
-// re-encodes the SRD 5.2 tables. Eligibility mirrors the backend creation filter:
-// a catalog spell on the class's list at exactly level 0 (cantrip) or 1.
+// Counting and selection helpers for the character-creation spell/cantrip picker
+// (#1131). Everything numeric here arrives from the reference payload's
+// level1SpellPicks. Since #1377 that includes the highest learnable level, and
+// eligibility itself is applied by GET /api/spells — no rule lives in this file.
 import type { CatalogSpell, ClassOption } from "@/types/character";
 
-export interface CreationSpellCounts {
-  cantrips: number;
-  spells: number;
+/** The served level-1 pick budget: two caps plus the legal level ceiling. */
+export type CreationSpellCounts = NonNullable<ClassOption["level1SpellPicks"]>;
+
+/**
+ * Split an already-eligible catalog into the picker's two groups by the served
+ * `level` field. This is not the eligibility rule — the class list and the level
+ * ceiling were applied by GET /api/spells before these rows arrived (#1377).
+ */
+export function splitCreationCatalog(catalog: CatalogSpell[] | null): {
+  cantrips: CatalogSpell[];
+  spells: CatalogSpell[];
+} {
+  const rows = catalog ?? [];
+  return { cantrips: rows.filter((s) => s.level === 0), spells: rows.filter((s) => s.level > 0) };
 }
 
 /** The chosen class's level-1 pick counts, or null for a non-caster (from the payload). */
 export function creationSpellCounts(selectedClass: ClassOption | undefined): CreationSpellCounts | null {
   return selectedClass?.level1SpellPicks ?? null;
-}
-
-/** Catalog cantrips (level 0) on the class's spell list. */
-export function eligibleCreationCantrips(catalog: CatalogSpell[] | null, className: string): CatalogSpell[] {
-  const cls = className.toLowerCase();
-  return (catalog ?? []).filter((s) => s.level === 0 && s.classes.includes(cls));
-}
-
-/** Catalog level-1 spells on the class's spell list. */
-export function eligibleCreationSpells(catalog: CatalogSpell[] | null, className: string): CatalogSpell[] {
-  const cls = className.toLowerCase();
-  return (catalog ?? []).filter((s) => s.level === 1 && s.classes.includes(cls));
 }
 
 /** Toggle an id in a selection list; refuses to add past `cap` (deselect always allowed). */

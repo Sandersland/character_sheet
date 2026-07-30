@@ -72,6 +72,12 @@ export interface Character {
 
   inventory: InventoryItem[];
   currency: Currency;
+  /** Carrying capacity in lb, derived server-side from the effective STR score (#1377). */
+  carryCapacity: number;
+  /** Carried weight in lb — the pack plus the purse, derived server-side (#1377). */
+  carriedWeight: number;
+  /** The attunement cap the server's attune path rejects past (#1377). */
+  attunementCap: number;
 
   spellcasting?: {
     ability: AbilityName;

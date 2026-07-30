@@ -53,7 +53,7 @@ const reference: ReferenceData = {
       hitDie: "d6",
       isSpellcaster: true,
       skillChoices: ["arcana", "history"],
-      level1SpellPicks: { cantrips: 3, spells: 2 },
+      level1SpellPicks: { cantrips: 3, spells: 2, maxSpellLevel: 1 },
     }),
   ],
   backgrounds: [
