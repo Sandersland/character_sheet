@@ -8,7 +8,7 @@ import {
   exhaustionEffectText,
 } from "@/lib/srd/srd.js";
 import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
-import { ZERO_CURRENCY, asCurrency } from "@/lib/inventory/inventory-currency.js";
+import { currencyOrEmpty } from "@/lib/inventory/inventory-currency.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { focusSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
@@ -396,7 +396,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // the post-clamp score is what the wire reports as `abilityScores`, and
     // reading the raw column would disagree with it after a STR ASI.
     carryCapacity: carryingCapacity(effectiveScores.strength),
-    carriedWeight: carriedWeight(row.inventoryItems, asCurrency(row.currency) ?? ZERO_CURRENCY),
+    carriedWeight: carriedWeight(row.inventoryItems, currencyOrEmpty(row.currency)),
     // The 3-item attunement cap as a served number, from the same constant the
     // attune path's 409 rejects on — the sheet used to re-type the literal in
     // four places.

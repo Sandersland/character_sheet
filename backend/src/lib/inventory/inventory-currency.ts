@@ -62,8 +62,17 @@ export function asCurrency(json: Prisma.JsonValue | null): Currency | null {
   return json as Currency | null;
 }
 
-/** An empty purse — the fallback whenever the Json column reads back null. */
-export const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
+const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
+
+/**
+ * A purse read straight off the Json column, empty when it holds null. The
+ * null-coalescing lives HERE rather than at each call site so a reader like
+ * serializeCharacter takes no branch for it — that function sits right under
+ * CI's ratcheted cyclomatic ceiling, and one inline `??` pushed it over.
+ */
+export function currencyOrEmpty(json: Prisma.JsonValue | null): Currency {
+  return asCurrency(json) ?? ZERO_CURRENCY;
+}
 
 export function toJsonInput(value: Currency | null | undefined): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
   return value ?? Prisma.JsonNull;
@@ -74,7 +83,7 @@ export async function getCharacterCurrency(tx: Prisma.TransactionClient, charact
   if (!character) {
     throw new InvalidInventoryOperationError(`Character not found: ${characterId}`);
   }
-  return asCurrency(character.currency) ?? ZERO_CURRENCY;
+  return currencyOrEmpty(character.currency);
 }
 
 export async function setCharacterCurrency(tx: Prisma.TransactionClient, characterId: string, currency: Currency) {
