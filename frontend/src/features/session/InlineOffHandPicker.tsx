@@ -12,7 +12,8 @@
 // (buildOffHandEntry, which may be null) and its footer/layout composition.
 //
 // Off-hand damage omits the ability modifier unless the character has the
-// Two-Weapon Fighting style — that adjustment lives in buildOffHandEntry.
+// Two-Weapon Fighting style — the adjustment is applied server-side and arrives
+// on the off-hand AttackRow, so this sheet only labels what it is served.
 //
 // Martial Arts Bonus Unarmed Strike (#1218) reuses this exact shell via
 // `variant="unarmed"`: same single-swing tally/counter path, just locked to
