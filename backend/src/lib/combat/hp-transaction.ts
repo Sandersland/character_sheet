@@ -1,3 +1,9 @@
+import type {
+  ConcentrationSaveOperation,
+  HitPointOperation,
+  LevelUpOperation,
+} from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import {
   clearBuffsForRestInTx,
@@ -7,11 +13,6 @@ import { logEvent } from "@/lib/activity/events.js";
 import { resetActivatedUsesForRestInTx } from "@/lib/inventory/item-recharge.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { InvalidHitPointOperationError, type HitPoints, type HitDice } from "./hp-core.js";
-import type {
-  ConcentrationSaveOperation,
-  HitPointOperation,
-  LevelUpOperation,
-} from "./hp-operations.js";
 import { buildHpOpContext, type HpOpContext, type HpOpResult } from "./hp-context.js";
 import {
   applyDamageOp,
