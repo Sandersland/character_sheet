@@ -114,29 +114,42 @@ async function resolveSubclassCandidatesBySlug(
   return bySlug;
 }
 
-// Resolves each CLASS_FEATURES row's classId/subclassId. Every seeded
-// Subclass row has edition: null today (no subclass forks yet, #1306), so
-// both a row's 2014 and 2024 ClassFeature point at the SAME Subclass row —
-// correct, and it costs this function nothing to stay correct the day a
-// subclass DOES fork, since resolveEditionRow is what's doing the resolving,
-// not a bare find.
+// Every seeded Subclass row has edition: null today (no subclass forks yet,
+// #1306), so both a row's 2014 and 2024 ClassFeature point at the SAME
+// Subclass row — correct, and it costs this function nothing to stay correct
+// the day a subclass DOES fork, since resolveEditionRow is what's doing the
+// resolving, not a bare find. Split out of resolveOneRow (below) purely to
+// keep each function's cyclomatic complexity low — see collectRawFeatures'
+// comment in class-features.ts on why prisma/seed/** floors at the UNCOVERED
+// CRAP formula regardless of real test coverage.
+function resolveSubclassId(
+  row: ClassFeatureSeedRow,
+  subclassCandidatesBySlug: Map<SubclassSlug, { id: string; edition: SeedEdition | null }[]>,
+): string | null {
+  if (!row.subclassSlug) return null;
+  const candidates = subclassCandidatesBySlug.get(row.subclassSlug) ?? [];
+  const match = resolveEditionRow(candidates, row.edition);
+  if (!match) {
+    throw new Error(`seedClassFeatures: no Subclass row for slug "${row.subclassSlug}" (${row.edition})`);
+  }
+  return match.id;
+}
+
+function resolveOneRow(
+  row: ClassFeatureSeedRow,
+  classIdByName: Map<string, string>,
+  subclassCandidatesBySlug: Map<SubclassSlug, { id: string; edition: SeedEdition | null }[]>,
+): ResolvedRow {
+  const classId = classIdByName.get(row.className);
+  if (!classId) throw new Error(`seedClassFeatures: unknown class "${row.className}" in CLASS_FEATURES`);
+  return { classId, subclassId: resolveSubclassId(row, subclassCandidatesBySlug), row };
+}
+
 function resolveRows(
   classIdByName: Map<string, string>,
   subclassCandidatesBySlug: Map<SubclassSlug, { id: string; edition: SeedEdition | null }[]>,
 ): ResolvedRow[] {
-  return CLASS_FEATURES.map((row) => {
-    const classId = classIdByName.get(row.className);
-    if (!classId) throw new Error(`seedClassFeatures: unknown class "${row.className}" in CLASS_FEATURES`);
-
-    if (!row.subclassSlug) return { classId, subclassId: null, row };
-
-    const candidates = subclassCandidatesBySlug.get(row.subclassSlug) ?? [];
-    const match = resolveEditionRow(candidates, row.edition);
-    if (!match) {
-      throw new Error(`seedClassFeatures: no Subclass row for slug "${row.subclassSlug}" (${row.edition})`);
-    }
-    return { classId, subclassId: match.id, row };
-  });
+  return CLASS_FEATURES.map((row) => resolveOneRow(row, classIdByName, subclassCandidatesBySlug));
 }
 
 async function writeResolvedRows(prisma: PrismaClient, resolved: ResolvedRow[]): Promise<void> {

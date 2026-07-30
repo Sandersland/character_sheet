@@ -60,24 +60,39 @@ const CLASS_MODULES: Record<string, ClassDefinition> = {
 // SubclassDefinition.slug — the same field the seeded Subclass row's `slug`
 // column must equal — rather than a second SUBCLASS_IDENTITY lookup: reading
 // the authoritative field directly can't drift out of sync with itself the
-// way a redundant (classKey, nameKey) -> slug re-derivation could.
-export interface RawFeatureRow {
+// way a redundant (classKey, nameKey) -> slug re-derivation could. Internal
+// (not exported): CLASS_FEATURES below is the derived artifact tests and
+// production code both consume; this is only its intermediate step.
+interface RawFeatureRow {
   className: string;
   subclassSlug: SubclassSlug | null;
   feature: DerivedFeature;
 }
 
-export function collectRawFeatures(): RawFeatureRow[] {
+// Split from collectRawFeatures purely to keep each function's cyclomatic
+// complexity low (prisma/seed/** carries no vitest coverage instrumentation —
+// vitest.config.ts's coverage.include is scoped to src/**/*.ts — so a function
+// here floors at the UNCOVERED CRAP formula CC^2+CC regardless of how
+// thoroughly class-feature-migration.test.ts exercises it; splitting the
+// branches down is the only lever, not adding coverage).
+function baseFeatureRows(className: string, classDef: ClassDefinition): RawFeatureRow[] {
+  return classDef.features.map((feature) => ({ className, subclassSlug: null, feature }));
+}
+
+function subclassFeatureRows(className: string, classDef: ClassDefinition): RawFeatureRow[] {
+  const rows: RawFeatureRow[] = [];
+  for (const subclassDef of Object.values(classDef.subclasses ?? {})) {
+    for (const feature of subclassDef.features) {
+      rows.push({ className, subclassSlug: subclassDef.slug, feature });
+    }
+  }
+  return rows;
+}
+
+function collectRawFeatures(): RawFeatureRow[] {
   const rows: RawFeatureRow[] = [];
   for (const [className, classDef] of Object.entries(CLASS_MODULES)) {
-    for (const feature of classDef.features) {
-      rows.push({ className, subclassSlug: null, feature });
-    }
-    for (const subclassDef of Object.values(classDef.subclasses ?? {})) {
-      for (const feature of subclassDef.features) {
-        rows.push({ className, subclassSlug: subclassDef.slug, feature });
-      }
-    }
+    rows.push(...baseFeatureRows(className, classDef), ...subclassFeatureRows(className, classDef));
   }
   return rows;
 }
@@ -139,13 +154,19 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 
 // Authored now, for #1528/#1530 to reuse when they first populate
 // resourceTotals/resourceDieTiers/derivedStatTiers — this stage's own rows
-// never set them (seed-class-features.ts always writes Prisma.JsonNull).
+// never set them (seed-class-features.ts always writes Prisma.JsonNull), so
+// no PRODUCTION import of these three exists until #1528/#1530 land; each is
+// used internally below (classFeatureSeedSchema) and by
+// class-feature-tier-schema.test.ts in the meantime.
+// fallow-ignore-next-line unused-export -- consumed by #1528/#1530, not yet landed; see comment above
 export const resourceTotalsTierSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), total: z.number().int().nonnegative() }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
+// fallow-ignore-next-line unused-export -- consumed by #1528/#1530, not yet landed; see comment above
 export const resourceDieTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), die: z.string().min(1) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
+// fallow-ignore-next-line unused-export -- consumed by #1528/#1530, not yet landed; see comment above
 export const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
