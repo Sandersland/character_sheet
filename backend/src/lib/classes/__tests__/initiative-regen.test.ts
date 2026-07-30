@@ -113,6 +113,19 @@ describe("applyInitiativeRegen (#1239)", () => {
     expect(applyInitiativeRegen(state, null)).toEqual([]);
     expect(JSON.stringify(state)).toBe(before);
   });
+
+  // #1221: onInitiative and shortRestRegain are declared orthogonal on
+  // DerivedResource — a pool may carry both, each read by its own mechanism.
+  // applyInitiativeRegen never reads shortRestRegain, so adding it changes
+  // nothing here; restPoolRegain's own half of this proof (it never reads
+  // onInitiative) lives in rest-pool-regain.test.ts.
+  it("ignores shortRestRegain entirely — a pool declaring both behaves identically to onInitiative alone", () => {
+    const state = stateWithUsed({ focus: 6 });
+    const withBoth: DerivedResource = { ...uncannyPool, shortRestRegain: 1 };
+    const regained = applyInitiativeRegen(state, info([withBoth]));
+    expect(state.used.focus).toBe(0);
+    expect(regained).toEqual([{ key: "focus", label: "Focus Points", restored: 6, remaining: 6 }]);
+  });
 });
 
 // Generic multi-descriptor + bonusHeal mechanism (#1243) — the shape a real
