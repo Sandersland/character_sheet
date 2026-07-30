@@ -83,7 +83,10 @@ describe("BonusActionSheetBody — regranted action names (#1431)", () => {
     expect(card("Cunning Action")).not.toHaveTextContent("·");
   });
 
-  it("uses the 2014 names for a 2014 character", () => {
+  // Reminder deliberately omitted so the card falls through to the resolved
+  // names — this pins the CARD's edition seam, not what a Thief sees (the real
+  // row always carries rule text and the test above covers that).
+  it("a reminder-less regranting row renders each edition's own name", () => {
     renderSheet([action({ key: "fastHands", name: "Fast Hands", regrants: ["useObject"] })], SERVED_ACTIONS_2014);
     expect(card("Fast Hands")).toHaveTextContent("Use an Object");
   });
