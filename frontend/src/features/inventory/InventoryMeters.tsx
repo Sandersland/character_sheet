@@ -7,16 +7,18 @@ interface InventoryMetersProps {
   overCapacity: boolean;
   hasAttunable: boolean;
   attunedCount: number;
+  /** The served attunement cap (#1377) — never a local literal. */
+  cap: number;
   atCap: boolean;
   /** Mobile density variant (#1029): a 6px strip with the number right-aligned. */
   slim?: boolean;
 }
 
-// Encumbrance meter + the X/3 attunement readout above the item list.
+// Encumbrance meter + the attunement count/cap readout above the item list.
 export default function InventoryMeters({ slim = false, ...props }: InventoryMetersProps) {
   if (slim) return <InventoryMetersSlim {...props} />;
 
-  const { totalWeight, capacity, overCapacity, hasAttunable, attunedCount, atCap } = props;
+  const { totalWeight, capacity, overCapacity, hasAttunable, attunedCount, cap, atCap } = props;
   return (
     <>
       {totalWeight > 0 && (
@@ -47,7 +49,7 @@ export default function InventoryMeters({ slim = false, ...props }: InventoryMet
         <div className="flex items-center justify-between text-xs">
           <span className="font-semibold uppercase tracking-wide text-parchment-600">Attunement</span>
           <span className={atCap ? "font-semibold text-arcane-700" : "text-parchment-600"}>
-            {attunedCount}/3 attuned
+            {attunedCount}/{cap} attuned
           </span>
         </div>
       )}

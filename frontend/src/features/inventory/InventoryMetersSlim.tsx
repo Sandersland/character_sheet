@@ -6,6 +6,8 @@ interface InventoryMetersSlimProps {
   overCapacity: boolean;
   hasAttunable: boolean;
   attunedCount: number;
+  /** The served attunement cap (#1377) — never a local literal. */
+  cap: number;
   atCap: boolean;
 }
 
@@ -17,6 +19,7 @@ export default function InventoryMetersSlim({
   overCapacity,
   hasAttunable,
   attunedCount,
+  cap,
   atCap,
 }: InventoryMetersSlimProps) {
   return (
@@ -46,7 +49,7 @@ export default function InventoryMetersSlim({
       {hasAttunable && (
         <div className="flex items-center justify-end">
           <span className={`text-[11px] font-semibold ${atCap ? "text-arcane-700" : "text-parchment-500"}`}>
-            {attunedCount}/3 attuned
+            {attunedCount}/{cap} attuned
           </span>
         </div>
       )}

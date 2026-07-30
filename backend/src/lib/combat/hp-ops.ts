@@ -1,3 +1,11 @@
+import type {
+  DamageOperation,
+  DeathSaveOperation,
+  HealOperation,
+  LevelUpOperation,
+  SetTempOperation,
+} from "@character-sheet/contracts";
+
 import {
   activeResistedDamageTypes,
   normalizeActiveEffectsMutable,
@@ -12,13 +20,6 @@ import {
   levelUpHpGain,
   resolveDamageAmount,
 } from "./hp-core.js";
-import type {
-  DamageOperation,
-  DeathSaveOperation,
-  HealOperation,
-  LevelUpOperation,
-  SetTempOperation,
-} from "./hp-operations.js";
 import type { HpOpContext, HpOpResult } from "./hp-context.js";
 
 export function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {

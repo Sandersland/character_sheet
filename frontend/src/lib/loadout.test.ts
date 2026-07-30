@@ -176,22 +176,30 @@ describe("buildLoadoutGroups", () => {
   });
 });
 
+// The cap is a served number (#1377), so these pass it in. A cap of 2 is not a
+// real 5e value — it is deliberately not 3, which is what proves the function
+// echoes the argument instead of a surviving local literal.
 describe("attunementSummary", () => {
-  it("reports zero attuned as below cap", () => {
-    expect(attunementSummary([])).toEqual({ count: 0, cap: 3, atCap: false });
+  it("reports zero attuned as below the served cap", () => {
+    expect(attunementSummary([], 3)).toEqual({ count: 0, cap: 3, atCap: false });
   });
 
-  it("reports two attuned as below cap", () => {
+  it("reports two attuned as below the served cap", () => {
     const inv = [item({ id: "a", attuned: true }), item({ id: "b", attuned: true })];
-    expect(attunementSummary(inv)).toEqual({ count: 2, cap: 3, atCap: false });
+    expect(attunementSummary(inv, 3)).toEqual({ count: 2, cap: 3, atCap: false });
   });
 
-  it("reports three attuned as at cap", () => {
+  it("reports three attuned as at the served cap", () => {
     const inv = [
       item({ id: "a", attuned: true }),
       item({ id: "b", attuned: true }),
       item({ id: "c", attuned: true }),
     ];
-    expect(attunementSummary(inv)).toEqual({ count: 3, cap: 3, atCap: true });
+    expect(attunementSummary(inv, 3)).toEqual({ count: 3, cap: 3, atCap: true });
+  });
+
+  it("honours a cap other than 3 rather than a local literal", () => {
+    const inv = [item({ id: "a", attuned: true }), item({ id: "b", attuned: true })];
+    expect(attunementSummary(inv, 2)).toEqual({ count: 2, cap: 2, atCap: true });
   });
 });

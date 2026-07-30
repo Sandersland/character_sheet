@@ -1,3 +1,4 @@
+import { experienceOperationSchema } from "@character-sheet/contracts";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -6,22 +7,8 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const experienceRouter = Router({ mergeParams: true });
 
-// Per-op Zod schemas, discriminated on `type`.
-const awardOpSchema = z.object({
-  type: z.literal("award"),
-  // Signed — positive = gain, negative = correction/deduction.
-  amount: z.number().int(),
-});
-
-const setOpSchema = z.object({
-  type: z.literal("set"),
-  value: z.number().int().nonnegative(),
-});
-
-const operationSchema = z.discriminatedUnion("type", [awardOpSchema, setOpSchema]);
-
 const experienceRequestSchema = z.object({
-  operations: z.array(operationSchema).min(1),
+  operations: z.array(experienceOperationSchema).min(1),
   // Optional: tag the resulting xpAward/xpSet events to a SPECIFIC session
   // (used by the retroactive "add XP to a past session" flow) instead of the
   // currently-active one. When supplied, that session's stored summary is
