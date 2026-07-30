@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 
-import { CLASS_FEATURES } from "../class-features.js";
+import { CLASS_FEATURES, LITERAL_ROW_CLASSES } from "../class-features.js";
 import { seedClassFeatures } from "../seed-class-features.js";
 
 describe("ClassFeature migration — row count (#1523)", () => {
@@ -74,10 +74,22 @@ const KNOWN_FORKED_NAMES = new Set(["Domain Spells", "Expanded Spell List"]);
 // about — that the DB holds what CLASS_FEATURES says — is covered
 // transitively by the exhaustive DB<->TS description-equality suite above and
 // the tuple-existence suite before it.
+//
+// SCOPED TO THE DERIVED HALF ONLY (#1227): LITERAL_ROW_CLASSES' rows
+// (Fighter's, fighter-features.ts) never pass through expandFeatureRow at
+// all — they arrive in CLASS_FEATURES already split one-row-per-edition, by
+// hand, and several same-name/same-level pairs (Second Wind, Action Surge,
+// Indomitable, Improved Critical, ...) are DELIBERATELY divergent text
+// without being in KNOWN_FORKED_NAMES (which is keyed on name alone and
+// would otherwise have to list all seven, defeating its own point — this
+// suite guards expandFeatureRow, not Fighter's authored content). Excluding
+// LITERAL_ROW_CLASSES rows here is the correct fix, not widening the
+// allow-list.
 describe("ClassFeature migration — expandFeatureRow's untagged branch keeps both editions byte-identical (#1523)", () => {
   it("every untagged feature's EDITION_2014/EDITION_2024 pair has equal level and description", async () => {
     const byKey = new Map<string, typeof CLASS_FEATURES>();
     for (const row of CLASS_FEATURES) {
+      if (LITERAL_ROW_CLASSES.has(row.className)) continue;
       if (KNOWN_FORKED_NAMES.has(row.name)) continue;
       const key = `${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.level}`;
       const group = byKey.get(key) ?? [];

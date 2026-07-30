@@ -33,10 +33,17 @@ const FIGHTER_ID = "test-actions-cast-fighter";
 const FIGHTER_CATALOG_NAME = "Actions Cast Test Fighter";
 
 // Level-5 Fighter (6500 XP), damaged to 20/44 so a Second Wind heal is visible.
+// Pinned to EDITION_2014 (#1227): this suite is about the CAST MECHANISM (pool
+// spend + heal + revert atomicity), not resource counts, and 2014's Second
+// Wind stays a single-use pool (byte-identical to before #1227) — the
+// default EDITION_2024 now grants 3 uses at level 5, which would make
+// "second cast fails once exhausted" require two casts first, entangling an
+// unrelated content change into a mechanism test.
 const FIGHTER_BASE = {
   id: FIGHTER_ID,
   name: "Actions Cast Test Fighter",
   alignment: "Lawful Neutral",
+  rulesEdition: "EDITION_2014" as const,
   experiencePoints: 6500,
   initiativeBonus: 2,
   speed: 30,

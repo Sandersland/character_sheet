@@ -20,7 +20,7 @@ import type { DerivedFeature } from "@/lib/classes/types.js";
 import { toWireFeatures } from "@/lib/character/serialize/classes.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
-import { CLASS_SUBCLASSES } from "./class-subclasses.fixture.js";
+import { CLASS_SUBCLASSES, LITERAL_ROW_CLASSES } from "./class-subclasses.fixture.js";
 import { loadDbFeatureRows } from "./db-feature-rows.fixture.js";
 
 const ABILITY_SCORES = {
@@ -84,7 +84,18 @@ describe("real-content sweep: feature-name sets agree across editions (#1374 AC 
         const at2024 = deriveResources(className, subclass, 20, ABILITY_SCORES, profBonus, featureRows, "EDITION_2024");
         const names2014 = new Set((at2014?.features ?? []).map((f) => f.name));
         const names2024 = new Set((at2024?.features ?? []).map((f) => f.name));
-        expect(names2014).toEqual(names2024);
+        // Fighter (#1227) is the first class whose 2024 content genuinely
+        // diverges by design — it adds several 2024-only feature names
+        // (Weapon Mastery, Tactical Mind, Two/Three Extra Attacks, ...) and
+        // renames one (Battle Master's L18 "Improved Combat Superiority
+        // (d12)" -> "Ultimate Combat Superiority"), so its name sets are
+        // SUPPOSED to differ across editions. Exempted from the equality
+        // check but still visited and still counted toward the anti-vacuity
+        // floor below — dropping it from the loop entirely would have
+        // silently shrunk that floor's real measured value.
+        if (!LITERAL_ROW_CLASSES.has(className)) {
+          expect(names2014).toEqual(names2024);
+        }
         triplesVisited += names2024.size;
       }
     }
@@ -114,12 +125,63 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 // accidental extra tag — none of which the name-set-equality sweep above can
 // tell apart on its own (forks share a name by construction, so that sweep
 // stays green even when a fork mistags).
+// Fighter's 30 new triples (#1227). `collectTaggedFeatureKeys` combines
+// `classRows` (Fighter's BASE rows — always ALL of them, regardless of which
+// subclass was requested) with `subclassRows` (that one subclass's own rows)
+// before calling taggedNamesFor — see loadDbFeatureRows.ts. So the 5 base
+// names that diverge by edition (Fighting Style, Second Wind, Action Surge,
+// Extra Attack, Indomitable) show up under EVERY subclass context Fighter
+// has (undefined/battle master/champion/eldritch knight), not just once —
+// 4 contexts x 5 base names = 20, plus Champion's own 5 and Battle Master's
+// own 5 = 30. The base-class rows (subclass slot "undefined" below) come from
+// CLASS_SUBCLASSES.fighter's own `undefined` entry, which
+// collectTaggedFeatureKeys' template literal stringifies to the literal
+// string "undefined" here — not a typo, matches the production key exactly.
+// Two Fighter renames are DELIBERATELY excluded: Battle Master's L18
+// "Improved Combat Superiority (d12)" (2014) / "Ultimate Combat Superiority"
+// (2024) share no name, so they're two unrelated single-description rows,
+// never a tagged pair (see fighter-features.ts's comment on that row). Every
+// wholly 2024-only name (Weapon Mastery, Tactical Mind, Two/Three Extra
+// Attacks, Tactical Shift, Tactical Master, Studied Attacks, Epic Boon,
+// Heroic Warrior) has exactly one description under its name too — absent
+// from a 2014 row entirely, not diverged from one — so none of those are
+// tagged either.
 const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["cleric", "life domain", "Domain Spells"],
   ["cleric", "trickery domain", "Domain Spells"],
   ["warlock", "the fiend", "Expanded Spell List"],
   ["warlock", "the archfey", "Expanded Spell List"],
   ["warlock", "the great old one", "Expanded Spell List"],
+  ["fighter", "undefined", "Fighting Style"],
+  ["fighter", "undefined", "Second Wind"],
+  ["fighter", "undefined", "Action Surge"],
+  ["fighter", "undefined", "Extra Attack"],
+  ["fighter", "undefined", "Indomitable"],
+  ["fighter", "champion", "Fighting Style"],
+  ["fighter", "champion", "Second Wind"],
+  ["fighter", "champion", "Action Surge"],
+  ["fighter", "champion", "Extra Attack"],
+  ["fighter", "champion", "Indomitable"],
+  ["fighter", "champion", "Improved Critical"],
+  ["fighter", "champion", "Remarkable Athlete"],
+  ["fighter", "champion", "Additional Fighting Style"],
+  ["fighter", "champion", "Superior Critical"],
+  ["fighter", "champion", "Survivor"],
+  ["fighter", "battle master", "Fighting Style"],
+  ["fighter", "battle master", "Second Wind"],
+  ["fighter", "battle master", "Action Surge"],
+  ["fighter", "battle master", "Extra Attack"],
+  ["fighter", "battle master", "Indomitable"],
+  ["fighter", "battle master", "Combat Superiority"],
+  ["fighter", "battle master", "Student of War"],
+  ["fighter", "battle master", "Know Your Enemy"],
+  ["fighter", "battle master", "Improved Combat Superiority (d10)"],
+  ["fighter", "battle master", "Relentless"],
+  ["fighter", "eldritch knight", "Fighting Style"],
+  ["fighter", "eldritch knight", "Second Wind"],
+  ["fighter", "eldritch knight", "Action Surge"],
+  ["fighter", "eldritch knight", "Extra Attack"],
+  ["fighter", "eldritch knight", "Indomitable"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

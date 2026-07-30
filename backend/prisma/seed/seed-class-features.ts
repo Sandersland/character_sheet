@@ -178,8 +178,28 @@ function resolveRows(
   return CLASS_FEATURES.map((row) => resolveOneRow(row, classIdByName, subclassCandidatesBySlug));
 }
 
+// ClassFeatureSeedRow's descriptor fields (#1227 widening) mirror
+// DESCRIPTOR_RESET's keys 1:1 — walking DESCRIPTOR_RESET's own key set (never
+// a second hand-maintained list) picks out only the fields a row ACTUALLY
+// sets. Deliberately skips a field whose value is `undefined` rather than
+// spreading it: `{ ...DESCRIPTOR_RESET, ...{ resourceKey: undefined } }`
+// would overwrite the reset's `null` with JS's own `undefined`, not leave the
+// reset alone. No row authored so far (#1227's Fighter rows included — pools
+// stay in resourceFn, actions stay in DERIVED_ACTIONS) sets any of these, so
+// this is a no-op today; it exists so #1528+ can populate a row's descriptors
+// without a second write path.
+function authoredDescriptors(row: ClassFeatureSeedRow): Partial<typeof DESCRIPTOR_RESET> {
+  const authored: Partial<Record<string, unknown>> = {};
+  for (const key of Object.keys(DESCRIPTOR_RESET)) {
+    const value = (row as unknown as Record<string, unknown>)[key];
+    if (value !== undefined) authored[key] = value;
+  }
+  return authored as Partial<typeof DESCRIPTOR_RESET>;
+}
+
 async function writeResolvedRows(prisma: PrismaClient, resolved: ResolvedRow[]): Promise<void> {
   for (const { classId, subclassId, row } of resolved) {
+    const descriptors = authoredDescriptors(row);
     const data = {
       classId,
       subclassId,
@@ -188,12 +208,13 @@ async function writeResolvedRows(prisma: PrismaClient, resolved: ResolvedRow[]):
       description: row.description,
       edition: row.edition,
       ...DESCRIPTOR_RESET,
+      ...descriptors,
     };
     await upsertEditionRow(
       prisma.classFeature,
       { classId, subclassId, name: row.name, edition: row.edition },
       data,
-      { level: row.level, description: row.description, ...DESCRIPTOR_RESET },
+      { level: row.level, description: row.description, ...DESCRIPTOR_RESET, ...descriptors },
     );
   }
 }
@@ -309,12 +330,21 @@ const MIN_ROWS_PER_PAIR = 10;
 // empty, the equality check below is dead code — delete it then, not
 // before. Cross-links: #1134 (the retab wave), #1522 (the epic this guard
 // belongs to).
+//
+// "Fighter" removed here (#1227, same diff as the content that makes its
+// counts diverge: base 5->13, Champion 5->6 EDITION_2024 rows; Battle Master
+// stays 6/6 by row COUNT but several rows genuinely reworded). This removal
+// is NOT "all of Fighter's 2024 text is verified" — Eldritch Knight's
+// EDITION_2024 rows are still verbatim EDITION_2014 copies (no first-party
+// source could be found for its PHB'24 text, #1531 owns authoring it) and
+// this guard cannot distinguish "genuinely 2024" from "still a copy" for any
+// class, Fighter included. The residual is disclosed here, not hidden by the
+// ratchet reading green.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Barbarian",
   "Bard",
   "Cleric",
   "Druid",
-  "Fighter",
   "Monk",
   "Paladin",
   "Ranger",

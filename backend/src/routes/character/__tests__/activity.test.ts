@@ -433,6 +433,11 @@ const FIGHTER_BASE = {
   id: FIGHTER_ID,
   name: "Activity Test Fighter",
   alignment: "Lawful Neutral",
+  // Pinned to EDITION_2014 (#1227): this suite is about revert/undo mechanics
+  // (spendResource -> restore), not resource counts — the "Second Wind (1
+  // use)" comment below is only true under 2014; the default EDITION_2024
+  // grants 3 uses at level 5.
+  rulesEdition: "EDITION_2014" as const,
   experiencePoints: 6500, // level 5 → 1 ASI slot (L4), prof +3
   initiativeBonus: 2,
   speed: 30,

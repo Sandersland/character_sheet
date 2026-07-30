@@ -3438,11 +3438,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -3452,17 +3453,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3473,17 +3475,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3494,17 +3497,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3515,17 +3519,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3536,17 +3541,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3557,17 +3563,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3578,17 +3585,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3599,17 +3607,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3627,17 +3636,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3655,17 +3665,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3683,17 +3694,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3711,17 +3723,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3739,17 +3752,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3767,17 +3781,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3795,17 +3810,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -3823,17 +3839,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -3851,17 +3868,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -3879,17 +3897,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -3907,17 +3926,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -3940,11 +3960,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -3954,17 +3975,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -3977,17 +3999,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 13,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4009,17 +4032,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 13,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4041,17 +4065,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4073,17 +4098,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4105,17 +4131,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4137,17 +4164,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4169,17 +4197,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4208,17 +4237,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4247,17 +4277,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4286,17 +4317,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4325,17 +4357,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4364,17 +4397,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4403,17 +4437,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4442,17 +4477,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4481,17 +4517,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -4520,17 +4557,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -4559,17 +4597,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -4598,17 +4637,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -4640,11 +4680,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -4654,17 +4695,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -4675,17 +4717,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -4696,17 +4739,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -4717,17 +4761,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -4738,17 +4783,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -4759,17 +4805,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -4780,17 +4827,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -4801,17 +4849,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4829,17 +4878,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4857,17 +4907,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4885,17 +4936,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4913,17 +4965,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4941,17 +4994,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4969,17 +5023,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -4997,17 +5052,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5025,17 +5081,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -5053,17 +5110,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -5081,17 +5139,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -5109,17 +5168,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -5142,11 +5202,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -5156,17 +5217,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -5177,17 +5239,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -5198,17 +5261,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -5219,17 +5283,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -5240,17 +5305,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -5261,17 +5327,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -5282,17 +5349,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
       ],
@@ -5303,17 +5371,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5331,17 +5400,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5359,17 +5429,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5387,17 +5458,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5415,17 +5487,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5443,17 +5516,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5471,17 +5545,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5499,17 +5574,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 1,
         },
         {
@@ -5527,17 +5603,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -5555,17 +5632,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -5583,17 +5661,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -5611,17 +5690,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. Regain use on a short or long rest.",
+          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
           "key": "secondWind",
           "label": "Second Wind",
-          "recharge": "shortRest",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
         {
           "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
           "key": "actionSurge",
           "label": "Action Surge",
-          "recharge": "shortRest",
+          "recharge": "short-or-long",
           "total": 2,
         },
         {
@@ -15156,17 +15236,18 @@ exports[`deriveResourcesForCharacterRow > derives level + resources from XP and 
   "maneuverSaveDC": 17,
   "resources": [
     {
-      "description": "Bonus action: regain 1d10 + 20 HP. Regain use on a short or long rest.",
+      "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
       "key": "secondWind",
       "label": "Second Wind",
-      "recharge": "shortRest",
-      "total": 1,
+      "recharge": "longRest",
+      "shortRestRegain": 1,
+      "total": 4,
     },
     {
       "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
       "key": "actionSurge",
       "label": "Action Surge",
-      "recharge": "shortRest",
+      "recharge": "short-or-long",
       "total": 2,
     },
     {
