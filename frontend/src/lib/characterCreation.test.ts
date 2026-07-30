@@ -289,7 +289,7 @@ describe("buildCreatePayload", () => {
 });
 
 describe("creation spells (#1131)", () => {
-  const caster = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4 } });
+  const caster = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4, maxSpellLevel: 1 } });
   const casterSelections = { race: undefined, class: caster, background: undefined };
 
   it("buildCreatePayload includes spells for a caster", () => {

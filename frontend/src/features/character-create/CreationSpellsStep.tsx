@@ -1,16 +1,11 @@
 // The guided Spells step (#1160): a level-1 caster learns its starting cantrips +
-// level-1 spells through the shared SpellPicker. Pick counts ride in from the
-// reference payload (never re-encoded); eligibility + the cap live in
-// lib/creationSpells. This step owns the catalog fetch and the draft patches.
+// level-1 spells through the shared SpellPicker. Every number rides in from the
+// reference payload, and since #1377 eligibility is applied by the server — this
+// step asks for the class's legal band and splits the answer into two groups.
 import Spinner from "@/components/ui/Spinner";
 import SpellPicker, { type SpellPickerGroup } from "@/features/spells/SpellPicker";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
-import {
-  eligibleCreationCantrips,
-  eligibleCreationSpells,
-  toggleCreationPick,
-  type CreationSpellCounts,
-} from "@/lib/creationSpells";
+import { splitCreationCatalog, toggleCreationPick, type CreationSpellCounts } from "@/lib/creationSpells";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 
 export default function CreationSpellsStep({
@@ -26,14 +21,16 @@ export default function CreationSpellsStep({
   spellIds: string[];
   onChange: (patch: Partial<CharacterDraft>) => void;
 }) {
-  const { catalog, error, showSpinner } = useSpellCatalog();
+  const { catalog, error, showSpinner } = useSpellCatalog({ className, maxLevel: counts.maxSpellLevel });
+
+  const options = splitCreationCatalog(catalog);
 
   const groups: SpellPickerGroup[] = [];
   if (counts.cantrips > 0) {
     groups.push({
       key: "cantrips",
       label: "Cantrips",
-      options: eligibleCreationCantrips(catalog, className),
+      options: options.cantrips,
       selectedIds: cantripIds,
       cap: counts.cantrips,
       onToggle: (id) => onChange({ cantripIds: toggleCreationPick(cantripIds, id, counts.cantrips) }),
@@ -43,7 +40,7 @@ export default function CreationSpellsStep({
     groups.push({
       key: "spells",
       label: "Spells",
-      options: eligibleCreationSpells(catalog, className),
+      options: options.spells,
       selectedIds: spellIds,
       cap: counts.spells,
       onToggle: (id) => onChange({ spellIds: toggleCreationPick(spellIds, id, counts.spells) }),

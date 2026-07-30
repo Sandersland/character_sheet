@@ -74,10 +74,20 @@ describe("GET /api/reference", () => {
       .get("/api/reference?edition=EDITION_2024");
     const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
 
-    expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2 });
-    expect(byName("Paladin").level1SpellPicks).toEqual({ cantrips: 0, spells: 2 });
-    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 4 });
+    expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
+    expect(byName("Paladin").level1SpellPicks).toEqual({ cantrips: 0, spells: 2, maxSpellLevel: 1 });
+    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 4, maxSpellLevel: 1 });
     expect(byName("Fighter").level1SpellPicks).toBeNull();
+
+    // #1377: maxSpellLevel replaces the client's hardcoded 1. It resolves to 1 for
+    // EVERY seeded class that reaches this branch — full casters, half-casters and
+    // Pact Magic alike — so this locks provenance, not variation. Its value is
+    // that the picker now sends a served number as ?maxLevel= instead of a literal.
+    const casters = response.body.classes.filter((c: { level1SpellPicks: unknown }) => c.level1SpellPicks !== null);
+    expect(casters.length).toBeGreaterThan(0);
+    for (const caster of casters) {
+      expect(caster.level1SpellPicks.maxSpellLevel, caster.name).toBe(1);
+    }
   });
 
   // #1161: each class carries its PHB'24 primary ability/abilities so the
