@@ -62,7 +62,7 @@ export type SetTempOperation = z.infer<typeof setTempOpSchema>;
  */
 export const shortRestOpSchema = z.object({
   type: z.literal("shortRest"),
-  rolls: z.array(z.number().int().min(1)).min(0),
+  rolls: z.array(z.number().int().min(1)),
 });
 export type ShortRestOperation = z.infer<typeof shortRestOpSchema>;
 

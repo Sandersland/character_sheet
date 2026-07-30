@@ -109,6 +109,15 @@ describe("hit-point op wire contract", () => {
     expect(hitPointOperationSchema.safeParse({ type: "levelUp", method: "guess" }).success).toBe(false);
   });
 
+  it("still floors the levelUp roll at a real die face when one is sent", () => {
+    const at = (roll: number) =>
+      hitPointOperationSchema.safeParse({ type: "levelUp", method: "roll", roll }).success;
+    expect(at(1)).toBe(true);
+    expect(at(0)).toBe(false);
+    expect(at(-1)).toBe(false);
+    expect(at(1.5)).toBe(false);
+  });
+
   it("requires a level-up target to name exactly one of classEntryId / classId", () => {
     expect(levelUpTargetSchema.safeParse({ kind: "existing", classEntryId: "ce-1" }).success).toBe(true);
     expect(levelUpTargetSchema.safeParse({ kind: "new", classId: "cls-1" }).success).toBe(true);
