@@ -1,55 +1,82 @@
+// attackMath is a formatter over the served `character.attackRows` (#1434): these
+// tests feed it rows in the exact shape serializeCharacter emits and assert the
+// label strings and row selection. There is deliberately no attack arithmetic to
+// test here any more — the specs are inputs, and the rules that produce them are
+// covered by backend off-hand-damage.test.ts / character-serialize-attack-rows.test.ts.
+
 import { describe, it, expect } from "vitest";
 
 import {
   attacksExhausted,
   buildAttackEntries,
   buildAttackForms,
-  buildEquippedWeaponEntries,
+  buildBonusSwingEntry,
   buildOffHandEntry,
   buildUnarmedOnlyForms,
-  capabilitiesActive,
   critDamageSpec,
   flurryStrikeCount,
   hasSuperiorityDice,
   unarmedDamageDisplay,
-  weaponDamageRiders,
-  weaponDamageSpec,
-  weaponDamageType,
   weaponGripLabel,
 } from "@/lib/attackMath";
-import type { Character, InventoryItem, ItemCapability, WeaponDetail } from "@/types/character";
+import type { Character } from "@/types/character";
+import type { AttackRow } from "@character-sheet/shared-types";
 
-// A dice-valued on-hit damage capability (Flame Tongue +2d6 fire).
-function diceCap(overrides: Partial<ItemCapability> = {}): ItemCapability {
+function weaponRow(overrides: Partial<AttackRow> = {}): AttackRow {
   return {
-    kind: "passiveBonus",
-    target: "damage",
-    op: "add",
-    dice: { count: 2, faces: 6, damageType: "fire" },
+    id: "inv-1",
+    kind: "weapon",
+    name: "Longsword",
+    attackSpec: { count: 1, faces: 20, modifier: 5 },
+    damageSpec: { count: 1, faces: 8, modifier: 3 },
+    damageType: "slashing",
+    grip: "one-handed",
+    magical: false,
+    offHand: false,
+    damageRiders: [],
+    attackComponents: { abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 },
+    damageComponents: { abilityMod: 3, meleeDamageBonus: 0 },
     ...overrides,
   };
 }
 
-function invItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
-  return {
-    id: "inv-1",
-    name: "Flame Tongue",
-    category: "weapon",
-    quantity: 1,
-    equipped: true,
-    attuned: true,
-    requiresAttunement: true,
-    ...overrides,
-  } as InventoryItem;
-}
+const UNARMED_ROW: AttackRow = {
+  id: "unarmed",
+  kind: "unarmed",
+  name: "Unarmed Strike",
+  attackSpec: { count: 1, faces: 20, modifier: 2 },
+  damageSpec: { count: 1, faces: 1, modifier: 0 },
+  damageType: "bludgeoning",
+  magical: false,
+  offHand: false,
+  damageRiders: [],
+};
+
+const IMPROVISED_ROW: AttackRow = {
+  id: "improvised",
+  kind: "improvised",
+  name: "Improvised Weapon",
+  attackSpec: { count: 1, faces: 20, modifier: 2 },
+  damageSpec: { count: 1, faces: 4, modifier: 0 },
+  damageType: "bludgeoning",
+  magical: false,
+  offHand: false,
+  damageRiders: [],
+};
+
+/** A Flame Tongue rider exactly as the serializer emits it. */
+const FIRE_RIDER = {
+  id: "inv-1:rider:0",
+  spec: { count: 2, faces: 6, modifier: 0 },
+  damageType: "fire",
+};
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Tester",
     // classEntryLevel's single-class fallback needs a class to match against
-    // (#1441) — inert for every other test in this file, which reads no other
-    // `character.class`-derived field.
+    // (#1441) — inert for every other test in this file.
     class: "Monk",
     inventory: [],
     unarmedStrike: {
@@ -61,61 +88,25 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
       damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" },
       proficient: false,
     },
+    attackRows: [UNARMED_ROW, IMPROVISED_ROW],
     resources: { pools: [] },
     advancements: [],
     ...overrides,
   } as unknown as Character;
 }
 
-function weaponItem(weapon: Partial<WeaponDetail>, name = "Longsword", id = "inv-1") {
-  return {
-    id,
-    name,
-    category: "weapon" as const,
-    quantity: 1,
-    equipped: true,
-    weapon: weapon as WeaponDetail,
-  };
+/** A character whose served rows are `weapons` followed by unarmed + improvised. */
+function withWeapons(weapons: AttackRow[], overrides: Partial<Character> = {}): Character {
+  return makeCharacter({ attackRows: [...weapons, UNARMED_ROW, IMPROVISED_ROW], ...overrides });
 }
-
-describe("weaponDamageSpec", () => {
-  it("uses legacy flat fields when server-derived damage is absent", () => {
-    const spec = weaponDamageSpec({
-      damageDiceCount: 1,
-      damageDiceFaces: 8,
-      damageModifier: 3,
-      damageType: "slashing",
-    } as WeaponDetail);
-    expect(spec).toEqual({ count: 1, faces: 8, modifier: 3 });
-  });
-
-  it("prefers grip-resolved damage when present", () => {
-    const spec = weaponDamageSpec({
-      damageDiceCount: 1,
-      damageDiceFaces: 8,
-      damageModifier: 0,
-      damageType: "slashing",
-      damage: { damageDiceCount: 1, damageDiceFaces: 10, damageModifier: 2, damageType: "slashing", grip: "versatile-two-handed" },
-    } as WeaponDetail);
-    expect(spec).toEqual({ count: 1, faces: 10, modifier: 2 });
-  });
-});
-
-describe("weaponDamageType", () => {
-  it("prefers grip-resolved type, falls back to flat", () => {
-    expect(weaponDamageType({ damageType: "piercing" } as WeaponDetail)).toBe("piercing");
-    expect(
-      weaponDamageType({ damageType: "piercing", damage: { damageType: "slashing", grip: "one-handed" } } as WeaponDetail),
-    ).toBe("slashing");
-  });
-});
 
 describe("weaponGripLabel", () => {
   it("labels two-handed grips and stays silent otherwise", () => {
-    expect(weaponGripLabel({ damage: { grip: "versatile-two-handed" } } as WeaponDetail)).toBe(" (two-handed)");
-    expect(weaponGripLabel({ damage: { grip: "two-handed" } } as WeaponDetail)).toBe(" (two-handed)");
-    expect(weaponGripLabel({ damage: { grip: "one-handed" } } as WeaponDetail)).toBe("");
-    expect(weaponGripLabel({} as WeaponDetail)).toBe("");
+    expect(weaponGripLabel("versatile-two-handed")).toBe(" (two-handed)");
+    expect(weaponGripLabel("two-handed")).toBe(" (two-handed)");
+    expect(weaponGripLabel("one-handed")).toBe("");
+    // Unarmed/improvised rows carry no grip.
+    expect(weaponGripLabel(undefined)).toBe("");
   });
 });
 
@@ -160,106 +151,14 @@ describe("attacksExhausted", () => {
   });
 });
 
-describe("buildEquippedWeaponEntries", () => {
-  it("collapses same-name equipped duplicates into one entry", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-1"),
-        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-2"),
-      ] as unknown as Character["inventory"],
-    });
-    const entries = buildEquippedWeaponEntries(character);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].name).toBe("Dagger");
-    expect(entries[0].id).toBe("inv-1");
-  });
-
-  it("keeps one entry per distinct weapon name", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"),
-        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-2"),
-      ] as unknown as Character["inventory"],
-    });
-    expect(buildEquippedWeaponEntries(character).map((e) => e.name)).toEqual(["Longsword", "Dagger"]);
-  });
-
-  it("excludes unequipped weapons and non-weapons", () => {
-    const character = makeCharacter({
-      inventory: [
-        { ...weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"), equipped: false },
-      ] as unknown as Character["inventory"],
-    });
-    expect(buildEquippedWeaponEntries(character)).toEqual([]);
-  });
-
-  // #1235: the entry forwards the weapon's server-derived decomposition so
-  // useAttackRolls can log it without recomputing any rule client-side.
-  it("forwards attackBonusComponents and a damage-derived meleeDamageBonus/abilityModifier pair as attackComponents/damageComponents", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem(
-          {
-            attackBonus: 5,
-            attackBonusComponents: { abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 },
-            damageDiceCount: 1,
-            damageDiceFaces: 8,
-            damageModifier: 5,
-            damageType: "slashing",
-            damage: {
-              damageDiceCount: 1,
-              damageDiceFaces: 8,
-              damageModifier: 5,
-              abilityModifier: 3,
-              meleeDamageBonus: 2,
-              damageType: "slashing",
-              grip: "one-handed",
-            },
-          },
-          "Longsword",
-          "inv-1",
-        ),
-      ] as unknown as Character["inventory"],
-    });
-    const [entry] = buildEquippedWeaponEntries(character);
-    expect(entry.attackComponents).toEqual({ abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 });
-    expect(entry.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 2 });
-  });
-
-  it("leaves attackComponents/damageComponents undefined for a legacy weapon serialized before #1235/#732", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem(
-          { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" },
-          "Longsword",
-          "inv-1",
-        ),
-      ] as unknown as Character["inventory"],
-    });
-    const [entry] = buildEquippedWeaponEntries(character);
-    expect(entry.attackComponents).toBeUndefined();
-    expect(entry.damageComponents).toBeUndefined();
-  });
-});
-
 describe("buildAttackEntries", () => {
-  it("orders equipped weapons, then unarmed, then improvised", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }),
-      ] as unknown as Character["inventory"],
-    });
-    const entries = buildAttackEntries(character);
+  it("keeps the served order: equipped weapons, then unarmed, then improvised", () => {
+    const entries = buildAttackEntries(withWeapons([weaponRow()]));
     expect(entries.map((e) => e.id)).toEqual(["inv-1", "unarmed", "improvised"]);
   });
 
   it("emits exact roll-source and log-source strings for a weapon", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }),
-      ] as unknown as Character["inventory"],
-    });
-    const [weapon] = buildAttackEntries(character);
+    const [weapon] = buildAttackEntries(withWeapons([weaponRow()]));
     expect(weapon.attackLabel).toBe("+5");
     expect(weapon.damageLabel).toBe("1d8 + 3 slashing");
     expect(weapon.attackSpec).toEqual({ count: 1, faces: 20, modifier: 5 });
@@ -271,27 +170,22 @@ describe("buildAttackEntries", () => {
     expect(weapon.note).toBeUndefined();
   });
 
-  it("labels a versatile-two-handed weapon with (two-handed) and the upgraded die", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({
-          attackBonus: 4,
-          damageDiceCount: 1,
-          damageDiceFaces: 8,
-          damageModifier: 0,
-          damageType: "slashing",
-          damage: { damageDiceCount: 1, damageDiceFaces: 10, damageModifier: 2, abilityModifier: 2, damageType: "slashing", grip: "versatile-two-handed" },
-        }),
-      ] as unknown as Character["inventory"],
-    });
-    const [weapon] = buildAttackEntries(character);
+  it("forwards the row's decomposed attack/damage components untouched (#1235)", () => {
+    const [weapon] = buildAttackEntries(withWeapons([weaponRow({ damageComponents: { abilityMod: 3, meleeDamageBonus: 2 } })]));
+    expect(weapon.attackComponents).toEqual({ abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 });
+    expect(weapon.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 2 });
+  });
+
+  it("labels a versatile-two-handed weapon with (two-handed) and shows its served die", () => {
+    const [weapon] = buildAttackEntries(
+      withWeapons([weaponRow({ damageSpec: { count: 1, faces: 10, modifier: 2 }, grip: "versatile-two-handed" })]),
+    );
     expect(weapon.damageLabel).toBe("1d10 + 2 slashing (two-handed)");
     expect(weapon.damageSpec).toEqual({ count: 1, faces: 10, modifier: 2 });
   });
 
   it("renders the unarmed row with a flat display when faces === 1", () => {
-    const [unarmed] = buildAttackEntries(makeCharacter());
-    expect(unarmed.id).toBe("unarmed");
+    const unarmed = buildAttackEntries(makeCharacter()).find((e) => e.id === "unarmed")!;
     expect(unarmed.name).toBe("Unarmed Strike");
     expect(unarmed.attackLabel).toBe("+2");
     expect(unarmed.damageLabel).toBe("1 bludgeoning");
@@ -302,21 +196,25 @@ describe("buildAttackEntries", () => {
     expect(unarmed.magical).toBe(false);
   });
 
-  it("flags the unarmed row magical when the strike is magical (Empowered Strikes)", () => {
+  it("flags the unarmed row magical when the served row is (Empowered Strikes)", () => {
     const character = makeCharacter({
       unarmedStrike: {
         attackBonus: 5,
         magical: true,
         damage: { count: 1, faces: 8, modifier: 3, damageType: "bludgeoning" },
       } as unknown as Character["unarmedStrike"],
+      attackRows: [
+        { ...UNARMED_ROW, magical: true, attackSpec: { count: 1, faces: 20, modifier: 5 }, damageSpec: { count: 1, faces: 8, modifier: 3 } },
+        IMPROVISED_ROW,
+      ],
     });
     const unarmed = buildAttackEntries(character).find((e) => e.id === "unarmed")!;
     expect(unarmed.magical).toBe(true);
+    expect(unarmed.damageLabel).toBe("1d8 + 3 bludgeoning");
   });
 
   it("signs the improvised attack and notes no proficiency", () => {
     const improvised = buildAttackEntries(makeCharacter()).find((e) => e.id === "improvised")!;
-    expect(improvised.id).toBe("improvised");
     expect(improvised.attackLabel).toBe("+2");
     expect(improvised.damageLabel).toBe("1d4 bludgeoning");
     expect(improvised.note).toBe("(no proficiency)");
@@ -332,56 +230,77 @@ describe("buildAttackEntries", () => {
         damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" },
         proficient: true,
       },
+      attackRows: [UNARMED_ROW, { ...IMPROVISED_ROW, attackSpec: { count: 1, faces: 20, modifier: -1 } }],
     });
     const improvised = buildAttackEntries(character).find((e) => e.id === "improvised")!;
     expect(improvised.attackLabel).toBe("-1");
     expect(improvised.note).toBeUndefined();
   });
 
-  it("carries a weapon's active dice riders and leaves unarmed/improvised rider-free", () => {
-    const weapon = {
-      ...invItem({ weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 2, damageType: "slashing", attackBonus: 5 } as WeaponDetail, capabilities: [diceCap()] }),
-    };
-    const character = makeCharacter({ inventory: [weapon] as unknown as Character["inventory"] });
-    const entries = buildAttackEntries(character);
-    const flame = entries.find((e) => e.id === "inv-1")!;
-    expect(flame.damageRiders).toHaveLength(1);
-    expect(flame.damageRiders[0].label).toBe("+2d6 fire");
+  it("decorates a served dice rider with its chip/roll/log strings", () => {
+    const entries = buildAttackEntries(
+      withWeapons([weaponRow({ name: "Flame Tongue", damageRiders: [FIRE_RIDER] })]),
+    );
+    const [rider] = entries[0].damageRiders;
+    expect(rider.id).toBe("inv-1:rider:0");
+    expect(rider.spec).toEqual({ count: 2, faces: 6, modifier: 0 });
+    expect(rider.damageType).toBe("fire");
+    expect(rider.label).toBe("+2d6 fire");
+    expect(rider.rollLabel).toBe("Flame Tongue: +2d6 fire");
+    expect(rider.logSource).toBe("Flame Tongue");
+    expect(rider.condition).toBeUndefined();
+  });
+
+  it("labels an untyped rider without a damage type and surfaces its condition as reminder text", () => {
+    const entries = buildAttackEntries(
+      withWeapons([
+        weaponRow({
+          name: "Dragon Slayer",
+          damageRiders: [{ id: "inv-1:rider:0", spec: { count: 3, faces: 6, modifier: 0 }, condition: "vs dragons" }],
+        }),
+      ]),
+    );
+    expect(entries[0].damageRiders[0].label).toBe("+3d6");
+    expect(entries[0].damageRiders[0].condition).toBe("vs dragons");
+  });
+
+  it("carries each row's own riders and leaves unarmed/improvised rider-free", () => {
+    const entries = buildAttackEntries(
+      withWeapons([
+        weaponRow({ id: "inv-1", name: "Flame Tongue", damageRiders: [FIRE_RIDER] }),
+        weaponRow({ id: "inv-2", name: "Dagger" }),
+      ]),
+    );
+    expect(entries.find((e) => e.id === "inv-1")!.damageRiders).toHaveLength(1);
+    expect(entries.find((e) => e.id === "inv-2")!.damageRiders).toEqual([]);
     expect(entries.find((e) => e.id === "unarmed")!.damageRiders).toEqual([]);
     expect(entries.find((e) => e.id === "improvised")!.damageRiders).toEqual([]);
   });
 
-  it("scopes riders to their own weapon — capabilities on other items don't leak", () => {
-    const flame = invItem({
-      id: "inv-1",
-      name: "Flame Tongue",
-      weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 3 } as WeaponDetail,
-      capabilities: [diceCap()],
-    });
-    const plain = invItem({
-      id: "inv-2",
-      name: "Dagger",
-      requiresAttunement: false,
-      attuned: false,
-      weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing", attackBonus: 3 } as WeaponDetail,
-    });
-    const character = makeCharacter({ inventory: [flame, plain] as unknown as Character["inventory"] });
-    const entries = buildAttackEntries(character);
-    expect(entries.find((e) => e.id === "inv-1")!.damageRiders).toHaveLength(1);
-    expect(entries.find((e) => e.id === "inv-2")!.damageRiders).toEqual([]);
+  it("excludes the off-hand row — it belongs to the bonus action and shares its weapon's id", () => {
+    const character = withWeapons([
+      weaponRow({ id: "off", name: "Dagger" }),
+      weaponRow({ id: "off", name: "Dagger", offHand: true, damageSpec: { count: 1, faces: 4, modifier: 0 } }),
+    ]);
+    expect(buildAttackEntries(character).map((e) => e.id)).toEqual(["off", "unarmed", "improvised"]);
   });
 });
 
 describe("buildAttackForms (#786)", () => {
-  it("dedupes equipped weapons, then appends Unarmed then Improvised", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing" }, "Dagger", "inv-1"),
-        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing" }, "Dagger", "inv-2"),
-      ] as unknown as Character["inventory"],
-    });
-    const forms = buildAttackForms(character);
+  it("dedupes equipped weapons by name, then appends Unarmed then Improvised", () => {
+    const forms = buildAttackForms(
+      withWeapons([weaponRow({ id: "inv-1", name: "Dagger" }), weaponRow({ id: "inv-2", name: "Dagger" })]),
+    );
     expect(forms.map((f) => f.name)).toEqual(["Dagger", "Unarmed Strike", "Improvised Weapon"]);
+    // First occurrence wins, so its snapshot drives the card.
+    expect(forms[0].id).toBe("inv-1");
+  });
+
+  it("keeps one form per distinct weapon name", () => {
+    const forms = buildAttackForms(
+      withWeapons([weaponRow({ id: "inv-1", name: "Longsword" }), weaponRow({ id: "inv-2", name: "Dagger" })]),
+    );
+    expect(forms.map((f) => f.name)).toEqual(["Longsword", "Dagger", "Unarmed Strike", "Improvised Weapon"]);
   });
 
   it("defaults to Unarmed as the first form when no weapon is equipped", () => {
@@ -391,31 +310,38 @@ describe("buildAttackForms (#786)", () => {
   });
 
   it("puts the main-hand weapon first so it is the default selection", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({ attackBonus: 6, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"),
-      ] as unknown as Character["inventory"],
-    });
-    expect(buildAttackForms(character)[0].name).toBe("Longsword");
+    expect(buildAttackForms(withWeapons([weaponRow()]))[0].name).toBe("Longsword");
+  });
+
+  // The off-hand row shares its weapon's id, so leaking it into the forms list
+  // would give the segmented selector two options with the same id (#1434).
+  it("never offers the off-hand row as a form", () => {
+    const forms = buildAttackForms(
+      withWeapons([
+        weaponRow({ id: "off", name: "Dagger" }),
+        weaponRow({ id: "off", name: "Dagger", offHand: true }),
+      ]),
+    );
+    expect(forms.map((f) => f.name)).toEqual(["Dagger", "Unarmed Strike", "Improvised Weapon"]);
   });
 });
 
 describe("buildUnarmedOnlyForms (#1217)", () => {
   it("returns exactly one form — Unarmed Strike — even with weapons equipped", () => {
-    const character = makeCharacter({
-      inventory: [
-        weaponItem({ attackBonus: 6, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing" }, "Shortsword", "inv-1"),
-      ] as unknown as Character["inventory"],
-    });
-    const forms = buildUnarmedOnlyForms(character);
+    const forms = buildUnarmedOnlyForms(withWeapons([weaponRow({ name: "Shortsword" })]));
     expect(forms).toHaveLength(1);
     expect(forms[0].id).toBe("unarmed");
     expect(forms[0].name).toBe("Unarmed Strike");
   });
 
   it("never includes Improvised Weapon (2024 Flurry grants no weapon choice)", () => {
-    const forms = buildUnarmedOnlyForms(makeCharacter());
-    expect(forms.some((f) => f.id === "improvised")).toBe(false);
+    expect(buildUnarmedOnlyForms(makeCharacter()).some((f) => f.id === "improvised")).toBe(false);
+  });
+
+  // Guards the fixture trap: a payload without its unarmed row must fail loudly
+  // rather than render an empty picker.
+  it("throws rather than returning nothing when the unarmed row is missing", () => {
+    expect(() => buildUnarmedOnlyForms(makeCharacter({ attackRows: [] }))).toThrow(/no unarmed attack row/);
   });
 });
 
@@ -452,199 +378,93 @@ describe("flurryStrikeCount (#1217, Heightened Focus upgrade #1244)", () => {
 });
 
 describe("buildOffHandEntry (#732)", () => {
-  // Two equipped weapons: a main-hand and an OFF_HAND shortsword whose damage
-  // snapshot carries its ability-mod component (STR +3 folded into damageModifier).
-  function twoWeaponChar(overrides: Partial<Character> = {}) {
-    const mainHand = {
-      ...weaponItem(
-        { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing",
-          light: true,
-          damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } },
-        "Shortsword",
-        "main",
-      ),
-      equippedSlot: "MAIN_HAND" as const,
-    };
-    const offHand = {
-      ...weaponItem(
-        { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing",
-          light: true,
-          damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "piercing", grip: "one-handed" } },
-        "Dagger",
-        "off",
-      ),
-      equippedSlot: "OFF_HAND" as const,
-    };
-    return makeCharacter({
-      inventory: [mainHand, offHand] as unknown as Character["inventory"],
-      ...overrides,
-    });
+  // The served pair: a main-hand Shortsword at +3 damage and the off-hand row the
+  // server already reduced to +0 (its ability mod dropped).
+  function twoWeaponRows(offHandOverrides: Partial<AttackRow> = {}): AttackRow[] {
+    return [
+      weaponRow({ id: "main", name: "Shortsword", damageSpec: { count: 1, faces: 6, modifier: 3 }, damageType: "piercing" }),
+      weaponRow({ id: "off", name: "Dagger", damageSpec: { count: 1, faces: 6, modifier: 3 }, damageType: "piercing" }),
+      weaponRow({
+        id: "off",
+        name: "Dagger",
+        offHand: true,
+        damageType: "piercing",
+        damageSpec: { count: 1, faces: 6, modifier: 0 },
+        damageComponents: { abilityMod: 0, meleeDamageBonus: 0 },
+        ...offHandOverrides,
+      }),
+    ];
   }
 
-  it("returns null with fewer than two equipped weapons", () => {
-    const character = makeCharacter({
-      inventory: [weaponItem({ damageModifier: 3, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } })] as unknown as Character["inventory"],
-    });
-    expect(buildOffHandEntry(character)).toBeNull();
+  it("returns null when the server served no off-hand row", () => {
+    expect(buildOffHandEntry(withWeapons([weaponRow()]))).toBeNull();
   });
 
-  it("scopes to the OFF_HAND weapon", () => {
-    const entry = buildOffHandEntry(twoWeaponChar())!;
+  it("suffixes only the display name, keeping the off-hand weapon's own id", () => {
+    const entry = buildOffHandEntry(withWeapons(twoWeaponRows()))!;
     expect(entry.id).toBe("off");
     expect(entry.name).toBe("Dagger (off-hand)");
   });
 
-  it("omits the ability modifier from off-hand damage WITHOUT the style", () => {
-    const entry = buildOffHandEntry(twoWeaponChar({ resources: { pools: [] } } as unknown as Partial<Character>))!;
-    // damageModifier 3 (= STR +3) minus the ability mod → 0.
+  it("keeps the weapon's own name on the roll and log labels, not the suffixed one", () => {
+    const entry = buildOffHandEntry(withWeapons(twoWeaponRows()))!;
+    expect(entry.attackRollLabel).toBe("Dagger attack");
+    expect(entry.damageRollLabel).toBe("Dagger damage (piercing)");
+    expect(entry.logSource).toBe("Dagger");
+  });
+
+  it("labels the reduced damage the server served, without recomputing it", () => {
+    const entry = buildOffHandEntry(withWeapons(twoWeaponRows()))!;
     expect(entry.damageSpec).toEqual({ count: 1, faces: 6, modifier: 0 });
     expect(entry.damageLabel).toBe("1d6 piercing");
+    expect(entry.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0 });
   });
 
-  it("keeps the ability modifier WITH the Two-Weapon Fighting feat improvement", () => {
+  it("labels the full damage when the served row kept its ability modifier (TWF style)", () => {
     const entry = buildOffHandEntry(
-      twoWeaponChar({
-        advancements: [
-          { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
-        ] as unknown as Character["advancements"],
-      }),
-    )!;
-    expect(entry.damageSpec).toEqual({ count: 1, faces: 6, modifier: 3 });
-    expect(entry.damageLabel).toBe("1d6 + 3 piercing");
-  });
-
-  it("keeps a negative ability modifier even without the style (RAW)", () => {
-    const character = makeCharacter({
-      inventory: [
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: -1, abilityModifier: -1, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: -1, abilityModifier: -1, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
-      ] as unknown as Character["inventory"],
-    });
-    // max(0, -1) = 0 subtracted → the negative mod stays.
-    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(-1);
-  });
-
-  it("shows the full modifier for a legacy weapon whose damage lacks abilityModifier", () => {
-    // Pre-#732 serialization: damage present but no ability-mod component.
-    const legacyDamage = { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing", grip: "one-handed" as const };
-    const character = makeCharacter({
-      inventory: [
-        { ...weaponItem({ light: true, damage: legacyDamage }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
-        { ...weaponItem({ light: true, damage: legacyDamage }, "B", "off"), equippedSlot: "OFF_HAND" as const },
-      ] as unknown as Character["inventory"],
-    });
-    // No abilityModifier to subtract → the full modifier is kept (matches pre-#732 behavior).
-    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(3);
-  });
-
-  it("preserves a melee-damage buff (Rage) while dropping only the ability mod", () => {
-    // damageModifier 5 = STR +3 folded with a +2 Rage buff; abilityModifier is the raw +3.
-    const character = makeCharacter({
-      inventory: [
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
-      ] as unknown as Character["inventory"],
-    });
-    // 5 − max(0,3) = 2 (the Rage buff survives).
-    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(2);
-  });
-
-  // #1235: the logged damageComponents must sum to damageSpec.modifier — if the
-  // off-hand omission zeroes the ability mod in the modifier but a stale
-  // component object still shows the full mod, the combat log would show math
-  // that doesn't add up to the number actually rolled.
-  it("mirrors the ability-mod omission onto damageComponents so it still sums to damageSpec.modifier", () => {
-    const character = makeCharacter({
-      inventory: [
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, meleeDamageBonus: 2, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, meleeDamageBonus: 2, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
-      ] as unknown as Character["inventory"],
-    });
-    const entry = buildOffHandEntry(character)!;
-    expect(entry.damageSpec.modifier).toBe(2); // 5 − max(0,3)
-    expect(entry.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 2 });
-    expect(entry.damageComponents!.abilityMod + entry.damageComponents!.meleeDamageBonus).toBe(entry.damageSpec.modifier);
-  });
-
-  it("keeps damageComponents' full ability mod WITH the Two-Weapon Fighting style", () => {
-    const character = makeCharacter({
-      inventory: [
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, meleeDamageBonus: 0, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
-        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, meleeDamageBonus: 0, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
-      ] as unknown as Character["inventory"],
-      advancements: [
-        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
-      ] as unknown as Character["advancements"],
-    });
-    const entry = buildOffHandEntry(character)!;
-    expect(entry.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0 });
-  });
-});
-
-describe("capabilitiesActive", () => {
-  it("gates an attunement-required item on attunement (not mere equip)", () => {
-    expect(capabilitiesActive({ equipped: true, attuned: true, requiresAttunement: true })).toBe(true);
-    expect(capabilitiesActive({ equipped: true, attuned: false, requiresAttunement: true })).toBe(false);
-  });
-
-  it("gates a non-attunement item on equipped (mirrors backend isItemActive)", () => {
-    expect(capabilitiesActive({ equipped: true, attuned: false, requiresAttunement: false })).toBe(true);
-    // An unattunable item that is somehow `attuned` is unreachable; the gate does
-    // not diverge from the backend by falling back to attunement here.
-    expect(capabilitiesActive({ equipped: false, attuned: true, requiresAttunement: false })).toBe(false);
-    expect(capabilitiesActive({ equipped: false, attuned: false, requiresAttunement: false })).toBe(false);
-  });
-});
-
-describe("weaponDamageRiders", () => {
-  it("builds a typed +2d6 fire rider from an active dice capability", () => {
-    const [rider] = weaponDamageRiders(invItem({ capabilities: [diceCap()] }));
-    expect(rider.id).toBe("inv-1:rider:0");
-    expect(rider.spec).toEqual({ count: 2, faces: 6, modifier: 0 });
-    expect(rider.damageType).toBe("fire");
-    expect(rider.label).toBe("+2d6 fire");
-    expect(rider.rollLabel).toBe("Flame Tongue: +2d6 fire");
-    expect(rider.logSource).toBe("Flame Tongue");
-    expect(rider.condition).toBeUndefined();
-  });
-
-  it("surfaces a conditional rider's condition as reminder text (never auto-gated)", () => {
-    const [rider] = weaponDamageRiders(
-      invItem({ name: "Dragon Slayer", capabilities: [diceCap({ dice: { count: 3, faces: 6 }, condition: "vs dragons" })] }),
-    );
-    expect(rider.label).toBe("+3d6");
-    expect(rider.condition).toBe("vs dragons");
-  });
-
-  it("removes riders when an attunement-required item is unattuned", () => {
-    expect(weaponDamageRiders(invItem({ attuned: false, capabilities: [diceCap()] }))).toEqual([]);
-  });
-
-  it("stacks multiple dice capabilities on one weapon", () => {
-    const riders = weaponDamageRiders(
-      invItem({ capabilities: [diceCap(), diceCap({ dice: { count: 1, faces: 8, damageType: "radiant" } })] }),
-    );
-    expect(riders.map((r) => r.label)).toEqual(["+2d6 fire", "+1d8 radiant"]);
-    expect(riders.map((r) => r.id)).toEqual(["inv-1:rider:0", "inv-1:rider:1"]);
-  });
-
-  it("ignores scalar, setTo, and non-damage capabilities", () => {
-    expect(
-      weaponDamageRiders(
-        invItem({
-          capabilities: [
-            { kind: "passiveBonus", target: "damage", op: "add", value: 2 },
-            { kind: "passiveBonus", target: "damage", op: "setTo", dice: { count: 2, faces: 6 } },
-            { kind: "passiveBonus", target: "attack", op: "add", dice: { count: 1, faces: 4 } },
-            { kind: "castSpell", description: "cast fireball" },
-          ],
+      withWeapons(
+        twoWeaponRows({
+          damageSpec: { count: 1, faces: 6, modifier: 3 },
+          damageComponents: { abilityMod: 3, meleeDamageBonus: 0 },
         }),
       ),
-    ).toEqual([]);
+    )!;
+    expect(entry.damageLabel).toBe("1d6 + 3 piercing");
+    expect(entry.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0 });
   });
 
-  it("returns nothing for an item with no capabilities", () => {
-    expect(weaponDamageRiders(invItem({ capabilities: undefined }))).toEqual([]);
+  it("labels a negative served modifier with a dash", () => {
+    const entry = buildOffHandEntry(
+      withWeapons(twoWeaponRows({ damageSpec: { count: 1, faces: 6, modifier: -1 } })),
+    )!;
+    expect(entry.damageLabel).toBe("1d6 - 1 piercing");
+  });
+
+  it("decorates the off-hand row's riders under the weapon's own name", () => {
+    const entry = buildOffHandEntry(
+      withWeapons(twoWeaponRows({ name: "Flame Tongue", damageRiders: [FIRE_RIDER] })),
+    )!;
+    expect(entry.damageRiders[0].rollLabel).toBe("Flame Tongue: +2d6 fire");
+    expect(entry.damageRiders[0].logSource).toBe("Flame Tongue");
+  });
+});
+
+describe("buildBonusSwingEntry", () => {
+  it('returns the off-hand entry for "twf"', () => {
+    const character = withWeapons([
+      weaponRow({ id: "off", name: "Dagger" }),
+      weaponRow({ id: "off", name: "Dagger", offHand: true }),
+    ]);
+    expect(buildBonusSwingEntry(character, "twf")!.name).toBe("Dagger (off-hand)");
+  });
+
+  it('returns the Unarmed Strike entry for "unarmed" even with weapons equipped', () => {
+    const character = withWeapons([weaponRow()]);
+    expect(buildBonusSwingEntry(character, "unarmed")!.id).toBe("unarmed");
+  });
+
+  it('is null for "twf" when no off-hand row was served', () => {
+    expect(buildBonusSwingEntry(withWeapons([weaponRow()]), "twf")).toBeNull();
   });
 });
 
@@ -659,8 +479,8 @@ describe("critDamageSpec", () => {
   });
 
   it("applies the same doubling rule to a damage rider's spec (Flame Tongue +2d6 → +4d6)", () => {
-    const rider = weaponDamageRiders(invItem({ capabilities: [diceCap()] }))[0];
-    expect(critDamageSpec(rider.spec)).toEqual({
+    const entries = buildAttackEntries(withWeapons([weaponRow({ damageRiders: [FIRE_RIDER] })]));
+    expect(critDamageSpec(entries[0].damageRiders[0].spec)).toEqual({
       count: 2,
       faces: 6,
       modifier: 0,

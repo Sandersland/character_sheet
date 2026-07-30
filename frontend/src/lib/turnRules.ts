@@ -12,9 +12,9 @@
 /**
  * Returns true when the character's equipped loadout allows a TWF bonus-action
  * off-hand attack: at least two weapons equipped, both of which are light
- * (light property = true on the weapon detail). The off-hand attack's damage
- * omits the ability modifier unless the character has the Two-Weapon Fighting
- * style — resolved from `weapon.damage.abilityModifier` in `buildOffHandEntry`.
+ * (light property = true on the weapon detail). The off-hand attack's DAMAGE is a
+ * separate question, resolved server-side by `deriveOffHandDamage` and served on
+ * the off-hand `AttackRow` — this function only answers availability.
  *
  * The **Two-Weapon Fighting fighting style** (#1137: now a feat, its
  * "offhandAbilityDamage" improvement) removes the light restriction, so when

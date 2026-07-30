@@ -6,6 +6,8 @@ import InlineOffHandPicker from "@/features/session/InlineOffHandPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { logRoll } from "@/api/client";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
+import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
+import type { AttackRow } from "@character-sheet/shared-types";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -32,9 +34,29 @@ function makeTurnState(bonusAttack: { total: number; used: number } | null) {
   } as unknown as TurnState & TurnStateActions;
 }
 
-// Two equipped light weapons: a main-hand and an OFF_HAND dagger whose damage
-// snapshot carries STR +3 folded into damageModifier (abilityModifier: 3).
-function twoWeaponCharacter(overrides: Partial<Character> = {}): Character {
+// The off-hand row the server would serve for the dagger below. `damageModifier`
+// is the number the server already resolved (#1434) — this sheet does no
+// subtraction of its own, so a test about the Two-Weapon Fighting style states the
+// modifier the style would have preserved rather than taking the feat.
+function offHandDaggerRow(damageModifier: number): AttackRow {
+  return attackRow({
+    id: "off",
+    kind: "weapon",
+    name: "Dagger",
+    grip: "one-handed",
+    damageType: "piercing",
+    offHand: true,
+    attackSpec: { count: 1, faces: 20, modifier: 5 },
+    damageSpec: { count: 1, faces: 6, modifier: damageModifier },
+  });
+}
+
+// Two equipped light weapons: a main-hand Shortsword and an OFF_HAND dagger whose
+// damage snapshot carries STR +3 folded into damageModifier (abilityModifier: 3).
+function twoWeaponCharacter(
+  overrides: Partial<Character> = {},
+  offHand: AttackRow | null = offHandDaggerRow(0),
+): Character {
   const weapon = (name: string, id: string, slot: "MAIN_HAND" | "OFF_HAND", type: string) => ({
     id,
     name,
@@ -59,6 +81,15 @@ function twoWeaponCharacter(overrides: Partial<Character> = {}): Character {
       },
     },
   });
+  const mainHandRow = attackRow({
+    id: "main",
+    kind: "weapon",
+    name: "Shortsword",
+    grip: "one-handed",
+    damageType: "slashing",
+    attackSpec: { count: 1, faces: 20, modifier: 5 },
+    damageSpec: { count: 1, faces: 6, modifier: 3 },
+  });
   return {
     id: "char-1",
     name: "Tester",
@@ -71,6 +102,7 @@ function twoWeaponCharacter(overrides: Partial<Character> = {}): Character {
     improvisedWeapon: { attackBonus: 2, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" }, proficient: false },
     resources: { pools: [] },
     advancements: [],
+    attackRows: [mainHandRow, ...(offHand ? [offHand] : []), UNARMED_ROW, IMPROVISED_ROW],
     ...overrides,
   } as unknown as Character;
 }
@@ -104,12 +136,11 @@ describe("InlineOffHandPicker (#813 redesign)", () => {
     expect(screen.queryByText(/1d6 \+ 3/)).not.toBeInTheDocument();
   });
 
-  it("keeps the ability mod in damage WITH the Two-Weapon Fighting feat", () => {
-    const character = twoWeaponCharacter({
-      advancements: [
-        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
-      ] as unknown as Character["advancements"],
-    });
+  // With the Two-Weapon Fighting style the SERVER keeps the ability mod on the
+  // off-hand row (deriveOffHandDamage); this sheet just has to label what it is
+  // served, so the fixture serves the un-reduced modifier rather than the feat.
+  it("labels the full ability mod when the served off-hand row kept it (TWF style)", () => {
+    const character = twoWeaponCharacter({}, offHandDaggerRow(3));
     renderPicker(character, makeTurnState({ total: 1, used: 0 }));
     expect(screen.getByText(/1d6 \+ 3 piercing/)).toBeInTheDocument();
   });
@@ -173,8 +204,8 @@ describe("InlineOffHandPicker (#813 redesign)", () => {
   });
 
   it("variant=unarmed ignores equipped weapons entirely, even with no off-hand weapon", () => {
-    // Would hit the "No off-hand weapon equipped" branch under variant=twf —
-    // buildUnarmedEntry never returns null, so the swing is always offered.
+    // No served off-hand row, so variant=twf would hit the "No off-hand weapon
+    // equipped" branch — the unarmed row is always served, so this swing is not.
     const solo = twoWeaponCharacter({
       inventory: [
         {
@@ -187,7 +218,7 @@ describe("InlineOffHandPicker (#813 redesign)", () => {
           weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing", light: true, attackBonus: 5 },
         },
       ] as unknown as Character["inventory"],
-    });
+    }, null);
     renderPicker(solo, makeTurnState({ total: 1, used: 0 }), { variant: "unarmed" });
     expect(screen.getByText("Unarmed Strike")).toBeInTheDocument();
     expect(screen.queryByText(/No off-hand weapon equipped/i)).not.toBeInTheDocument();
@@ -223,7 +254,7 @@ describe("InlineOffHandPicker (#813 redesign)", () => {
           weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing", light: true, attackBonus: 5 },
         },
       ] as unknown as Character["inventory"],
-    });
+    }, null);
     renderPicker(solo, makeTurnState({ total: 1, used: 0 }));
     expect(screen.getByText(/No off-hand weapon equipped/i)).toBeInTheDocument();
   });
