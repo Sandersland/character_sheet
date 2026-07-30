@@ -1,6 +1,10 @@
 /**
  * Combat wire types: derived attacks, conditions, buffs, roll modifiers, and HP operations.
  */
+// ConditionKey is used below (ConditionEntry.key) as well as re-exported (the
+// `export type` block further down) — a bare `export … from` doesn't bind a
+// local name, so it needs its own `import type` too.
+import type { ConditionKey } from "@character-sheet/contracts";
 
 /**
  * A derived attack row — unarmed strike or improvised weapon — computed
@@ -30,28 +34,14 @@ export interface ArmorClassPart {
   value: number;
 }
 
-/**
- * Conditions state + operation types — mirror of `ConditionOperation` /
- * `applyConditionsOperations`. Sent as `{ operations: ConditionOperation[] }` to
- * POST /api/characters/:id/conditions/transactions.
- *
- * ConditionKey: the 14 standard 5e status condition keys (mirror of the backend `ConditionKey`).
- */
-export type ConditionKey =
-  | "blinded"
-  | "charmed"
-  | "deafened"
-  | "frightened"
-  | "grappled"
-  | "incapacitated"
-  | "invisible"
-  | "paralyzed"
-  | "petrified"
-  | "poisoned"
-  | "prone"
-  | "restrained"
-  | "stunned"
-  | "unconscious";
+// Condition ops and the 14-key ConditionKey are derived from the route zod
+// schemas in @character-sheet/contracts (#1390) — `import type` only, so zod
+// never enters the client bundle. Sent as
+// `{ operations: ConditionOperation[] }` to
+// POST /api/characters/:id/conditions/transactions. removeCondition/
+// setExhaustion don't forward: they have no frontend call site, and a
+// forwarded-only name is a dead export under the fallow gate.
+export type { ApplyConditionOperation, ConditionKey, ConditionOperation } from "@character-sheet/contracts";
 
 export interface ConditionEntry {
   key: ConditionKey;
@@ -122,17 +112,6 @@ export type RollEffect = AdvantageRollEffect | FlatRollEffect;
 
 /** A RollEffect resolved with its provenance label (e.g. "Rage", "Poisoned", "Exhaustion"). Derived on read. */
 export type RollModifier = RollEffect & { source: string };
-
-export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }
-
-export interface RemoveConditionOperation { type: "removeCondition"; key: ConditionKey }
-
-export interface SetExhaustionOperation { type: "setExhaustion"; level: number }
-
-export type ConditionOperation =
-  | ApplyConditionOperation
-  | RemoveConditionOperation
-  | SetExhaustionOperation;
 
 // HP ops are derived from the route zod schemas in @character-sheet/contracts
 // (#1390) — `import type` only, so zod never enters the client bundle. Sent as

@@ -1,7 +1,7 @@
 /**
  * Latch for the HP op schemas migrated into @character-sheet/contracts (#1390),
- * which retired lib/combat/hp-operations.ts — the third hand-written declaration
- * of these shapes.
+ * which retired the backend's own hand-written op interfaces — the third
+ * declaration of these shapes.
  *
  * Three things this guards, and the runtime half is the one that matters most:
  *

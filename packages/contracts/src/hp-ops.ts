@@ -3,7 +3,7 @@
  * The route value-imports `hitPointOperationSchema` and runs `.parse()`; the
  * lib/combat dispatcher and the frontend both take their types from `z.infer`
  * of these same schemas, replacing what used to be three declarations per op
- * (route zod + lib/combat/hp-operations.ts + a frontend interface).
+ * (the route's zod object, a backend lib interface, and a frontend interface).
  *
  * Upper bounds that depend on live character state — how many hit dice remain,
  * which die a class rolls, whether the character is actually at 0 HP — are
