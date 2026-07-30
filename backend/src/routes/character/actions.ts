@@ -33,6 +33,7 @@ import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
 import { applyHealInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import { applySpendResourceInTx } from "@/lib/classes/resources.js";
 import { deriveMartialArtsDie } from "@/lib/srd/srd.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
@@ -186,11 +187,12 @@ async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[]
   if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
   const classRow = await prisma.character.findUnique({
     where: { id: characterId },
-    select: { classEntries: { select: { name: true, level: true } } },
+    select: { classEntries: { select: { name: true, level: true } }, rulesEdition: true },
   });
-  const monkLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
+  if (!classRow) return 0;
+  const monkLevel = classRow.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
   if (monkLevel < 10) return 0;
-  const dieFaces = deriveMartialArtsDie(monkLevel);
+  const dieFaces = deriveMartialArtsDie(monkLevel, editionOf(classRow));
   return rollDie(dieFaces) + rollDie(dieFaces);
 }
 

@@ -78,7 +78,7 @@ function deriveBaseLayer(
   edition: RulesEdition,
 ): ClassLayer {
   return {
-    pools: classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey) : [],
+    pools: classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [],
     features: (classDef?.features ?? []).filter((f) => f.level <= level && featureAppliesToEdition(f, edition)),
   };
 }
@@ -119,7 +119,13 @@ function deriveSubclassLayer(
   return {
     active: true,
     def,
-    pools: def.resourceFn ? def.resourceFn(level, abilityScores, profBonus) : [],
+    // subclassKey is `undefined` here, not this function's own `subclassKey`
+    // param (#1499) — ResourceFn's subclassKey exists so the BASE layer can
+    // resolve #906's wildShape pool-key collision against the active
+    // subclass; a subclass's own resourceFn is already scoped to that
+    // subclass, so passing it again would be a silent semantic change under
+    // deriveResources' byte-identical-2024-output AC.
+    pools: def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [],
     features: def.features.filter((f) => f.level <= level && featureAppliesToEdition(f, edition)),
   };
 }
@@ -166,7 +172,7 @@ export function deriveResources(
   // Subclass-specific bespoke choice-cap fields (ClassExtras) — the only shape
   // a subclass's deriveExtras may contribute beyond its resources/features layer.
   if (sub.active && sub.def?.deriveExtras) {
-    Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus));
+    Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus, edition));
   }
 
   // Generic subclass "choose N" features (#899): list only those the character

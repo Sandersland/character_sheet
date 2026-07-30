@@ -21,8 +21,8 @@ import type { DerivedClassInfo } from "@/lib/classes/class-features.js";
 
 const ABILITY_SCORES = { strength: 10, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 14, charisma: 10 };
 
-function focusInfo(level: number, profBonus: number): DerivedClassInfo {
-  return { resources: monk.resourceFn!(level, ABILITY_SCORES, profBonus), features: [] };
+function focusInfo(level: number, profBonus: number, edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024"): DerivedClassInfo {
+  return { resources: monk.resourceFn!(level, ABILITY_SCORES, profBonus, undefined, edition), features: [] };
 }
 
 function stateWithUsed(used: Record<string, number>): ResourcesMutableState {
@@ -47,6 +47,21 @@ describe("Monk Focus onInitiative — Uncanny Metabolism / Perfect Focus (#1243)
       {
         key: "focus", label: "Focus Points", restored: 2, remaining: 2,
         bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: 6, flatBonus: 2 },
+      },
+    ]);
+  });
+
+  // #1499: bonusHeal.dieFaces reads the Martial Arts die through the newly
+  // edition-threaded resourceFn — the 2014 monk table (SRD 5.1 / PHB'14 p.78)
+  // is 1d4 at L1-4, so a level-2 EDITION_2014 monk's Uncanny Metabolism heal
+  // uses dieFaces 4, not the 2024 table's 6.
+  it("(a, EDITION_2014) L2: bonusHeal.dieFaces uses the 2014 Martial Arts die (4), not the 2024 one (6)", () => {
+    const state = stateWithUsed({ focus: 2 });
+    const regen = applyInitiativeRegen(state, focusInfo(2, 2, "EDITION_2014"));
+    expect(regen).toEqual([
+      {
+        key: "focus", label: "Focus Points", restored: 2, remaining: 2,
+        bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: 4, flatBonus: 2 },
       },
     ]);
   });

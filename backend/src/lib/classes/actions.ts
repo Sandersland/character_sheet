@@ -34,6 +34,8 @@
  *    is a client-side economy effect with no server state to apply.
  */
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { ActiveBuff } from "@/lib/combat/active-effects.js";
 import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
@@ -65,6 +67,17 @@ interface DerivedActionRecord {
   name: string;
   cost: ActionCost;
   universal?: boolean;
+  /**
+   * Absent means valid in both editions (the default — mirrors
+   * `DerivedFeature.edition`, #1374/#1499). A row whose mechanics genuinely
+   * differ between PHB'14 and PHB'24 is tagged for the edition it describes;
+   * `matchesActionGate` filters on it the same way `featureAppliesToEdition`
+   * filters features (registry.ts) — the one place this rule lives. A blanket
+   * tagging pass is not wanted: only a row whose 2014 shape doesn't exist or
+   * differs enough to need its own row gets tagged (see the seven monk rows
+   * below); most rows (e.g. Second Wind, Rage) are edition-invariant.
+   */
+  edition?: RulesEdition;
   grantClass?: string;   // lowercase class name
   grantLevel?: number;   // min level for this action
   /**
@@ -210,10 +223,19 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Monk
   // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no
   // resource cost, gated only on the Martial Arts blanket condition (no armor
-  // or Shield), not on the Attack action. Distinct from Flurry of Blows (#1217,
-  // the two-strike Focus version).
+  // or Shield). SRD 5.2 / PHB'24 p.88 grants this with no Attack-action
+  // prerequisite; SRD 5.1 / PHB'14 p.78 DOES require the Attack action first —
+  // this comment used to assert the 2024 reading as if it were universal
+  // (corrected by #1499). The row stays SHARED across editions regardless:
+  // both editions gate on the identical unarmored/no-shield condition, and the
+  // Attack-action difference is reminder TEXT, not a gate — `reminder` here is
+  // `(level) => string`, not edition-parameterized, so forking the wording is
+  // #1500's work, not this slice's. Distinct from Flurry of Blows (#1217, the
+  // two-strike Focus version, tagged EDITION_2024 below — SRD 5.1's Flurry
+  // costs 1 ki for two strikes into the "ki" pool (monkPoolKey), a different
+  // resource key from this row's "focus").
   { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
+  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
   // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
   // TWO menu entries — a free variant and a 1-Focus variant — rather than the
   // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
@@ -226,15 +248,16 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // willing-creature rider (no server state — this app has no ally/NPC
   // combatant model to move).
   // These four rows' `regrants` (#1431) is data ONLY — deliberately unrendered,
-  // and the curated reminders above/below stay the card subtitle. The rows are
-  // 2024-shaped yet served edition-blind (the debt this comment block records),
-  // and the grant is one of the places the editions genuinely disagree: SRD 5.1
-  // Patient Defense buys DODGE for 1 ki, while SRD 5.2 grants Disengage free
-  // and Disengage + Dodge for 1 Focus. Naming the regrant on the card would
-  // therefore print a wrong answer onto a 2014 monk's screen — it waits on the
-  // edition axis reaching this catalog (#1313). Rogue's Cunning Action and
+  // and the curated reminders above/below stay the card subtitle. All four are
+  // now tagged edition: "EDITION_2024" (#1499): SRD 5.1 Patient Defense buys
+  // DODGE for a flat 1 ki (no free variant), and SRD 5.1 Step of the Wind buys
+  // Disengage-or-Dash for a flat 1 ki the same way — neither 2014 shape is
+  // these two-menu-entries-per-feature rows, so serving them to a 2014 monk
+  // would be wrong, not merely unnamed. #1500 authors the 2014-keyed
+  // equivalents under monkPoolKey's "ki" pool. Naming the regrant on the card
+  // remains future work regardless of edition — Rogue's Cunning Action and
   // Thief's Fast Hands are invariant in both editions and DO render theirs.
-  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action)." },
+  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action).", edition: "EDITION_2024" },
   {
     key: "patientDefenseFocus",
     name: "Patient Defense (1 Focus)",
@@ -248,8 +271,9 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
       level >= 10
         ? "Disengage + Dodge (spend 1 Focus). Heightened Focus (L10): also gain temporary hit points equal to two Martial Arts die rolls."
         : "Disengage + Dodge (spend 1 Focus).",
+    edition: "EDITION_2024",
   },
-  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["dash"], reminder: "Dash (free bonus action)." },
+  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["dash"], reminder: "Dash (free bonus action).", edition: "EDITION_2024" },
   {
     key: "stepOfTheWindFocus",
     name: "Step of the Wind (1 Focus)",
@@ -263,6 +287,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
       level >= 10
         ? "Disengage + Dash, jump distance doubled this turn (spend 1 Focus). Heightened Focus (L10): also bring one willing creature within 5 ft along with you, moving it up to your Speed — it doesn't provoke opportunity attacks."
         : "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
+    edition: "EDITION_2024",
   },
   // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
   // (spend + Con save + fail/success outcome), built as its own dedicated
@@ -272,7 +297,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // reduction (1d10 + Dex + monk level) costs nothing, so — like the Warrior of Shadow
   // reminders below — it carries no resourceKey and the client rolls it directly (see
   // ACTION_EFFECT_FN comment). Deflect Energy (L13) just widens the damage-type clause
-  // in the reminder text; it isn't a separate action key.
+  // in the reminder text; it isn't a separate action key. Tagged EDITION_2024 (#1499):
+  // PHB'14's Deflect Missiles is ranged-weapon-attacks-only, a materially different
+  // feature under a different name, not a text variant of this one — #1500 authors it
+  // as its own row rather than forking this one.
   {
     key: "deflectAttacks",
     name: "Deflect Attacks",
@@ -281,12 +309,24 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantLevel: 3,
     reminder:
       "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+    edition: "EDITION_2024",
   },
   // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a "free"
   // follow-up decision within the same reaction (mirrors Stunning Strike's shape),
   // not its own action-economy slot. Spends the persisted Focus resource, unlike
-  // the free base reduction above.
-  { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1 },
+  // the free base reduction above. Tagged EDITION_2024 alongside deflectAttacks —
+  // PHB'14's Deflect Missiles has no redirect rider at all.
+  { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
+
+  // Every row below (Warrior of Shadow / Warrior of the Elements / Warrior of
+  // the Open Hand / Warrior of Mercy) is subclass-gated via grantSubclassSlugs
+  // and deliberately left UNTAGGED (#1499) even though all four subclasses are
+  // 2024-only content: SUBCLASS_SLUGS (subclass-slug.ts) contains no 2014 monk
+  // subclass, so matchesSubclassGate already excludes every one of these rows
+  // for a 2014 monk (no slug can ever resolve) — an edition tag would add no
+  // observable behaviour. Tagging wholenessOfBody in particular would also
+  // pre-decide a content question that belongs to #1500 (PHB'14 Way of the
+  // Open Hand has its own Wholeness of Body at a different level).
   // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
   // server effect; reminder is the deliverable. Improved Shadow Step (L11)
   // upgrades the SAME bonus action (ignore the dim/dark destination requirement
@@ -478,6 +518,7 @@ export function matchesActionGate(
   cls: string,
   slug: SubclassSlug | undefined,
   level: number,
+  edition: RulesEdition,
 ): boolean {
   // Only class-specific actions ride the character payload; universal rows are
   // served per edition by referenceRouter (#1430). No DERIVED_ACTIONS row sets
@@ -485,6 +526,11 @@ export function matchesActionGate(
   // one out of availableActions[] instead of double-rendering it, which is why
   // it stays even though the field is unset (#1431).
   if (a.universal) return false;
+
+  // Edition gate (#1499) — mirrors featureAppliesToEdition (registry.ts):
+  // absent `edition` means both editions; a row tagged for the OTHER edition
+  // is filtered out here, before the class/subclass gates below ever see it.
+  if (a.edition !== undefined && a.edition !== edition) return false;
 
   // Class + level gate (single-class grantClass/grantLevel or a multi-class
   // grantClasses list — matched when ANY gate matches; see classGatesOf).
@@ -513,14 +559,18 @@ export function deriveActions(
   pools: ResourcePool[],
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218).
   // Defaults to true (permissive) since only requiresUnarmored actions read it.
+  // `edition` must sit AFTER this defaulted parameter (mirrors subclassGateLevel),
+  // which means the default can no longer be skipped by a caller that also
+  // needs to pass edition — every such call site now passes both explicitly.
   unarmoredUnshielded = true,
+  edition: RulesEdition,
 ): AvailableAction[] {
   const cls = (className ?? "").toLowerCase();
 
   const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
 
   return DERIVED_ACTIONS
-    .filter((a) => matchesActionGate(a, cls, subclassSlug, level))
+    .filter((a) => matchesActionGate(a, cls, subclassSlug, level, edition))
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
@@ -564,13 +614,14 @@ export function deriveEntryScopedActions(
   totalLevel: number,
   pools: ResourcePool[],
   unarmoredUnshielded = true,
+  edition: RulesEdition,
 ): AvailableAction[] {
   const seenKeys = new Set<string>();
   const actions: AvailableAction[] = [];
   for (const entry of classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
     const slug = resolveSubclassSlug(entry.name, entry);
-    for (const action of deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded)) {
+    for (const action of deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded, edition)) {
       if (seenKeys.has(action.key)) continue;
       seenKeys.add(action.key);
       actions.push(action);
@@ -586,8 +637,12 @@ export function deriveEntryScopedActions(
  * truth instead of hardcoding the number a second time, which is exactly the
  * kind of drift deriveEntryScopedActions itself exists to prevent (#1315).
  */
-export function actionGrantLevel(key: string): number | undefined {
-  const row = DERIVED_ACTIONS.find((a) => a.key === key);
+export function actionGrantLevel(key: string, edition: RulesEdition): number | undefined {
+  // Filters on edition BEFORE find (#1499) — a no-op today since no key is
+  // duplicated across editions, but written this way anyway: #1500 adds
+  // same-key 2014 monk rows, and a lookup that's only silently correct
+  // because no collision exists yet is exactly what breaks then.
+  const row = DERIVED_ACTIONS.find((a) => a.key === key && (a.edition === undefined || a.edition === edition));
   if (!row) return undefined;
   // Min across gates so a row two classes grant (channelDivinity) reports the
   // earliest level any of them grants it, rather than undefined.
