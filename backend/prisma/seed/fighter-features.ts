@@ -118,7 +118,7 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     // #1138's; this is the level-1 feature TEXT a 2024 Fighter's sheet must
     // not omit.
     description:
-      "You use the mastery properties of three kinds of Simple or Martial weapons of your choice (4 at level 4, 5 at level 10, 6 at level 16). Whenever you finish a Long Rest, you can change which weapon types you've mastered.",
+      "You use the mastery properties of three kinds of Simple or Martial weapons of your choice (4 at level 4, 5 at level 10, 6 at level 16). Whenever you finish a Long Rest, you can change one of those weapon choices.",
   },
   {
     subclassSlug: null,
@@ -138,7 +138,7 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     // (today's resourceFn says "shortRest" only, in both editions) is fixed
     // in fighter.ts, not here.
     description:
-      "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17.",
+      "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
   },
   {
     subclassSlug: null,
