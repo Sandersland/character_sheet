@@ -156,7 +156,7 @@ describe("ClassFeaturesSection — subclass gate per edition (#1325)", () => {
       toolProficiencies: [],
       toolChoices: [],
       toolChoiceCount: 0,
-      level1SpellPicks: { cantrips: 3, spells: 2 },
+      level1SpellPicks: { cantrips: 3, spells: 2, maxSpellLevel: 1 },
       primaryAbility: ["wisdom"],
     };
   }

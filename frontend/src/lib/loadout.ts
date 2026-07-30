@@ -24,9 +24,6 @@ const LOADOUT_GROUP_LABELS: Record<SlotGroup, string> = {
   adornment: "Accessories",
 };
 
-// 5e caps attunement at three items; the count is derived, never stored.
-const ATTUNEMENT_CAP = 3;
-
 export interface FilledLoadoutRow {
   kind: "filled";
   key: string;
@@ -116,8 +113,10 @@ export interface AttunementSummary {
   atCap: boolean;
 }
 
-// Derived attunement counter for the loadout header — count vs the 5e cap.
-export function attunementSummary(inventory: InventoryItem[]): AttunementSummary {
+// Attunement counter for the loadout header. The cap is served (#1377) — the
+// number the backend's attune path rejects past — so this only counts and
+// compares; it never re-encodes the 5e limit.
+export function attunementSummary(inventory: InventoryItem[], cap: number): AttunementSummary {
   const count = inventory.filter((item) => item.attuned).length;
-  return { count, cap: ATTUNEMENT_CAP, atCap: count >= ATTUNEMENT_CAP };
+  return { count, cap, atCap: count >= cap };
 }

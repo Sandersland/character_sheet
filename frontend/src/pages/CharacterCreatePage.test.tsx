@@ -59,7 +59,7 @@ const referenceFixture: ReferenceData = {
       toolProficiencies: [],
       toolChoices: ["Lute", "Drum", "Flute"],
       toolChoiceCount: 2,
-      level1SpellPicks: { cantrips: 1, spells: 1 },
+      level1SpellPicks: { cantrips: 1, spells: 1, maxSpellLevel: 1 },
       primaryAbility: ["charisma"],
     },
     {
@@ -318,7 +318,7 @@ const cleric = (subclassGateLevel: number): ReferenceData["classes"][number] => 
   toolProficiencies: [],
   toolChoices: [],
   toolChoiceCount: 0,
-  level1SpellPicks: { cantrips: 3, spells: 2 },
+  level1SpellPicks: { cantrips: 3, spells: 2, maxSpellLevel: 1 },
   primaryAbility: ["wisdom"],
 });
 
