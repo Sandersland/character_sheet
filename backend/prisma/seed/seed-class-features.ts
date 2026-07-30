@@ -351,11 +351,11 @@ function collectClassPairCounts(
   });
 }
 
-// Isolated so the `?? 0` fallback (never expected to fire — collectClass-
-// PairCounts always sets both editions — but costs nothing as a defensive
-// default) doesn't add a branch to every caller's own complexity count;
-// prisma/seed/** has no coverage instrumentation, so an extra branch here
-// is an extra 5 points of uncovered CRAP in whichever function holds it.
+// Isolated so the `?? 0` fallback (never expected to fire —
+// collectClassPairCounts always sets both editions — but costs nothing as a
+// defensive default) doesn't add a branch to every caller's own complexity
+// count; prisma/seed/** has no coverage instrumentation, so an extra branch
+// here is an extra 5 points of uncovered CRAP in whichever function holds it.
 function pairCount(entry: ClassPairCounts, edition: SeedEdition): number {
   return entry.perEdition.get(edition) ?? 0;
 }
