@@ -3,9 +3,9 @@
 // AttackTallyStrip and the Turn-summary banner — and both must behave
 // identically, so the verdict writes and the inline damage roll live here.
 //
-// The damage spec is DERIVED at resolve time from the row's formId against the
-// live inventory (buildAttackForms) rather than persisted on the row — if the
-// form no longer exists (weapon dropped mid-turn), the inline roll is simply
+// The damage spec is looked up at resolve time from the row's formId against the
+// character's live served attack rows rather than persisted on the tally row — if
+// the form no longer exists (weapon dropped mid-turn), the inline roll is simply
 // not offered and the verdict buttons still work.
 
 import { useCallback } from "react";
@@ -42,8 +42,9 @@ export function useTallyResolve({
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
 
-  // A bonusAction row resolves against the off-hand entry (no ability mod unless
-  // the TWF style) — never the main-hand form of the same weapon id (#813).
+  // A bonusAction row resolves against the off-hand entry (its served damage has
+  // the ability mod already dropped) — never the main-hand form, which carries the
+  // SAME id: the two rows are told apart by the off-hand flag alone (#813).
   const formFor = useCallback(
     (row: AttackTallyRow) => {
       if (row.source === "bonusAction") {

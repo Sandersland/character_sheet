@@ -3,9 +3,10 @@
  */
 
 /**
- * A derived attack row — unarmed strike or improvised weapon — computed
- * server-side and surfaced on the character so `AttacksPanel` can render them
- * without reproducing combat rules on the client.
+ * A derived attack profile — unarmed strike or improvised weapon — computed
+ * server-side and surfaced on the character so the session turn sheets can render
+ * it without reproducing combat rules on the client. Also the source the matching
+ * `AttackRow` entries are built from (#1434).
  */
 export interface DerivedAttack {
   attackBonus: number;

@@ -63,6 +63,33 @@ const mockCharacter: Character = {
     damage: { count: 1, faces: 4, modifier: 1, damageType: "bludgeoning" },
   },
   attacksPerAction: 1,
+  // Served attack rows (#1434). BannerVitals renders none of them, but the field
+  // is required on the wire, so the fixture carries the two always-present rows
+  // rather than being weakened to `as unknown as Character`.
+  attackRows: [
+    {
+      id: "unarmed",
+      kind: "unarmed",
+      name: "Unarmed Strike",
+      attackSpec: { count: 1, faces: 20, modifier: 3 },
+      damageSpec: { count: 1, faces: 1, modifier: 1 },
+      damageType: "bludgeoning",
+      magical: false,
+      offHand: false,
+      damageRiders: [],
+    },
+    {
+      id: "improvised",
+      kind: "improvised",
+      name: "Improvised Weapon",
+      attackSpec: { count: 1, faces: 20, modifier: 1 },
+      damageSpec: { count: 1, faces: 4, modifier: 1 },
+      damageType: "bludgeoning",
+      magical: false,
+      offHand: false,
+      damageRiders: [],
+    },
+  ],
   advancements: [],
   advancementSlots: { total: 1, used: 0 },
   fightingStyleSlots: { total: 0, used: 0 },
