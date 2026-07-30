@@ -16,4 +16,5 @@
  * `.fallowrc.jsonc`.
  */
 export * from "./ability-ops.js";
+export * from "./action-ops.js";
 export * from "./xp-ops.js";
