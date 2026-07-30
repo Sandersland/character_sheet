@@ -8,6 +8,8 @@ export interface MetersProps {
   overCapacity: boolean;
   hasAttunable: boolean;
   attunedCount: number;
+  /** The served attunement cap (#1377) — never a local literal. */
+  cap: number;
   atCap: boolean;
 }
 

@@ -129,6 +129,25 @@ describe("InventoryList encumbrance readout", () => {
   });
 });
 
+// The cap comes off the wire (#1377). Both fixtures use a cap of 5 rather than
+// 3 so a surviving local literal fails instead of coincidentally passing.
+describe("InventoryList attunement readout", () => {
+  const attunable = [
+    makeItem({ id: "r1", name: "Ring of Protection", category: "gear", requiresAttunement: true, attuned: true }),
+  ];
+
+  it("renders the served cap in the slim strip", () => {
+    render(makeCharacter(attunable, { attunementCap: 5 }));
+    expect(screen.getByText("1/5 attuned")).toBeInTheDocument();
+  });
+
+  it("renders the served cap on desktop", () => {
+    forceDesktop();
+    render(makeCharacter(attunable, { attunementCap: 5 }));
+    expect(screen.getByText("1/5 attuned")).toBeInTheDocument();
+  });
+});
+
 describe("InventoryList sectioning", () => {
   it("groups items under category headers with count and weight", () => {
     const inventory = [

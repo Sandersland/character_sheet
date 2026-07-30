@@ -35,9 +35,10 @@ export default function InventoryList() {
   const totalWeight = character.carriedWeight;
   const capacity = character.carryCapacity;
   const hasItems = character.inventory.length > 0;
-  // 5e: at most 3 attuned items. Derived from live rows; the server enforces it.
+  // The cap is served (#1377) — the same constant the attune endpoint 409s past.
+  // Counting the live rows stays local; the limit itself never does.
   const attunedCount = character.inventory.filter((item) => item.attuned).length;
-  const atCap = attunedCount >= 3;
+  const atCap = attunedCount >= character.attunementCap;
 
   const filtered = filterInventory(character.inventory, filter, search);
   const sections = buildSections(filtered);
@@ -61,6 +62,7 @@ export default function InventoryList() {
     overCapacity: totalWeight > capacity,
     hasAttunable: character.inventory.some((item) => item.requiresAttunement),
     attunedCount,
+    cap: character.attunementCap,
     atCap,
   };
 
