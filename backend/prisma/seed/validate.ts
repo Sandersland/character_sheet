@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { SUBCLASSES, subclassSeedSchema } from "./subclasses.js";
 import { SUBCLASS_GRANTED_SPELLS, subclassGrantedSpellSeedSchema } from "./subclass-granted-spells.js";
+import { CLASS_FEATURES, classFeatureSeedSchema } from "./class-features.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -24,6 +25,7 @@ interface SeedFamily {
 const SEED_FAMILIES: Record<string, SeedFamily> = {
   SUBCLASSES: { schema: subclassSeedSchema, rows: SUBCLASSES },
   SUBCLASS_GRANTED_SPELLS: { schema: subclassGrantedSpellSeedSchema, rows: SUBCLASS_GRANTED_SPELLS },
+  CLASS_FEATURES: { schema: classFeatureSeedSchema, rows: CLASS_FEATURES },
 };
 
 export interface SeedValidationSummary {

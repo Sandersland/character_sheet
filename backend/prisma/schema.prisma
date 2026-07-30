@@ -611,6 +611,9 @@ model CharacterClass {
 
   entries    CharacterClassEntry[]
   subclasses Subclass[]
+  // Back-relation only — not a column, appears on no payload unless included
+  // (#1522/#1523's ClassFeature foundation).
+  features   ClassFeature[]
 }
 
 // Subclass catalog — Pattern A (like Race/CharacterClass). Each row is a
@@ -644,6 +647,9 @@ model Subclass {
 
   selections    CharacterClassEntry[]
   grantedSpells SubclassGrantedSpell[]
+  // Back-relation only — not a column, appears on no payload unless included
+  // (#1522/#1523's ClassFeature foundation).
+  features      ClassFeature[]
 
   @@unique([classId, name, edition], name: "classId_name")
   // The slug-form twin of classId_name: a lineage that forks across editions
@@ -673,6 +679,108 @@ model SubclassGrantedSpell {
   castingAbility String
 
   @@unique([subclassId, spellId])
+  @@index([subclassId])
+}
+
+// Seeded home for the per-class feature text that lived in twelve lib/classes/
+// *.ts modules as DerivedFeature[] (#1522/#1523). Real relations (not bare
+// scalar FKs) to CharacterClass/Subclass, both onDelete: Cascade — #1524's
+// read path is "arrives through the include that already loads class/
+// subclass", which needs a `features` field on both parents to include, and
+// #1522 forbids making the derivation path async (the only alternative to a
+// relation here). classId is required (every feature belongs to a class);
+// subclassId is NULL for a base-class feature (the majority of rows).
+model ClassFeature {
+  id         String          @id @default(uuid())
+  classId    String
+  class      CharacterClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subclassId String?
+  subclass   Subclass?       @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  name       String
+  level      Int             // absolute character level (#1522's settled Q1 — copy 2014 subclass-grant levels verbatim)
+  description String
+
+  // Non-nullable, unlike Subclass/Feat/GrantedAbility/Background/Action's
+  // `edition RulesEdition?` (NULL there means "shared"). Here every row
+  // forks: this is the enforcement mechanism for "every class-authoring unit
+  // is a row per edition" (#1522 decision), which makes resolveEditionRow's
+  // shared-row (edition: null) fallback unreachable BY TYPE for this family —
+  // the #1430/#1519 "silently ambiguous which document a row cites" failure
+  // class cannot be expressed here at all.
+  edition RulesEdition
+
+  // ---- Descriptor columns (#1522 decision 3). Every one is NULL/default
+  // ---- after this migration — #1528 populates Fighter's, then each wave-2
+  // ---- per-class retab its own. Authored once here (one migration) rather
+  // ---- than re-migrating all 522 text rows a second time when #1528 lands.
+
+  // Resource block — replaces the pool this feature declares in resourceFn.
+  // A row may set resourceKey and leave the totals NULL: a formula-computed
+  // pool (Bardic Inspiration = Cha mod, Lay on Hands = level x 5) keeps
+  // resourceFn until #416's C3 evaluator exists.
+  resourceKey      String?
+  resourceLabel    String?
+  resourceRecharge String?  // RechargeOn
+  resourceTotals   Json?    // [{ minLevel, total }] — ASCENDING by minLevel, last-match-wins
+  resourceDieTiers Json?    // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
+
+  // Activation block — replaces this feature's DERIVED_ACTIONS row. No gate
+  // columns: grantClass IS classId, grantSubclassSlugs IS subclassId,
+  // grantLevel IS level — one row, one gate.
+  activationCost    String?  // ActionCost: action | bonusAction | reaction | free | special
+  resolverKind      String?  // ResolutionKind — served on the wire, retiring the frontend mirror
+  requiresUnarmored Boolean  @default(false)
+  regrants          String[] @default([])
+
+  // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
+  // exactly these four, all optional) so readAbilityCost reads them unchanged.
+  costKind    String?
+  costPoolKey String?
+  costBase    Int?
+  costPerStep Int?
+
+  // Effect block — GrantedAbility's columns MINUS upcastDicePerLevel,
+  // cantripScaling and concentration. Those three are deliberately NOT
+  // copied: EffectRow is `EffectColumns & { level: number }` and
+  // resolveEffectScaling reads `row.level` as the SPELL level, while this
+  // model's `level` is the CHARACTER level the feature is gained at. A
+  // ClassFeature row handed straight to readEffectSpec would typecheck and
+  // silently reinterpret the grant level — turning Second Wind (grant level
+  // 1) into an upcastable spell. Inert only because these three columns are
+  // absent; #1528 must adapt the row (e.g. `{ ...row, level: 0 }`) or use a
+  // dedicated reader, never add these three columns back to "complete" the copy.
+  effectKind           String?
+  effectDiceCount      Int?
+  effectDiceFaces      Int?
+  effectDieSource      String?
+  effectModifier       Int?
+  // "classLevel" | "abilityMod:<ability>" — the ONE column decision 3 adds
+  // beyond GrantedAbility's shipped vocabulary (#1528 earns it with content).
+  // NOT in EffectColumns, so readEffectSpec ignores it until #1528 wires it.
+  effectModifierSource String?
+  damageType           String?
+  attackType           String?
+  saveAbility          String?
+  saveEffect           String?
+  buffTarget           String?
+  buffModifier         Int?
+
+  // A passive derived-stat modifier is NOT a #900 C2b buff (duration-bound:
+  // while-active/until-rest) — Extra Attack (#1530), crit range (#1120) and
+  // half-proficiency (#1124) are permanent and level-gated, read synchronously
+  // in serializeCharacter off these two columns. Populated by nobody yet; the
+  // VALUE vocabulary is defined by whichever of #1530/#1120 populates it
+  // first — this issue invents none. Recorded as a comment on #900.
+  derivedStat      String?
+  derivedStatTiers Json?   // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
+
+  // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
+  // express it) — subclassId is nullable and base-class features are the
+  // majority of rows, so without it two identical (fighter, NULL, "Second
+  // Wind", EDITION_2024) rows would both insert.
+  @@unique([classId, subclassId, name, edition])
+  // The read path (#1524) joins on subclassId alone; the compound unique
+  // above is classId-prefixed and cannot serve it.
   @@index([subclassId])
 }
 
