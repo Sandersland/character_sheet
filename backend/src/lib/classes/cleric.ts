@@ -1,8 +1,8 @@
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-const CLERIC_FEATURES: DerivedFeature[] = [
+const CLERIC_FEATURES: AuthoredFeature[] = [
   {
     name: "Spellcasting",
     level: 1,
@@ -39,7 +39,7 @@ const CLERIC_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const LIFE_DOMAIN_FEATURES: DerivedFeature[] = [
+const LIFE_DOMAIN_FEATURES: AuthoredFeature[] = [
   // #1374: the lowest domain-spell tier is cleric level 1 in PHB'14 but level
   // 3 in PHB'24 (#1128) — the two editions genuinely disagree on this text,
   // so it forks into one row per edition sharing the "Domain Spells" name
@@ -106,7 +106,7 @@ const LIFE_DOMAIN_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const TRICKERY_DOMAIN_FEATURES: DerivedFeature[] = [
+const TRICKERY_DOMAIN_FEATURES: AuthoredFeature[] = [
   // #1374: same PHB'14-vs-PHB'24 lowest-tier fork as Life Domain above.
   {
     name: "Domain Spells",

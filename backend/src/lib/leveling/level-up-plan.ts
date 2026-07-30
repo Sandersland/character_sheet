@@ -87,7 +87,10 @@ function derivedAt(
   edition: RulesEdition,
 ): DerivedClassInfo | null {
   if (level < 1) return null;
-  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), edition);
+  // A pure planner (LevelUpPlanCharacter has no DB relation, see its own
+  // comment) — no featureRows carrier to pass, so this preview never lists
+  // features (#1524's Fact 2: no consumer of this planner reads them).
+  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), undefined, edition);
 }
 
 // Everything the ceremony's HP step shows the player: the advancing die, the Con

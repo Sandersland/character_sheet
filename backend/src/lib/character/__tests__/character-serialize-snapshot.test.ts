@@ -30,8 +30,11 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 const OWNER_ID = "owner-serialize-snapshot";
 const FIGHTER_CLASS_NAME = "Test Fighter (Snapshot Suite)";
+const WIZARD_CLASS_NAME = "Test Wizard (Snapshot Suite)";
 const CHAR_IDS = ["snap-char-multi", "snap-char-simple"];
 let fighterClassId: string;
+let wizardClassId: string;
+let battleMasterSubclassId: string;
 
 async function serialize(characterId: string) {
   const row = await prisma.character.findUniqueOrThrow({ where: { id: characterId }, include: characterInclude });
@@ -41,17 +44,47 @@ async function serialize(characterId: string) {
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   await prisma.character.deleteMany({ where: { id: { in: CHAR_IDS } } });
-  await prisma.characterClass.deleteMany({ where: { name: FIGHTER_CLASS_NAME } });
+  await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, WIZARD_CLASS_NAME] } } });
   // Fixed id so the classes view's classId snapshots deterministically.
   const fighter = await prisma.characterClass.create({
     data: { id: "class-snap-fighter", name: FIGHTER_CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"], skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3 },
   });
   fighterClassId = fighter.id;
+  const wizard = await prisma.characterClass.create({
+    data: { id: "class-snap-wizard", name: WIZARD_CLASS_NAME, hitDie: "d6", savingThrows: ["intelligence", "wisdom"], skillChoiceCount: 2, skillChoices: ["arcana"], isSpellcaster: true, subclassLevel: 2 },
+  });
+  wizardClassId = wizard.id;
+
+  // #1524: this fixture deliberately uses bespoke CharacterClass rows (fixed
+  // ids, for classId snapshot determinism) instead of the real seeded Fighter/
+  // Wizard rows, whose ids are fresh UUIDs per reseed. Now that feature TEXT
+  // is DB-linked via classId/subclassId (ClassFeature), these bespoke classes
+  // need their own ClassFeature rows too — text copied verbatim from the real
+  // seeded Fighter/Battle Master/Wizard EDITION_2024 rows (both fixtures below
+  // are EDITION_2024, the default) so the snapshot's pinned feature content
+  // still reflects production text, not a fixture-only string.
+  const battleMaster = await prisma.subclass.create({
+    data: { id: "subclass-snap-battle-master", classId: fighterClassId, name: "Test Battle Master (Snapshot Suite)", description: "Test fixture subclass.", slug: "battle-master" },
+  });
+  battleMasterSubclassId = battleMaster.id;
+
+  await prisma.classFeature.createMany({
+    data: [
+      { classId: fighterClassId, subclassId: null, name: "Fighting Style", level: 1, edition: "EDITION_2024", description: "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage)." },
+      { classId: fighterClassId, subclassId: null, name: "Second Wind", level: 1, edition: "EDITION_2024", description: "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest." },
+      { classId: fighterClassId, subclassId: null, name: "Action Surge", level: 2, edition: "EDITION_2024", description: "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17." },
+      { classId: fighterClassId, subclassId: null, name: "Extra Attack", level: 5, edition: "EDITION_2024", description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20." },
+      { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Combat Superiority", level: 3, edition: "EDITION_2024", description: "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated." },
+      { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Student of War", level: 3, edition: "EDITION_2024", description: "You gain proficiency with one type of artisan's tools of your choice." },
+      { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You copy spells into your spellbook and prepare a number equal to your Intelligence modifier + your wizard level (minimum 1) after each long rest." },
+      { classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024", description: "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots)." },
+    ],
+  });
 });
 
 afterAll(async () => {
   await prisma.character.deleteMany({ where: { id: { in: CHAR_IDS } } });
-  await prisma.characterClass.deleteMany({ where: { name: FIGHTER_CLASS_NAME } });
+  await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, WIZARD_CLASS_NAME] } } });
 });
 
 // Fixture 1 — wizard 5 / fighter 1 multiclass caster: used slots + stale slot
@@ -112,7 +145,7 @@ async function createMulticlassCaster() {
       },
       classEntries: {
         create: [
-          { id: "ce-snap-wiz", name: "wizard", position: 0, level: 5 },
+          { id: "ce-snap-wiz", name: "wizard", classId: wizardClassId, position: 0, level: 5 },
           // name must match a DERIVED_ACTIONS grantClass ("fighter") or
           // availableActions[] is structurally empty and this snapshot can't
           // regress — #1315's entry-scoping fix shipped with zero snapshot
@@ -230,7 +263,7 @@ async function createSimpleFighter() {
         advancements: [{ id: "adv-asi", level: 4, kind: "asi", abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 }],
         fightingStyle: "defense", // entitled at fighter 5, kept
       },
-      classEntries: { create: [{ id: "ce-snap-simple", name: "fighter", position: 0, level: 5, subclass: "battle master" }] },
+      classEntries: { create: [{ id: "ce-snap-simple", name: "fighter", classId: fighterClassId, position: 0, level: 5, subclass: "battle master", subclassId: battleMasterSubclassId }] },
     },
   });
 }

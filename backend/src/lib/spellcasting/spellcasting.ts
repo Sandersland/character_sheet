@@ -925,7 +925,10 @@ function resolveArcaneRecoveryContext(
 ): { resources: ResourcesMutableState; available: boolean; wizardLevel: number } {
   const primary = row.classEntries[0];
   const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
-  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus, editionOf(row));
+  // SPELLCASTING_SELECT carries no class/subclassRef.features relation — this
+  // caller only reads `.resources` (the arcaneRecovery pool key), so an absent
+  // featureRows carrier is safe (#1524's Fact 3).
+  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus, undefined, editionOf(row));
   return {
     resources: normalizeResourcesMutable(row.resources),
     available: Boolean(resourceInfo?.resources.some((r) => r.key === "arcaneRecovery")),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
+import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
 
 // Ability scores with distinct INT/WIS/CHA mods so tests can assert the right
@@ -26,11 +27,11 @@ const PROF_3 = 3; // proficiency at level 5+
 
 describe("deriveResources — unknown class", () => {
   it("returns null for a completely unknown class with no subclass", () => {
-    expect(deriveResources("artificer", undefined, 5, ABILITY_SCORES, PROF_2, "EDITION_2024")).toBeNull();
+    expect(deriveResources("artificer", undefined, 5, ABILITY_SCORES, PROF_2, testFeatureRowsFor("artificer", undefined), "EDITION_2024")).toBeNull();
   });
 
   it("returns null for an unknown class even with an unrecognised subclass", () => {
-    expect(deriveResources("artificer", "alchemist", 5, ABILITY_SCORES, PROF_2, "EDITION_2024")).toBeNull();
+    expect(deriveResources("artificer", "alchemist", 5, ABILITY_SCORES, PROF_2, testFeatureRowsFor("artificer", "alchemist"), "EDITION_2024")).toBeNull();
   });
 });
 
@@ -40,7 +41,7 @@ describe("deriveResources — unknown class", () => {
 
 describe("deriveResources — Battle Master subclass gating", () => {
   it("does not include superiorityDice below grant level 3", () => {
-    const result = deriveResources("fighter", "battle master", 2, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", "battle master", 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     // Fighter L2 has base features + pools (Second Wind, Action Surge)
     expect(result).not.toBeNull();
     const poolKeys = result!.resources.map((r) => r.key);
@@ -48,21 +49,21 @@ describe("deriveResources — Battle Master subclass gating", () => {
   });
 
   it("includes superiorityDice at grant level 3", () => {
-    const result = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result).not.toBeNull();
     const poolKeys = result!.resources.map((r) => r.key);
     expect(poolKeys).toContain("superiorityDice");
   });
 
   it("still returns non-null for a Fighter below subclass grant level (base features present)", () => {
-    const result = deriveResources("fighter", "battle master", 1, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", "battle master", 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result).not.toBeNull();
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
   it("returns null for a fully unknown subclass on a known class only if class has no data", () => {
     // Fighter has base data, so a purple dragon knight returns non-null (base Fighter features)
-    const result = deriveResources("fighter", "purple dragon knight", 5, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", "purple dragon knight", 5, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "purple dragon knight"), "EDITION_2024");
     expect(result).not.toBeNull();
     // But the unrecognised subclass itself contributes nothing
     const poolKeys = result!.resources.map((r) => r.key);
@@ -70,7 +71,7 @@ describe("deriveResources — Battle Master subclass gating", () => {
   });
 
   it("sets maneuverChoiceCount and maneuverSaveDC at level 3", () => {
-    const result = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result!.maneuverChoiceCount).toBe(3);
     // STR mod +3, DEX mod 0, prof 2 → DC = 8 + 2 + 3 = 13
     expect(result!.maneuverSaveDC).toBe(13);
@@ -82,14 +83,14 @@ describe("deriveResources — Battle Master subclass gating", () => {
 
 describe("deriveResources — Druid Wild Shape", () => {
   it("returns no wildShape pool below level 2", () => {
-    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
     const poolKeys = result!.resources.map((r) => r.key);
     expect(poolKeys).not.toContain("wildShape");
   });
 
   it("returns 2 wildShape uses at level 2", () => {
-    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
     const ws = result!.resources.find((r) => r.key === "wildShape");
     expect(ws).toBeDefined();
     expect(ws!.total).toBe(2);
@@ -97,24 +98,24 @@ describe("deriveResources — Druid Wild Shape", () => {
   });
 
   it("returns 2 wildShape uses through level 19", () => {
-    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "wildShape")!.total).toBe(2);
   });
 
   it("returns sentinel value at level 20 (Archdruid)", () => {
-    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
     const ws = result!.resources.find((r) => r.key === "wildShape");
     expect(ws!.total).toBeGreaterThan(10); // unlimited sentinel
   });
 
   it("Circle of the Moon shares the base wildShape pool (no duplicate)", () => {
-    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
     const wsPools = result!.resources.filter((r) => r.key === "wildShape");
     expect(wsPools.length).toBe(1); // exactly one — no duplicate from subclass
   });
 
   it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) at its level-3 grant (#1128)", () => {
-    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
     const featureNames = result!.features.map((f) => f.name);
     expect(featureNames).toContain("Combat Wild Shape");
     expect(featureNames).toContain("Circle Forms");
@@ -129,14 +130,14 @@ describe("deriveResources — Barbarian Rage", () => {
   it.each([
     [1, 2], [2, 2], [3, 3], [5, 3], [6, 4], [9, 4], [11, 4], [12, 5], [16, 5], [17, 6], [19, 6],
   ])("level %i → %i rage uses", (level, expectedTotal) => {
-    const result = deriveResources("barbarian", undefined, level, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("barbarian", undefined, level, ABILITY_SCORES, PROF_2, testFeatureRowsFor("barbarian", undefined), "EDITION_2024");
     const rage = result!.resources.find((r) => r.key === "rage");
     expect(rage!.total).toBe(expectedTotal);
     expect(rage!.recharge).toBe("longRest");
   });
 
   it("level 20 → unlimited sentinel", () => {
-    const result = deriveResources("barbarian", undefined, 20, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const result = deriveResources("barbarian", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("barbarian", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "rage")!.total).toBeGreaterThan(10);
   });
 });
@@ -149,44 +150,44 @@ describe("deriveResources — Bard Bardic Inspiration", () => {
   const HIGH_CHA = { ...ABILITY_SCORES, charisma: 16 }; // +3 modifier
 
   it("die is d6 before level 5", () => {
-    const result = deriveResources("bard", undefined, 3, HIGH_CHA, PROF_2, "EDITION_2024");
+    const result = deriveResources("bard", undefined, 3, HIGH_CHA, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     const bi = result!.resources.find((r) => r.key === "bardicInspiration");
     expect(bi!.die).toBe("d6");
   });
 
   it("die is d8 at level 5", () => {
-    const result = deriveResources("bard", undefined, 5, HIGH_CHA, PROF_3, "EDITION_2024");
+    const result = deriveResources("bard", undefined, 5, HIGH_CHA, PROF_3, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.die).toBe("d8");
   });
 
   it("die is d10 at level 10", () => {
-    const result = deriveResources("bard", undefined, 10, HIGH_CHA, PROF_4, "EDITION_2024");
+    const result = deriveResources("bard", undefined, 10, HIGH_CHA, PROF_4, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.die).toBe("d10");
   });
 
   it("die is d12 at level 15", () => {
-    const result = deriveResources("bard", undefined, 15, HIGH_CHA, PROF_5, "EDITION_2024");
+    const result = deriveResources("bard", undefined, 15, HIGH_CHA, PROF_5, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.die).toBe("d12");
   });
 
   it("recharges on longRest before level 5", () => {
-    const result = deriveResources("bard", undefined, 4, HIGH_CHA, PROF_2, "EDITION_2024");
+    const result = deriveResources("bard", undefined, 4, HIGH_CHA, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.recharge).toBe("longRest");
   });
 
   it("recharges on short-or-long at level 5 (Font of Inspiration)", () => {
-    const result = deriveResources("bard", undefined, 5, HIGH_CHA, PROF_3, "EDITION_2024");
+    const result = deriveResources("bard", undefined, 5, HIGH_CHA, PROF_3, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.recharge).toBe("short-or-long");
   });
 
   it("total = max(1, Cha modifier)", () => {
-    const result = deriveResources("bard", undefined, 3, HIGH_CHA, PROF_2, "EDITION_2024"); // Cha +3
+    const result = deriveResources("bard", undefined, 3, HIGH_CHA, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024"); // Cha +3
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.total).toBe(3);
   });
 
   it("total minimum 1 with Cha modifier ≤ 0", () => {
     const lowCha = { ...ABILITY_SCORES, charisma: 8 }; // -1 modifier
-    const result = deriveResources("bard", undefined, 3, lowCha, PROF_2, "EDITION_2024");
+    const result = deriveResources("bard", undefined, 3, lowCha, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.total).toBe(1);
   });
 });
@@ -195,32 +196,32 @@ describe("deriveResources — Bard Bardic Inspiration", () => {
 
 describe("deriveResources — Fighter base pools", () => {
   it("has secondWind at level 1", () => {
-    const result = deriveResources("fighter", undefined, 1, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "secondWind")).toBeDefined();
   });
 
   it("has actionSurge starting at level 2 (total 1)", () => {
-    const result = deriveResources("fighter", undefined, 2, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "actionSurge")!.total).toBe(1);
   });
 
   it("actionSurge total is 2 at level 17", () => {
-    const result = deriveResources("fighter", undefined, 17, ABILITY_SCORES, PROF_6, "EDITION_2024");
+    const result = deriveResources("fighter", undefined, 17, ABILITY_SCORES, PROF_6, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "actionSurge")!.total).toBe(2);
   });
 
   it("has no indomitable before level 9", () => {
-    const result = deriveResources("fighter", undefined, 8, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("fighter", undefined, 8, ABILITY_SCORES, PROF_3, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "indomitable")).toBeUndefined();
   });
 
   it("indomitable appears at level 9 (total 1)", () => {
-    const result = deriveResources("fighter", undefined, 9, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const result = deriveResources("fighter", undefined, 9, ABILITY_SCORES, PROF_4, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "indomitable")!.total).toBe(1);
   });
 
   it("indomitable total is 2 at level 13", () => {
-    const result = deriveResources("fighter", undefined, 13, ABILITY_SCORES, PROF_5, "EDITION_2024");
+    const result = deriveResources("fighter", undefined, 13, ABILITY_SCORES, PROF_5, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "indomitable")!.total).toBe(2);
   });
 });
@@ -229,19 +230,19 @@ describe("deriveResources — Fighter base pools", () => {
 
 describe("deriveResources — Monk Focus", () => {
   it("no focus pool below level 2", () => {
-    const result = deriveResources("monk", undefined, 1, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("monk", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("monk", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "focus")).toBeUndefined();
   });
 
   it("focus total equals monk level", () => {
     for (const level of [2, 5, 10, 17, 20]) {
-      const result = deriveResources("monk", undefined, level, ABILITY_SCORES, PROF_2, "EDITION_2024");
+      const result = deriveResources("monk", undefined, level, ABILITY_SCORES, PROF_2, testFeatureRowsFor("monk", undefined), "EDITION_2024");
       expect(result!.resources.find((r) => r.key === "focus")!.total).toBe(level);
     }
   });
 
   it("focus recharges on short-or-long rest", () => {
-    const result = deriveResources("monk", undefined, 5, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("monk", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("monk", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "focus")!.recharge).toBe("short-or-long");
   });
 });
@@ -253,7 +254,7 @@ describe("deriveResources — Monk Focus", () => {
 
 describe("deriveResources — Warrior of the Elements", () => {
   it("surfaces all four fixed features by level 17", () => {
-    const result = deriveResources("monk", "warrior of the elements", 17, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("monk", "warrior of the elements", 17, ABILITY_SCORES, PROF_2, testFeatureRowsFor("monk", "warrior of the elements"), "EDITION_2024");
     const names = result!.features.filter((f) => f.source === "subclass").map((f) => f.name);
     for (const feature of [
       "Manipulate Elements",
@@ -267,7 +268,7 @@ describe("deriveResources — Warrior of the Elements", () => {
   });
 
   it("does not surface subclass features below grant level 3", () => {
-    const result = deriveResources("monk", "warrior of the elements", 2, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("monk", "warrior of the elements", 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("monk", "warrior of the elements"), "EDITION_2024");
     expect(result!.features.some((f) => f.source === "subclass")).toBe(false);
   });
 });
@@ -279,7 +280,7 @@ describe("deriveResources — Warrior of the Elements", () => {
 
 describe("deriveResources — Warrior of Shadow", () => {
   it("describes the 1-focus Darkness cast plus Minor Illusion + Darkvision at level 3", () => {
-    const result = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("monk", "warrior of shadow"), "EDITION_2024");
     const feature = result!.features.find((f) => f.name === "Shadow Arts");
     expect(feature?.description).toMatch(/1 focus/i);
     expect(feature?.description).toMatch(/darkness/i);
@@ -288,22 +289,22 @@ describe("deriveResources — Warrior of Shadow", () => {
   });
 
   it("surfaces Improved Shadow Step at level 11 (replaces the 2014 Cloak of Shadows slot)", () => {
-    const below = deriveResources("monk", "warrior of shadow", 10, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const below = deriveResources("monk", "warrior of shadow", 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("monk", "warrior of shadow"), "EDITION_2024");
     expect(below!.features.some((f) => f.name === "Improved Shadow Step")).toBe(false);
-    const result = deriveResources("monk", "warrior of shadow", 11, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const result = deriveResources("monk", "warrior of shadow", 11, ABILITY_SCORES, PROF_4, testFeatureRowsFor("monk", "warrior of shadow"), "EDITION_2024");
     expect(result!.features.some((f) => f.name === "Improved Shadow Step")).toBe(true);
     // Cloak of Shadows hasn't unlocked yet at L11 — it moved to L17.
     expect(result!.features.some((f) => f.name === "Cloak of Shadows")).toBe(false);
   });
 
   it("surfaces the Cloak of Shadows feature at level 17", () => {
-    const result = deriveResources("monk", "warrior of shadow", 17, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const result = deriveResources("monk", "warrior of shadow", 17, ABILITY_SCORES, PROF_4, testFeatureRowsFor("monk", "warrior of shadow"), "EDITION_2024");
     expect(result!.features.some((f) => f.name === "Cloak of Shadows")).toBe(true);
   });
 
   it("no Opportunist feature at any level (2014 L17 feature retired)", () => {
     for (const level of [17, 20]) {
-      const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4, "EDITION_2024");
+      const result = deriveResources("monk", "warrior of shadow", level, ABILITY_SCORES, PROF_4, testFeatureRowsFor("monk", "warrior of shadow"), "EDITION_2024");
       expect(result!.features.some((f) => f.name === "Opportunist")).toBe(false);
     }
   });
@@ -316,29 +317,29 @@ describe("deriveResources — Paladin base pools", () => {
 
   it("layOnHands total = 5 × level", () => {
     for (const level of [1, 5, 10, 20]) {
-      const result = deriveResources("paladin", undefined, level, CHA_16, PROF_2, "EDITION_2024");
+      const result = deriveResources("paladin", undefined, level, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
       expect(result!.resources.find((r) => r.key === "layOnHands")!.total).toBe(level * 5);
     }
   });
 
   it("divineSense total = 1 + Cha modifier", () => {
-    const result = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, "EDITION_2024"); // +3 Cha
+    const result = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024"); // +3 Cha
     expect(result!.resources.find((r) => r.key === "divineSense")!.total).toBe(4); // 1+3
   });
 
   it("no channelDivinity before level 3", () => {
-    const result = deriveResources("paladin", undefined, 2, CHA_16, PROF_2, "EDITION_2024");
+    const result = deriveResources("paladin", undefined, 2, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeUndefined();
   });
 
   it("channelDivinity appears at level 3", () => {
-    const result = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, "EDITION_2024");
+    const result = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeDefined();
   });
 
   it("oaths share base channelDivinity pool — exactly one channelDivinity pool", () => {
     for (const oath of ["oath of devotion", "oath of the ancients", "oath of vengeance"]) {
-      const result = deriveResources("paladin", oath, 5, CHA_16, PROF_3, "EDITION_2024");
+      const result = deriveResources("paladin", oath, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", oath), "EDITION_2024");
       const cdPools = result!.resources.filter((r) => r.key === "channelDivinity");
       expect(cdPools.length).toBe(1);
     }
@@ -349,13 +350,13 @@ describe("deriveResources — Paladin base pools", () => {
 
 describe("deriveResources — Sorcerer Sorcery Points", () => {
   it("no sorcery points before level 2", () => {
-    const result = deriveResources("sorcerer", undefined, 1, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("sorcerer", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("sorcerer", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "sorceryPoints")).toBeUndefined();
   });
 
   it("sorcery points total equals sorcerer level", () => {
     for (const level of [2, 5, 10, 20]) {
-      const result = deriveResources("sorcerer", undefined, level, ABILITY_SCORES, PROF_2, "EDITION_2024");
+      const result = deriveResources("sorcerer", undefined, level, ABILITY_SCORES, PROF_2, testFeatureRowsFor("sorcerer", undefined), "EDITION_2024");
       expect(result!.resources.find((r) => r.key === "sorceryPoints")!.total).toBe(level);
     }
   });
@@ -365,30 +366,30 @@ describe("deriveResources — Sorcerer Sorcery Points", () => {
 
 describe("deriveResources — Cleric Channel Divinity", () => {
   it("no channelDivinity at level 1", () => {
-    const result = deriveResources("cleric", undefined, 1, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("cleric", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeUndefined();
   });
 
   it("1 use at levels 2–5", () => {
     for (const level of [2, 3, 5]) {
-      const result = deriveResources("cleric", undefined, level, ABILITY_SCORES, PROF_2, "EDITION_2024");
+      const result = deriveResources("cleric", undefined, level, ABILITY_SCORES, PROF_2, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
       expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(1);
     }
   });
 
   it("2 uses at level 6", () => {
-    const result = deriveResources("cleric", undefined, 6, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("cleric", undefined, 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(2);
   });
 
   it("3 uses at level 18", () => {
-    const result = deriveResources("cleric", undefined, 18, ABILITY_SCORES, PROF_6, "EDITION_2024");
+    const result = deriveResources("cleric", undefined, 18, ABILITY_SCORES, PROF_6, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(3);
   });
 
   it("domains share base channelDivinity — no duplicates", () => {
     for (const domain of ["life domain", "trickery domain"]) {
-      const result = deriveResources("cleric", domain, 5, ABILITY_SCORES, PROF_3, "EDITION_2024");
+      const result = deriveResources("cleric", domain, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("cleric", domain), "EDITION_2024");
       const cdPools = result!.resources.filter((r) => r.key === "channelDivinity");
       expect(cdPools.length).toBe(1);
     }
@@ -399,28 +400,28 @@ describe("deriveResources — Cleric Channel Divinity", () => {
 
 describe("deriveResources — features-only classes", () => {
   it("Rogue has features but no resource pools", () => {
-    const result = deriveResources("rogue", undefined, 5, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("rogue", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("rogue", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
     expect(result!.resources).toHaveLength(0);
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
   it("Ranger has features but no resource pools", () => {
-    const result = deriveResources("ranger", undefined, 5, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("ranger", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("ranger", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
     expect(result!.resources).toHaveLength(0);
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
   it("Wizard has features and the Arcane Recovery pool (#904)", () => {
-    const result = deriveResources("wizard", undefined, 5, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("wizard", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("wizard", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
     expect(result!.resources.map((r) => r.key)).toEqual(["arcaneRecovery"]);
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
   it("Warlock has features but no resource pools", () => {
-    const result = deriveResources("warlock", undefined, 5, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("warlock", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("warlock", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
     expect(result!.resources).toHaveLength(0);
     expect(result!.features.length).toBeGreaterThan(0);
@@ -431,13 +432,13 @@ describe("deriveResources — features-only classes", () => {
 
 describe("deriveResources — feature level gating", () => {
   it("does not surface features above current level", () => {
-    const result = deriveResources("fighter", undefined, 1, ABILITY_SCORES, PROF_2, "EDITION_2024");
+    const result = deriveResources("fighter", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
     const hasHighLevelFeature = result!.features.some((f) => f.level > 1);
     expect(hasHighLevelFeature).toBe(false);
   });
 
   it("surfaces features up to and including current level", () => {
-    const result = deriveResources("monk", undefined, 7, ABILITY_SCORES, PROF_3, "EDITION_2024");
+    const result = deriveResources("monk", undefined, 7, ABILITY_SCORES, PROF_3, testFeatureRowsFor("monk", undefined), "EDITION_2024");
     const names = result!.features.map((f) => f.name);
     expect(names).toContain("Evasion");       // level 7
     expect(names).toContain("Stunning Strike"); // level 5
@@ -445,7 +446,7 @@ describe("deriveResources — feature level gating", () => {
   });
 
   it("features are sorted by level ascending", () => {
-    const result = deriveResources("barbarian", undefined, 10, ABILITY_SCORES, PROF_4, "EDITION_2024");
+    const result = deriveResources("barbarian", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("barbarian", undefined), "EDITION_2024");
     const levels = result!.features.map((f) => f.level);
     for (let i = 1; i < levels.length; i++) {
       expect(levels[i]).toBeGreaterThanOrEqual(levels[i - 1]);

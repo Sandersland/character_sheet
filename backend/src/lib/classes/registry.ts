@@ -9,6 +9,7 @@ import { editionOf } from "@/lib/rules/edition.js";
 
 import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";
+import { featuresFromRows, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { cleric } from "./cleric.js";
 import { druid } from "./druid.js";
 import { fighter } from "./fighter.js";
@@ -17,7 +18,7 @@ import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
 import { rogue } from "./rogue.js";
 import { sorcerer } from "./sorcerer.js";
-import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, SubclassDefinition } from "./types.js";
+import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
 
@@ -55,15 +56,6 @@ export function resolveClassDie(source: string, info: DerivedClassInfo): number 
   return Number.isFinite(faces) && faces > 0 ? faces : null;
 }
 
-// The ONE place the edition rule for feature TEXT lives (#1374) — mirrors
-// subclassGateLevel's shape (edition last). Absent `edition` on a feature
-// means "both editions"; a feature tagged for the other edition is filtered
-// out here, before mergeLayers/collectEntryScopedFeatures ever see it, so
-// their dedup-by-name never has to arbitrate between a fork's two halves.
-export function featureAppliesToEdition(feature: DerivedFeature, edition: RulesEdition): boolean {
-  return feature.edition === undefined || feature.edition === edition;
-}
-
 interface ClassLayer {
   pools: DerivedResource[];
   features: DerivedFeature[];
@@ -75,11 +67,12 @@ function deriveBaseLayer(
   abilityScores: Record<string, number>,
   profBonus: number,
   subclassKey: string | undefined,
+  featureRows: ClassFeatureRowsCarrier | undefined,
   edition: RulesEdition,
 ): ClassLayer {
   return {
     pools: classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [],
-    features: (classDef?.features ?? []).filter((f) => f.level <= level && featureAppliesToEdition(f, edition)),
+    features: featuresFromRows(featureRows?.classRows ?? [], level, "class", edition),
   };
 }
 
@@ -112,6 +105,7 @@ function deriveSubclassLayer(
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  featureRows: ClassFeatureRowsCarrier | undefined,
   edition: RulesEdition,
 ): SubclassLayer {
   const def = SUBCLASSES[subclassKey];
@@ -126,7 +120,7 @@ function deriveSubclassLayer(
     // subclass, so passing it again would be a silent semantic change under
     // deriveResources' byte-identical-2024-output AC.
     pools: def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [],
-    features: def.features.filter((f) => f.level <= level && featureAppliesToEdition(f, edition)),
+    features: featuresFromRows(featureRows?.subclassRows ?? [], level, "subclass", edition),
   };
 }
 
@@ -153,36 +147,62 @@ export function deriveResources(
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  // The seeded ClassFeature rows this character's class/subclass loaded
+  // (characterInclude, #1522/#1523/#1524) — optional and positioned
+  // immediately before `edition` (edition stays last, the subclassGateLevel/
+  // #1499 convention). Absent for every caller reaching this function through
+  // a narrow select that can't carry a relation (deriveEntryScopedResources'
+  // five such callers); only deriveEntryInfo (below) ever builds a real one.
+  featureRows: ClassFeatureRowsCarrier | undefined,
   edition: RulesEdition,
 ): DerivedClassInfo | null {
   const classKey = (className ?? "").toLowerCase();
   const subclassKey = (subclass ?? "").toLowerCase();
 
-  const sub = deriveSubclassLayer(subclassKey, level, abilityScores, profBonus, edition);
+  const sub = deriveSubclassLayer(subclassKey, level, abilityScores, profBonus, featureRows, edition);
   // Feed the active subclass into the base pool derivation so base-wins pool-key
   // collisions (e.g. druid wildShape) resolve to the subclass's variant (#906).
-  const base = deriveBaseLayer(CLASSES[classKey], level, abilityScores, profBonus, sub.active ? subclassKey : undefined, edition);
+  const base = deriveBaseLayer(
+    CLASSES[classKey],
+    level,
+    abilityScores,
+    profBonus,
+    sub.active ? subclassKey : undefined,
+    featureRows,
+    edition,
+  );
   const { resources, features } = mergeLayers(base, sub);
 
-  // Return null only for truly unknown/empty classes
-  if (resources.length === 0 && features.length === 0) return null;
-
-  const result: DerivedClassInfo = { resources, features };
-
-  // Subclass-specific bespoke choice-cap fields (ClassExtras) — the only shape
-  // a subclass's deriveExtras may contribute beyond its resources/features layer.
+  // Subclass-specific bespoke choice-cap fields (ClassExtras) and the generic
+  // subclass "choose N" list (#899) — computed BEFORE the null check below.
+  // #1524: with an absent featureRows carrier (every narrow-select caller —
+  // e.g. RESOURCES_SELECT's applyResourceOpInTx, which learnSubclassChoice
+  // itself runs through), `features` is now empty for classes whose TS array
+  // used to guarantee `features.length > 0` unconditionally (a resourceFn-less
+  // class/subclass, e.g. Ranger/Hunter). Deciding null-ness on resources+
+  // features alone — as pre-#1524 code safely could, since features was never
+  // actually empty for a known class — would silently drop a subclass's
+  // deriveExtras/choices contribution for exactly those classes. Extras must
+  // be computed first and folded into the null decision.
+  let extras: ClassExtras | undefined;
   if (sub.active && sub.def?.deriveExtras) {
-    Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus, edition));
+    extras = sub.def.deriveExtras(level, abilityScores, profBonus, edition);
   }
-
-  // Generic subclass "choose N" features (#899): list only those the character
-  // has reached (count > 0). The reconciler/clamp and level-up step read this.
+  let subclassChoices: DerivedSubclassChoice[] | undefined;
   if (sub.active && sub.def?.choices) {
-    const subclassChoices = sub.def.choices
+    const computed = sub.def.choices
       .map((c) => ({ key: c.key, label: c.label, catalogSource: c.catalogSource, count: c.count(level) }))
       .filter((c) => c.count > 0);
-    if (subclassChoices.length > 0) result.subclassChoices = subclassChoices;
+    if (computed.length > 0) subclassChoices = computed;
   }
+  const hasExtras = (extras !== undefined && Object.keys(extras).length > 0) || subclassChoices !== undefined;
+
+  // Return null only for truly unknown/empty classes
+  if (resources.length === 0 && features.length === 0 && !hasExtras) return null;
+
+  const result: DerivedClassInfo = { resources, features };
+  if (extras) Object.assign(result, extras);
+  if (subclassChoices) result.subclassChoices = subclassChoices;
 
   return result;
 }
@@ -206,12 +226,16 @@ export function deriveResourcesForCharacterRow(row: {
   const profBonus = proficiencyBonusForLevel(level);
   const primaryEntry = row.classEntries[0];
   const abilityScores = row.abilityScores as Record<string, number>;
+  // No relation on this row's narrow select — no production caller of this
+  // wrapper exists today (barrel export + tests only, #1524); featureRows
+  // stays absent rather than widening a shape nothing loads.
   const derived = deriveResources(
     primaryEntry?.name ?? "",
     primaryEntry?.subclass ?? undefined,
     level,
     abilityScores,
     profBonus,
+    undefined,
     editionOf(row),
   );
   return { derived, level };
@@ -228,7 +252,7 @@ export function deriveResourcesForCharacterRow(row: {
 export function deriveEntryScopedResourcesForCharacterRow(row: {
   experiencePoints: number;
   abilityScores: unknown;
-  classEntries: { name: string; subclass?: string | null; level: number }[];
+  classEntries: EntryScopedClassEntry[];
   rulesEdition: RulesEdition;
 }): { derived: DerivedClassInfo | null; level: number } {
   const level = levelForExperience(row.experiencePoints);
@@ -292,20 +316,49 @@ function overlayExtrasFields(acc: DerivedClassInfo | null, info: DerivedClassInf
   return target;
 }
 
+// The minimal shape every classEntries caller has. `deriveEntryScopedResources`
+// and its collectors below are GENERIC over it (`<E extends EntryScopedClassEntry>`)
+// rather than structurally declaring an optional `class?`/`subclassRef?`
+// feature-carrier shape on this type directly (#1524) — several narrow
+// selects legitimately declare their OWN unrelated same-named field (e.g.
+// combat/hp-context.ts's `ClassEntryRow.class = { hitDie: string } | null`),
+// and TypeScript's weak-type check rejects assigning that to any type
+// declaring `class?: { features?: ... }` even though both fields are
+// optional, because the two `class` shapes share no properties at all. Generic
+// + the getFeatureRows callback below sidesteps that: every caller's own
+// concrete entry type only ever needs to satisfy THIS minimal constraint.
+interface EntryScopedClassEntry {
+  name: string;
+  subclass?: string | null;
+  level: number;
+}
+
+// Extracts one entry's feature-carrier rows, supplied by the caller that
+// actually has them loaded — only buildResourcesView (serialize/classes.ts)
+// passes one, built from the real characterInclude relations
+// (entry.class?.features / entry.subclassRef?.features). Every narrow-select
+// caller (MANEUVER_SELECT, FOCUS_CAST_CHARACTER_SELECT, SPELLCASTING_SELECT,
+// rest.ts's HpOpContext, level-reconciliation.ts's three selects,
+// channel-divinity.ts) omits this parameter entirely — none of them read
+// `.features` (#1524's Fact 3) — so `undefined` flows through to
+// deriveResources unedited at every one of those call sites.
+type GetFeatureRows<E> = (entry: E) => ClassFeatureRowsCarrier | undefined;
+
 // One class entry's own DerivedClassInfo at ITS OWN effective level (not the
 // primary's or the summed total) — the single derivation the pools/features
 // collectors and the extras-overlay loop below all key off, so the
 // effectiveEntryLevel + deriveResources call lives in exactly one place.
-function deriveEntryInfo(
-  entry: { name: string; subclass?: string | null; level: number },
+function deriveEntryInfo<E extends EntryScopedClassEntry>(
+  entry: E,
   entryCount: number,
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  getFeatureRows: GetFeatureRows<E> | undefined,
   edition: RulesEdition,
 ): DerivedClassInfo | null {
   const effLevel = effectiveEntryLevel(entry.level, entryCount, totalLevel);
-  return deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus, edition);
+  return deriveResources(entry.name, entry.subclass ?? undefined, effLevel, abilityScores, profBonus, getFeatureRows?.(entry), edition);
 }
 
 // How a sanctioned shared pool key's contributions from multiple class entries
@@ -351,17 +404,18 @@ function mergeSharedPool(existing: DerivedResource, incoming: DerivedResource, s
 // on every read/write, never persisted). Split out of deriveEntryScopedResources
 // to keep that function's branching budget for the (unrelated) choice-cap
 // overlay loop.
-function collectEntryScopedPools(
-  classEntries: { name: string; subclass?: string | null; level: number }[],
+function collectEntryScopedPools<E extends EntryScopedClassEntry>(
+  classEntries: E[],
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  getFeatureRows: GetFeatureRows<E> | undefined,
   edition: RulesEdition,
 ): DerivedResource[] {
   const indexByKey = new Map<string, number>();
   const pools: DerivedResource[] = [];
   for (const entry of classEntries) {
-    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, edition);
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
     for (const pool of info?.resources ?? []) {
       addOrMergeEntryPool(pools, indexByKey, pool, entry.name);
     }
@@ -403,17 +457,18 @@ function addOrMergeEntryPool(
 // same-named feature from a different class collapses into one entry rather
 // than being attributed to both — if per-class attribution is later needed,
 // that's a separate change.
-function collectEntryScopedFeatures(
-  classEntries: { name: string; subclass?: string | null; level: number }[],
+function collectEntryScopedFeatures<E extends EntryScopedClassEntry>(
+  classEntries: E[],
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  getFeatureRows: GetFeatureRows<E> | undefined,
   edition: RulesEdition,
 ): DerivedFeature[] {
   const seenNames = new Set<string>();
   const features: DerivedFeature[] = [];
   for (const entry of classEntries) {
-    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, edition);
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
     for (const feature of info?.features ?? []) {
       if (seenNames.has(feature.name)) continue;
       seenNames.add(feature.name);
@@ -440,24 +495,28 @@ function collectEntryScopedFeatures(
  * characters, so single-class output is byte-identical to a bare
  * deriveResources() call (see the parity tests).
  */
-export function deriveEntryScopedResources(
-  classEntries: { name: string; subclass?: string | null; level: number }[],
+export function deriveEntryScopedResources<E extends EntryScopedClassEntry>(
+  classEntries: E[],
   totalLevel: number,
   abilityScores: Record<string, number>,
   profBonus: number,
   edition: RulesEdition,
+  // Optional (#1524): only buildResourcesView (serialize/classes.ts) — the ONE
+  // production caller with real ClassFeature relations loaded — passes one.
+  // See GetFeatureRows's own comment for why every other caller omits it.
+  getFeatureRows?: GetFeatureRows<E>,
 ): { derived: DerivedClassInfo | null } {
   let derived: DerivedClassInfo | null = null;
 
   for (const entry of classEntries) {
-    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, edition);
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
     if (!info || !entryContributesExtras(info)) continue;
 
     derived = overlayExtrasFields(derived, info);
   }
 
-  const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus, edition);
-  const features = collectEntryScopedFeatures(classEntries, totalLevel, abilityScores, profBonus, edition);
+  const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
+  const features = collectEntryScopedFeatures(classEntries, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
 
   if (derived) {
     derived.resources = pools;

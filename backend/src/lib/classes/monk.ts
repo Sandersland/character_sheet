@@ -2,7 +2,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { abilityModifier, deriveMartialArtsDie } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature, DerivedResource, InitiativeRegen } from "./types.js";
+import type { AuthoredFeature, ClassDefinition, DerivedResource, InitiativeRegen } from "./types.js";
 
 // Monk save DC — used by Stunning Strike, Open Hand Technique, Quivering Palm
 // (live-play automation lives in their own modules, which import this), focus
@@ -27,7 +27,7 @@ export function monkPoolKey(edition: RulesEdition): "ki" | "focus" {
   return edition === "EDITION_2014" ? "ki" : "focus";
 }
 
-const MONK_FEATURES: DerivedFeature[] = [
+const MONK_FEATURES: AuthoredFeature[] = [
   {
     name: "Unarmored Defense",
     level: 1,
@@ -155,7 +155,7 @@ const MONK_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_THE_OPEN_HAND_FEATURES: AuthoredFeature[] = [
   {
     name: "Open Hand Technique",
     level: 3,
@@ -190,7 +190,7 @@ const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
 // menu for a single 1-focus Darkness cast + passive Minor Illusion/Darkvision
 // grants; Cloak of Shadows moves 11 -> 17 (replacing Opportunist, retired —
 // no 2024 equivalent) and Improved Shadow Step fills the vacated L11 slot.
-const WARRIOR_OF_SHADOW_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_SHADOW_FEATURES: AuthoredFeature[] = [
   {
     name: "Shadow Arts",
     level: 3,
@@ -231,7 +231,7 @@ const WARRIOR_OF_SHADOW_FEATURES: DerivedFeature[] = [
 // Survivor's saving-throw proficiency above, it's feature text only; this
 // app has no mechanism for a subclass to auto-add to the persisted skill/tool
 // proficiency lists (those are chosen at creation).
-const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_MERCY_FEATURES: AuthoredFeature[] = [
   {
     name: "Implements of Mercy",
     level: 3,
@@ -282,7 +282,7 @@ const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
 // Burst at L6, Stride of the Elements at L11, and the Elemental Epitome capstone
 // at L17. Elemental Attunement is modeled as a while-active buff + two Focus-
 // spending session actions (toggle + Elemental Burst) — see warrior-of-elements.ts.
-const WARRIOR_OF_THE_ELEMENTS_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_THE_ELEMENTS_FEATURES: AuthoredFeature[] = [
   {
     name: "Manipulate Elements",
     level: 3,

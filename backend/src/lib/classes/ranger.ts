@@ -1,6 +1,6 @@
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-const RANGER_FEATURES: DerivedFeature[] = [
+const RANGER_FEATURES: AuthoredFeature[] = [
   {
     name: "Favored Enemy",
     level: 1,
@@ -79,7 +79,7 @@ const RANGER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const HUNTER_FEATURES: DerivedFeature[] = [
+const HUNTER_FEATURES: AuthoredFeature[] = [
   {
     name: "Hunter's Prey",
     level: 3,
@@ -110,7 +110,7 @@ const HUNTER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const BEAST_MASTER_FEATURES: DerivedFeature[] = [
+const BEAST_MASTER_FEATURES: AuthoredFeature[] = [
   {
     name: "Ranger's Companion",
     level: 3,

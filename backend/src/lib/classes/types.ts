@@ -71,19 +71,49 @@ export interface DerivedResource {
   description?: string;
 }
 
+/**
+ * A feature exactly as authored in a lib/classes/<class>.ts module (and the
+ * seed's mirroring `RawFeatureRow`, prisma/seed/class-features.ts) — the
+ * pre-migration shape, kept because the twelve class modules stay the seed's
+ * AUTHORING input even after #1524 (they no longer feed the derivation
+ * directly; `CLASS_FEATURES` compiles from them at seed time — #1524's Fact
+ * 1). `edition` optional: the ~256-entry majority never sets it (both
+ * editions share the text) and #1374 rejected a blanket tagging pass to force
+ * one. `DerivedFeature` below is the read-time counterpart — split out
+ * because the two can no longer share one type (see its own comment).
+ */
+export interface AuthoredFeature {
+  name: string;
+  level: number;        // character level at which this feature is gained
+  description: string;
+  source: "class" | "subclass";
+  edition?: RulesEdition;
+}
+
+/**
+ * A feature as DERIVED for one character (registry.ts's deriveResources
+ * output), resolved from seeded `ClassFeature` rows by `featuresFromRows`
+ * (lib/classes/class-feature-rows.ts) — now the ONE place the edition rule
+ * for feature TEXT lives, retiring `featureAppliesToEdition` (#1374/#1524).
+ * `edition` is REQUIRED here, unlike `AuthoredFeature.edition?` above:
+ * `ClassFeature.edition` is a non-nullable DB column (#1522 decision 3 — every
+ * row forks one-per-edition), so every row `featuresFromRows` reads already
+ * names its edition; an untagged *derived* feature would mean row-resolution
+ * failed, not a valid "both editions" state. (#1524 is what makes this split
+ * possible: before it, this type's `edition` was optional too, and its
+ * comment claimed "absent means both editions" / "a blanket tagging pass is
+ * not wanted" — both now false at the DERIVED layer, because #1522 already
+ * tagged every row at the AUTHORING layer; the untagged case didn't
+ * disappear, it relocated to `AuthoredFeature` above.) Still server-side
+ * only: `toWireFeatures` (serialize/classes.ts) strips this field at the wire
+ * boundary.
+ */
 export interface DerivedFeature {
   name: string;
   level: number;        // character level at which this feature is gained
   description: string;
   source: "class" | "subclass";
-  /**
-   * Absent means valid in both editions (the ~150-entry default). A feature
-   * whose text genuinely diverges between PHB'14 and PHB'24 forks into one
-   * row per edition sharing the same `name` — mirrors `Subclass.edition`
-   * (#1306) — filtered by `featureAppliesToEdition` (registry.ts), the one
-   * place this rule lives. A blanket tagging pass is not wanted (#1374).
-   */
-  edition?: RulesEdition;
+  edition: RulesEdition;
 }
 
 /**
@@ -205,7 +235,7 @@ export interface SubclassDefinition {
    * the same 2014 gate (#1308/#1291).
    */
   grantLevel?: number;
-  features: DerivedFeature[];
+  features: AuthoredFeature[];
   resourceFn?: ResourceFn;
   deriveExtras?: ExtrasFn;
   /**
@@ -217,7 +247,7 @@ export interface SubclassDefinition {
 }
 
 export interface ClassDefinition {
-  features: DerivedFeature[];
+  features: AuthoredFeature[];
   resourceFn?: ResourceFn;
   /** Keyed by lowercase subclass name (entry.subclass.toLowerCase()). */
   subclasses?: Record<string, SubclassDefinition>;

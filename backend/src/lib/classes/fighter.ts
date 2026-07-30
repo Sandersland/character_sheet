@@ -1,6 +1,6 @@
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature, DerivedResource } from "./types.js";
+import type { AuthoredFeature, ClassDefinition, DerivedResource } from "./types.js";
 
 /** Superiority dice count by Fighter level (Battle Master). */
 function battleMasterDiceCount(level: number): number {
@@ -34,7 +34,7 @@ function battleMasterManeuverCount(level: number): number {
   return 3;
 }
 
-const FIGHTER_FEATURES: DerivedFeature[] = [
+const FIGHTER_FEATURES: AuthoredFeature[] = [
   {
     name: "Fighting Style",
     level: 1,
@@ -72,7 +72,7 @@ const FIGHTER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const BATTLE_MASTER_FEATURES: DerivedFeature[] = [
+const BATTLE_MASTER_FEATURES: AuthoredFeature[] = [
   {
     name: "Combat Superiority",
     level: 3,
@@ -115,7 +115,7 @@ const BATTLE_MASTER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const CHAMPION_FEATURES: DerivedFeature[] = [
+const CHAMPION_FEATURES: AuthoredFeature[] = [
   {
     name: "Improved Critical",
     level: 3,
@@ -150,7 +150,7 @@ const CHAMPION_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const ELDRITCH_KNIGHT_FEATURES: DerivedFeature[] = [
+const ELDRITCH_KNIGHT_FEATURES: AuthoredFeature[] = [
   {
     name: "Eldritch Knight Spellcasting",
     level: 3,

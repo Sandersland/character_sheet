@@ -37,7 +37,18 @@ export function buildResourcesView(
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
 ): { resources: object | undefined; maneuverSaveDC: number | undefined } {
-  const { derived: derivedRes } = deriveEntryScopedResources(row.classEntries, level, abilityScores, proficiencyBonus, editionOf(row));
+  // The ONE production caller that supplies real ClassFeature rows (#1524):
+  // characterInclude loaded entry.class.features (already subclassId:null
+  // filtered) and entry.subclassRef.features — featuresFromRows does the
+  // per-edition filter inside deriveResources itself.
+  const { derived: derivedRes } = deriveEntryScopedResources(
+    row.classEntries,
+    level,
+    abilityScores,
+    proficiencyBonus,
+    editionOf(row),
+    (entry) => ({ classRows: entry.class?.features ?? [], subclassRows: entry.subclassRef?.features ?? [] }),
+  );
 
   const resources = derivedRes
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
@@ -47,8 +58,9 @@ export function buildResourcesView(
 }
 
 // #1272/#1374: DerivedFeature.edition is a server-side selector (which of a
-// fork's two rows survived featureAppliesToEdition) — never a client-trusted
-// rule input, so it must not cross the wire. Every other buildResourcesPayload
+// fork's two rows survived featuresFromRows' edition filter,
+// lib/classes/class-feature-rows.ts, #1524) — never a client-trusted rule
+// input, so it must not cross the wire. Every other buildResourcesPayload
 // field is already explicitly projected; `features` was the one passthrough.
 export function toWireFeatures(
   features: DerivedFeature[],

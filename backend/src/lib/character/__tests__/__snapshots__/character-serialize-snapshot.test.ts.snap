@@ -168,7 +168,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "class": "wizard",
   "classes": [
     {
-      "classId": undefined,
+      "classId": "class-snap-wizard",
       "id": "ce-snap-wiz",
       "level": 5,
       "name": "wizard",
@@ -868,12 +868,12 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "class": "fighter",
   "classes": [
     {
-      "classId": undefined,
+      "classId": "class-snap-fighter",
       "id": "ce-snap-simple",
       "level": 5,
       "name": "fighter",
       "subclass": "battle master",
-      "subclassId": undefined,
+      "subclassId": "subclass-snap-battle-master",
     },
   ],
   "conditionImmunities": [],
@@ -1116,7 +1116,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "speed": 30,
   "spellcasting": undefined,
   "subclass": "battle master",
-  "subclassId": undefined,
+  "subclassId": "subclass-snap-battle-master",
   "toolProficiencies": [
     {
       "category": "artisan",

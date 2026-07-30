@@ -31,6 +31,12 @@ function getPlan(characterId: string, query = "", cookie = COOKIE) {
 
 async function makeFighter(opts: { id: string; xp: number; hitDiceTotal: number; entryLevel: number; subclass: string | null }): Promise<string> {
   const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+  // #1524: production always sets subclassId alongside the subclass string
+  // (routes/character/class.ts, level-up.ts); resolved here so this fixture
+  // matches that shape.
+  const subclassId = opts.subclass
+    ? (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: opts.subclass } })).id
+    : null;
   await prisma.character.create({
     data: {
       ...BASE,
@@ -43,7 +49,7 @@ async function makeFighter(opts: { id: string; xp: number; hitDiceTotal: number;
       abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
       spellcasting: Prisma.JsonNull,
       classEntries: {
-        create: [{ name: "fighter", subclass: opts.subclass, classId: fighter.id, position: 0, level: opts.entryLevel }],
+        create: [{ name: "fighter", subclass: opts.subclass, subclassId, classId: fighter.id, position: 0, level: opts.entryLevel }],
       },
     },
   });
@@ -101,6 +107,12 @@ async function makePaladin(opts: { id: string; hitDiceTotal: number; entryLevel:
 // advance — `classId` is optional so the detached-entry fallback can be exercised.
 async function makeWizard(opts: { id: string; entryLevel: number; withClassId?: boolean }): Promise<string> {
   const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+  const detached = opts.withClassId === false;
+  // #1524: production always sets subclassId alongside the subclass string
+  // (routes/character/class.ts, level-up.ts) — but only when classId itself
+  // is set; the `withClassId: false` case deliberately keeps BOTH ids absent
+  // to exercise the detached-entry fallback (no catalog class row at all).
+  const subclassId = detached ? null : (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
   await prisma.character.create({
     data: {
       ...BASE,
@@ -116,7 +128,8 @@ async function makeWizard(opts: { id: string; entryLevel: number; withClassId?: 
         create: [{
           name: "wizard",
           subclass: "School of Evocation",
-          classId: opts.withClassId === false ? null : wizard.id,
+          subclassId,
+          classId: detached ? null : wizard.id,
           position: 0,
           level: opts.entryLevel,
         }],
