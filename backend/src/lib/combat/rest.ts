@@ -3,7 +3,8 @@ import type { ShortRestOperation } from "@character-sheet/contracts";
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { deriveEntryScopedResources, type DerivedClassInfo, type DerivedResource } from "@/lib/classes/class-features.js";
+import type { RechargeOn } from "@/lib/classes/types.js";
 import { editionOf } from "@/lib/rules/edition.js";
 // Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
 // now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
@@ -153,9 +154,33 @@ async function rechargeItemChargePoolsOnRest(
 // the two ops differ only in which phases run and with which rest kind.
 
 /** Does a class-resource pool recharge on this rest? "short-or-long" fires on both. */
-function poolRechargesOn(recharge: string, rest: "short" | "long"): boolean {
+function poolRechargesOn(recharge: RechargeOn, rest: "short" | "long"): boolean {
   if (recharge === "short-or-long") return true;
   return recharge === (rest === "short" ? "shortRest" : "longRest");
+}
+
+/**
+ * Per-pool rest arithmetic (#1221) — the ONE place `recharge` and
+ * `shortRestRegain` combine, so `resetRestResources`'s loop stays a plain
+ * fold over this. `recharge` firing on this rest is checked FIRST and wins
+ * outright (`nextUsed: 0`): a pool that both fully resets on a short rest
+ * AND declares `shortRestRegain` (not a real 2024 case today, but not
+ * forbidden) must not have the partial top-up subtract on top of the full
+ * reset. Only once the full reset doesn't apply does a short rest's partial
+ * `shortRestRegain` top-up apply — `?? 0` when absent is what makes every
+ * pool that doesn't declare it (every pool that exists today) inert here.
+ */
+export function restPoolRegain(
+  pool: DerivedResource,
+  used: number,
+  rest: "short" | "long",
+): { nextUsed: number; restored: number } {
+  if (poolRechargesOn(pool.recharge, rest)) {
+    return { nextUsed: 0, restored: used };
+  }
+  const regain = rest === "short" ? (pool.shortRestRegain ?? 0) : 0;
+  const restored = Math.min(regain, used);
+  return { nextUsed: used - restored, restored };
 }
 
 /**
@@ -178,10 +203,19 @@ function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
 }
 
 /**
- * Reset class resource pools that recharge on this rest (e.g. Battle Master
- * superiority dice on short, Rage on long; "short-or-long" fires on both).
- * Mutates and returns the normalized state for the caller to serialize; the
- * before-state deep-clone feeds the event snapshot that undo restores.
+ * Reset class resource pools that recharge or partially regain on this rest
+ * (e.g. Battle Master superiority dice on short, Rage on long, a 2024 pool's
+ * `shortRestRegain` top-up; "short-or-long" fires on both) via the shared
+ * `restPoolRegain` — this loop is its only production caller. Mutates and
+ * returns the normalized state for the caller to serialize.
+ *
+ * `beforeResourceState` is snapshotted BEFORE this loop runs, so undo always
+ * restores the exact prior `used` map regardless of whether the rest fully
+ * reset a pool or only partially topped it up — partial and full restore are
+ * structurally indistinguishable to undo. No class declares `shortRestRegain`
+ * yet (#1221 ships the mechanism only), so the end-to-end *partial*-restore
+ * undo case has no pool to assert against here; it lands with the first
+ * consuming class issue (#1227, Fighter Second Wind).
  */
 function resetRestResources(
   row: HpOpContext["row"],
@@ -192,10 +226,16 @@ function resetRestResources(
   const beforeResourceState = snapshotResources(state);
   let resourcesRestored = 0;
   for (const pool of derivedRes?.resources ?? []) {
-    if (poolRechargesOn(pool.recharge, rest)) {
-      resourcesRestored += state.used[pool.key] ?? 0;
-      state.used[pool.key] = 0;
+    const used = state.used[pool.key] ?? 0;
+    const { nextUsed, restored } = restPoolRegain(pool, used, rest);
+    // Only write when this pool actually recharges/tops up on this rest — a
+    // pool inert on this rest (the common case: no class declares
+    // shortRestRegain yet, and most pools don't recharge on both rest kinds)
+    // must not materialize a fresh `used[key] = 0` entry it never had before.
+    if (poolRechargesOn(pool.recharge, rest) || restored > 0) {
+      state.used[pool.key] = nextUsed;
     }
+    resourcesRestored += restored;
   }
   // A long rest resets the once-per-long-rest initiative-regen cap (#1239) so
   // the next combat's regen (e.g. Uncanny Metabolism) can fire again.

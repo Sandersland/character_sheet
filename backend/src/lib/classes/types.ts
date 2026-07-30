@@ -68,6 +68,19 @@ export interface DerivedResource {
    * Perfect Focus (every combat, top-up to 4). Inert when absent.
    */
   onInitiative?: InitiativeRegen | InitiativeRegen[];
+  /**
+   * Partial short-rest top-up (#1221, SRD 5.2's "regain one expended use on a
+   * Short Rest, and all on a Long Rest" — 2024 Rage / Channel Divinity /
+   * Second Wind / Wild Shape). Orthogonal to `recharge`, which keeps meaning a
+   * FULL restore on the named rest: `shortRestRegain: N` additionally regains
+   * up to N expended uses on a short rest. Where `recharge` already fires on a
+   * short rest (`shortRest` / `short-or-long`), the full reset wins and this
+   * field is a no-op for that rest — never subtracted twice. Absent ⇒ today's
+   * behaviour exactly (no partial top-up). Read only by `restPoolRegain`
+   * (lib/combat/rest.ts). Independent of `onInitiative`, which fires on a
+   * different trigger (combat start, not a rest) — a pool may declare both.
+   */
+  shortRestRegain?: number;
   description?: string;
 }
 
