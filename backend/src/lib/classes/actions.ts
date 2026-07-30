@@ -483,7 +483,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // The object-use grant is the edition-invariant half and is the `regrants`
   // link; the reminder deliberately does not NAME that action, since SRD 5.1
   // calls it Use an Object and SRD 5.2 Utilize. #1240's edition-blind service
-  // of this catalog is why the name has to come off the wire, not out of here.
+  // of this row is why the name has to come off the wire, not out of here.
   // The prose feature description stays in rogue.ts's THIEF_FEATURES — that is
   // the feature; this is the action.
   {

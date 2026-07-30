@@ -284,9 +284,11 @@ export function buildUnarmedOnlyForms(character: Character): AttackEntry[] {
 // character level (#1441).
 //
 // PHB'14 Flurry of Blows is always two unarmed strikes at every level — there
-// is no 2014 three-strike upgrade. This mirrors the 2024-only DERIVED_ACTIONS
-// row (backend lib/classes/actions.ts carries no edition axis, so a 2014 Monk
-// is served this branch regardless); tracked on #1435 / #1313, not forked here.
+// is no 2014 three-strike upgrade. `DERIVED_ACTIONS`'s flurryOfBlows row is
+// now tagged EDITION_2024 (#1499), so a 2014 Monk is no longer served this
+// action at all — flurryStrikeCount itself still takes no edition parameter
+// (isn't forked client-side); rules-edition forks stay backend-owned.
+// Tracked on #1435 / #1313.
 export function flurryStrikeCount(character: Character): number {
   return classEntryLevel(character, "monk") >= 10 ? 3 : 2;
 }
