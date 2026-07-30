@@ -11,10 +11,12 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
+import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
+
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 12, intelligence: 14, wisdom: 16, charisma: 16 };
 
 function subclassFeatures(className: string, subclass: string, level: number, edition: RulesEdition = "EDITION_2024") {
-  const info = deriveResources(className, subclass, level, ABILITIES, proficiencyBonusForLevel(level), edition);
+  const info = deriveResources(className, subclass, level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor(className, subclass), edition);
   return (info?.features ?? []).filter((f) => f.source === "subclass");
 }
 
@@ -38,7 +40,7 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
 
   it("Archfey's feyPresence pool is absent at level 2 and present at level 3", () => {
     const at = (level: number) =>
-      deriveResources("warlock", "the archfey", level, ABILITIES, proficiencyBonusForLevel(level), "EDITION_2024")
+      deriveResources("warlock", "the archfey", level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("warlock", "the archfey"), "EDITION_2024")
         ?.resources.some((r) => r.key === "feyPresence") ?? false;
     expect(at(2)).toBe(false);
     expect(at(3)).toBe(true);
@@ -54,7 +56,7 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
     ["warlock", "the great old one"],
   ];
   it.each(L1_LABEL_SUBCLASSES)("%s / %s has no feature description labelling a tier (L1)", (className, subclass) => {
-    const info = deriveResources(className, subclass, 20, ABILITIES, proficiencyBonusForLevel(20), "EDITION_2024");
+    const info = deriveResources(className, subclass, 20, ABILITIES, proficiencyBonusForLevel(20), testFeatureRowsFor(className, subclass), "EDITION_2024");
     const withL1 = (info?.features ?? []).filter((f) => f.description.includes("(L1)")).map((f) => f.name);
     expect(withL1).toEqual([]);
   });

@@ -86,6 +86,7 @@ describe("POST /api/characters/:id/level-up/transactions — Fighter 7→8 (hp +
   beforeEach(async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
     fighterClassId = fighter.id;
+    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighterClassId, name: "Champion" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -98,7 +99,7 @@ describe("POST /api/characters/:id/level-up/transactions — Fighter 7→8 (hp +
         abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
         spellcasting: Prisma.JsonNull,
         classEntries: {
-          create: [{ name: "fighter", subclass: "Champion", classId: fighterClassId, position: 0, level: 7 }],
+          create: [{ name: "fighter", subclass: "Champion", subclassId: champion, classId: fighterClassId, position: 0, level: 7 }],
         },
       },
     });
@@ -200,6 +201,7 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 
   beforeEach(async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -212,7 +214,7 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
         abilityScores: { strength: 8, dexterity: 14, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
         classEntries: {
-          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+          create: [{ name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 3 }],
         },
       },
     });
@@ -396,6 +398,7 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 describe("POST …/level-up/transactions — Bard Magical Secrets eligibility gate (#1440)", () => {
   async function makeBard(id: string, opts: { hitDiceTotal: number; xp: number; edition?: "EDITION_2014" | "EDITION_2024" }): Promise<string> {
     const bard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Bard" } });
+    const collegeOfLore = (await prisma.subclass.findFirstOrThrow({ where: { classId: bard.id, name: "College of Lore" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -409,7 +412,7 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
         abilityScores: { strength: 10, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
         classEntries: {
-          create: [{ name: "bard", subclass: "College of Lore", classId: bard.id, position: 0, level: opts.hitDiceTotal }],
+          create: [{ name: "bard", subclass: "College of Lore", subclassId: collegeOfLore, classId: bard.id, position: 0, level: opts.hitDiceTotal }],
         },
       },
     });
@@ -566,6 +569,7 @@ describe("POST …/level-up/transactions — prepared-spell swap (Sorcerer 5→6
 
   beforeEach(async () => {
     const sorcerer = await prisma.characterClass.findFirstOrThrow({ where: { name: "Sorcerer" } });
+    const draconicBloodline = (await prisma.subclass.findFirstOrThrow({ where: { classId: sorcerer.id, name: "Draconic Bloodline" } })).id;
     const pool = await prisma.spell.findMany({ where: { classes: { has: "sorcerer" }, level: 1 }, take: 5 });
     expect(pool.length).toBe(5);
     seeded = [pool[0], pool[1]];
@@ -584,7 +588,7 @@ describe("POST …/level-up/transactions — prepared-spell swap (Sorcerer 5→6
           slotsUsed: {}, arcanumUsed: {}, concentratingOn: null,
           spells: [entryFor(pool[0], "known-a"), entryFor(pool[1], "known-b")],
         },
-        classEntries: { create: [{ name: "sorcerer", subclass: "Draconic Bloodline", classId: sorcerer.id, position: 0, level: 5 }] },
+        classEntries: { create: [{ name: "sorcerer", subclass: "Draconic Bloodline", subclassId: draconicBloodline, classId: sorcerer.id, position: 0, level: 5 }] },
       },
     });
   });
@@ -677,6 +681,7 @@ describe("POST …/level-up/transactions — prepared-spell swap (Sorcerer 5→6
 describe("POST …/level-up/transactions — swap rejected for a non-caster (#1101)", () => {
   it("400: a Fighter 7→8 forget is rejected (does not allow swapping)", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Champion" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -688,7 +693,7 @@ describe("POST …/level-up/transactions — swap rejected for a non-caster (#11
         hitDice: { total: 7, die: "d10", spent: 0 },
         abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
         spellcasting: Prisma.JsonNull,
-        classEntries: { create: [{ name: "fighter", subclass: "Champion", classId: fighter.id, position: 0, level: 7 }] },
+        classEntries: { create: [{ name: "fighter", subclass: "Champion", subclassId: champion, classId: fighter.id, position: 0, level: 7 }] },
       },
     });
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-fighter-swap" } });
@@ -710,6 +715,7 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
 
   beforeEach(async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -722,7 +728,7 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
         abilityScores: { strength: 8, dexterity: 14, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
         classEntries: {
-          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+          create: [{ name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 3 }],
         },
       },
     });
@@ -842,6 +848,9 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     subclass: string | null;
   }): Promise<string> {
     const fighter = await fighterClass();
+    const subclassId = opts.subclass
+      ? (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: opts.subclass } })).id
+      : null;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -854,7 +863,7 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
         abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
         spellcasting: Prisma.JsonNull,
         classEntries: {
-          create: [{ name: "fighter", subclass: opts.subclass, classId: fighter.id, position: 0, level: opts.entryLevel }],
+          create: [{ name: "fighter", subclass: opts.subclass, subclassId, classId: fighter.id, position: 0, level: opts.entryLevel }],
         },
       },
     });
@@ -964,6 +973,7 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     const CHAR_ID = "lvtx-rej-multiclass";
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await fighterClass();
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -977,7 +987,7 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
         classEntries: {
           create: [
-            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 2 },
+            { name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 2 },
             { name: "fighter", subclass: null, classId: fighter.id, position: 1, level: 2 },
           ],
         },
@@ -1048,6 +1058,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
     const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     const CHAR_ID = "lvtx-mc-into-fighter";
     await prisma.character.create({
       data: {
@@ -1058,7 +1069,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
         hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 3, die: "d6", spent: 0 },
         classEntries: {
-          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+          create: [{ name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 3 }],
         },
       },
     });
@@ -1092,6 +1103,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
     const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     const CHAR_ID = "lvtx-mc-undo";
     await prisma.character.create({
       data: {
@@ -1102,7 +1114,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
         hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 3, die: "d6", spent: 0 },
         classEntries: {
-          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+          create: [{ name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 3 }],
         },
       },
     });
@@ -1126,6 +1138,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
     const champion = await prisma.subclass.findFirstOrThrow({ where: { name: "Champion", classId: fighter.id } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     const CHAR_ID = "lvtx-mc-champion";
     await prisma.character.create({
       data: {
@@ -1137,7 +1150,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
         hitDice: { total: 5, die: "d6", spent: 0 },
         classEntries: {
           create: [
-            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
+            { name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 3 },
             { name: "fighter", subclass: null, classId: fighter.id, position: 1, level: 2 },
           ],
         },
@@ -1168,6 +1181,8 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
   it("a non-primary Battle Master 6→7 (maneuvers-only plan) commits and caps at the fighter-7 count; single revert restores everything", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
+    const battleMaster = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } })).id;
     const CHAR_ID = "lvtx-mc-bm-maneuvers";
     await prisma.character.create({
       data: {
@@ -1179,8 +1194,8 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
         hitDice: { total: 9, die: "d6", spent: 0 },
         classEntries: {
           create: [
-            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
-            { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 6 },
+            { name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 3 },
+            { name: "fighter", subclass: "Battle Master", subclassId: battleMaster, classId: fighter.id, position: 1, level: 6 },
           ],
         },
       },
@@ -1214,6 +1229,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
     const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
     const warriorOfElements = await prisma.subclass.findFirstOrThrow({ where: { name: "Warrior of the Elements" } });
+    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Champion" } })).id;
     const CHAR_ID = "lvtx-mc-monk-elements";
     await prisma.character.create({
       data: {
@@ -1228,7 +1244,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
         spellcasting: Prisma.JsonNull,
         classEntries: {
           create: [
-            { name: "fighter", subclass: "Champion", classId: fighter.id, position: 0, level: 5 },
+            { name: "fighter", subclass: "Champion", subclassId: champion, classId: fighter.id, position: 0, level: 5 },
             { name: "monk", subclass: null, classId: monk.id, position: 1, level: 2 },
           ],
         },
@@ -1257,6 +1273,8 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
   it("atomicity: a bogus maneuverId 400s the whole ceremony — entry level unchanged, zero events", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
+    const battleMaster = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } })).id;
     const CHAR_ID = "lvtx-mc-bm-atomicity";
     await prisma.character.create({
       data: {
@@ -1268,8 +1286,8 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
         hitDice: { total: 9, die: "d6", spent: 0 },
         classEntries: {
           create: [
-            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
-            { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 6 },
+            { name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 3 },
+            { name: "fighter", subclass: "Battle Master", subclassId: battleMaster, classId: fighter.id, position: 1, level: 6 },
           ],
         },
       },
@@ -1298,6 +1316,7 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
 describe("POST …/level-up/transactions — subclassChoice validator messages", () => {
   it("rejects a subclassChoices entry with a bogus choiceKey on a ceremony with no such step", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Champion" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -1309,7 +1328,7 @@ describe("POST …/level-up/transactions — subclassChoice validator messages",
         hitDice: { total: 7, die: "d10", spent: 0 },
         abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
         spellcasting: Prisma.JsonNull,
-        classEntries: { create: [{ name: "fighter", subclass: "Champion", classId: fighter.id, position: 0, level: 7 }] },
+        classEntries: { create: [{ name: "fighter", subclass: "Champion", subclassId: champion, classId: fighter.id, position: 0, level: 7 }] },
       },
     });
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-choice-bogus" } });
@@ -1367,6 +1386,7 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
 
   beforeEach(async () => {
     const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
+    const theFiend = (await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -1378,7 +1398,7 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
         hitDice: { total: 3, die: "d8", spent: 0 },
         abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
-        classEntries: { create: [{ name: "warlock", subclass: "The Fiend", classId: warlock.id, position: 0, level: 3 }] },
+        classEntries: { create: [{ name: "warlock", subclass: "The Fiend", subclassId: theFiend, classId: warlock.id, position: 0, level: 3 }] },
       },
     });
   });
@@ -1449,6 +1469,7 @@ describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)
 
   beforeEach(async () => {
     const rogue = await prisma.characterClass.findFirstOrThrow({ where: { name: "Rogue" } });
+    const thief = (await prisma.subclass.findFirstOrThrow({ where: { classId: rogue.id, name: "Thief" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -1461,7 +1482,7 @@ describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)
         // High across the board so any multiclass prerequisite is met.
         abilityScores: { strength: 15, dexterity: 15, constitution: 15, intelligence: 15, wisdom: 15, charisma: 15 },
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
-        classEntries: { create: [{ name: "rogue", subclass: "Thief", classId: rogue.id, position: 0, level: 5 }] },
+        classEntries: { create: [{ name: "rogue", subclass: "Thief", subclassId: thief, classId: rogue.id, position: 0, level: 5 }] },
       },
     });
   });
@@ -1520,6 +1541,7 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
   it("single-class Fighter 6→7: hitPoints.max rises by exactly meta.averageGain", async () => {
     const CHAR_ID = "lvtx-hp-meta-single";
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Champion" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -1531,7 +1553,7 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
         hitDice: { total: 6, die: "d10", spent: 0 },
         abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
         spellcasting: Prisma.JsonNull,
-        classEntries: { create: [{ name: "fighter", subclass: "Champion", classId: fighter.id, position: 0, level: 6 }] },
+        classEntries: { create: [{ name: "fighter", subclass: "Champion", subclassId: champion, classId: fighter.id, position: 0, level: 6 }] },
       },
     });
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
@@ -1548,6 +1570,7 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
     const CHAR_ID = "lvtx-hp-meta-multi";
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     await prisma.character.create({
       data: {
         ...BASE,
@@ -1562,7 +1585,7 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
         spellcasting: { slotsUsed: {}, spells: [] } as Prisma.InputJsonValue,
         classEntries: {
           create: [
-            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 5 },
+            { name: "wizard", subclass: "School of Evocation", subclassId: evocation, classId: wizard.id, position: 0, level: 5 },
             { name: "fighter", subclass: null, classId: fighter.id, position: 1, level: 1 },
           ],
         },

@@ -77,6 +77,14 @@ let hordeBreakerId: string; // huntersPrey
 let steelWillId: string; // defensiveTactics
 
 async function createHunter(level: number, xp: number, resourcesJson: Prisma.InputJsonValue | typeof Prisma.JsonNull) {
+  // #1524: classId/subclassId resolved from the real seeded catalog rows —
+  // production always sets both (routes/character/class.ts, level-up.ts), and
+  // characterInclude's ClassFeature relations key off them, so a fixture that
+  // sets neither loses every feature (base AND subclass) under the new
+  // rows-fed derivation. The string "ranger"/"hunter" pair still separately
+  // drives deriveResources' pools/extras/gate — unaffected by these ids.
+  const rangerClass = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Ranger" } });
+  const hunterSubclass = await prisma.subclass.findFirstOrThrow({ where: { classId: rangerClass.id, name: "Hunter" } });
   return prisma.character.create({
     data: {
       ...BASE_CHARACTER,
@@ -89,7 +97,9 @@ async function createHunter(level: number, xp: number, resourcesJson: Prisma.Inp
       spellcasting: Prisma.JsonNull,
       resources: resourcesJson,
       // name "ranger" + subclass "hunter" drive deriveResources directly.
-      classEntries: { create: [{ name: "ranger", subclass: "hunter", position: 0, level }] },
+      classEntries: {
+        create: [{ name: "ranger", classId: rangerClass.id, subclass: "hunter", subclassId: hunterSubclass.id, position: 0, level }],
+      },
     },
   });
 }

@@ -1,6 +1,6 @@
-import type { ClassDefinition, DerivedFeature, DerivedResource } from "./types.js";
+import type { AuthoredFeature, ClassDefinition, DerivedResource } from "./types.js";
 
-const WARLOCK_FEATURES: DerivedFeature[] = [
+const WARLOCK_FEATURES: AuthoredFeature[] = [
   {
     name: "Pact Magic",
     level: 1,
@@ -38,7 +38,7 @@ const WARLOCK_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const THE_FIEND_FEATURES: DerivedFeature[] = [
+const THE_FIEND_FEATURES: AuthoredFeature[] = [
   // #1374: PHB'14 grants the Expanded Spell List at warlock level 1, keyed by
   // SPELL level (not character level) — genuinely different text from the
   // 2024 row below (which labels tiers by 2024 character level, #1128), so
@@ -91,7 +91,7 @@ const THE_FIEND_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const THE_ARCHFEY_FEATURES: DerivedFeature[] = [
+const THE_ARCHFEY_FEATURES: AuthoredFeature[] = [
   // #1374: same PHB'14-vs-PHB'24 spell-level-vs-character-level fork as The
   // Fiend above.
   {
@@ -142,7 +142,7 @@ const THE_ARCHFEY_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const THE_GREAT_OLD_ONE_FEATURES: DerivedFeature[] = [
+const THE_GREAT_OLD_ONE_FEATURES: AuthoredFeature[] = [
   // #1374: same PHB'14-vs-PHB'24 spell-level-vs-character-level fork as The
   // Fiend/Archfey above.
   {

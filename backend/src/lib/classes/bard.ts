@@ -1,8 +1,8 @@
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature, RechargeOn } from "./types.js";
+import type { AuthoredFeature, ClassDefinition, RechargeOn } from "./types.js";
 
-const BARD_FEATURES: DerivedFeature[] = [
+const BARD_FEATURES: AuthoredFeature[] = [
   {
     name: "Spellcasting",
     level: 1,
@@ -68,7 +68,7 @@ const BARD_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const COLLEGE_OF_LORE_FEATURES: DerivedFeature[] = [
+const COLLEGE_OF_LORE_FEATURES: AuthoredFeature[] = [
   {
     name: "Bonus Proficiencies",
     level: 3,
@@ -99,7 +99,7 @@ const COLLEGE_OF_LORE_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const COLLEGE_OF_VALOR_FEATURES: DerivedFeature[] = [
+const COLLEGE_OF_VALOR_FEATURES: AuthoredFeature[] = [
   {
     name: "Bonus Proficiencies",
     level: 3,

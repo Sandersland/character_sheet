@@ -1,4 +1,4 @@
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
 // Font of Magic "Creating Spell Slots" cost table (PHB p.101): slot level → SP cost.
 // Sorcerers can create spell slots no higher than 5th level.
@@ -11,7 +11,7 @@ export function sorceryPointCostForSlot(slotLevel: number): number | null {
   return FONT_OF_MAGIC_SLOT_COSTS[slotLevel] ?? null;
 }
 
-const SORCERER_FEATURES: DerivedFeature[] = [
+const SORCERER_FEATURES: AuthoredFeature[] = [
   {
     name: "Spellcasting",
     level: 1,
@@ -49,7 +49,7 @@ const SORCERER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const DRACONIC_BLOODLINE_FEATURES: DerivedFeature[] = [
+const DRACONIC_BLOODLINE_FEATURES: AuthoredFeature[] = [
   {
     name: "Dragon Ancestor",
     level: 1,
@@ -87,7 +87,7 @@ const DRACONIC_BLOODLINE_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const WILD_MAGIC_FEATURES: DerivedFeature[] = [
+const WILD_MAGIC_FEATURES: AuthoredFeature[] = [
   {
     name: "Wild Magic Surge",
     level: 1,

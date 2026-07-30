@@ -54,12 +54,20 @@ function cdPools(body: { resources: { pools: CDPool[] } }): CDPool[] {
 describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'14 p.164)", () => {
   let clericId: string;
   let paladinId: string;
+  let lifeDomainId: string;
+  let oathOfDevotionId: string;
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
     clericId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Cleric" } })).id;
     paladinId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Paladin" } })).id;
+    // #1524: production always sets subclassId alongside the subclass string
+    // (routes/character/class.ts, level-up.ts) — resolved here so these
+    // fixtures match that shape even though channelDivinity's pool merge
+    // itself is driven by the "cleric"/"paladin" name strings, not these ids.
+    lifeDomainId = (await prisma.subclass.findFirstOrThrow({ where: { classId: clericId, name: "Life Domain" } })).id;
+    oathOfDevotionId = (await prisma.subclass.findFirstOrThrow({ where: { classId: paladinId, name: "Oath of Devotion" } })).id;
   });
 
   describe("Cleric 2 / Paladin 3 (total level 5) — MC_LOW", () => {
@@ -79,8 +87,8 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
           resources: Prisma.JsonNull,
           classEntries: {
             create: [
-              { name: "cleric", subclass: "Life Domain", classId: clericId, position: 0, level: 2 },
-              { name: "paladin", subclass: "Oath of Devotion", classId: paladinId, position: 1, level: 3 },
+              { name: "cleric", subclass: "Life Domain", subclassId: lifeDomainId, classId: clericId, position: 0, level: 2 },
+              { name: "paladin", subclass: "Oath of Devotion", subclassId: oathOfDevotionId, classId: paladinId, position: 1, level: 3 },
             ],
           },
         },
@@ -123,7 +131,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
           classEntries: {
             create: [
               { name: "cleric", classId: clericId, position: 0, level: 6 },
-              { name: "paladin", subclass: "Oath of Devotion", classId: paladinId, position: 1, level: 4 },
+              { name: "paladin", subclass: "Oath of Devotion", subclassId: oathOfDevotionId, classId: paladinId, position: 1, level: 4 },
             ],
           },
         },
@@ -224,7 +232,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
           resources: Prisma.JsonNull,
           classEntries: {
             create: [
-              { name: "paladin", subclass: "Oath of Devotion", classId: paladinId, position: 0, level: 4 },
+              { name: "paladin", subclass: "Oath of Devotion", subclassId: oathOfDevotionId, classId: paladinId, position: 0, level: 4 },
               { name: "cleric", classId: clericId, position: 1, level: 6 },
             ],
           },

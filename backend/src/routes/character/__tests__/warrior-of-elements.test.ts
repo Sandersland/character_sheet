@@ -42,18 +42,62 @@ function agent() {
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/warrior-of-elements/transactions`;
 
-async function createMonk(level: number, subclass?: string) {
+// #1524: production always sets both classId/subclassId (routes/character/
+// class.ts, level-up.ts), and characterInclude's ClassFeature relations key
+// off them. This fixture's bespoke CLASS_NAME row (isolated by name, this
+// file's own convention) carries no seeded rows on its own, so a subclass
+// string with no matching subclassId now loses that subclass's feature TEXT
+// entirely. Only "Warrior of the Elements" is asserted against `.features`
+// (the rest only exercise pools/gates, unaffected by missing subclassId), so
+// only its rows are seeded — text copied verbatim from the real seeded Monk/
+// Warrior of the Elements EDITION_2024 rows.
+const WARRIOR_OF_ELEMENTS_SUBCLASS_NAME = "Warrior of Elements Route Test Subclass";
+let warriorOfElementsSubclassId: string | undefined;
+
+async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ classId: string; subclassId: string | undefined }> {
   const cls = await prisma.characterClass.upsert({
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
   });
+  if (subclass !== "Warrior of the Elements") return { classId: cls.id, subclassId: undefined };
+
+  if (!warriorOfElementsSubclassId) {
+    // find-then-create, never .upsert()'s classId_name compound key: `edition`
+    // is nullable and Prisma rejects a literal null inside a compound-unique
+    // where at runtime (dec-1-2, catalog-edition.ts's upsertEditionRow JSDoc).
+    const existing = await prisma.subclass.findFirst({ where: { classId: cls.id, name: WARRIOR_OF_ELEMENTS_SUBCLASS_NAME } });
+    const sub =
+      existing ??
+      (await prisma.subclass.create({
+        // A distinct slug (not the real "warrior-of-elements") — Subclass has
+        // a @@unique([slug, edition]) constraint and the real seeded row
+        // shares this fixture's (implicit) null edition.
+        data: { classId: cls.id, name: WARRIOR_OF_ELEMENTS_SUBCLASS_NAME, description: "Test fixture subclass.", slug: "warrior-of-elements-route-test-fixture" },
+      }));
+    warriorOfElementsSubclassId = sub.id;
+    await prisma.classFeature.deleteMany({ where: { classId: cls.id, subclassId: sub.id } });
+    await prisma.classFeature.createMany({
+      data: [
+        { classId: cls.id, subclassId: sub.id, name: "Elemental Attunement", level: 3, edition: "EDITION_2024", description: "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure." },
+        { classId: cls.id, subclassId: sub.id, name: "Manipulate Elements", level: 3, edition: "EDITION_2024", description: "You know the Elementalism cantrip. Wisdom is your spellcasting ability for it." },
+        { classId: cls.id, subclassId: sub.id, name: "Elemental Burst", level: 6, edition: "EDITION_2024", description: "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success." },
+        { classId: cls.id, subclassId: sub.id, name: "Stride of the Elements", level: 11, edition: "EDITION_2024", description: "While your Elemental Attunement is active, you have a Fly Speed and a Swim Speed each equal to your Speed." },
+        { classId: cls.id, subclassId: sub.id, name: "Elemental Epitome", level: 17, edition: "EDITION_2024", description: "While your Elemental Attunement is active you gain: Resistance to Acid, Cold, Fire, Lightning, or Thunder damage (choose one at the start of each of your turns); Destructive Stride (when you use Step of the Wind, your Speed increases by 20 ft that turn, and the first creature you move within 5 ft of takes one roll of your Martial Arts die of your chosen resistance type); and Empowered Strikes (once per turn, one Unarmed Strike deals an extra Martial Arts die of your chosen resistance type on a hit)." },
+      ],
+    });
+  }
+  return { classId: cls.id, subclassId: warriorOfElementsSubclassId };
+}
+
+async function createMonk(level: number, subclass?: string) {
+  const { classId, subclassId } = await resolveClassAndSubclass(subclass);
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
       experiencePoints: xpForLevel(level),
       ownerId: OWNER_ID,
-      classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level, subclass }] },
+      classEntries: { create: [{ name: "monk", classId, subclassId, position: 0, level, subclass }] },
     },
   });
 }
@@ -71,17 +115,13 @@ function xpForLevel(level: number): number {
 // /hp levelUp op yet, mirrors hitDice.total vs progress.level in
 // character-serialize.ts). Distinct from createMonk, which keeps both in sync.
 async function createMonkStaleLevelColumn(entryLevelColumn: number, xpLevel: number, subclass?: string) {
-  const cls = await prisma.characterClass.upsert({
-    where: { name: CLASS_NAME },
-    create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
-    update: {},
-  });
+  const { classId, subclassId } = await resolveClassAndSubclass(subclass);
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
       experiencePoints: xpForLevel(xpLevel),
       ownerId: OWNER_ID,
-      classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level: entryLevelColumn, subclass }] },
+      classEntries: { create: [{ name: "monk", classId, subclassId, position: 0, level: entryLevelColumn, subclass }] },
     },
   });
 }

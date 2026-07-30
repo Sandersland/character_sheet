@@ -69,13 +69,16 @@ interface DerivedActionRecord {
   universal?: boolean;
   /**
    * Absent means valid in both editions (the default — mirrors
-   * `DerivedFeature.edition`, #1374/#1499). A row whose mechanics genuinely
-   * differ between PHB'14 and PHB'24 is tagged for the edition it describes;
-   * `matchesActionGate` filters on it the same way `featureAppliesToEdition`
-   * filters features (registry.ts) — the one place this rule lives. A blanket
-   * tagging pass is not wanted: only a row whose 2014 shape doesn't exist or
-   * differs enough to need its own row gets tagged (see the seven monk rows
-   * below); most rows (e.g. Second Wind, Rage) are edition-invariant.
+   * `AuthoredFeature.edition`, #1374/#1499; DERIVED_ACTIONS stays hand-rolled
+   * TS, so it keeps the "optional = both editions" shape `DerivedFeature`
+   * itself moved off of when #1524 switched feature TEXT to seeded rows). A
+   * row whose mechanics genuinely differ between PHB'14 and PHB'24 is tagged
+   * for the edition it describes; `matchesActionGate` filters on it the same
+   * way `featuresFromRows` filters `ClassFeature` rows
+   * (lib/classes/class-feature-rows.ts) — the one place THAT rule lives. A
+   * blanket tagging pass is not wanted: only a row whose 2014 shape doesn't
+   * exist or differs enough to need its own row gets tagged (see the seven
+   * monk rows below); most rows (e.g. Second Wind, Rage) are edition-invariant.
    */
   edition?: RulesEdition;
   grantClass?: string;   // lowercase class name
@@ -527,9 +530,11 @@ export function matchesActionGate(
   // it stays even though the field is unset (#1431).
   if (a.universal) return false;
 
-  // Edition gate (#1499) — mirrors featureAppliesToEdition (registry.ts):
-  // absent `edition` means both editions; a row tagged for the OTHER edition
-  // is filtered out here, before the class/subclass gates below ever see it.
+  // Edition gate (#1499) — mirrors featuresFromRows' edition filter
+  // (lib/classes/class-feature-rows.ts, #1524, retired from this file's own
+  // featureAppliesToEdition precedent): absent `edition` means both editions;
+  // a row tagged for the OTHER edition is filtered out here, before the
+  // class/subclass gates below ever see it.
   if (a.edition !== undefined && a.edition !== edition) return false;
 
   // Class + level gate (single-class grantClass/grantLevel or a multi-class

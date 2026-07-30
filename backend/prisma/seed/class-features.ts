@@ -21,7 +21,7 @@
 import { z } from "zod";
 
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
-import type { ClassDefinition, DerivedFeature } from "../../src/lib/classes/types.js";
+import type { AuthoredFeature, ClassDefinition } from "../../src/lib/classes/types.js";
 import type { SeedEdition } from "./edition.js";
 
 import { barbarian } from "../../src/lib/classes/barbarian.js";
@@ -66,7 +66,7 @@ const CLASS_MODULES: Record<string, ClassDefinition> = {
 interface RawFeatureRow {
   className: string;
   subclassSlug: SubclassSlug | null;
-  feature: DerivedFeature;
+  feature: AuthoredFeature;
 }
 
 // Split from collectRawFeatures purely to keep each function's cyclomatic

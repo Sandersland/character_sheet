@@ -35,6 +35,15 @@ describe("rest recharge reads all class entries, not just primary (#1072)", () =
 
   it("Monk 5 / Fighter (Battle Master) 3 short-rests: focus refills to 5 AND superiority dice refill to 4", async () => {
     await ensureTestOwner(OWNER_ID);
+    // #1524: production always sets classId/subclassId alongside the
+    // subclass string (routes/character/class.ts, level-up.ts); resolved
+    // here from the real seeded catalog rows even though rest's own
+    // buildHpOpContext select never carries the class/subclassRef features
+    // relation (a narrow-select caller, per registry.ts's deriveResources
+    // comment) — this fixture still shouldn't diverge from production shape.
+    const monkId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } })).id;
+    const fighterId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
+    const battleMasterId = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighterId, name: "Battle Master" } })).id;
     await prisma.character.create({
       data: {
         ...BASE_CHAR,
@@ -50,8 +59,8 @@ describe("rest recharge reads all class entries, not just primary (#1072)", () =
         resources: { used: { focus: 5, superiorityDice: 4 } } as Prisma.InputJsonValue,
         classEntries: {
           create: [
-            { name: "monk", position: 0, level: 5 },
-            { name: "fighter", position: 1, level: 3, subclass: "battle master" },
+            { name: "monk", classId: monkId, position: 0, level: 5 },
+            { name: "fighter", subclass: "battle master", subclassId: battleMasterId, classId: fighterId, position: 1, level: 3 },
           ],
         },
       },

@@ -5,6 +5,8 @@ import { deriveEntryScopedActions } from "@/lib/classes/actions.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
+import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
+
 const ABILITIES = {
   strength: 10,
   dexterity: 16,
@@ -15,7 +17,7 @@ const ABILITIES = {
 };
 
 function thiefFeatureNames(level: number): string[] {
-  const info = deriveResources("rogue", "thief", level, ABILITIES, proficiencyBonusForLevel(level), "EDITION_2024");
+  const info = deriveResources("rogue", "thief", level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("rogue", "thief"), "EDITION_2024");
   return (info?.features ?? []).filter((f) => f.source === "subclass").map((f) => f.name);
 }
 
@@ -63,8 +65,8 @@ describe("Rogue Thief subclass (#909)", () => {
   });
 
   it("adds no trackable resource pool (content-only, no new level-gated axis)", () => {
-    const info = deriveResources("rogue", "thief", 17, ABILITIES, proficiencyBonusForLevel(17), "EDITION_2024");
-    const base = deriveResources("rogue", undefined, 17, ABILITIES, proficiencyBonusForLevel(17), "EDITION_2024");
+    const info = deriveResources("rogue", "thief", 17, ABILITIES, proficiencyBonusForLevel(17), testFeatureRowsFor("rogue", "thief"), "EDITION_2024");
+    const base = deriveResources("rogue", undefined, 17, ABILITIES, proficiencyBonusForLevel(17), testFeatureRowsFor("rogue", undefined), "EDITION_2024");
     expect(info?.resources).toEqual(base?.resources);
   });
 });

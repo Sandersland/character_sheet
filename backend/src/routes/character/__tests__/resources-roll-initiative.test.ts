@@ -92,6 +92,21 @@ describe("POST /api/characters/:id/resources/transactions — rollInitiative (Mo
       update: {},
     });
     classId = cls.id;
+
+    // #1524: this fixture uses a bespoke CharacterClass row (isolated by its
+    // own name, per this file's own convention), so it carries no seeded
+    // ClassFeature rows. At level 1 Monk's Focus pool doesn't exist yet
+    // (resourceFn returns []), so without at least one level-1 base feature
+    // row, deriveResources' `resources.length === 0 && features.length === 0`
+    // guard would return null for the (c)/(d) below-gate case — text copied
+    // verbatim from the real seeded Monk EDITION_2024 level-1 rows.
+    await prisma.classFeature.deleteMany({ where: { classId } });
+    await prisma.classFeature.createMany({
+      data: [
+        { classId, subclassId: null, name: "Martial Arts", level: 1, edition: "EDITION_2024", description: "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action." },
+        { classId, subclassId: null, name: "Unarmored Defense", level: 1, edition: "EDITION_2024", description: "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier." },
+      ],
+    });
   });
 
   afterAll(async () => {

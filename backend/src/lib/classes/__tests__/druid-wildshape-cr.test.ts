@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
+import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
+
 const ABILITIES = {
   strength: 10,
   dexterity: 10,
@@ -14,7 +16,7 @@ const ABILITIES = {
 };
 
 function wildShapeDescription(subclass: string | undefined, level: number): string | undefined {
-  const info = deriveResources("druid", subclass, level, ABILITIES, proficiencyBonusForLevel(level), "EDITION_2024");
+  const info = deriveResources("druid", subclass, level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("druid", subclass), "EDITION_2024");
   return info?.resources.find((r) => r.key === "wildShape")?.description;
 }
 

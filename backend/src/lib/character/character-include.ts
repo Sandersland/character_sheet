@@ -12,11 +12,26 @@ export const characterInclude = {
   classEntries: {
     orderBy: { position: "asc" },
     include: {
-      class: { select: { subclassLevel: true } },
+      // `features` (#1522/#1523/#1524): the class's OWN feature rows, never a
+      // subclass's — `subclassId: null` is load-bearing. ClassFeature.classId
+      // is required on subclass rows too, so an unfiltered `class.features`
+      // would return every subclass under this class (a Fighter would list
+      // Champion + Battle Master + Eldritch Knight together). Both editions
+      // load (this `include` is a module-level const with no access to the
+      // character's rulesEdition); featuresFromRows (lib/classes/
+      // class-feature-rows.ts) does the in-memory per-edition filter.
+      class: { select: { subclassLevel: true, features: { where: { subclassId: null } } } },
       // Subclass-granted spells (#898), resolved live at serialize time from the
       // catalog rows this join loads (never snapshotted). Null when no subclass or
       // a homebrew subclass without a catalog row (#911).
-      subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
+      // `features` (#1524): this subclass's own rows — already scoped by the
+      // Subclass.features back-relation, no further filter needed.
+      subclassRef: {
+        include: {
+          grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } },
+          features: true,
+        },
+      },
     },
   },
   inventoryItems: {

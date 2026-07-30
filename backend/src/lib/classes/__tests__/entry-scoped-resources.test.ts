@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 import { deriveEntryScopedResources, deriveResources, SHARED_POOL_MERGE } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
+import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
+
 const ABILITY_SCORES = {
   strength: 16,
   dexterity: 14,
@@ -25,8 +27,8 @@ describe("deriveEntryScopedResources", () => {
     const profBonus = proficiencyBonusForLevel(level);
     const entries = [{ name: "fighter", subclass: "battle master", level }];
 
-    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
-    const bare = deriveResources("fighter", "battle master", level, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
+    const bare = deriveResources("fighter", "battle master", level, ABILITY_SCORES, profBonus, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
 
     expect(derived).toEqual(bare);
   });
@@ -36,8 +38,8 @@ describe("deriveEntryScopedResources", () => {
     const profBonus = proficiencyBonusForLevel(level);
     const entries = [{ name: "monk", subclass: "warrior of the elements", level }];
 
-    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
-    const bare = deriveResources("monk", "warrior of the elements", level, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
+    const bare = deriveResources("monk", "warrior of the elements", level, ABILITY_SCORES, profBonus, testFeatureRowsFor("monk", "warrior of the elements"), "EDITION_2024");
 
     expect(derived).toEqual(bare);
   });
@@ -50,13 +52,13 @@ describe("deriveEntryScopedResources", () => {
       { name: "fighter", subclass: "battle master", level: 7 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
 
     // Fighter-7 Battle Master maneuver cap is 5 (battleMasterManeuverCount) — NOT
     // the count a level-10 Battle Master would have (still 5 here, so also pin
     // the entry-level DC which differs from a total-level derivation).
     expect(derived?.maneuverChoiceCount).toBe(5);
-    const bareAtEntryLevel = deriveResources("fighter", "battle master", 7, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const bareAtEntryLevel = deriveResources("fighter", "battle master", 7, ABILITY_SCORES, profBonus, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(derived?.maneuverSaveDC).toBe(bareAtEntryLevel?.maneuverSaveDC);
   });
 
@@ -68,12 +70,12 @@ describe("deriveEntryScopedResources", () => {
       { name: "wizard", subclass: "school of evocation", level: 6 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
 
     // Fighter-4 Battle Master maneuver cap is 3 (battleMasterManeuverCount < 7 →
     // 3) — a total-level (10) derivation would wrongly report 7.
     expect(derived?.maneuverChoiceCount).toBe(3);
-    const wrongTotalLevelCount = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const wrongTotalLevelCount = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(wrongTotalLevelCount?.maneuverChoiceCount).toBe(7);
     expect(derived?.maneuverChoiceCount).not.toBe(wrongTotalLevelCount?.maneuverChoiceCount);
   });
@@ -90,10 +92,10 @@ describe("deriveEntryScopedResources", () => {
       { name: "fighter", subclass: "battle master", level: 2 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
 
     expect(derived?.toolProfChoiceCount).toBeUndefined();
-    const wrongTotalLevel = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const wrongTotalLevel = deriveResources("fighter", "battle master", totalLevel, ABILITY_SCORES, profBonus, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(wrongTotalLevel?.toolProfChoiceCount).toBe(1);
   });
 
@@ -105,7 +107,7 @@ describe("deriveEntryScopedResources", () => {
       { name: "ranger", subclass: "hunter", level: 3 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
 
     expect(derived?.subclassChoices).toBeDefined();
     const huntersPrey = derived?.subclassChoices?.find((c) => c.key === "huntersPrey");
@@ -124,7 +126,7 @@ describe("deriveEntryScopedResources", () => {
       { name: "fighter", subclass: "battle master", level: 3 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
 
     const focus = derived?.resources.find((r) => r.key === "focus");
     // Focus total = monk level (5), NOT total character level (8).
@@ -144,8 +146,8 @@ describe("deriveEntryScopedResources", () => {
     const profBonus = proficiencyBonusForLevel(level);
     const entries = [{ name: "monk", subclass: undefined, level }];
 
-    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
-    const bare = deriveResources("monk", undefined, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
+    const bare = deriveResources("monk", undefined, level, ABILITY_SCORES, profBonus, testFeatureRowsFor("monk", undefined), "EDITION_2024");
 
     expect(derived?.resources).toEqual(bare?.resources);
   });
@@ -161,12 +163,12 @@ describe("deriveEntryScopedResources", () => {
       { name: "fighter", subclass: "battle master", level: 3 },
     ];
 
-    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
     const derivedNames = new Set(derived?.features?.map((f) => f.name));
 
-    const bareMonkAt5 = deriveResources("monk", undefined, 5, ABILITY_SCORES, profBonus, "EDITION_2024");
-    const bareFighterAt3 = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, profBonus, "EDITION_2024");
-    const bareMonkAt8 = deriveResources("monk", undefined, 8, ABILITY_SCORES, profBonus, "EDITION_2024");
+    const bareMonkAt5 = deriveResources("monk", undefined, 5, ABILITY_SCORES, profBonus, testFeatureRowsFor("monk", undefined), "EDITION_2024");
+    const bareFighterAt3 = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, profBonus, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
+    const bareMonkAt8 = deriveResources("monk", undefined, 8, ABILITY_SCORES, profBonus, testFeatureRowsFor("monk", undefined), "EDITION_2024");
     const monkAt5Names = new Set(bareMonkAt5?.features.map((f) => f.name));
 
     // Every monk-L5 feature and every fighter-L3 feature is present...
@@ -203,7 +205,7 @@ describe("deriveEntryScopedResources", () => {
         { name: "cleric", subclass: "life domain", level: 2 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
       ];
-      const { derived } = deriveEntryScopedResources(entries, 5, ABILITY_SCORES, proficiencyBonusForLevel(5), "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, 5, ABILITY_SCORES, proficiencyBonusForLevel(5), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pools = derived?.resources.filter((r) => r.key === "channelDivinity") ?? [];
       expect(pools).toHaveLength(1);
       expect(pools[0].total).toBe(1);
@@ -214,7 +216,7 @@ describe("deriveEntryScopedResources", () => {
         { name: "cleric", subclass: "life domain", level: 6 },
         { name: "paladin", subclass: "oath of devotion", level: 4 },
       ];
-      const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pool = derived?.resources.find((r) => r.key === "channelDivinity");
       expect(pool?.total).toBe(2);
     });
@@ -224,7 +226,7 @@ describe("deriveEntryScopedResources", () => {
         { name: "paladin", subclass: "oath of devotion", level: 4 },
         { name: "cleric", subclass: "life domain", level: 6 },
       ];
-      const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pool = derived?.resources.find((r) => r.key === "channelDivinity");
       expect(pool?.total).toBe(2);
     });
@@ -236,9 +238,9 @@ describe("deriveEntryScopedResources", () => {
         { name: "cleric", subclass: "life domain", level: 6 },
         { name: "paladin", subclass: "oath of devotion", level: 4 },
       ];
-      const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const merged = derived?.resources.find((r) => r.key === "channelDivinity");
-      const bareCleric = deriveResources("cleric", "life domain", 6, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const bareCleric = deriveResources("cleric", "life domain", 6, ABILITY_SCORES, profBonus, testFeatureRowsFor("cleric", "life domain"), "EDITION_2024");
       const clericPool = bareCleric?.resources.find((r) => r.key === "channelDivinity");
       expect(merged?.label).toBe(clericPool?.label);
       expect(merged?.recharge).toBe(clericPool?.recharge);
@@ -252,9 +254,9 @@ describe("deriveEntryScopedResources", () => {
         { name: "paladin", subclass: "oath of devotion", level: 4 },
         { name: "cleric", subclass: "life domain", level: 6 },
       ];
-      const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const merged = derived?.resources.find((r) => r.key === "channelDivinity");
-      const barePaladin = deriveResources("paladin", "oath of devotion", 4, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const barePaladin = deriveResources("paladin", "oath of devotion", 4, ABILITY_SCORES, profBonus, testFeatureRowsFor("paladin", "oath of devotion"), "EDITION_2024");
       const paladinPool = barePaladin?.resources.find((r) => r.key === "channelDivinity");
       expect(merged?.label).toBe(paladinPool?.label);
       expect(merged?.recharge).toBe(paladinPool?.recharge);
@@ -266,7 +268,7 @@ describe("deriveEntryScopedResources", () => {
         { name: "cleric", subclass: "life domain", level: 1 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
       ];
-      const { derived } = deriveEntryScopedResources(entries, 4, ABILITY_SCORES, proficiencyBonusForLevel(4), "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, 4, ABILITY_SCORES, proficiencyBonusForLevel(4), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pools = derived?.resources.filter((r) => r.key === "channelDivinity") ?? [];
       expect(pools).toHaveLength(1);
       expect(pools[0].total).toBe(1);
@@ -276,8 +278,8 @@ describe("deriveEntryScopedResources", () => {
       const level = 6;
       const profBonus = proficiencyBonusForLevel(level);
       const entries = [{ name: "cleric", subclass: "life domain", level }];
-      const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
-      const bare = deriveResources("cleric", "life domain", level, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
+      const bare = deriveResources("cleric", "life domain", level, ABILITY_SCORES, profBonus, testFeatureRowsFor("cleric", "life domain"), "EDITION_2024");
       expect(derived).toEqual(bare);
     });
 
@@ -285,8 +287,8 @@ describe("deriveEntryScopedResources", () => {
       const level = 4;
       const profBonus = proficiencyBonusForLevel(level);
       const entries = [{ name: "paladin", subclass: "oath of devotion", level }];
-      const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024");
-      const bare = deriveResources("paladin", "oath of devotion", level, ABILITY_SCORES, profBonus, "EDITION_2024");
+      const { derived } = deriveEntryScopedResources(entries, level, ABILITY_SCORES, profBonus, "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
+      const bare = deriveResources("paladin", "oath of devotion", level, ABILITY_SCORES, profBonus, testFeatureRowsFor("paladin", "oath of devotion"), "EDITION_2024");
       expect(derived).toEqual(bare);
     });
   });
@@ -302,7 +304,7 @@ describe("deriveEntryScopedResources", () => {
       { name: "monk", subclass: undefined, level: 5 },
     ];
     expect(() =>
-      deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024"),
+      deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass)),
     ).toThrow(/duplicate pool key "focus"/);
   });
 
@@ -321,7 +323,7 @@ describe("deriveEntryScopedResources", () => {
     for (const className of CLASS_NAMES) {
       for (let level = 1; level <= 20; level++) {
         const profBonus = proficiencyBonusForLevel(level);
-        const info = deriveResources(className, undefined, level, ABILITY_SCORES, profBonus, "EDITION_2024");
+        const info = deriveResources(className, undefined, level, ABILITY_SCORES, profBonus, testFeatureRowsFor(className, undefined), "EDITION_2024");
         for (const pool of info?.resources ?? []) {
           const classes = classesByPoolKey.get(pool.key) ?? new Set<string>();
           classes.add(className);

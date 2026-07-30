@@ -1,6 +1,6 @@
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-const BARBARIAN_FEATURES: DerivedFeature[] = [
+const BARBARIAN_FEATURES: AuthoredFeature[] = [
   {
     name: "Rage",
     level: 1,
@@ -84,7 +84,7 @@ const BARBARIAN_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const TOTEM_WARRIOR_FEATURES: DerivedFeature[] = [
+const TOTEM_WARRIOR_FEATURES: AuthoredFeature[] = [
   {
     name: "Spirit Seeker",
     level: 3,
@@ -122,7 +122,7 @@ const TOTEM_WARRIOR_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const BERSERKER_FEATURES: DerivedFeature[] = [
+const BERSERKER_FEATURES: AuthoredFeature[] = [
   {
     name: "Frenzy",
     level: 3,

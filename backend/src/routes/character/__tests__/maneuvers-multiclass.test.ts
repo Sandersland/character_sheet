@@ -49,6 +49,13 @@ describe("castManeuver — Battle Master as a SECONDARY class entry (#1072)", ()
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
     tripId = (await prisma.grantedAbility.findFirst({ where: { name: "Trip Attack" } }))!.id;
+    // #1524: production always sets classId/subclassId alongside the
+    // subclass string (routes/character/class.ts, level-up.ts); resolved
+    // here from the real seeded catalog rows so this fixture matches that
+    // shape.
+    const rogueId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Rogue" } })).id;
+    const fighterId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
+    const battleMasterId = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighterId, name: "Battle Master" } })).id;
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
@@ -56,8 +63,8 @@ describe("castManeuver — Battle Master as a SECONDARY class entry (#1072)", ()
         resources: Prisma.JsonNull,
         classEntries: {
           create: [
-            { name: "rogue", position: 0, level: 2 },
-            { name: "fighter", subclass: "battle master", position: 1, level: 3 },
+            { name: "rogue", classId: rogueId, position: 0, level: 2 },
+            { name: "fighter", subclass: "battle master", subclassId: battleMasterId, classId: fighterId, position: 1, level: 3 },
           ],
         },
       },
