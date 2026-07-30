@@ -276,4 +276,205 @@ export async function seedClassFeatures(prisma: PrismaClient): Promise<void> {
   const byPartition = groupByPartition(resolved);
   await pruneStalePartitions(prisma, byPartition);
   await sweepAbandonedPartitions(prisma, byPartition);
+
+  // Runs LAST, after both prune passes, so the window this inspects includes
+  // their deletions — a guard that ran first could not see the very emptying
+  // it exists to catch (#1525).
+  await assertEveryClassEditionPopulated(prisma);
+}
+
+const EDITIONS: readonly SeedEdition[] = ["EDITION_2014", "EDITION_2024"];
+
+// Below this, a (class, edition) pair reads as a half-written partition, not
+// real content — e.g. a migration that landed a class's base-layer rows but
+// not a subclass's, or a retab commit that stopped partway through. Today's
+// smallest FULLY authored pair is Sorcerer's 15 (both editions, no
+// subclasses) — ten leaves five rows of slack, tight enough that a bare
+// `>= 1` (which a half-write sails straight past) can't hide behind it.
+const MIN_ROWS_PER_PAIR = 10;
+
+// Every class whose EDITION_2024 rows are STILL an unverified verbatim copy
+// of its EDITION_2014 text (#1522 decision: "authored once, populated
+// nowhere" — every class ships with SOME 2024 text so no character is
+// featureless mid-epic, but nothing anywhere checks that the copy IS 2024
+// content). This list itself IS that disclosure, made machine-readable:
+// every name on it is a class assertEveryClassEditionPopulated cannot vouch
+// for beyond "a 2024 row exists next to its 2014 twin, and the two agree on
+// row count." A retab PR (#1528/#1227 for Fighter, #1134 for the rest)
+// removes its class from this list in the SAME diff that makes that class's
+// two editions genuinely diverge (a level shift is two rows with two
+// `level` values — count stays equal, so it does NOT get removed for that
+// alone; an added or dropped 2024-only feature changes the count and DOES).
+// A list only ever edited to remove is a ratchet, never a tax. When it is
+// empty, the equality check below is dead code — delete it then, not
+// before. Cross-links: #1134 (the retab wave), #1522 (the epic this guard
+// belongs to).
+const EDITIONS_STILL_IDENTICAL = new Set<string>([
+  "Barbarian",
+  "Bard",
+  "Cleric",
+  "Druid",
+  "Fighter",
+  "Monk",
+  "Paladin",
+  "Ranger",
+  "Rogue",
+  "Sorcerer",
+  "Warlock",
+  "Wizard",
+]);
+
+export interface ClassEditionPopulationSummary {
+  pairsChecked: number;
+  classRowCount: number;
+  minPairCount: number;
+  rowsCounted: number;
+}
+
+interface ClassPairCounts {
+  name: string;
+  perEdition: Map<SeedEdition, number>;
+}
+
+// Split out of assertEveryClassEditionPopulated purely to keep each
+// function's cyclomatic/cognitive complexity low (mirrors baseFeatureRows'
+// / resolveSubclassId's split above, for the same fallow ratchet reason —
+// prisma/seed/** carries no coverage instrumentation, see their comments).
+function collectClassPairCounts(
+  classes: { id: string; name: string }[],
+  countByPair: Map<string, number>,
+): ClassPairCounts[] {
+  return classes.map((cls) => {
+    const perEdition = new Map<SeedEdition, number>();
+    for (const edition of EDITIONS) perEdition.set(edition, countByPair.get(`${cls.id}::${edition}`) ?? 0);
+    return { name: cls.name, perEdition };
+  });
+}
+
+// Isolated so the `?? 0` fallback (never expected to fire — collectClass-
+// PairCounts always sets both editions — but costs nothing as a defensive
+// default) doesn't add a branch to every caller's own complexity count;
+// prisma/seed/** has no coverage instrumentation, so an extra branch here
+// is an extra 5 points of uncovered CRAP in whichever function holds it.
+function pairCount(entry: ClassPairCounts, edition: SeedEdition): number {
+  return entry.perEdition.get(edition) ?? 0;
+}
+
+// The "silent missing feature" check for ONE (class, edition) pair: 0 rows
+// means the class is featureless in that edition; a nonzero count below
+// MIN_ROWS_PER_PAIR means a half-written partition (see that constant's own
+// comment) — a bare `>= 1` would sail past the second case.
+function pairFloorFailure(name: string, edition: SeedEdition, count: number): string | null {
+  if (count === 0) return `  ${name} / ${edition}: 0 rows (expected >= 1)`;
+  if (count < MIN_ROWS_PER_PAIR) return `  ${name} / ${edition}: ${count} rows (below the >= ${MIN_ROWS_PER_PAIR} floor)`;
+  return null;
+}
+
+function pairFloorFailures(entry: ClassPairCounts): string[] {
+  const failures: string[] = [];
+  for (const edition of EDITIONS) {
+    const failure = pairFloorFailure(entry.name, edition, pairCount(entry, edition));
+    if (failure) failures.push(failure);
+  }
+  return failures;
+}
+
+// The EDITIONS_STILL_IDENTICAL ratchet check (correction 5): a class still
+// on that list has never had its 2024 rows genuinely retabbed, so its two
+// editions' row counts must still match exactly — divergence there means
+// either a retab landed without removing the class from the list, or a
+// prune ran unevenly across editions.
+function ratchetFailure(entry: ClassPairCounts): string | null {
+  if (!EDITIONS_STILL_IDENTICAL.has(entry.name)) return null;
+  const c2014 = pairCount(entry, "EDITION_2014");
+  const c2024 = pairCount(entry, "EDITION_2024");
+  if (c2014 === c2024) return null;
+  return (
+    `  ${entry.name}: EDITION_2014 has ${c2014} rows but EDITION_2024 has ${c2024} rows — still listed in ` +
+    `EDITIONS_STILL_IDENTICAL; remove it there in the same diff that makes this class's editions diverge on purpose`
+  );
+}
+
+// The anti-vacuity summary (#1525's `triplesVisited`-shaped literals a test
+// asserts independently of anything the guard itself could also get wrong).
+function summarizePairCounts(entries: ClassPairCounts[]): {
+  pairsChecked: number;
+  rowsCounted: number;
+  minPairCount: number;
+} {
+  let pairsChecked = 0;
+  let rowsCounted = 0;
+  let minPairCount = Infinity;
+  for (const entry of entries) {
+    for (const edition of EDITIONS) {
+      pairsChecked += 1;
+      const count = pairCount(entry, edition);
+      rowsCounted += count;
+      if (count < minPairCount) minPairCount = count;
+    }
+  }
+  return { pairsChecked, rowsCounted, minPairCount };
+}
+
+/**
+ * Post-write presence guard (#1522/#1525): every seeded CharacterClass row
+ * must have at least MIN_ROWS_PER_PAIR ClassFeature rows in EACH of
+ * EDITION_2014 and EDITION_2024. Non-nullable `ClassFeature.edition` means
+ * `featuresFromRows`' `rows.filter((row) => row.edition === edition && ...)`
+ * has no shared-row fallback (correctly — every row forks), so a class
+ * missing one edition's partition doesn't render 2014 text to a 2024
+ * character (the #1430/#1519 failure this schema already closed) — it
+ * renders NO features at all, on a sheet that otherwise looks fine. Louder
+ * than wrong-edition text, but still silent without this.
+ *
+ * PRESENCE ONLY, never correctness. "A row exists" and "the row is 2024
+ * content" are different assertions, and this only ever makes the first —
+ * after #1523 every class's EDITION_2024 rows are unverified verbatim
+ * copies of EDITION_2014 text (see EDITIONS_STILL_IDENTICAL above), and this
+ * guard is green against a table where every one of them still is. Only
+ * #1528/#1227 (Fighter) and the #1134 retabs establish real 2024 content,
+ * each asserting against SRD 5.2 values directly — never against "differs
+ * from 2014". A green run of this guard must never be read as "the 2024
+ * content is real".
+ *
+ * Anchored on `prisma.characterClass.findMany()` — the runtime truth — not
+ * on catalog-data.ts's CLASSES (the seed input, verified to name the exact
+ * same 12 classes today) or either in-memory `CLASSES`/`CLASS_MODULES`
+ * registry under lib/classes/: both of those are module-private maps that
+ * #1532 edits (Fighter leaves lib/classes/registry.ts's CLASSES the same
+ * wave this guard ships), so anchoring there would silently stop checking a
+ * class the moment it migrates off the old registry — disarming the guard
+ * in the same diff that most needs it armed.
+ *
+ * Exported so a test can call it directly against a deliberately broken DB
+ * state — routing the probe through seedClassFeatures itself can only ever
+ * pass, since the seeder rewrites every row before this ever runs.
+ */
+export async function assertEveryClassEditionPopulated(
+  prisma: PrismaClient,
+): Promise<ClassEditionPopulationSummary> {
+  const classes = await prisma.characterClass.findMany({ select: { id: true, name: true } });
+  const grouped = await prisma.classFeature.groupBy({ by: ["classId", "edition"], _count: { _all: true } });
+  const countByPair = new Map<string, number>();
+  for (const g of grouped) countByPair.set(`${g.classId}::${g.edition}`, g._count._all);
+
+  const entries = collectClassPairCounts(classes, countByPair);
+  const failures = entries.flatMap((entry) => {
+    const ratchet = ratchetFailure(entry);
+    return ratchet ? [...pairFloorFailures(entry), ratchet] : pairFloorFailures(entry);
+  });
+
+  if (failures.length > 0) {
+    throw new Error(
+      [
+        "seedClassFeatures: ClassFeature population guard failed (#1525) —",
+        ...failures,
+        "Re-run `npx prisma db seed`. This guard asserts PRESENCE only, never that the",
+        "2024 text is genuine 2024 content (#1528/#1227, #1134).",
+      ].join("\n"),
+    );
+  }
+
+  const { pairsChecked, rowsCounted, minPairCount } = summarizePairCounts(entries);
+  return { pairsChecked, classRowCount: classes.length, minPairCount, rowsCounted };
 }
