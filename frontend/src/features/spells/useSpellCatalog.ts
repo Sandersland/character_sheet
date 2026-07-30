@@ -1,22 +1,28 @@
-// Loads the GET /api/spells catalog once; delayed spinner flag to avoid flicker.
+// Loads the GET /api/spells catalog; delayed spinner flag to avoid flicker.
+// An optional filter is forwarded to the server (#1377) — the creation ceremony
+// narrows to one class's legal band, the sheet's picker takes everything.
 import { useEffect, useState } from "react";
 
-import { fetchSpells } from "@/api/client";
+import { fetchSpells, type SpellCatalogFilter } from "@/api/client";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { CatalogSpell } from "@/types/character";
 
-export function useSpellCatalog() {
+export function useSpellCatalog(filter?: SpellCatalogFilter) {
   const [catalog, setCatalog] = useState<CatalogSpell[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const showSpinner = useDelayedFlag(catalog === null && !error);
+  // Destructured so the effect depends on the two primitives, not on a fresh
+  // object identity every render (which would refetch in a loop).
+  const className = filter?.className;
+  const maxLevel = filter?.maxLevel;
 
   useEffect(() => {
     let mounted = true;
-    fetchSpells()
+    fetchSpells({ className, maxLevel })
       .then((spells) => { if (mounted) setCatalog(spells); })
       .catch(() => { if (mounted) setError("Couldn't load spell catalog."); });
     return () => { mounted = false; };
-  }, []);
+  }, [className, maxLevel]);
 
   return { catalog, error, showSpinner };
 }
