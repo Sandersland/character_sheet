@@ -100,6 +100,19 @@ interface DerivedActionRecord {
   // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
   // future Martial-Arts-conditioned action can reuse the same gate.
   requiresUnarmored?: boolean;
+  /**
+   * Universal action keys this class feature RE-COSTS rather than shadows
+   * (#1431) — Cunning Action buys Dash/Disengage/Hide for a Bonus Action. Pure
+   * display + provenance: it gates nothing, consumes nothing extra, and the
+   * served universal rows keep their own `cost: "action"` (they are never
+   * rewritten per character).
+   *
+   * Keys, never names: the name forks per edition (Use an Object / Utilize),
+   * so only the row referenceRouter serves for THIS character's edition can
+   * name it. REGRANTED_UNIVERSAL_KEYS is the drift gate that every key here
+   * still resolves to a seeded `universal: true`, `cost: "action"` row.
+   */
+  regrants?: readonly string[];
 }
 
 // The row's class/level gate as a list — the one normalization both the legacy
@@ -135,6 +148,11 @@ export interface AvailableAction {
   disabledReason?: string;
   /** In-play rule text surfaced as the card subtitle + on-use reminder. */
   reminder?: string;
+  /** Universal action keys this row re-costs — see DerivedActionRecord.regrants
+   *  (#1431). The client resolves each against GET /api/reference's
+   *  universalActions for its edition-correct name; it never knows what a key
+   *  means. */
+  regrants?: string[];
 }
 
 /** Resource pool shape — typed subset of what serializeCharacter builds. */
@@ -207,7 +225,16 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // temp-HP roll; stepOfTheWindFocus's reminder gains a narrated move-a-
   // willing-creature rider (no server state — this app has no ally/NPC
   // combatant model to move).
-  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Disengage (free bonus action)." },
+  // These four rows' `regrants` (#1431) is data ONLY — deliberately unrendered,
+  // and the curated reminders above/below stay the card subtitle. The rows are
+  // 2024-shaped yet served edition-blind (the debt this comment block records),
+  // and the grant is one of the places the editions genuinely disagree: SRD 5.1
+  // Patient Defense buys DODGE for 1 ki, while SRD 5.2 grants Disengage free
+  // and Disengage + Dodge for 1 Focus. Naming the regrant on the card would
+  // therefore print a wrong answer onto a 2014 monk's screen — it waits on the
+  // edition axis reaching this catalog (#1313). Rogue's Cunning Action and
+  // Thief's Fast Hands are invariant in both editions and DO render theirs.
+  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action)." },
   {
     key: "patientDefenseFocus",
     name: "Patient Defense (1 Focus)",
@@ -216,12 +243,13 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantLevel: 2,
     resourceKey: "focus",
     resourceAmount: 1,
+    regrants: ["disengage", "dodge"],
     reminder: (level) =>
       level >= 10
         ? "Disengage + Dodge (spend 1 Focus). Heightened Focus (L10): also gain temporary hit points equal to two Martial Arts die rolls."
         : "Disengage + Dodge (spend 1 Focus).",
   },
-  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, reminder: "Dash (free bonus action)." },
+  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["dash"], reminder: "Dash (free bonus action)." },
   {
     key: "stepOfTheWindFocus",
     name: "Step of the Wind (1 Focus)",
@@ -230,6 +258,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantLevel: 2,
     resourceKey: "focus",
     resourceAmount: 1,
+    regrants: ["disengage", "dash"],
     reminder: (level) =>
       level >= 10
         ? "Disengage + Dash, jump distance doubled this turn (spend 1 Focus). Heightened Focus (L10): also bring one willing creature within 5 ft along with you, moving it up to your Speed — it doesn't provoke opportunity attacks."
@@ -401,7 +430,33 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Channel Divinity is a single cross-class row — see channelDivinity above (PHB'14 p.164).
 
   // Rogue
-  { key: "cunningAction", name: "Cunning Action", cost: "bonusAction", grantClass: "rogue", grantLevel: 2 },
+  // Cunning Action carries no reminder on purpose: its `regrants` ARE the rule,
+  // and the three names are identical in SRD 5.1 and SRD 5.2 (Dash, Disengage,
+  // Hide), so the client can name them from the served rows for either edition
+  // without the caveat the monk rows above carry (#1431).
+  { key: "cunningAction", name: "Cunning Action", cost: "bonusAction", grantClass: "rogue", grantLevel: 2, regrants: ["dash", "disengage", "hide"] },
+  // Thief's Fast Hands (SRD 5.1 / SRD 5.2, Thief: Fast Hands) — a MODE of
+  // Cunning Action, not a second Bonus Action: both editions spend "the Bonus
+  // Action granted by your Cunning Action", so a Thief L3 sees two sibling
+  // bonus-action cards that compete for the one slot. The reminder says so,
+  // because nothing in the action economy can express "these two share a slot".
+  // The object-use grant is the edition-invariant half and is the `regrants`
+  // link; the reminder deliberately does not NAME that action, since SRD 5.1
+  // calls it Use an Object and SRD 5.2 Utilize. #1240's edition-blind service
+  // of this catalog is why the name has to come off the wire, not out of here.
+  // The prose feature description stays in rogue.ts's THIEF_FEATURES — that is
+  // the feature; this is the action.
+  {
+    key: "fastHands",
+    name: "Fast Hands",
+    cost: "bonusAction",
+    grantClass: "rogue",
+    grantSubclassSlugs: ["rogue-thief"],
+    grantLevel: 3,
+    regrants: ["useObject"],
+    reminder:
+      "Uses the Bonus Action granted by Cunning Action, not an extra one: make a Sleight of Hand check, use Thieves' Tools to pick a lock or disarm a trap, or use an object.",
+  },
 
   // Sorcerer
   { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 3, resourceKey: "sorceryPoints", resourceAmount: 1 },
@@ -412,13 +467,20 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
 // (below, which both `availableActions[]` and shadow-arts.ts's cast guards
 // resolve through) key off, so a level gate can never drift into two
 // independent copies (#1315 — CLAUDE.md's level-gated-registry rule).
-function matchesActionGate(
+// Exported ONLY so the `universal` latch below can be tested against a
+// synthetic record (#1431): with no real row setting the field, deleting the
+// guard is otherwise undetectable through any observable output.
+export function matchesActionGate(
   a: DerivedActionRecord,
   cls: string,
   slug: SubclassSlug | undefined,
   level: number,
 ): boolean {
-  // Only include class-specific actions here (universal handled client-side).
+  // Only class-specific actions ride the character payload; universal rows are
+  // served per edition by referenceRouter (#1430). No DERIVED_ACTIONS row sets
+  // `universal` today — this guard is the structural latch that keeps a future
+  // one out of availableActions[] instead of double-rendering it, which is why
+  // it stays even though the field is unset (#1431).
   if (a.universal) return false;
 
   // Class + level gate (single-class grantClass/grantLevel or a multi-class
@@ -466,9 +528,22 @@ export function deriveActions(
         enabled,
         ...(disabledReason ? { disabledReason } : {}),
         ...(reminder ? { reminder } : {}),
+        ...(a.regrants ? { regrants: [...a.regrants] } : {}),
       };
     });
 }
+
+/**
+ * Every universal action key any DERIVED_ACTIONS row re-costs (#1431), deduped.
+ * Exported instead of DERIVED_ACTIONS itself so the seed-side drift gate can
+ * assert "each of these resolves to a seeded `universal: true`, `cost: action`
+ * row in BOTH editions" without the whole class catalog becoming public API.
+ * The gate closes a different gap from #1315's (which was class-row-vs-seed
+ * drift): here it is class row → served UNIVERSAL row.
+ */
+export const REGRANTED_UNIVERSAL_KEYS: readonly string[] = [
+  ...new Set(DERIVED_ACTIONS.flatMap((a) => a.regrants ?? [])),
+];
 
 /**
  * Entry-scoped `availableActions` derivation (#1206/#1315): each class entry's
