@@ -131,7 +131,7 @@ describe("GET /api/characters/:id — encumbrance + attunement cap (#1377)", () 
       .send({ currency: { cp: 0, sp: 0, gp: 500, pp: 0 } });
 
     expect(response.status).toBe(200);
-    // 30 lb of gear + 500 coins = 10 lb.
+    // 30 lb of gear + 500 coins (= 10 lb) = 40 lb total.
     expect(response.body.carriedWeight).toBe(40);
   });
 
