@@ -4,8 +4,9 @@
 // submission matches them exactly. No DB, no Prisma — the caller resolves any
 // subclass id → name before calling. Later tasks wire the endpoint that applies
 // the returned steps.
+import type { LevelUpTarget } from "@character-sheet/contracts";
+
 import type { AdvancementOperation, TakeFeatOperation } from "@/lib/leveling/advancement.js";
-import type { LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import type {
   LearnManeuverOperation,
   LearnToolProficiencyOperation,

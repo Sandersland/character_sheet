@@ -73,11 +73,18 @@ export function ClassActionCard({
   busy: boolean;
   onClick: () => void;
 }) {
+  // Regranted action names only fill a subtitle the row does not already have
+  // (#1431). Cunning Action is the row that gains one — it carries no reminder,
+  // which is precisely why its card never named Dash/Disengage/Hide. Every row
+  // WITH rule text of its own keeps it verbatim, which is what holds the four
+  // monk cards byte-identical: their regrants are 2024-shaped on an
+  // edition-blind row and must not be named until #1313 (see DERIVED_ACTIONS).
+  const subtitle = option.subtitle ?? option.regrantNames?.join(" · ");
   return (
     <OptionCard
       icon={option.heal ? GiHealthNormal : Zap}
       title={option.title}
-      subtitle={option.subtitle}
+      subtitle={subtitle}
       badge={option.badge}
       tone={option.heal ? "vitality" : option.enabled ? "arcane" : "neutral"}
       disabled={!option.enabled || busy}

@@ -13,6 +13,13 @@
  * Concentration is intentionally separate (tracked in spellcasting).
  */
 
+import type {
+  ApplyConditionOperation,
+  ConditionOperation,
+  RemoveConditionOperation,
+  SetExhaustionOperation,
+} from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { logEvent } from "@/lib/activity/events.js";
@@ -89,30 +96,6 @@ export function serializeConditionsState(state: ConditionsMutableState): Prisma.
     exhaustion: state.exhaustion,
   } as unknown as Prisma.InputJsonValue;
 }
-
-/** Apply (add) a standard 5e status condition. No-op-error if already present. */
-export interface ApplyConditionOperation {
-  type: "applyCondition";
-  key: ConditionKey;
-  source?: string;
-}
-
-/** Remove a standard 5e status condition by key. */
-export interface RemoveConditionOperation {
-  type: "removeCondition";
-  key: ConditionKey;
-}
-
-/** Set exhaustion to an absolute level (0–6). */
-export interface SetExhaustionOperation {
-  type: "setExhaustion";
-  level: number;
-}
-
-export type ConditionOperation =
-  | ApplyConditionOperation
-  | RemoveConditionOperation
-  | SetExhaustionOperation;
 
 function deepCopy(state: ConditionsMutableState): { conditions: ConditionsMutableState } {
   return {

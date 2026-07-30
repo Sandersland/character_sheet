@@ -10,9 +10,11 @@ import {
   itemBuffKey,
 } from "./inventory-types.js";
 
-// 5e: a character can attune to at most 3 magic items (DMG p. 138). Derived
-// (counted from live rows), never persisted.
-const ATTUNEMENT_LIMIT = 3;
+// 5e: a character can attune to at most 3 magic items (SRD 5.1 / SRD 5.2,
+// "Attunement") — edition-invariant. Derived (counted from live rows), never
+// persisted. Exported so serializeCharacter's `attunementCap` and the 409 below
+// resolve to the SAME constant; keep it the only `3` in this file.
+export const ATTUNEMENT_LIMIT = 3;
 
 export async function applyAttune(
   tx: Prisma.TransactionClient,

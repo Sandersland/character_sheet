@@ -190,6 +190,15 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   layOnHands:        { key: "layOnHands",        kind: "heal-input",     slot: "action",      serverEffect: true,  resourceKey: "layOnHands" },
 
   cunningAction:     { key: "cunningAction",     kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+  // Thief's Fast Hands (#1431) — economy-only, like the Patient Defense / Step
+  // of the Wind free variants: no backend ACTION_EFFECT_FN entry, so
+  // serverEffect:false and no resourceKey. Without a row here
+  // partitionClassActions filters the backend's fastHands out and no card
+  // renders at all. It spends the SAME Bonus Action as Cunning Action (both
+  // editions), which the backend reminder says — the economy model has no way
+  // to express two cards sharing one slot, and consuming the bonus action once
+  // per click is already the correct accounting.
+  fastHands:         { key: "fastHands",         kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
 
   metamagic:         { key: "metamagic",         kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "sorceryPoints" },
 };

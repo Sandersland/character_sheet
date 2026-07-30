@@ -113,18 +113,12 @@ export type AdvancementOperation =
   | TakeFeatOperation
   | RemoveAdvancementOperation;
 
-/**
- * XP operation types — mirror of `applyExperienceOperations`. Sent as
- * `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
- *
- * Award or deduct XP by a signed delta.
- */
-export interface XpAwardOperation { type: "award"; amount: number }
-
-/** Set total XP to an exact value. */
-export interface XpSetOperation { type: "set"; value: number }
-
-export type ExperienceOperation = XpAwardOperation | XpSetOperation;
+// XP ops are derived from the route zod schema in @character-sheet/contracts
+// (#1390) — `import type` only, so zod never enters the client bundle. Sent as
+// `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
+// Only the union forwards: the award/set member types have zero frontend call
+// sites, and a forwarded-only name is a dead export under the fallow gate.
+export type { ExperienceOperation } from "@character-sheet/contracts";
 
 /** Mirror of the backend `LevelUpStepKind` (buildLevelUpPlan). */
 export type LevelUpStepKind =
