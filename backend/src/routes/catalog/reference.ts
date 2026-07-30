@@ -6,6 +6,7 @@ import {
   MULTICLASS_PREREQUISITES,
   cantripsKnownAtLevel,
   conditionRulesText,
+  maxSpellLevelForClass,
   multiclassPrerequisitesMet,
   preparedSpellCountAt,
   primaryAbilities,
@@ -99,9 +100,20 @@ referenceRouter.get("/reference", async (req, res) => {
     primaryAbility: primaryAbilities(c.name),
     // #1131: level-1 creation pick counts from the SRD 5.2 tables (null for a
     // non-caster) so the creation picker never re-encodes the rules.
+    //
+    // maxSpellLevel (#1377) moves the highest-learnable-level rule off the client,
+    // which hardcoded 1. Every seeded class that reaches this branch resolves to 1
+    // today — the value is provenance, not yet a variable. Note it is NOT the same
+    // call creationPickError makes: that one passes the chosen subclass, this one
+    // can't (no subclass is chosen yet at this point in the ceremony). The two
+    // agree at level 1; do not assume they are joined.
     level1SpellPicks:
       preparedSpellCountAt(c.name, 1) != null
-        ? { cantrips: cantripsKnownAtLevel(c.name, 1), spells: preparedSpellCountAt(c.name, 1)! }
+        ? {
+            cantrips: cantripsKnownAtLevel(c.name, 1),
+            spells: preparedSpellCountAt(c.name, 1)!,
+            maxSpellLevel: maxSpellLevelForClass(c.name, 1),
+          }
         : null,
     // 5e multiclass ability prerequisite (PHB p. 163): the option thresholds plus
     // a rendered description. Lets the add-class picker gate + explain eligibility

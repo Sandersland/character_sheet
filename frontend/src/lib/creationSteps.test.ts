@@ -84,7 +84,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
 }
 
 const rogue = makeClass();
-const wizard = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4 } });
+const wizard = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4, maxSpellLevel: 1 } });
 
 const specBackground = {
   id: "bg-crim",
