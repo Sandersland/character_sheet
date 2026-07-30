@@ -75,6 +75,8 @@ function makeCharacter(inventory: InventoryItem[], over: Partial<Character> = {}
     weaponProficiencies: [],
     armorProficiencies: [],
     offHandLocked: false,
+    // Served, not a local constant (#1377) — the attunement header reads it.
+    attunementCap: 3,
     ...over,
   } as unknown as Character;
 }
@@ -255,6 +257,15 @@ describe("LoadoutList attunement", () => {
       item({ id: "c", name: "Cloak", slot: "CLOAK", equippedSlot: "CLOAK", requiresAttunement: true, attuned: true }),
     ]);
     expect(screen.getByText("Attuned 3/3")).toBeInTheDocument();
+  });
+
+  it("renders the SERVED cap in the header, not a local 3 (#1377)", () => {
+    renderList(
+      [attunableRing({ id: "a", name: "Ring A", attuned: true })],
+      vi.fn(),
+      { attunementCap: 5 },
+    );
+    expect(screen.getByText("Attuned 1/5")).toBeInTheDocument();
   });
 
   it("renders an Attune control only for items requiring attunement", () => {

@@ -19,7 +19,9 @@ import {
   twfHint,
 } from "@/lib/turnOptions";
 import { resolverFor } from "@/features/session/actionResolvers";
+import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
 import { SERVED_ACTIONS_2014, SERVED_ACTIONS_2024 } from "@/test/universalActions";
+import type { AttackRow } from "@character-sheet/shared-types";
 import type { AvailableAction, Character, ResourcePool, Spell } from "@/types/character";
 
 function weaponItem(
@@ -45,8 +47,11 @@ function weaponItem(
   };
 }
 
-function makeCharacter(overrides: Partial<Character> = {}): Character {
-  return {
+// mainWeaponSummary/offHandSummary read `character.attackRows` (#1434), so
+// `weaponRows` states the weapon rows the server would have served; the two
+// always-present rows are appended.
+function makeCharacter(overrides: Partial<Character> = {}, weaponRows: AttackRow[] = []): Character {
+  const base = {
     id: "char-1",
     name: "Tester",
     level: 5,
@@ -71,6 +76,10 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     resources: { pools: [] },
     ...overrides,
   } as unknown as Character;
+  return {
+    ...base,
+    attackRows: overrides.attackRows ?? [...weaponRows, UNARMED_ROW, IMPROVISED_ROW],
+  } as unknown as Character;
 }
 
 function makeSpell(overrides: Partial<Spell> = {}): Spell {
@@ -92,9 +101,21 @@ function makeSpell(overrides: Partial<Spell> = {}): Spell {
   } as Spell;
 }
 
+/** The served row for a weapon fixture, at whatever numbers the test cares about. */
+function weaponRow(over: Partial<AttackRow> & Pick<AttackRow, "id" | "name">): AttackRow {
+  return attackRow({ kind: "weapon", grip: "one-handed", damageType: "slashing", ...over });
+}
+
 describe("mainWeaponSummary", () => {
   it("summarizes the first equipped weapon", () => {
-    const c = makeCharacter({ inventory: [weaponItem()] } as Partial<Character>);
+    const c = makeCharacter({ inventory: [weaponItem()] } as Partial<Character>, [
+      weaponRow({
+        id: "inv-1",
+        name: "Longsword",
+        attackSpec: { count: 1, faces: 20, modifier: 7 },
+        damageSpec: { count: 1, faces: 8, modifier: 4 },
+      }),
+    ]);
     expect(mainWeaponSummary(c)).toBe("Longsword · +7 to hit · 1d8 + 4 slashing");
   });
 
@@ -104,29 +125,26 @@ describe("mainWeaponSummary", () => {
 });
 
 describe("offHandSummary", () => {
-  it("summarizes the second equipped weapon", () => {
-    const c = makeCharacter({
-      inventory: [
-        weaponItem({ id: "a", name: "Shortsword" }, { light: true, attackBonus: 5, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing" }),
-        weaponItem(
-          { id: "b", name: "Dagger" },
-          {
-            light: true,
-            attackBonus: 5,
-            damageDiceFaces: 4,
-            damageModifier: 3,
-            damageType: "piercing",
-            damage: { damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 3, damageType: "piercing", grip: "one-handed", abilityModifier: 3 },
-          },
-        ),
-      ],
-    } as Partial<Character>);
-    // Off-hand drops the +3 ability modifier (no TWF style) → 1d4 piercing.
+  it("summarizes the served off-hand row", () => {
+    const dagger = { id: "b", name: "Dagger", damageType: "piercing", attackSpec: { count: 1, faces: 20, modifier: 5 } };
+    const c = makeCharacter({}, [
+      weaponRow({
+        id: "a",
+        name: "Shortsword",
+        damageType: "piercing",
+        attackSpec: { count: 1, faces: 20, modifier: 5 },
+        damageSpec: { count: 1, faces: 6, modifier: 3 },
+      }),
+      weaponRow({ ...dagger, damageSpec: { count: 1, faces: 4, modifier: 3 } }),
+      // The server already dropped the +3 ability modifier (no TWF style), and the
+      // off-hand row shares its weapon's id.
+      weaponRow({ ...dagger, offHand: true, damageSpec: { count: 1, faces: 4, modifier: 0 } }),
+    ]);
     expect(offHandSummary(c)).toBe("Dagger (off-hand) · +5 to hit · 1d4 piercing");
   });
 
-  it("returns null when the loadout can't dual-wield", () => {
-    expect(offHandSummary(makeCharacter({ inventory: [weaponItem()] } as Partial<Character>))).toBeNull();
+  it("returns null when no off-hand row was served", () => {
+    expect(offHandSummary(makeCharacter({}, [weaponRow({ id: "inv-1", name: "Longsword" })]))).toBeNull();
   });
 });
 
@@ -186,7 +204,7 @@ describe("classActionOption", () => {
         pools: [{ key: "secondWind", label: "Second Wind", total: 1, used: 0, remaining: 1, recharge: "shortRest" }],
       },
     } as Partial<Character>);
-    const option = classActionOption(available(), resolverFor("secondWind"), c);
+    const option = classActionOption(available(), resolverFor("secondWind"), c, []);
     expect(option).toMatchObject({
       key: "secondWind",
       title: "Second Wind",
@@ -203,6 +221,9 @@ describe("classActionOption", () => {
       available({ key: "cunningAction", name: "Cunning Action" }),
       resolverFor("cunningAction"),
       c,
+      // Served rows present but the action regrants nothing — nothing may leak
+      // onto a row that declared no grant (#1431).
+      SERVED_ACTIONS_2014,
     );
     expect(option).toEqual({ key: "cunningAction", title: "Cunning Action", enabled: true, heal: false });
   });
@@ -212,6 +233,7 @@ describe("classActionOption", () => {
       available({ key: "shadowStep", name: "Shadow Step", cost: "bonusAction", reminder: "Teleport up to 60 ft between dim light or darkness." }),
       resolverFor("shadowStep"),
       makeCharacter(),
+      [],
     );
     expect(option).toEqual({
       key: "shadowStep",
@@ -227,6 +249,7 @@ describe("classActionOption", () => {
       available({ enabled: false, disabledReason: "No uses remaining" }),
       resolverFor("secondWind"),
       makeCharacter(),
+      [],
     );
     expect(option.enabled).toBe(false);
     expect(option.disabledReason).toBe("No uses remaining");
@@ -237,6 +260,7 @@ describe("classActionOption", () => {
       available({ key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike" }),
       resolverFor("bonusUnarmedStrike"),
       makeCharacter(),
+      [],
     );
     expect(option).toEqual({
       key: "bonusUnarmedStrike",
@@ -257,6 +281,7 @@ describe("classActionOption", () => {
       }),
       resolverFor("bonusUnarmedStrike"),
       makeCharacter(),
+      [],
     );
     expect(option.enabled).toBe(false);
     expect(option.disabledReason).toBe("Requires no armor or Shield");
@@ -271,11 +296,62 @@ describe("classActionOption", () => {
       available({ key: "flurryOfBlows", name: "Flurry of Blows" }),
       resolverFor("flurryOfBlows"),
       c,
+      [],
     );
     expect(option).toMatchObject({
       subtitle: "Spend 1 Focus Points",
       badge: "3 / rest",
     });
+  });
+
+  // #1431. Names, never the served `description`: OptionCard's subtitle is one
+  // truncated line and the served paragraphs run 75-278 chars.
+  it("resolves regranted keys to the served names for the character's edition", () => {
+    const cunning = available({
+      key: "cunningAction",
+      name: "Cunning Action",
+      regrants: ["dash", "disengage", "hide"],
+    });
+    expect(
+      classActionOption(cunning, resolverFor("cunningAction"), makeCharacter(), SERVED_ACTIONS_2014).regrantNames,
+    ).toEqual(["Dash", "Disengage", "Hide"]);
+  });
+
+  it("resolves the SAME key to each edition's own name (Use an Object / Utilize)", () => {
+    const fastHands = available({ key: "fastHands", name: "Fast Hands", regrants: ["useObject"] });
+    const namesFor = (served: typeof SERVED_ACTIONS_2014) =>
+      classActionOption(fastHands, resolverFor("fastHands"), makeCharacter(), served).regrantNames;
+    expect(namesFor(SERVED_ACTIONS_2014)).toEqual(["Use an Object"]);
+    expect(namesFor(SERVED_ACTIONS_2024)).toEqual(["Utilize"]);
+  });
+
+  it("drops keys the served list doesn't cover, and omits the field when none resolve", () => {
+    const partial = available({ key: "cunningAction", name: "Cunning Action", regrants: ["dash", "notAnAction"] });
+    expect(
+      classActionOption(partial, resolverFor("cunningAction"), makeCharacter(), SERVED_ACTIONS_2024).regrantNames,
+    ).toEqual(["Dash"]);
+    // The empty case is first paint, before the reference query resolves — the
+    // card must render with no subtitle rather than an empty one.
+    expect(
+      classActionOption(partial, resolverFor("cunningAction"), makeCharacter(), []),
+    ).not.toHaveProperty("regrantNames");
+  });
+
+  it("leaves a regranting row's own reminder as the subtitle (the monk-card latch)", () => {
+    const patientDefense = available({
+      key: "patientDefense",
+      name: "Patient Defense",
+      regrants: ["disengage"],
+      reminder: "Disengage (free bonus action).",
+    });
+    const option = classActionOption(
+      patientDefense,
+      resolverFor("patientDefense"),
+      makeCharacter(),
+      SERVED_ACTIONS_2024,
+    );
+    expect(option.subtitle).toBe("Disengage (free bonus action).");
+    expect(option.regrantNames).toEqual(["Disengage"]);
   });
 });
 

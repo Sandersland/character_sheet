@@ -26,32 +26,21 @@ export interface AvailableAction {
   disabledReason?: string;
   /** In-play rule text for no-server-effect reminder actions (e.g. Shadow Step). */
   reminder?: string;
-}
-
-/**
- * Execute a named action from the Action catalog. The server looks up
- * ACTION_EFFECT_FN[key], emits the appropriate domain ops (spendResource,
- * adjustQuantity, heal, etc.) within a single atomic transaction, and returns
- * the updated character. Client-rolled values (potion heal, die roll totals)
- * are passed via `roll`.
- */
-export interface ExecuteActionOperation {
-  type: "executeAction";
-  /** Matches `Action.key` in the catalog (e.g. "drinkPotion", "rage"). */
-  actionKey: string;
-  /** Target inventory item id for item-consuming actions (e.g. drinkPotion). */
-  inventoryItemId?: string;
   /**
-   * Client-rolled total for actions whose effects involve dice (e.g. a potion
-   * heal). The server validates and records this; it does NOT re-roll.
-   * Absent for actions with no die roll.
+   * Universal action keys this class feature re-costs rather than shadows
+   * (#1431) — Cunning Action buys Dash/Disengage/Hide for a Bonus Action.
+   * Resolved against `GET /api/reference`'s `universalActions` for the
+   * character's edition: the client looks a key up and never knows what it
+   * means, and never assumes a name, because one key serves two (Use an Object
+   * in SRD 5.1, Utilize in SRD 5.2).
    */
-  roll?: number;
+  regrants?: string[];
 }
 
-/**
- * Action operation types — the executeAction op is resolved via `ACTION_EFFECT_FN`.
- * Sent as `{ operations: ActionOperation[] }` to
- * POST /api/characters/:id/actions/transactions.
- */
-export type ActionOperation = ExecuteActionOperation;
+// The action op is derived from the route zod schema in
+// @character-sheet/contracts (#1390) — `import type` only, so zod never enters
+// the client bundle. Sent as `{ operations: ActionOperation[] }` to
+// POST /api/characters/:id/actions/transactions. Only the union alias forwards:
+// ExecuteActionOperation has zero frontend call sites, and a forwarded-only
+// name is a dead export under the fallow gate.
+export type { ActionOperation } from "@character-sheet/contracts";

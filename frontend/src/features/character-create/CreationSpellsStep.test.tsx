@@ -27,14 +27,15 @@ function spell(over: Partial<CatalogSpell>): CatalogSpell {
   };
 }
 
+// What the server returns for ?class=warlock&maxLevel=1 (#1377). The class and
+// level filters live there now, so a mock returning off-list rows would only
+// test a filter this component no longer has — it would render them.
 const CATALOG: CatalogSpell[] = [
   spell({ id: "eb", name: "Eldritch Blast", level: 0, classes: ["warlock"], description: "A beam of crackling energy." }),
-  spell({ id: "presti", name: "Prestidigitation", level: 0, classes: ["wizard"] }),
   spell({ id: "charm", name: "Charm Person", level: 1, classes: ["warlock", "bard"], description: "Charm a humanoid." }),
-  spell({ id: "shield", name: "Shield", level: 1, classes: ["wizard"] }),
 ];
 
-const COUNTS = { cantrips: 2, spells: 2 };
+const COUNTS = { cantrips: 2, spells: 2, maxSpellLevel: 1 };
 
 function renderStep(over: Partial<Parameters<typeof CreationSpellsStep>[0]> = {}) {
   const onChange = vi.fn();
@@ -57,16 +58,30 @@ describe("CreationSpellsStep", () => {
     fetchMock.mockResolvedValue(CATALOG);
   });
 
-  it("shows only class-eligible level-0/1 spells (wizard-only spells absent for a warlock)", async () => {
+  // Eligibility is a server rule now, so the component's contract is the REQUEST
+  // it makes, plus splitting the answer on the served level. It must not filter.
+  it("asks the server for the class's legal band, passing the served maxSpellLevel", async () => {
     renderStep();
+    await screen.findByRole("button", { name: "Open Eldritch Blast" });
+    expect(fetchMock).toHaveBeenCalledWith({ className: "warlock", maxLevel: 1 });
+  });
+
+  // Each render keeps exactly one group alive, which is how the level-0 split can
+  // be observed without the picker's <section>s carrying accessible names.
+  it("routes level-0 rows to the Cantrips group only", async () => {
+    renderStep({ counts: { ...COUNTS, spells: 0 } });
     expect(await screen.findByRole("button", { name: "Open Eldritch Blast" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Charm Person" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open Prestidigitation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open Shield" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Charm Person" })).not.toBeInTheDocument();
+  });
+
+  it("routes rows above level 0 to the Spells group only", async () => {
+    renderStep({ counts: { ...COUNTS, cantrips: 0 } });
+    expect(await screen.findByRole("button", { name: "Open Charm Person" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Eldritch Blast" })).not.toBeInTheDocument();
   });
 
   it("omits the Spells group when the class learns zero level-1 spells", async () => {
-    renderStep({ counts: { cantrips: 2, spells: 0 } });
+    renderStep({ counts: { ...COUNTS, spells: 0 } });
     // A cantrip row proves the catalog loaded; the Spells heading must be absent.
     await screen.findByRole("button", { name: "Open Eldritch Blast" });
     expect(screen.queryByText("Spells", { exact: true })).not.toBeInTheDocument();
@@ -84,9 +99,9 @@ describe("CreationSpellsStep", () => {
   });
 
   it("disables unselected cantrip pills once the cap is reached", async () => {
-    renderStep({ cantripIds: ["eb"], counts: { cantrips: 1, spells: 2 } });
-    // Eldritch Blast fills the single cantrip slot, so Prestidigitation... is
-    // off-list anyway; assert the other warlock-eligible list respects its cap.
+    renderStep({ cantripIds: ["eb"], counts: { ...COUNTS, cantrips: 1 } });
+    // Eldritch Blast fills the single cantrip slot; the served list holds no
+    // second warlock cantrip, so the cap shows as the picked pill staying pressed.
     const added = await screen.findByRole("button", { name: "Add Eldritch Blast" });
     expect(added).toHaveAttribute("aria-pressed", "true");
   });

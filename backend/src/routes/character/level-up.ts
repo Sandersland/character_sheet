@@ -1,8 +1,10 @@
 // Owns POST /api/characters/:id/level-up/transactions — the unified level-up
 // ceremony endpoint (#885). The submission schema REUSES each domain's existing
-// op schema verbatim (imported from the per-domain routers) so the wire contract
-// never drifts from the domains it composes; applyLevelUpTransaction validates it
+// op schema verbatim — from @character-sheet/contracts for the domains migrated
+// there (#1390), else from the per-domain router — so the wire contract never
+// drifts from the domains it composes; applyLevelUpTransaction validates it
 // against the derived plan and applies every choice under one batchId.
+import { levelUpTargetSchema, type LevelUpTarget } from "@character-sheet/contracts";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -11,14 +13,12 @@ import { prisma } from "@/lib/core/prisma.js";
 import { applyLevelUpTransaction, resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
 import { grantedSpellsGained, type GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
 import { InvalidLevelUpError, resolveLevelUpPlan } from "@/lib/leveling/level-up-submission.js";
-import type { LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import { InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
 import { InvalidAdvancementOperationError } from "@/lib/leveling/advancement.js";
 import { InvalidClassOperationError } from "@/lib/classes/class.js";
 import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/spellcasting.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
-import { levelUpTargetSchema } from "@/routes/character/hitpoints.js";
 import { takeAsiOpSchema, takeFeatOpSchema } from "@/routes/character/advancement.js";
 import {
   learnManeuverOpSchema,

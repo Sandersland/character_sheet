@@ -1,14 +1,33 @@
 import { Router } from "express";
 
+import { parseClassFilterOr400 } from "@/lib/http/parse-class-param.js";
+import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 export const spellsRouter = Router();
 
-// Feeds the spellcasting section's "learn from catalog" picker — same role
-// as GET /api/items feeds the inventory editor. Ordered by level then name
-// so the UI can group by level without sorting client-side.
-spellsRouter.get("/spells", async (_req, res) => {
+/**
+ * Feeds the spellcasting section's "learn from catalog" picker — same role
+ * as GET /api/items feeds the inventory editor. Ordered by level then name
+ * so the UI can group by level without sorting client-side.
+ *
+ * `?class=` and `?maxLevel=` are OPTIONAL, unlike `?edition=` elsewhere: the
+ * creation ceremony asks for one class's legal band, while the sheet's picker
+ * legitimately wants everything. Server-applied so the eligibility rule — on the
+ * class's list, inside the legal level band — has exactly one home (#1377).
+ * No `?edition=`: Spell rows are not edition-tagged.
+ */
+spellsRouter.get("/spells", async (req, res) => {
+  const classFilter = parseClassFilterOr400(req, res);
+  if (!classFilter.ok) return;
+  const levelFilter = parseMaxSpellLevelOr400(req, res);
+  if (!levelFilter.ok) return;
+
   const spells = await prisma.spell.findMany({
+    where: {
+      ...(classFilter.className ? { classes: { has: classFilter.className } } : {}),
+      ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
+    },
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
 

@@ -167,6 +167,18 @@ describe("actionResolvers", () => {
     expect(resolverFor("quiveringPalm")).toBeUndefined();
   });
 
+  // Without this entry partitionClassActions filters the backend's fastHands row
+  // out and no card renders at all — the resolver registry is the gate, not the
+  // payload (#1431).
+  it("Thief's Fast Hands is an economy-only bonus-action confirm (#1431)", () => {
+    const r = resolverFor("fastHands");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("simple-confirm");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.serverEffect).toBe(false); // no backend ACTION_EFFECT_FN, like patientDefense
+    expect(r!.resourceKey).toBeUndefined();
+  });
+
   it("all resolvers have a valid slot", () => {
     const VALID_SLOTS = new Set(["action", "bonusAction", "reaction", "free", "special"]);
     for (const r of Object.values(ACTION_RESOLVERS)) {

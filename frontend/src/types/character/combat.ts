@@ -1,11 +1,16 @@
 /**
  * Combat wire types: derived attacks, conditions, buffs, roll modifiers, and HP operations.
  */
+// ConditionKey is used below (ConditionEntry.key) as well as re-exported (the
+// `export type` block further down) — a bare `export … from` doesn't bind a
+// local name, so it needs its own `import type` too.
+import type { ConditionKey } from "@character-sheet/contracts";
 
 /**
- * A derived attack row — unarmed strike or improvised weapon — computed
- * server-side and surfaced on the character so `AttacksPanel` can render them
- * without reproducing combat rules on the client.
+ * A derived attack profile — unarmed strike or improvised weapon — computed
+ * server-side and surfaced on the character so the session turn sheets can render
+ * it without reproducing combat rules on the client. Also the source the matching
+ * `AttackRow` entries are built from (#1434).
  */
 export interface DerivedAttack {
   attackBonus: number;
@@ -30,28 +35,14 @@ export interface ArmorClassPart {
   value: number;
 }
 
-/**
- * Conditions state + operation types — mirror of `ConditionOperation` /
- * `applyConditionsOperations`. Sent as `{ operations: ConditionOperation[] }` to
- * POST /api/characters/:id/conditions/transactions.
- *
- * ConditionKey: the 14 standard 5e status condition keys (mirror of the backend `ConditionKey`).
- */
-export type ConditionKey =
-  | "blinded"
-  | "charmed"
-  | "deafened"
-  | "frightened"
-  | "grappled"
-  | "incapacitated"
-  | "invisible"
-  | "paralyzed"
-  | "petrified"
-  | "poisoned"
-  | "prone"
-  | "restrained"
-  | "stunned"
-  | "unconscious";
+// Condition ops and the 14-key ConditionKey are derived from the route zod
+// schemas in @character-sheet/contracts (#1390) — `import type` only, so zod
+// never enters the client bundle. Sent as
+// `{ operations: ConditionOperation[] }` to
+// POST /api/characters/:id/conditions/transactions. removeCondition/
+// setExhaustion don't forward: they have no frontend call site, and a
+// forwarded-only name is a dead export under the fallow gate.
+export type { ApplyConditionOperation, ConditionKey, ConditionOperation } from "@character-sheet/contracts";
 
 export interface ConditionEntry {
   key: ConditionKey;
@@ -123,79 +114,13 @@ export type RollEffect = AdvantageRollEffect | FlatRollEffect;
 /** A RollEffect resolved with its provenance label (e.g. "Rage", "Poisoned", "Exhaustion"). Derived on read. */
 export type RollModifier = RollEffect & { source: string };
 
-export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }
-
-export interface RemoveConditionOperation { type: "removeCondition"; key: ConditionKey }
-
-export interface SetExhaustionOperation { type: "setExhaustion"; level: number }
-
-export type ConditionOperation =
-  | ApplyConditionOperation
-  | RemoveConditionOperation
-  | SetExhaustionOperation;
-
-/**
- * HP operation types — mirror of `applyHitPointOperations`. Sent as
- * `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.
- */
-/**
- * `autoRollConcentration: false` (issue #76) defers a triggered concentration
- * save to the client — the response carries a `status: "pending"` check and the
- * client follows up with a `ConcentrationSaveOperation`. Omitted = auto-roll.
- */
-/**
- * `damageType` (optional, #456) drives resistance auto-halving server-side;
- * `applyResistance: false` declines the auto-halve (take the full amount).
- */
-export interface DamageOperation { type: "damage"; amount: number; damageType?: string; applyResistance?: boolean; autoRollConcentration?: boolean }
-
-export interface HealOperation { type: "heal"; amount: number }
-
-export interface SetTempOperation { type: "setTemp"; amount: number }
-
-/** `rolls`: one raw die value per hit die spent (rolled by the client via `rollDie`). */
-export interface ShortRestOperation { type: "shortRest"; rolls: number[] }
-
-export interface LongRestOperation { type: "longRest" }
-
-/**
- * Which class the level-up advances (mirrors backend LevelUpTarget). Omitted =
- * the primary class (single-class default). `existing` increments a class entry;
- * `new` multiclasses into a fresh class (ability prereqs enforced server-side).
- */
-export type LevelUpTarget =
-  | { kind: "existing"; classEntryId: string }
-  | { kind: "new"; classId: string };
-
-/** For "roll": client rolls via `rollDie`, sends the raw die face as `roll`. */
-export interface LevelUpOperation {
-  type: "levelUp";
-  method: "average" | "roll";
-  roll?: number;
-  target?: LevelUpTarget;
-}
-
-/** Client rolls d20 via `rollDie`, sends the raw value. Only valid at 0 HP. */
-export interface DeathSaveOperation { type: "deathSave"; roll: number }
-
-export interface StabilizeOperation { type: "stabilize" }
-
-/**
- * Resolve a deferred concentration save with a client-rolled d20 (issue #76).
- * `damage` lets the server recompute the DC; `roll` is the raw d20 face.
- */
-export interface ConcentrationSaveOperation { type: "concentrationSave"; entryId: string; roll: number; damage: number }
-
-export type HitPointOperation =
-  | DamageOperation
-  | HealOperation
-  | SetTempOperation
-  | ShortRestOperation
-  | LongRestOperation
-  | LevelUpOperation
-  | DeathSaveOperation
-  | StabilizeOperation
-  | ConcentrationSaveOperation;
+// HP ops are derived from the route zod schemas in @character-sheet/contracts
+// (#1390) — `import type` only, so zod never enters the client bundle. Sent as
+// `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp. Only the
+// two names this tier consumes forward: the nine member types have zero
+// frontend call sites, and a forwarded-only name is a dead export under the
+// fallow gate. LevelUpTarget also reaches ./leveling through this re-export.
+export type { HitPointOperation, LevelUpTarget } from "@character-sheet/contracts";
 
 /**
  * Result of the concentration check the server makes when a concentrating

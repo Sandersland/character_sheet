@@ -11,8 +11,10 @@ import { describe, expect, it } from "vitest";
 import {
   deriveActions,
   deriveEntryScopedActions,
+  matchesActionGate,
   ACTION_EFFECT_FN,
   ACTION_CAST_FN,
+  REGRANTED_UNIVERSAL_KEYS,
   rageMeleeDamageBonus,
   type AvailableAction,
   type ResourcePool,
@@ -127,6 +129,68 @@ describe("deriveActions — universal actions excluded", () => {
     for (const key of universalKeys) {
       expect(result).not.toContain(key);
     }
+  });
+
+  // The exclusion above can only ever pass, because no DERIVED_ACTIONS row sets
+  // `universal` — so deleting matchesActionGate's guard would break nothing
+  // observable. This is the latch, asserted against a synthetic record: the SAME
+  // row with and without the flag, so a green "false" can only come from the
+  // universal branch and not from a class/level gate (#1431).
+  it("matchesActionGate rejects a universal record that every other gate accepts (#1431)", () => {
+    const row = { key: "syntheticUniversal", name: "Synthetic", cost: "action" as const, grantClass: "rogue", grantLevel: 1 };
+    expect(matchesActionGate(row, "rogue", undefined, 20)).toBe(true);
+    expect(matchesActionGate({ ...row, universal: true }, "rogue", undefined, 20)).toBe(false);
+  });
+});
+
+describe("deriveActions — regrants (#1431)", () => {
+  const regrantsFor = (actions: AvailableAction[], key: string) =>
+    actions.find((a) => a.key === key)?.regrants;
+
+  it("Cunning Action re-costs Dash/Disengage/Hide for a rogue L2", () => {
+    expect(regrantsFor(at("rogue", undefined, 2, []), "cunningAction")).toEqual([
+      "dash",
+      "disengage",
+      "hide",
+    ]);
+  });
+
+  it("carries the monk grants as data even though no card renders them", () => {
+    const monkL10 = at("monk", undefined, 10, [pool("focus", 5)]);
+    expect(regrantsFor(monkL10, "patientDefense")).toEqual(["disengage"]);
+    expect(regrantsFor(monkL10, "patientDefenseFocus")).toEqual(["disengage", "dodge"]);
+    expect(regrantsFor(monkL10, "stepOfTheWind")).toEqual(["dash"]);
+    expect(regrantsFor(monkL10, "stepOfTheWindFocus")).toEqual(["disengage", "dash"]);
+  });
+
+  it("a row with no regrants omits the field entirely", () => {
+    const secondWind = at("fighter", undefined, 2, []).find((a) => a.key === "secondWind");
+    expect(secondWind).toBeDefined();
+    expect(secondWind).not.toHaveProperty("regrants");
+  });
+
+  it("REGRANTED_UNIVERSAL_KEYS is the deduped union of every row's keys", () => {
+    expect([...REGRANTED_UNIVERSAL_KEYS].sort()).toEqual(["dash", "disengage", "dodge", "hide", "useObject"]);
+  });
+});
+
+describe("deriveActions — Fast Hands (Thief L3, #1431)", () => {
+  it("a Thief rogue gets fastHands at L3, re-costing the object-use action", () => {
+    const thief = at("rogue", "Thief", 3, []);
+    expect(keys(thief)).toContain("fastHands");
+    const row = thief.find((a) => a.key === "fastHands");
+    expect(row?.cost).toBe("bonusAction");
+    expect(row?.regrants).toEqual(["useObject"]);
+    // Both editions spend Cunning Action's OWN Bonus Action, and no action-economy
+    // field can express "these two cards share a slot" — so the reminder is the
+    // only place that rule can be stated (SRD 5.1 / SRD 5.2, Thief: Fast Hands).
+    expect(row?.reminder).toMatch(/Cunning Action/);
+  });
+
+  it("no fastHands below L3, for a non-Thief rogue, or for a rogue with no subclass", () => {
+    expect(keys(at("rogue", "Thief", 2, []))).not.toContain("fastHands");
+    expect(keys(at("rogue", "Assassin", 3, []))).not.toContain("fastHands");
+    expect(keys(at("rogue", undefined, 3, []))).not.toContain("fastHands");
   });
 });
 

@@ -1,6 +1,14 @@
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
-import { deriveAttacksPerAction, deriveRangedAttackRollBonus, exhaustionEffectText } from "@/lib/srd/srd.js";
+import {
+  carriedWeight,
+  carryingCapacity,
+  deriveAttacksPerAction,
+  deriveRangedAttackRollBonus,
+  exhaustionEffectText,
+} from "@/lib/srd/srd.js";
+import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
+import { currencyOrEmpty } from "@/lib/inventory/inventory-currency.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { focusSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
@@ -20,6 +28,7 @@ import {
   buildToolProficienciesView,
   mergeItemWeaponProficiencies,
 } from "./serialize/proficiencies.js";
+import { buildAttackRowsView } from "./serialize/attack-rows.js";
 import { buildInventoryContext, buildItemGrantsView, serializeInventoryItem } from "./serialize/inventory.js";
 import {
   buildArmorClassView,
@@ -288,6 +297,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     rangedAttackRollBonus,
     buffTargets,
   );
+  // Bound rather than inlined in the response literal so buildAttackRowsView can
+  // compose its rows from the SAME serialized rows the sheet renders (#1434).
+  const inventory = row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext));
 
   // 5. Equipped-armor selection feeds AC, speed (Unarmored/Fast Movement), and
   //    the Monk unarmed strike — all derived, never persisted.
@@ -306,7 +318,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     buffTargets,
   );
   const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion, editionOf(row));
-  const { unarmedStrike, improvisedWeapon } = buildUnarmedAttacksView(
+  const unarmedAttacks = buildUnarmedAttacksView(
     row,
     effectiveScores,
     progress.proficiencyBonus,
@@ -315,6 +327,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     bestArmor,
     hasShield,
   );
+  const { unarmedStrike, improvisedWeapon } = unarmedAttacks;
+  const attackRows = buildAttackRowsView(inventory, unarmedAttacks, clampedAdvancements);
 
   // Riders (#1316) — each key present only when the character has it.
   const riders = buildRiderView(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects, maneuverSaveDC);
@@ -381,8 +395,18 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // class proficiency renders as a single class-sourced entry.
     armorProficiencies: armorGrants,
     weaponProficiencies: itemMergedWeaponGrants,
-    inventory: row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext)),
+    inventory,
     currency: row.currency,
+    // Encumbrance (#1377): both numbers are derived here so the sheet only
+    // formats them. Capacity reads `effectiveScores`, not row.abilityScores —
+    // the post-clamp score is what the wire reports as `abilityScores`, and
+    // reading the raw column would disagree with it after a STR ASI.
+    carryCapacity: carryingCapacity(effectiveScores.strength),
+    carriedWeight: carriedWeight(row.inventoryItems, currencyOrEmpty(row.currency)),
+    // The 3-item attunement cap as a served number, from the same constant the
+    // attune path's 409 rejects on — the sheet used to re-type the literal in
+    // four places.
+    attunementCap: ATTUNEMENT_LIMIT,
     spellcasting,
     resources,
     // Active status conditions + exhaustion level. Normalized on read (unknown
@@ -432,10 +456,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // GET /api/reference instead, resolved per edition — #1430).
     availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded),
 
-    // Combat attack rows — derived at read time; the frontend renders these
-    // directly in AttacksPanel rather than recomputing attack math on the client.
+    // Combat attack rows — derived at read time so the session turn sheets render
+    // served numbers instead of recomputing attack math on the client (#1434).
+    // unarmedStrike/improvisedWeapon stay on the payload because other surfaces
+    // read them; the matching `attackRows` entries are built FROM them.
     unarmedStrike,
     improvisedWeapon,
+    attackRows,
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.
     attacksPerAction: deriveAttacksPerAction(row.classEntries),
     // A two-handed weapon in MAIN_HAND locks OFF_HAND (#1433) — a property of the

@@ -2,7 +2,7 @@
  * The aggregate serialized Character shape and its lean summary view.
  */
 
-import type { DiceRider, RulesEdition, SaveRider } from "@character-sheet/shared-types";
+import type { AttackRow, DiceRider, RulesEdition, SaveRider } from "@character-sheet/shared-types";
 
 import type { AvailableAction } from "./actions";
 import type { CampaignPreferences } from "./campaign";
@@ -72,6 +72,12 @@ export interface Character {
 
   inventory: InventoryItem[];
   currency: Currency;
+  /** Carrying capacity in lb, derived server-side from the effective STR score (#1377). */
+  carryCapacity: number;
+  /** Carried weight in lb — the pack plus the purse, derived server-side (#1377). */
+  carriedWeight: number;
+  /** The attunement cap the server's attune path rejects past (#1377). */
+  attunementCap: number;
 
   spellcasting?: {
     ability: AbilityName;
@@ -162,6 +168,11 @@ export interface Character {
    *  is true only when "Improvised Weapons" appears in weaponProficiencies
    *  (e.g. via Tavern Brawler), which adds proficiency bonus to attackBonus. */
   improvisedWeapon: DerivedImprovisedAttack;
+
+  /** Every way this character can swing, fully resolved server-side (#1434) — see
+   *  `AttackRow`. REQUIRED, not optional: it is always served, and optional would
+   *  let a fixture omit it and silently render an empty attack picker. */
+  attackRows: AttackRow[];
 
   /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
   attacksPerAction: number;

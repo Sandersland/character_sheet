@@ -2,6 +2,7 @@
 // set exhaustion). Mutation-router contract: apply ops atomically in the lib
 // layer, then re-fetch with characterInclude and return
 // serializeCharacter(updated).
+import { conditionOperationSchema } from "@character-sheet/contracts";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -9,39 +10,12 @@ import {
   applyConditionsOperations,
   InvalidConditionOperationError,
 } from "@/lib/combat/conditions.js";
-import { CONDITIONS, EXHAUSTION_MAX, type ConditionKey } from "@/lib/srd/srd.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const conditionsRouter = Router({ mergeParams: true });
 
-const conditionKeySchema = z.enum(
-  CONDITIONS.map((c) => c.key) as [ConditionKey, ...ConditionKey[]],
-);
-
-const applyConditionOpSchema = z.object({
-  type: z.literal("applyCondition"),
-  key: conditionKeySchema,
-  source: z.string().min(1).optional(),
-});
-
-const removeConditionOpSchema = z.object({
-  type: z.literal("removeCondition"),
-  key: conditionKeySchema,
-});
-
-const setExhaustionOpSchema = z.object({
-  type: z.literal("setExhaustion"),
-  level: z.number().int().min(0).max(EXHAUSTION_MAX),
-});
-
-const operationSchema = z.discriminatedUnion("type", [
-  applyConditionOpSchema,
-  removeConditionOpSchema,
-  setExhaustionOpSchema,
-]);
-
 const transactionsRequestSchema = z.object({
-  operations: z.array(operationSchema).min(1),
+  operations: z.array(conditionOperationSchema).min(1),
 });
 
 /**

@@ -127,12 +127,15 @@ export function useTurnActions({
   // Render models for the option-card picker sheets (pure turnOptions
   // derivations) — built here so the slot components stay presentational and
   // `character` never flows into them.
-  const enrich = (a: AvailableAction) => classActionOption(a, resolverFor(a.key), character);
   // Universal actions are served per edition (#1430), not held client-side, and
   // are read HERE rather than in the sheet bodies so those stay presentational
   // ("all data arrives via the ActionSheetModel") and `character` never flows
-  // into them.
+  // into them. Read before `enrich` because a class row's `regrants` keys are
+  // resolved to names against these rows (#1431) — one read serves all three
+  // sheet models.
   const universalActions = useUniversalActions(character.rulesEdition);
+  const enrich = (a: AvailableAction) =>
+    classActionOption(a, resolverFor(a.key), character, universalActions);
   const actionSheetModel = {
     attackSummary: mainWeaponSummary(character),
     universalActions,
