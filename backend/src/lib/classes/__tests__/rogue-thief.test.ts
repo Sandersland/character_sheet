@@ -55,7 +55,7 @@ describe("Rogue Thief subclass (#909)", () => {
   // renders. Losing either half is a regression, so both are pinned together.
   it("Fast Hands is both a THIEF_FEATURES prose row and a bonus-action row (#1431)", () => {
     expect(thiefFeatureNames(3)).toContain("Fast Hands");
-    const actions = deriveEntryScopedActions([{ name: "rogue", subclass: "Thief", level: 3 }], 3, []);
+    const actions = deriveEntryScopedActions([{ name: "rogue", subclass: "Thief", level: 3 }], 3, [], true, "EDITION_2024");
     const row = actions.find((a) => a.key === "fastHands");
     expect(row?.name).toBe("Fast Hands");
     expect(row?.cost).toBe("bonusAction");

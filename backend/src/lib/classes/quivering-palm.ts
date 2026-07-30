@@ -28,7 +28,7 @@ import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/exp
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
-import { focusSaveDC } from "./monk.js";
+import { monkSaveDC } from "./monk.js";
 import { resolveSubclassSlug } from "./subclass-slug.js";
 
 export class InvalidQuiveringPalmOperationError extends Error {}
@@ -170,7 +170,7 @@ async function triggerQuiveringPalm(
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  const dc = focusSaveDC(abilityScores, profBonus);
+  const dc = monkSaveDC(abilityScores, profBonus);
 
   const saveRoll = 1 + Math.floor(Math.random() * 20);
   const { outcome, appliedDamage } = resolveQuiveringPalmDamage(saveRoll, dc, op.roll);

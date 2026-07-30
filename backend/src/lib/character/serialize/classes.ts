@@ -1,5 +1,7 @@
 // Clamp-on-read blocks here pair 1:1 with LEVEL_GATED_RECONCILERS (lib/leveling/level-reconciliation.ts).
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import {
   characterAdvancementSlots,
   characterFightingStyleFeatSlots,
@@ -191,12 +193,13 @@ export function buildAvailableActionsView(
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218) —
   // gates the Monk's Bonus Unarmed Strike (requiresUnarmored in DERIVED_ACTIONS).
   unarmoredUnshielded: boolean,
+  edition: RulesEdition,
 ): AvailableAction[] {
   const pools =
     resources && "pools" in resources
       ? (resources as { pools: { key: string; remaining: number }[] }).pools
       : [];
-  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded);
+  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition);
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

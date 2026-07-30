@@ -12,6 +12,7 @@ import {
   deriveActions,
   deriveEntryScopedActions,
   matchesActionGate,
+  actionGrantLevel,
   ACTION_EFFECT_FN,
   ACTION_CAST_FN,
   REGRANTED_UNIVERSAL_KEYS,
@@ -42,13 +43,17 @@ function keys(actions: AvailableAction[]) {
 // every call site below, not a semantic edit. A handful of calls stay direct
 // `deriveActions(cls, "monk-warrior-of-shadow", …)` further down so the
 // slug-native contract is asserted without going through the resolver too.
+// Defaults to EDITION_2024 (#1499) — every existing call in this file exercises
+// 2024 behavior, which is the byte-identical-output AC for this slice; the
+// edition-fork tests below pass "EDITION_2014" explicitly.
 const at = (
   cls: string,
   subclass: string | undefined,
   level: number,
   pools: ResourcePool[] = [],
   unarmored = true,
-) => deriveEntryScopedActions([{ name: cls, subclass, level }], level, pools, unarmored);
+  edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
+) => deriveEntryScopedActions([{ name: cls, subclass, level }], level, pools, unarmored, edition);
 
 // ── deriveActions ─────────────────────────────────────────────────────────────
 
@@ -138,8 +143,8 @@ describe("deriveActions — universal actions excluded", () => {
   // universal branch and not from a class/level gate (#1431).
   it("matchesActionGate rejects a universal record that every other gate accepts (#1431)", () => {
     const row = { key: "syntheticUniversal", name: "Synthetic", cost: "action" as const, grantClass: "rogue", grantLevel: 1 };
-    expect(matchesActionGate(row, "rogue", undefined, 20)).toBe(true);
-    expect(matchesActionGate({ ...row, universal: true }, "rogue", undefined, 20)).toBe(false);
+    expect(matchesActionGate(row, "rogue", undefined, 20, "EDITION_2024")).toBe(true);
+    expect(matchesActionGate({ ...row, universal: true }, "rogue", undefined, 20, "EDITION_2024")).toBe(false);
   });
 });
 
@@ -611,6 +616,66 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   });
 });
 
+// #1499: the class-derivation layer's edition axis. Only the seven base-class
+// monk rows tagged EDITION_2024 fork; every other row (including
+// bonusUnarmedStrike, deliberately shared) is served to both editions.
+describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024-tagged rows (#1499)", () => {
+  const TAGGED_2024_ROWS = [
+    "flurryOfBlows",
+    "patientDefense",
+    "patientDefenseFocus",
+    "stepOfTheWind",
+    "stepOfTheWindFocus",
+    "deflectAttacks",
+    "deflectAttacksRedirect",
+  ];
+
+  it("a level-20 EDITION_2014 monk has none of the seven tagged rows — the 2014 shapes are #1500's follow-up", () => {
+    const l20 = keys(
+      at("monk", undefined, 20, [pool("focus", 20), pool("wholenessOfBody", 5)], true, "EDITION_2014"),
+    );
+    for (const key of TAGGED_2024_ROWS) {
+      expect(l20).not.toContain(key);
+    }
+  });
+
+  it("the same 2014 monk still has bonusUnarmedStrike — the shared row is not swept up by the tagging pass", () => {
+    const l20 = keys(at("monk", undefined, 20, [], true, "EDITION_2014"));
+    expect(l20).toContain("bonusUnarmedStrike");
+  });
+
+  it("a level-20 EDITION_2024 monk is unaffected — has every one of the seven tagged rows", () => {
+    const l20 = keys(
+      at("monk", undefined, 20, [pool("focus", 20), pool("wholenessOfBody", 5)], true, "EDITION_2024"),
+    );
+    for (const key of TAGGED_2024_ROWS) {
+      expect(l20).toContain(key);
+    }
+    expect(l20).toContain("bonusUnarmedStrike");
+  });
+
+  // Extends the #1431 synthetic-record test onto the edition axis: the SAME
+  // row with and without an edition tag, so a green "false" can only come from
+  // the edition branch and not from a class/level/subclass gate.
+  it("matchesActionGate rejects a row tagged for the other edition (#1499)", () => {
+    const row = { key: "synthetic2024", name: "Synthetic", cost: "action" as const, grantClass: "monk", grantLevel: 1 };
+    expect(matchesActionGate(row, "monk", undefined, 20, "EDITION_2014")).toBe(true);
+    expect(matchesActionGate({ ...row, edition: "EDITION_2024" as const }, "monk", undefined, 20, "EDITION_2014")).toBe(false);
+    expect(matchesActionGate({ ...row, edition: "EDITION_2024" as const }, "monk", undefined, 20, "EDITION_2024")).toBe(true);
+  });
+
+  it("actionGrantLevel filters on edition before find (#1499)", () => {
+    // flurryOfBlows is tagged EDITION_2024 only — a 2014 lookup finds nothing
+    // (no 2014-keyed row exists yet; #1500 adds one), while a 2024 lookup
+    // still resolves to its grantLevel.
+    expect(actionGrantLevel("flurryOfBlows", "EDITION_2024")).toBe(2);
+    expect(actionGrantLevel("flurryOfBlows", "EDITION_2014")).toBeUndefined();
+    // bonusUnarmedStrike is untagged (shared) — resolves for both editions.
+    expect(actionGrantLevel("bonusUnarmedStrike", "EDITION_2014")).toBe(1);
+    expect(actionGrantLevel("bonusUnarmedStrike", "EDITION_2024")).toBe(1);
+  });
+});
+
 describe("ACTION_CAST_FN — secondWind (#420)", () => {
   it("is a cast-core action, not an op-list action", () => {
     // The migration moved Second Wind off ACTION_EFFECT_FN onto the cast core.
@@ -840,32 +905,32 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
   const SHADOW: SubclassSlug = "monk-warrior-of-shadow";
 
   it("Shadow monk gets shadowArts at L3, not L2", () => {
-    expect(keys(deriveActions("monk", SHADOW, 2, []))).not.toContain("shadowArts");
-    const l3 = deriveActions("monk", SHADOW, 3, [pool("focus", 1)]);
+    expect(keys(deriveActions("monk", SHADOW, 2, [], true, "EDITION_2024"))).not.toContain("shadowArts");
+    const l3 = deriveActions("monk", SHADOW, 3, [pool("focus", 1)], true, "EDITION_2024");
     const shadowArts = l3.find((a) => a.key === "shadowArts");
     expect(shadowArts).toBeDefined();
     expect(shadowArts?.cost).toBe("action");
   });
 
   it("shadowArts is gated on 1 focus like any other resource-gated action", () => {
-    const noFocus = deriveActions("monk", SHADOW, 3, [pool("focus", 0)]);
+    const noFocus = deriveActions("monk", SHADOW, 3, [pool("focus", 0)], true, "EDITION_2024");
     expect(noFocus.find((a) => a.key === "shadowArts")?.enabled).toBe(false);
-    const withFocus = deriveActions("monk", SHADOW, 3, [pool("focus", 1)]);
+    const withFocus = deriveActions("monk", SHADOW, 3, [pool("focus", 1)], true, "EDITION_2024");
     expect(withFocus.find((a) => a.key === "shadowArts")?.enabled).toBe(true);
   });
 
   it("Shadow monk gets cloakOfShadows at L17, not L16", () => {
-    expect(keys(deriveActions("monk", SHADOW, 16, []))).not.toContain("cloakOfShadows");
-    const l17 = deriveActions("monk", SHADOW, 17, [pool("focus", 3)]);
+    expect(keys(deriveActions("monk", SHADOW, 16, [], true, "EDITION_2024"))).not.toContain("cloakOfShadows");
+    const l17 = deriveActions("monk", SHADOW, 17, [pool("focus", 3)], true, "EDITION_2024");
     const cloak = l17.find((a) => a.key === "cloakOfShadows");
     expect(cloak).toBeDefined();
     expect(cloak?.cost).toBe("action");
   });
 
   it("cloakOfShadows costs 3 focus", () => {
-    const short = deriveActions("monk", SHADOW, 17, [pool("focus", 2)]);
+    const short = deriveActions("monk", SHADOW, 17, [pool("focus", 2)], true, "EDITION_2024");
     expect(short.find((a) => a.key === "cloakOfShadows")?.enabled).toBe(false);
-    const enough = deriveActions("monk", SHADOW, 17, [pool("focus", 3)]);
+    const enough = deriveActions("monk", SHADOW, 17, [pool("focus", 3)], true, "EDITION_2024");
     expect(enough.find((a) => a.key === "cloakOfShadows")?.enabled).toBe(true);
   });
 

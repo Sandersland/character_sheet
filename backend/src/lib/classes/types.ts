@@ -147,11 +147,20 @@ export interface DerivedSubclassChoice {
   count: number;
 }
 
+// `subclassKey`/`edition` are both required (never optional) so `edition` can
+// sit last (the subclassGateLevel pattern, #1499) — a defaulted-then-skipped
+// middle parameter can't coexist with a later required one. Every existing
+// resourceFn implementation still typechecks: TS structurally allows a
+// function value with FEWER declared parameters than its target type (the
+// extra call args are simply ignored), so only monk.ts's own resourceFn (the
+// one implementation that needs `edition` for its Martial Arts die) declares
+// the full parameter list.
 export type ResourceFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
-  subclassKey?: string,
+  subclassKey: string | undefined,
+  edition: RulesEdition,
 ) => DerivedResource[];
 
 /**
@@ -165,11 +174,17 @@ export type ResourceFn = (
 type ClassExtrasOnly = Partial<ClassExtras> &
   Partial<Record<Exclude<keyof DerivedClassInfo, keyof ClassExtras>, never>>;
 
-/** A subclass's bespoke level-gated choice-cap fields beyond its resources/features layer — see ClassExtras. */
+/**
+ * A subclass's bespoke level-gated choice-cap fields beyond its resources/
+ * features layer — see ClassExtras. `edition` last, same rationale as
+ * ResourceFn (#1499) — no subclassKey here since an ExtrasFn is already
+ * scoped to one subclass.
+ */
 export type ExtrasFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ) => ClassExtrasOnly;
 
 export interface SubclassDefinition {

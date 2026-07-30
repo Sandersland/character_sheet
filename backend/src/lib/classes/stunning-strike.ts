@@ -30,7 +30,7 @@ import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
-import { focusSaveDC } from "./monk.js";
+import { monkSaveDC } from "./monk.js";
 
 export class InvalidStunningStrikeOperationError extends Error {}
 
@@ -95,7 +95,7 @@ async function attemptStunningStrike(
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  const dc = focusSaveDC(abilityScores, profBonus);
+  const dc = monkSaveDC(abilityScores, profBonus);
 
   // Spend 1 focus BEFORE rolling — insufficient focus throws
   // InvalidResourceOperationError (its own 400), so a failed spend never
