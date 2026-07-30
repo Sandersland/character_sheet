@@ -21,6 +21,8 @@ import {
 import { seedUniversalActions } from "@/test/universalActions";
 import { axe } from "@/test/axe";
 import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
+import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
+import type { AttackRow } from "@character-sheet/shared-types";
 import type { Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -43,7 +45,11 @@ vi.mock("@/api/client", () => ({
   fetchReference: vi.fn(),
 }));
 
-function makeCharacter(overrides: Partial<Character> = {}): Character {
+// The turn sheets render the served attackRows (#1434); `weaponRows` states the
+// weapon rows the server would have served, and the two always-present rows are
+// appended. A fixture that also equips the weapon in `inventory` is doing so for
+// the paper-doll surfaces, not for the attack sheets.
+function makeCharacter(overrides: Partial<Character> = {}, weaponRows: AttackRow[] = []): Character {
   return {
     id: "char-1",
     name: "Tester",
@@ -84,6 +90,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
       ],
       toolProficienciesKnown: [],
     },
+    attackRows: [...weaponRows, UNARMED_ROW, IMPROVISED_ROW],
     ...overrides,
   } as unknown as Character;
 }
@@ -704,7 +711,19 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
           },
         },
       ] as unknown as Character["inventory"],
-    } as unknown as Partial<Character>);
+    } as unknown as Partial<Character>,
+      [
+        attackRow({
+          id: "inv-1",
+          kind: "weapon",
+          name: "Longsword",
+          grip: "one-handed",
+          damageType: "slashing",
+          attackSpec: { count: 1, faces: 20, modifier: 6 },
+          damageSpec: { count: 1, faces: 8, modifier: 3 },
+        }),
+      ],
+    );
   }
 
   async function openAttackPicker(user: ReturnType<typeof userEvent.setup>) {
@@ -1147,6 +1166,12 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
         attackBonus: 6,
         damage: { count: 1, faces: 8, modifier: 3, damageType: "bludgeoning" },
       },
+      // The served row has to agree with unarmedStrike above: the row feeds the
+      // attack label, unarmedStrike the damage display.
+      attackRows: [
+        { ...UNARMED_ROW, attackSpec: { count: 1, faces: 20, modifier: 6 }, damageSpec: { count: 1, faces: 8, modifier: 3 } },
+        IMPROVISED_ROW,
+      ],
       availableActions: [
         {
           key: "deflectAttacks",
