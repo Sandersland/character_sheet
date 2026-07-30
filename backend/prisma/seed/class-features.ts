@@ -154,20 +154,22 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 
 // Authored now, for #1528/#1530 to reuse when they first populate
 // resourceTotals/resourceDieTiers/derivedStatTiers — this stage's own rows
-// never set them (seed-class-features.ts always writes Prisma.JsonNull), so
-// no PRODUCTION import of these three exists until #1528/#1530 land; each is
-// used internally below (classFeatureSeedSchema) and by
-// class-feature-tier-schema.test.ts in the meantime.
-// fallow-ignore-next-line unused-export -- consumed by #1528/#1530, not yet landed; see comment above
-export const resourceTotalsTierSchema = z
+// never set them (seed-class-features.ts always writes Prisma.DbNull), so no
+// production import of these three exists until #1528/#1530 land. Not
+// exported: classFeatureSeedSchema (below) is the surface anything outside
+// this file — including class-feature-tier-schema.test.ts — should validate
+// against, since that's the schema that actually ships. Exporting these three
+// individually would let a caller bypass classFeatureSeedSchema's other
+// fields and required an unused-export lint suppression on all three purely
+// because #1528/#1530 hadn't landed yet — un-exporting removes both problems
+// at once.
+const resourceTotalsTierSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), total: z.number().int().nonnegative() }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
-// fallow-ignore-next-line unused-export -- consumed by #1528/#1530, not yet landed; see comment above
-export const resourceDieTiersSchema = z
+const resourceDieTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), die: z.string().min(1) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
-// fallow-ignore-next-line unused-export -- consumed by #1528/#1530, not yet landed; see comment above
-export const derivedStatTiersSchema = z
+const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 

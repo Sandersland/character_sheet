@@ -7,59 +7,93 @@
 // ambiguity. Nothing in this migration populates these columns yet (#1528+
 // is the first consumer); this only proves the validator itself rejects a
 // descending array.
+//
+// Driven through classFeatureSeedSchema.safeParse, not the three tier
+// schemas directly: those are intentionally un-exported (class-features.ts)
+// since classFeatureSeedSchema is the surface that actually ships, and
+// testing through it exercises the SAME `.refine` predicate as the
+// production validation path (prisma/seed/validate.ts) rather than a second,
+// bypassable entry point.
 import { describe, expect, it } from "vitest";
 
-import { derivedStatTiersSchema, resourceDieTiersSchema, resourceTotalsTierSchema } from "../class-features.js";
+import { classFeatureSeedSchema } from "../class-features.js";
+
+const baseRow = {
+  className: "Fighter",
+  subclassSlug: null,
+  name: "Test Feature",
+  level: 1,
+  description: "test",
+  edition: "EDITION_2024" as const,
+};
 
 describe("ClassFeature tier-array schemas reject a descending minLevel order (#1522)", () => {
-  it("resourceTotalsTierSchema accepts strictly ascending minLevel", () => {
-    const result = resourceTotalsTierSchema.safeParse([
-      { minLevel: 1, total: 2 },
-      { minLevel: 4, total: 3 },
-      { minLevel: 10, total: 4 },
-    ]);
+  it("resourceTotals accepts strictly ascending minLevel", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [
+        { minLevel: 1, total: 2 },
+        { minLevel: 4, total: 3 },
+        { minLevel: 10, total: 4 },
+      ],
+    });
     expect(result.success).toBe(true);
   });
 
-  it("resourceTotalsTierSchema rejects a DESCENDING array — the EXTRA_ATTACK_TIERS shape", () => {
-    const result = resourceTotalsTierSchema.safeParse([
-      { minLevel: 20, total: 4 },
-      { minLevel: 11, total: 3 },
-      { minLevel: 5, total: 2 },
-    ]);
+  it("resourceTotals rejects a DESCENDING array — the EXTRA_ATTACK_TIERS shape", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [
+        { minLevel: 20, total: 4 },
+        { minLevel: 11, total: 3 },
+        { minLevel: 5, total: 2 },
+      ],
+    });
     expect(result.success).toBe(false);
   });
 
-  it("resourceTotalsTierSchema rejects a repeated minLevel (not strictly increasing)", () => {
-    const result = resourceTotalsTierSchema.safeParse([
-      { minLevel: 1, total: 2 },
-      { minLevel: 1, total: 3 },
-    ]);
+  it("resourceTotals rejects a repeated minLevel (not strictly increasing)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [
+        { minLevel: 1, total: 2 },
+        { minLevel: 1, total: 3 },
+      ],
+    });
     expect(result.success).toBe(false);
   });
 
-  it("resourceDieTiersSchema rejects descending order", () => {
-    const result = resourceDieTiersSchema.safeParse([
-      { minLevel: 18, die: "d12" },
-      { minLevel: 10, die: "d10" },
-      { minLevel: 1, die: "d8" },
-    ]);
+  it("resourceDieTiers rejects descending order", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDieTiers: [
+        { minLevel: 18, die: "d12" },
+        { minLevel: 10, die: "d10" },
+        { minLevel: 1, die: "d8" },
+      ],
+    });
     expect(result.success).toBe(false);
   });
 
-  it("derivedStatTiersSchema rejects descending order", () => {
-    const result = derivedStatTiersSchema.safeParse([
-      { minLevel: 11, value: 3 },
-      { minLevel: 5, value: 2 },
-    ]);
+  it("derivedStatTiers rejects descending order", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      derivedStatTiers: [
+        { minLevel: 11, value: 3 },
+        { minLevel: 5, value: 2 },
+      ],
+    });
     expect(result.success).toBe(false);
   });
 
-  it("derivedStatTiersSchema accepts ascending order with a string value", () => {
-    const result = derivedStatTiersSchema.safeParse([
-      { minLevel: 5, value: "19-20" },
-      { minLevel: 15, value: "18-20" },
-    ]);
+  it("derivedStatTiers accepts ascending order with a string value", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      derivedStatTiers: [
+        { minLevel: 5, value: "19-20" },
+        { minLevel: 15, value: "18-20" },
+      ],
+    });
     expect(result.success).toBe(true);
   });
 });

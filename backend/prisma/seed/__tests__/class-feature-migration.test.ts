@@ -12,6 +12,7 @@
 // same shape validate.test.ts uses for assertSeedContentValid.
 import { describe, expect, it } from "vitest";
 
+import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 import { CLASS_FEATURES } from "../class-features.js";
@@ -60,7 +61,20 @@ describe("ClassFeature migration — row count (#1523)", () => {
 // pre-expansion feature list (which class-features.ts keeps internal).
 const KNOWN_FORKED_NAMES = new Set(["Domain Spells", "Expanded Spell List"]);
 
-describe("ClassFeature migration — untagged rows are byte-identical across editions (#1523)", () => {
+// This suite reads in-memory CLASS_FEATURES, not the DB — both editions of an
+// untagged row come from the SAME expandFeatureRow spread (class-features.ts),
+// so this can only ever pass: it cannot catch a future author writing
+// divergent 2014/2024 text for what should be one untagged feature, because
+// by the time such a row reached CLASS_FEATURES it would already be two rows
+// with two `feature.edition` tags, i.e. no longer "untagged" by this test's
+// own KNOWN_FORKED_NAMES exclusion. What it DOES guard is expandFeatureRow
+// itself: a future edit that made the untagged branch build two DIFFERENT
+// descriptions (e.g. a copy-paste that varies `edition` into the text) fails
+// here without needing a DB round-trip. The AC this migration actually cares
+// about — that the DB holds what CLASS_FEATURES says — is covered
+// transitively by the exhaustive DB<->TS description-equality suite above and
+// the tuple-existence suite before it.
+describe("ClassFeature migration — expandFeatureRow's untagged branch keeps both editions byte-identical (#1523)", () => {
   it("every untagged feature's EDITION_2014/EDITION_2024 pair has equal level and description", async () => {
     const byKey = new Map<string, typeof CLASS_FEATURES>();
     for (const row of CLASS_FEATURES) {
@@ -123,7 +137,10 @@ describe("ClassFeature migration — the 5 already-forked pairs were not duplica
 describe("ClassFeature migration — every descriptor column is NULL/default across all 522 rows (#1523)", () => {
   it("no row has a populated descriptor column yet — mechanics wiring belongs to #1528+", async () => {
     const rows = await prisma.classFeature.findMany();
-    expect(rows.length).toBeGreaterThan(0);
+    // Pinned to the registry-derived count, not `> 0`: a row silently dropped
+    // by the seeder (or left over from a previous test's partial write) would
+    // still pass every per-row expectation below and read as "all clear".
+    expect(rows.length).toBe(CLASS_FEATURES.length);
 
     for (const row of rows) {
       expect(row.resourceKey, row.name).toBeNull();
@@ -153,6 +170,26 @@ describe("ClassFeature migration — every descriptor column is NULL/default acr
       expect(row.buffModifier, row.name).toBeNull();
       expect(row.derivedStat, row.name).toBeNull();
       expect(row.derivedStatTiers, row.name).toBeNull();
+    }
+  });
+
+  // Prisma deserializes BOTH SQL NULL (Prisma.DbNull) and a stored JSON `null`
+  // (Prisma.JsonNull) to the JS value `null` — so the per-row `toBeNull()`
+  // checks above pass identically whichever one is actually on disk and
+  // cannot tell them apart. That gap is exactly what let seed-class-
+  // features.ts write Prisma.JsonNull (a real, non-NULL JSON scalar) into
+  // all three Json? descriptor columns while this suite stayed green. Assert
+  // the SQL-level state directly for the three Json? columns so a future
+  // regression to JsonNull goes red here instead of only showing up as a
+  // `WHERE col IS NULL` filter silently matching zero rows four stages from
+  // now (#1525's population guards).
+  it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null", async () => {
+    for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
+      const dbNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.DbNull } } });
+      expect(dbNullCount, column).toBe(CLASS_FEATURES.length);
+
+      const jsonNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.JsonNull } } });
+      expect(jsonNullCount, column).toBe(0);
     }
   });
 });

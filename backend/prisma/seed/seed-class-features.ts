@@ -12,17 +12,24 @@ import { CLASS_FEATURES, type ClassFeatureSeedRow } from "./class-features.js";
 // Every descriptor column reset to NULL/default — the literal "populated
 // nowhere" state #1523's acceptance criteria pin. Spread onto every row this
 // seeder writes; #1528 is what first overrides any of these per-row. The
-// three Json? columns use Prisma.JsonNull (never a bare `null`): Prisma's
+// three Json? columns use Prisma.DbNull (never a bare `null`): Prisma's
 // generated CreateInput type for a nullable Json field only accepts
 // InputJsonValue | NullableJsonNullValueInput, rejecting a literal `null` at
-// compile time — the same JSON-column idiom `spellcasting: Prisma.JsonNull`
-// uses elsewhere in this codebase.
+// compile time, but that type also accepts Prisma.JsonNull — which stores the
+// JSON value `null`, not SQL NULL. Prisma.DbNull is the sentinel that stores
+// actual SQL NULL, which is what "populated nowhere" means and what
+// class-feature-migration.test.ts's descriptor-column assertions require;
+// this repo's own idiom for it is `preferences: Prisma.DbNull` in
+// preferences.test.ts. Prisma.JsonNull is right where a column is meant to
+// literally hold a JSON `null` value (e.g. the `spellcasting: Prisma.JsonNull`
+// test fixture elsewhere in this codebase) — a different intent than this
+// reset, which was the bug the arbiter caught here.
 const DESCRIPTOR_RESET = {
   resourceKey: null,
   resourceLabel: null,
   resourceRecharge: null,
-  resourceTotals: Prisma.JsonNull,
-  resourceDieTiers: Prisma.JsonNull,
+  resourceTotals: Prisma.DbNull,
+  resourceDieTiers: Prisma.DbNull,
   activationCost: null,
   resolverKind: null,
   requiresUnarmored: false,
@@ -44,7 +51,7 @@ const DESCRIPTOR_RESET = {
   buffTarget: null,
   buffModifier: null,
   derivedStat: null,
-  derivedStatTiers: Prisma.JsonNull,
+  derivedStatTiers: Prisma.DbNull,
 };
 
 function partitionKey(classId: string, subclassId: string | null): string {
@@ -63,6 +70,25 @@ function partitionKey(classId: string, subclassId: string | null): string {
 // restricted to the two editions ClassFeature can actually hold, rather than
 // widening the shared helper to special-case a column shape none of its other
 // callers has.
+//
+// staleCatalogRowsWhere's own header documents the `notIn: []` trap: a
+// partition with zero seeded rows for one edition builds `notIn: []` for that
+// edition's OR-branch, which matches (and deletes) EVERY existing row there —
+// fatal for a source that forks, harmless for one that doesn't. On the
+// `edition` axis alone, that trap is discharged by non-nullability: there is
+// no "zero rows because shared" case to misfire on here, since every
+// ClassFeature row names its one edition. But `subclassId` reintroduces the
+// IDENTICAL `notIn: []` hazard on a second axis staleCatalogRowsWhere never
+// partitions on: a (classId, subclassId) partition that genuinely authors
+// zero rows for one edition (#1227's "removed in 2024 means do not author a
+// 2024 row") deletes all of that edition's rows here via the SAME empty-array
+// mechanism — correct ONLY because pruneStalePartitions (below) has already
+// scoped `seeded` to the exact partition before calling this function. The
+// same subclassId-is-nullable hazard shows up on two other surfaces: the
+// schema's `@@unique([classId, subclassId, name, edition])` (NULLS NOT
+// DISTINCT, hand-written in the migration SQL because subclassId can repeat
+// as NULL) and seedClassFeatures' JSDoc below, on why the compound `where`
+// this helper's caller builds can't use `.upsert()`.
 function classFeatureStaleWhere(
   seeded: readonly { identity: string; edition: SeedEdition }[],
   extraWhere: { classId: string; subclassId: string | null },
