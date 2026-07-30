@@ -14,8 +14,7 @@ import { useInventoryTransactions } from "@/features/inventory/useInventoryTrans
 import { useItemCatalog } from "@/features/inventory/useItemCatalog";
 import { useSellSelection } from "@/features/inventory/useSellSelection";
 import { buildSellOperations, type SellLine } from "@/lib/bulkSell";
-import { carryingCapacity, coinWeight } from "@/lib/encumbrance";
-import { buildSections, filterInventory, itemsWeight, selectionGp, type FilterKey } from "@/lib/inventorySections";
+import { buildSections, filterInventory, selectionGp, type FilterKey } from "@/lib/inventorySections";
 import { useState } from "react";
 
 // The sheet's inventory editor: category-sectioned rows + add/sell panels, all funneling through one submitOperations that calls POST .../inventory/transactions and swaps in the returned character.
@@ -30,10 +29,11 @@ export default function InventoryList() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [view, setView] = useState<"bag" | "worn">("bag");
 
-  // Coins count toward carried weight (5e: 50 coins = 1 lb).
-  const totalWeight = itemsWeight(character.inventory) + coinWeight(character.currency);
-  // 5e carrying capacity = STR × 15, derive-on-read so it tracks STR changes.
-  const capacity = carryingCapacity(character.abilityScores.strength);
+  // Both numbers arrive resolved (#1377) — the pack-plus-purse sum and STR × 15
+  // are 5e rules and live in the backend's srd/encumbrance. Only the comparison
+  // below is ours: 5e lets you carry UP TO capacity, so `>` and not `>=`.
+  const totalWeight = character.carriedWeight;
+  const capacity = character.carryCapacity;
   const hasItems = character.inventory.length > 0;
   // 5e: at most 3 attuned items. Derived from live rows; the server enforces it.
   const attunedCount = character.inventory.filter((item) => item.attuned).length;

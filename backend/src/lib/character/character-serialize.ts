@@ -1,6 +1,14 @@
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
-import { deriveAttacksPerAction, deriveRangedAttackRollBonus, exhaustionEffectText } from "@/lib/srd/srd.js";
+import {
+  carriedWeight,
+  carryingCapacity,
+  deriveAttacksPerAction,
+  deriveRangedAttackRollBonus,
+  exhaustionEffectText,
+} from "@/lib/srd/srd.js";
+import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
+import { ZERO_CURRENCY, asCurrency } from "@/lib/inventory/inventory-currency.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { focusSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
@@ -383,6 +391,16 @@ export function serializeCharacter(row: CharacterWithRelations) {
     weaponProficiencies: itemMergedWeaponGrants,
     inventory: row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext)),
     currency: row.currency,
+    // Encumbrance (#1377): both numbers are derived here so the sheet only
+    // formats them. Capacity reads `effectiveScores`, not row.abilityScores —
+    // the post-clamp score is what the wire reports as `abilityScores`, and
+    // reading the raw column would disagree with it after a STR ASI.
+    carryCapacity: carryingCapacity(effectiveScores.strength),
+    carriedWeight: carriedWeight(row.inventoryItems, asCurrency(row.currency) ?? ZERO_CURRENCY),
+    // The 3-item attunement cap as a served number, from the same constant the
+    // attune path's 409 rejects on — the sheet used to re-type the literal in
+    // four places.
+    attunementCap: ATTUNEMENT_LIMIT,
     spellcasting,
     resources,
     // Active status conditions + exhaustion level. Normalized on read (unknown

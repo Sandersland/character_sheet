@@ -62,6 +62,9 @@ export function asCurrency(json: Prisma.JsonValue | null): Currency | null {
   return json as Currency | null;
 }
 
+/** An empty purse — the fallback whenever the Json column reads back null. */
+export const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
+
 export function toJsonInput(value: Currency | null | undefined): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
   return value ?? Prisma.JsonNull;
 }
@@ -71,7 +74,7 @@ export async function getCharacterCurrency(tx: Prisma.TransactionClient, charact
   if (!character) {
     throw new InvalidInventoryOperationError(`Character not found: ${characterId}`);
   }
-  return asCurrency(character.currency) ?? { cp: 0, sp: 0, gp: 0, pp: 0 };
+  return asCurrency(character.currency) ?? ZERO_CURRENCY;
 }
 
 export async function setCharacterCurrency(tx: Prisma.TransactionClient, characterId: string, currency: Currency) {

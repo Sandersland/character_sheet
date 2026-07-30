@@ -81,6 +81,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   ],
   "armorProficiencies": [],
   "attacksPerAction": 1,
+  "attunementCap": 3,
   "availableActions": [
     {
       "cost": "bonusAction",
@@ -92,6 +93,8 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "background": "",
   "campaignId": undefined,
   "campaignPreferences": undefined,
+  "carriedWeight": 0.2,
+  "carryCapacity": 150,
   "class": "wizard",
   "classes": [
     {
@@ -732,6 +735,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   ],
   "armorProficiencies": [],
   "attacksPerAction": 2,
+  "attunementCap": 3,
   "availableActions": [
     {
       "cost": "bonusAction",
@@ -749,6 +753,8 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "background": "",
   "campaignId": undefined,
   "campaignPreferences": undefined,
+  "carriedWeight": 0,
+  "carryCapacity": 240,
   "class": "fighter",
   "classes": [
     {

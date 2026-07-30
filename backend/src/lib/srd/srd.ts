@@ -6,12 +6,10 @@
 // ability mapping from its own existing frontend/src/lib/abilities.ts
 // SKILL_LABELS (display-only, no rules logic).
 //
-// This file is a barrel: the rules tables themselves live in topical files
-// alongside it (alignments, tools, condition-data, item-rarity,
-// armor-class, movement, extra-attack, spellcasting-tables,
-// math, advancement-slots, proficiencies, weapon-damage, character-derive,
-// feats). Import from those files directly for new same-domain code; this
-// barrel exists so the ~30 existing importers keep working unchanged.
+// This file is a barrel: the rules tables themselves live in the topical files
+// re-exported below. Import from those files directly for new same-domain code;
+// this barrel exists so the ~30 existing importers keep working unchanged.
+// (The former inline file list is gone — it had already gone stale twice.)
 
 export * from "@/lib/srd/alignments.js";
 export * from "@/lib/srd/tools.js";
@@ -21,6 +19,7 @@ export * from "@/lib/srd/item-rarity.js";
 export * from "@/lib/srd/armor-class.js";
 export * from "@/lib/srd/movement.js";
 export * from "@/lib/srd/extra-attack.js";
+export * from "@/lib/srd/encumbrance.js";
 export * from "@/lib/srd/spellcasting-tables.js";
 export * from "@/lib/srd/math.js";
 export * from "@/lib/srd/advancement-slots.js";
