@@ -3,6 +3,8 @@
 // (validateLevelUpSubmission), maps the validated steps to tagged domain ops, and
 // applies them all under ONE batchId in ONE runCharacterTransaction. No 5e rules
 // live here — every rule is delegated to the validator/plan and the *InTx seams.
+import type { LevelUpOperation, LevelUpTarget } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
@@ -22,7 +24,6 @@ import {
   applyLevelUpHpInTx,
   normalizeHitDice,
 } from "@/lib/combat/hitpoints.js";
-import type { LevelUpOperation, LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import {
   validateLevelUpSubmission,
   InvalidLevelUpError,

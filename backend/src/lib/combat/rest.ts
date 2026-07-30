@@ -1,3 +1,5 @@
+import type { ShortRestOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { rollDie } from "@/lib/core/dice.js";
@@ -27,7 +29,6 @@ import {
   type CapabilityColumns,
 } from "@/lib/inventory/capabilities.js";
 import { InvalidHitPointOperationError, hitDieHeal, type HitDice } from "./hp-core.js";
-import type { ShortRestOperation } from "./hp-operations.js";
 import type { HpOpContext, HpOpResult } from "./hp-context.js";
 
 type InventoryItemRow = NonNullable<HpOpContext["row"]["inventoryItems"]>[number];
