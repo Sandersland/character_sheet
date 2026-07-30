@@ -1,14 +1,17 @@
 import { weaponAbilityMod } from "@/lib/srd/proficiencies.js";
 import { abilityModifier } from "@/lib/srd/math.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
+import type { WeaponGrip } from "@character-sheet/shared-types";
 
-export type WeaponGrip = "one-handed" | "two-handed" | "versatile-two-handed";
+// Re-exported so importers reaching for it through the `srd.js` barrel keep
+// resolving, while the one declaration is the wire type behind `AttackRow.grip`.
+export type { WeaponGrip };
 
 /**
  * Derives the damage roll spec for a weapon, choosing the correct die for
  * versatile weapons based on what else is equipped.
  *
- * Grip rule (5e PHB):
+ * Grip rule (PHB'14 p. 146-147 / SRD 5.2, weapon properties Versatile + Two-Handed):
  *   - `twoHanded` weapons always use their base dice (no off-hand applies).
  *   - Versatile weapons use their **two-handed die** when the off-hand is free
  *     (no equipped shield and no other equipped weapon). Otherwise one-handed.
@@ -19,11 +22,9 @@ export type WeaponGrip = "one-handed" | "two-handed" | "versatile-two-handed";
  * consistent and we never duplicate that rule.
  *
  * `abilityModifier` is returned as a separate component (the governing ability
- * mod, before the melee buff) so the client can implement the Two-Weapon
- * Fighting off-hand rule — an off-hand bonus attack omits the ability modifier
- * from its damage unless the character has the Two-Weapon Fighting style (#732).
- * Exposing it here keeps the ability-selection rule server-side rather than
- * duplicating it on the frontend.
+ * mod, before the melee buff) because the Two-Weapon Fighting off-hand rule
+ * subtracts exactly that component — see `deriveOffHandDamage`, the one place
+ * that rule lives (#1434; it used to be re-derived on the client, #732).
  *
  * `meleeDamageBonus` is the OTHER addend folded into `damageModifier` (an active
  * "meleeDamage" buff, e.g. Rage) — surfaced alongside `abilityModifier` for the
@@ -88,6 +89,47 @@ export function deriveWeaponDamage(
     meleeDamageBonus: appliedMeleeDamageBonus,
     damageType: weapon.damageType,
     grip,
+  };
+}
+
+/** The damage decomposition `deriveOffHandDamage` adjusts — a `deriveWeaponDamage` result, or any shape carrying those addends. */
+interface OffHandDamageInput {
+  damageModifier: number;
+  abilityModifier?: number;
+}
+
+/**
+ * Two-Weapon Fighting: the off-hand attack's damage.
+ *
+ * The extra off-hand attack does not add the governing ability modifier to its
+ * damage unless that modifier is negative — PHB'14 p. 195 (Two-Weapon Fighting)
+ * and SRD 5.2 (Light property) state the same rule, and the Two-Weapon Fighting
+ * fighting style restores the modifier in both, so this takes no `edition`.
+ * `Math.max(0, …)` is that "unless negative" clause: only a positive modifier
+ * is dropped.
+ *
+ * Returns the input with `damageModifier` AND `abilityModifier` reduced by the
+ * same amount, which is what keeps `deriveWeaponDamage`'s
+ * `abilityModifier + meleeDamageBonus === damageModifier` invariant true through
+ * the adjustment — so a logged off-hand damage roll's components still sum to
+ * what was rolled (#1235). Any other addend folded into `damageModifier` (an
+ * active meleeDamage buff, e.g. Rage) survives untouched.
+ *
+ * An absent `abilityModifier` means the decomposition is unknown, and an unknown
+ * amount must never be subtracted — the full modifier is kept, which is also the
+ * behaviour a weapon row serialized before #732 has always had.
+ */
+export function deriveOffHandDamage<T extends OffHandDamageInput>(
+  damage: T,
+  hasTwoWeaponFightingStyle: boolean,
+): T {
+  const abilityMod = damage.abilityModifier;
+  if (hasTwoWeaponFightingStyle || abilityMod === undefined) return damage;
+  const dropped = Math.max(0, abilityMod);
+  return {
+    ...damage,
+    damageModifier: damage.damageModifier - dropped,
+    abilityModifier: abilityMod - dropped,
   };
 }
 

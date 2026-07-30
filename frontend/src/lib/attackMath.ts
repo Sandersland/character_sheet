@@ -1,25 +1,30 @@
-// Pure attack-row math for InlineAttackPicker: builds the equipped-weapon,
-// unarmed-strike, and improvised-weapon rows plus their roll/log label strings.
+// Presentation layer over the character's served `attackRows` (#1434): selects
+// rows for a surface and decorates each with the label strings that surface
+// needs. The 5e math — attack/damage specs, the grip-resolved die, the
+// Two-Weapon Fighting off-hand subtraction, and which dice riders are live —
+// arrives already resolved from serializeCharacter and is never recomputed here.
 
 import { formatRollSpec } from "@/lib/dice";
 import type { RollSpec } from "@/lib/dice";
-import { hasFeatImprovement } from "@/lib/featDisplay";
 import { classEntryLevel } from "@/lib/multiclass";
-import type { Character, InventoryItem, WeaponDetail } from "@/types/character";
-import type { RollEventAttackComponents, RollEventDamageComponents } from "@character-sheet/shared-types";
+import type { Character } from "@/types/character";
+import type {
+  AttackDamageRider,
+  AttackRollSpec,
+  AttackRow,
+  AttackRowKind,
+  RollEventAttackComponents,
+  RollEventDamageComponents,
+  WeaponGrip,
+} from "@character-sheet/shared-types";
 
-export interface RollSpecTriple {
-  count: number;
-  faces: number;
-  modifier: number;
-}
-
-// One dice-valued on-hit rider a weapon adds to its damage roll (Flame Tongue
-// +2d6 fire): its own spec + damage type, rolled as a separate typed term. A
-// `condition` (e.g. "vs dragons") is reminder text — never auto-gated on a target.
+// One dice-valued on-hit rider on a row (Flame Tongue +2d6 fire) with its label
+// strings resolved: the chip text, the dice-engine roll source, and the Session
+// Log source. A `condition` (e.g. "vs dragons") is reminder text — never
+// auto-gated on a target.
 export interface DamageRider {
   id: string;
-  spec: RollSpecTriple;
+  spec: AttackRollSpec;
   damageType?: string;
   label: string;
   rollLabel: string;
@@ -27,10 +32,17 @@ export interface DamageRider {
   condition?: string;
 }
 
-// One attack row, fully resolved for display + rolling. Roll-source labels
-// (passed to the dice engine) and log-source (passed to the Session Log) are
-// precomputed here because their casing differs, e.g. "Unarmed strike attack"
-// roll label vs "Unarmed Strike" log source.
+/**
+ * One served `AttackRow` decorated for display + rolling.
+ *
+ * Everything numeric here is forwarded from the row unchanged; the strings are
+ * this module's whole job. They are NOT served, and this docstring is the
+ * decision record for why: their casing deliberately differs per surface —
+ * "Unarmed strike attack" is the dice-engine roll label while "Unarmed Strike"
+ * is the Session Log source, and the display name carries " (off-hand)" while
+ * the roll/log labels keep the weapon's own name. One served string would force
+ * one casing on all of them.
+ */
 export interface AttackEntry {
   id: string;
   name: string;
@@ -38,8 +50,8 @@ export interface AttackEntry {
   damageLabel: string;
   note?: string;
   magical?: boolean;
-  attackSpec: RollSpecTriple;
-  damageSpec: RollSpecTriple;
+  attackSpec: AttackRollSpec;
+  damageSpec: AttackRollSpec;
   damageType: string;
   attackRollLabel: string;
   damageRollLabel: string;
@@ -47,21 +59,12 @@ export interface AttackEntry {
   /** Dice-valued on-hit riders from THIS item's active capabilities (Flame Tongue +2d6). */
   damageRiders: DamageRider[];
   /**
-   * Decomposed to-hit/damage math forwarded from the weapon's server-derived
-   * `attackBonusComponents`/`damage` (#1235 combat-log drill-in) — undefined
-   * for unarmed/improvised entries, which the backend doesn't decompose.
+   * Decomposed to-hit/damage math forwarded from the row (#1235 combat-log
+   * drill-in) — undefined on the unarmed/improvised rows, which the backend
+   * doesn't decompose.
    */
   attackComponents?: RollEventAttackComponents;
   damageComponents?: RollEventDamageComponents;
-}
-
-// A weapon's capabilities are live when equipped/attuned; an attunement-required
-// item needs attunement specifically, so unattuning removes its riders.
-export function capabilitiesActive(item: Pick<InventoryItem, "equipped" | "attuned" | "requiresAttunement">): boolean {
-  // Mirror backend isItemActive exactly: attunement items gate on `attuned`,
-  // everything else on `equipped` (an unattunable item that is somehow `attuned`
-  // is unreachable, but we don't want the frontend gate to diverge from the wire).
-  return item.requiresAttunement ? item.attuned : item.equipped;
 }
 
 // Compact term label for a dice rider, e.g. "+2d6 fire" or "+1d4".
@@ -70,41 +73,19 @@ function damageRiderLabel(count: number, faces: number, damageType?: string): st
   return damageType ? `${dice} ${damageType}` : dice;
 }
 
-// This item's dice-valued on-hit passiveBonus riders (target: damage, op: add,
-// dice present), scoped to THIS item only so other items never leak in. Scalar,
-// setTo, and non-damage capabilities are not riders. Empty when the item's
-// capabilities are inactive (not equipped/attuned).
-export function weaponDamageRiders(item: InventoryItem): DamageRider[] {
-  if (!capabilitiesActive(item)) return [];
-  const riders: DamageRider[] = [];
-  (item.capabilities ?? []).forEach((cap, index) => {
-    if (cap.kind !== "passiveBonus" || cap.target !== "damage") return;
-    if ((cap.op ?? "add") !== "add" || !cap.dice) return;
-    const { count, faces, damageType } = cap.dice;
-    const label = damageRiderLabel(count, faces, damageType);
-    riders.push({
-      id: `${item.id}:rider:${index}`,
-      spec: { count, faces, modifier: 0 },
-      damageType,
-      label,
-      rollLabel: `${item.name}: ${label}`,
-      logSource: item.name,
-      ...(cap.condition ? { condition: cap.condition } : {}),
-    });
-  });
-  return riders;
-}
-
-// d20 spec for a weapon's attack roll.
-function weaponAttackSpec(w: WeaponDetail): RollSpecTriple {
-  return { count: 1, faces: 20, modifier: w.attackBonus ?? 0 };
-}
-
-// Grip-resolved damage spec: server-derived `w.damage` first, legacy flat fields as fallback.
-export function weaponDamageSpec(w: WeaponDetail): RollSpecTriple {
-  return w.damage
-    ? { count: w.damage.damageDiceCount, faces: w.damage.damageDiceFaces, modifier: w.damage.damageModifier }
-    : { count: w.damageDiceCount, faces: w.damageDiceFaces, modifier: w.damageModifier };
+// `sourceName` is the owning row's unadorned item name: an off-hand swing's
+// riders still roll and log under the weapon's own name, not "Dagger (off-hand)".
+function decorateRider(sourceName: string, rider: AttackDamageRider): DamageRider {
+  const label = damageRiderLabel(rider.spec.count, rider.spec.faces, rider.damageType);
+  return {
+    id: rider.id,
+    spec: rider.spec,
+    damageType: rider.damageType,
+    label,
+    rollLabel: `${sourceName}: ${label}`,
+    logSource: sourceName,
+    ...(rider.condition ? { condition: rider.condition } : {}),
+  };
 }
 
 // 5e critical hit: doubles the weapon damage **dice** only (`crit` flag →
@@ -113,20 +94,19 @@ export function weaponDamageSpec(w: WeaponDetail): RollSpecTriple {
 // (Flame Tongue +2d6 → +4d6 on a crit) — both are plain count/faces/modifier
 // specs, so the same doubling rule applies. The Battle Master superiority die is
 // a flat add (ManeuverPrompt), not weapon dice, so it never routes through here.
+//
+// This is the ONE sanctioned client-side exception to "attack math is served"
+// (#1434/#1378): the crit is player input arriving after serialization, over a
+// spec the player may have re-rolled, so there is nothing for the server to
+// resolve. It is not duplicated rules logic — do not flag it again.
 export function critDamageSpec(spec: RollSpec): RollSpec {
   return { ...spec, crit: true };
 }
 
-// Grip-resolved damage type: server-derived first, legacy flat field as fallback.
-export function weaponDamageType(w: WeaponDetail): string {
-  return w.damage?.damageType ?? w.damageType;
-}
-
-// " (two-handed)" suffix for a two-handed grip, else "".
-export function weaponGripLabel(w: WeaponDetail): string {
-  return w.damage?.grip === "versatile-two-handed" || w.damage?.grip === "two-handed"
-    ? " (two-handed)"
-    : "";
+// " (two-handed)" suffix for a two-handed grip, else "". Absent on the
+// unarmed/improvised rows, which have no grip.
+export function weaponGripLabel(grip: WeaponGrip | undefined): string {
+  return grip === "versatile-two-handed" || grip === "two-handed" ? " (two-handed)" : "";
 }
 
 // Unarmed damage display — flat value when faces === 1 (baseline), or die notation.
@@ -152,98 +132,130 @@ export function attacksExhausted(attack: { used: number; total: number } | null)
   return attack !== null && attack.used >= attack.total;
 }
 
-// One equipped-weapon attack row. Shared by buildAttackEntries and the off-hand
-// (TWF) builder so the two never drift.
-function buildWeaponEntry(item: InventoryItem): AttackEntry {
-  const w = item.weapon!;
-  const damageSpec = weaponDamageSpec(w);
-  const damageType = weaponDamageType(w);
-  const gripLabel = weaponGripLabel(w);
+// One equipped-weapon row. Shared by the main-hand and off-hand rows so the two
+// never drift: the " (off-hand)" display suffix is the only difference, and it
+// tags the form header, tally strip and turn-summary banner so a two-weapon swing
+// reads distinctly from a main-hand attack (#813).
+function decorateWeaponRow(row: AttackRow): AttackEntry {
+  const gripLabel = weaponGripLabel(row.grip);
   return {
-    id: item.id,
-    name: item.name,
-    attackLabel: `+${w.attackBonus ?? 0}`,
-    damageLabel: `${formatRollSpec(damageSpec)} ${damageType}${gripLabel}`,
-    attackSpec: weaponAttackSpec(w),
-    damageSpec,
-    damageType,
-    attackRollLabel: `${item.name} attack`,
-    damageRollLabel: `${item.name} damage (${damageType})`,
-    logSource: item.name,
-    damageRiders: weaponDamageRiders(item),
-    attackComponents: w.attackBonusComponents,
-    damageComponents:
-      w.damage?.abilityModifier !== undefined && w.damage?.meleeDamageBonus !== undefined
-        ? { abilityMod: w.damage.abilityModifier, meleeDamageBonus: w.damage.meleeDamageBonus }
-        : undefined,
+    id: row.id,
+    name: row.offHand ? `${row.name} (off-hand)` : row.name,
+    attackLabel: `+${row.attackSpec.modifier}`,
+    damageLabel: `${formatRollSpec(row.damageSpec)} ${row.damageType}${gripLabel}`,
+    attackSpec: row.attackSpec,
+    damageSpec: row.damageSpec,
+    damageType: row.damageType,
+    attackRollLabel: `${row.name} attack`,
+    damageRollLabel: `${row.name} damage (${row.damageType})`,
+    logSource: row.name,
+    damageRiders: row.damageRiders.map((rider) => decorateRider(row.name, rider)),
+    attackComponents: row.attackComponents,
+    damageComponents: row.damageComponents,
   };
 }
 
-function equippedWeapons(character: Character): InventoryItem[] {
-  return character.inventory.filter(
-    (item) => item.category === "weapon" && item.equipped && item.weapon,
-  );
+// The Unarmed Strike row — flat display when faces === 1 (baseline).
+function decorateUnarmedRow(row: AttackRow, unarmed: Character["unarmedStrike"]): AttackEntry {
+  return {
+    id: row.id,
+    name: row.name,
+    attackLabel: `+${row.attackSpec.modifier}`,
+    damageLabel: `${unarmedDamageDisplay(unarmed)} ${row.damageType}`,
+    magical: row.magical,
+    attackSpec: row.attackSpec,
+    damageSpec: row.damageSpec,
+    damageType: row.damageType,
+    attackRollLabel: "Unarmed strike attack",
+    damageRollLabel: `Unarmed strike damage (${row.damageType})`,
+    logSource: row.name,
+    damageRiders: [],
+  };
+}
+
+// The Improvised Weapon row — signed bonus, "(no proficiency)" note when
+// unproficient. `proficient` is read off the served improvisedWeapon rather than
+// duplicated onto the row: this note is its only reader.
+function decorateImprovisedRow(
+  row: AttackRow,
+  improvised: Character["improvisedWeapon"],
+): AttackEntry {
+  return {
+    id: row.id,
+    name: row.name,
+    attackLabel: `${row.attackSpec.modifier >= 0 ? "+" : ""}${row.attackSpec.modifier}`,
+    damageLabel: `${formatRollSpec(row.damageSpec)} ${row.damageType}`,
+    note: improvised.proficient ? undefined : "(no proficiency)",
+    attackSpec: row.attackSpec,
+    damageSpec: row.damageSpec,
+    damageType: row.damageType,
+    attackRollLabel: "Improvised weapon attack",
+    damageRollLabel: `Improvised weapon damage (${row.damageType})`,
+    logSource: row.name,
+    damageRiders: [],
+  };
+}
+
+// Kinds differ only in label vocabulary — see each decorator.
+function decorateRow(character: Character, row: AttackRow): AttackEntry {
+  switch (row.kind) {
+    case "unarmed":
+      return decorateUnarmedRow(row, character.unarmedStrike);
+    case "improvised":
+      return decorateImprovisedRow(row, character.improvisedWeapon);
+    default:
+      return decorateWeaponRow(row);
+  }
+}
+
+// The one row of a singleton kind. Unarmed and improvised are always served
+// (everyone can punch or swing a chair leg), so a missing row is a serializer
+// bug and says so instead of rendering an empty picker.
+function rowOfKind(character: Character, kind: AttackRowKind): AttackRow {
+  const row = character.attackRows.find((r) => r.kind === kind);
+  if (!row) throw new Error(`Character ${character.id} has no ${kind} attack row`);
+  return row;
+}
+
+// The non-weapon rows in served order (unarmed, then improvised).
+function unarmedAndImprovisedEntries(character: Character): AttackEntry[] {
+  return character.attackRows
+    .filter((row) => row.kind !== "weapon")
+    .map((row) => decorateRow(character, row));
+}
+
+// The Attack action's rows in served order: equipped weapons (raw, un-deduped),
+// then unarmed, then improvised. The off-hand row is excluded — it belongs to the
+// bonus action and shares its weapon's id (see `AttackRow`).
+export function buildAttackEntries(character: Character): AttackEntry[] {
+  return character.attackRows
+    .filter((row) => !row.offHand)
+    .map((row) => decorateRow(character, row));
 }
 
 /**
- * The single off-hand attack row for Two-Weapon Fighting (#732), or null when
- * the loadout can't dual-wield (< 2 equipped weapons). Prefers the weapon in the
- * OFF_HAND paper-doll slot, falling back to the second equipped weapon.
- *
- * Off-hand damage omits the governing ability modifier (PHB p.195) UNLESS the
- * character has the Two-Weapon Fighting style. We subtract `damage.abilityModifier`
- * (the server-derived component) rather than recomputing the ability-selection
- * rule on the client. `max(0, …)` keeps a negative modifier (RAW: only a positive
- * ability mod is dropped), and any melee-damage buff folded into `damageModifier`
- * (e.g. Rage) survives because only the ability component is removed.
+ * The single off-hand attack row for Two-Weapon Fighting (#732), or null when the
+ * loadout can't dual-wield — the server emits the row only with two weapons
+ * equipped, and its damage already has the ability modifier dropped
+ * (`deriveOffHandDamage`). Whether the swing is available this turn is the gated
+ * action row's question, not this one's.
  */
 export function buildOffHandEntry(character: Character): AttackEntry | null {
-  const weapons = equippedWeapons(character);
-  if (weapons.length < 2) return null;
-  const offHand = weapons.find((i) => i.equippedSlot === "OFF_HAND") ?? weapons[1];
-
-  const entry = buildWeaponEntry(offHand);
-  const hasStyle = hasFeatImprovement(character, "offhandAbilityDamage");
-  // Undefined only for a legacy weapon serialized before #732 (no ability-mod
-  // component) — skip the subtraction and show the full modifier, matching the
-  // pre-#732 behavior rather than silently dropping the wrong amount.
-  const abilityMod = offHand.weapon!.damage?.abilityModifier;
-  const dropAbilityMod = !hasStyle && abilityMod !== undefined;
-  const modifier = dropAbilityMod
-    ? entry.damageSpec.modifier - Math.max(0, abilityMod)
-    : entry.damageSpec.modifier;
-  const damageSpec = { ...entry.damageSpec, modifier };
-  const gripLabel = weaponGripLabel(offHand.weapon!);
-  // Mirror the same subtraction onto damageComponents (#1235) so a logged
-  // off-hand damage roll's components still sum to what was actually rolled —
-  // the same `abilityMod + meleeDamageBonus === damageSpec.modifier` invariant
-  // deriveWeaponDamage guarantees on the server, kept intact through this
-  // client-side TWF adjustment.
-  const damageComponents =
-    dropAbilityMod && entry.damageComponents
-      ? { ...entry.damageComponents, abilityMod: entry.damageComponents.abilityMod - Math.max(0, abilityMod) }
-      : entry.damageComponents;
-
-  return {
-    ...entry,
-    // "(off-hand)" tags the form header, tally strip, and turn-summary banner line
-    // so a two-weapon swing reads distinctly from a main-hand attack (#813).
-    name: `${entry.name} (off-hand)`,
-    damageSpec,
-    damageComponents,
-    damageLabel: `${formatRollSpec(damageSpec)} ${entry.damageType}${gripLabel}`,
-  };
+  const row = character.attackRows.find((r) => r.offHand);
+  return row ? decorateWeaponRow(row) : null;
 }
 
 // Distinct equipped-weapon rows, collapsing same-name duplicates (two Daggers →
-// one entry). First occurrence wins so its attack/damage snapshot drives the card.
-export function buildEquippedWeaponEntries(character: Character): AttackEntry[] {
+// one entry). First occurrence wins so its attack/damage snapshot drives the
+// card. A presentation choice about which card renders, not a 5e rule — the
+// server emits one row per equipped weapon, un-deduped.
+function equippedWeaponEntries(character: Character): AttackEntry[] {
   const seen = new Set<string>();
   const entries: AttackEntry[] = [];
-  for (const item of equippedWeapons(character)) {
-    if (seen.has(item.name)) continue;
-    seen.add(item.name);
-    entries.push(buildWeaponEntry(item));
+  for (const row of character.attackRows) {
+    if (row.kind !== "weapon" || row.offHand || seen.has(row.name)) continue;
+    seen.add(row.name);
+    entries.push(decorateWeaponRow(row));
   }
   return entries;
 }
@@ -255,70 +267,15 @@ export function buildEquippedWeaponEntries(character: Character): AttackEntry[] 
  * budget clear of this branch.
  */
 export function buildBonusSwingEntry(character: Character, variant: "twf" | "unarmed"): AttackEntry | null {
-  return variant === "unarmed" ? buildUnarmedEntry(character) : buildOffHandEntry(character);
-}
-
-// The Unarmed Strike attack row — flat display when faces === 1 (baseline).
-function buildUnarmedEntry(character: Character): AttackEntry {
-  const { unarmedStrike } = character;
-  const unarmedSpec: RollSpecTriple = {
-    count: unarmedStrike.damage.count,
-    faces: unarmedStrike.damage.faces,
-    modifier: unarmedStrike.damage.modifier,
-  };
-  return {
-    id: "unarmed",
-    name: "Unarmed Strike",
-    attackLabel: `+${unarmedStrike.attackBonus}`,
-    damageLabel: `${unarmedDamageDisplay(unarmedStrike)} bludgeoning`,
-    magical: unarmedStrike.magical ?? false,
-    attackSpec: { count: 1, faces: 20, modifier: unarmedStrike.attackBonus },
-    damageSpec: unarmedSpec,
-    damageType: "bludgeoning",
-    attackRollLabel: "Unarmed strike attack",
-    damageRollLabel: "Unarmed strike damage (bludgeoning)",
-    logSource: "Unarmed Strike",
-    damageRiders: [],
-  };
-}
-
-// The Improvised Weapon attack row — signed bonus, "(no proficiency)" note when unproficient.
-function buildImprovisedEntry(character: Character): AttackEntry {
-  const { improvisedWeapon } = character;
-  const improvisedSpec: RollSpecTriple = {
-    count: improvisedWeapon.damage.count,
-    faces: improvisedWeapon.damage.faces,
-    modifier: improvisedWeapon.damage.modifier,
-  };
-  return {
-    id: "improvised",
-    name: "Improvised Weapon",
-    attackLabel: `${improvisedWeapon.attackBonus >= 0 ? "+" : ""}${improvisedWeapon.attackBonus}`,
-    damageLabel: `${formatRollSpec(improvisedSpec)} bludgeoning`,
-    note: improvisedWeapon.proficient ? undefined : "(no proficiency)",
-    attackSpec: { count: 1, faces: 20, modifier: improvisedWeapon.attackBonus },
-    damageSpec: improvisedSpec,
-    damageType: "bludgeoning",
-    attackRollLabel: "Improvised weapon attack",
-    damageRollLabel: "Improvised weapon damage (bludgeoning)",
-    logSource: "Improvised Weapon",
-    damageRiders: [],
-  };
-}
-
-// Builds the ordered attack rows: equipped weapons (raw, un-deduped), then unarmed, then improvised.
-export function buildAttackEntries(character: Character): AttackEntry[] {
-  return [
-    ...equippedWeapons(character).map(buildWeaponEntry),
-    buildUnarmedEntry(character),
-    buildImprovisedEntry(character),
-  ];
+  return variant === "unarmed"
+    ? decorateRow(character, rowOfKind(character, "unarmed"))
+    : buildOffHandEntry(character);
 }
 
 // Flurry of Blows' single form — 2024 rules grant no weapon choice, so unlike
 // buildAttackForms this never includes equipped weapons or Improvised (#1217).
 export function buildUnarmedOnlyForms(character: Character): AttackEntry[] {
-  return [buildUnarmedEntry(character)];
+  return [decorateRow(character, rowOfKind(character, "unarmed"))];
 }
 
 // Flurry of Blows strike count (SRD 5.2 "Focus"): expend 1 Focus Point to make
@@ -338,9 +295,5 @@ export function flurryStrikeCount(character: Character): number {
 // equipped weapons, then Unarmed Strike, then Improvised Weapon. The first row is
 // the main-hand weapon (or Unarmed when nothing is equipped) — the default form.
 export function buildAttackForms(character: Character): AttackEntry[] {
-  return [
-    ...buildEquippedWeaponEntries(character),
-    buildUnarmedEntry(character),
-    buildImprovisedEntry(character),
-  ];
+  return [...equippedWeaponEntries(character), ...unarmedAndImprovisedEntries(character)];
 }
