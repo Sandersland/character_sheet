@@ -6,6 +6,7 @@ import InlineFlurryPicker from "@/features/session/InlineFlurryPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { logRoll } from "@/api/client";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
+import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -33,7 +34,8 @@ function makeTurnState(bonusAttack: { total: number; used: number } | null) {
   } as unknown as TurnState & TurnStateActions;
 }
 
-// A monk with an equipped weapon — Flurry must never offer it as a form.
+// A monk with an equipped weapon — Flurry must never offer it as a form, even
+// though the served attackRows (#1434) carry a row for it.
 function monkCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
@@ -61,6 +63,20 @@ function monkCharacter(overrides: Partial<Character> = {}): Character {
     improvisedWeapon: { attackBonus: 2, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" }, proficient: false },
     resources: { pools: [] },
     advancements: [],
+    // The Shortsword's served row is present and must still never be offered.
+    attackRows: [
+      attackRow({
+        id: "inv-1",
+        kind: "weapon",
+        name: "Shortsword",
+        grip: "one-handed",
+        damageType: "slashing",
+        attackSpec: { count: 1, faces: 20, modifier: 5 },
+        damageSpec: { count: 1, faces: 6, modifier: 3 },
+      }),
+      { ...UNARMED_ROW, attackSpec: { count: 1, faces: 20, modifier: 6 }, damageSpec: { count: 1, faces: 6, modifier: 3 } },
+      IMPROVISED_ROW,
+    ],
     ...overrides,
   } as unknown as Character;
 }

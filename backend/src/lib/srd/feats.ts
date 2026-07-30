@@ -161,6 +161,20 @@ export function deriveRangedAttackRollBonus(advancements: AdvancementEntry[]): n
 }
 
 /**
+ * Whether the Two-Weapon Fighting fighting style is taken (#1137 turned fighting
+ * styles into feats, so its `offhandAbilityDamage` improvement is the marker) —
+ * the flag `deriveOffHandDamage` reads to keep the governing ability modifier in
+ * the off-hand attack's damage. A presence check, not a sum: the improvement's
+ * `amount` carries no meaning. Callers pass the already-clamped slice so an
+ * over-cap style feat is excluded automatically.
+ */
+export function hasOffHandAbilityDamage(advancements: AdvancementEntry[]): boolean {
+  return advancements.some((entry) =>
+    (entry.improvements ?? []).some((imp) => imp.target === "offhandAbilityDamage"),
+  );
+}
+
+/**
  * Collects proficiency grants from feat improvements across a set of advancements.
  * Returns four sets:
  *   - `skills`:       camelCase skill keys (e.g. "athletics") where `target === "skillProficiency"`

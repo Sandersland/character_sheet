@@ -10,6 +10,8 @@ import { logRoll, castManeuverTransaction } from "@/api/client";
 import { getQueryClient } from "@/api/queryClient";
 import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
+import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
+import type { AttackRow } from "@character-sheet/shared-types";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -41,6 +43,9 @@ const turnState = {
   consumeReaction: vi.fn(),
 } as unknown as TurnState & TurnStateActions;
 
+// The picker renders `character.attackRows` (#1434). `attackRows` in the overrides
+// lists only the WEAPON rows the server would have served; the two rows every
+// payload always carries are appended here so no test has to restate them.
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
@@ -58,6 +63,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     },
     resources: { pools: [] },
     ...overrides,
+    attackRows: [...(overrides.attackRows ?? []), UNARMED_ROW, IMPROVISED_ROW],
   } as unknown as Character;
 }
 
@@ -89,23 +95,25 @@ function renderPicker(
   return { onCancel, onClose };
 }
 
-function equippedWeapon(name: string, id: string, overrides: Record<string, unknown> = {}) {
-  return {
+// The served row for an equipped weapon: +3 to hit, 1d8 slashing.
+function weaponRow(name: string, id: string, overrides: Partial<AttackRow> = {}): AttackRow {
+  return attackRow({
     id,
+    kind: "weapon",
     name,
-    category: "weapon" as const,
-    quantity: 1,
-    equipped: true,
-    weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 3 },
+    grip: "one-handed",
+    damageType: "slashing",
+    attackSpec: { count: 1, faces: 20, modifier: 3 },
+    damageSpec: { count: 1, faces: 8, modifier: 0 },
     ...overrides,
-  };
+  });
 }
 
 describe("InlineAttackPicker — attack form selector (#786)", () => {
   it("renders one segment per distinct equipped weapon plus Unarmed and Improvised", () => {
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
       }),
     );
     expect(screen.getByRole("radiogroup", { name: /Attacking with/ })).toBeInTheDocument();
@@ -120,7 +128,7 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
     const user = userEvent.setup();
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1")],
       }),
     );
     const mode = screen.getByRole("group", { name: "Attack roll mode" });
@@ -135,7 +143,7 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
   it("shows exactly one attack card (one Roll to hit) and one damage card", () => {
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
       }),
     );
     expect(screen.getAllByRole("button", { name: /Roll to hit/ })).toHaveLength(1);
@@ -152,7 +160,7 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
       onLogChanged: vi.fn(),
     };
     const initialCharacter = makeCharacter({
-      inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+      attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
     });
     const { rerender } = renderWithCharacter(
       <RollProvider>
@@ -170,7 +178,7 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
     getQueryClient().setQueryData(
       characterKeys.detail(initialCharacter.id),
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1")],
       }),
     );
     rerender(
@@ -188,7 +196,7 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
   it("collapses two same-name equipped weapons into a single segment", () => {
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Dagger", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Dagger", "inv-1"), weaponRow("Dagger", "inv-2")],
       }),
     );
     expect(screen.getAllByRole("radio", { name: "Dagger" })).toHaveLength(1);
@@ -198,25 +206,24 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
   it("defaults the selection to the main-hand weapon", () => {
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
       }),
     );
     expect(screen.getByRole("radio", { name: "Longsword" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Dagger" })).not.toBeChecked();
   });
 
-  it("never surfaces an unequipped inventory weapon as a segment", () => {
-    renderPicker(
-      makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1", { equipped: false })] as unknown as Character["inventory"],
-      }),
-    );
+  // The server only emits a row for an EQUIPPED weapon, so a bagged Longsword
+  // never reaches this sheet at all (backend character-serialize-attack-rows.test.ts
+  // pins that); the picker must then offer only Unarmed + Improvised.
+  it("never surfaces a weapon the server served no row for", () => {
+    renderPicker(makeCharacter());
     expect(screen.queryByRole("radio", { name: "Longsword" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("radio")).toHaveLength(2);
   });
 
   it("shows the turn-screen empty-state hint and defaults to Unarmed when no weapon is equipped", () => {
-    renderPicker(makeCharacter({ inventory: [] }));
+    renderPicker(makeCharacter());
     const hint = screen.getByText(/No weapon equipped/i);
     expect(hint.textContent).toMatch(/Change/);
     expect(hint.textContent).toMatch(/turn screen/i);
@@ -228,7 +235,7 @@ describe("InlineAttackPicker — selecting a form updates the card (#786)", () =
   it("selecting Improvised shows its signed bonus and the no-proficiency note", async () => {
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1")],
       }),
     );
     await userEvent.click(screen.getByRole("radio", { name: "Improvised Weapon" }));
@@ -239,7 +246,7 @@ describe("InlineAttackPicker — selecting a form updates the card (#786)", () =
   it("selecting Unarmed shows its bonus and flat bludgeoning damage preview", async () => {
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1")],
       }),
     );
     await userEvent.click(screen.getByRole("radio", { name: "Unarmed Strike" }));
@@ -249,7 +256,7 @@ describe("InlineAttackPicker — selecting a form updates the card (#786)", () =
   it("rolls to hit with the selected form (logs the Improvised source)", async () => {
     renderPicker(
       makeCharacter({
-        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+        attackRows: [weaponRow("Longsword", "inv-1")],
       }),
     );
     await userEvent.click(screen.getByRole("radio", { name: "Improvised Weapon" }));
@@ -269,7 +276,7 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
   function withWeapon(attacksPerAction: number) {
     return makeCharacter({
       attacksPerAction,
-      inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+      attackRows: [weaponRow("Longsword", "inv-1")],
     });
   }
 
@@ -312,7 +319,7 @@ describe("InlineAttackPicker — Damage card is inert until a hit is rolled (#78
     // Mid-face seed → a non-crit to-hit so the button stays labelled "Roll damage".
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     renderPicker(
-      makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }),
     );
 
     expect(screen.getByRole("button", { name: /Roll damage/ })).toBeDisabled();
@@ -325,7 +332,7 @@ describe("InlineAttackPicker — Damage card is inert until a hit is rolled (#78
 
 describe("InlineAttackPicker — footer", () => {
   it("offers Cancel — refund action before any attack is rolled, wired to onCancel", async () => {
-    const { onCancel } = renderPicker(makeCharacter({ inventory: [] }));
+    const { onCancel } = renderPicker(makeCharacter());
     const cancel = screen.getByRole("button", { name: /Cancel — refund action/ });
     await userEvent.click(cancel);
     expect(onCancel).toHaveBeenCalled();
@@ -337,33 +344,30 @@ describe("InlineAttackPicker — footer", () => {
       ...turnState,
       attack: { total: 1, used: 1 },
     } as unknown as TurnState & TurnStateActions;
-    renderPicker(makeCharacter({ inventory: [] }), vi.fn(), { turnState: rolledTurnState });
+    renderPicker(makeCharacter(), vi.fn(), { turnState: rolledTurnState });
     expect(screen.getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
   });
 });
 
-// An equipped weapon carrying a dice-valued on-hit passiveBonus capability.
-function flameTongue(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "inv-flame",
-    name: "Flame Tongue",
-    category: "weapon" as const,
-    quantity: 1,
-    equipped: true,
-    attuned: true,
-    requiresAttunement: true,
-    weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 3 },
-    capabilities: [{ kind: "passiveBonus", target: "damage", op: "add", dice: { count: 2, faces: 6, damageType: "fire" } }],
+// A weapon row carrying a dice-valued on-hit rider. Riders are gated server-side
+// on `isItemActive`, so an equipped-but-unattuned attunement item is served NONE at
+// all (backend character-serialize-attack-rows.test.ts owns that rule) — a fixture
+// that wants no rider passes `damageRiders: []`.
+function flameTongueRow(overrides: Partial<AttackRow> = {}): AttackRow {
+  return weaponRow("Flame Tongue", "inv-flame", {
+    damageRiders: [
+      { id: "inv-flame:rider:0", spec: { count: 2, faces: 6, modifier: 0 }, damageType: "fire" },
+    ],
     ...overrides,
-  };
+  });
 }
 
 describe("InlineAttackPicker — on-hit dice riders", () => {
   it("renders a typed rider button for an attuned Flame Tongue after a hit and rolls it with the fire type", async () => {
     const onLogChanged = vi.fn();
     renderPicker(
-      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow()] }),
       onLogChanged,
     );
 
@@ -382,9 +386,9 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
     );
   });
 
-  it("hides the rider when the attunement-required weapon is unattuned", async () => {
+  it("hides the rider when the served row carries none (an unattuned attunement item)", async () => {
     renderPicker(
-      makeCharacter({ inventory: [flameTongue({ attuned: false })] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
     );
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.queryByRole("button", { name: /Roll \+2d6 fire/ })).not.toBeInTheDocument();
@@ -393,12 +397,14 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
   it("shows a conditional rider's condition as reminder text", async () => {
     renderPicker(
       makeCharacter({
-        inventory: [
-          flameTongue({
+        attackRows: [
+          flameTongueRow({
             name: "Dragon Slayer",
-            capabilities: [{ kind: "passiveBonus", target: "damage", op: "add", dice: { count: 3, faces: 6 }, condition: "vs dragons" }],
+            damageRiders: [
+              { id: "inv-flame:rider:0", spec: { count: 3, faces: 6, modifier: 0 }, condition: "vs dragons" },
+            ],
           }),
-        ] as unknown as Character["inventory"],
+        ],
       }),
     );
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -406,18 +412,11 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
   });
 
   it("only shows the last-rolled form's rider — a second weapon's is not on the card", async () => {
-    const plainSword = {
-      id: "inv-plain",
-      name: "Longsword",
-      category: "weapon" as const,
-      quantity: 1,
-      equipped: true,
-      attuned: false,
-      requiresAttunement: false,
-      weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 2 },
-    };
+    const plainSword = weaponRow("Longsword", "inv-plain", {
+      attackSpec: { count: 1, faces: 20, modifier: 2 },
+    });
     renderPicker(
-      makeCharacter({ inventory: [flameTongue(), plainSword] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow(), plainSword] }),
     );
     // Default form is the main-hand Flame Tongue — roll to hit binds the Damage card to it.
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -443,7 +442,7 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
   it("shows 'Critical hit!' and auto-rolls doubled damage after a nat-20 to-hit", async () => {
     seedTopFace();
     renderPicker(
-      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -461,7 +460,7 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
   it("doubles the on-hit dice rider automatically under the auto-crit flow", async () => {
     seedTopFace();
     renderPicker(
-      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow()] }),
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -479,7 +478,7 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
   it("shows a Miss indicator on a natural 1 and leaves damage rollable (non-crit)", async () => {
     seedNat1();
     renderPicker(
-      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -491,7 +490,7 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
   it("keeps a dice rider single when the weapon damage was rolled normally", async () => {
     seedMid();
     renderPicker(
-      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow()] }),
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -515,7 +514,7 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
 
   it("has no standalone 'Critical' button and no Crit checkbox in the sheet", () => {
     renderPicker(
-      makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }),
     );
     expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
@@ -546,7 +545,7 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
   it("calling Crit! flips the damage roll to doubled dice (verdict is the crit authority)", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit to-hit
     const character = makeCharacter({
-      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+      attackRows: [flameTongueRow({ damageRiders: [] })],
     });
     renderWithCharacter(<LiveHarness character={character} />, character);
 
@@ -563,7 +562,7 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const character = makeCharacter({
       attacksPerAction: 3,
-      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+      attackRows: [flameTongueRow({ damageRiders: [] })],
     });
     renderWithCharacter(<LiveHarness character={character} />, character);
 
@@ -585,7 +584,7 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const character = makeCharacter({
       attacksPerAction: 2,
-      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+      attackRows: [flameTongueRow({ damageRiders: [] })],
     });
     renderWithCharacter(<LiveHarness character={character} />, character);
 
@@ -611,7 +610,7 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
   it("rolling damage marks the current row hit (implicit hit) with Crit! still offered", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const character = makeCharacter({
-      inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+      attackRows: [flameTongueRow({ damageRiders: [] })],
     });
     renderWithCharacter(<LiveHarness character={character} />, character);
 
@@ -629,7 +628,7 @@ describe("InlineAttackPicker — Damage card copy (#786)", () => {
   it("labels the inert Damage card by prompt and names the form once a hit is rolled", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     renderPicker(
-      makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }),
     );
     expect(screen.queryByText(/land the hit/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Roll to hit first — then roll damage/)).toBeInTheDocument();
@@ -645,14 +644,18 @@ describe("InlineAttackPicker — Damage card maneuver state resets on form switc
 
   function battleMaster(): Character {
     return makeCharacter({
-      inventory: [
-        equippedWeapon("Longsword", "inv-1", {
-          weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 5 },
+      attackRows: [
+        weaponRow("Longsword", "inv-1", {
+          damageType: "slashing",
+          attackSpec: { count: 1, faces: 20, modifier: 5 },
+          damageSpec: { count: 1, faces: 8, modifier: 0 },
         }),
-        equippedWeapon("Dagger", "inv-2", {
-          weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing", attackBonus: 5 },
+        weaponRow("Dagger", "inv-2", {
+          damageType: "piercing",
+          attackSpec: { count: 1, faces: 20, modifier: 5 },
+          damageSpec: { count: 1, faces: 4, modifier: 0 },
         }),
-      ] as unknown as Character["inventory"],
+      ],
       resources: {
         pools: [
           { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },
@@ -701,7 +704,7 @@ describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
 
   it("shows the attack die box after rolling to hit", async () => {
     renderPicker(
-      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
     );
 
     // No result visible until a roll happens.
@@ -717,7 +720,7 @@ describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
   it("shows the weapon damage die box after rolling to hit then damage", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit → a single d8 box
     renderPicker(
-      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -742,11 +745,13 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
 
   function battleMaster(): Character {
     return makeCharacter({
-      inventory: [
-        equippedWeapon("Longsword", "inv-1", {
-          weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 5 },
+      attackRows: [
+        weaponRow("Longsword", "inv-1", {
+          damageType: "slashing",
+          attackSpec: { count: 1, faces: 20, modifier: 5 },
+          damageSpec: { count: 1, faces: 8, modifier: 0 },
         }),
-      ] as unknown as Character["inventory"],
+      ],
       resources: {
         pools: [
           { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },

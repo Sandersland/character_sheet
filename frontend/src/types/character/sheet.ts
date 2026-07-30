@@ -2,7 +2,7 @@
  * The aggregate serialized Character shape and its lean summary view.
  */
 
-import type { DiceRider, RulesEdition, SaveRider } from "@character-sheet/shared-types";
+import type { AttackRow, DiceRider, RulesEdition, SaveRider } from "@character-sheet/shared-types";
 
 import type { AvailableAction } from "./actions";
 import type { CampaignPreferences } from "./campaign";
@@ -168,6 +168,11 @@ export interface Character {
    *  is true only when "Improvised Weapons" appears in weaponProficiencies
    *  (e.g. via Tavern Brawler), which adds proficiency bonus to attackBonus. */
   improvisedWeapon: DerivedImprovisedAttack;
+
+  /** Every way this character can swing, fully resolved server-side (#1434) — see
+   *  `AttackRow`. REQUIRED, not optional: it is always served, and optional would
+   *  let a fixture omit it and silently render an empty attack picker. */
+  attackRows: AttackRow[];
 
   /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
   attacksPerAction: number;
