@@ -8,13 +8,15 @@
 //
 // SEED_FAMILIES is a registry, not a hardcoded list of calls — adding a
 // family is one entry here, demonstrated by the second member (SUBCLASS_
-// GRANTED_SPELLS) landing alongside the first, not merely asserted. Deliberately
-// in scope for only these two today; the other eleven seed families already
-// carry structural coverage via seed-data.test.ts and are a named follow-up.
+// GRANTED_SPELLS) landing alongside the first, not merely asserted, and the
+// third (CLASS_FEATURES, #1523) landing the same way. Deliberately in scope
+// for only these three today; the other ten seed families already carry
+// structural coverage via seed-data.test.ts and are a named follow-up.
 import { z } from "zod";
 
 import { SUBCLASSES, subclassSeedSchema } from "./subclasses.js";
 import { SUBCLASS_GRANTED_SPELLS, subclassGrantedSpellSeedSchema } from "./subclass-granted-spells.js";
+import { CLASS_FEATURES, classFeatureSeedSchema } from "./class-features.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -24,6 +26,7 @@ interface SeedFamily {
 const SEED_FAMILIES: Record<string, SeedFamily> = {
   SUBCLASSES: { schema: subclassSeedSchema, rows: SUBCLASSES },
   SUBCLASS_GRANTED_SPELLS: { schema: subclassGrantedSpellSeedSchema, rows: SUBCLASS_GRANTED_SPELLS },
+  CLASS_FEATURES: { schema: classFeatureSeedSchema, rows: CLASS_FEATURES },
 };
 
 export interface SeedValidationSummary {

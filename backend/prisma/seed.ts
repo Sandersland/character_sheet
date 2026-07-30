@@ -16,6 +16,7 @@ import { FEATS } from "./seed/feats.js";
 import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
+import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
 import { assertSeedContentValid } from "./seed/validate.js";
@@ -465,6 +466,8 @@ async function main() {
   await seedRaces(prisma);
   const classIds = await seedClasses(prisma);
   await seedSubclasses(prisma, classIds);
+  // Feature rows FK both classes and subclasses seeded above (#1522/#1523).
+  await seedClassFeatures(prisma);
   await seedActions(prisma);
   await seedManeuvers(prisma);
   await seedShadowArts(prisma);

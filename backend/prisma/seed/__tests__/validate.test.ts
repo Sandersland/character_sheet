@@ -15,9 +15,12 @@ import { assertSeedContentValid } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
-  it("visited at least 2 families and 31 rows (SUBCLASSES + SUBCLASS_GRANTED_SPELLS)", () => {
+  // 3 families today: SUBCLASSES, SUBCLASS_GRANTED_SPELLS, and CLASS_FEATURES
+  // (#1523, 522 rows) — >= floors rather than exact counts so this doesn't
+  // need editing every time a family is added.
+  it("visited at least 3 families and 31 rows", () => {
     const summary = assertSeedContentValid();
-    expect(summary.familiesChecked).toBeGreaterThanOrEqual(2);
+    expect(summary.familiesChecked).toBeGreaterThanOrEqual(3);
     expect(summary.rowsChecked).toBeGreaterThanOrEqual(31);
   });
 
