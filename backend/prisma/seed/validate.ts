@@ -8,9 +8,10 @@
 //
 // SEED_FAMILIES is a registry, not a hardcoded list of calls — adding a
 // family is one entry here, demonstrated by the second member (SUBCLASS_
-// GRANTED_SPELLS) landing alongside the first, not merely asserted. Deliberately
-// in scope for only these two today; the other eleven seed families already
-// carry structural coverage via seed-data.test.ts and are a named follow-up.
+// GRANTED_SPELLS) landing alongside the first, not merely asserted, and the
+// third (CLASS_FEATURES, #1523) landing the same way. Deliberately in scope
+// for only these three today; the other ten seed families already carry
+// structural coverage via seed-data.test.ts and are a named follow-up.
 import { z } from "zod";
 
 import { SUBCLASSES, subclassSeedSchema } from "./subclasses.js";

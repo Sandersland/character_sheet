@@ -119,7 +119,7 @@ async function resolveSubclassCandidatesBySlug(
 // Subclass row — correct, and it costs this function nothing to stay correct
 // the day a subclass DOES fork, since resolveEditionRow is what's doing the
 // resolving, not a bare find. Split out of resolveOneRow (below) purely to
-// keep each function's cyclomatic complexity low — see collectRawFeatures'
+// keep each function's cyclomatic complexity low — see baseFeatureRows'
 // comment in class-features.ts on why prisma/seed/** floors at the UNCOVERED
 // CRAP formula regardless of real test coverage.
 function resolveSubclassId(
