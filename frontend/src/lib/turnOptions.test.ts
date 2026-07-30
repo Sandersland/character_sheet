@@ -19,7 +19,7 @@ import {
   twfHint,
 } from "@/lib/turnOptions";
 import { resolverFor } from "@/features/session/actionResolvers";
-import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
+import { SERVED_ACTIONS_2014, SERVED_ACTIONS_2024 } from "@/test/universalActions";
 import type { AvailableAction, Character, ResourcePool, Spell } from "@/types/character";
 
 function weaponItem(
@@ -444,21 +444,42 @@ describe("partitionClassActions", () => {
 });
 
 describe("more-actions helpers", () => {
-  it("every non-primary universal action has a micro-caption", () => {
-    const nonPrimary = UNIVERSAL_ACTIONS.filter(
-      (a) => a.cost === "action" && !PRIMARY_ACTION_KEYS.has(a.key),
-    );
+  // Asserted against the SERVED row shape, per edition: the captions are keyed
+  // on the edition-stable `key`, so a 2024-only addition (study/influence) that
+  // never got one would ship a tile with no caption.
+  it.each([
+    ["2014", SERVED_ACTIONS_2014],
+    ["2024", SERVED_ACTIONS_2024],
+  ])("every non-primary universal action served for %s has a micro-caption", (_edition, served) => {
+    const nonPrimary = served.filter((a) => a.cost === "action" && !PRIMARY_ACTION_KEYS.has(a.key));
+    expect(nonPrimary.length).toBeGreaterThan(0);
     for (const a of nonPrimary) {
       expect(MICRO_CAPTIONS[a.key], `missing caption for ${a.key}`).toBeTruthy();
     }
   });
 
-  it("moreActionsPreview joins labels with dots", () => {
+  // PRIMARY_ACTION_KEYS partitions the served list: each primary key must exist
+  // in BOTH editions, or one edition would silently lose a rich card.
+  it.each([
+    ["2014", SERVED_ACTIONS_2014],
+    ["2024", SERVED_ACTIONS_2024],
+  ])("every primary action key is served for %s", (_edition, served) => {
+    const servedKeys = new Set(served.map((a) => a.key));
+    for (const key of PRIMARY_ACTION_KEYS) {
+      expect(servedKeys.has(key), `primary key ${key} not served`).toBe(true);
+    }
+  });
+
+  it("moreActionsPreview joins the SERVED names with dots", () => {
     expect(
       moreActionsPreview([
-        { key: "disengage", label: "Disengage", cost: "action", description: "" },
-        { key: "hide", label: "Hide", cost: "action", description: "" },
+        { key: "disengage", name: "Disengage", cost: "action", description: "" },
+        { key: "hide", name: "Hide", cost: "action", description: "" },
       ]),
     ).toBe("Disengage · Hide");
+    // The 2024 rename reaches the preview because it reads `name`, not `key`.
+    expect(
+      moreActionsPreview([{ key: "useObject", name: "Utilize", cost: "action", description: "" }]),
+    ).toBe("Utilize");
   });
 });

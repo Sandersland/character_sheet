@@ -33,14 +33,16 @@ export default function ShadowArtsSection({ busy, onCast }: Props) {
   const [catalog, setCatalog] = useState<CatalogShadowArt[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
-  // The mounted flag alone is the StrictMode-safe fetch guard.
+  // The mounted flag alone is the StrictMode-safe fetch guard. The catalog is
+  // edition-scoped server-side (#1412), so the edition belongs in the deps —
+  // Character.rulesEdition is write-once, so in practice it never re-fires.
   useEffect(() => {
     let mounted = true;
-    fetchShadowArts()
+    fetchShadowArts(character.rulesEdition)
       .then((rows) => { if (mounted) setCatalog(rows); })
       .catch(() => { if (mounted) setCatalogError("Couldn't load Shadow Arts."); });
     return () => { mounted = false; };
-  }, []);
+  }, [character.rulesEdition]);
 
   const focusAvailable = focusRemaining(character);
   const concentratingOn = character.spellcasting?.concentratingOn ?? null;

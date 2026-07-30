@@ -4,7 +4,6 @@ import {
   advantageGrantSummary,
   capabilitySummary,
   castSpellSummary,
-  describeAttunementPrereq,
   grantSummary,
   targetUsesAbilityKey,
   targetUsesSkillKey,
@@ -144,18 +143,5 @@ describe("target key predicates", () => {
     expect(targetUsesAbilityKey("skill")).toBe(false);
     expect(targetUsesSkillKey("skill")).toBe(true);
     expect(targetUsesSkillKey("ac")).toBe(false);
-  });
-});
-
-describe("describeAttunementPrereq", () => {
-  it("phrases each kind", () => {
-    expect(describeAttunementPrereq("spellcaster")).toBe("a spellcaster");
-    expect(describeAttunementPrereq("class", "Wizard")).toBe("a Wizard");
-    expect(describeAttunementPrereq("species", "Elf")).toBe("a Elf");
-    expect(describeAttunementPrereq("alignment", "Lawful Good")).toBe("a Lawful Good creature");
-  });
-
-  it("degrades gracefully with no value", () => {
-    expect(describeAttunementPrereq("class")).toBe("a specific class");
   });
 });

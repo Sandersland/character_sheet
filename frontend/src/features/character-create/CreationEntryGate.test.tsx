@@ -4,14 +4,22 @@ import userEvent from "@testing-library/user-event";
 
 import { axe } from "@/test/axe";
 import CreationEntryGate from "@/features/character-create/CreationEntryGate";
-import { fetchCampaigns } from "@/api/client";
+import { fetchCampaigns, fetchEditions } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { catalogKeys } from "@/api/queryKeys";
+import { SERVED_EDITIONS, seedEditions } from "@/test/editions";
 import type { Campaign } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchCampaigns: vi.fn(),
+  // Never actually called in the seeded cases (seedEditions makes the
+  // staleTime: Infinity entry permanently fresh) — stubbed so the cold-cache and
+  // fetch-failed cases can drive it explicitly.
+  fetchEditions: vi.fn(),
 }));
 
 const mockFetchCampaigns = vi.mocked(fetchCampaigns);
+const mockFetchEditions = vi.mocked(fetchEditions);
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
   return {
@@ -19,6 +27,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     name: "The Sunless Citadel",
     ownerId: "u1",
     rulesEdition: "EDITION_2024",
+    rulesEditionLabel: "2024 rules",
     inviteCode: "abc123",
     createdAt: new Date().toISOString(),
     role: "PLAYER",
@@ -37,6 +46,10 @@ function makeCampaigns(n: number): Campaign[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedEditions();
+  // A realistic default so a refetch triggered by "Try again" resolves rather
+  // than returning undefined; the load-state specs below override it.
+  mockFetchEditions.mockResolvedValue({ defaultEdition: "EDITION_2024", editions: SERVED_EDITIONS });
 });
 
 describe("CreationEntryGate (#1286)", () => {
@@ -84,7 +97,11 @@ describe("CreationEntryGate (#1286)", () => {
   });
 
   it("picking a campaign displays its inherited edition instead of asking", async () => {
-    mockFetchCampaigns.mockResolvedValue([makeCampaign({ rulesEdition: "EDITION_2014" })]);
+    // Both fields set explicitly — deriving the label from the key in a fixture
+    // would re-implement the mapping #1436 moved server-side.
+    mockFetchCampaigns.mockResolvedValue([
+      makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    ]);
     const onResolved = vi.fn();
     render(<CreationEntryGate onResolved={onResolved} />);
 
@@ -104,7 +121,9 @@ describe("CreationEntryGate (#1286)", () => {
   });
 
   it("switching back to Solo after picking a campaign re-reveals the edition picker", async () => {
-    mockFetchCampaigns.mockResolvedValue([makeCampaign({ rulesEdition: "EDITION_2014" })]);
+    mockFetchCampaigns.mockResolvedValue([
+      makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    ]);
     render(<CreationEntryGate onResolved={vi.fn()} />);
 
     await userEvent.click(await screen.findByRole("radio", { name: /the sunless citadel/i }));
@@ -152,6 +171,81 @@ describe("CreationEntryGate (#1286)", () => {
 
       expect(await screen.findByRole("radio", { name: "2024 rules" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /continue/i })).toBeInTheDocument();
+    });
+  });
+
+  // #1436: /api/editions is the second precondition of this screen, and its
+  // failure mode is the same one — a fallback edition on an irreversible field IS
+  // the guess the copy above promises not to make.
+  describe("rules editions fail to load", () => {
+    it("takes the same 'we won't guess' branch, with no picker and no Continue", async () => {
+      getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
+      mockFetchEditions.mockRejectedValue(new Error("network down"));
+      mockFetchCampaigns.mockResolvedValue([]);
+      const onResolved = vi.fn();
+      render(<CreationEntryGate onResolved={onResolved} />);
+
+      expect(await screen.findByText(/won't guess/i)).toBeInTheDocument();
+      expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /continue/i })).not.toBeInTheDocument();
+      expect(onResolved).not.toHaveBeenCalled();
+    });
+
+    it("Try again refetches BOTH round-trips, not just the campaign list", async () => {
+      getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
+      mockFetchEditions
+        .mockRejectedValueOnce(new Error("network down"))
+        .mockResolvedValueOnce({ defaultEdition: "EDITION_2024", editions: SERVED_EDITIONS });
+      mockFetchCampaigns.mockResolvedValue([]);
+      render(<CreationEntryGate onResolved={vi.fn()} />);
+
+      await screen.findByText(/won't guess/i);
+      await userEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+      expect(await screen.findByRole("radio", { name: "2024 rules" })).toBeInTheDocument();
+      expect(mockFetchEditions).toHaveBeenCalledTimes(2);
+      expect(mockFetchCampaigns).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // #1436: cold cache and the scrambled-order fixture — the two states the
+  // positional default made unrepresentable.
+  describe("rules editions load states", () => {
+    it("cold cache: shows only the spinner — no picker, no flash of a wrong default", async () => {
+      getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
+      mockFetchEditions.mockReturnValue(new Promise(() => {}));
+      mockFetchCampaigns.mockResolvedValue([makeCampaign()]);
+      render(<CreationEntryGate onResolved={vi.fn()} />);
+
+      // The campaign list resolves first; the screen must still be the spinner.
+      await waitFor(() => expect(mockFetchCampaigns).toHaveBeenCalled());
+      expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /continue/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/EDITION_/)).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toBeInTheDocument();
+    });
+
+    // Rows 2014-FIRST while the served default is 2024: order and default
+    // deliberately disagree, so no positional implementation can pass both
+    // assertions. This is the test the same-name/opposite-order arrays lacked.
+    it("checks the SERVED default, not the first row, when the two disagree", async () => {
+      const [row2024, row2014] = SERVED_EDITIONS;
+      seedEditions({ editions: [row2014, row2024], defaultEdition: "EDITION_2024" });
+      mockFetchCampaigns.mockResolvedValue([]);
+      const onResolved = vi.fn();
+      render(<CreationEntryGate onResolved={onResolved} />);
+
+      const radios = await screen.findAllByRole("radio");
+      expect(radios.map((r) => r.getAttribute("aria-label"))).toEqual(["2014 rules", "2024 rules"]);
+      expect(radios[0]).toHaveAttribute("aria-checked", "false");
+      expect(screen.getByRole("radio", { name: "2024 rules" })).toHaveAttribute("aria-checked", "true");
+
+      await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+      expect(onResolved).toHaveBeenCalledWith({
+        campaignId: null,
+        campaignName: null,
+        rulesEdition: "EDITION_2024",
+      });
     });
   });
 

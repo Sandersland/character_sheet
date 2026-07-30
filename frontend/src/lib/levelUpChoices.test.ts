@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchFeats, fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
+import { fetchFeats, fetchManeuvers, fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
 import {
   CHOICE_KIND_CONFIGS,
   choiceConfigForStep,
@@ -42,11 +42,12 @@ describe("CHOICE_KIND_CONFIGS", () => {
   describe("maneuvers", () => {
     const cfg = CHOICE_KIND_CONFIGS.maneuvers!;
 
-    it("loads catalog options", async () => {
-      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024" })).toEqual([
+    it("loads catalog options for the advancing character's edition (#1412)", async () => {
+      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014" })).toEqual([
         { id: "m1", name: "Riposte", description: "riposte" },
         { id: "m2", name: "Trip Attack", description: "trip" },
       ]);
+      expect(fetchManeuvers).toHaveBeenCalledWith("EDITION_2014");
     });
 
     it("extracts known ids from the character", () => {

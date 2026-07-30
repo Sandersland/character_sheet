@@ -242,6 +242,24 @@ export interface InventoryItem {
   equippedSlot?: EquipSlot;
   /** Declared paper-doll slot for wearable gear (#565); absent = bag-only. */
   slot?: EquipSlot;
+  /**
+   * Server-resolved: whether this item's CATEGORY can be worn/wielded at all
+   * (#1433) — the gate on the inventory row's equip toggle. Deliberately NOT
+   * `allowedSlots.length > 0`: worn gear declaring a slot is placeable but not
+   * equippable, so a ring gets no equip toggle while the loadout RING picker
+   * still offers it.
+   */
+  equippable: boolean;
+  /** Server-resolved slots this item may legally occupy (#1433); empty = bag-only. */
+  allowedSlots: EquipSlot[];
+  /**
+   * Server-resolved: whether the character is proficient with this item (#1433).
+   * Reads the character's merged weapon/armor grants INCLUDING item grants, so it
+   * never contradicts `Character.weaponProficiencies` rendered beside it. Items
+   * with no derivable requirement (gear, consumables, an unclassified weapon) are
+   * `true` — a no-warn display policy, not a rules claim.
+   */
+  proficient: boolean;
   /** Magic-item rarity tier snapshot; absent for mundane gear. */
   rarity?: ItemRarity;
   /** Attunement state (#546); the 3-item cap is derived, never stored. */
@@ -250,6 +268,13 @@ export interface InventoryItem {
   requiresAttunement: boolean;
   attunementPrereqKind?: AttunementPrereqKind;
   attunementPrereqValue?: string;
+  /**
+   * Server-resolved 5e phrasing of the prerequisite ("a Wizard"), byte-identical
+   * to the string an unmet-prerequisite attune is rejected with (#1382). Absent
+   * when there is no prerequisite; never composed client-side from the two fields
+   * above, which remain on the wire for the DM item form's round-trip.
+   */
+  attunementPrereqText?: string;
 
   notes?: string;
   weapon?: WeaponDetail;

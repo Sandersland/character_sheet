@@ -35,7 +35,15 @@ export const referenceKeys = {
 
 // The SRD item catalog (`GET /items`) — a separate endpoint from `/reference`,
 // so it gets its own key rather than overloading referenceKeys.
-export const catalogKeys = { items: () => ["catalog", "items"] as const };
+export const catalogKeys = {
+  items: () => ["catalog", "items"] as const,
+  // Takes NO edition argument, unlike referenceKeys.byEdition above: /editions is
+  // edition-independent by construction (#1436), because it is what the client
+  // reads in order to CHOOSE an edition. Adding one "for symmetry" would
+  // reintroduce edition-dependence into the one endpoint that must be answerable
+  // BEFORE an edition exists.
+  editions: () => ["catalog", "editions"] as const,
+};
 
 // The character's session-doorway + full-active-session reads (#1299), lifted
 // out of LiveSessionProvider's own useState so a lifecycle mutation elsewhere

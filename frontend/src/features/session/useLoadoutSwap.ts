@@ -106,7 +106,7 @@ export function useLoadoutSwap(character: Character, turnState: TurnState & Turn
   }
 
   async function commitSwap(ops: InventoryOperation[], inverseOps: InventoryOperation[], payment: InteractionSpend | "action") {
-    const previousLabel = equippedLoadoutLabel(character.inventory);
+    const previousLabel = equippedLoadoutLabel(character.inventory, character.offHandLocked);
     setBudgetError(null);
     try {
       await swapMutation.mutateAsync(ops);

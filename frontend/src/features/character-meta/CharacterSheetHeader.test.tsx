@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
+import { fetchEditions } from "@/api/client";
 import { RollProvider } from "@/features/dice/RollContext";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
@@ -19,7 +20,12 @@ function desktopSheetActions(): HTMLElement {
 
 
 // BackendStatus pings the API on mount; keep it quiet + healthy in tests.
-vi.mock("@/api/client", () => ({ checkHealth: vi.fn().mockResolvedValue(true) }));
+// fetchEditions is listed only so the badge spec below can prove it is NEVER
+// called — the badge reads the label served with the sheet (#1436).
+vi.mock("@/api/client", () => ({
+  checkHealth: vi.fn().mockResolvedValue(true),
+  fetchEditions: vi.fn(),
+}));
 
 const TABS: SheetTab[] = [
   { id: "overview", label: "Overview" },
@@ -262,16 +268,38 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
   });
 });
 
+// Both cases set rulesEdition AND rulesEditionLabel explicitly (#1436) — a
+// fixture that derived one from the other would re-implement the mapping this
+// issue moved server-side, and would pass even against a client-side lookup.
 describe("CharacterSheetHeader rules edition (#1286)", () => {
   it("shows the character's 2024 rules edition in the desktop banner", () => {
-    renderHeader({ activeTab: "overview" }, makeCharacter({ rulesEdition: "EDITION_2024" }));
+    renderHeader(
+      { activeTab: "overview" },
+      makeCharacter({ rulesEdition: "EDITION_2024", rulesEditionLabel: "2024 rules" }),
+    );
     const desktopHeader = screen.getAllByRole("banner").find((h) => h.className.includes("md:block"))!;
     expect(within(desktopHeader).getByText("2024 rules")).toBeInTheDocument();
   });
 
   it("shows the character's 2014 rules edition in the desktop banner", () => {
-    renderHeader({ activeTab: "overview" }, makeCharacter({ rulesEdition: "EDITION_2014" }));
+    renderHeader(
+      { activeTab: "overview" },
+      makeCharacter({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    );
     const desktopHeader = screen.getAllByRole("banner").find((h) => h.className.includes("md:block"))!;
     expect(within(desktopHeader).getByText("2014 rules")).toBeInTheDocument();
+  });
+
+  // The stronger claim than "the query is pending": after #1436 this component
+  // never calls useEditions at all, so "never requested" is the observable one.
+  // The editions cache is deliberately left unseeded here.
+  it("renders the badge without ever requesting /api/editions", () => {
+    renderHeader(
+      { activeTab: "overview" },
+      makeCharacter({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
+    );
+    const desktopHeader = screen.getAllByRole("banner").find((h) => h.className.includes("md:block"))!;
+    expect(within(desktopHeader).getByText("2014 rules")).toBeInTheDocument();
+    expect(vi.mocked(fetchEditions)).not.toHaveBeenCalled();
   });
 });

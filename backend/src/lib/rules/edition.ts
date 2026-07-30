@@ -27,13 +27,24 @@ export function editionOf(row: { rulesEdition: RulesEdition }): RulesEdition {
   return row.rulesEdition;
 }
 
-const RULES_EDITIONS: readonly RulesEdition[] = ["EDITION_2014", "EDITION_2024"];
+// The ONE RulesEdition order array in the codebase, and its order IS the order
+// editionsRouter serves and EditionPicker renders — 2024 first, because that is
+// what most new tables run. Until #1436 there was a second array of the same
+// name in the frontend in the OPPOSITE order, while two client sites treated
+// index 0 as the creation default; "aligning the two arrays" would silently have
+// flipped the edition of every new campaign and solo character. Never index this
+// array to obtain a default — that is DEFAULT_RULES_EDITION's job, and the two
+// are independent concerns that merely agree today (a product decision to show
+// 2014 first must not move the creation default).
+export const RULES_EDITION_DISPLAY_ORDER: readonly RulesEdition[] = ["EDITION_2024", "EDITION_2014"];
 
 // The one guard for an edition arriving over the wire (a query param, a body
 // field) rather than read off a Character row — feats.ts and reference.ts both
-// need this, so it lives here rather than being copy-pasted a third time.
+// need this, so it lives here rather than being copy-pasted a third time. It
+// only membership-tests the array above, so display order is irrelevant to it
+// and there is no second array to fall out of sync with.
 export function isRulesEdition(raw: unknown): raw is RulesEdition {
-  return (RULES_EDITIONS as readonly string[]).includes(raw as string);
+  return (RULES_EDITION_DISPLAY_ORDER as readonly string[]).includes(raw as string);
 }
 
 // Mirrors Character.rulesEdition's Prisma `@default(EDITION_2024)` — the ONE
@@ -43,16 +54,31 @@ export function isRulesEdition(raw: unknown): raw is RulesEdition {
 // Deliberate-coupling latch: change the schema default, change this too.
 export const DEFAULT_RULES_EDITION: RulesEdition = "EDITION_2024";
 
-// Plain-language labels for user-facing text (e.g. the campaign-join mismatch
-// error, #1286) — players say "2014/2024 rules", never "SRD 5.1/5.2".
-//
-// Deliberate-coupling latch: byte-identical to frontend/src/lib/editionCopy.ts's
-// EDITION_LABELS (the join-mismatch error's exact wording is asserted against
-// that copy in CampaignDetailPage.test.tsx). Not single-sourced in
-// @character-sheet/shared-types because that package is pure types only
-// (index.ts: "nothing here reaches either runtime bundle") — a runtime const
-// there would break that invariant for every consumer. Change one, change both.
+// Plain-language labels for user-facing text — players say "2014/2024 rules",
+// never "SRD 5.1/5.2" (#1286). Sole source since #1436 deleted the frontend
+// twin: every label the client renders is served, either by editionsRouter or
+// alongside a `rulesEdition` key as `rulesEditionLabel`. The campaign-join
+// mismatch message is composed entirely in campaignsRouter's attach handler from
+// this map, so no client copy could ever affect its wording.
 export const RULES_EDITION_LABELS: Record<RulesEdition, string> = {
   EDITION_2014: "2014 rules",
   EDITION_2024: "2024 rules",
+};
+
+// Prose for the edition picker's cards — product copy, not rules text, so it
+// names no SRD citation.
+export const EDITION_DESCRIPTIONS: Record<RulesEdition, string> = {
+  EDITION_2024: "The current rulebooks — what most new tables are running.",
+  EDITION_2014: "The original 5th edition rulebooks, sometimes called \"classic\" 5e.",
+};
+
+// Deliberate-coupling latch (#1371): an edition present here is served with an
+// `unavailableReason` and renders as a visible-but-unselectable EditionPicker
+// card carrying that reason. Remove the EDITION_2014 entry only when #1372 (its
+// content-parity ungate) ships — the entry lives HERE since #1436, not in any
+// frontend module, and that issue also restores the tests this map's addition
+// inverted.
+export const EDITION_UNAVAILABLE: Partial<Record<RulesEdition, string>> = {
+  EDITION_2014:
+    "Not available yet — the 2014 feats, fighting styles, caster model and Monk rules haven't shipped, and a character's edition can't be changed later.",
 };

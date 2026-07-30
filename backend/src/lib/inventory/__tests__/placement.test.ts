@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { allowedSlotsForItem, type PlaceableItem } from "@/lib/inventory/inventory-placement.js";
+import {
+  allowedSlotsForItem,
+  isOffHandLocked,
+  type EquippedRow,
+  type PlaceableItem,
+} from "@/lib/inventory/inventory-placement.js";
 
-// Pure unit tests — no DB. Pins the slot-legality rule now that it is exported
-// for reuse outside its defining module (#1432); the assertions mirror the
-// frontend mirror's `allowedSlotsForItem` block so a divergence shows up here.
+// Pure unit tests — no DB. Pins the slot-legality and off-hand-lock rules now
+// that both are exported for reuse outside their defining module (#1432/#1433):
+// `serializeCharacter` serves them as `allowedSlots` / `offHandLocked`, so a
+// divergence here changes what the sheet renders, not just what a write rejects.
 
 function placeable(overrides: Partial<PlaceableItem> = {}): PlaceableItem {
   return { category: "gear", slot: null, weaponDetail: null, armorDetail: null, ...overrides };
@@ -31,10 +37,9 @@ describe("allowedSlotsForItem", () => {
     expect(allowedSlotsForItem(item)).toEqual(["BODY"]);
   });
 
-  // Not reachable from the wire shape the frontend mirror sees, so only this
-  // suite covers it: a detail-less armor row falls to BODY rather than to the
-  // shield branch, which is what keeps `applySetEquipped` from rejecting armor
-  // whose detail row failed to load.
+  // A detail-less armor row falls to BODY rather than to the shield branch,
+  // which is what keeps `applySetEquipped` from rejecting armor whose detail row
+  // failed to load. Pinned here because the seeded fixtures never produce it.
   it("armor with no detail row falls back to body", () => {
     expect(allowedSlotsForItem(placeable({ category: "armor" }))).toEqual(["BODY"]);
   });
@@ -49,5 +54,34 @@ describe("allowedSlotsForItem", () => {
 
   it("consumables are never equippable", () => {
     expect(allowedSlotsForItem(placeable({ category: "consumable" }))).toEqual([]);
+  });
+});
+
+describe("isOffHandLocked", () => {
+  const row = (overrides: Partial<EquippedRow> = {}): EquippedRow => ({
+    equippedSlot: null,
+    weaponDetail: null,
+    ...overrides,
+  });
+
+  it("locks the off-hand for a two-handed main-hand weapon", () => {
+    expect(isOffHandLocked([row({ equippedSlot: "MAIN_HAND", weaponDetail: { twoHanded: true } })])).toBe(true);
+  });
+
+  it("leaves the off-hand free for a one-handed main-hand weapon", () => {
+    expect(isOffHandLocked([row({ equippedSlot: "MAIN_HAND", weaponDetail: { twoHanded: false } })])).toBe(false);
+  });
+
+  // Slot-scoped, not inventory-scoped: an unequipped greatsword locks nothing.
+  it("ignores a two-handed weapon that is not equipped", () => {
+    expect(isOffHandLocked([row({ weaponDetail: { twoHanded: true } })])).toBe(false);
+  });
+
+  it("ignores a two-handed weapon equipped somewhere other than the main hand", () => {
+    expect(isOffHandLocked([row({ equippedSlot: "OFF_HAND", weaponDetail: { twoHanded: true } })])).toBe(false);
+  });
+
+  it("an empty loadout locks nothing", () => {
+    expect(isOffHandLocked([])).toBe(false);
   });
 });

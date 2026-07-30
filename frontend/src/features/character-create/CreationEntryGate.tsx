@@ -14,9 +14,9 @@ import EditionPicker from "@/components/ui/EditionPicker";
 import Spinner from "@/components/ui/Spinner";
 import { CeremonyCard, CeremonyStage, GHOST_BTN } from "@/features/ceremony/CeremonyShell";
 import { fetchCampaigns } from "@/api/client";
+import { useEditions } from "@/hooks/useEditions";
 import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
-import { EDITION_LABELS, RULES_EDITIONS } from "@/lib/editionCopy";
-import type { Campaign } from "@/types/character";
+import type { Campaign, EditionOption } from "@/types/character";
 
 interface CreationEntryGateProps {
   onResolved: (choice: {
@@ -108,10 +108,12 @@ function CampaignChoiceCards({
 // it's stated at the moment of choosing, never discovered later (#1286).
 function EditionSection({
   campaign,
+  rows,
   soloEdition,
   onSoloEditionChange,
 }: {
   campaign: Campaign | undefined;
+  rows: EditionOption[];
   soloEdition: RulesEdition;
   onSoloEditionChange: (edition: RulesEdition) => void;
 }) {
@@ -119,14 +121,18 @@ function EditionSection({
     <div className="mt-5">
       {campaign ? (
         <p className="text-sm text-parchment-700">
+          {/* Off the campaign row's own served label (#1436), NOT a lookup in the
+              editions rows: the inherited edition is a fact about that campaign,
+              and resolving it through the picker's catalog would make an
+              already-known value depend on a second request. */}
           This character will use the{" "}
-          <span className="font-semibold text-parchment-900">{EDITION_LABELS[campaign.rulesEdition]}</span> —
-          inherited from {campaign.name}.
+          <span className="font-semibold text-parchment-900">{campaign.rulesEditionLabel}</span> — inherited
+          from {campaign.name}.
         </p>
       ) : (
         <>
           <p className="mb-2 text-sm font-semibold text-parchment-800">Which rules is this character using?</p>
-          <EditionPicker value={soloEdition} onChange={onSoloEditionChange} label="Rules edition" />
+          <EditionPicker rows={rows} value={soloEdition} onChange={onSoloEditionChange} label="Rules edition" />
         </>
       )}
       <p className="mt-3 text-xs text-parchment-500">This can't be changed later — a character's rules edition is locked in at creation.</p>
@@ -140,7 +146,11 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
   // Bumped by "Try again" to re-run the fetch effect below.
   const [retryToken, setRetryToken] = useState(0);
   const [choice, setChoice] = useState<string>(SOLO);
-  const [soloEdition, setSoloEdition] = useState<RulesEdition>(RULES_EDITIONS[0]);
+  // null = "the player hasn't touched the picker", not "2024": a character's
+  // edition is locked in at creation, so the pre-checked card must come from the
+  // server's defaultEdition rather than a client-side literal (#1436).
+  const [soloEdition, setSoloEdition] = useState<RulesEdition | null>(null);
+  const { editions, error: editionsFailed, refetch: refetchEditions } = useEditions();
 
   useEffect(() => {
     let active = true;
@@ -156,7 +166,10 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
   // #1286: the choice is irreversible, so a fetch failure must never silently
   // fall through to "no campaigns" — that would steer a player who meant to
   // join a campaign into picking an edition for a character that can't move.
-  if (loadError) {
+  // A failed /api/editions takes the same branch (#1436) for the same reason: a
+  // fallback edition IS a guess, and this copy already says we won't make one.
+  // "Try again" retries both, since either one alone leaves this screen unusable.
+  if (loadError || editionsFailed) {
     return (
       <CeremonyStage layout="page">
         <CeremonyCard className="px-6 py-10 text-center">
@@ -167,7 +180,10 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
           </p>
           <button
             type="button"
-            onClick={() => setRetryToken((t) => t + 1)}
+            onClick={() => {
+              setRetryToken((t) => t + 1);
+              refetchEditions();
+            }}
             className={`${PRIMARY_BTN} mt-4`}
           >
             Try again
@@ -177,7 +193,10 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
     );
   }
 
-  if (campaigns === null) {
+  // Both round-trips gated behind one spinner: showing the campaign cards before
+  // the editions arrive would flash a section with no picker in it, and showing a
+  // picker before its rows arrive is the fallback-value bug this issue removes.
+  if (campaigns === null || editions === null) {
     return (
       <CeremonyStage layout="page">
         <CeremonyCard className="flex items-center justify-center px-6 py-10">
@@ -188,12 +207,15 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
   }
 
   const chosenCampaign = campaigns.find((c) => c.id === choice);
+  // Past the guard above, the served default is known — so an untouched picker
+  // resolves to it rather than to any literal in this file.
+  const effectiveSoloEdition = soloEdition ?? editions.defaultEdition;
 
   function handleContinue() {
     onResolved({
       campaignId: chosenCampaign ? chosenCampaign.id : null,
       campaignName: chosenCampaign ? chosenCampaign.name : null,
-      rulesEdition: chosenCampaign ? chosenCampaign.rulesEdition : soloEdition,
+      rulesEdition: chosenCampaign ? chosenCampaign.rulesEdition : effectiveSoloEdition,
     });
   }
 
@@ -212,7 +234,12 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
           </div>
         )}
 
-        <EditionSection campaign={chosenCampaign} soloEdition={soloEdition} onSoloEditionChange={setSoloEdition} />
+        <EditionSection
+          campaign={chosenCampaign}
+          rows={editions.editions}
+          soloEdition={effectiveSoloEdition}
+          onSoloEditionChange={setSoloEdition}
+        />
 
         <footer className="mt-6 flex items-center justify-between gap-3 border-t border-parchment-200 pt-4">
           {onCancel ? (

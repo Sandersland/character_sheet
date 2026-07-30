@@ -16,6 +16,7 @@ const REFERENCE: ReferenceData = {
   alignments: [],
   artisanTools: [],
   conditions: [],
+  universalActions: [],
   itemRarities: [],
 };
 

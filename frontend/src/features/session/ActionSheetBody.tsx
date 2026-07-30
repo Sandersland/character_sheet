@@ -19,6 +19,8 @@ import {
   GiHealthPotion,
   GiHoodedFigure,
   GiMagnifyingGlass,
+  GiOpenBook,
+  GiPublicSpeaker,
   GiPush,
   GiRun,
   GiSandsOfTime,
@@ -29,7 +31,6 @@ import {
 } from "@/components/ui/icons";
 import OptionCard, { type OptionIcon } from "@/features/session/OptionCard";
 import { MICRO_CAPTIONS, PRIMARY_ACTION_KEYS, moreActionsPreview } from "@/lib/turnOptions";
-import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
 import { NO_BUDGET_REASON, changeWeaponsSubtitle } from "@/lib/loadoutPicker";
 import type { ActionSheetModel, ClassActionOption } from "@/lib/turnOptions";
 
@@ -48,6 +49,8 @@ function gateClassAction(option: ClassActionOption, actionAvailable: boolean): C
   return { ...option, enabled: false, disabledReason: option.disabledReason ?? NO_ACTION_LEFT_REASON };
 }
 
+// Keyed on the edition-stable `key`, never the served `name` — the 2024 renames
+// (Magic / Utilize) must not cost a tile its glyph. Unknown keys fall back to Zap.
 const TILE_ICONS: Record<string, OptionIcon> = {
   disengage: GiSprint,
   help: GiThreeFriends,
@@ -56,6 +59,8 @@ const TILE_ICONS: Record<string, OptionIcon> = {
   ready: GiSandsOfTime,
   grapple: GiGrab,
   shove: GiPush,
+  study: GiOpenBook,
+  influence: GiPublicSpeaker,
 };
 
 /** Shared row card for a class action (also used by the Bonus/Reaction sheets). */
@@ -101,9 +106,11 @@ export default function ActionSheetBody({
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Same exclusion rule as the old pill list: universal actions the class
-  // doesn't already provide; the primary five render as dedicated cards.
+  // doesn't already provide; the primary five render as dedicated cards. Empty
+  // until the reference query resolves, which collapses the whole disclosure —
+  // deliberate: a missing card degrades, a wrong-edition card lies.
   const classKeys = new Set(model.classActionOptions.map((o) => o.key));
-  const moreActions = UNIVERSAL_ACTIONS.filter(
+  const moreActions = model.universalActions.filter(
     (u) => u.cost === "action" && !PRIMARY_ACTION_KEYS.has(u.key) && !classKeys.has(u.key),
   );
 
@@ -203,7 +210,7 @@ export default function ActionSheetBody({
                 <OptionCard
                   key={action.key}
                   icon={TILE_ICONS[action.key] ?? Zap}
-                  title={action.label}
+                  title={action.name}
                   subtitle={MICRO_CAPTIONS[action.key]}
                   variant="tile"
                   {...actionGate(actionAvailable)}

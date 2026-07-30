@@ -1,5 +1,6 @@
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 /** PHB'24 feat categories (local union keeps srd/ a dependency leaf). */
 export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
@@ -9,10 +10,18 @@ export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon"
  * (PHB'24 pp. 87-88). Origin feats come from backgrounds and Fighting Style from
  * class features, so neither is ever offered here; General unlocks at level 4 and
  * Epic Boon at level 19 unless the feat overrides levelPrerequisite.
+ *
+ * Both editions resolve identically today: origin/general/fighting_style/epic_boon
+ * is PHB'24 taxonomy and no 2014 Feat rows exist outside the already-forked Alert
+ * pair, so there is nothing for a 2014 branch to decide yet. `edition` is threaded
+ * now (last parameter, per subclassGateLevel) so #1310's 2014 feat catalog changes
+ * this body instead of every call site — a unit test pins the two verdicts equal.
  */
 export function featOfferedForAsiSlot(
   feat: { category: FeatCategory; levelPrerequisite?: number | null },
   level: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the #1310 fork seam; see JSDoc, both editions resolve identically until 2014 feats exist
+  edition: RulesEdition,
 ): boolean {
   switch (feat.category) {
     case "origin":

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
+import { fetchEditions } from "@/api/client";
 import { RollProvider } from "@/features/dice/RollContext";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
@@ -10,9 +11,12 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
 // The switcher sheet fetches the character list on open; keep it inert here.
+// fetchEditions is stubbed so the badge spec below can prove it is NEVER called
+// — the badge reads the label served with the sheet (#1436).
 vi.mock("@/api/client", async (importActual) => ({
   ...(await importActual<typeof import("@/api/client")>()),
   fetchCharacters: vi.fn().mockResolvedValue([]),
+  fetchEditions: vi.fn(),
 }));
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
@@ -289,9 +293,13 @@ describe("MobileSheetHeader collapse-on-scroll (#1026)", () => {
 // header") — the desktop banner alone isn't enough, since mobile is the only
 // header shown below the md breakpoint.
 describe("MobileSheetHeader rules edition (#1286)", () => {
-  it("shows the character's rules edition in the expanded header", () => {
-    renderHeader({}, makeCharacter({ rulesEdition: "EDITION_2014" }));
+  // Both fields set explicitly (#1436): deriving one from the other in a fixture
+  // would re-implement the mapping this issue moved server-side. The editions
+  // cache is deliberately unseeded — this header never calls useEditions.
+  it("shows the character's rules edition in the expanded header, with no /api/editions request", () => {
+    renderHeader({}, makeCharacter({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }));
     expect(screen.getByText("2014 rules")).toBeInTheDocument();
+    expect(vi.mocked(fetchEditions)).not.toHaveBeenCalled();
   });
 });
 

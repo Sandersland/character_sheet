@@ -59,6 +59,21 @@ describe("rulesEdition on the character wire (#1285)", () => {
     expect(res.status).toBe(201);
     expect(res.body.rulesEdition).toBe("EDITION_2014");
   });
+
+  // #1436: the resolved label rides the key, so the sheet's edition badge is
+  // synchronous and the frontend holds no label table. Both editions, because a
+  // single-edition assertion also passes a hardcoded string.
+  it("GET /api/characters/:id serves rulesEditionLabel for both editions", async () => {
+    const twentyFour = await create({ ...BASE, name: "RulesEdition Label 2024" });
+    expect((await get(twentyFour.body.id)).body.rulesEditionLabel).toBe("2024 rules");
+
+    const fourteen = await create({
+      ...BASE,
+      name: "RulesEdition Label 2014",
+      rulesEdition: "EDITION_2014",
+    });
+    expect((await get(fourteen.body.id)).body.rulesEditionLabel).toBe("2014 rules");
+  });
 });
 
 // Write-once (#1281, 2026-07-25). These are regression pins, not red-first

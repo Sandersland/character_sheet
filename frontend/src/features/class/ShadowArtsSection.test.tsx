@@ -37,6 +37,7 @@ function makeCharacter(focusRemaining: number, concentratingOn: { entryId: strin
     id: "char-1",
     class: "Monk",
     level: 3,
+    rulesEdition: "EDITION_2014",
     resources: {
       features: [],
       pools: [{ key: "focus", label: "Focus", total: 3, recharge: "shortRest", used: 3 - focusRemaining, remaining: focusRemaining }],
@@ -67,6 +68,9 @@ describe("ShadowArtsSection", () => {
     expect(screen.getByText(/Cast Darkness for 1 focus/)).toBeInTheDocument();
     // Focus remaining surfaced.
     expect(screen.getByText("3")).toBeInTheDocument();
+    // The catalog is edition-scoped server-side (#1412) — a hardcoded edition
+    // would render identically here, so the argument itself is the assertion.
+    expect(client.fetchShadowArts).toHaveBeenCalledWith("EDITION_2014");
   });
 
   it("casts Darkness as a castShadowArt op", async () => {

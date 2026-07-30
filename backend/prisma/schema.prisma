@@ -931,7 +931,7 @@ enum SpellSchool {
 // actions.ts. No migration needed for new actions; only new columns need one.
 model Action {
   id          String     @id @default(uuid())
-  key         String     @unique  // stable machine key, e.g. "rage" | "dodge"
+  key         String               // stable machine key, e.g. "rage" | "dodge"
   name        String               // display label
   description String
 
@@ -951,11 +951,18 @@ model Action {
   resourceKey    String? // matches DerivedResource.key, e.g. "rage"
   resourceAmount Int?    // units required; null means no resource check needed
 
-  // NULL = valid in both editions (#1306). `key` stays plainly @unique for now
-  // — no divergent Action content exists yet, so widening it to an
-  // edition-aware compound (like Feat/Subclass/Background) is deferred to
-  // whichever future issue actually forks an action by edition.
+  // NULL = valid in both editions (#1306) — still true for every class row.
+  // Every `universal: true` row is now forked (#1430): each `description` is a
+  // transcription from ONE named document, so a shared row could only cite
+  // "SRD 5.1 and SRD 5.2" and an ambiguous citation is a bug. That is why the
+  // business key is (key, edition) rather than plain `key` — `key` is
+  // edition-stable identity, so the 2024 Magic row keeps `key: "castSpell"`.
   edition RulesEdition?
+
+  // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
+  // emit it), so a class row's NULL edition still admits at most one row per
+  // key — see 20260729120000_widen_action_key_edition.
+  @@unique([key, edition])
 }
 
 enum ActionCost {

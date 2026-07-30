@@ -5,11 +5,18 @@ import { MemoryRouter } from "react-router-dom";
 
 import CampaignsPage from "@/features/campaign/CampaignsPage";
 import * as client from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { catalogKeys } from "@/api/queryKeys";
+import { SERVED_EDITIONS, seedEditions } from "@/test/editions";
 import type { Campaign } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchCampaigns: vi.fn(),
   createCampaign: vi.fn(),
+  // Never actually called in the seeded cases (seedEditions makes the
+  // staleTime: Infinity entry permanently fresh) — stubbed so the cold-cache and
+  // fetch-failed cases can drive it explicitly.
+  fetchEditions: vi.fn(),
 }));
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
@@ -18,6 +25,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     name: "The Sunless Citadel",
     ownerId: "u1",
     rulesEdition: "EDITION_2024",
+    rulesEditionLabel: "2024 rules",
     inviteCode: "abc123",
     createdAt: new Date().toISOString(),
     role: "OWNER",
@@ -35,6 +43,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedEditions();
 });
 
 describe("CampaignsPage (#246)", () => {
@@ -124,5 +133,74 @@ describe("CampaignsPage (#246)", () => {
     await screen.findByText(/no campaigns yet/i);
     expect(screen.queryByRole("button", { name: /join campaign/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/invite code/i)).not.toBeInTheDocument();
+  });
+});
+
+// #1436: a campaign's edition can never be changed, so this form must never
+// write one the DM didn't see. That makes the /api/editions load states part of
+// the contract, not incidental loading polish.
+describe("CampaignsPage rules edition (#1436)", () => {
+  // The fixture deliberately makes display order and the default DISAGREE: rows
+  // are 2014-FIRST while the served default is 2024. No positional implementation
+  // can satisfy both assertions at once, which is what makes this test durable
+  // against a reintroduced `editions[0]`.
+  it("checks the SERVED default, not the first row, when the two disagree", async () => {
+    const [row2024, row2014] = SERVED_EDITIONS;
+    seedEditions({ editions: [row2014, row2024], defaultEdition: "EDITION_2024" });
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no campaigns yet/i);
+    const radios = screen.getAllByRole("radio");
+    expect(radios.map((r) => r.getAttribute("aria-label"))).toEqual(["2014 rules", "2024 rules"]);
+    expect(radios[0]).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("radio", { name: "2024 rules" })).toHaveAttribute("aria-checked", "true");
+  });
+
+  // The seam that shipped a one-click data-loss path last wave: a control offering
+  // only its fallback value before its rows resolved.
+  it("cold cache: renders the field's label and notice but NO picker, and disables submit", async () => {
+    getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
+    vi.mocked(client.fetchEditions).mockReturnValue(new Promise(() => {}));
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no campaigns yet/i);
+    expect(screen.getByText("Rules edition")).toBeInTheDocument();
+    expect(screen.getByText(/can't be changed after the campaign is created/i)).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(screen.queryByText(/EDITION_/)).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/campaign name/i), "Too Early");
+    expect(screen.getByRole("button", { name: /create campaign/i })).toBeDisabled();
+  });
+
+  it("fetch failed: says it won't guess and still refuses to submit", async () => {
+    getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
+    vi.mocked(client.fetchEditions).mockRejectedValue(new Error("network down"));
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/won't guess/i)).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/campaign name/i), "No Editions");
+    expect(screen.getByRole("button", { name: /create campaign/i })).toBeDisabled();
+    expect(vi.mocked(client.createCampaign)).not.toHaveBeenCalled();
   });
 });

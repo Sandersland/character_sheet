@@ -39,9 +39,10 @@ function FeatPicker({
 }) {
   const { character } = useCurrentCharacter();
   const [open, setOpen] = useState(false);
-  // Fighting Style feats never appear in the ASI picker, so useFeatCatalog.filter
-  // (which mirrors that gate) is bypassed — we filter the raw catalog by category.
-  const feats = useFeatCatalog(open, character.level, character.rulesEdition);
+  // No asiLevel (#1438): featOfferedForAsiSlot always rejects fighting_style, so
+  // asking the server for the ASI-legal set would empty this picker. It reads
+  // feats.catalog raw for the same reason — feats.filter is search-only.
+  const feats = useFeatCatalog(open, undefined, character.rulesEdition);
   const options = (feats.catalog ?? []).filter(
     (f) => f.category === "fighting_style" && !takenIds.has(f.id),
   );

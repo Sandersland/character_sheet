@@ -182,7 +182,7 @@ export function applyFeatLayer(
 // class entry at its own effective level (#1206/#1315), not just the primary
 // entry at total level, so a secondary class's gated actions (e.g. a Warrior
 // of Shadow monk's shadowArts/cloakOfShadows) surface even when it isn't
-// primary. Universal actions are rendered client-side from UNIVERSAL_ACTIONS;
+// primary. Universal actions are served per edition by referenceRouter (#1430);
 // only class-specific ones live here to avoid double-rendering.
 export function buildAvailableActionsView(
   classEntries: CharacterWithRelations["classEntries"],

@@ -15,7 +15,8 @@ interface Props {
   currentScores: Record<string, number>;
   slotsRemaining: number;
   busy: boolean;
-  /** Character level — gates which feats the picker offers (General 4+, Epic Boon 19+). */
+  /** Character level — sent as `asiLevel` so the server gates which feats the
+   *  picker offers (General 4+, Epic Boon 19+); the client never re-applies it (#1438). */
   characterLevel: number;
   /** The character's rules edition — decides which edition's feat rows the picker offers (#1411). */
   rulesEdition: RulesEdition;

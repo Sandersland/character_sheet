@@ -1,9 +1,10 @@
 /**
- * Paper-doll placement rules (#566) — the frontend mirror of the backend's
- * allowedSlotsForItem + slot taxonomy. Pure logic (no JSX):
- * which slots an item may occupy, how the twelve rendered cells group into the
- * desktop rails / mobile tiles, and which bag items fit a given slot. The server
- * is the source of truth for placement validation; this only drives the UI.
+ * Paper-doll DISPLAY layer (#566) — pure logic (no JSX) over values the server
+ * already resolved: the slot taxonomy and its labels, how the rendered cells
+ * group into the desktop rails / mobile tiles, which bag items fit a given slot,
+ * and the hands summary. Placement legality, equippability and proficiency are
+ * all served per row (`allowedSlots` / `equippable` / `proficient`, #1433) —
+ * nothing here re-derives a 5e rule.
  */
 import type { EquipSlot, InventoryItem } from "@/types/character";
 
@@ -61,29 +62,6 @@ export const SLOT_GROUPS: Record<SlotGroup, { label: string; slots: EquipSlot[] 
 
 export const SLOT_GROUP_ORDER: readonly SlotGroup[] = ["hands", "armor", "adornment"];
 
-// The slots an item may legally occupy — mirror of backend allowedSlotsForItem.
-// Weapons/body armor derive from detail data; gear declares its slot. Empty =
-// not equippable (bag-only: consumables, slotless gear).
-export function allowedSlotsForItem(item: InventoryItem): EquipSlot[] {
-  if (item.category === "weapon") {
-    return item.weapon?.twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
-  }
-  if (item.category === "armor") {
-    return item.armor?.armorCategory === "shield" ? ["OFF_HAND"] : ["BODY"];
-  }
-  if (item.category === "gear") {
-    return item.slot ? [item.slot] : [];
-  }
-  return [];
-}
-
-// Any item the paper doll can place — i.e. it has at least one legal slot.
-// (Named to avoid colliding with isEquippable, which is the
-// category-level rule; this one is slot-aware and takes the full item.)
-export function hasEquipSlots(item: InventoryItem): boolean {
-  return allowedSlotsForItem(item).length > 0;
-}
-
 // The currently-equipped item(s) in a slot, in stable id order. RING may hold
 // two; every other slot at most one. Only draws from equippedSlot placement.
 export function itemsInSlot(inventory: InventoryItem[], slot: EquipSlot): InventoryItem[] {
@@ -95,66 +73,24 @@ export function itemsInSlot(inventory: InventoryItem[], slot: EquipSlot): Invent
 // Human-readable summary of what's in the hands, for the turn UI's loadout row
 // (#733) — e.g. "Longsword & Shield", "Greatsword (two-handed)", "Two daggers"
 // (same name in both hands collapses), or "Unarmed" when both hands are empty.
-export function equippedLoadoutLabel(inventory: InventoryItem[]): string {
+// `offHandLocked` is the served character flag, not re-derived here.
+export function equippedLoadoutLabel(inventory: InventoryItem[], offHandLocked: boolean): string {
   const main = itemsInSlot(inventory, "MAIN_HAND")[0];
   const off = itemsInSlot(inventory, "OFF_HAND")[0];
   if (!main && !off) return "Unarmed";
   // A two-handed main-hand weapon owns both hands — no off-hand segment.
-  if (main && isOffHandLocked(inventory)) return `${main.name} (two-handed)`;
+  if (main && offHandLocked) return `${main.name} (two-handed)`;
   const names = [main?.name, off?.name].filter((n): n is string => Boolean(n));
   if (names.length === 2 && names[0] === names[1]) return `Two ${names[0].toLowerCase()}s`;
   return names.join(" & ");
 }
 
-// A two-handed weapon in MAIN_HAND locks the OFF_HAND (no shield/second weapon).
-export function isOffHandLocked(inventory: InventoryItem[]): boolean {
-  return inventory.some(
-    (item) => item.equippedSlot === "MAIN_HAND" && item.category === "weapon" && item.weapon?.twoHanded,
-  );
-}
-
 // Unequipped bag items that legally fit `slot` — the inline picker's candidates.
+// Reads the served `allowedSlots` (#1433); slot legality is a backend rule.
 export function bagItemsForSlot(inventory: InventoryItem[], slot: EquipSlot): InventoryItem[] {
   return inventory
-    .filter((item) => item.equippedSlot == null && allowedSlotsForItem(item).includes(slot))
+    .filter((item) => item.equippedSlot == null && item.allowedSlots.includes(slot))
     .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// Whether the character is proficient with an equipped item — the frontend
-// mirror of backend srd.ts isProficientWithWeapon plus the armor-category rule.
-// Weapon grants mix category labels ("Simple Weapons"/"Martial Weapons", matched
-// by weaponClass) with pluralised specific names ("Longswords", matched against
-// the singular catalog name); armor grants are category-keyed. Items that carry
-// no proficiency requirement (gear, consumables, detail-less weapons/armor) are
-// always "proficient" so the doll never warns on them. Reads arrays already on
-// the wire — no server round-trip.
-export function isProficientWithItem(
-  item: InventoryItem,
-  weaponProficiencies: ReadonlyArray<{ name: string }>,
-  armorProficiencies: ReadonlyArray<{ category: string }>,
-): boolean {
-  if (item.category === "weapon") {
-    const weaponClass = item.weapon?.weaponClass;
-    // No class (e.g. a homebrew weapon with none set) means no derivable
-    // proficiency requirement — never warn, mirroring the armor branch's
-    // `!category` guard below.
-    if (!weaponClass) return true;
-    const lcName = item.name.toLowerCase();
-    return weaponProficiencies.some((grant) => {
-      if (grant.name === "Simple Weapons" && weaponClass === "simple") return true;
-      if (grant.name === "Martial Weapons" && weaponClass === "martial") return true;
-      // Specific weapon: grants are plural ("Longswords"), catalog names
-      // singular — assumes SRD plurals formed by appending "s" (mirrors backend
-      // srd.ts isProficientWithWeapon).
-      return grant.name.toLowerCase().replace(/s$/, "") === lcName;
-    });
-  }
-  if (item.category === "armor") {
-    const category = item.armor?.armorCategory;
-    if (!category) return true;
-    return armorProficiencies.some((grant) => grant.category === category);
-  }
-  return true;
 }
 
 // A versatile weapon's current grip, split for the two display surfaces: `short`

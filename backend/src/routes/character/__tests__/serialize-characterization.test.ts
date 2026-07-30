@@ -7,7 +7,9 @@
  * lists, multiclass-aware classes with subclass visibility, attacksPerAction,
  * advancementSlots, conditions). It is the byte-parity oracle for the
  * view-builder extraction: green now, and must stay green UNEDITED after the
- * inline derivations become named per-domain builders.
+ * inline derivations become named per-domain builders. That latch is about
+ * *refactors* — a deliberate wire-shape change (e.g. #1382 adding a field) does
+ * update the expectations here, and the strict toEqual is what forces it to.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -538,7 +540,14 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         requiresAttunement: true,
         attunementPrereqKind: "class",
         attunementPrereqValue: "Fighter",
+        attunementPrereqText: "a Fighter",
         notes: "Keep polished.",
+        equippable: true,
+        allowedSlots: ["MAIN_HAND", "OFF_HAND"],
+        // Served flags (#1433). `proficient` is true where attackBonusComponents
+        // withholds the proficiency bonus: this weapon has no weaponClass, and
+        // the no-warn display policy differs from the attack rule on purpose.
+        proficient: true,
         weapon: {
           damageDiceCount: 1,
           damageDiceFaces: 8,
@@ -567,6 +576,10 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         slot: "FEET",
         attuned: false,
         requiresAttunement: false,
+        // Worn gear: placeable but not equippable — the two flags are separate rules.
+        equippable: false,
+        allowedSlots: ["FEET"],
+        proficient: true,
       },
       {
         id: expect.any(String),
@@ -576,6 +589,11 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         equipped: false,
         attuned: false,
         requiresAttunement: false,
+        equippable: true,
+        allowedSlots: ["BODY"],
+        // False because this fixture's class name is a suite-local catalog row that
+        // CLASS_PROFICIENCY_GRANTS doesn't key on (#1388), so armorProficiencies is empty.
+        proficient: false,
         armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true, stealthDisadvantage: false },
       },
       {
@@ -586,6 +604,9 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         equipped: false,
         attuned: false,
         requiresAttunement: false,
+        equippable: false,
+        allowedSlots: [],
+        proficient: true,
         consumable: {
           effectDiceCount: 2,
           effectDiceFaces: 4,
