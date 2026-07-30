@@ -17,6 +17,7 @@
 
 import { randomUUID } from "node:crypto";
 
+import { executeActionOpSchema, type ExecuteActionOperation } from "@character-sheet/contracts";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -41,20 +42,9 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 export const actionsRouter = Router({ mergeParams: true });
 
-const executeActionSchema = z.object({
-  type: z.literal("executeAction"),
-  actionKey: z.string().min(1),
-  /** Client-supplied roll total (potion healing, Second Wind heal, etc.). */
-  roll: z.number().int().positive().optional(),
-  /** Inventory item to consume (for "drink potion" / Use Object). */
-  inventoryItemId: z.string().optional(),
-});
-
 const actionTransactionsSchema = z.object({
-  operations: z.array(executeActionSchema).min(1),
+  operations: z.array(executeActionOpSchema).min(1),
 });
-
-type ExecuteActionOp = z.infer<typeof executeActionSchema>;
 
 /**
  * Apply a single action op inside the shared transaction. A cast-core action
@@ -67,7 +57,7 @@ type ExecuteActionOp = z.infer<typeof executeActionSchema>;
 async function applyActionOpInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
-  op: ExecuteActionOp,
+  op: ExecuteActionOperation,
   batchId: string,
   sessionId: string | null,
   rageDamageBonus: number,
@@ -162,7 +152,7 @@ async function applyActionEffectInTx(
 }
 
 /** Fail fast (400) on an op whose actionKey isn't in either dispatch table. */
-function assertKnownActionKeys(operations: ExecuteActionOp[]): void {
+function assertKnownActionKeys(operations: ExecuteActionOperation[]): void {
   for (const op of operations) {
     if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
       throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
@@ -174,7 +164,7 @@ function assertKnownActionKeys(operations: ExecuteActionOp[]): void {
  * Level-derived Rage melee bonus, resolved before the transaction so the rage
  * effect fn stays pure (no DB). Only hits the DB when a rage op is present.
  */
-async function computeRageDamageBonus(operations: ExecuteActionOp[], characterId: string): Promise<number> {
+async function computeRageDamageBonus(operations: ExecuteActionOperation[], characterId: string): Promise<number> {
   if (!operations.some((op) => op.actionKey === "rage")) return 0;
   const classRow = await prisma.character.findUnique({
     where: { id: characterId },
@@ -192,7 +182,7 @@ async function computeRageDamageBonus(operations: ExecuteActionOp[], characterId
  * when the monk is actually L10+ (0 below that, so the effect fn omits the
  * tempHp op entirely rather than granting a zero amount).
  */
-async function computeHeightenedFocusTempHp(operations: ExecuteActionOp[], characterId: string): Promise<number> {
+async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[], characterId: string): Promise<number> {
   if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
   const classRow = await prisma.character.findUnique({
     where: { id: characterId },

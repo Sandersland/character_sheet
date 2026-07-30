@@ -15,10 +15,24 @@ export async function fetchItems(): Promise<Item[]> {
   return request<Item[]>("/items", undefined, "Failed to fetch items");
 }
 
+/** Server-applied spell-catalog narrowing (#1377); omit a field to leave it unfiltered. */
+export interface SpellCatalogFilter {
+  className?: string;
+  maxLevel?: number;
+}
+
 // Feeds the spellcasting section's "learn from catalog" picker.
 // Ordered by level then name server-side; no client-side re-sort needed.
-export async function fetchSpells(): Promise<CatalogSpell[]> {
-  return request<CatalogSpell[]>("/spells", undefined, "Failed to fetch spell catalog");
+//
+// The filter is optional, following fetchFeats' query-string pattern: the
+// creation ceremony asks for one class's legal band and the server applies the
+// eligibility rule (#1377), while the sheet's picker wants the whole catalog.
+export async function fetchSpells(filter: SpellCatalogFilter = {}): Promise<CatalogSpell[]> {
+  const params = new URLSearchParams();
+  if (filter.className !== undefined) params.set("class", filter.className);
+  if (filter.maxLevel !== undefined) params.set("maxLevel", String(filter.maxLevel));
+  const query = params.toString();
+  return request<CatalogSpell[]>(query ? `/spells?${query}` : "/spells", undefined, "Failed to fetch spell catalog");
 }
 
 // Feeds the advancement section's feat picker — same role as fetchManeuvers.

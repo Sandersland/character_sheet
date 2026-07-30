@@ -1,6 +1,7 @@
 // Rogue Thief (#909): content-only subclass — features derive at PHB levels, no new pool.
 import { describe, expect, it } from "vitest";
 
+import { deriveEntryScopedActions } from "@/lib/classes/actions.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
@@ -46,6 +47,19 @@ describe("Rogue Thief subclass (#909)", () => {
       "Use Magic Device",
       "Thief's Reflexes",
     ]);
+  });
+
+  // #1431 gave Fast Hands a DERIVED_ACTIONS row so the mechanic is data, not
+  // only prose. The prose entry STAYS: it is the feature description the Class
+  // tab renders, while the action row is the affordance the Bonus Action sheet
+  // renders. Losing either half is a regression, so both are pinned together.
+  it("Fast Hands is both a THIEF_FEATURES prose row and a bonus-action row (#1431)", () => {
+    expect(thiefFeatureNames(3)).toContain("Fast Hands");
+    const actions = deriveEntryScopedActions([{ name: "rogue", subclass: "Thief", level: 3 }], 3, []);
+    const row = actions.find((a) => a.key === "fastHands");
+    expect(row?.name).toBe("Fast Hands");
+    expect(row?.cost).toBe("bonusAction");
+    expect(row?.regrants).toEqual(["useObject"]);
   });
 
   it("adds no trackable resource pool (content-only, no new level-gated axis)", () => {

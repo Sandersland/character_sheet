@@ -89,7 +89,7 @@ export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
   const inventory = character.inventory;
   const rarities = useItemRarities(character.rulesEdition);
   const groups = buildLoadoutGroups(character);
-  const attunement = attunementSummary(inventory);
+  const attunement = attunementSummary(inventory, character.attunementCap);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {

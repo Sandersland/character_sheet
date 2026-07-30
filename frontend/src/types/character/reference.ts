@@ -68,8 +68,10 @@ export interface ClassOption {
   toolChoices: string[];
   /** Number of tool choices the player may make. */
   toolChoiceCount: number;
-  /** #1131: level-1 creation pick counts (SRD 5.2); null for a non-caster. */
-  level1SpellPicks: { cantrips: number; spells: number } | null;
+  /** #1131: level-1 creation pick counts (SRD 5.2); null for a non-caster.
+   *  `maxSpellLevel` (#1377) is the highest level the class can learn at level 1,
+   *  served so the picker sends it as `?maxLevel=` rather than a hardcoded 1. */
+  level1SpellPicks: { cantrips: number; spells: number; maxSpellLevel: number } | null;
   /** #1161: PHB'24 primary ability/abilities the creation panel recommends; [] for homebrew. */
   primaryAbility: AbilityName[];
 }

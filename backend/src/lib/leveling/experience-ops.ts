@@ -1,3 +1,5 @@
+import type { ExperienceOperation } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
 import { logEvent } from "@/lib/activity/events.js";
@@ -13,20 +15,6 @@ import { abilityModifier, hitDieFace } from "@/lib/srd/srd.js";
 import { recomputeSummaries } from "@/lib/session/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
-
-/** Award or deduct XP by a signed delta ("Earned 450 XP from encounter"). */
-export interface XpAwardOperation {
-  type: "award";
-  amount: number; // signed — positive = gain, negative = correction
-}
-
-/** Set total XP to an exact value ("Set to 23,000 XP"). */
-export interface XpSetOperation {
-  type: "set";
-  value: number; // must be >= 0
-}
-
-export type ExperienceOperation = XpAwardOperation | XpSetOperation;
 
 /**
  * Rolls back HP/hit-dice/class-entry-level when XP drops the derived level
