@@ -1,15 +1,28 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-import type { AuthoredFeature, ClassDefinition, DerivedResource } from "./types.js";
+import type { ClassDefinition, DerivedResource } from "./types.js";
 
-/** Superiority dice count by Fighter level (Battle Master). */
+// Fighter's FEATURE TEXT is authored as literal seed data, not here
+// (backend/prisma/seed/fighter-features.ts, #1227) — this module keeps only
+// what stays code: resource pools (below, forked on `edition`) and Battle
+// Master's bespoke ClassExtras (maneuverChoiceCount/SaveDC,
+// toolProfChoiceCount — no tier array expresses a maneuver save DC that
+// embeds ability-score math). `subclasses` below carries `slug`/`grantLevel`/
+// `resourceFn`/`deriveExtras` only; `features` is intentionally absent on
+// every entry (ClassDefinition.features / SubclassDefinition.features are
+// optional, types.ts) since prisma/seed/class-features.ts no longer derives
+// Fighter's rows from this file at all.
+
+/** Superiority dice count by Fighter level (Battle Master). Edition-invariant (#1227). */
 function battleMasterDiceCount(level: number): number {
   if (level >= 15) return 6;
   if (level >= 7) return 5;
   return 4;
 }
 
-/** Superiority die size by Fighter level (Battle Master). */
+/** Superiority die size by Fighter level (Battle Master). Edition-invariant (#1227). */
 function battleMasterDieFace(level: number): string {
   if (level >= 18) return "d12";
   if (level >= 10) return "d10";
@@ -26,7 +39,7 @@ function studentOfWarToolCount(level: number): number {
   return level >= 3 ? 1 : 0;
 }
 
-/** Maneuver choice count by Fighter level (Battle Master). */
+/** Maneuver choice count by Fighter level (Battle Master). Edition-invariant (#1227). */
 function battleMasterManeuverCount(level: number): number {
   if (level >= 15) return 9;
   if (level >= 10) return 7;
@@ -34,185 +47,51 @@ function battleMasterManeuverCount(level: number): number {
   return 3;
 }
 
-const FIGHTER_FEATURES: AuthoredFeature[] = [
-  {
-    name: "Fighting Style",
-    level: 1,
-    source: "class",
-    description:
-      "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
-  },
-  {
-    name: "Second Wind",
-    level: 1,
-    source: "class",
-    description:
-      "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
-  },
-  {
-    name: "Action Surge",
-    level: 2,
-    source: "class",
-    description:
-      "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17.",
-  },
-  {
-    name: "Extra Attack",
-    level: 5,
-    source: "class",
-    description:
-      "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20.",
-  },
-  {
-    name: "Indomitable",
-    level: 9,
-    source: "class",
-    description:
-      "Reroll a failed saving throw (you must use the new roll). Regain use(s) on a long rest. Two uses at level 13, three at level 17.",
-  },
-];
-
-const BATTLE_MASTER_FEATURES: AuthoredFeature[] = [
-  {
-    name: "Combat Superiority",
-    level: 3,
-    source: "subclass",
-    description:
-      "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated.",
-  },
-  {
-    name: "Student of War",
-    level: 3,
-    source: "subclass",
-    description:
-      "You gain proficiency with one type of artisan's tools of your choice.",
-  },
-  {
-    name: "Know Your Enemy",
-    level: 7,
-    source: "subclass",
-    description:
-      "If you spend at least 1 minute observing or interacting with another creature outside combat, you can compare two of its ability scores, armor class, hit points, hit dice, or levels to your own.",
-  },
-  {
-    name: "Improved Combat Superiority (d10)",
-    level: 10,
-    source: "subclass",
-    description: "Your superiority dice turn into d10s.",
-  },
-  {
-    name: "Relentless",
-    level: 15,
-    source: "subclass",
-    description:
-      "When you roll initiative and have no superiority dice remaining, you regain 1 superiority die.",
-  },
-  {
-    name: "Improved Combat Superiority (d12)",
-    level: 18,
-    source: "subclass",
-    description: "Your superiority dice turn into d12s.",
-  },
-];
-
-const CHAMPION_FEATURES: AuthoredFeature[] = [
-  {
-    name: "Improved Critical",
-    level: 3,
-    source: "subclass",
-    description: "Your weapon attacks score a critical hit on a roll of 19 or 20.",
-  },
-  {
-    name: "Remarkable Athlete",
-    level: 7,
-    source: "subclass",
-    description:
-      "Add half your proficiency bonus (rounded up) to Strength, Dexterity, or Constitution checks that don't already use your proficiency bonus. Running long jump distance increases by your Strength modifier in feet.",
-  },
-  {
-    name: "Additional Fighting Style",
-    level: 10,
-    source: "subclass",
-    description: "Choose a second option from the Fighting Style class feature.",
-  },
-  {
-    name: "Superior Critical",
-    level: 15,
-    source: "subclass",
-    description: "Your weapon attacks score a critical hit on a roll of 18, 19, or 20.",
-  },
-  {
-    name: "Survivor",
-    level: 18,
-    source: "subclass",
-    description:
-      "At the start of each of your turns, regain HP equal to 5 + your Constitution modifier if you are at or below half your hit point maximum (and not at 0 HP).",
-  },
-];
-
-const ELDRITCH_KNIGHT_FEATURES: AuthoredFeature[] = [
-  {
-    name: "Eldritch Knight Spellcasting",
-    level: 3,
-    source: "subclass",
-    description:
-      "You learn spells from the wizard list (primarily abjuration and evocation), casting with Intelligence. Third-caster progression: spell slots start at level 3. You know cantrips and a limited number of spells.",
-  },
-  {
-    name: "Weapon Bond",
-    level: 3,
-    source: "subclass",
-    description:
-      "Perform a 1-hour ritual to bond with up to two weapons. Bonded weapons can't be disarmed and you can summon one to your hand as a bonus action.",
-  },
-  {
-    name: "War Magic",
-    level: 7,
-    source: "subclass",
-    description:
-      "When you use your action to cast a cantrip, you can make one weapon attack as a bonus action.",
-  },
-  {
-    name: "Eldritch Strike",
-    level: 10,
-    source: "subclass",
-    description:
-      "When you hit a creature with a weapon attack, that creature has disadvantage on the next saving throw it makes against a spell you cast before the end of your next turn.",
-  },
-  {
-    name: "Arcane Charge",
-    level: 15,
-    source: "subclass",
-    description:
-      "When you use your Action Surge, you can teleport up to 30 feet to an unoccupied space you can see, before or after the additional action.",
-  },
-  {
-    name: "Improved War Magic",
-    level: 18,
-    source: "subclass",
-    description:
-      "When you use your action to cast a spell, you can make one weapon attack as a bonus action.",
-  },
-];
+/** Second Wind's use count, EDITION_2024 only — 2/3/4 at L1/4/10 (SRD 5.2 p. 48). */
+function secondWindTotal2024(level: number): number {
+  if (level >= 10) return 4;
+  if (level >= 4) return 3;
+  return 2;
+}
 
 export const fighter: ClassDefinition = {
-  features: FIGHTER_FEATURES,
-  resourceFn: (level) => {
-    const pools: DerivedResource[] = [
-      {
+  resourceFn: (level, _abilityScores, _profBonus, _subclassKey, edition: RulesEdition) => {
+    const pools: DerivedResource[] = [];
+    // Second Wind is the FIRST consumer of #1221's partial short-rest-regain
+    // shape: 2014 fully resets on either rest (SRD 5.1 p. 23); 2024 is a
+    // longRest-recharge pool that additionally tops up by 1 on a short rest
+    // (SRD 5.2 p. 48), which `shortRestRegain` exists to express.
+    if (edition === "EDITION_2014") {
+      pools.push({
         key: "secondWind",
         label: "Second Wind",
         total: 1,
-        recharge: "shortRest",
+        // LIVE BUG FIX (#1227): was "shortRest", which never recharged on a
+        // long rest despite the feature's own description promising it.
+        recharge: "short-or-long",
         description: `Bonus action: regain 1d10 + ${level} HP. Regain use on a short or long rest.`,
-      },
-    ];
+      });
+    } else {
+      const total = secondWindTotal2024(level);
+      pools.push({
+        key: "secondWind",
+        label: "Second Wind",
+        total,
+        recharge: "longRest",
+        shortRestRegain: 1,
+        description: `Bonus action: regain 1d10 + ${level} HP. You have ${total} uses. Regain one expended use on a short rest, all on a long rest.`,
+      });
+    }
     if (level >= 2) {
       pools.push({
         key: "actionSurge",
         label: "Action Surge",
         total: level >= 17 ? 2 : 1,
-        recharge: "shortRest",
+        // LIVE BUG FIX (#1227), both editions: was "shortRest", which never
+        // recharged on a long rest. SRD 5.1 p. 24 / SRD 5.2 p. 48 both read
+        // "you can't do so again until you finish a Short or Long Rest" —
+        // genuinely no edition fork here, unlike Second Wind.
+        recharge: "short-or-long",
         description: "Take one additional action on your turn. Regain use(s) on a short or long rest.",
       });
     }
@@ -231,7 +110,6 @@ export const fighter: ClassDefinition = {
     "battle master": {
       slug: "fighter-battle-master",
       grantLevel: 3,
-      features: BATTLE_MASTER_FEATURES,
       resourceFn: (level, abilityScores, profBonus) => {
         const count = battleMasterDiceCount(level);
         const die = battleMasterDieFace(level);
@@ -260,7 +138,7 @@ export const fighter: ClassDefinition = {
         };
       },
     },
-    champion: { slug: "fighter-champion", grantLevel: 3, features: CHAMPION_FEATURES },
-    "eldritch knight": { slug: "fighter-eldritch-knight", grantLevel: 3, features: ELDRITCH_KNIGHT_FEATURES },
+    champion: { slug: "fighter-champion", grantLevel: 3 },
+    "eldritch knight": { slug: "fighter-eldritch-knight", grantLevel: 3 },
   },
 };

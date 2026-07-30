@@ -547,7 +547,15 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
 
     const ev = await restEvent("longRest");
     expect(ev.before!.resources!.used).toEqual({ superiorityDice: 3 });
-    expect(ev.after!.resources!.used).toEqual({ superiorityDice: 0 });
+    // secondWind/actionSurge now appear at 0 (#1227's recharge fix): both now
+    // genuinely recharge on a Long Rest (previously "shortRest"-only, a live
+    // bug — neither pool ever reset on a long rest despite its own
+    // description promising it), so resetRestResources' write condition
+    // (`poolRechargesOn(...) || restored > 0`) fires for them here even
+    // though this level-4 Battle Master never spent either — the same
+    // "materialize used[key]=0 on a recharging rest" behavior every other
+    // fully-recharging pool (e.g. Indomitable, Rage) already has.
+    expect(ev.after!.resources!.used).toEqual({ superiorityDice: 0, secondWind: 0, actionSurge: 0 });
     expect(ev.after!.resources).not.toEqual(ev.before!.resources);
   });
 });

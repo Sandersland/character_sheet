@@ -55,10 +55,16 @@ describe("deriveResources — Battle Master subclass gating", () => {
     expect(poolKeys).toContain("superiorityDice");
   });
 
-  it("still returns non-null for a Fighter below subclass grant level (base features present)", () => {
+  it("still returns non-null for a Fighter below subclass grant level (base pools present)", () => {
     const result = deriveResources("fighter", "battle master", 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result).not.toBeNull();
-    expect(result!.features.length).toBeGreaterThan(0);
+    // Asserts on `.resources`, not `.features` (#1227): testFeatureRowsFor's
+    // TS-sourced fixture always returns EMPTY feature rows for Fighter now —
+    // its text lives in literal seed data (prisma/seed/fighter-features.ts),
+    // which this src-side fixture can't import (rootDir boundary, see the
+    // fixture's own header). Non-null here comes from the base pools
+    // (Second Wind, at minimum) resourceFn still returns unconditionally.
+    expect(result!.resources.length).toBeGreaterThan(0);
   });
 
   it("returns null for a fully unknown subclass on a known class only if class has no data", () => {

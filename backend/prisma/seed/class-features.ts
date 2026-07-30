@@ -21,14 +21,13 @@
 import { z } from "zod";
 
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
-import type { AuthoredFeature, ClassDefinition } from "../../src/lib/classes/types.js";
+import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
 import type { SeedEdition } from "./edition.js";
 
 import { barbarian } from "../../src/lib/classes/barbarian.js";
 import { bard } from "../../src/lib/classes/bard.js";
 import { cleric } from "../../src/lib/classes/cleric.js";
 import { druid } from "../../src/lib/classes/druid.js";
-import { fighter } from "../../src/lib/classes/fighter.js";
 import { monk } from "../../src/lib/classes/monk.js";
 import { paladin } from "../../src/lib/classes/paladin.js";
 import { ranger } from "../../src/lib/classes/ranger.js";
@@ -36,15 +35,20 @@ import { rogue } from "../../src/lib/classes/rogue.js";
 import { sorcerer } from "../../src/lib/classes/sorcerer.js";
 import { warlock } from "../../src/lib/classes/warlock.js";
 import { wizard } from "../../src/lib/classes/wizard.js";
+import { FIGHTER_FEATURES } from "./fighter-features.js";
 
 // className must match a CharacterClass.name seed row (catalog-data.ts) —
-// title case, not the lowercase registry.ts dispatch key.
+// title case, not the lowercase registry.ts dispatch key. Fighter is
+// deliberately ABSENT (#1227): its rows are literal data (fighter-features.ts),
+// not derived from a ClassDefinition.features array — see LITERAL_ROW_CLASSES
+// below and fighter.ts's own header for why `features` stays optional on
+// ClassDefinition/SubclassDefinition even though Fighter's resourceFn/
+// deriveExtras/subclasses (unrelated to this migration) still live there.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
   Barbarian: barbarian,
   Bard: bard,
   Cleric: cleric,
   Druid: druid,
-  Fighter: fighter,
   Monk: monk,
   Paladin: paladin,
   Ranger: ranger,
@@ -53,6 +57,18 @@ const CLASS_MODULES: Record<string, ClassDefinition> = {
   Warlock: warlock,
   Wizard: wizard,
 };
+
+// Classes whose CLASS_FEATURES rows are authored as LITERAL seed data
+// (fighter-features.ts) rather than derived from a lib/classes/<class>.ts
+// module's AuthoredFeature[] arrays via collectRawFeatures/expandFeatureRow
+// below. Exported so every test that needs to skip/scope around this class
+// (class-feature-migration.test.ts's derived-half scoping; the lowercase
+// sibling set in src/lib/classes/__tests__/class-subclasses.fixture.ts, kept
+// separate because backend/tsconfig.json's `rootDir: "src"` makes a src file
+// importing anything under prisma/ a compile error — verified empirically,
+// TS6059) keys off ONE authoritative set per side, never a second
+// hand-maintained list.
+export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set(["Fighter"]);
 
 // One entry per DerivedFeature exactly as authored in lib/classes/<class>.ts —
 // pre-expansion (an untagged feature is still ONE entry here; expandFeatureRow
@@ -76,15 +92,26 @@ interface RawFeatureRow {
 // thoroughly class-feature-migration.test.ts exercises it; splitting the
 // branches down is the only lever, not adding coverage).
 function baseFeatureRows(className: string, classDef: ClassDefinition): RawFeatureRow[] {
-  return classDef.features.map((feature) => ({ className, subclassSlug: null, feature }));
+  // `?? []` is Fighter-shaped defensive code that never fires today (Fighter
+  // is absent from CLASS_MODULES, #1227) — ClassDefinition.features is
+  // optional on the TYPE now that fighter.ts's arrays are gone, so every
+  // caller through this shared type must narrow, even the eleven classes
+  // that still always set it.
+  return (classDef.features ?? []).map((feature) => ({ className, subclassSlug: null, feature }));
+}
+
+// Extracted purely to keep subclassFeatureRows' own cyclomatic/CRAP score
+// under the ratchet (#1227's `?? []` narrowing pushed it over 16/25 —
+// prisma/seed/** carries no coverage instrumentation, see baseFeatureRows'
+// comment above for why splitting is the only lever here).
+function rowsForSubclass(className: string, subclassDef: SubclassDefinition): RawFeatureRow[] {
+  return (subclassDef.features ?? []).map((feature) => ({ className, subclassSlug: subclassDef.slug, feature }));
 }
 
 function subclassFeatureRows(className: string, classDef: ClassDefinition): RawFeatureRow[] {
   const rows: RawFeatureRow[] = [];
   for (const subclassDef of Object.values(classDef.subclasses ?? {})) {
-    for (const feature of subclassDef.features) {
-      rows.push({ className, subclassSlug: subclassDef.slug, feature });
-    }
+    rows.push(...rowsForSubclass(className, subclassDef));
   }
   return rows;
 }
@@ -107,6 +134,14 @@ function collectRawFeatures(): RawFeatureRow[] {
 // already been split one-per-edition by expandFeatureRow below — there is no
 // "omitted = shared" case left by the time a row reaches this shape,
 // mirroring the DB column's own non-nullability.
+// Descriptor fields mirror ClassFeature's columns 1:1 (schema.prisma) — added
+// here (#1227) so a literal seed row (fighter-features.ts) and any future
+// population pass (#1528+) share ONE row shape, never two. This migration
+// itself never sets any of them (Fighter's pools stay in resourceFn, actions
+// stay in DERIVED_ACTIONS): every field is optional and every row authored so
+// far leaves them all undefined, so writeResolvedRows' DESCRIPTOR_RESET
+// (seed-class-features.ts) is what actually lands in the DB — identical to
+// every other class today.
 export interface ClassFeatureSeedRow {
   className: string;
   subclassSlug: SubclassSlug | null;
@@ -114,6 +149,33 @@ export interface ClassFeatureSeedRow {
   level: number;
   description: string;
   edition: SeedEdition;
+  resourceKey?: string;
+  resourceLabel?: string;
+  resourceRecharge?: string;
+  resourceTotals?: { minLevel: number; total: number }[];
+  resourceDieTiers?: { minLevel: number; die: string }[];
+  activationCost?: string;
+  resolverKind?: string;
+  requiresUnarmored?: boolean;
+  regrants?: string[];
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
+  costPerStep?: number;
+  effectKind?: string;
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectDieSource?: string;
+  effectModifier?: number;
+  effectModifierSource?: string;
+  damageType?: string;
+  attackType?: string;
+  saveAbility?: string;
+  saveEffect?: string;
+  buffTarget?: string;
+  buffModifier?: number;
+  derivedStat?: string;
+  derivedStatTiers?: { minLevel: number; value: number | string }[];
 }
 
 // Untagged (feature.edition undefined, #1522's ~256-row default) -> two rows,
@@ -132,10 +194,15 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
   return editions.map((edition) => ({ ...base, edition }));
 }
 
-// The 522-row seed family: 256 untagged x 2 editions + 10 already-forked = 522
-// (re-derived from the registry by class-feature-migration.test.ts, never
-// hardcoded there either).
-export const CLASS_FEATURES: ClassFeatureSeedRow[] = collectRawFeatures().flatMap(expandFeatureRow);
+// The full seed family: every derived-class row (re-derived from the
+// eleven-class registry by class-feature-migration.test.ts, never hardcoded
+// there either) PLUS Fighter's literal rows (fighter-features.ts, #1227) —
+// concatenated, not merged through expandFeatureRow, since FIGHTER_FEATURES
+// is already in final ClassFeatureSeedRow[] shape.
+export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
+  ...collectRawFeatures().flatMap(expandFeatureRow),
+  ...FIGHTER_FEATURES,
+];
 
 // Shared ascending-by-minLevel invariant (#1522 decision: tier arrays are
 // ASCENDING, last-match-wins — settled here because the two shapes being

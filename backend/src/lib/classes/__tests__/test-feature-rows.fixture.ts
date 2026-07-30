@@ -8,6 +8,19 @@
 // parity test (class-feature-parity.test.ts) is the proof this fixture and
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
+//
+// FIGHTER (#1227): `fighter.ts` carries no `.features` at all any more — its
+// rows are literal seed data (prisma/seed/fighter-features.ts), which this
+// src-side fixture can't import (backend/tsconfig.json's `rootDir: "src"`
+// makes a src file importing anything under prisma/ a compile error,
+// TS6059). `testFeatureRowsFor("fighter", ...)` therefore returns EMPTY
+// carriers via the `?? []` fallbacks below (already there, unchanged) — this
+// is harmless for class-features-snapshot.test.ts, the only consumer: that
+// suite records `withoutFeatures(deriveResources(...))`, stripping `.features`
+// before snapshotting, so Fighter's real feature text was never part of what
+// gets pinned there. class-feature-parity.test.ts is the suite that DOES
+// assert on `.features` content, and it skips Fighter entirely for the same
+// underlying reason (its own file's LITERAL_ROW_CLASSES check).
 import { barbarian } from "@/lib/classes/barbarian.js";
 import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";

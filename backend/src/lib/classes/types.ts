@@ -248,7 +248,11 @@ export interface SubclassDefinition {
    * the same 2014 gate (#1308/#1291).
    */
   grantLevel?: number;
-  features: AuthoredFeature[];
+  // Optional (#1227): Fighter's subclasses carry no AuthoredFeature[] at all
+  // — their text is literal seed data (prisma/seed/fighter-features.ts), and
+  // collectRawFeatures/baseFeatureRows (prisma/seed/class-features.ts) treat
+  // an absent array as zero rows to derive, never a crash.
+  features?: AuthoredFeature[];
   resourceFn?: ResourceFn;
   deriveExtras?: ExtrasFn;
   /**
@@ -260,7 +264,10 @@ export interface SubclassDefinition {
 }
 
 export interface ClassDefinition {
-  features: AuthoredFeature[];
+  // Optional (#1227) — same rationale as SubclassDefinition.features above.
+  // Fighter is the only class today with no array at all: its base-class
+  // text is literal seed data too.
+  features?: AuthoredFeature[];
   resourceFn?: ResourceFn;
   /** Keyed by lowercase subclass name (entry.subclass.toLowerCase()). */
   subclasses?: Record<string, SubclassDefinition>;
