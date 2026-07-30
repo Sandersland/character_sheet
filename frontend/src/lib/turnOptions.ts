@@ -77,6 +77,15 @@ export interface ClassActionOption {
   badge?: string;
   /** True for self-heal resolvers — the card renders in the vitality tone. */
   heal: boolean;
+  /**
+   * Names of the universal actions this class row re-costs (#1431), resolved
+   * from the served rows for the character's edition. Absent when the row
+   * regrants nothing OR when nothing resolved — an unresolved key is dropped
+   * silently, because the reference query is simply not in yet on first paint;
+   * the seed/route drift tests are the gate against a genuinely bogus key, not
+   * this renderer.
+   */
+  regrantNames?: string[];
 }
 
 /**
@@ -96,7 +105,14 @@ export function classActionOption(
   action: AvailableAction,
   resolver: ActionResolver | undefined,
   character: Character,
+  // The rows GET /api/reference served for this character's edition (#1430) —
+  // the only place a regranted key's display name exists, since one key can
+  // resolve to two names across editions.
+  universalActions: UniversalActionOption[],
 ): ClassActionOption {
+  const regrantNames = (action.regrants ?? [])
+    .map((key) => universalActions.find((u) => u.key === key)?.name)
+    .filter((name): name is string => name !== undefined);
   const heal = resolver?.kind === "heal-roll" || resolver?.kind === "heal-input";
   const badge = poolBadgeFor(resolver?.resourceKey, character.resources?.pools);
   // Heal-roll actions preview their heal; a resolver-level static subtitle
@@ -120,6 +136,7 @@ export function classActionOption(
     ...(subtitle ? { subtitle } : {}),
     ...(badge ? { badge } : {}),
     heal,
+    ...(regrantNames.length > 0 ? { regrantNames } : {}),
   };
 }
 

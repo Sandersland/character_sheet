@@ -454,8 +454,11 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantSubclassSlugs: ["rogue-thief"],
     grantLevel: 3,
     regrants: ["useObject"],
+    // Shared-slot clause first, so it survives the card subtitle's one-line
+    // truncation; the whole string still reaches the player as the on-use
+    // reminder. The object-use option is the `regrants` link, not prose here.
     reminder:
-      "Uses the Bonus Action granted by Cunning Action, not an extra one: make a Sleight of Hand check, use Thieves' Tools to pick a lock or disarm a trap, or use an object.",
+      "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand check, or Thieves' Tools to pick a lock or disarm a trap.",
   },
 
   // Sorcerer

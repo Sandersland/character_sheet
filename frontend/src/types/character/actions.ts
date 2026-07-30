@@ -26,6 +26,15 @@ export interface AvailableAction {
   disabledReason?: string;
   /** In-play rule text for no-server-effect reminder actions (e.g. Shadow Step). */
   reminder?: string;
+  /**
+   * Universal action keys this class feature re-costs rather than shadows
+   * (#1431) — Cunning Action buys Dash/Disengage/Hide for a Bonus Action.
+   * Resolved against `GET /api/reference`'s `universalActions` for the
+   * character's edition: the client looks a key up and never knows what it
+   * means, and never assumes a name, because one key serves two (Use an Object
+   * in SRD 5.1, Utilize in SRD 5.2).
+   */
+  regrants?: string[];
 }
 
 /**

@@ -186,7 +186,7 @@ describe("classActionOption", () => {
         pools: [{ key: "secondWind", label: "Second Wind", total: 1, used: 0, remaining: 1, recharge: "shortRest" }],
       },
     } as Partial<Character>);
-    const option = classActionOption(available(), resolverFor("secondWind"), c);
+    const option = classActionOption(available(), resolverFor("secondWind"), c, []);
     expect(option).toMatchObject({
       key: "secondWind",
       title: "Second Wind",
@@ -203,6 +203,9 @@ describe("classActionOption", () => {
       available({ key: "cunningAction", name: "Cunning Action" }),
       resolverFor("cunningAction"),
       c,
+      // Served rows present but the action regrants nothing — nothing may leak
+      // onto a row that declared no grant (#1431).
+      SERVED_ACTIONS_2014,
     );
     expect(option).toEqual({ key: "cunningAction", title: "Cunning Action", enabled: true, heal: false });
   });
@@ -212,6 +215,7 @@ describe("classActionOption", () => {
       available({ key: "shadowStep", name: "Shadow Step", cost: "bonusAction", reminder: "Teleport up to 60 ft between dim light or darkness." }),
       resolverFor("shadowStep"),
       makeCharacter(),
+      [],
     );
     expect(option).toEqual({
       key: "shadowStep",
@@ -227,6 +231,7 @@ describe("classActionOption", () => {
       available({ enabled: false, disabledReason: "No uses remaining" }),
       resolverFor("secondWind"),
       makeCharacter(),
+      [],
     );
     expect(option.enabled).toBe(false);
     expect(option.disabledReason).toBe("No uses remaining");
@@ -237,6 +242,7 @@ describe("classActionOption", () => {
       available({ key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike" }),
       resolverFor("bonusUnarmedStrike"),
       makeCharacter(),
+      [],
     );
     expect(option).toEqual({
       key: "bonusUnarmedStrike",
@@ -257,6 +263,7 @@ describe("classActionOption", () => {
       }),
       resolverFor("bonusUnarmedStrike"),
       makeCharacter(),
+      [],
     );
     expect(option.enabled).toBe(false);
     expect(option.disabledReason).toBe("Requires no armor or Shield");
@@ -271,11 +278,62 @@ describe("classActionOption", () => {
       available({ key: "flurryOfBlows", name: "Flurry of Blows" }),
       resolverFor("flurryOfBlows"),
       c,
+      [],
     );
     expect(option).toMatchObject({
       subtitle: "Spend 1 Focus Points",
       badge: "3 / rest",
     });
+  });
+
+  // #1431. Names, never the served `description`: OptionCard's subtitle is one
+  // truncated line and the served paragraphs run 75-278 chars.
+  it("resolves regranted keys to the served names for the character's edition", () => {
+    const cunning = available({
+      key: "cunningAction",
+      name: "Cunning Action",
+      regrants: ["dash", "disengage", "hide"],
+    });
+    expect(
+      classActionOption(cunning, resolverFor("cunningAction"), makeCharacter(), SERVED_ACTIONS_2014).regrantNames,
+    ).toEqual(["Dash", "Disengage", "Hide"]);
+  });
+
+  it("resolves the SAME key to each edition's own name (Use an Object / Utilize)", () => {
+    const fastHands = available({ key: "fastHands", name: "Fast Hands", regrants: ["useObject"] });
+    const namesFor = (served: typeof SERVED_ACTIONS_2014) =>
+      classActionOption(fastHands, resolverFor("fastHands"), makeCharacter(), served).regrantNames;
+    expect(namesFor(SERVED_ACTIONS_2014)).toEqual(["Use an Object"]);
+    expect(namesFor(SERVED_ACTIONS_2024)).toEqual(["Utilize"]);
+  });
+
+  it("drops keys the served list doesn't cover, and omits the field when none resolve", () => {
+    const partial = available({ key: "cunningAction", name: "Cunning Action", regrants: ["dash", "notAnAction"] });
+    expect(
+      classActionOption(partial, resolverFor("cunningAction"), makeCharacter(), SERVED_ACTIONS_2024).regrantNames,
+    ).toEqual(["Dash"]);
+    // The empty case is first paint, before the reference query resolves — the
+    // card must render with no subtitle rather than an empty one.
+    expect(
+      classActionOption(partial, resolverFor("cunningAction"), makeCharacter(), []),
+    ).not.toHaveProperty("regrantNames");
+  });
+
+  it("leaves a regranting row's own reminder as the subtitle (the monk-card latch)", () => {
+    const patientDefense = available({
+      key: "patientDefense",
+      name: "Patient Defense",
+      regrants: ["disengage"],
+      reminder: "Disengage (free bonus action).",
+    });
+    const option = classActionOption(
+      patientDefense,
+      resolverFor("patientDefense"),
+      makeCharacter(),
+      SERVED_ACTIONS_2024,
+    );
+    expect(option.subtitle).toBe("Disengage (free bonus action).");
+    expect(option.regrantNames).toEqual(["Disengage"]);
   });
 });
 
