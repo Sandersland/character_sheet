@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { BATTLE_MASTER_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import {
   buildLevelUpPlan,
   type LevelUpPlanCharacter,
@@ -152,7 +153,11 @@ describe("buildLevelUpPlan — subclass", () => {
 
 describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/toolProficiency)", () => {
   it("Battle Master 6→7 grants 2 maneuvers", () => {
-    const plan = buildLevelUpPlan(char("fighter", 6, "battle master"), target("fighter", 7, "battle master"));
+    // #1546 Part B-ii: maneuverChoiceCount is ROW-driven now (Combat
+    // Superiority's derivedStat) — the persisted subclassFeatureRows carrier
+    // must be supplied, mirroring what resolveLevelUpContext resolves in
+    // production (TARGET_ENTRY_SELECT's subclassRef.features).
+    const plan = buildLevelUpPlan(char("fighter", 6, "battle master"), { ...target("fighter", 7, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(kinds(plan)).toEqual(["hitPoints", "maneuvers", "review"]);
     expect(plan.find((s) => s.kind === "maneuvers")?.count).toBe(2);
   });
@@ -177,7 +182,8 @@ describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/too
   });
 
   it("Battle Master 2→3 re-plan (subclass pre-chosen) surfaces maneuvers + tool proficiency", () => {
-    const plan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, "battle master"));
+    // #1546 Part B-ii: same row-driven carrier requirement as the 6→7 case above.
+    const plan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(kinds(plan)).toEqual(["hitPoints", "maneuvers", "toolProficiency", "review"]);
     expect(plan.find((s) => s.kind === "maneuvers")?.count).toBe(3);
     expect(plan.find((s) => s.kind === "toolProficiency")?.count).toBe(1);
@@ -370,7 +376,9 @@ describe("buildLevelUpPlan — subclass-unset re-plan contract", () => {
   });
 
   it("Fighter 2→3 with Battle Master set surfaces the subclass-derived choices", () => {
-    const plan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, "battle master"));
+    // #1546 Part B-ii: same row-driven carrier requirement as the describe
+    // block above.
+    const plan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(kinds(plan)).toContain("maneuvers");
     expect(kinds(plan)).toContain("toolProficiency");
   });

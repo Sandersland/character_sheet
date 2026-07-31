@@ -4014,7 +4014,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 13. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d8",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4047,7 +4047,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 13. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d8",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4080,7 +4080,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 14. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d8",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4113,7 +4113,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 14. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d8",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4146,7 +4146,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 14. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d8",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4179,7 +4179,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 14. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d8",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4219,7 +4219,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 15. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d8",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4259,7 +4259,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 15. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4299,7 +4299,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 15. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4339,7 +4339,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 1,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 15. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4379,7 +4379,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 16. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4419,7 +4419,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 16. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4459,7 +4459,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 16. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4499,7 +4499,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 16. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4539,7 +4539,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 17. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d10",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4579,7 +4579,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 17. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d12",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4619,7 +4619,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 17. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d12",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -4659,7 +4659,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Spend to fuel maneuvers. Maneuver save DC 17. Regain all on a short or long rest.",
+          "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
           "die": "d12",
           "key": "superiorityDice",
           "label": "Superiority Dice",
@@ -15228,24 +15228,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "level": 20,
   },
 ]
-`;
-
-exports[`deriveResourcesForCharacterRow > derives level + resources from XP and the primary class entry 1`] = `
-{
-  "maneuverChoiceCount": 9,
-  "maneuverSaveDC": 17,
-  "resources": [
-    {
-      "description": "Spend to fuel maneuvers. Maneuver save DC 17. Regain all on a short or long rest.",
-      "die": "d12",
-      "key": "superiorityDice",
-      "label": "Superiority Dice",
-      "recharge": "short-or-long",
-      "total": 6,
-    },
-  ],
-  "toolProfChoiceCount": 1,
-}
 `;
 
 exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > barbarian / (no subclass) 1`] = `

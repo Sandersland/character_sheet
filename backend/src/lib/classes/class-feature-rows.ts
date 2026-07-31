@@ -115,6 +115,13 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   // wire back to the row.
   derivedStat?: string | null;
   derivedStatTiers?: DerivedStatTier[] | null;
+  // The ability list a closed-form save DC is computed from (#1546) — read
+  // directly by saveDcAbilitiesFromRows below, never matched against
+  // `derivedStat` by name: a row may need BOTH a tiered derivedStat (Combat
+  // Superiority's maneuverChoiceCount) AND this formula axis at once, and one
+  // nullable String column can't name two fields. Empty/absent means "no
+  // such axis" for every row but the one Battle Master row that sets it.
+  saveDcAbilities?: string[] | null;
 }
 
 /**
@@ -231,4 +238,27 @@ export function derivedStatFromRows(
     best = best === undefined ? tier.value : Math.max(best, tier.value);
   }
   return best;
+}
+
+/**
+ * The first qualifying row's `saveDcAbilities` list (#1546) — the row-driven
+ * trigger for a closed-form announced save DC (8 + PB + max of these
+ * abilities' modifiers; the arithmetic itself lives in
+ * lib/srd/announced-save-dc.ts, alongside abilityModifier). Read directly,
+ * NOT via a `derivedStat` name match like derivedStatFromRows above: Combat
+ * Superiority's row already spends its one `derivedStat` slot on
+ * `"maneuverChoiceCount"` (a tiered count), so the save-DC axis needs its own
+ * trigger that doesn't collide with it on the same row. Filters by edition +
+ * grant level exactly like derivedStatFromRows/poolsFromRows.
+ */
+export function saveDcAbilitiesFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+): string[] | undefined {
+  for (const row of rows) {
+    if (row.edition !== edition || row.level > level) continue;
+    if (row.saveDcAbilities && row.saveDcAbilities.length > 0) return row.saveDcAbilities;
+  }
+  return undefined;
 }

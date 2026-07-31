@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { BATTLE_MASTER_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import {
   buildLevelUpPlan,
   type LevelUpPlanCharacter,
@@ -57,9 +58,13 @@ describe("resolveLevelUpPlan — submission-free plan resolution (#886)", () => 
   });
 
   it("Fighter 2→3 with Battle Master chosen re-plans and splices the subclass step", () => {
-    const steps = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), "battle master");
+    // #1546 Part B-ii: maneuverChoiceCount/toolProfChoiceCount are ROW-driven
+    // now — the picked subclass's own rows must be supplied, mirroring what
+    // resolveLevelUpContext resolves via the ?subclassId= pick's
+    // Subclass.findUnique (level-up-transaction.ts's resolvePickedSubclass).
+    const steps = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), "battle master", BATTLE_MASTER_ROWS);
     expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "maneuvers", "toolProficiency", "review"]);
-    const replan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, "battle master"));
+    const replan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(steps.filter((s) => s.kind !== "subclass")).toEqual(replan);
   });
 });
@@ -101,6 +106,9 @@ describe("validateLevelUpSubmission — count mismatches", () => {
           maneuvers: [maneuver("m1")],
           toolProficiencies: [{ type: "learnToolProficiency", name: "Smith's Tools" }],
         },
+        // #1546 Part B-ii: the plan can't surface a maneuvers step at all
+        // without the picked subclass's row-driven maneuverChoiceCount.
+        BATTLE_MASTER_ROWS,
       ),
     ).toThrow(/expected 3 maneuvers/);
   });
@@ -373,11 +381,14 @@ describe("validateLevelUpSubmission — subclass re-plan contract", () => {
         maneuvers: [maneuver("m1"), maneuver("m2"), maneuver("m3")],
         toolProficiencies: [{ type: "learnToolProficiency", name: "Smith's Tools" }],
       },
+      // #1546 Part B-ii: the picked subclass's own rows (mirrors the two
+      // fixes above in this file).
+      BATTLE_MASTER_ROWS,
     );
     // Effective plan mirrors buildLevelUpPlan for the chosen subclass, with the
     // subclass step spliced after hitPoints (no advancement) and before maneuvers.
     expect(kinds(steps)).toEqual(["hitPoints", "subclass", "maneuvers", "toolProficiency", "review"]);
-    const replan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, "battle master"));
+    const replan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(steps.filter((s) => s.kind !== "subclass")).toEqual(replan);
   });
 });

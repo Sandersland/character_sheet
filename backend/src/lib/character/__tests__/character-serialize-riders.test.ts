@@ -44,8 +44,21 @@ const BASE = {
   hitPoints: { current: 10, max: 10, temp: 0, deathSaves: { successes: 0, failures: 0 } },
 };
 
+let fighterClassId: string;
+let battleMasterSubclassId: string;
+
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
+  // #1546 Part B-ii: Battle Master's maneuverChoiceCount/maneuverSaveDC are
+  // ROW-driven now (fighter.ts's deriveExtras is gone) — resolving them needs
+  // the REAL FK relations (CharacterClassEntry.classId/subclassId), which this
+  // fixture previously omitted entirely (harmless while Battle Master's
+  // content was code, keyed only by the `subclass` NAME string). Points at the
+  // real seeded catalog (read-only, never mutated — mirrors
+  // maneuvers-multiclass.test.ts's identical pattern) rather than a bespoke
+  // Subclass row, since this suite has no other reason to own its own class.
+  fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
+  battleMasterSubclassId = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighterClassId, name: "Battle Master" } })).id;
 });
 
 afterEach(async () => {
@@ -66,7 +79,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         experiencePoints: 23000, // level 7, proficiency +3
         hitDice: { total: 7, die: "d10", spent: 7 },
         abilityScores: { strength: 16, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
-        classEntries: { create: [{ name: "fighter", position: 0, level: 7, subclass: "battle master" }] },
+        classEntries: { create: [{ name: "fighter", position: 0, level: 7, subclass: "battle master", classId: fighterClassId, subclassId: battleMasterSubclassId }] },
       },
     });
     const payload = await serialize("riders-battle-master-l7");

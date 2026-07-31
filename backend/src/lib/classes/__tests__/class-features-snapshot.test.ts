@@ -102,13 +102,14 @@ describe("deriveResourcesForCharacterRow", () => {
     // #1524: deriveResourcesForCharacterRow has no relation to read (its row
     // type carries no class/subclassRef), so `.features` is now always empty
     // here — expected (no production caller exists; see registry.ts's own
-    // comment). Snapshotting `withoutFeatures` keeps this pinned to what the
-    // function's real contract still guarantees. #1528: the same absent-
-    // carrier gap now also means Fighter's row-driven base pools (Second
-    // Wind/Action Surge/Indomitable) are absent from `.resources` here too —
-    // only Battle Master's superiorityDice survives (still resourceFn-driven,
-    // unaffected by the missing carrier).
-    expect(withoutFeatures(derived)).toMatchSnapshot();
+    // comment). #1528: the same absent-carrier gap also means Fighter's
+    // row-driven base pools (Second Wind/Action Surge/Indomitable) are absent
+    // from `.resources` here. #1546 Part B retired the LAST exception:
+    // Battle Master's superiorityDice pool/maneuverChoiceCount/
+    // toolProfChoiceCount/maneuverSaveDC moved off fighter.ts's `resourceFn`/
+    // `deriveExtras` (unaffected by a missing carrier) onto rows too, so this
+    // absent-carrier caller now sees NOTHING at all — `derived` is null.
+    expect(derived).toBeNull();
   });
 
   it("returns null derived resources and level 1 for an empty class-entry list", () => {

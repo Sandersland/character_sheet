@@ -133,22 +133,18 @@ describe("#1546 Part A — real (unmocked) registry: the overlay still wins for 
     expect((info2?.features ?? []).length).toBeGreaterThan(0);
   });
 
-  it("Battle Master's deriveExtras still wins over its identity-only stub (proves the overlay, not just the seeding pass)", async () => {
-    const { deriveResources } = await import("@/lib/classes/class-features.js");
-    const info = deriveResources(
-      "fighter",
-      "battle master",
-      3,
-      ABILITIES,
-      proficiencyBonusForLevel(3),
-      { classRows: [], subclassRows: [] },
-      "EDITION_2024",
-    );
-    // No rows supplied, yet maneuverChoiceCount/maneuverSaveDC/toolProfChoiceCount
-    // are present — they can only have come from fighter.ts's own `deriveExtras`,
-    // which an identity-only `{ slug }` stub does not carry.
-    expect(info?.maneuverChoiceCount).toBe(3);
-    expect(info?.toolProfChoiceCount).toBe(1);
-    expect(typeof info?.maneuverSaveDC).toBe("number");
-  });
+  // Retired (#1546 Part B): this test used to prove the overlay wins by
+  // supplying NO rows and getting real maneuverChoiceCount/maneuverSaveDC/
+  // toolProfChoiceCount anyway — proof they came from fighter.ts's
+  // `deriveExtras`, which an identity-only `{ slug }` stub doesn't carry.
+  // Part B deleted that `deriveExtras` (registry.ts's deriveRowExtras reads
+  // Combat Superiority/Student of War's OWN rows instead), so Battle Master
+  // no longer has a code-authored value an identity-only stub could lose —
+  // supplying no rows now correctly yields nothing, same as an unregistered
+  // subclass would. No other class currently sets `deriveExtras` (Battle
+  // Master was the last), so the overlay-wins-on-extras claim has no live
+  // subject to test empirically; the overlay mechanism itself (registry.ts's
+  // second SUBCLASSES loop unconditionally overwriting the identity-only
+  // seed) is still covered structurally by the mocked-unregistration tests
+  // above and by Champion's/Wizard's cases here.
 });

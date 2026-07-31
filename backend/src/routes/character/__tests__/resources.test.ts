@@ -16,6 +16,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-resources";
 let COOKIE: string;
@@ -23,6 +24,7 @@ let COOKIE: string;
 const FIXTURE_ID = "test-resources-character-1";
 const FIGHTER_CATALOG_NAME = "Resources Route Test Fighter";
 const MANEUVER_CATALOG_NAME = "Resources Route Test Trip Attack";
+const BM_SUBCLASS_NAME = "battle master"; // exact lowercase key deriveResources reads
 
 // Level-3 Battle Master Fighter. XP 900 → level 3 → prof bonus +2.
 // Str 16 (+3). Superiority dice: 4 × d8. Maneuvers known cap: 3. Tool cap: 1.
@@ -94,6 +96,7 @@ async function activity(): Promise<ActivityEvent[]> {
 
 describe("POST /api/characters/:id/resources/transactions", () => {
   let catalogManeuverId: string;
+  let bmSubclassId: string;
 
   afterAll(async () => {
     await prisma.grantedAbility.deleteMany({ where: { name: MANEUVER_CATALOG_NAME } });
@@ -117,9 +120,26 @@ describe("POST /api/characters/:id/resources/transactions", () => {
         skillChoices: ["athletics", "intimidation"],
         isSpellcaster: false,
         fightingStyleFeatLevel: 1,
+        subclassLevel: 3,
       },
-      update: { fightingStyleFeatLevel: 1 },
+      update: { fightingStyleFeatLevel: 1, subclassLevel: 3 },
     });
+
+    // #1546 Part B-ii: Battle Master's superiority-dice pool + maneuver/tool
+    // choice counts are ROW-driven now (fighter.ts's resourceFn/deriveExtras
+    // are gone) — a bespoke Subclass row with no ClassFeature children would
+    // silently lose all three, same failure mode fighterResourceRowsData's
+    // own header describes for the base class (#1546 Part B-i, Ruling 2).
+    // Shared helper, not a per-file copy.
+    const bm = await upsertEditionRow(
+      prisma.subclass,
+      { classId: cls.id, name: BM_SUBCLASS_NAME, edition: null },
+      { classId: cls.id, name: BM_SUBCLASS_NAME, description: "Maneuvers.", slug: "fighter-battle-master-resources-route-test" },
+      {},
+    );
+    bmSubclassId = bm.id;
+    await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+    await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(cls.id, bmSubclassId) });
 
     const maneuver = await upsertEditionRow(
       prisma.grantedAbility,
@@ -145,7 +165,7 @@ describe("POST /api/characters/:id/resources/transactions", () => {
         ownerId: OWNER_ID,
         resources: Prisma.JsonNull,
         classEntries: {
-          create: [{ name: "fighter", subclass: "battle master", classId: cls.id, position: 0 }],
+          create: [{ name: "fighter", subclass: "battle master", subclassId: bmSubclassId, classId: cls.id, position: 0 }],
         },
       },
     });

@@ -184,6 +184,11 @@ export interface ClassFeatureSeedRow {
   buffModifier?: number;
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  // The ability list a closed-form announced save DC is computed from
+  // (#1546) — see ClassFeature.saveDcAbilities' own schema.prisma comment for
+  // why this is read directly rather than matched against derivedStat by
+  // name. Only Fighter's Combat Superiority rows set it today.
+  saveDcAbilities?: string[];
 }
 
 // Untagged (feature.edition undefined, #1522's ~256-row default) -> two rows,
@@ -281,4 +286,5 @@ export const classFeatureSeedSchema = z.object({
   resourceTotals: resourceTotalsTierSchema.nullable().optional(),
   resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
   derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
+  saveDcAbilities: z.array(z.string().min(1)).optional(),
 });

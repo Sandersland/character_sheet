@@ -68,11 +68,12 @@ const MANEUVER_SELECT = {
 type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }>;
 
 // Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
-// featureRowsOf (#1528 chunk 0) — Battle Master's own superiority-dice pool
-// still comes from its subclass resourceFn (unaffected), but the carrier is
-// threaded through anyway so this call site matches every other narrow
-// select and stays correct the day Battle Master's pool description no
-// longer needs the computed save DC embedded in it.
+// featureRowsOf (#1528 chunk 0) — Battle Master's superiority-dice pool and
+// its maneuverSaveDC are now BOTH row-driven (#1546 Part B: resourceKey/
+// resourceTotals/resourceDieTiers + saveDcAbilities on the Combat Superiority
+// row, read via deriveEntryScopedResourcesForCharacterRow -> registry.ts's
+// deriveRowExtras), which is exactly why this carrier is threaded through
+// here — not a forward-looking comment anymore, but the live path.
 function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
   const { derived } = deriveEntryScopedResourcesForCharacterRow(row, featureRowsOf);
 

@@ -64,17 +64,18 @@ interface RawFighterFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // ---- Descriptor columns (#1528) — resourceKey through effectModifierSource
-  // ---- below are populated only for Second Wind/Action Surge/Indomitable
-  // ---- today; every other row leaves these undefined, which `expand()`
-  // ---- passes straight through as `undefined` (never writing a stray
-  // ---- `null`/`Prisma.DbNull` override for a row this issue doesn't touch).
-  // ---- derivedStat/derivedStatTiers are the exception — see their own
-  // ---- comment just below (#1530).
+  // ---- Descriptor columns (#1528/#1530/#1546) — resourceKey through
+  // ---- saveDcAbilities below are populated only for Second Wind/Action
+  // ---- Surge/Indomitable (#1528), Extra Attack (#1530), and Combat
+  // ---- Superiority/Student of War (#1546 Part B); every other row leaves
+  // ---- these undefined, which `expand()` passes straight through as
+  // ---- `undefined` (never writing a stray `null`/`Prisma.DbNull` override
+  // ---- for a row this issue doesn't touch).
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  resourceDieTiers?: { minLevel: number; die: string }[];
   activationCost?: string;
   resolverKind?: string;
   costKind?: string;
@@ -84,11 +85,18 @@ interface RawFighterFeature {
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifierSource?: string;
-  // #1530: populated only on the base class's L5 "Extra Attack" row (both
+  // #1530: populated on the base class's L5 "Extra Attack" row (both
   // editions) — Two/Three Extra Attacks stay text-only, see that row's own
-  // comment for why.
+  // comment for why. #1546 Part B: ALSO populated on Combat Superiority
+  // (maneuverChoiceCount) and Student of War (toolProfChoiceCount) — see
+  // each row's own comment.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  // #1546 Part B: the ability list Combat Superiority's maneuverSaveDC is
+  // computed from (8 + PB + max of these). Deliberately NOT matched against
+  // `derivedStat` by name — see class-feature-rows.ts's
+  // saveDcAbilitiesFromRows for why the same row needs both axes at once.
+  saveDcAbilities?: string[];
 }
 
 function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
@@ -102,6 +110,7 @@ function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    resourceDieTiers: raw.resourceDieTiers,
     activationCost: raw.activationCost,
     resolverKind: raw.resolverKind,
     costKind: raw.costKind,
@@ -113,6 +122,7 @@ function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
     effectModifierSource: raw.effectModifierSource,
     derivedStat: raw.derivedStat,
     derivedStatTiers: raw.derivedStatTiers,
+    saveDcAbilities: raw.saveDcAbilities,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -543,17 +553,58 @@ const CHAMPION_RAW: RawFighterFeature[] = [
 // Mirrors: dnd2024.wikidot.com/fighter:battle-master and Roll20's licensed
 // compendium agree verbatim; no first-party SRD text exists for this
 // subclass in either edition, so it is never cited as "SRD 5.2".
-// Every row below leaves every descriptor column NULL. Combat Superiority is
-// NOT DONE YET: its superiority-dice pool total/die tier COULD move onto
-// resourceTotals/resourceDieTiers, but its description embeds the computed
-// maneuver save DC (8 + prof + max(Str,Dex)) — no tier array expresses that,
-// so it stays fighter.ts's subclass resourceFn (see that file's own header)
-// rather than a half-migrated row. Student of War / Know Your Enemy /
-// Improved Combat Superiority / Relentless / Ultimate Combat Superiority have
-// NO SUCH AXIS (passive text/proficiency grants with no clickable action this
-// app dispatches — maneuvers themselves are their own GrantedAbility catalog,
+// #1546 Part B: Combat Superiority and Student of War are DONE now — the
+// superiority-dice pool (resourceKey/resourceTotals/resourceDieTiers), the
+// maneuver-choice count (derivedStat/derivedStatTiers), the tool-choice count
+// (Student of War's own derivedStat/derivedStatTiers), and the maneuver save
+// DC (saveDcAbilities, resolved by lib/srd/announced-save-dc.ts) are all row
+// data — the "no tier array expresses a computed DC" blocker Finding 2
+// disproved: the OLD resourceFn's pool description was a computed string
+// embedding the DC, but that string is dead (nothing renders
+// ResourcePool.description — the wire DC comes from the #1316
+// `maneuvers.saveDC` rider instead), so the row's own authored `description`
+// text (below) simply replaces it, and the DC itself moved to a dedicated
+// column + resolver rather than a tier. Know Your Enemy / Improved Combat
+// Superiority / Relentless / Ultimate Combat Superiority still have NO SUCH
+// AXIS (passive text/proficiency grants with no clickable action this app
+// dispatches — maneuvers themselves are their own GrantedAbility catalog,
 // castManeuver/maneuvers.ts, not ClassFeature rows at all).
 const BATTLE_MASTER_SLUG = slug("fighter-battle-master");
+
+// #1546 Part B: dice 4/5/6 @ L3/7/15, die d8/d10/d12 @ L3/10/18, maneuvers
+// known 3/5/7/9 @ L3/7/10/15, DC 8 + PB + max(Str, Dex) — edition-invariant
+// (PHB'14 p.73), byte-identical between the 2014 and 2024 Combat Superiority
+// rows; only each row's TEXT forks (transcribed from a different document —
+// CLAUDE.md's ACTIONS precedent). Extracted to one object spread into both
+// rows below rather than authored twice — a fallow duplication finding on two
+// literal copies of this exact block, not a suppression.
+const COMBAT_SUPERIORITY_MECHANICS: Pick<
+  RawFighterFeature,
+  "resourceKey" | "resourceLabel" | "resourceRecharge" | "resourceTotals" | "resourceDieTiers" | "derivedStat" | "derivedStatTiers" | "saveDcAbilities"
+> = {
+  resourceKey: "superiorityDice",
+  resourceLabel: "Superiority Dice",
+  resourceRecharge: "short-or-long",
+  resourceTotals: [
+    { minLevel: 3, total: 4 },
+    { minLevel: 7, total: 5 },
+    { minLevel: 15, total: 6 },
+  ],
+  resourceDieTiers: [
+    { minLevel: 3, die: "d8" },
+    { minLevel: 10, die: "d10" },
+    { minLevel: 18, die: "d12" },
+  ],
+  derivedStat: "maneuverChoiceCount",
+  derivedStatTiers: [
+    { minLevel: 3, value: 3 },
+    { minLevel: 7, value: 5 },
+    { minLevel: 10, value: 7 },
+    { minLevel: 15, value: 9 },
+  ],
+  saveDcAbilities: ["strength", "dexterity"],
+};
+
 const BATTLE_MASTER_RAW: RawFighterFeature[] = [
   {
     subclassSlug: BATTLE_MASTER_SLUG,
@@ -562,6 +613,7 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     edition: "EDITION_2014",
     description:
       "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated.",
+    ...COMBAT_SUPERIORITY_MECHANICS,
   },
   {
     subclassSlug: BATTLE_MASTER_SLUG,
@@ -577,6 +629,7 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     // the mechanics agree (CLAUDE.md's ACTIONS precedent).
     description:
       "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
+    ...COMBAT_SUPERIORITY_MECHANICS,
   },
   {
     subclassSlug: BATTLE_MASTER_SLUG,
@@ -584,6 +637,9 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     level: 3,
     edition: "EDITION_2014",
     description: "You gain proficiency with one type of artisan's tools of your choice.",
+    // #1546 Part B: flat 1 from L3 (the subclass grant level), edition-invariant.
+    derivedStat: "toolProfChoiceCount",
+    derivedStatTiers: [{ minLevel: 3, value: 1 }],
   },
   {
     subclassSlug: BATTLE_MASTER_SLUG,
@@ -596,6 +652,8 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     // scope — text row only.
     description:
       "You gain proficiency with one type of artisan's tools of your choice, and you gain proficiency in one skill of your choice from the Fighter's level 1 skill list.",
+    derivedStat: "toolProfChoiceCount",
+    derivedStatTiers: [{ minLevel: 3, value: 1 }],
   },
   {
     subclassSlug: BATTLE_MASTER_SLUG,

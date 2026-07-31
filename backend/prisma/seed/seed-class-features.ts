@@ -52,6 +52,7 @@ const DESCRIPTOR_RESET = {
   buffModifier: null,
   derivedStat: null,
   derivedStatTiers: Prisma.DbNull,
+  saveDcAbilities: [] as string[],
 };
 
 function partitionKey(classId: string, subclassId: string | null): string {

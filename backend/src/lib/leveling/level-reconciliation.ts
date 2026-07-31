@@ -351,11 +351,14 @@ async function loadResourcesReconcileState(
   const profBonus = proficiencyBonusForLevel(newDerivedLevel);
   // ctx.edition (not a fresh row read) — write-once (#1285), constant for the whole pass.
   // featureRowsOf (#1528 chunk 0): reconcileKnownList/reconcileSubclassChoices
-  // only read maneuverChoiceCount/toolProfChoiceCount/subclassChoices today
-  // (ClassExtras — still code, unaffected by Fighter's row migration), but the
-  // carrier is threaded through anyway so this select matches every other
-  // deriveEntryScopedResources call site and stays correct if a future
-  // reconciler ever needs a row-driven pool's `used` cap.
+  // read maneuverChoiceCount/toolProfChoiceCount/subclassChoices — Battle
+  // Master's two counts are ROW-driven now (#1546 Part B-ii: registry.ts's
+  // deriveRowExtras reads Combat Superiority/Student of War's derivedStat
+  // columns), so this carrier is load-bearing for reconcileManeuvers/
+  // reconcileToolProficiencies, not merely future-proofing; every other
+  // class's subclassChoices is still SubclassDefinition.choices (code). This
+  // select matches every other deriveEntryScopedResources call site and stays
+  // correct if a future reconciler ever needs a row-driven pool's `used` cap.
   const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus, edition, featureRowsOf);
   return { state, derived };
 }
