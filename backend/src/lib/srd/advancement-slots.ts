@@ -35,7 +35,7 @@ export function fightingStyleFeatSlots(fightingStyleFeatLevel: number | null | u
 // (CharacterClassEntry.classId is nullable by design, #1529).
 interface FightingStyleGatedEntry {
   level: number;
-  class?: { fightingStyleFeatLevel: number | null } | null;
+  class: { fightingStyleFeatLevel: number | null } | null;
 }
 
 // Total Fighting Style feat entitlement across every class entry, each judged at
@@ -57,7 +57,7 @@ export function characterFightingStyleFeatSlots(
 // The minimal per-entry shape characterAdvancementSlots needs.
 interface AdvancementGatedEntry {
   level: number;
-  class?: { extraAsiLevels: readonly number[] } | null;
+  class: { extraAsiLevels: readonly number[] } | null;
 }
 
 // PHB'24 p.163: ASI/feat slots accrue per CLASS level, not primary-class ×
@@ -78,7 +78,7 @@ export function characterAdvancementSlots(
   );
 }
 
-// 5e multiclass ability prerequisite (PHB p. 163): each class's options are AND
+// 5e multiclass ability prerequisite (PHB'14 p. 163): each class's options are AND
 // -ed within an option and OR-ed across options — e.g. Fighter's
 // `[{strength:13},{dexterity:13}]` (the only OR class), stored verbatim in
 // CharacterClass.multiclassPrerequisites (#1529). `null`/`undefined`/`[]`

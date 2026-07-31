@@ -49,12 +49,12 @@ export const RACES = [
 ];
 
 // #1529: armorProficiencies/weaponProficiencies are SRD 5.1/PHB'14 ONLY —
-// relocated verbatim from the deleted CLASS_PROFICIENCY_GRANTS record
-// (lib/srd/proficiencies.ts). At least Bard/Druid/Monk/Rogue/Sorcerer/Wizard
-// differ in SRD 5.2/PHB'24; authoring those lists is an explicit follow-up
-// (#1543-adjacent, not this issue), never guessed here. extraAsiLevels/
-// multiclassPrerequisites are PHB p.163/38 (2014 and 2024 agree — CLAUDE.md).
-// primaryAbilities is PHB'24 p. by-class table only (no 2014 counterpart).
+// relocated verbatim from the deleted CLASS_PROFICIENCY_GRANTS record.
+// At least Bard/Druid/Monk/Rogue/Sorcerer/Wizard differ in SRD 5.2/PHB'24;
+// authoring those lists is an explicit follow-up (#1548), never guessed here.
+// extraAsiLevels/multiclassPrerequisites are PHB'14 p. 163/PHB'14 p. 38
+// (2014 and 2024 agree — CLAUDE.md). primaryAbilities is PHB'24's by-class
+// table only (no 2014 counterpart).
 export const CLASSES = [
   {
     name: "Wizard",

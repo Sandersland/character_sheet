@@ -527,7 +527,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
         // not just the primary. `class` (#1529): the reconciler's half of the
         // reconciler/clamp-on-read pair CLAUDE.md governs — must resolve
         // extraAsiLevels/fightingStyleFeatLevel through the SAME columns
-        // applyAdvancementClamp (serialize/classes.ts) reads via characterInclude.
+        // applyAdvancementClamp reads via characterInclude.
         select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
       },
     },

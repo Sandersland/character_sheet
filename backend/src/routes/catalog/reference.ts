@@ -115,7 +115,7 @@ referenceRouter.get("/reference", async (req, res) => {
             maxSpellLevel: maxSpellLevelForClass(c.name, 1),
           }
         : null,
-    // 5e multiclass ability prerequisite (PHB p. 163): the option thresholds plus
+    // 5e multiclass ability prerequisite (PHB'14 p. 163): the option thresholds plus
     // a rendered description. Lets the add-class picker gate + explain eligibility
     // without duplicating the rules table on the frontend. Null for homebrew classes.
     // `multiclassPrerequisites` (#1529): every seeded class has at least one

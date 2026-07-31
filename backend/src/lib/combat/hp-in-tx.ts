@@ -46,8 +46,8 @@ export async function applyHealInTx(
       // All entries — the feat-slot cap sums entitlement per class level (#1073),
       // not just the primary (position 0). `class` (#1529): characterAdvancementSlots'
       // extraAsiLevels read — this is one of the reconciler/clamp-on-read pair's
-      // six query sites CLAUDE.md governs; it must resolve the SAME column
-      // characterInclude/level-reconciliation.ts select.
+      // seven query sites CLAUDE.md governs; it must resolve the SAME column as
+      // reconcileAdvancements' select.
       classEntries: {
         orderBy: { position: "asc" as const },
         select: { id: true, level: true, name: true, subclass: true, class: { select: { extraAsiLevels: true } } },

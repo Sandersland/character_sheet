@@ -59,9 +59,12 @@ function computeConcentrationSave(
     savingThrowProficiencies: string[];
     resources: Prisma.JsonValue;
     // `class` (#1529): characterAdvancementSlots' extraAsiLevels read below —
-    // one of the reconciler/clamp-on-read pair's six query sites CLAUDE.md
-    // governs, resolving the SAME column as characterInclude/hp-context.ts.
-    classEntries: { name: string; level: number; class?: { extraAsiLevels: number[] } | null }[];
+    // one of the reconciler/clamp-on-read pair's seven query sites CLAUDE.md
+    // governs, resolving the SAME column as reconcileAdvancements' select.
+    // Non-optional (no `?`) so a select that omits `class` fails `tsc`, not
+    // just at runtime — a structurally-compatible Prisma result missing
+    // `class` would otherwise satisfy an optional property silently.
+    classEntries: { name: string; level: number; class: { extraAsiLevels: number[] } | null }[];
   },
   damage: number,
 ): { saveBonus: number; dc: number } {

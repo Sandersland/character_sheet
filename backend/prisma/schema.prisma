@@ -626,16 +626,16 @@ model CharacterClass {
   armorProficiencies  String[] @default([])
   weaponProficiencies String[] @default([])
   // ASI/feat slot levels BEYOND the edition-invariant base schedule
-  // (4/8/12/16/19, BASE_ASI_LEVELS in advancement-slots.ts) — Fighter [6,14],
-  // Rogue [10], [] for every other class. CLAUDE.md lists ASI levels among
-  // the rules where 2014 and 2024 agree, so this is one column, no edition fork.
+  // (4/8/12/16/19, BASE_ASI_LEVELS) — Fighter [6,14], Rogue [10], [] for
+  // every other class. CLAUDE.md lists ASI levels among the rules where
+  // 2014 and 2024 agree, so this is one column, no edition fork.
   extraAsiLevels      Int[]    @default([])
   // The character level at which this class grants a Fighting Style feat pick
   // (Fighter 1, Paladin/Ranger 2 — agrees in both editions); NULL = this class
   // never grants one. What differs by edition is feat-vs-menu (SRD 5.2 p. 47,
   // #1137's concern), not this level, so no edition fork here either.
   fightingStyleFeatLevel Int?
-  // 5e multiclass ability-score prerequisite (PHB p. 163): an array of AND-
+  // 5e multiclass ability-score prerequisite (PHB'14 p. 163): an array of AND-
   // option-groups, OR'd together — e.g. Fighter's `[{strength:13},
   // {dexterity:13}]` (the only OR class), Paladin's `[{strength:13,
   // charisma:13}]` (a single AND group). Json (not String[]) because only it

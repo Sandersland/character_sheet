@@ -48,7 +48,7 @@ function buildMergedToolProficiencies(
 // CharacterClassEntry.classId is nullable BY DESIGN (homebrew), not because
 // this is unreachable — a homebrew entry correctly grants nothing here.
 export function buildMergedArmorProficiencies(
-  classEntries: { class?: { armorProficiencies: string[] } | null }[],
+  classEntries: { class: { armorProficiencies: string[] } | null }[],
   raceName: string | undefined,
   featArmor: Set<string>,
 ): Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> {
@@ -76,7 +76,7 @@ export function buildMergedArmorProficiencies(
 // deduped, highest-priority wins; see buildMergedArmorProficiencies on multiclass
 // and its class-relation-resolution comment (#1529/#1388).
 export function buildMergedWeaponProficiencies(
-  classEntries: { class?: { weaponProficiencies: string[] } | null }[],
+  classEntries: { class: { weaponProficiencies: string[] } | null }[],
   raceName: string | undefined,
   featWeapons: Set<string>,
 ): Array<{ name: string; source: "class" | "race" | "feat" }> {

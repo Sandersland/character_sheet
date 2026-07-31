@@ -11,8 +11,8 @@ const FIGHTER_GRANTS = { armorProficiencies: ["light", "medium", "heavy", "shiel
 
 describe("buildMergedArmorProficiencies / buildMergedWeaponProficiencies — resolution is by classId, not name (#1388)", () => {
   it("a lowercase-name entry and a display-name entry with the SAME classId resolve identically", () => {
-    const lowercase = [{ class: FIGHTER_GRANTS }]; // entry.name would have been "fighter"
-    const displayName = [{ class: FIGHTER_GRANTS }]; // entry.name would have been "Fighter"
+    const lowercase = [{ name: "fighter", class: FIGHTER_GRANTS }];
+    const displayName = [{ name: "Fighter", class: FIGHTER_GRANTS }];
 
     const armorLower = buildMergedArmorProficiencies(lowercase, undefined, new Set());
     const armorDisplay = buildMergedArmorProficiencies(displayName, undefined, new Set());
