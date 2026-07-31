@@ -7,6 +7,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-experience";
 let COOKIE: string;
@@ -99,6 +100,10 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
       {},
     );
     battleMasterSubclassId = bm.id;
+    // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy — see its
+    // own header for why every bespoke Battle Master Subclass row needs this.
+    await prisma.classFeature.deleteMany({ where: { subclassId: battleMasterSubclassId } });
+    await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, battleMasterSubclassId) });
 
     const clericClass = await prisma.characterClass.upsert({
       where: { name: CLERIC_CLASS_NAME },
@@ -401,6 +406,9 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
       {},
     );
     battleMasterSubclassId2 = bm.id;
+    // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy.
+    await prisma.classFeature.deleteMany({ where: { subclassId: battleMasterSubclassId2 } });
+    await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId2, battleMasterSubclassId2) });
   });
 
   afterAll(async () => {

@@ -20,6 +20,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-snapshot-undo";
 let COOKIE: string;
@@ -90,6 +91,9 @@ beforeAll(async () => {
     {},
   );
   bmSubclassId = bm.id;
+  // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy.
+  await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+  await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });
 
 afterAll(async () => {

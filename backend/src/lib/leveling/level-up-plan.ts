@@ -5,6 +5,7 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
@@ -71,6 +72,19 @@ export interface TargetClassEntry {
   // subclassLevel's own default-3 comment.
   extraAsiLevels?: number[];
   fightingStyleFeatLevel?: number | null;
+  // #1546 Part B-i: the seeded ClassFeature rows for THIS target — the FK
+  // carrier resolveLevelUpContext resolves (TARGET_ENTRY_SELECT, mirroring
+  // characterInclude's class.features/subclassRef.features), same rationale
+  // as subclassLevel/extraAsiLevels above (a pure planner has no DB relation
+  // to read these itself). `subclassFeatureRows` is the PERSISTED subclass's
+  // own rows — absent when no subclass is chosen yet. The not-yet-committed
+  // `?subclassId=` pick's own rows travel separately, as resolveLevelUpPlan's
+  // own parameter (mirroring persistedGrantSource/pickedGrantSource,
+  // level-up.ts, which solves this exact persisted/picked split for #898's
+  // granted spells) — never baked onto this field, since a re-plan target
+  // hasn't actually committed to that subclass.
+  classFeatureRows?: ClassFeatureRow[];
+  subclassFeatureRows?: ClassFeatureRow[];
 }
 
 // The target plus its derived resources at N and N-1 — the context each step reads.
@@ -94,17 +108,24 @@ function derivedAt(
   edition: RulesEdition,
 ): DerivedClassInfo | null {
   if (level < 1) return null;
-  // A pure planner (LevelUpPlanCharacter has no DB relation, see its own
-  // comment) — no featureRows carrier to pass, so this preview never lists
-  // features or row-driven pools (#1524's Fact 2: no consumer of this planner
-  // reads DerivedClassInfo.resources/features). Audited for #1528 chunk 0:
-  // every step this file builds (hitPointsStep, advancementStep, subclassStep,
-  // choiceCountStep, fightingStyleFeatStep, subclassChoiceSteps, newSpellsStep)
-  // reads only ClassExtras fields (maneuverChoiceCount/toolProfChoiceCount,
-  // still code via SubclassDefinition.deriveExtras) and subclassChoices (still
-  // code via SubclassDefinition.choices) — neither moved onto ClassFeature
-  // rows, so an absent carrier here is a confirmed no-op, not a latent gap.
-  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), undefined, edition);
+  // #1546 Part B-i: the carrier is now threaded (target.classFeatureRows/
+  // subclassFeatureRows, resolved by the caller — see TargetClassEntry's own
+  // comment), replacing the `undefined` this call passed before. This is
+  // still a behavior no-op for every step built below: every one of them
+  // (hitPointsStep, advancementStep, subclassStep, choiceCountStep,
+  // fightingStyleFeatStep, subclassChoiceSteps, newSpellsStep) reads only
+  // ClassExtras fields (maneuverChoiceCount/toolProfChoiceCount, still code
+  // via SubclassDefinition.deriveExtras) and subclassChoices (still code via
+  // SubclassDefinition.choices) — NOT DerivedClassInfo.resources/.features,
+  // which is all this carrier feeds (poolsFromRows/featuresFromRows). Part
+  // B-ii's row-driven ClassExtras reader is what makes this carrier
+  // load-bearing; until then, the plan output stays byte-identical (proven by
+  // level-up-plan.test.ts's existing assertions, unedited by this change).
+  const featureRows: ClassFeatureRowsCarrier = {
+    classRows: target.classFeatureRows ?? [],
+    subclassRows: target.subclassFeatureRows ?? [],
+  };
+  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), featureRows, edition);
 }
 
 // Everything the ceremony's HP step shows the player: the advancing die, the Con

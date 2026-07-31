@@ -98,7 +98,10 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
   try {
     const target = await resolvePlanTarget(req.params.id, parsed.data);
     const context = await resolveLevelUpContext(req.params.id, target, parsed.data.subclassId);
-    const steps = resolveLevelUpPlan(context.planCharacter, context.targetEntry, context.chosenSubclassName);
+    // #1546 Part B-i: context.pickedSubclassFeatureRows carries the not-yet-
+    // committed pick's own rows through the re-plan splice — see
+    // resolveLevelUpPlan's own comment.
+    const steps = resolveLevelUpPlan(context.planCharacter, context.targetEntry, context.chosenSubclassName, context.pickedSubclassFeatureRows);
     const persisted = await persistedGrantSource(target);
     const picked = await pickedGrantSource(parsed.data.subclassId);
     const gained = grantedSpellsGained(

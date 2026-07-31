@@ -28,6 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
@@ -71,10 +72,13 @@ beforeAll(async () => {
   // ids, for classId snapshot determinism) instead of the real seeded Fighter/
   // Wizard rows, whose ids are fresh UUIDs per reseed. Now that feature TEXT
   // is DB-linked via classId/subclassId (ClassFeature), these bespoke classes
-  // need their own ClassFeature rows too — text copied verbatim from the real
-  // seeded Fighter/Battle Master/Wizard EDITION_2024 rows (both fixtures below
-  // are EDITION_2024, the default) so the snapshot's pinned feature content
-  // still reflects production text, not a fixture-only string.
+  // need their own ClassFeature rows too — Fighter/Wizard's own rows below
+  // are hand-copied verbatim from the real seeded EDITION_2024 rows (both
+  // fixtures below are EDITION_2024, the default); Battle Master's rows come
+  // from the shared battleMasterResourceRowsData helper instead (#1546 Part
+  // B-i, Ruling 2) rather than a third hand-copy of the same descriptor text
+  // — so the snapshot's pinned feature content still reflects production
+  // text, not a fixture-only string.
   const battleMaster = await prisma.subclass.create({
     data: { id: "subclass-snap-battle-master", classId: fighterClassId, name: "Test Battle Master (Snapshot Suite)", description: "Test fixture subclass.", slug: "battle-master" },
   });
@@ -116,8 +120,14 @@ beforeAll(async () => {
         derivedStat: "attacksPerAction",
         derivedStatTiers: [{ minLevel: 5, value: 2 }, { minLevel: 11, value: 3 }, { minLevel: 20, value: 4 }],
       },
-      { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Combat Superiority", level: 3, edition: "EDITION_2024", description: "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated." },
-      { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Student of War", level: 3, edition: "EDITION_2024", description: "You gain proficiency with one type of artisan's tools of your choice." },
+      // #1546 Part B-i (Ruling 2): Battle Master's own rows, from the shared
+      // helper rather than a hand-copied pair — this also FIXES a stale
+      // mismatch the hand-copy had: the row below was tagged EDITION_2024 but
+      // carried the 2014 TEXT (no save-DC sentence). The 2024 text is longer,
+      // but this fixture's fighter entry is level 5 (< 7/10/15/18), so no
+      // higher-level Battle Master feature enters the snapshot — only the
+      // corrected Combat Superiority/Student of War text is new output.
+      ...battleMasterResourceRowsData(fighterClassId, battleMasterSubclassId),
       { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You copy spells into your spellbook and prepare a number equal to your Intelligence modifier + your wizard level (minimum 1) after each long rest." },
       { classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024", description: "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots)." },
     ],

@@ -140,6 +140,65 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
   },
 ]);
 
+// BATTLE MASTER's own subclass rows (#1546 Part B-i): mirrors
+// prisma/seed/fighter-features.ts's BATTLE_MASTER_RAW verbatim (name/level/
+// description/edition only — no resourceKey/derivedStat columns, since
+// neither exists on the real seeded rows yet; that's #1546 Part B-ii's job).
+// Same rootDir boundary as FIGHTER_BASE_ROWS above (a src file can't import
+// prisma/), same reason for hardcoding rather than re-deriving. Exported so
+// test-support/fighter-resource-rows.ts's battleMasterResourceRowsData can
+// scope it to a bespoke fixture's classId/subclassId, the same way
+// fighterResourceRowsData derives from FIGHTER_BASE_ROWS — one shared source
+// for every suite that builds its own Battle Master Subclass row, instead of
+// each hand-copying the descriptor text a second (or third) time.
+export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Combat Superiority",
+    level: 3,
+    edition,
+    description:
+      edition === "EDITION_2014"
+        ? "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated."
+        : "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
+  },
+  {
+    name: "Student of War",
+    level: 3,
+    edition,
+    description:
+      edition === "EDITION_2014"
+        ? "You gain proficiency with one type of artisan's tools of your choice."
+        : "You gain proficiency with one type of artisan's tools of your choice, and you gain proficiency in one skill of your choice from the Fighter's level 1 skill list.",
+  },
+  {
+    name: "Know Your Enemy",
+    level: 7,
+    edition,
+    description:
+      edition === "EDITION_2014"
+        ? "If you spend at least 1 minute observing or interacting with another creature outside combat, you can compare two of its ability scores, armor class, hit points, hit dice, or levels to your own."
+        : "As a Bonus Action, choose a creature you can see within 30 feet of yourself and learn whether it has any damage Immunities, Resistances, or Vulnerabilities, and what they are if any. You can use this feature once, and you regain your use of it when you finish a Long Rest or when you expend a Superiority Die to restore it (no action required).",
+  },
+  {
+    name: "Improved Combat Superiority (d10)",
+    level: 10,
+    edition,
+    description: edition === "EDITION_2014" ? "Your superiority dice turn into d10s." : "Your Superiority Dice turn into d10s.",
+  },
+  {
+    name: "Relentless",
+    level: 15,
+    edition,
+    description:
+      edition === "EDITION_2014"
+        ? "When you roll initiative and have no superiority dice remaining, you regain 1 superiority die."
+        : "Once per turn when you use a maneuver, you can roll 1d8 and use the number rolled instead of expending a Superiority Die.",
+  },
+  edition === "EDITION_2014"
+    ? { name: "Improved Combat Superiority (d12)", level: 18, edition, description: "Your superiority dice turn into d12s." }
+    : { name: "Ultimate Combat Superiority", level: 18, edition, description: "Your Superiority Dice turn into d12s." },
+]);
+
 /** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */
 export function testFeatureRowsFor(className: string, subclass: string | undefined): ClassFeatureRowsCarrier {
   const classDef = TEST_CLASSES[(className ?? "").toLowerCase()];
