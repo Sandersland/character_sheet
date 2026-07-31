@@ -1099,11 +1099,13 @@ enum WeaponRange {
   ranged
 }
 
-// Tool-proficiency category (PHB p.154) — mirrors backend lib/srd/tools.ts's
-// TOOLS list (#1564). Lets a starting-equipment open pick filter on "is this
-// a musical instrument" as a COLUMN the validator reads, rather than the
-// DB-driven equipment resolver reaching into a rules TS module. Only the
-// items that are actual tools carry this on Item (the ten instruments,
+// Tool-proficiency category (SRD 5.1 / SRD 5.2 — both editions' tools pages
+// list all three categories: Artisan's Tools, Gaming Set, Musical Instrument)
+// — mirrors backend lib/srd/tools.ts's TOOLS list (#1564). Lets a starting-
+// equipment open pick filter on "is this a musical instrument" as a COLUMN
+// the validator reads, rather than the DB-driven equipment resolver reaching
+// into a rules TS module. Only the items that are actual tools carry this on
+// Item (the ten instruments,
 // Herbalism Kit, Thieves' Tools) — most of TOOLS has no Item row at all.
 enum ToolCategory {
   artisan
