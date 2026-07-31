@@ -8,6 +8,10 @@ interface StartingEquipmentSectionProps {
   value: EquipmentDraft | null;
   catalog: Item[];
   onChange: (value: EquipmentDraft) => void;
+  /** The character's own chosen tool proficiencies (creation toolChoices
+   *  step) — threaded down to a boundToToolChoice open pick (#1564 PR #1567
+   *  fix 2), never re-derived here. */
+  selectedToolChoices: string[];
 }
 
 export default function StartingEquipmentSection({
@@ -15,6 +19,7 @@ export default function StartingEquipmentSection({
   value,
   catalog,
   onChange,
+  selectedToolChoices,
 }: StartingEquipmentSectionProps) {
   if (!startingEquipment || !value) return null;
   return (
@@ -33,6 +38,7 @@ export default function StartingEquipmentSection({
           catalog={catalog}
           value={value}
           onChange={onChange}
+          selectedToolChoices={selectedToolChoices}
         />
       </div>
     </Card>

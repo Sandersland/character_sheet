@@ -25,6 +25,13 @@ interface StartingEquipmentEditorProps {
   /** Current draft value. */
   value: EquipmentDraft;
   onChange: (draft: EquipmentDraft) => void;
+  /** The character's own chosen tool proficiencies (creation toolChoices step,
+   *  #1564 PR #1567 fix — catalog item names). A boundToToolChoice pick
+   *  (Monk's "Artisan's Tools or Musical Instrument chosen for the tool
+   *  proficiency above") filters to exactly these, never the whole catalog —
+   *  matching the server's boundToolChoiceError so the picker never offers a
+   *  choice the write path would reject (#1336). */
+  selectedToolChoices: string[];
 }
 
 /** Describes the fixed-item contents of a bundle (no open pick placeholders). */
@@ -42,17 +49,24 @@ interface OpenPickSelectProps {
   catalog: Item[];
   currentPick: string;
   onPick: (itemName: string) => void;
+  selectedToolChoices: string[];
 }
 
-// A toolCategory-filtered pick (Bard's "musical instrument of your choice",
-// #1564) draws from the tool/gear pool by Item.toolCategory rather than the
-// weapon pool — mutually exclusive with weaponClass/range in practice (a
-// pick is either weapon-shaped or tool-shaped, never both, per shared-types'
-// OpenPickFilter comment).
-function matchesPick(item: Item, pick: OpenWeaponPick): boolean {
-  if (pick.filter.toolCategory) {
-    return item.toolCategory === pick.filter.toolCategory;
-  }
+// Mirrors the backend's openPickFilterError dispatch order exactly (#1564,
+// PR #1567 fix 2): a toolCategory filter (if present) gates first; a
+// boundToToolChoice pick (Monk's "Artisan's Tools or Musical Instrument
+// chosen for the tool proficiency above" — spans two tool categories, so it
+// carries no single filter.toolCategory) then requires membership in the
+// character's OWN chosen tool proficiencies instead of falling through to
+// the weapon pool — the old fallback offered every weapon in the catalog,
+// which the server's boundToolChoiceError would reject outright (#1336: a
+// picker offering what the write path rejects is a dead end). A plain
+// toolCategory pick (no binding) accepts anything in that category; anything
+// else keeps the pre-#1564 weapon-only behaviour unchanged.
+// The pre-#1564 weapon-only behaviour, unchanged — split out of matchesPick
+// purely to keep its own cyclomatic complexity low (mirrors the backend's
+// own openPickFilterError -> weaponFilterError split, character-create.ts).
+function matchesWeaponFilter(item: Item, pick: OpenWeaponPick): boolean {
   return (
     item.category === "weapon" &&
     item.weapon !== undefined &&
@@ -61,10 +75,17 @@ function matchesPick(item: Item, pick: OpenWeaponPick): boolean {
   );
 }
 
+function matchesPick(item: Item, pick: OpenWeaponPick, selectedToolChoices: string[]): boolean {
+  if (pick.filter.toolCategory && item.toolCategory !== pick.filter.toolCategory) return false;
+  if (pick.boundToToolChoice) return selectedToolChoices.includes(item.name);
+  if (pick.filter.toolCategory) return true;
+  return matchesWeaponFilter(item, pick);
+}
+
 /** A single open-pick dropdown, filtered to the pick's weapon-class/range/
- *  toolCategory constraint (#1564). */
-function OpenPickSelect({ pick, catalog, currentPick, onPick }: OpenPickSelectProps) {
-  const matchingItems = catalog.filter((item) => matchesPick(item, pick));
+ *  toolCategory/boundToToolChoice constraint (#1564). */
+function OpenPickSelect({ pick, catalog, currentPick, onPick, selectedToolChoices }: OpenPickSelectProps) {
+  const matchingItems = catalog.filter((item) => matchesPick(item, pick, selectedToolChoices));
   const unfilled = !currentPick;
   return (
     <div className="flex flex-col gap-1">
@@ -102,10 +123,11 @@ interface OpenPickListProps {
   catalog: Item[];
   currentPicks: string[] | undefined;
   onPick: (pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
 }
 
 /** Renders a bundle's open-pick dropdowns (may be none). */
-function OpenPickList({ bundle, catalog, currentPicks, onPick }: OpenPickListProps) {
+function OpenPickList({ bundle, catalog, currentPicks, onPick, selectedToolChoices }: OpenPickListProps) {
   if (!bundle.openPicks?.length) return null;
   return (
     <>
@@ -116,6 +138,7 @@ function OpenPickList({ bundle, catalog, currentPicks, onPick }: OpenPickListPro
           catalog={catalog}
           currentPick={currentPicks?.[pickIdx] ?? ""}
           onPick={(itemName) => onPick(pickIdx, itemName)}
+          selectedToolChoices={selectedToolChoices}
         />
       ))}
     </>
@@ -130,6 +153,7 @@ interface OptionChoiceProps {
   currentPicks: string[] | undefined;
   onChoose: () => void;
   onPick: (pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
 }
 
 // Split out of OptionChoice purely to keep its own cyclomatic complexity low
@@ -140,17 +164,25 @@ function ChosenOpenPicks({
   catalog,
   currentPicks,
   onPick,
+  selectedToolChoices,
 }: {
   isChosen: boolean;
   option: EquipmentBundle;
   catalog: Item[];
   currentPicks: string[] | undefined;
   onPick: (pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
 }) {
   if (!isChosen || !option.openPicks?.length) return null;
   return (
     <div className="ml-5 flex flex-col gap-2">
-      <OpenPickList bundle={option} catalog={catalog} currentPicks={currentPicks} onPick={onPick} />
+      <OpenPickList
+        bundle={option}
+        catalog={catalog}
+        currentPicks={currentPicks}
+        onPick={onPick}
+        selectedToolChoices={selectedToolChoices}
+      />
     </div>
   );
 }
@@ -171,6 +203,7 @@ function OptionChoice({
   currentPicks,
   onChoose,
   onPick,
+  selectedToolChoices,
 }: OptionChoiceProps) {
   return (
     <label
@@ -190,7 +223,14 @@ function OptionChoice({
         />
         <span className="text-sm text-parchment-800">{option.label}</span>
       </div>
-      <ChosenOpenPicks isChosen={isChosen} option={option} catalog={catalog} currentPicks={currentPicks} onPick={onPick} />
+      <ChosenOpenPicks
+        isChosen={isChosen}
+        option={option}
+        catalog={catalog}
+        currentPicks={currentPicks}
+        onPick={onPick}
+        selectedToolChoices={selectedToolChoices}
+      />
       <ChosenFixedSummary isChosen={isChosen} option={option} />
     </label>
   );
@@ -203,12 +243,21 @@ interface EquipmentGroupCardProps {
   catalog: Item[];
   onSetOptionIndex: (groupIdx: number, optionIdx: number) => void;
   onSetOpenPick: (groupIdx: number, pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
 }
 
 /** One choice group's card — auto-granted display or the player's option
  *  radio list, plus any open picks. Split out of StartingEquipmentEditor
  *  purely to keep its own cyclomatic complexity low. */
-function EquipmentGroupCard({ group, groupIdx, sel, catalog, onSetOptionIndex, onSetOpenPick }: EquipmentGroupCardProps) {
+function EquipmentGroupCard({
+  group,
+  groupIdx,
+  sel,
+  catalog,
+  onSetOptionIndex,
+  onSetOpenPick,
+  selectedToolChoices,
+}: EquipmentGroupCardProps) {
   const isAutoGrant = group.options.length === 1;
   const chosenOptionIdx = sel?.optionIndex ?? -1;
   const chosenBundle = chosenOptionIdx >= 0 ? group.options[chosenOptionIdx] : null;
@@ -236,6 +285,7 @@ function EquipmentGroupCard({ group, groupIdx, sel, catalog, onSetOptionIndex, o
               currentPicks={sel?.openPicks}
               onChoose={() => onSetOptionIndex(groupIdx, optionIdx)}
               onPick={(pickIdx, itemName) => onSetOpenPick(groupIdx, pickIdx, itemName)}
+              selectedToolChoices={selectedToolChoices}
             />
           ))}
         </div>
@@ -248,6 +298,7 @@ function EquipmentGroupCard({ group, groupIdx, sel, catalog, onSetOptionIndex, o
           catalog={catalog}
           currentPicks={sel?.openPicks}
           onPick={(pickIdx, itemName) => onSetOpenPick(groupIdx, pickIdx, itemName)}
+          selectedToolChoices={selectedToolChoices}
         />
       )}
     </div>
@@ -347,11 +398,58 @@ function draftWithOpenPick(
   return { mode: "package", selections: newSelections };
 }
 
+interface ModeToggleProps {
+  isPackage: boolean;
+  isGold: boolean;
+  // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564)
+  // — the toggle to that mode is simply not offered.
+  gold: StartingGold | null;
+  onSelectPackage: () => void;
+  onSelectGold: () => void;
+}
+
+// Split out of StartingEquipmentEditor purely to keep its own cyclomatic
+// complexity low.
+function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold }: ModeToggleProps) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={onSelectPackage}
+        className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
+          isPackage
+            ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+            : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
+        }`}
+      >
+        Class equipment package
+      </button>
+      {/* No roll-for-gold path is offered at all when this edition has none
+          (PHB'24, #1564) — PHB'24 reaches gold through a lettered package
+          option instead (StartingEquipmentOption.gold). */}
+      {gold && (
+        <button
+          type="button"
+          onClick={onSelectGold}
+          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            isGold
+              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
+          }`}
+        >
+          Starting gold ({goldLabel(gold)})
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function StartingEquipmentEditor({
   startingEquipment,
   catalog,
   value,
   onChange,
+  selectedToolChoices,
 }: StartingEquipmentEditorProps) {
   if (!startingEquipment) return null;
 
@@ -374,36 +472,13 @@ export default function StartingEquipmentEditor({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Mode toggle */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(draftForMode(startingEquipment!, "package"))}
-          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            isPackage
-              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
-              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
-          }`}
-        >
-          Class equipment package
-        </button>
-        {/* No roll-for-gold path is offered at all when this edition has none
-            (PHB'24, #1564) — PHB'24 reaches gold through a lettered package
-            option instead (StartingEquipmentOption.gold). */}
-        {gold && (
-          <button
-            type="button"
-            onClick={() => onChange(draftForMode(startingEquipment!, "gold"))}
-            className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
-              isGold
-                ? "border-arcane-500 bg-arcane-50 text-arcane-800"
-                : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
-            }`}
-          >
-            Starting gold ({goldLabel(gold)})
-          </button>
-        )}
-      </div>
+      <ModeToggle
+        isPackage={isPackage}
+        isGold={isGold}
+        gold={gold}
+        onSelectPackage={() => onChange(draftForMode(startingEquipment!, "package"))}
+        onSelectGold={() => onChange(draftForMode(startingEquipment!, "gold"))}
+      />
 
       {isPackage && value.mode === "package" && (
         <div className="flex flex-col gap-5">
@@ -416,6 +491,7 @@ export default function StartingEquipmentEditor({
               catalog={catalog}
               onSetOptionIndex={setOptionIndex}
               onSetOpenPick={setOpenPick}
+              selectedToolChoices={selectedToolChoices}
             />
           ))}
         </div>

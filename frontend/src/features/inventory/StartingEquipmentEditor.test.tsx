@@ -86,6 +86,7 @@ describe("StartingEquipmentEditor open picks", () => {
         catalog={catalog}
         value={draft}
         onChange={onChange}
+        selectedToolChoices={[]}
       />,
     );
 
@@ -131,6 +132,7 @@ describe("StartingEquipmentEditor open picks", () => {
         catalog={catalog}
         value={draft}
         onChange={onChange}
+        selectedToolChoices={[]}
       />,
     );
 
@@ -166,6 +168,7 @@ describe("StartingEquipmentEditor — null gold (#1564)", () => {
         catalog={catalog}
         value={packageDraft(startingEquipment)}
         onChange={onChange}
+        selectedToolChoices={[]}
       />,
     );
 
@@ -213,6 +216,7 @@ describe("StartingEquipmentEditor — toolCategory open pick (#1564)", () => {
         catalog={catalog}
         value={draft}
         onChange={onChange}
+        selectedToolChoices={[]}
       />,
     );
 
@@ -226,5 +230,73 @@ describe("StartingEquipmentEditor — toolCategory open pick (#1564)", () => {
       mode: "package",
       selections: [{ optionIndex: 0, openPicks: ["Flute"] }],
     });
+  });
+});
+
+// PR #1567 review, fix 2: a boundToToolChoice pick (Monk's "Artisan's Tools
+// or Musical Instrument chosen for the tool proficiency above") spans two
+// tool categories with no single filter.toolCategory, so matchesPick's old
+// fallback offered every weapon in the catalog — options the backend's
+// boundToolChoiceError would then reject, a dead-end #1336 was filed against.
+// The dropdown must instead offer ONLY the character's own chosen tool
+// proficiencies (selectedToolChoices), regardless of category.
+describe("StartingEquipmentEditor — boundToToolChoice open pick (#1564, #1336)", () => {
+  const startingEquipment: ClassStartingEquipment = {
+    groups: [
+      {
+        label: "Artisan's Tools or Musical Instrument chosen for the tool proficiency above",
+        options: [
+          {
+            label: "The tool chosen above",
+            openPicks: [{ label: "the tool chosen above", filter: {}, boundToToolChoice: true }],
+          },
+        ],
+      },
+    ],
+    gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
+  };
+
+  it("offers only the character's chosen tool proficiency, never every weapon in the catalog", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const draft = packageDraft(startingEquipment, { selections: [{ optionIndex: 0, openPicks: [""] }] });
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={startingEquipment}
+        catalog={catalog}
+        value={draft}
+        onChange={onChange}
+        selectedToolChoices={["Flute"]}
+      />,
+    );
+
+    const select = screen.getByRole("combobox");
+    expect(screen.getByRole("option", { name: "Flute" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Herbalism Kit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Longsword" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Dagger" })).not.toBeInTheDocument();
+
+    await user.selectOptions(select, "Flute");
+    expect(onChange).toHaveBeenCalledWith({
+      mode: "package",
+      selections: [{ optionIndex: 0, openPicks: ["Flute"] }],
+    });
+  });
+
+  it("offers nothing when the character chose a different tool proficiency", () => {
+    const draft = packageDraft(startingEquipment, { selections: [{ optionIndex: 0, openPicks: [""] }] });
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={startingEquipment}
+        catalog={catalog}
+        value={draft}
+        onChange={vi.fn()}
+        selectedToolChoices={["Herbalism Kit"]}
+      />,
+    );
+
+    screen.getByRole("combobox");
+    expect(screen.queryByRole("option", { name: "Flute" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Herbalism Kit" })).toBeInTheDocument();
   });
 });
