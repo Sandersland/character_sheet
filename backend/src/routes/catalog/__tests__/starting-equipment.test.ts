@@ -17,6 +17,11 @@ import { authCookie } from "@/test-support/auth.js";
 const FIXTURE_2014 = JSON.parse(
   readFileSync(fileURLToPath(new URL("./__fixtures__/starting-equipment-2014.json", import.meta.url)), "utf8"),
 );
+// SRD 5.2 (#1535) — transcribed independently of FIXTURE_2014, never derived
+// from it; see starting-equipment.ts's header for the per-class source lines.
+const FIXTURE_2024 = JSON.parse(
+  readFileSync(fileURLToPath(new URL("./__fixtures__/starting-equipment-2024.json", import.meta.url)), "utf8"),
+);
 
 const OWNER_ID = "owner-starting-equipment";
 let COOKIE: string;
@@ -44,18 +49,18 @@ describe("GET /api/reference — startingEquipment (#1534)", () => {
 
   // Asserted SEPARATELY from the 2014 case (not derived from that response) so
   // the two editions are proven to resolve independently rather than by one
-  // shared code path returning one answer. #1533's EDITION_2024 rows are an
-  // interim verbatim copy of the 2014 ones (#1535, parked, replaces them), so
-  // the expected content is the SAME fixture — that sameness is the seed
-  // content's property, not this test's; do not read a green run here as "the
-  // 2024 content is real".
-  it("EDITION_2024 returns the same twelve packages (the #1533 interim copy)", async () => {
+  // shared code path returning one answer. FIXTURE_2024 is SRD 5.2 content
+  // (#1535), transcribed independently of FIXTURE_2014 — a passing run here
+  // asserts real VALUES (this class's option A grants exactly these items and
+  // this much gold), not merely "differs from 2014", which would pass on any
+  // wrong transcription just as readily as a correct one.
+  it("EDITION_2024 deep-equals the SRD 5.2 fixture for all twelve classes", async () => {
     const response = await supertest
       .agent(createApp())
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_2024");
 
     expect(response.status).toBe(200);
-    expect(startingEquipmentByName(response.body)).toEqual(FIXTURE_2014);
+    expect(startingEquipmentByName(response.body)).toEqual(FIXTURE_2024);
   });
 });

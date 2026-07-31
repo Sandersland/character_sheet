@@ -7,7 +7,9 @@
 // a Monk take an instrument they have no proficiency with, which the book
 // does not permit). A fixture class (same "safe from assertEveryClassEdition
 // HasPackage" reasoning as starting-equipment-edition.test.ts) proves all
-// three branches, since no real seeded package exercises them until #1535.
+// three branches in isolation; the real Bard/Monk EDITION_2024 packages (#1535)
+// exercise the same two non-weapon branches end-to-end in
+// starting-equipment-2024-content.test.ts.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 

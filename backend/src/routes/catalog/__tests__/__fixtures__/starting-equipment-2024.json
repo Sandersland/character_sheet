@@ -1,0 +1,291 @@
+{
+  "Barbarian": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Greataxe, 4 Handaxes, Explorer's Pack, and 15 GP",
+            "items": [
+              { "catalogName": "Greataxe" },
+              { "catalogName": "Handaxe", "quantity": 4 },
+              { "catalogName": "Explorer's Pack" }
+            ],
+            "gold": 15
+          },
+          { "label": "(B) 75 GP", "gold": 75 }
+        ]
+      }
+    ]
+  },
+  "Bard": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Leather Armor, 2 Daggers, a Musical Instrument of your choice, Entertainer's Pack, and 19 GP",
+            "items": [
+              { "catalogName": "Leather Armor" },
+              { "catalogName": "Dagger", "quantity": 2 },
+              { "catalogName": "Entertainer's Pack" }
+            ],
+            "openPicks": [
+              { "label": "a musical instrument of your choice", "filter": { "toolCategory": "musicalInstrument" } }
+            ],
+            "gold": 19
+          },
+          { "label": "(B) 90 GP", "gold": 90 }
+        ]
+      }
+    ]
+  },
+  "Cleric": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Chain Shirt, Shield, Mace, Holy Symbol, Priest's Pack, and 7 GP",
+            "items": [
+              { "catalogName": "Chain Shirt" },
+              { "catalogName": "Shield" },
+              { "catalogName": "Mace" },
+              { "catalogName": "Holy Symbol" },
+              { "catalogName": "Priest's Pack" }
+            ],
+            "gold": 7
+          },
+          { "label": "(B) 110 GP", "gold": 110 }
+        ]
+      }
+    ]
+  },
+  "Druid": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Leather Armor, Shield, Sickle, a Quarterstaff (Druidic Focus), Explorer's Pack, Herbalism Kit, and 9 GP",
+            "items": [
+              { "catalogName": "Leather Armor" },
+              { "catalogName": "Shield" },
+              { "catalogName": "Sickle" },
+              { "catalogName": "Quarterstaff" },
+              { "catalogName": "Explorer's Pack" },
+              { "catalogName": "Herbalism Kit" }
+            ],
+            "gold": 9
+          },
+          { "label": "(B) 50 GP", "gold": 50 }
+        ]
+      }
+    ]
+  },
+  "Fighter": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Chain Mail, Greatsword, Flail, 8 Javelins, Dungeoneer's Pack, and 4 GP",
+            "items": [
+              { "catalogName": "Chain Mail" },
+              { "catalogName": "Greatsword" },
+              { "catalogName": "Flail" },
+              { "catalogName": "Javelin", "quantity": 8 },
+              { "catalogName": "Dungeoneer's Pack" }
+            ],
+            "gold": 4
+          },
+          {
+            "label": "(B) Studded Leather Armor, Scimitar, Shortsword, Longbow, 20 Arrows, Quiver, Dungeoneer's Pack, and 11 GP",
+            "items": [
+              { "catalogName": "Studded Leather Armor" },
+              { "catalogName": "Scimitar" },
+              { "catalogName": "Shortsword" },
+              { "catalogName": "Longbow" },
+              { "catalogName": "Arrows", "quantity": 20 },
+              { "catalogName": "Quiver" },
+              { "catalogName": "Dungeoneer's Pack" }
+            ],
+            "gold": 11
+          },
+          { "label": "(C) 155 GP", "gold": 155 }
+        ]
+      }
+    ]
+  },
+  "Monk": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Spear, 5 Daggers, Artisan's Tools or a Musical Instrument (chosen for the tool proficiency above), Explorer's Pack, and 11 GP",
+            "items": [
+              { "catalogName": "Spear" },
+              { "catalogName": "Dagger", "quantity": 5 },
+              { "catalogName": "Explorer's Pack" }
+            ],
+            "openPicks": [
+              {
+                "label": "Artisan's Tools or a Musical Instrument (chosen for the tool proficiency above)",
+                "filter": {},
+                "boundToToolChoice": true
+              }
+            ],
+            "gold": 11
+          },
+          { "label": "(B) 50 GP", "gold": 50 }
+        ]
+      }
+    ]
+  },
+  "Paladin": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Chain Mail, Shield, Longsword, 6 Javelins, Holy Symbol, Priest's Pack, and 9 GP",
+            "items": [
+              { "catalogName": "Chain Mail" },
+              { "catalogName": "Shield" },
+              { "catalogName": "Longsword" },
+              { "catalogName": "Javelin", "quantity": 6 },
+              { "catalogName": "Holy Symbol" },
+              { "catalogName": "Priest's Pack" }
+            ],
+            "gold": 9
+          },
+          { "label": "(B) 150 GP", "gold": 150 }
+        ]
+      }
+    ]
+  },
+  "Ranger": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Studded Leather Armor, Scimitar, Shortsword, Longbow, 20 Arrows, Quiver, Druidic Focus (sprig of mistletoe), Explorer's Pack, and 7 GP",
+            "items": [
+              { "catalogName": "Studded Leather Armor" },
+              { "catalogName": "Scimitar" },
+              { "catalogName": "Shortsword" },
+              { "catalogName": "Longbow" },
+              { "catalogName": "Arrows", "quantity": 20 },
+              { "catalogName": "Quiver" },
+              { "catalogName": "Druidic Focus" },
+              { "catalogName": "Explorer's Pack" }
+            ],
+            "gold": 7
+          },
+          { "label": "(B) 150 GP", "gold": 150 }
+        ]
+      }
+    ]
+  },
+  "Rogue": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Leather Armor, 2 Daggers, Shortsword, Shortbow, 20 Arrows, Quiver, Thieves' Tools, Burglar's Pack, and 8 GP",
+            "items": [
+              { "catalogName": "Leather Armor" },
+              { "catalogName": "Dagger", "quantity": 2 },
+              { "catalogName": "Shortsword" },
+              { "catalogName": "Shortbow" },
+              { "catalogName": "Arrows", "quantity": 20 },
+              { "catalogName": "Quiver" },
+              { "catalogName": "Thieves' Tools" },
+              { "catalogName": "Burglar's Pack" }
+            ],
+            "gold": 8
+          },
+          { "label": "(B) 100 GP", "gold": 100 }
+        ]
+      }
+    ]
+  },
+  "Sorcerer": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Spear, 2 Daggers, Arcane Focus (a Crystal), Dungeoneer's Pack, and 28 GP",
+            "items": [
+              { "catalogName": "Spear" },
+              { "catalogName": "Dagger", "quantity": 2 },
+              { "catalogName": "Crystal" },
+              { "catalogName": "Dungeoneer's Pack" }
+            ],
+            "gold": 28
+          },
+          { "label": "(B) 50 GP", "gold": 50 }
+        ]
+      }
+    ]
+  },
+  "Warlock": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) Leather Armor, Sickle, 2 Daggers, Arcane Focus (an Orb), a Book of Lore (occult lore), Scholar's Pack, and 15 GP",
+            "items": [
+              { "catalogName": "Leather Armor" },
+              { "catalogName": "Sickle" },
+              { "catalogName": "Dagger", "quantity": 2 },
+              { "catalogName": "Orb" },
+              { "catalogName": "Book of Lore" },
+              { "catalogName": "Scholar's Pack" }
+            ],
+            "gold": 15
+          },
+          { "label": "(B) 100 GP", "gold": 100 }
+        ]
+      }
+    ]
+  },
+  "Wizard": {
+    "gold": null,
+    "groups": [
+      {
+        "label": "Starting Equipment",
+        "options": [
+          {
+            "label": "(A) 2 Daggers, Arcane Focus (a Quarterstaff), a Robe, a Spellbook, Scholar's Pack, and 5 GP",
+            "items": [
+              { "catalogName": "Dagger", "quantity": 2 },
+              { "catalogName": "Quarterstaff" },
+              { "catalogName": "Robe" },
+              { "catalogName": "Spellbook" },
+              { "catalogName": "Scholar's Pack" }
+            ],
+            "gold": 5
+          },
+          { "label": "(B) 55 GP", "gold": 55 }
+        ]
+      }
+    ]
+  }
+}
