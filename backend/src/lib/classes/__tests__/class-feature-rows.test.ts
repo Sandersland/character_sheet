@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { featuresFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { derivedStatFromRows, featuresFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 
 function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
   return { name: "Test Feature", level: 1, description: "test description", edition: "EDITION_2014", ...overrides };
@@ -56,6 +56,46 @@ describe("featuresFromRows edition + level truth table (#1524, retired from #137
 
   it("an empty row list produces an empty feature list (the no-carrier default every narrow-select caller falls back to)", () => {
     expect(featuresFromRows([], 20, "class", "EDITION_2024")).toEqual([]);
+  });
+});
+
+describe("derivedStatFromRows (#1530) — same edition/level truth table as featuresFromRows, plus MAX-across-rows", () => {
+  it("a row tagged for the matching edition, at or below level, whose tier is reached, contributes its value", () => {
+    const rows = [row({ derivedStat: "attacksPerAction", derivedStatTiers: [{ minLevel: 5, value: 2 }] })];
+    expect(derivedStatFromRows(rows, 4, "EDITION_2014", "attacksPerAction")).toBeUndefined();
+    expect(derivedStatFromRows(rows, 5, "EDITION_2014", "attacksPerAction")).toBe(2);
+  });
+
+  it("a row above the character's level is excluded regardless of tier content", () => {
+    const rows = [row({ level: 5, derivedStat: "attacksPerAction", derivedStatTiers: [{ minLevel: 5, value: 2 }] })];
+    expect(derivedStatFromRows(rows, 4, "EDITION_2014", "attacksPerAction")).toBeUndefined();
+  });
+
+  it("a row tagged for the OTHER edition is excluded — never falls back", () => {
+    const rows = [row({ edition: "EDITION_2014", derivedStat: "attacksPerAction", derivedStatTiers: [{ minLevel: 1, value: 2 }] })];
+    expect(derivedStatFromRows(rows, 20, "EDITION_2024", "attacksPerAction")).toBeUndefined();
+  });
+
+  it("a row naming a DIFFERENT derivedStat is excluded", () => {
+    const rows = [row({ derivedStat: "somethingElse", derivedStatTiers: [{ minLevel: 1, value: 99 }] })];
+    expect(derivedStatFromRows(rows, 20, "EDITION_2014", "attacksPerAction")).toBeUndefined();
+  });
+
+  it("takes the MAX across every qualifying row, not the first match — lets a base-class row and a subclass row compose", () => {
+    const rows = [
+      row({ name: "Extra Attack", derivedStat: "attacksPerAction", derivedStatTiers: [{ minLevel: 5, value: 2 }] }),
+      row({ name: "Some Subclass Bonus Attack", derivedStat: "attacksPerAction", derivedStatTiers: [{ minLevel: 5, value: 4 }] }),
+    ];
+    expect(derivedStatFromRows(rows, 20, "EDITION_2014", "attacksPerAction")).toBe(4);
+  });
+
+  it("a row whose derivedStatTiers has a string value (e.g. a future crit-range column) is ignored, not coerced", () => {
+    const rows = [row({ derivedStat: "attacksPerAction", derivedStatTiers: [{ minLevel: 1, value: "19-20" }] })];
+    expect(derivedStatFromRows(rows, 20, "EDITION_2014", "attacksPerAction")).toBeUndefined();
+  });
+
+  it("an empty row list returns undefined (the caller supplies the floor, not this function)", () => {
+    expect(derivedStatFromRows([], 20, "EDITION_2024", "attacksPerAction")).toBeUndefined();
   });
 });
 

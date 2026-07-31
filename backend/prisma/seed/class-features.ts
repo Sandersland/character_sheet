@@ -194,6 +194,13 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
     name: raw.feature.name,
     level: raw.feature.level,
     description: raw.feature.description,
+    // #1530: the only two descriptor columns an AuthoredFeature may set
+    // today. `undefined` passes straight through — writeResolvedRows'
+    // authoredDescriptors (seed-class-features.ts) skips undefined keys, so
+    // the eleven classes' hundreds of other rows keep resolving to
+    // DESCRIPTOR_RESET exactly as before this field existed.
+    derivedStat: raw.feature.derivedStat,
+    derivedStatTiers: raw.feature.derivedStatTiers,
   };
   const editions: SeedEdition[] = raw.feature.edition ? [raw.feature.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));

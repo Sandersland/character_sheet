@@ -34,6 +34,10 @@ const BARBARIAN_FEATURES: AuthoredFeature[] = [
     level: 5,
     source: "class",
     description: "You can attack twice whenever you take the Attack action on your turn.",
+    // #1530: edition-invariant (SRD 5.1 / SRD 5.2 Barbarian, Extra Attack) —
+    // one flat tier, no further scaling at higher levels (unlike Fighter).
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
   },
   {
     name: "Fast Movement",

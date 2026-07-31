@@ -30,6 +30,19 @@ export interface ResourceDieTier {
 }
 
 /**
+ * One tier of a permanent, level-gated derived-stat modifier (#1530) —
+ * ASCENDING by minLevel, last-match-wins, same invariant as
+ * ResourceTotalTier/ResourceDieTier. `value` is `number | string` because the
+ * vocabulary is shared across future derivedStat columns (crit range, #1120,
+ * would want a string like `"19-20"`); attacksPerAction only ever reads the
+ * numeric case (derivedStatFromRows below).
+ */
+export interface DerivedStatTier {
+  minLevel: number;
+  value: number | string;
+}
+
+/**
  * ClassFeature's resource-block columns (schema.prisma) — the row-authored
  * counterpart to a resourceFn's returned pool. `resourceKey` absent means this
  * row declares no pool.
@@ -96,6 +109,12 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   saveEffect?: string | null;
   buffTarget?: string | null;
   buffModifier?: number | null;
+  // Permanent derived-stat modifier block (#1530) — distinct from #900's C2b
+  // buff layer, which is duration-bound. `derivedStat` names the SERIALIZED
+  // field it feeds (e.g. "attacksPerAction"), so a reader can grep from the
+  // wire back to the row.
+  derivedStat?: string | null;
+  derivedStatTiers?: DerivedStatTier[] | null;
 }
 
 /**
@@ -184,4 +203,32 @@ export function poolsFromRows(rows: readonly ClassFeatureRow[], level: number, e
     if (pool) pools.push(pool);
   }
   return pools;
+}
+
+/**
+ * The MAX numeric derivedStatTiers value across every row named `stat`, at
+ * one character level — the row-driven counterpart to a hardcoded per-class
+ * Record (e.g. the retired EXTRA_ATTACK_TIERS, #1530). Takes the max over
+ * EVERY qualifying row rather than the first match, which is what lets a
+ * base-class row (Fighter's own "Extra Attack") and a subclass row (College
+ * of Valor's) compose without either shadowing the other — same rationale as
+ * poolsFromRows collecting every row instead of stopping at one. Filters by
+ * edition + grant level exactly like featuresFromRows/poolsFromRows.
+ * `undefined` return means no qualifying row at this level — the caller
+ * supplies the floor (deriveAttacksPerAction's `1`), not this function.
+ */
+export function derivedStatFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+  stat: string,
+): number | undefined {
+  let best: number | undefined;
+  for (const row of rows) {
+    if (row.edition !== edition || row.level > level || row.derivedStat !== stat) continue;
+    const tier = tierAt(row.derivedStatTiers, level);
+    if (tier === undefined || typeof tier.value !== "number") continue;
+    best = best === undefined ? tier.value : Math.max(best, tier.value);
+  }
+  return best;
 }
