@@ -122,7 +122,7 @@ describe("reconciler == clamp-on-read for an over-cap Fighter (#1529)", () => {
 });
 
 describe("homebrew entry named exactly like a catalog class (#1529) — resolution is by classId only", () => {
-  it("a classId: null entry named 'Fighter' gets the base 5-slot ASI schedule, no FS slot, no proficiencies, no primary abilities, no multiclass prerequisite", async () => {
+  it("a classId: null entry named 'Fighter' gets the base 5-slot ASI schedule, no FS slot, no proficiencies", async () => {
     await prisma.character.create({
       data: {
         ...BASE,
