@@ -34,9 +34,9 @@ referenceRouter.get("/reference", async (req, res) => {
   const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
   // Narrowed to at-most-two-per-key at the DB (withEditionOrShared), then
   // resolveEditionCatalog picks the one row per business key — same D3 shape
-  // as originFeatRows/universalActionRows below. `edition` rides along
-  // unselected-out (no `select` here, so the full row includes it) purely to
-  // drive the resolution; the projections below never forward it to the wire.
+  // as originFeatRows/universalActionRows below. `edition` is present on the
+  // full row (no `select` strips it) purely to drive that resolution; the
+  // projections below never forward it to the wire.
   const rawClasses = await prisma.characterClass.findMany({
     orderBy: { name: "asc" },
     include: { subclasses: { where: withEditionOrShared({}, edition), orderBy: { name: "asc" } } },

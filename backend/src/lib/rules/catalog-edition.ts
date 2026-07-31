@@ -82,7 +82,11 @@ export function withEditionOrShared<Where extends object>(
  * than defaulting to `row.name`: Feat/GrantedAbility/Action/Background key on
  * name alone, but Subclass's business key is `(classId, name)` — a bare
  * name-default would silently collapse two same-named subclasses under
- * different classes. Order of the input is preserved for each group's first
+ * different classes. That compound key is only needed when the input spans
+ * classes: a caller resolving ONE class's own `subclasses` relation (#1336)
+ * has a constant classId across the slice, so `name` alone is sufficient
+ * there and the compound form would read as a guard against something that
+ * cannot happen. Order of the input is preserved for each group's first
  * occurrence.
  */
 export function resolveEditionCatalog<T extends EditionTagged>(
