@@ -14,6 +14,7 @@ import {
 // would close an import cycle back through combat/hitpoints.ts.
 import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources-state.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { FEATURE_ROWS_ORDER_BY } from "@/lib/classes/feature-rows-select.js";
 import {
   InvalidHitPointOperationError,
   normalizeHitPoints,
@@ -128,10 +129,20 @@ export async function buildHpOpContext(
           position: true,
           // `features` (#1528 chunk 0): deriveRestPools' featureRows carrier —
           // see ClassEntryRow's own comment for why this can't just spread
-          // FEATURE_ROWS_ENTRY_SELECT in. `extraAsiLevels` (#1529): the
-          // featSlotCap read below (characterAdvancementSlots).
-          class: { select: { hitDie: true, extraAsiLevels: true, features: { where: { subclassId: null } } } },
-          subclassRef: { select: { features: true } },
+          // FEATURE_ROWS_ENTRY_SELECT in. It still has to repeat that
+          // fragment's FEATURE_ROWS_ORDER_BY: Postgres makes no ordering
+          // guarantee absent an explicit orderBy, and this is the one feature
+          // read that cannot share the fragment, so it is where drift hides
+          // (#1545). `extraAsiLevels` (#1529): the featSlotCap read below
+          // (characterAdvancementSlots).
+          class: {
+            select: {
+              hitDie: true,
+              extraAsiLevels: true,
+              features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+            },
+          },
+          subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
         },
       },
     },

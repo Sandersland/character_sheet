@@ -19,9 +19,23 @@ import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import { barbarian } from "@/lib/classes/barbarian.js";
+import { bard } from "@/lib/classes/bard.js";
+import { cleric } from "@/lib/classes/cleric.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
+import { druid } from "@/lib/classes/druid.js";
+import { monk } from "@/lib/classes/monk.js";
+import { paladin } from "@/lib/classes/paladin.js";
+import { ranger } from "@/lib/classes/ranger.js";
+import { rogue } from "@/lib/classes/rogue.js";
+import { sorcerer } from "@/lib/classes/sorcerer.js";
+import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
+import type { ClassDefinition } from "@/lib/classes/types.js";
+import { warlock } from "@/lib/classes/warlock.js";
+import { wizard } from "@/lib/classes/wizard.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
+import { CLASS_SUBCLASSES } from "./class-subclasses.fixture.js";
 import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
 
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 12, intelligence: 14, wisdom: 16, charisma: 16 };
@@ -126,4 +140,54 @@ describe("real registry: the overlay still wins for every class still on the TS 
   // subject to test empirically; the overlay mechanism itself (registry.ts's
   // second SUBCLASSES loop unconditionally overwriting the identity-only
   // seed) is still covered structurally by Champion's/Wizard's cases here.
+});
+
+// #1557 review: registry.ts builds SUBCLASSES in two passes — SUBCLASS_IDENTITY
+// keyed by `nameKey` first, then each TS ClassDefinition's `subclasses` keyed by
+// its own map key. Its comment claims the second pass "immediately replaces"
+// the first for every still-TS-registered subclass, which is true ONLY while
+// the two spellings are the same string. Diverge them and both survive under
+// different keys: a character whose persisted `subclass` matches the nameKey
+// silently resolves to the identity-only `{ slug }` stub — no resourceFn, no
+// deriveExtras, no choices — while the richer definition sits unreachable. That
+// is a behaviour regression no type and no existing test could see, so assert it.
+const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
+  barbarian,
+  bard,
+  cleric,
+  druid,
+  monk,
+  paladin,
+  ranger,
+  rogue,
+  sorcerer,
+  warlock,
+  wizard,
+};
+
+describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () => {
+  it("every TS subclass map key is exactly the nameKey its own declared slug resolves to", () => {
+    const mismatches: string[] = [];
+    for (const [classKey, def] of Object.entries(TS_REGISTERED_CLASSES)) {
+      for (const [mapKey, subclassDef] of Object.entries(def.subclasses ?? {})) {
+        const identity = SUBCLASS_IDENTITY[subclassDef.slug];
+        if (identity.nameKey !== mapKey || identity.classKey !== classKey) {
+          mismatches.push(
+            `${classKey}.subclasses["${mapKey}"] declares slug "${subclassDef.slug}", whose identity is ${identity.classKey}/"${identity.nameKey}"`,
+          );
+        }
+      }
+    }
+    expect(mismatches).toEqual([]);
+  });
+
+  // Keeps the map above honest: a twelfth class added to registry.ts's CLASSES
+  // but not here would leave its subclasses unchecked by the test above, and
+  // nothing else would notice. CLASS_SUBCLASSES is maintained by two other
+  // suites, so tying to it means the omission fails HERE rather than silently
+  // shrinking coverage. Fighter is the one class with no TS module at all
+  // (#1532 deleted it) — its three subclasses are identity-only by design.
+  it("covers every class in CLASS_SUBCLASSES except Fighter, which has no TS module", () => {
+    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter"])).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
+  });
 });

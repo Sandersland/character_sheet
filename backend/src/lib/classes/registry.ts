@@ -244,9 +244,15 @@ function deriveRowExtras(
 // sources for the same field today (Battle Master is rows-only after this
 // issue; the other eleven classes' subclasses are ExtrasFn-only), so the
 // merge order is defense-in-depth, not a live collision.
+// Returns undefined rather than {} when neither side contributes a field, so
+// "has extras" is the single predicate `extras !== undefined` at both the
+// null-check and the Object.assign below — an empty object is falsy to
+// Object.keys().length but truthy to `if`, and having the two disagree is how
+// a reader concludes the assign is guarded when it isn't.
 function combineExtras(fromFn: ClassExtras | undefined, fromRows: ClassExtras | undefined): ClassExtras | undefined {
   if (!fromFn && !fromRows) return undefined;
-  return { ...fromRows, ...fromFn };
+  const merged = { ...fromRows, ...fromFn };
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 // The generic subclass "choose N" list (#899): each catalog entry's level-gated
@@ -314,7 +320,7 @@ export function deriveResources(
     deriveRowExtras(sub, featureRows?.subclassRows ?? [], level, edition, abilityScores, profBonus),
   );
   const subclassChoices = deriveSubclassChoiceList(sub, level);
-  const hasExtras = (extras !== undefined && Object.keys(extras).length > 0) || subclassChoices !== undefined;
+  const hasExtras = extras !== undefined || subclassChoices !== undefined;
 
   // Return null only for truly unknown/empty classes
   if (resources.length === 0 && features.length === 0 && !hasExtras) return null;
