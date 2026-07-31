@@ -9,7 +9,7 @@ import type {
   EquipmentBundle,
   EquipmentChoiceGroup,
   FixedItemRef,
-  OpenWeaponPick,
+  OpenPick,
 } from "@character-sheet/shared-types";
 
 // Shared Prisma include shape, all the way down to items/openPicks.
@@ -60,7 +60,7 @@ function mapItem(item: RowItem): FixedItemRef {
 // exercises that yet). toolCategory (#1564) is the non-weapon axis; boundToToolChoice
 // is omitted when false (every existing weapon pick) so it round-trips
 // through seed-starting-equipment.ts's openPickCreateInput unchanged.
-function mapOpenPick(pick: RowOpenPick): OpenWeaponPick {
+function mapOpenPick(pick: RowOpenPick): OpenPick {
   return {
     label: pick.label,
     filter: {

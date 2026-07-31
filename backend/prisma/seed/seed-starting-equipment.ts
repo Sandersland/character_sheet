@@ -11,7 +11,7 @@ import type {
   EquipmentBundle,
   EquipmentChoiceGroup,
   FixedItemRef,
-  OpenWeaponPick,
+  OpenPick,
 } from "@character-sheet/shared-types";
 
 import { CLASSES } from "./catalog-data.js";
@@ -39,7 +39,7 @@ function itemCreateInput(item: FixedItemRef, position: number) {
 // to keep that function's own cyclomatic complexity low (this file's header
 // on why prisma/seed/** floors at the uncovered-CRAP formula regardless of
 // real test coverage).
-function openPickFilterCreateInput(filter: OpenWeaponPick["filter"]) {
+function openPickFilterCreateInput(filter: OpenPick["filter"]) {
   return {
     weaponClass: filter.weaponClass ?? null,
     weaponRange: filter.range ?? null,
@@ -50,7 +50,7 @@ function openPickFilterCreateInput(filter: OpenWeaponPick["filter"]) {
 // boundToToolChoice/quantity are this function's inverse of mapOpenPick's own
 // omission rules — a false/undefined boundToToolChoice defaults to the
 // column's own default (false).
-function openPickCreateInput(pick: OpenWeaponPick, position: number) {
+function openPickCreateInput(pick: OpenPick, position: number) {
   return {
     position,
     label: pick.label,
@@ -289,8 +289,8 @@ function throwIfPopulationFailures(failures: readonly string[]): void {
     [
       "seedStartingEquipment: StartingEquipmentPackage population guard failed (#1533) —",
       ...failures,
-      "Re-run `npx prisma db seed`. This guard asserts PRESENCE only, never that the",
-      "2024 package is genuine 2024 content (#1535, parked).",
+      "Re-run `npx prisma db seed`. This guard asserts PRESENCE only, never content",
+      "correctness (starting-equipment.test.ts's job).",
     ].join("\n"),
   );
 }
@@ -315,10 +315,10 @@ function throwIfPopulationFailures(failures: readonly string[]): void {
  * filter at all.
  *
  * PRESENCE ONLY: "a package exists with >= 1 group" says nothing about
- * whether its EDITION_2024 content is genuinely PHB'24 (it isn't — #1533's
- * "interim" 2024 rows are verbatim 2014 copies; only #1535, parked, would
- * establish real 2024 content). A green run here must never be read as "the
- * 2024 packages are real".
+ * whether its content is a correct transcription of that edition's rules text
+ * — this guard would pass equally on a package with the right group count and
+ * the wrong items. Content correctness is starting-equipment.test.ts's job
+ * (value assertions against a committed fixture per edition, #1535).
  *
  * Exported so a test can call it against a deliberately broken DB state.
  */

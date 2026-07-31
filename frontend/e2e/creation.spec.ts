@@ -11,9 +11,15 @@ function continueStep(page: Page) {
   return page.getByRole("button", { name: /Continue/ }).click();
 }
 
-// Walks the guided creation ceremony end-to-end and lands on the new sheet. Uses
-// the starting-gold path for the equipment step — a single deterministic choice
-// that completes the package regardless of catalog contents.
+// Equipment step, default (2024) edition: PHB'24's package has no roll-for-gold
+// rule at all (#1535), so "Starting gold" isn't offered — pick the class's
+// lettered option (A) instead, a single deterministic choice with no open
+// picks for either class this spec creates (Fighter, Warlock).
+function chooseEquipmentOptionA(page: Page) {
+  return page.getByRole("radio", { name: /^\(A\)/ }).check();
+}
+
+// Walks the guided creation ceremony end-to-end and lands on the new sheet.
 test("creation: guided ceremony lands on the sheet with the chosen class", async ({ page }) => {
   const name = uniqueName("Forged Hero");
 
@@ -46,10 +52,9 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   // Skills & Tools step — no required picks for this build.
   await continueStep(page);
 
-  // Equipment step — choose the starting-gold option and roll a valid amount. The
-  // gold roll label carries a ×N multiplier, distinguishing it from "Roll 4d6".
-  await page.getByRole("button", { name: /Starting gold/ }).click();
-  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  // Equipment step — the 2024 Fighter package's option (A) (chain mail etc.),
+  // no open picks required.
+  await chooseEquipmentOptionA(page);
   await continueStep(page);
 
   // Review step — create.
@@ -112,9 +117,9 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await page.getByRole("button", { name: "Add Hideous Laughter" }).click();
   await continueStep(page);
 
-  // Equipment step — the deterministic starting-gold path (as above).
-  await page.getByRole("button", { name: /Starting gold/ }).click();
-  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  // Equipment step — the 2024 Warlock package's option (A) (no roll-for-gold
+  // rule under PHB'24, #1535; same reasoning as the Fighter test above).
+  await chooseEquipmentOptionA(page);
   await continueStep(page);
 
   // Review step — create.
@@ -176,7 +181,10 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   await page.getByRole("button", { name: "Add Hideous Laughter" }).click();
   await continueStep(page);
 
-  // Equipment step — the deterministic starting-gold path (as above).
+  // Equipment step — unlike the 2024 case above, a 2014 Warlock package still
+  // has a roll-for-gold rule, so the starting-gold path remains reachable
+  // here. The gold roll label carries a ×N multiplier, distinguishing it from
+  // "Roll 4d6".
   await page.getByRole("button", { name: /Starting gold/ }).click();
   await page.getByRole("button", { name: /^Roll.*×/ }).click();
   await continueStep(page);

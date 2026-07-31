@@ -76,13 +76,12 @@ referenceRouter.get("/reference", async (req, res) => {
   //
   // Scope latch (#1336): backgrounds and each class's subclasses (below) are now
   // resolved per the requesting edition, same mechanism as originFeatRows and
-  // universalActionRows. `startingEquipment` (above) is ALSO now resolved per
+  // universalActionRows. `startingEquipment` (above) is ALSO resolved per
   // requesting edition — by an exact (classId, edition) match rather than
   // resolveEditionCatalog's fallback, since StartingEquipmentPackage.edition is
-  // non-nullable (#1534). That resolution is real; the CONTENT it resolves to
-  // is not — #1533's EDITION_2024 rows are an interim verbatim copy of 2014's,
-  // so a 2024 character still gets PHB'14 gear until #1535 (parked) authors the
-  // real packages. Still deliberately unfiltered by this endpoint: `races`
+  // non-nullable (#1534) — and, since #1535, that resolution reaches genuinely
+  // different SRD 5.2 content, not a 2014 copy: a 2024 character gets the real
+  // PHB'24 package. Still deliberately unfiltered by this endpoint: `races`
   // (species divergence is real — ability increases, roster membership — but
   // not representable by an edition column alone, #1518); `classes` themselves
   // (one CharacterClass row serves both editions by design, subclassGateLevel

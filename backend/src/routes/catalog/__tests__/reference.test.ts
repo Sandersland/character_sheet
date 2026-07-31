@@ -518,13 +518,16 @@ describe("GET /api/reference", () => {
   });
 
   // #1308: CharacterClass has no edition column by design — one row serves
-  // both editions, and subclassGateLevel is its only edition-divergent field.
-  // `subclasses` is excluded from this comparison because #1336 makes THAT
-  // field edition-filtered on purpose (the describe block above); this latch
+  // both editions, and subclassGateLevel is an edition-divergent field on it.
+  // `subclasses` is excluded because #1336 makes THAT field edition-filtered
+  // on purpose (the describe block above); `startingEquipment` is excluded
+  // because #1535 makes IT genuinely edition-divergent content too (a real
+  // PHB'24 package, not the pre-#1535 2014 copy) via the same exact
+  // (classId, edition) resolution as subclasses, not a fallback. This latch
   // guards every OTHER class field against a future "for symmetry" filter,
   // same shape as this file's itemRarities latch (edition-invariant, not
   // edition-resolved).
-  it("classes (apart from subclassGateLevel/subclasses) and races are identical between editions (#1308)", async () => {
+  it("classes (apart from subclassGateLevel/subclasses/startingEquipment) and races are identical between editions (#1308/#1535)", async () => {
     const app = createApp();
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
@@ -533,6 +536,7 @@ describe("GET /api/reference", () => {
       const rest = { ...c };
       delete rest.subclassGateLevel;
       delete rest.subclasses;
+      delete rest.startingEquipment;
       return rest;
     };
     expect(res2014.body.classes.map(stripEditionDivergentFields)).toEqual(

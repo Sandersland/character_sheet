@@ -36,7 +36,7 @@ export interface FixedItemRef {
  * character's own creation tool choices (Monk's "Artisan's Tools or Musical
  * Instrument chosen for the tool proficiency above"; omitted when false).
  */
-export interface OpenWeaponPick {
+export interface OpenPick {
   label: string;
   filter: OpenPickFilter;
   quantity?: number; // default 1
@@ -53,7 +53,7 @@ export interface OpenWeaponPick {
 export interface EquipmentBundle {
   label: string;
   items?: FixedItemRef[];
-  openPicks?: OpenWeaponPick[];
+  openPicks?: OpenPick[];
   gold?: number;
 }
 

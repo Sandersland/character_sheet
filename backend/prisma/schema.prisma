@@ -849,10 +849,11 @@ model ClassFeature {
 // and a JSON blob would put catalogName/weaponClass references beyond zod's
 // reach (#1247/#1408). `edition` is NON-NULLABLE: there is no edition-neutral
 // starting package, and a nullable column here is exactly how a 2014 package
-// would silently serve a 2024 character (the bug #1535, parked, still needs to
-// fix — #1534 relocated the bug from a TS module into rows, it did not fix
-// it). With `edition` NOT NULL, @@unique([classId, edition]) needs no NULLS
-// NOT DISTINCT clause (contrast ClassFeature's nullable-subclassId trap).
+// would silently serve a 2024 character — the bug #1519 was filed for, which
+// #1534 relocated from a TS module into rows and #1535 finally fixed by
+// authoring the real SRD 5.2 packages. With `edition` NOT NULL,
+// @@unique([classId, edition]) needs no NULLS NOT DISTINCT clause (contrast
+// ClassFeature's nullable-subclassId trap).
 model StartingEquipmentPackage {
   id      String         @id @default(uuid())
   classId String

@@ -1,9 +1,12 @@
 // Edition independence at the WRITE path (#1534, [R4]/[R5]). The real seeded
-// EDITION_2024 packages are #1533's interim verbatim copy of EDITION_2014's,
-// so they cannot prove per-edition resolution — content is identical by
-// construction. A fixture class with two StartingEquipmentPackage rows whose
-// content genuinely DIFFERS between editions is the only way to prove
-// character-create.ts resolves (classId, edition) rather than classId alone.
+// EDITION_2024 packages now carry genuine SRD 5.2 content (#1535), but that
+// content's gold is per-option (StartingEquipmentOption.gold) with the
+// package-level dice columns NULL — unsuited to this file's dice-range probe,
+// which needs BOTH editions to expose a roll-for-gold range. A fixture class
+// with two StartingEquipmentPackage rows whose content genuinely DIFFERS
+// between editions is what proves character-create.ts resolves (classId,
+// edition) rather than classId alone; starting-equipment-2024-content.test.ts
+// proves the same resolution against the real seeded Barbarian rows.
 //
 // The fixture class name is safe from assertEveryClassEditionHasPackage
 // (seed-starting-equipment.ts) — that guard only checks names drawn from the

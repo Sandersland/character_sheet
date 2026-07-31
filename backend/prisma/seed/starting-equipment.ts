@@ -1,23 +1,20 @@
-// --- StartingEquipmentPackage catalog (#1519/#1533) --------------------------
-// Migrates the twelve classes' starting-equipment packages that live in
-// backend/src/lib/inventory/starting-equipment.ts's STARTING_EQUIPMENT into
-// seeded rows — a TRANSCRIPTION, not a rewrite: every package below is
-// byte-for-byte the same content as its STARTING_EQUIPMENT twin, proven by
-// starting-equipment-fidelity.test.ts's twelve toEqual assertions. Every
-// citation is PHB'14 (p. 72 armor/weapons tables, p. 143 Starting Wealth) —
-// no PHB'24 content is authored here (that's #1535, parked).
+// --- StartingEquipmentPackage catalog (#1519/#1533/#1535) --------------------
+// Two independently-authored halves per class, never one copied onto the
+// other: EDITION_2014 (PHB'14 p. 72 armor/weapons tables, p. 143 Starting
+// Wealth) migrated verbatim from the old STARTING_EQUIPMENT lookup table, and
+// EDITION_2024 (SRD 5.2) transcribed from the twelve class-equipment tables
+// (parsed from raw HTML, 5e24srd.com, CC-BY-4.0, cross-checked against
+// 5thsrd.org — see #1535's issue thread for the per-class source lines). The
+// two editions genuinely differ in SHAPE, not just content: every 2014
+// package is four-ish (a)/(b) groups; every 2024 package is ONE choice group
+// with two lettered options (Fighter alone has three, (A)/(B)/(C)) whose
+// final option is flat GP with no items — do not force them to look alike.
 //
 // Authored NESTED (the wire shape, ClassStartingEquipment) rather than as
 // flat row literals: `position` is then just the array index (nothing to
 // author, nothing to get wrong — #1545's lesson), and the seed validator
 // (validate.ts) can validate the same tree the client renders. The seeder
 // (seed-starting-equipment.ts) flattens this into the five relational tables.
-//
-// The 2024 half is an INTERIM verbatim copy of the 2014 half (same trick
-// #1523 uses for ClassFeature) so no character is left without starting
-// equipment mid-epic — see EDITIONS_STILL_IDENTICAL's sibling reasoning
-// there. This is NOT "the 2024 content is real"; #1535 (parked) would be
-// where genuine PHB'24 packages land, and it is out of scope here.
 //
 // DATA MODULE ONLY (#1277 AC 4, machine-enforced by
 // scripts/check-seed-data-modules.sh): no direct database calls or async
@@ -40,7 +37,7 @@ const fixedItemSchema = z.object({
   quantity: z.number().int().positive().optional(),
 });
 
-const openWeaponPickSchema = z.object({
+const openPickSchema = z.object({
   label: z.string().min(1),
   filter: z.object({
     weaponClass: weaponClassSchema.optional(),
@@ -56,7 +53,7 @@ const openWeaponPickSchema = z.object({
 const equipmentBundleSchema = z.object({
   label: z.string().min(1),
   items: z.array(fixedItemSchema).optional(),
-  openPicks: z.array(openWeaponPickSchema).optional(),
+  openPicks: z.array(openPickSchema).optional(),
   // PHB'24 per-option GP (#1564) — every EDITION_2014 option omits this (0).
   gold: z.number().int().positive().optional(),
 });
@@ -630,11 +627,365 @@ const PACKAGES_2014: Record<string, ClassStartingEquipment> = {
   Warlock: WARLOCK_2014,
 };
 
-// Flattened below into one row per (className, edition) — see this module's
-// header for why the 2024 half is an interim verbatim copy.
-export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = Object.entries(PACKAGES_2014).flatMap(
-  ([className, pkg]) => [
-    { className, edition: "EDITION_2014" as const, package: pkg },
-    { className, edition: "EDITION_2024" as const, package: pkg },
+// --- EDITION_2024 (SRD 5.2) ---------------------------------------------
+// One choice group per class (Fighter alone has three lettered options,
+// (A)/(B)/(C); every other class has two, (A)/(B)). The final option in every
+// package is flat GP with no items — modelled as an EquipmentBundle with
+// `gold` set and no `items`, exactly how SRD 5.2 presents it. Every non-final
+// option's label keeps the book's own inline "and N GP" text (#1535 PR
+// review): StartingEquipmentOption.gold is the machine-readable half, but the
+// picker renders `label`, so dropping the GP from the label would make it
+// invisible in the UI even though it lands in the character's purse.
+//
+// Four catalogName mappings, settled on the issue thread: `Arcane Focus
+// (crystal)`/`(orb)` -> the Crystal/Orb rows added by #1564; `Arcane Focus
+// (Quarterstaff)` (Wizard) and `Druidic Focus (Quarterstaff)` (Druid) -> the
+// existing Quarterstaff weapon row (a usable staff, not a second abstract
+// focus item); `Druidic Focus (sprig of mistletoe)` (Ranger) -> the existing
+// Druidic Focus row, whose description already names a sprig of mistletoe;
+// `Book (occult lore)` (Warlock) -> the catalog's "Book of Lore" (there is no
+// bare "Book" row), subject carried in the option label instead of a second
+// catalog item — same pattern #1565 will need for Book (prayers)/(history).
+const BARBARIAN_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Greataxe, 4 Handaxes, Explorer's Pack, and 15 GP",
+          items: [
+            { catalogName: "Greataxe" },
+            { catalogName: "Handaxe", quantity: 4 },
+            { catalogName: "Explorer's Pack" },
+          ],
+          gold: 15,
+        },
+        { label: "(B) 75 GP", gold: 75 },
+      ],
+    },
   ],
-);
+};
+
+const BARD_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Leather Armor, 2 Daggers, a Musical Instrument of your choice, Entertainer's Pack, and 19 GP",
+          items: [
+            { catalogName: "Leather Armor" },
+            { catalogName: "Dagger", quantity: 2 },
+            { catalogName: "Entertainer's Pack" },
+          ],
+          openPicks: [
+            { label: "a musical instrument of your choice", filter: { toolCategory: "musicalInstrument" } },
+          ],
+          gold: 19,
+        },
+        { label: "(B) 90 GP", gold: 90 },
+      ],
+    },
+  ],
+};
+
+const CLERIC_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Chain Shirt, Shield, Mace, Holy Symbol, Priest's Pack, and 7 GP",
+          items: [
+            { catalogName: "Chain Shirt" },
+            { catalogName: "Shield" },
+            { catalogName: "Mace" },
+            { catalogName: "Holy Symbol" },
+            { catalogName: "Priest's Pack" },
+          ],
+          gold: 7,
+        },
+        { label: "(B) 110 GP", gold: 110 },
+      ],
+    },
+  ],
+};
+
+const DRUID_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Leather Armor, Shield, Sickle, a Quarterstaff (Druidic Focus), Explorer's Pack, Herbalism Kit, and 9 GP",
+          items: [
+            { catalogName: "Leather Armor" },
+            { catalogName: "Shield" },
+            { catalogName: "Sickle" },
+            { catalogName: "Quarterstaff" },
+            { catalogName: "Explorer's Pack" },
+            { catalogName: "Herbalism Kit" },
+          ],
+          gold: 9,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+// The one 2024 package with three lettered options rather than two — SRD 5.2
+// gives Fighter an (a)/(b)/(c) choice, not the (a)/(b) every other class gets.
+const FIGHTER_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Chain Mail, Greatsword, Flail, 8 Javelins, Dungeoneer's Pack, and 4 GP",
+          items: [
+            { catalogName: "Chain Mail" },
+            { catalogName: "Greatsword" },
+            { catalogName: "Flail" },
+            { catalogName: "Javelin", quantity: 8 },
+            { catalogName: "Dungeoneer's Pack" },
+          ],
+          gold: 4,
+        },
+        {
+          label:
+            "(B) Studded Leather Armor, Scimitar, Shortsword, Longbow, 20 Arrows, Quiver, Dungeoneer's Pack, and 11 GP",
+          items: [
+            { catalogName: "Studded Leather Armor" },
+            { catalogName: "Scimitar" },
+            { catalogName: "Shortsword" },
+            { catalogName: "Longbow" },
+            { catalogName: "Arrows", quantity: 20 },
+            { catalogName: "Quiver" },
+            { catalogName: "Dungeoneer's Pack" },
+          ],
+          gold: 11,
+        },
+        { label: "(C) 155 GP", gold: 155 },
+      ],
+    },
+  ],
+};
+
+const MONK_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label:
+            "(A) Spear, 5 Daggers, Artisan's Tools or a Musical Instrument (chosen for the tool proficiency above), Explorer's Pack, and 11 GP",
+          items: [
+            { catalogName: "Spear" },
+            { catalogName: "Dagger", quantity: 5 },
+            { catalogName: "Explorer's Pack" },
+          ],
+          // Bound to the tool proficiency chosen at creation (#1564's
+          // boundToToolChoice), not a free pick — the book's own wording
+          // ("chosen for the tool proficiency above") spans BOTH artisan's
+          // tools and musical instruments, so this carries no toolCategory
+          // filter at all (empty filter), unlike Bard's open instrument pick.
+          openPicks: [
+            {
+              label: "Artisan's Tools or a Musical Instrument (chosen for the tool proficiency above)",
+              filter: {},
+              boundToToolChoice: true,
+            },
+          ],
+          gold: 11,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+const PALADIN_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Chain Mail, Shield, Longsword, 6 Javelins, Holy Symbol, Priest's Pack, and 9 GP",
+          items: [
+            { catalogName: "Chain Mail" },
+            { catalogName: "Shield" },
+            { catalogName: "Longsword" },
+            { catalogName: "Javelin", quantity: 6 },
+            { catalogName: "Holy Symbol" },
+            { catalogName: "Priest's Pack" },
+          ],
+          gold: 9,
+        },
+        { label: "(B) 150 GP", gold: 150 },
+      ],
+    },
+  ],
+};
+
+const RANGER_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label:
+            "(A) Studded Leather Armor, Scimitar, Shortsword, Longbow, 20 Arrows, Quiver, Druidic Focus (sprig of mistletoe), Explorer's Pack, and 7 GP",
+          items: [
+            { catalogName: "Studded Leather Armor" },
+            { catalogName: "Scimitar" },
+            { catalogName: "Shortsword" },
+            { catalogName: "Longbow" },
+            { catalogName: "Arrows", quantity: 20 },
+            { catalogName: "Quiver" },
+            { catalogName: "Druidic Focus" },
+            { catalogName: "Explorer's Pack" },
+          ],
+          gold: 7,
+        },
+        { label: "(B) 150 GP", gold: 150 },
+      ],
+    },
+  ],
+};
+
+const ROGUE_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label:
+            "(A) Leather Armor, 2 Daggers, Shortsword, Shortbow, 20 Arrows, Quiver, Thieves' Tools, Burglar's Pack, and 8 GP",
+          items: [
+            { catalogName: "Leather Armor" },
+            { catalogName: "Dagger", quantity: 2 },
+            { catalogName: "Shortsword" },
+            { catalogName: "Shortbow" },
+            { catalogName: "Arrows", quantity: 20 },
+            { catalogName: "Quiver" },
+            { catalogName: "Thieves' Tools" },
+            { catalogName: "Burglar's Pack" },
+          ],
+          gold: 8,
+        },
+        { label: "(B) 100 GP", gold: 100 },
+      ],
+    },
+  ],
+};
+
+const SORCERER_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Spear, 2 Daggers, Arcane Focus (a Crystal), Dungeoneer's Pack, and 28 GP",
+          items: [
+            { catalogName: "Spear" },
+            { catalogName: "Dagger", quantity: 2 },
+            { catalogName: "Crystal" },
+            { catalogName: "Dungeoneer's Pack" },
+          ],
+          gold: 28,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+const WARLOCK_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label:
+            "(A) Leather Armor, Sickle, 2 Daggers, Arcane Focus (an Orb), a Book of Lore (occult lore), Scholar's Pack, and 15 GP",
+          items: [
+            { catalogName: "Leather Armor" },
+            { catalogName: "Sickle" },
+            { catalogName: "Dagger", quantity: 2 },
+            { catalogName: "Orb" },
+            { catalogName: "Book of Lore" },
+            { catalogName: "Scholar's Pack" },
+          ],
+          gold: 15,
+        },
+        { label: "(B) 100 GP", gold: 100 },
+      ],
+    },
+  ],
+};
+
+const WIZARD_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) 2 Daggers, Arcane Focus (a Quarterstaff), a Robe, a Spellbook, Scholar's Pack, and 5 GP",
+          items: [
+            { catalogName: "Dagger", quantity: 2 },
+            { catalogName: "Quarterstaff" },
+            { catalogName: "Robe" },
+            { catalogName: "Spellbook" },
+            { catalogName: "Scholar's Pack" },
+          ],
+          gold: 5,
+        },
+        { label: "(B) 55 GP", gold: 55 },
+      ],
+    },
+  ],
+};
+
+const PACKAGES_2024: Record<string, ClassStartingEquipment> = {
+  Fighter: FIGHTER_2024,
+  Wizard: WIZARD_2024,
+  Rogue: ROGUE_2024,
+  Cleric: CLERIC_2024,
+  Barbarian: BARBARIAN_2024,
+  Bard: BARD_2024,
+  Druid: DRUID_2024,
+  Monk: MONK_2024,
+  Paladin: PALADIN_2024,
+  Ranger: RANGER_2024,
+  Sorcerer: SORCERER_2024,
+  Warlock: WARLOCK_2024,
+};
+
+// Flattened below into one row per (className, edition) — PACKAGES_2014 and
+// PACKAGES_2024 are independently-authored siblings (see this module's
+// header), never one derived from the other.
+export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = [
+  ...Object.entries(PACKAGES_2014).map(([className, pkg]) => ({
+    className,
+    edition: "EDITION_2014" as const,
+    package: pkg,
+  })),
+  ...Object.entries(PACKAGES_2024).map(([className, pkg]) => ({
+    className,
+    edition: "EDITION_2024" as const,
+    package: pkg,
+  })),
+];

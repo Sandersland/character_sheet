@@ -2,10 +2,12 @@
 // computing (#1564 commit 3). PHB'24 packages have no roll-for-gold rule at
 // all — StartingEquipmentPackage.goldDiceCount/Faces/Multiplier are jointly
 // NULL for them — so `mode: "gold"` becomes a 2014-only path once per-option
-// GP (commit 2) gives PHB'24 its own lettered-option route to gold. No real
-// seeded package is null-gold yet (every EDITION_2014/2024 row keeps 2014's
-// dice, #1533's interim copy), so a fixture class proves the reject path the
-// same way starting-equipment-edition.test.ts proves per-edition resolution.
+// GP (commit 2) gives PHB'24 its own lettered-option route to gold. Every
+// real seeded EDITION_2024 package is null-gold since #1535; this file keeps
+// its own EDITION_2014 fixture class rather than switching to a real 2024
+// class so the reject-path assertion stays independent of any one class's
+// seeded content, the same reasoning starting-equipment-edition.test.ts gives
+// for its own fixture class.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 

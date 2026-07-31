@@ -620,11 +620,14 @@ describe("characters routes", () => {
     // race, Sage/Soldier backgrounds, and the weapon/armor/gear items) which
     // is applied via `prisma db seed` before running the test suite.
     describe("with startingEquipment (package mode)", () => {
-      // Simplest package path: Wizard with no open picks.
-      //   Group 0: Quarterstaff
-      //   Group 1: Component Pouch
-      //   Group 2: Scholar's Pack (expands via PACK_CONTENTS → 6 rows)
-      //   Group 3: Spellbook (auto-grant)
+      // Simplest package path: Wizard with no open picks. This whole describe
+      // block exercises the PHB'14 FOUR-group package shape (Group 0:
+      // Quarterstaff, Group 1: Component Pouch, Group 2: Scholar's Pack
+      // (expands via PACK_CONTENTS -> 6 rows), Group 3: Spellbook auto-grant)
+      // by fixed group/optionIndex — the EDITION_2024 Wizard package (#1535)
+      // is ONE group of two lettered options instead, so every body here
+      // pins rulesEdition explicitly rather than relying on
+      // DEFAULT_RULES_EDITION (2024).
       const wizardBody = {
         name: "Merlin",
         alignment: "Neutral Good",
@@ -640,6 +643,7 @@ describe("characters routes", () => {
           charisma: 10,
         },
         skillProficiencies: ["arcana", "history"],
+        rulesEdition: "EDITION_2014" as const,
         startingEquipment: {
           mode: "package",
           selections: [
@@ -680,6 +684,7 @@ describe("characters routes", () => {
 
       it("creates inventory rows with an open-pick weapon (Fighter martial weapon)", async () => {
         // Fighter group 1, option 0: martial weapon + shield. Open pick: Longsword
+        // (the PHB'14 four-group shape — pin the edition, see wizardBody's comment above)
         const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
@@ -697,6 +702,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -767,6 +773,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -854,6 +861,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -886,6 +894,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -933,6 +942,9 @@ describe("characters routes", () => {
     });
 
     describe("with startingEquipment (gold mode)", () => {
+      // 2014-only: EDITION_2024's Wizard package has no roll-for-gold rule at
+      // all (gold: null, #1564/#1535) — pin the edition rather than relying
+      // on DEFAULT_RULES_EDITION (2024).
       const baseBody = {
         name: "Wealthy Adventurer",
         alignment: "True Neutral",
@@ -948,6 +960,7 @@ describe("characters routes", () => {
           charisma: 10,
         },
         skillProficiencies: ["arcana", "history"],
+        rulesEdition: "EDITION_2014" as const,
       };
 
       it("sets currency.gp and leaves inventory empty", async () => {
