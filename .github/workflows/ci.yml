@@ -53,6 +53,13 @@ jobs:
       - name: catalog ids resolved with the cross-edition guard
         run: sh scripts/check-catalog-id-edition-guard.sh
 
+      # A MIGRATED class (#1522/#1134 — retabled from lib/classes/<class>.ts
+      # onto seeded ClassFeature rows, Fighter first per #1532) must never
+      # reappear as class-specific TS elsewhere. Needs no node, so it runs
+      # alongside the other grep gates above. Twin of the lefthook pre-commit job.
+      - name: migrated classes stay out of class-specific TS
+        run: sh scripts/check-class-ts-migration.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc

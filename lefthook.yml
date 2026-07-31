@@ -84,6 +84,11 @@ pre-commit:
     # the declared exemption list (#1345). Also a CI step.
     catalog-id-edition-guard:
       run: sh scripts/check-catalog-id-edition-guard.sh
+    # A MIGRATED class (#1522/#1134 — retabled from lib/classes/<class>.ts
+    # onto seeded ClassFeature rows, Fighter first per #1532) must never
+    # reappear as class-specific TS elsewhere in the codebase. Also a CI step.
+    class-ts-migration:
+      run: sh scripts/check-class-ts-migration.sh
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"
