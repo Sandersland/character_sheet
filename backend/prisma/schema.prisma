@@ -870,11 +870,15 @@ model StartingEquipmentPackage {
   // states that truthfully ("this package has no dice alternative"), where
   // 0/0/0 would read as "roll zero gold", the same class of lie as encoding a
   // flat 155 GP as {1,1,155}. Jointly null, never partially — a package
-  // either has all three or none. Every EDITION_2014 package keeps its
-  // existing non-null values; resolveStartingGold (character-create.ts)
-  // rejects rather than computing when handed a NULL-dice package, since
-  // PHB'24 reaches its gold through a lettered StartingEquipmentOption.gold
-  // instead (#1564 commit 2).
+  // either has all three or none — ENFORCED by a hand-written CHECK
+  // constraint (20260731160000_starting_equipment_package_gold_dice_check;
+  // Prisma's DSL has no `@@check` attribute, same DSL gap as the schema's
+  // NULLS NOT DISTINCT indexes), not just a convention mapGold's non-null
+  // assertions rest on. Every EDITION_2014 package keeps its existing
+  // non-null values; resolveStartingGold (character-create.ts) rejects
+  // rather than computing when handed a NULL-dice package, since PHB'24
+  // reaches its gold through a lettered StartingEquipmentOption.gold instead
+  // (#1564 commit 2).
   goldDiceCount  Int?
   goldDiceFaces  Int?
   goldMultiplier Int?
