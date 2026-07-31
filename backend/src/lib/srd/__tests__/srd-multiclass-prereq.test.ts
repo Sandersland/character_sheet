@@ -1,39 +1,47 @@
 import { describe, it, expect } from "vitest";
 
-import { multiclassPrerequisitesMet } from "@/lib/srd/srd.js";
+import { multiclassPrerequisitesMet, type MulticlassPrerequisiteOption } from "@/lib/srd/srd.js";
 
 const BASE = { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 
+// #1529: multiclassPrerequisitesMet now takes the resolved
+// CharacterClass.multiclassPrerequisites option array directly (no more
+// className lookup) — every caller already holds the catalog row.
 describe("multiclassPrerequisitesMet", () => {
   it("single-ability class (Wizard): met only at INT 13+", () => {
-    expect(multiclassPrerequisitesMet("Wizard", { ...BASE, intelligence: 13 }).met).toBe(true);
-    expect(multiclassPrerequisitesMet("Wizard", { ...BASE, intelligence: 12 }).met).toBe(false);
+    const wizard = [{ intelligence: 13 }];
+    expect(multiclassPrerequisitesMet(wizard, { ...BASE, intelligence: 13 }).met).toBe(true);
+    expect(multiclassPrerequisitesMet(wizard, { ...BASE, intelligence: 12 }).met).toBe(false);
   });
 
   it("OR class (Fighter): met when either STR 13 or DEX 13", () => {
-    expect(multiclassPrerequisitesMet("Fighter", { ...BASE, strength: 13 }).met).toBe(true);
-    expect(multiclassPrerequisitesMet("Fighter", { ...BASE, dexterity: 13 }).met).toBe(true);
-    expect(multiclassPrerequisitesMet("Fighter", { ...BASE }).met).toBe(false);
+    const fighter: MulticlassPrerequisiteOption[] = [{ strength: 13 }, { dexterity: 13 }];
+    expect(multiclassPrerequisitesMet(fighter, { ...BASE, strength: 13 }).met).toBe(true);
+    expect(multiclassPrerequisitesMet(fighter, { ...BASE, dexterity: 13 }).met).toBe(true);
+    expect(multiclassPrerequisitesMet(fighter, { ...BASE }).met).toBe(false);
   });
 
   it("AND class (Paladin): needs both STR 13 and CHA 13", () => {
-    expect(multiclassPrerequisitesMet("Paladin", { ...BASE, strength: 13, charisma: 13 }).met).toBe(true);
-    expect(multiclassPrerequisitesMet("Paladin", { ...BASE, strength: 13 }).met).toBe(false);
-    expect(multiclassPrerequisitesMet("Paladin", { ...BASE, charisma: 13 }).met).toBe(false);
+    const paladin = [{ strength: 13, charisma: 13 }];
+    expect(multiclassPrerequisitesMet(paladin, { ...BASE, strength: 13, charisma: 13 }).met).toBe(true);
+    expect(multiclassPrerequisitesMet(paladin, { ...BASE, strength: 13 }).met).toBe(false);
+    expect(multiclassPrerequisitesMet(paladin, { ...BASE, charisma: 13 }).met).toBe(false);
   });
 
-  it("case-insensitive class name", () => {
-    expect(multiclassPrerequisitesMet("rogue", { ...BASE, dexterity: 13 }).met).toBe(true);
-  });
-
-  it("unknown / homebrew class has no prerequisite (always met)", () => {
-    const res = multiclassPrerequisitesMet("Homebrew Warden", { ...BASE });
-    expect(res.met).toBe(true);
-    expect(res.description).toBe("");
+  it("homebrew class (no catalog row: null/undefined/[]) has no prerequisite (always met)", () => {
+    for (const options of [null, undefined, []]) {
+      const res = multiclassPrerequisitesMet(options, { ...BASE });
+      expect(res.met).toBe(true);
+      expect(res.description).toBe("");
+    }
   });
 
   it("carries a human-readable requirement description", () => {
-    expect(multiclassPrerequisitesMet("Fighter", BASE).description).toBe("Strength 13 or Dexterity 13");
-    expect(multiclassPrerequisitesMet("Paladin", BASE).description).toBe("Strength 13 and Charisma 13");
+    expect(multiclassPrerequisitesMet([{ strength: 13 }, { dexterity: 13 }], BASE).description).toBe(
+      "Strength 13 or Dexterity 13",
+    );
+    expect(multiclassPrerequisitesMet([{ strength: 13, charisma: 13 }], BASE).description).toBe(
+      "Strength 13 and Charisma 13",
+    );
   });
 });

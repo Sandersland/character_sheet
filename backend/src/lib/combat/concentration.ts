@@ -58,7 +58,10 @@ function computeConcentrationSave(
     experiencePoints: number;
     savingThrowProficiencies: string[];
     resources: Prisma.JsonValue;
-    classEntries: { name: string; level: number }[];
+    // `class` (#1529): characterAdvancementSlots' extraAsiLevels read below —
+    // one of the reconciler/clamp-on-read pair's six query sites CLAUDE.md
+    // governs, resolving the SAME column as characterInclude/hp-context.ts.
+    classEntries: { name: string; level: number; class?: { extraAsiLevels: number[] } | null }[];
   },
   damage: number,
 ): { saveBonus: number; dc: number } {
@@ -90,10 +93,11 @@ async function readConcentratingStateInTx(tx: Prisma.TransactionClient, characte
       savingThrowProficiencies: true,
       resources: true,
       // All entries — the feat-slot cap sums entitlement per class level (#1073),
-      // not just the primary (position 0).
+      // not just the primary (position 0). `class` (#1529): see computeConcentrationSave's
+      // param comment.
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { name: true, level: true },
+        select: { name: true, level: true, class: { select: { extraAsiLevels: true } } },
       },
     },
   });

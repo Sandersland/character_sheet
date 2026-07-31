@@ -3,14 +3,17 @@
 // while the builders move into lib/character/serialize/*.
 //
 // #1341 audit: every class-entry `name` here must match the rule registries
-// that gate mechanical derivation off it. DERIVED_ACTIONS (matchesActionGate),
-// CLASSES (deriveResources), and the ASI/fighting-style/caster-fraction/
-// extra-attack tables all lowercase before lookup, so both fixtures' lowercase
-// entry names ("fighter"/"wizard") match them correctly. CLASS_PROFICIENCY_GRANTS
-// is the one exception: it's keyed on the capitalized catalog display name
-// ("Fighter"/"Wizard") and looked up case-sensitively, so both fixtures miss it
-// — a real production defect (#1388), not fixed here because correcting it
-// would change both fixtures' derived proficiency and weapon-attack values.
+// that gate mechanical derivation off it. DERIVED_ACTIONS (matchesActionGate)
+// and CLASSES (deriveResources) lowercase before lookup, so both fixtures'
+// lowercase entry names ("fighter"/"wizard") match them correctly.
+// Armor/weapon proficiencies AND the ASI-extra/Fighting-Style-feat schedule
+// resolve through the class FK relation now (#1529, fixing #1388's class
+// half — case no longer matters at all), so this fixture's CharacterClass
+// rows carry Fighter's real extraAsiLevels/fightingStyleFeatLevel values
+// explicitly (see the `characterClass.create` call below) to stay
+// byte-identical with pre-#1529 behavior; armorProficiencies/
+// weaponProficiencies are left at their column default ([]) since neither
+// fixture exercises a proficiency-gated assertion.
 //
 // #1322 audit: both fixtures are EDITION_2024 (the default), so
 // `exhaustionEffectText`'s +1-line-per-fixture delta never exercises the 2014
@@ -46,8 +49,17 @@ beforeAll(async () => {
   await prisma.character.deleteMany({ where: { id: { in: CHAR_IDS } } });
   await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, WIZARD_CLASS_NAME] } } });
   // Fixed id so the classes view's classId snapshots deterministically.
+  // extraAsiLevels/fightingStyleFeatLevel (#1529) are set to Fighter's real
+  // values — this fixture's entry `name` is lowercase "fighter", which used to
+  // match EXTRA_ASI_LEVELS/fightingStyleFeatSlots' className lookup by
+  // coincidence; the FK-only resolution needs the SAME values on the row
+  // itself to stay byte-identical (a `mistyped value`, not a fix, per #1529).
   const fighter = await prisma.characterClass.create({
-    data: { id: "class-snap-fighter", name: FIGHTER_CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"], skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3 },
+    data: {
+      id: "class-snap-fighter", name: FIGHTER_CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"],
+      skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3,
+      extraAsiLevels: [6, 14], fightingStyleFeatLevel: 1,
+    },
   });
   fighterClassId = fighter.id;
   const wizard = await prisma.characterClass.create({

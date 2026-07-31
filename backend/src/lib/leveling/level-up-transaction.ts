@@ -71,17 +71,31 @@ const TARGET_ENTRY_SELECT = {
   class: { select: { hitDie: true } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
-// Fetch the target class's catalog subclassLevel and resolve it through the
-// edition seam (#1308) — the column is 2014-only (subclassGateLevel hardcodes 3
-// under 2024), so subclassStep must never compare against the raw column.
-async function subclassLevelFor(classId: string | null, className: string, edition: RulesEdition): Promise<number> {
+// Fetch the target class's catalog subclassLevel/extraAsiLevels/
+// fightingStyleFeatLevel (#1529) in one read, resolving subclassLevel through
+// the edition seam (#1308) — that column is 2014-only (subclassGateLevel
+// hardcodes 3 under 2024), so subclassStep must never compare against the raw
+// column. extraAsiLevels/fightingStyleFeatLevel carry no edition fork
+// (CLAUDE.md: ASI levels and the FS grant level agree in both editions) and
+// pass through as-is — `[]`/`null` for a homebrew class with no catalog row,
+// same fallback advancementSlotsForLevel/fightingStyleFeatSlots apply.
+async function targetClassCatalogFor(
+  classId: string | null,
+  className: string,
+  edition: RulesEdition,
+): Promise<{ subclassLevel: number; extraAsiLevels: number[]; fightingStyleFeatLevel: number | null }> {
+  const select = { subclassLevel: true, extraAsiLevels: true, fightingStyleFeatLevel: true } as const;
   const row = classId
-    ? await prisma.characterClass.findUnique({ where: { id: classId }, select: { subclassLevel: true } })
+    ? await prisma.characterClass.findUnique({ where: { id: classId }, select })
     : await prisma.characterClass.findFirst({
         where: { name: { equals: className, mode: "insensitive" } },
-        select: { subclassLevel: true },
+        select,
       });
-  return subclassGateLevel(row?.subclassLevel, edition);
+  return {
+    subclassLevel: subclassGateLevel(row?.subclassLevel, edition),
+    extraAsiLevels: row?.extraAsiLevels ?? [],
+    fightingStyleFeatLevel: row?.fightingStyleFeatLevel ?? null,
+  };
 }
 
 // Reads the character + resolves a level-up target into the validator inputs
@@ -144,7 +158,7 @@ export async function resolveLevelUpContext(
   // previewed gain and the committed gain can't be resolved off different dice.
   const { die: hitDie } = advancingHitDie(catalogHitDie, hitDice.die);
 
-  const subclassLevel = await subclassLevelFor(classId, targetClassName, edition);
+  const { subclassLevel, extraAsiLevels, fightingStyleFeatLevel } = await targetClassCatalogFor(classId, targetClassName, edition);
 
   let chosenSubclassName: string | null = null;
   if (subclassId) {
@@ -171,7 +185,7 @@ export async function resolveLevelUpContext(
       spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
       edition,
     },
-    targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel, hitDie },
+    targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel, hitDie, extraAsiLevels, fightingStyleFeatLevel },
     chosenSubclassName,
     targetIsPrimary,
   };

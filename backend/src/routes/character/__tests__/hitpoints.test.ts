@@ -483,6 +483,9 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
   beforeEach(async () => {
     await ensureTestOwner(FS_OWNER_ID);
     bmCookie = await authCookie(FS_OWNER_ID);
+    // fightingStyleFeatLevel (#1529): the fs-slot cap resolves via this
+    // column through the class FK relation now — needed for the Defense feat
+    // this fixture asserts survives the rest-undo snapshot.
     const cls = await prisma.characterClass.upsert({
       where: { name: BM_CATALOG_NAME },
       create: {
@@ -492,8 +495,9 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
         skillChoiceCount: 2,
         skillChoices: ["athletics", "intimidation"],
         isSpellcaster: false,
+        fightingStyleFeatLevel: 1,
       },
-      update: {},
+      update: { fightingStyleFeatLevel: 1 },
     });
     // Second Wind/Action Surge are row-driven now (#1528) and tied to a
     // specific classId — Battle Master's superiorityDice pool is unaffected

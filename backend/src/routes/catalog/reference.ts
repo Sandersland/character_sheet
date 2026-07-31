@@ -3,7 +3,6 @@ import { Router } from "express";
 import {
   ALIGNMENTS,
   ITEM_RARITIES,
-  MULTICLASS_PREREQUISITES,
   cantripsKnownAtLevel,
   conditionRulesText,
   maxSpellLevelForClass,
@@ -11,6 +10,7 @@ import {
   preparedSpellCountAt,
   primaryAbilities,
   toolsByCategory,
+  type MulticlassPrerequisiteOption,
 } from "@/lib/srd/srd.js";
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -96,8 +96,8 @@ referenceRouter.get("/reference", async (req, res) => {
     toolChoiceCount: c.toolChoiceCount,
     subclasses: c.subclasses.map((s) => ({ id: s.id, name: s.name, description: s.description })),
     startingEquipment: STARTING_EQUIPMENT[c.name] ?? null,
-    // #1161: PHB'24 primary ability/abilities; [] for a homebrew class.
-    primaryAbility: primaryAbilities(c.name),
+    // #1161/#1529: PHB'24 primary ability/abilities, off the catalog column; [] for a homebrew class.
+    primaryAbility: primaryAbilities(c.primaryAbilities),
     // #1131: level-1 creation pick counts from the SRD 5.2 tables (null for a
     // non-caster) so the creation picker never re-encodes the rules.
     //
@@ -118,12 +118,14 @@ referenceRouter.get("/reference", async (req, res) => {
     // 5e multiclass ability prerequisite (PHB p. 163): the option thresholds plus
     // a rendered description. Lets the add-class picker gate + explain eligibility
     // without duplicating the rules table on the frontend. Null for homebrew classes.
-    multiclassPrerequisite: MULTICLASS_PREREQUISITES[c.name.toLowerCase()]
-      ? {
-          options: MULTICLASS_PREREQUISITES[c.name.toLowerCase()],
-          description: multiclassPrerequisitesMet(c.name, {}).description,
-        }
-      : null,
+    // `multiclassPrerequisites` (#1529): every seeded class has at least one
+    // option group, so an empty array here means a homebrew/unseeded row.
+    multiclassPrerequisite: ((): { options: MulticlassPrerequisiteOption[]; description: string } | null => {
+      const options = c.multiclassPrerequisites as MulticlassPrerequisiteOption[];
+      return options.length > 0
+        ? { options, description: multiclassPrerequisitesMet(options, {}).description }
+        : null;
+    })(),
   }));
 
   const racesWithTools = races.map((r) => ({

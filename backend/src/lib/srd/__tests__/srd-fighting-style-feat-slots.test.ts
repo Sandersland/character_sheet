@@ -12,38 +12,50 @@ import type { AdvancementEntry, FeatImprovement } from "@/lib/classes/resources.
 
 // SRD 5.2: the Fighting Style feature grants a Fighting Style feat — Fighter at
 // level 1, Paladin and Ranger at level 2. Champion's extra style at L7 is #1148.
+// #1529: fightingStyleFeatSlots now takes the class's resolved
+// fightingStyleFeatLevel (CharacterClass column) directly, not a className.
 describe("fightingStyleFeatSlots", () => {
-  it("Fighter gains a Fighting Style feat slot at level 1", () => {
-    expect(fightingStyleFeatSlots("fighter", 1)).toBe(1);
-    expect(fightingStyleFeatSlots("Fighter", 20)).toBe(1);
+  it("Fighter's grant level (1): a slot from level 1 on", () => {
+    expect(fightingStyleFeatSlots(1, 1)).toBe(1);
+    expect(fightingStyleFeatSlots(1, 20)).toBe(1);
   });
-  it("Paladin and Ranger gain a slot at level 2, not level 1", () => {
-    expect(fightingStyleFeatSlots("paladin", 1)).toBe(0);
-    expect(fightingStyleFeatSlots("paladin", 2)).toBe(1);
-    expect(fightingStyleFeatSlots("ranger", 1)).toBe(0);
-    expect(fightingStyleFeatSlots("Ranger", 5)).toBe(1);
+  it("Paladin/Ranger's grant level (2): a slot from level 2, not level 1", () => {
+    expect(fightingStyleFeatSlots(2, 1)).toBe(0);
+    expect(fightingStyleFeatSlots(2, 2)).toBe(1);
+    expect(fightingStyleFeatSlots(2, 5)).toBe(1);
   });
-  it("other classes and level 0 get 0", () => {
-    expect(fightingStyleFeatSlots("wizard", 20)).toBe(0);
-    expect(fightingStyleFeatSlots("rogue", 6)).toBe(0);
-    expect(fightingStyleFeatSlots("fighter", 0)).toBe(0);
+  it("null grant level (a class that never grants one) and level 0 get 0", () => {
+    expect(fightingStyleFeatSlots(null, 20)).toBe(0);
+    expect(fightingStyleFeatSlots(undefined, 6)).toBe(0);
+    expect(fightingStyleFeatSlots(1, 0)).toBe(0);
   });
 });
 
+// #1529: characterFightingStyleFeatSlots reads each entry's `class` relation
+// (fightingStyleFeatLevel) instead of looking up by `name` — a homebrew entry
+// (`class` absent/null) resolves via the `?? null` fallback to "never granted".
 describe("characterFightingStyleFeatSlots", () => {
+  const FIGHTER = { fightingStyleFeatLevel: 1 };
+  const PALADIN = { fightingStyleFeatLevel: 2 };
+  const RANGER = { fightingStyleFeatLevel: 2 };
+  const WIZARD = { fightingStyleFeatLevel: null };
+
   it("sums entitlement across class entries at each entry's effective level", () => {
-    expect(characterFightingStyleFeatSlots([{ name: "Fighter", level: 5 }], 5)).toBe(1);
+    expect(characterFightingStyleFeatSlots([{ level: 5, class: FIGHTER }], 5)).toBe(1);
     // Fighter1/Wizard4 multiclass — the Fighter entry still entitles a slot (#1065).
     expect(
-      characterFightingStyleFeatSlots([{ name: "Wizard", level: 4 }, { name: "Fighter", level: 1 }], 5),
+      characterFightingStyleFeatSlots([{ level: 4, class: WIZARD }, { level: 1, class: FIGHTER }], 5),
     ).toBe(1);
     // Paladin 6 / Ranger 5 — both entries entitle a slot.
     expect(
-      characterFightingStyleFeatSlots([{ name: "Paladin", level: 6 }, { name: "Ranger", level: 5 }], 11),
+      characterFightingStyleFeatSlots([{ level: 6, class: PALADIN }, { level: 5, class: RANGER }], 11),
     ).toBe(2);
   });
   it("a Paladin at level 1 (no second level yet) gets 0", () => {
-    expect(characterFightingStyleFeatSlots([{ name: "Paladin", level: 1 }], 1)).toBe(0);
+    expect(characterFightingStyleFeatSlots([{ level: 1, class: PALADIN }], 1)).toBe(0);
+  });
+  it("a homebrew entry with no class relation gets 0, regardless of level", () => {
+    expect(characterFightingStyleFeatSlots([{ level: 5, class: null }], 5)).toBe(0);
   });
   it("level-0 / empty roster gets 0", () => {
     expect(characterFightingStyleFeatSlots([], 0)).toBe(0);
@@ -51,19 +63,28 @@ describe("characterFightingStyleFeatSlots", () => {
 });
 
 // PHB'24 p.163: ASI/feat slots accrue per class level (#1073), not
-// primary-class × total level.
+// primary-class × total level. #1529: characterAdvancementSlots reads each
+// entry's `class` relation (extraAsiLevels) instead of looking up by `name`.
 describe("characterAdvancementSlots", () => {
+  const FIGHTER = { extraAsiLevels: [6, 14] };
+  const WIZARD = { extraAsiLevels: [] };
+
   it("Wizard 3 / Fighter 8 gets 3 slots (Fighter's 4/6/8), not the Wizard schedule at total level 11", () => {
     expect(
-      characterAdvancementSlots([{ name: "Wizard", level: 3 }, { name: "Fighter", level: 8 }], 11),
+      characterAdvancementSlots([{ level: 3, class: WIZARD }, { level: 8, class: FIGHTER }], 11),
     ).toBe(3);
   });
   it("single-class collapses to advancementSlotsForLevel (byte-identical)", () => {
-    expect(characterAdvancementSlots([{ name: "Fighter", level: 8 }], 8)).toBe(
-      advancementSlotsForLevel("Fighter", 8),
+    expect(characterAdvancementSlots([{ level: 8, class: FIGHTER }], 8)).toBe(
+      advancementSlotsForLevel(FIGHTER.extraAsiLevels, 8),
     );
-    expect(characterAdvancementSlots([{ name: "Wizard", level: 12 }], 12)).toBe(
-      advancementSlotsForLevel("Wizard", 12),
+    expect(characterAdvancementSlots([{ level: 12, class: WIZARD }], 12)).toBe(
+      advancementSlotsForLevel(WIZARD.extraAsiLevels, 12),
+    );
+  });
+  it("a homebrew entry with no class relation falls back to the base 5-slot schedule", () => {
+    expect(characterAdvancementSlots([{ level: 19, class: null }], 19)).toBe(
+      advancementSlotsForLevel([], 19),
     );
   });
   it("level-0 / empty roster gets 0", () => {

@@ -609,6 +609,45 @@ model CharacterClass {
   toolChoices        String[] @default([])
   toolChoiceCount    Int      @default(0)
 
+  // ---- #1529: the last class-table content still keyed by class NAME in
+  // ---- lib/srd/ Record<string,...> literals, moved onto this row so
+  // ---- resolution is by FK (fixes #1388's class half — a lowercase/display-
+  // ---- name entry with the same classId now resolves identically).
+
+  // Fixed armor/weapon proficiency grants (PHB). SEEDED WITH SRD 5.1/PHB'14
+  // VALUES ONLY — at least Bard/Druid/Monk/Rogue/Sorcerer/Wizard genuinely
+  // differ in SRD 5.2/PHB'24 (broader "Simple weapons" grants, a property-
+  // scoped Martial subset, Druid's shields going nonmetal). This column has
+  // no `edition` split (CharacterClass has none), so when the 2024 lists are
+  // authored (their own follow-up issue — never guessed here) the fork takes
+  // the `subclassLevel`/`subclassGateLevel` shape: one rule function reading
+  // this column with `edition` as its last parameter, never a second column
+  // and never `=== "EDITION_…"`.
+  armorProficiencies  String[] @default([])
+  weaponProficiencies String[] @default([])
+  // ASI/feat slot levels BEYOND the edition-invariant base schedule
+  // (4/8/12/16/19, BASE_ASI_LEVELS in advancement-slots.ts) — Fighter [6,14],
+  // Rogue [10], [] for every other class. CLAUDE.md lists ASI levels among
+  // the rules where 2014 and 2024 agree, so this is one column, no edition fork.
+  extraAsiLevels      Int[]    @default([])
+  // The character level at which this class grants a Fighting Style feat pick
+  // (Fighter 1, Paladin/Ranger 2 — agrees in both editions); NULL = this class
+  // never grants one. What differs by edition is feat-vs-menu (SRD 5.2 p. 47,
+  // #1137's concern), not this level, so no edition fork here either.
+  fightingStyleFeatLevel Int?
+  // 5e multiclass ability-score prerequisite (PHB p. 163): an array of AND-
+  // option-groups, OR'd together — e.g. Fighter's `[{strength:13},
+  // {dexterity:13}]` (the only OR class), Paladin's `[{strength:13,
+  // charisma:13}]` (a single AND group). Json (not String[]) because only it
+  // can express the OR-of-AND shape; edition-invariant per CLAUDE.md.
+  multiclassPrerequisites Json   @default("[]")
+  // PHB'24 class-table "Primary Ability" column — the ability(ies) the
+  // creation ability panel recommends (#1161). NOT a 2014/2024 agreement:
+  // PHB'14 has no such table column (Quick Build suggestions instead), so
+  // this is 2024-sourced with no 2014 counterpart, not edition-invariant
+  // content pretending to be shared.
+  primaryAbilities        String[] @default([])
+
   entries    CharacterClassEntry[]
   subclasses Subclass[]
   // Back-relation only — not a column, appears on no payload unless included

@@ -72,7 +72,8 @@ export interface ClassEntryRow {
   // EntryScopedClassEntry comment documents the same collision) — so this
   // select widens its EXISTING `class`/adds its own `subclassRef` rather than
   // spreading the shared fragment in.
-  class: { hitDie: string; features: ClassFeatureRow[] } | null;
+  // `extraAsiLevels` (#1529): characterAdvancementSlots' featSlotCap read below.
+  class: { hitDie: string; extraAsiLevels: number[]; features: ClassFeatureRow[] } | null;
   subclassRef: { features: ClassFeatureRow[] } | null;
 }
 
@@ -127,8 +128,9 @@ export async function buildHpOpContext(
           position: true,
           // `features` (#1528 chunk 0): deriveRestPools' featureRows carrier —
           // see ClassEntryRow's own comment for why this can't just spread
-          // FEATURE_ROWS_ENTRY_SELECT in.
-          class: { select: { hitDie: true, features: { where: { subclassId: null } } } },
+          // FEATURE_ROWS_ENTRY_SELECT in. `extraAsiLevels` (#1529): the
+          // featSlotCap read below (characterAdvancementSlots).
+          class: { select: { hitDie: true, extraAsiLevels: true, features: { where: { subclassId: null } } } },
           subclassRef: { select: { features: true } },
         },
       },

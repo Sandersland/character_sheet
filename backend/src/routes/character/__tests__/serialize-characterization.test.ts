@@ -591,8 +591,8 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         requiresAttunement: false,
         equippable: true,
         allowedSlots: ["BODY"],
-        // False because this fixture's class name is a suite-local catalog row that
-        // CLASS_PROFICIENCY_GRANTS doesn't key on (#1388), so armorProficiencies is empty.
+        // False because this fixture's class is a suite-local CharacterClass row
+        // whose armorProficiencies column is left at its [] default (#1529).
         proficient: false,
         armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true, stealthDisadvantage: false },
       },

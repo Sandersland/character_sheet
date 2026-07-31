@@ -1,6 +1,5 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import {
-  CLASS_PROFICIENCY_GRANTS,
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
   deriveFeatProficiencies,
@@ -42,8 +41,14 @@ function buildMergedToolProficiencies(
 // Armor grants from class(es)/race/feats, deduped, highest-priority source wins
 // (class > race > feat). Multiclass takes the full union — a deliberate,
 // conservatively permissive simplification of 5e's multiclass restrictions.
+//
+// Resolved through the class RELATION (#1529), never `entry.name` — the fix for
+// #1388's class half: a lowercase and a display-name entry with the SAME
+// classId now resolve identically. `entry.class` is `?? []`-guarded because
+// CharacterClassEntry.classId is nullable BY DESIGN (homebrew), not because
+// this is unreachable — a homebrew entry correctly grants nothing here.
 export function buildMergedArmorProficiencies(
-  classEntries: { name: string }[],
+  classEntries: { class?: { armorProficiencies: string[] } | null }[],
   raceName: string | undefined,
   featArmor: Set<string>,
 ): Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> {
@@ -57,7 +62,7 @@ export function buildMergedArmorProficiencies(
   };
 
   for (const entry of classEntries) {
-    for (const cat of CLASS_PROFICIENCY_GRANTS[entry.name]?.armor ?? []) push(cat, "class");
+    for (const cat of entry.class?.armorProficiencies ?? []) push(cat, "class");
   }
   if (raceName) {
     for (const cat of RACE_PROFICIENCY_GRANTS[raceName]?.armor ?? []) push(cat, "race");
@@ -68,9 +73,10 @@ export function buildMergedArmorProficiencies(
 }
 
 // Weapon grants (category-level or specific names) from class(es)/race/feats,
-// deduped, highest-priority wins; see buildMergedArmorProficiencies on multiclass.
+// deduped, highest-priority wins; see buildMergedArmorProficiencies on multiclass
+// and its class-relation-resolution comment (#1529/#1388).
 export function buildMergedWeaponProficiencies(
-  classEntries: { name: string }[],
+  classEntries: { class?: { weaponProficiencies: string[] } | null }[],
   raceName: string | undefined,
   featWeapons: Set<string>,
 ): Array<{ name: string; source: "class" | "race" | "feat" }> {
@@ -84,7 +90,7 @@ export function buildMergedWeaponProficiencies(
   };
 
   for (const entry of classEntries) {
-    for (const w of CLASS_PROFICIENCY_GRANTS[entry.name]?.weapons ?? []) push(w, "class");
+    for (const w of entry.class?.weaponProficiencies ?? []) push(w, "class");
   }
   if (raceName) {
     for (const w of RACE_PROFICIENCY_GRANTS[raceName]?.weapons ?? []) push(w, "race");

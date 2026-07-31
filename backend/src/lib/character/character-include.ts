@@ -22,9 +22,18 @@ export const characterInclude = {
       // load (this `include` is a module-level const with no access to the
       // character's rulesEdition); featuresFromRows (lib/classes/
       // class-feature-rows.ts) does the in-memory per-edition filter.
+      // armorProficiencies/weaponProficiencies/extraAsiLevels/
+      // fightingStyleFeatLevel (#1529): the class-table content
+      // characterAdvancementSlots/characterFightingStyleFeatSlots/
+      // buildMergedArmorProficiencies/buildMergedWeaponProficiencies read off
+      // this relation instead of a name-keyed lib/srd/ Record.
       class: {
         select: {
           subclassLevel: true,
+          armorProficiencies: true,
+          weaponProficiencies: true,
+          extraAsiLevels: true,
+          fightingStyleFeatLevel: true,
           features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
         },
       },
