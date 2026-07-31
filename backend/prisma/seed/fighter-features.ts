@@ -14,20 +14,21 @@
 // shape class-features.ts's own expandFeatureRow/collectRawFeatures already
 // establishes in this same directory.
 //
-// SCOPE (#1227) then #1528: #1227 authored Fighter's FEATURE TEXT only, with
-// every descriptor column left NULL (resource pools stayed in fighter.ts's
-// resourceFn, every activation in classes/actions.ts's DERIVED_ACTIONS).
-// #1528 populated the base class's resource+activation+cost+effect columns
-// for Second Wind/Action Surge/Indomitable (the pilot's proof-of-authoring)
-// and retired the matching resourceFn/DERIVED_ACTIONS entries — see
-// fighter.ts's own header. Every OTHER row below (Champion/Battle
-// Master/Eldritch Knight, and Fighting Style/Weapon Mastery/Extra Attack on
-// the base) still leaves its descriptor columns NULL: some because the
-// feature has no such axis (a passive, e.g. Improved Critical), some because
-// it isn't done yet (Champion's crit range needs a derivedStat axis this
-// issue doesn't add — filed separately; Tactical Mind's conditional-refund
-// wrinkle has no AbilityCost shape yet) — see each row's own comment for
-// which.
+// SCOPE (#1227) then #1528 then #1530: #1227 authored Fighter's FEATURE TEXT
+// only, with every descriptor column left NULL (resource pools stayed in
+// fighter.ts's resourceFn, every activation in classes/actions.ts's
+// DERIVED_ACTIONS). #1528 populated the base class's resource+activation+
+// cost+effect columns for Second Wind/Action Surge/Indomitable (the pilot's
+// proof-of-authoring) and retired the matching resourceFn/DERIVED_ACTIONS
+// entries — see fighter.ts's own header. #1530 populated the base class's L5
+// Extra Attack row's derivedStat/derivedStatTiers (see that row's own comment
+// below). Every OTHER row below (Champion/Battle Master/Eldritch Knight, and
+// Fighting Style/Weapon Mastery on the base) still leaves its descriptor
+// columns NULL: some because the feature has no such axis (a passive, e.g.
+// Improved Critical), some because it isn't done yet (Champion's crit range
+// needs a derivedStat axis this issue doesn't add — filed separately;
+// Tactical Mind's conditional-refund wrinkle has no AbilityCost shape yet) —
+// see each row's own comment for which.
 //
 // EDITION RULE: `edition` omitted -> expand() seeds ONE row per edition with
 // IDENTICAL text (the 2014-is-a-transcription invariant; today that's only
@@ -63,11 +64,13 @@ interface RawFighterFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // ---- Descriptor columns (#1528) — populated only for Second Wind/Action
-  // ---- Surge/Indomitable today; every other row leaves these undefined,
-  // ---- which `expand()` passes straight through as `undefined` (never
-  // ---- writing a stray `null`/`Prisma.DbNull` override for a row this
-  // ---- issue doesn't touch).
+  // ---- Descriptor columns (#1528) — resourceKey through effectModifierSource
+  // ---- below are populated only for Second Wind/Action Surge/Indomitable
+  // ---- today; every other row leaves these undefined, which `expand()`
+  // ---- passes straight through as `undefined` (never writing a stray
+  // ---- `null`/`Prisma.DbNull` override for a row this issue doesn't touch).
+  // ---- derivedStat/derivedStatTiers are the exception — see their own
+  // ---- comment just below (#1530).
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
@@ -81,6 +84,11 @@ interface RawFighterFeature {
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifierSource?: string;
+  // #1530: populated only on the base class's L5 "Extra Attack" row (both
+  // editions) — Two/Three Extra Attacks stay text-only, see that row's own
+  // comment for why.
+  derivedStat?: string;
+  derivedStatTiers?: { minLevel: number; value: number | string }[];
 }
 
 function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
@@ -103,6 +111,8 @@ function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
     effectDiceCount: raw.effectDiceCount,
     effectDiceFaces: raw.effectDiceFaces,
     effectModifierSource: raw.effectModifierSource,
+    derivedStat: raw.derivedStat,
+    derivedStatTiers: raw.derivedStatTiers,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -116,19 +126,22 @@ function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
 // three separately-named/leveled 2024 features instead of one feature whose
 // text describes all three tiers.
 // Every row below EXCEPT Second Wind/Action Surge/Indomitable (populated
-// above) leaves every descriptor column NULL because the feature has NO SUCH
-// AXIS: Fighting Style/Weapon Mastery/Tactical Shift/Two Extra Attacks/Studied
-// Attacks/Epic Boon/Three Extra Attacks/Tactical Master are all passive text
-// or feat grants with no resource pool, no clickable action, and no roll this
-// app computes. Extra Attack is the one row that's NO SUCH AXIS for some
-// columns and NOT DONE YET for another: its resource/activation/effect
-// columns are NO SUCH AXIS like the rest of this list (its own count is
-// `deriveAttacksPerAction`, a separate TS rule for its cross-multiclass max),
-// but #1530 may attach derivedStat/derivedStatTiers to this same row, which
-// makes that ONE column pair NOT DONE YET rather than a permanent NULL.
-// Tactical Mind is the other "not done yet" row: its conditional
-// not-expended-on-failure refund has no AbilityCost shape (see its own
-// comment below).
+// above) and Extra Attack (populated by #1530, see that row below) leaves
+// every descriptor column NULL because the feature has NO SUCH AXIS:
+// Fighting Style/Weapon Mastery/Tactical Shift/Studied Attacks/Epic Boon/
+// Tactical Master are all passive text or feat grants with no resource pool,
+// no clickable action, and no roll this app computes. Two Extra Attacks and
+// Three Extra Attacks are the SAME no-such-axis NULL for a more specific
+// reason: their tier is already carried by the L5 Extra Attack row's
+// derivedStatTiers (#1528's decision, populated by #1530) — attaching a
+// second copy here would need deriveAttacksPerAction to dedupe instead of
+// simply composing, for no benefit, since these rows have no `level` of
+// their own left to gate anything else. Extra Attack (L5) is the one row
+// per edition that sets derivedStat/derivedStatTiers — byte-identical across
+// both, since the tier progression is edition-invariant even though the row
+// SHAPE (one row vs three) forks. Tactical Mind is the last "not done yet"
+// row: its conditional not-expended-on-failure refund has no AbilityCost
+// shape (see its own comment below).
 const FIGHTER_BASE_RAW: RawFighterFeature[] = [
   {
     subclassSlug: null,
@@ -285,6 +298,16 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 5,
     edition: "EDITION_2014",
     description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20.",
+    // #1530: the full three-tier progression rides THIS row even though 2014
+    // describes all three tiers in one feature's text — ascending/last-match-
+    // wins (tierAt, class-feature-rows.ts). Byte-identical to the 2024 row's
+    // tiers below: the rule is edition-invariant, only the row SHAPE forks.
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [
+      { minLevel: 5, value: 2 },
+      { minLevel: 11, value: 3 },
+      { minLevel: 20, value: 4 },
+    ],
   },
   {
     subclassSlug: null,
@@ -295,8 +318,16 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     // features below (Two/Three Extra Attacks) instead of folding them into
     // this row's text — transcribe the document as structured, don't
     // recombine it. Consequence for #1530: derivedStat/derivedStatTiers
-    // attach to THIS row; the L11/L20 rows stay text-only.
+    // attach to THIS row; the L11/L20 rows stay text-only (see their own
+    // comments below for why NULL there is "no such axis", not "not done
+    // yet").
     description: "You can attack twice instead of once whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [
+      { minLevel: 5, value: 2 },
+      { minLevel: 11, value: 3 },
+      { minLevel: 20, value: 4 },
+    ],
   },
   {
     subclassSlug: null,
@@ -362,6 +393,12 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 11,
     edition: "EDITION_2024",
     description: "You can attack three times whenever you take the Attack action on your turn.",
+    // derivedStat/derivedStatTiers NULL here because there is NO SUCH AXIS on
+    // THIS row (#1530): the count this row's text describes is already
+    // carried by the L5 "Extra Attack" row's derivedStatTiers, which has this
+    // row's own level (11) as one of its tiers. A second derivedStat here
+    // would have deriveAttacksPerAction take the max of two rows describing
+    // the SAME number, not a new one — never "not done yet".
   },
   {
     subclassSlug: null,
@@ -387,6 +424,9 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 20,
     edition: "EDITION_2024",
     description: "You can attack four times whenever you take the Attack action on your turn.",
+    // NULL for the same reason as Two Extra Attacks above: no such axis on
+    // THIS row — the L5 Extra Attack row's derivedStatTiers already carries
+    // level 20's value.
   },
 ];
 

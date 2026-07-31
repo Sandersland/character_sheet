@@ -105,7 +105,17 @@ beforeAll(async () => {
         activationCost: "special", resolverKind: "simple-confirm",
         costKind: "pool", costPoolKey: "actionSurge", costBase: 1,
       },
-      { classId: fighterClassId, subclassId: null, name: "Extra Attack", level: 5, edition: "EDITION_2024", description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20." },
+      // #1530: derivedStat/derivedStatTiers mirror the real seeded Fighter
+      // row (fighter-features.ts) — without these two fields, this fixture's
+      // hand-built row would go through with attacksPerAction=1 (floor),
+      // silently re-baselining the snapshot below instead of proving zero
+      // behaviour change.
+      {
+        classId: fighterClassId, subclassId: null, name: "Extra Attack", level: 5, edition: "EDITION_2024",
+        description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20.",
+        derivedStat: "attacksPerAction",
+        derivedStatTiers: [{ minLevel: 5, value: 2 }, { minLevel: 11, value: 3 }, { minLevel: 20, value: 4 }],
+      },
       { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Combat Superiority", level: 3, edition: "EDITION_2024", description: "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated." },
       { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Student of War", level: 3, edition: "EDITION_2024", description: "You gain proficiency with one type of artisan's tools of your choice." },
       { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You copy spells into your spellbook and prepare a number equal to your Intelligence modifier + your wizard level (minimum 1) after each long rest." },

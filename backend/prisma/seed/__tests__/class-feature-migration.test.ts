@@ -161,6 +161,30 @@ function isPopulatedFighterRow(row: { className: string; subclassSlug: string | 
   return row.className === "Fighter" && row.subclassSlug === null && POPULATED_ROW_NAMES.has(row.name);
 }
 
+// #1530: Extra Attack's derivedStat/derivedStatTiers columns are populated on
+// six (class, subclass) pairs — the base-class row for Fighter/Barbarian/
+// Monk/Paladin/Ranger, plus Bard's College of Valor subclass row (the only
+// subclass-gated Extra Attack, #1277's slug join). Keyed by (className,
+// subclassSlug, name) tuple, not by (className, name): Bard is the row that
+// needs it — base Bard has no "Extra Attack" row at all, only College of
+// Valor's subclass-tagged one, so subclassSlug is what lets this set name
+// THAT row precisely instead of a bare className+name pair that would stop
+// being unambiguous the moment any class gains a same-named row under both
+// its base and a subclass. Two/Three Extra Attacks are a different name
+// entirely and never need the tuple for that reason.
+const DERIVED_STAT_ROW_KEYS = new Set([
+  "Fighter::null::Extra Attack",
+  "Barbarian::null::Extra Attack",
+  "Monk::null::Extra Attack",
+  "Paladin::null::Extra Attack",
+  "Ranger::null::Extra Attack",
+  "Bard::bard-college-of-valor::Extra Attack",
+]);
+
+function isDerivedStatRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return DERIVED_STAT_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
+}
+
 describe("ClassFeature migration — every descriptor column is NULL/default, except Fighter's #1528 pilot rows", () => {
   it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528)", async () => {
     const rows = await prisma.classFeature.findMany({
@@ -211,8 +235,17 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       expect(row.saveEffect, row.name).toBeNull();
       expect(row.buffTarget, row.name).toBeNull();
       expect(row.buffModifier, row.name).toBeNull();
-      expect(row.derivedStat, row.name).toBeNull();
-      expect(row.derivedStatTiers, row.name).toBeNull();
+
+      // #1530: Extra Attack's six populated (class, subclass) pairs are the
+      // one other exception, checked separately since they don't touch any
+      // of the columns asserted null above.
+      if (isDerivedStatRow({ className: row.class.name, subclassSlug: row.subclass?.slug ?? null, name: row.name })) {
+        expect(row.derivedStat, row.name).not.toBeNull();
+        expect(row.derivedStatTiers, row.name).not.toBeNull();
+      } else {
+        expect(row.derivedStat, row.name).toBeNull();
+        expect(row.derivedStatTiers, row.name).toBeNull();
+      }
     }
   });
 
@@ -227,13 +260,20 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // `WHERE col IS NULL` filter silently matching zero rows four stages from
   // now (#1525's population guards). resourceTotals excludes #1528's six
   // populated Fighter rows (Second Wind ×2/Action Surge ×2/Indomitable ×2,
-  // all of which set it); resourceDieTiers/derivedStatTiers are untouched by
-  // #1528 (no Fighter row sets a die-size tier), so their counts stay
-  // CLASS_FEATURES.length exactly.
-  it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere #1528 didn't populate them", async () => {
+  // all of which set it); derivedStatTiers excludes #1530's twelve populated
+  // Extra Attack rows (DERIVED_STAT_ROW_KEYS ×2 editions each); resourceDieTiers
+  // is untouched by either wave, so its count stays CLASS_FEATURES.length
+  // exactly.
+  it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
     const populatedResourceTotalsCount = 6;
+    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
-      const expectedDbNull = column === "resourceTotals" ? CLASS_FEATURES.length - populatedResourceTotalsCount : CLASS_FEATURES.length;
+      const expectedDbNull =
+        column === "resourceTotals"
+          ? CLASS_FEATURES.length - populatedResourceTotalsCount
+          : column === "derivedStatTiers"
+            ? CLASS_FEATURES.length - populatedDerivedStatTiersCount
+            : CLASS_FEATURES.length;
       const dbNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.DbNull } } });
       expect(dbNullCount, column).toBe(expectedDbNull);
 

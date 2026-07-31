@@ -101,6 +101,16 @@ export interface AuthoredFeature {
   description: string;
   source: "class" | "subclass";
   edition?: RulesEdition;
+  /**
+   * ClassFeature's descriptor-column pair for a permanent, level-gated
+   * derived-stat modifier (#1530) — e.g. `"attacksPerAction"` for Extra
+   * Attack. Distinct from #900's C2b buff layer, which is duration-bound
+   * (`while-active`/`until-rest`); these two columns are for a modifier that
+   * never expires. Both threaded straight through expandFeatureRow into the
+   * seeded ClassFeatureSeedRow unchanged — this file never interprets them.
+   */
+  derivedStat?: string;
+  derivedStatTiers?: { minLevel: number; value: number | string }[];
 }
 
 /**

@@ -13,6 +13,7 @@ import { sneakAttackSpec } from "@/lib/classes/rogue.js";
 import { monkSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
+import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
@@ -463,8 +464,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
     unarmedStrike,
     improvisedWeapon,
     attackRows,
-    // Weapon attacks per Attack action (Extra Attack), max across multiclass.
-    attacksPerAction: deriveAttacksPerAction(row.classEntries),
+    // Weapon attacks per Attack action (Extra Attack), max across multiclass
+    // (#1530) — row-driven from each entry's seeded ClassFeature rows,
+    // featureRowsOf is the SAME "class"/"subclassRef" -> carrier extractor
+    // buildResourcesView/buildAvailableActionsView already use.
+    attacksPerAction: deriveAttacksPerAction(row.classEntries, editionOf(row), featureRowsOf),
     // A two-handed weapon in MAIN_HAND locks OFF_HAND (#1433) — a property of the
     // whole loadout, hence one top-level boolean rather than a per-row flag. NOT
     // the same rule as `offHandBusy` (an internal of buildInventoryContext):
