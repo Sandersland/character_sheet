@@ -24,7 +24,7 @@ set -eu
 
 ALLOWLIST="backend/src/lib/leveling/advancement.ts:359:guarded by crossEditionRejection (Feat, #1345 Chunk 1)
 backend/src/lib/classes/class.ts:90:guarded by crossEditionRejection (Subclass, #1345 Chunk 2)
-backend/src/lib/character/character-create.ts:167:guarded by crossEditionRejection (Subclass, #1345 Chunk 3)
+backend/src/lib/character/character-create.ts:170:guarded by crossEditionRejection (Subclass, #1345 Chunk 3)
 backend/src/lib/classes/resources.ts:339:guarded by crossEditionRejection (GrantedAbility maneuver, #1345 Chunk 4)
 backend/src/lib/classes/resources.ts:477:guarded by crossEditionRejection (GrantedAbility subclass-choice, #1345 Chunk 4)
 backend/src/lib/classes/shadow-arts.ts:95:guarded by crossEditionRejection (GrantedAbility, #1345 Chunk 5)

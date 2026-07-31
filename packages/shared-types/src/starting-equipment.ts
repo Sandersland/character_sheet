@@ -1,10 +1,12 @@
 // Starting-equipment wire types (#1273) — de-duplicates the declarations that
-// were hand-mirrored between the backend's STARTING_EQUIPMENT module and
-// frontend/src/types/character/reference.ts. The nested choice-group / open-pick
-// structure stays TS-shaped rather than DB-shaped: pack contents already migrated
-// to the Pack/PackContent tables, but the choice-group schema isn't worth
-// designing yet. The frontend receives a package per class from GET /api/reference;
-// pack expansion runs server-side at character creation from the DB-backed packs.
+// were hand-mirrored between the backend's (since-deleted) STARTING_EQUIPMENT
+// module and frontend/src/types/character/reference.ts. These types are now
+// ALSO the wire contract for the DB-backed choice-group schema
+// (StartingEquipmentPackage/Group/Option/Item/OpenPick, #1519/#1533/#1534):
+// mapStartingEquipmentPackage (backend lib/inventory/starting-equipment-package.ts)
+// maps rows onto exactly this shape. The frontend receives a package per class
+// from GET /api/reference; pack expansion runs server-side at character
+// creation from the DB-backed packs.
 
 import type { WeaponClass, WeaponRange } from "./item-detail-inputs.js";
 

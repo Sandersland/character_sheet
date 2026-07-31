@@ -12,7 +12,10 @@ import {
   toolsByCategory,
   type MulticlassPrerequisiteOption,
 } from "@/lib/srd/srd.js";
-import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
+import {
+  mapStartingEquipmentPackage,
+  EQUIPMENT_PACKAGE_INCLUDE,
+} from "@/lib/inventory/starting-equipment-package.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
@@ -41,6 +44,18 @@ referenceRouter.get("/reference", async (req, res) => {
     orderBy: { name: "asc" },
     include: { subclasses: { where: withEditionOrShared({}, edition), orderBy: { name: "asc" } } },
   });
+  // One findMany for every class's package rather than one query per class
+  // (avoids an N+1 over the `classes` map below). `edition` is non-nullable on
+  // StartingEquipmentPackage — an exact-match filter, not resolveEditionCatalog
+  // (there is no shared/NULL row to fall back to, unlike Feat/Subclass/Background).
+  const startingEquipmentPackages = await prisma.startingEquipmentPackage.findMany({
+    where: { classId: { in: rawClasses.map((c) => c.id) }, edition },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  const startingEquipmentByClassId = new Map(
+    startingEquipmentPackages.map((p) => [p.classId, mapStartingEquipmentPackage(p)]),
+  );
+
   const rawBackgrounds = await prisma.background.findMany({
     where: withEditionOrShared({}, edition),
     orderBy: { name: "asc" },
@@ -61,14 +76,18 @@ referenceRouter.get("/reference", async (req, res) => {
   //
   // Scope latch (#1336): backgrounds and each class's subclasses (below) are now
   // resolved per the requesting edition, same mechanism as originFeatRows and
-  // universalActionRows. Still deliberately unfiltered by this endpoint:
-  // `races` (species divergence is real — ability increases, roster
-  // membership — but not representable by an edition column alone, #1518);
-  // `classes` themselves (one CharacterClass row serves both editions by
-  // design, subclassGateLevel is the only field that forks, #1308); and
-  // `startingEquipment` (2014 Basic Rules packages served to both editions
-  // today, a live 2024 bug, #1534/#1535). The spell catalog (`GET
-  // /api/spells`) is a separate endpoint with its own edition gap, #1517.
+  // universalActionRows. `startingEquipment` (above) is ALSO now resolved per
+  // requesting edition — by an exact (classId, edition) match rather than
+  // resolveEditionCatalog's fallback, since StartingEquipmentPackage.edition is
+  // non-nullable (#1534). That resolution is real; the CONTENT it resolves to
+  // is not — #1533's EDITION_2024 rows are an interim verbatim copy of 2014's,
+  // so a 2024 character still gets PHB'14 gear until #1535 (parked) authors the
+  // real packages. Still deliberately unfiltered by this endpoint: `races`
+  // (species divergence is real — ability increases, roster membership — but
+  // not representable by an edition column alone, #1518); `classes` themselves
+  // (one CharacterClass row serves both editions by design, subclassGateLevel
+  // is the only field that forks, #1308). The spell catalog (`GET /api/spells`)
+  // is a separate endpoint with its own edition gap, #1517.
   const originFeatNames = [
     ...new Set(backgrounds.map((b) => b.originFeat?.name).filter((n): n is string => n != null)),
   ];
@@ -116,7 +135,7 @@ referenceRouter.get("/reference", async (req, res) => {
       name: s.name,
       description: s.description,
     })),
-    startingEquipment: STARTING_EQUIPMENT[c.name] ?? null,
+    startingEquipment: startingEquipmentByClassId.get(c.id) ?? null,
     // #1161/#1529: PHB'24 primary ability/abilities, off the catalog column; [] for a homebrew class.
     primaryAbility: primaryAbilities(c.primaryAbilities),
     // #1131: level-1 creation pick counts from the SRD 5.2 tables (null for a

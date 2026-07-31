@@ -130,12 +130,6 @@ fi
 #     mechanics — only a key that must be type-checked"). After #1546 Part A
 #     it also carries subclass REGISTRATION, which strengthens rather than
 #     weakens the ruling.
-#   - starting-equipment.ts: TEMPORARY, owned by #1534 (STARTING_EQUIPMENT's
-#     Fighter key — a real class-keyed TS rules record #1532 doesn't touch).
-#     Delete this line the moment #1534 lands; anti-vacuity check 3 forces
-#     that deletion by failing loudly the moment the key it depends on
-#     stops existing, rather than letting the entry rot as a permanent-
-#     looking exemption.
 #   - classes/actions.ts, routes/character/actions.ts: PERMANENT (#1223).
 #     Barbarian's DERIVED_ACTIONS "rage"/"endRage" entries (grantClass:
 #     "barbarian") and computeRageDamageBonus' classEntries lookup are Rage's
@@ -154,7 +148,6 @@ fi
 #     function homes under CLAUDE.md ("Rules logic is backend-owned"), not a
 #     reappearance of migrated content.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
-backend/src/lib/inventory/starting-equipment.ts
 backend/src/lib/classes/actions.ts
 backend/src/routes/character/actions.ts
 backend/src/lib/character/serialize/combat.ts
