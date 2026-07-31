@@ -567,6 +567,66 @@ export interface SubclassEditionPopulationSummary {
   pairsChecked: number;
 }
 
+interface SubclassRowForPresence {
+  id: string;
+  slug: string;
+  edition: SeedEdition | null;
+}
+
+// Groups ClassFeature's (subclassId, edition) row counts into "which editions
+// actually have >= 1 row, per subclass" — split out of
+// assertEverySubclassEditionPopulated purely to keep each function's own
+// cyclomatic/cognitive complexity low. prisma/seed/** carries no vitest
+// coverage instrumentation (vitest.config.ts scopes coverage.include to
+// src/**/*.ts), so a function here floors at the UNCOVERED CRAP formula
+// CC^2+CC regardless of real test coverage — splitting branches down is the
+// only lever, not adding tests (see baseFeatureRows' comment, class-features.ts,
+// for the same reasoning; mirrors collectClassPairCounts/pairCount's role one
+// level up, for assertEveryClassEditionPopulated).
+function groupPresentEditionsBySubclassId(
+  featureCounts: readonly { subclassId: string | null; edition: SeedEdition }[],
+): Map<string, SeedEdition[]> {
+  const bySubclassId = new Map<string, SeedEdition[]>();
+  for (const f of featureCounts) {
+    if (!f.subclassId) continue;
+    const present = bySubclassId.get(f.subclassId) ?? [];
+    present.push(f.edition);
+    bySubclassId.set(f.subclassId, present);
+  }
+  return bySubclassId;
+}
+
+// Same complexity reasoning as groupPresentEditionsBySubclassId above.
+function toSubclassPresenceInputs(
+  subclassRows: readonly SubclassRowForPresence[],
+  presentEditionsBySubclassId: Map<string, SeedEdition[]>,
+): SubclassPresenceInput[] {
+  return subclassRows.map((row) => ({
+    slug: row.slug,
+    edition: row.edition,
+    presentEditions: presentEditionsBySubclassId.get(row.id) ?? [],
+  }));
+}
+
+// The failure-message throw, isolated so assertEverySubclassEditionPopulated's
+// own body carries only ONE branch (checking whether to call this at all) —
+// same complexity reasoning as the two helpers above. The message text is the
+// load-bearing part for the next retab author, which is why it stays attached
+// to the one call site that can actually produce `failures`, not hoisted to a
+// generic "throw with lines" utility that would separate the words from the
+// #1559 citation explaining them.
+function throwSubclassPopulationFailure(failures: readonly string[]): never {
+  throw new Error(
+    [
+      "seedClassFeatures: Subclass population guard failed (#1559) —",
+      ...failures,
+      "Every Subclass row must have at least one ClassFeature row in every edition it is",
+      "offered for (edition: null offers both). Either author the missing ClassFeature",
+      "rows, or tag the Subclass row's `edition` to the edition(s) it actually has content for.",
+    ].join("\n"),
+  );
+}
+
 /**
  * Post-seed presence guard (#1559): every seeded Subclass row must have at
  * least one ClassFeature row in every edition it is OFFERED for — this bug's
@@ -606,32 +666,15 @@ export async function assertEverySubclassEditionPopulated(
     where: { subclassId: { in: subclassRows.map((r) => r.id) } },
     _count: { _all: true },
   });
-  const presentEditionsBySubclassId = new Map<string, SeedEdition[]>();
-  for (const f of featureCounts) {
-    if (!f.subclassId) continue;
-    const present = presentEditionsBySubclassId.get(f.subclassId) ?? [];
-    present.push(f.edition);
-    presentEditionsBySubclassId.set(f.subclassId, present);
-  }
 
-  const inputs: SubclassPresenceInput[] = subclassRows.map((row) => ({
-    slug: row.slug,
-    edition: row.edition as SeedEdition | null,
-    presentEditions: presentEditionsBySubclassId.get(row.id) ?? [],
-  }));
+  const presentEditionsBySubclassId = groupPresentEditionsBySubclassId(featureCounts);
+  const inputs = toSubclassPresenceInputs(
+    subclassRows.map((row) => ({ id: row.id, slug: row.slug, edition: row.edition as SeedEdition | null })),
+    presentEditionsBySubclassId,
+  );
   const failures = subclassPopulationFailures(inputs);
+  if (failures.length > 0) throwSubclassPopulationFailure(failures);
 
-  if (failures.length > 0) {
-    throw new Error(
-      [
-        "seedClassFeatures: Subclass population guard failed (#1559) —",
-        ...failures,
-        "Every Subclass row must have at least one ClassFeature row in every edition it is",
-        "offered for (edition: null offers both). Either author the missing ClassFeature",
-        "rows, or tag the Subclass row's `edition` to the edition(s) it actually has content for.",
-      ].join("\n"),
-    );
-  }
-
-  return { subclassesChecked: subclassRows.length, pairsChecked: inputs.reduce((n, r) => n + offeredEditions(r.edition).length, 0) };
+  const pairsChecked = inputs.reduce((n, r) => n + offeredEditions(r.edition).length, 0);
+  return { subclassesChecked: subclassRows.length, pairsChecked };
 }

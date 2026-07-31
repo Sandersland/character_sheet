@@ -16,25 +16,61 @@ export interface StaleSubclassRow {
   edition: SeedEdition | null;
 }
 
-// A retag gives an existing subclass slug a NEW row id — upsertEditionRow's
-// `where` includes `edition`, so retagging a previously-shared row (Totem
-// Warrior null -> EDITION_2014, #1559) finds no match and CREATES rather
-// than updates in place, leaving the OLD row for pruneStaleSubclasses to
-// drop. `CharacterClassEntry.subclassRef` is `onDelete: SetNull`
-// (schema.prisma) — deleting a row a live character's CharacterClassEntry
-// still points at would SILENTLY null out that character's subclass, not
-// error. That silence is the one failure mode this seed must never produce,
-// so it gets its own loud stop rather than the quiet FK behavior Postgres
-// would otherwise apply. (The other two relations FROM catalog rows TO
-// Subclass — ClassFeature.subclass, SubclassGrantedSpell.subclass — are
-// `onDelete: Cascade` and rewritten by their own seeders in the SAME run, so
-// they need no guard here; only CharacterClassEntry reaches user data.)
-//
+// Groups CharacterClassEntry's (subclassId) row counts into "how many
+// referencing rows per stale subclass id" — split out purely to keep each
+// function's own cyclomatic/cognitive complexity low. prisma/seed/** carries
+// no vitest coverage instrumentation (vitest.config.ts scopes coverage.include
+// to src/**/*.ts), so a function here floors at the UNCOVERED CRAP formula
+// CC^2+CC regardless of real test coverage — splitting branches down is the
+// only lever, not adding tests (see baseFeatureRows' comment, class-features.ts,
+// and groupPresentEditionsBySubclassId's twin role, seed-class-features.ts).
+function countReferencingBySubclassId(
+  referencing: readonly { subclassId: string | null; _count: { _all: number } }[],
+): Map<string, number> {
+  const countBySubclassId = new Map<string, number>();
+  for (const r of referencing) {
+    if (r.subclassId) countBySubclassId.set(r.subclassId, r._count._all);
+  }
+  return countBySubclassId;
+}
+
+// Same complexity reasoning as countReferencingBySubclassId above.
+function staleRowFailureMessages(stale: readonly StaleSubclassRow[], countBySubclassId: Map<string, number>): string[] {
+  return stale
+    .filter((s) => countBySubclassId.has(s.id))
+    .map((s) => `  ${s.slug} (${s.edition ?? "shared"}): ${countBySubclassId.get(s.id)} referencing CharacterClassEntry row(s)`);
+}
+
+// The failure throw, isolated so assertNoCharactersReferenceStaleSubclasses'
+// own body carries only the two branches deciding WHETHER to call this — same
+// complexity reasoning as the two helpers above. This message (not the two
+// pure helpers) is the load-bearing part a future retab author actually
+// reads: `onDelete: SetNull` is what makes the silent-null failure mode
+// possible, and a retag is what gives the seeded slug a NEW row id in the
+// first place (upsertEditionRow creates rather than updates in place, Totem
+// Warrior null -> EDITION_2014, #1559) — a reader hits this comment before
+// the delete that would otherwise silently mutate a character.
+function throwStaleSubclassReferencedError(messages: readonly string[]): never {
+  throw new Error(
+    [
+      "seedSubclasses: refusing to prune a Subclass row a live character still references (#1559) —",
+      ...messages,
+      "CharacterClassEntry.subclassRef is onDelete: SetNull, so deleting this row would silently null",
+      "out those characters' subclass instead of erroring. Remap the referencing CharacterClassEntry",
+      "rows onto the retained (slug, edition) row first, then re-run the seed.",
+    ].join("\n"),
+  );
+}
+
 // Parameterized on the stale-row list rather than reading SUBCLASSES
 // directly, so a test can fabricate a retag against its OWN fixture subclass
 // in isolation from the real 31-row catalog — the same "call the underlying
 // primitive directly" idiom action-fork-reseed.test.ts uses, since seed.ts
 // can't be re-invoked from a test (it self-invokes main() at module load).
+// (The other two relations FROM catalog rows TO Subclass —
+// ClassFeature.subclass, SubclassGrantedSpell.subclass — are `onDelete:
+// Cascade` and rewritten by their own seeders in the SAME run, so they need
+// no guard here; only CharacterClassEntry reaches user data.)
 export async function assertNoCharactersReferenceStaleSubclasses(
   prisma: PrismaClient,
   stale: readonly StaleSubclassRow[],
@@ -45,25 +81,9 @@ export async function assertNoCharactersReferenceStaleSubclasses(
     where: { subclassId: { in: stale.map((s) => s.id) } },
     _count: { _all: true },
   });
-  const countBySubclassId = new Map<string, number>();
-  for (const r of referencing) {
-    if (r.subclassId) countBySubclassId.set(r.subclassId, r._count._all);
-  }
-  const messages = stale
-    .filter((s) => countBySubclassId.has(s.id))
-    .map((s) => `  ${s.slug} (${s.edition ?? "shared"}): ${countBySubclassId.get(s.id)} referencing CharacterClassEntry row(s)`);
-
-  if (messages.length > 0) {
-    throw new Error(
-      [
-        "seedSubclasses: refusing to prune a Subclass row a live character still references (#1559) —",
-        ...messages,
-        "CharacterClassEntry.subclassRef is onDelete: SetNull, so deleting this row would silently null",
-        "out those characters' subclass instead of erroring. Remap the referencing CharacterClassEntry",
-        "rows onto the retained (slug, edition) row first, then re-run the seed.",
-      ].join("\n"),
-    );
-  }
+  const countBySubclassId = countReferencingBySubclassId(referencing);
+  const messages = staleRowFailureMessages(stale, countBySubclassId);
+  if (messages.length > 0) throwStaleSubclassReferencedError(messages);
 }
 
 // Prune the row a subclass's edition tag CHANGE strands (Totem Warrior null
