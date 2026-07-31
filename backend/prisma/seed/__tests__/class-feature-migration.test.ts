@@ -161,6 +161,14 @@ function isPopulatedFighterRow(row: { className: string; subclassSlug: string | 
   return row.className === "Fighter" && row.subclassSlug === null && POPULATED_ROW_NAMES.has(row.name);
 }
 
+// #1223: Rage's resource pool (base Barbarian, both editions — 2 rows) is the
+// second class to populate a resource descriptor column after Fighter's #1528
+// pilot. No activation/cost/effect columns — Rage's activation stays in
+// classes/actions.ts's DERIVED_ACTIONS (this migration moves the pool only).
+function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return row.className === "Barbarian" && row.subclassSlug === null && row.name === "Rage";
+}
+
 // #1546 Part B: Battle Master's Combat Superiority is the one SUBCLASS-scoped
 // resource row (its superiority-dice pool) alongside the three base-class
 // ones above.
@@ -203,8 +211,8 @@ function isDerivedStatRow(row: { className: string; subclassSlug: string | null;
   return DERIVED_STAT_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
-describe("ClassFeature migration — every descriptor column is NULL/default, except Fighter's #1528 pilot rows", () => {
-  it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528)", async () => {
+describe("ClassFeature migration — every descriptor column is NULL/default, except Fighter's #1528 pilot rows and Barbarian's #1223 Rage rows", () => {
+  it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528) and Rage (#1223)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
         resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
@@ -223,7 +231,7 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
 
     for (const row of rows) {
       const key = { className: row.class.name, subclassSlug: row.subclass?.slug ?? null, name: row.name };
-      const populated = isPopulatedFighterRow(key) || isPopulatedBattleMasterPoolRow(key);
+      const populated = isPopulatedFighterRow(key) || isPopulatedBattleMasterPoolRow(key) || isPopulatedBarbarianRow(key);
       if (populated) {
         // Populated by #1528/#1546 — asserted precisely in the describe blocks below.
         // Falls through to the derivedStat/saveDcAbilities checks below rather
@@ -292,13 +300,14 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // `WHERE col IS NULL` filter silently matching zero rows four stages from
   // now (#1525's population guards). resourceTotals excludes #1528's six
   // populated Fighter rows (Second Wind ×2/Action Surge ×2/Indomitable ×2)
-  // PLUS #1546's Combat Superiority ×2 (its superiority-dice pool);
+  // PLUS #1546's Combat Superiority ×2 (its superiority-dice pool) PLUS
+  // #1223's Rage ×2 (Barbarian's base-class pool, both editions);
   // derivedStatTiers excludes #1530's twelve populated Extra Attack rows PLUS
   // #1546's Combat Superiority/Student of War ×2 editions each
   // (DERIVED_STAT_ROW_KEYS ×2 editions each, computed below); resourceDieTiers
   // excludes only Combat Superiority ×2 (the only row with a die-size tier).
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
-    const populatedResourceTotalsCount = 8;
+    const populatedResourceTotalsCount = 10;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
@@ -388,6 +397,46 @@ describe("ClassFeature migration — Fighter's #1528 pilot rows are populated ex
         { minLevel: 13, total: 2 },
         { minLevel: 17, total: 3 },
       ]);
+      expect(row.activationCost, row.edition).toBeNull();
+      expect(row.costKind, row.edition).toBeNull();
+    }
+  });
+});
+
+// #1223: precise pin for Rage's two populated rows, mirroring the Fighter
+// pilot-row proofs above — proves the write landed exactly as authored, not
+// just "something is non-null".
+describe("ClassFeature migration — Barbarian's #1223 Rage rows are populated exactly as authored", () => {
+  it("resourceKey/recharge/totals only — no activation/cost columns (Rage's activation stays in classes/actions.ts's DERIVED_ACTIONS)", async () => {
+    const rows = await prisma.classFeature.findMany({
+      where: { name: "Rage", class: { name: "Barbarian" }, subclassId: null },
+      orderBy: { edition: "asc" },
+    });
+    expect(rows).toHaveLength(2);
+    const [row2014, row2024] = rows[0].edition === "EDITION_2014" ? [rows[0], rows[1]] : [rows[1], rows[0]];
+
+    expect(row2014.resourceKey).toBe("rage");
+    expect(row2014.resourceRecharge).toBe("longRest");
+    expect(row2014.resourceTotals).toEqual([
+      { minLevel: 1, total: 2 },
+      { minLevel: 3, total: 3 },
+      { minLevel: 6, total: 4 },
+      { minLevel: 12, total: 5 },
+      { minLevel: 17, total: 6 },
+      { minLevel: 20, total: 99 },
+    ]);
+
+    expect(row2024.resourceKey).toBe("rage");
+    expect(row2024.resourceRecharge).toBe("longRest");
+    expect(row2024.resourceTotals).toEqual([
+      { minLevel: 1, total: 2, shortRestRegain: 1 },
+      { minLevel: 3, total: 3, shortRestRegain: 1 },
+      { minLevel: 6, total: 4, shortRestRegain: 1 },
+      { minLevel: 12, total: 5, shortRestRegain: 1 },
+      { minLevel: 17, total: 6, shortRestRegain: 1 },
+    ]);
+
+    for (const row of rows) {
       expect(row.activationCost, row.edition).toBeNull();
       expect(row.costKind, row.edition).toBeNull();
     }

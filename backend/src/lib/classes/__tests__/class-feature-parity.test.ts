@@ -20,7 +20,6 @@ import { subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import type { AuthoredFeature, ClassDefinition } from "@/lib/classes/types.js";
 
-import { barbarian } from "@/lib/classes/barbarian.js";
 import { bard } from "@/lib/classes/bard.js";
 import { cleric } from "@/lib/classes/cleric.js";
 import { druid } from "@/lib/classes/druid.js";
@@ -35,17 +34,18 @@ import { wizard } from "@/lib/classes/wizard.js";
 import { CLASS_SUBCLASSES, LITERAL_ROW_CLASSES } from "./class-subclasses.fixture.js";
 import { loadDbFeatureRows } from "./db-feature-rows.fixture.js";
 
-// Fighter deliberately absent (#1227, #1532): `lib/classes/fighter.ts` no
-// longer exists at all (features moved to literal seed data,
-// fighter-features.ts), so `oldDeriveFeatures`'s TS-derived "OLD" side has no
-// ClassDefinition left to read `classDef?.features` from — comparing that
+// Fighter and Barbarian deliberately absent (#1227/#1532, #1223):
+// `lib/classes/fighter.ts` and `lib/classes/barbarian.ts` no longer exist at
+// all (features moved to literal seed data, fighter-features.ts/
+// barbarian-features.ts), so `oldDeriveFeatures`'s TS-derived "OLD" side has
+// no ClassDefinition left to read `classDef?.features` from — comparing that
 // against the real rows-fed "NEW" side would fail on content this migration
 // deliberately changed, not a regression. See LITERAL_ROW_CLASSES' comment
 // for why this header's own reminder ("MUST be replaced once the TS arrays
-// are finally retired") is now true FOR FIGHTER; the other eleven classes
-// still need it.
+// are finally retired") is now true for both; the other ten classes still
+// need it.
 const REFERENCE_CLASSES: Record<string, ClassDefinition> = {
-  barbarian, bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+  bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
 };
 
 const ABILITY_SCORES = {

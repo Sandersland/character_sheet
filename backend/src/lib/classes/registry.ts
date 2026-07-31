@@ -8,7 +8,6 @@ import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-
 import { editionOf } from "@/lib/rules/edition.js";
 import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
-import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";
 import { derivedStatFromRows, featuresFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { cleric } from "./cleric.js";
@@ -23,12 +22,13 @@ import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, De
 import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
 
-// Fighter is deliberately absent (#1532 — lib/classes/fighter.ts is deleted).
-// Its three subclasses (Champion/Battle Master/Eldritch Knight) resolve
-// entirely through the SUBCLASS_IDENTITY seeding pass below; deriveBaseLayer's
-// optional-chaining on `classDef` already tolerates a missing key.
+// Fighter and Barbarian are deliberately absent (#1532 / #1223 —
+// lib/classes/fighter.ts and lib/classes/barbarian.ts are both deleted).
+// Their subclasses (Fighter: Champion/Battle Master/Eldritch Knight;
+// Barbarian: Totem Warrior/Berserker) resolve entirely through the
+// SUBCLASS_IDENTITY seeding pass below; deriveBaseLayer's optional-chaining
+// on `classDef` already tolerates a missing key.
 const CLASSES: Record<string, ClassDefinition> = {
-  barbarian,
   bard,
   cleric,
   druid,
@@ -53,24 +53,25 @@ const CLASSES: Record<string, ClassDefinition> = {
 // class not yet migrated off `lib/classes/<class>.ts` still supplies
 // explicitly. This is what lets deriveSubclassLayer resolve a subclass's
 // seeded ClassFeature rows (poolsFromRows/featuresFromRows) even when no
-// ClassDefinition registers it in TS at all (Fighter's three, now that
-// fighter.ts is deleted, #1532) — before this, a missing TS entry meant
-// `deriveSubclassLayer` returned early with EMPTY pools and features,
-// silently deleting every seeded row for that subclass (see this issue's
-// probe).
+// ClassDefinition registers it in TS at all (Fighter's three since fighter.ts
+// was deleted, #1532; Barbarian's two since barbarian.ts was, #1223) —
+// before this, a missing TS entry meant `deriveSubclassLayer` returned early
+// with EMPTY pools and features, silently deleting every seeded row for that
+// subclass (see #1532's probe).
 //
 // THEN overlaid by the CLASSES-derived definitions, in a second pass — order
 // matters: a class still on the TS migration path (a non-3 grantLevel,
 // resourceFn, deriveExtras, or the `choices` catalog) must win over its own
-// identity-only stub, or those fields would silently vanish for the eleven
+// identity-only stub, or those fields would silently vanish for the ten
 // classes not yet fully row-driven. `SUBCLASS_IDENTITY` is 31 entries against
-// 28 TS registrations now that Fighter's three (Champion/Battle
-// Master/Eldritch Knight) have none — so the overlay is behaviour-preserving
-// by construction only for those 28: every key the first loop seeds for a
-// still-TS-registered class is immediately replaced by the second loop's
-// richer definition; Fighter's three keep their identity-only seed as their
-// final definition, which is correct — there is no richer TS definition left
-// to overlay it with.
+// 26 TS registrations now that Fighter's three (Champion/Battle
+// Master/Eldritch Knight) and Barbarian's two (Totem Warrior/Berserker) have
+// none — so the overlay is behaviour-preserving by construction only for
+// those 26: every key the first loop seeds for a still-TS-registered class is
+// immediately replaced by the second loop's richer definition; Fighter's
+// three and Barbarian's two keep their identity-only seed as their final
+// definition, which is correct — there is no richer TS definition left to
+// overlay it with.
 const SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const [slug, { nameKey }] of Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]) {
   SUBCLASSES[nameKey] = { slug };
@@ -97,11 +98,11 @@ interface ClassLayer {
 
 // A resourceFn pool wins over a row-declared pool of the same key (mirrors
 // mergeLayers' base-wins policy) — no production collision exists today
-// (only Fighter's rows declare a resourceKey, #1528, and Fighter's base
-// resourceFn no longer emits Second Wind/Action Surge/Indomitable), but this
-// keeps a class mid-migration (resourceFn for some pools, rows for others)
-// from silently doubling a pool up if a row and a resourceFn ever named the
-// same key during the transition.
+// (Fighter's rows declare a resourceKey since #1528, Barbarian's since #1223,
+// and neither class has a resourceFn left to collide with, both modules
+// deleted), but this keeps a class mid-migration (resourceFn for some pools,
+// rows for others) from silently doubling a pool up if a row and a resourceFn
+// ever named the same key during the transition.
 function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]): DerivedResource[] {
   if (fromRows.length === 0) return fromFn;
   const seenKeys = new Set(fromFn.map((p) => p.key));
@@ -110,9 +111,10 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
 
 // Row-driven pools are DATA-gated, not class-gated: `poolsFromRows` reads
 // whatever `resourceKey` a class's rows actually populate, which today is
-// Fighter alone (#1528) — every other class's rows carry no resourceKey, so
-// this is a no-op for them until their own wave-2 retab (#1134) populates
-// theirs. No `=== "fighter"` check anywhere (CLAUDE.md).
+// Fighter (#1528) and Barbarian's Rage (#1223) — every other class's rows
+// carry no resourceKey, so this is a no-op for them until their own wave-2
+// retab (#1134) populates theirs. No `=== "fighter"` / `=== "barbarian"`
+// check anywhere (CLAUDE.md).
 function deriveBaseLayer(
   classDef: ClassDefinition | undefined,
   level: number,

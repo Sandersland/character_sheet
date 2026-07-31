@@ -84,15 +84,21 @@ describe("real-content sweep: feature-name sets agree across editions (#1374 AC 
         const at2024 = deriveResources(className, subclass, 20, ABILITY_SCORES, profBonus, featureRows, "EDITION_2024");
         const names2014 = new Set((at2014?.features ?? []).map((f) => f.name));
         const names2024 = new Set((at2024?.features ?? []).map((f) => f.name));
-        // Fighter (#1227) is the first class whose 2024 content genuinely
+        // Fighter (#1227) was the first class whose 2024 content genuinely
         // diverges by design — it adds several 2024-only feature names
         // (Weapon Mastery, Tactical Mind, Two/Three Extra Attacks, ...) and
         // renames one (Battle Master's L18 "Improved Combat Superiority
-        // (d12)" -> "Ultimate Combat Superiority"), so its name sets are
-        // SUPPOSED to differ across editions. Exempted from the equality
-        // check but still visited and still counted toward the anti-vacuity
-        // floor below — dropping it from the loop entirely would have
-        // silently shrunk that floor's real measured value.
+        // (d12)" -> "Ultimate Combat Superiority"). Barbarian (#1223) is the
+        // second: it adds Weapon Mastery/Primal Knowledge/Instinctive Pounce/
+        // Brutal Strike/Improved Brutal Strike/Epic Boon, drops Brutal
+        // Critical, and Path of the Totem Warrior loses all its features
+        // outright (no 2024 successor authored). LITERAL_ROW_CLASSES is what
+        // actually drives the exemption below — any class on that list has
+        // its name sets SUPPOSED to differ across editions, not just these
+        // two. Exempted from the equality check but still visited and still
+        // counted toward the anti-vacuity floor below — dropping it from the
+        // loop entirely would have silently shrunk that floor's real measured
+        // value.
         if (!LITERAL_ROW_CLASSES.has(className)) {
           expect(names2014).toEqual(names2024);
         }
@@ -146,12 +152,57 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 // Heroic Warrior) has exactly one description under its name too — absent
 // from a 2014 row entirely, not diverged from one — so none of those are
 // tagged either.
+// Barbarian's 31 new triples (#1223): the 9 base-class names that genuinely
+// forked (Rage, Unarmored Defense, Danger Sense, Reckless Attack, Feral
+// Instinct, Relentless Rage, Persistent Rage, Indomitable Might, Primal
+// Champion) show up under EVERY subclass context Barbarian has
+// (undefined/totem warrior/berserker), same reason Fighter's 5 base names
+// show up under all 4 of ITS contexts (collectTaggedFeatureKeys combines
+// classRows with EVERY subclass's own rows) — 9 x 3 = 27, plus Berserker's
+// own 4 (Frenzy, Mindless Rage, Retaliation, Intimidating Presence) = 31.
+// Extra Attack/Fast Movement are NOT here: both stay one untagged row per
+// #1223's own decision (edition-invariant in wording, not just mechanics).
+// Two Berserker level-shifts (Retaliation 14->10, Intimidating Presence
+// 10->14) share their name across editions same as everything else here —
+// taggedNamesFor keys on name alone, not level, so a level-shifted pair
+// counts as "tagged" exactly like a same-level rewrite.
 const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["cleric", "life domain", "Domain Spells"],
   ["cleric", "trickery domain", "Domain Spells"],
   ["warlock", "the fiend", "Expanded Spell List"],
   ["warlock", "the archfey", "Expanded Spell List"],
   ["warlock", "the great old one", "Expanded Spell List"],
+  ["barbarian", "undefined", "Rage"],
+  ["barbarian", "undefined", "Unarmored Defense"],
+  ["barbarian", "undefined", "Danger Sense"],
+  ["barbarian", "undefined", "Reckless Attack"],
+  ["barbarian", "undefined", "Feral Instinct"],
+  ["barbarian", "undefined", "Relentless Rage"],
+  ["barbarian", "undefined", "Persistent Rage"],
+  ["barbarian", "undefined", "Indomitable Might"],
+  ["barbarian", "undefined", "Primal Champion"],
+  ["barbarian", "totem warrior", "Rage"],
+  ["barbarian", "totem warrior", "Unarmored Defense"],
+  ["barbarian", "totem warrior", "Danger Sense"],
+  ["barbarian", "totem warrior", "Reckless Attack"],
+  ["barbarian", "totem warrior", "Feral Instinct"],
+  ["barbarian", "totem warrior", "Relentless Rage"],
+  ["barbarian", "totem warrior", "Persistent Rage"],
+  ["barbarian", "totem warrior", "Indomitable Might"],
+  ["barbarian", "totem warrior", "Primal Champion"],
+  ["barbarian", "berserker", "Rage"],
+  ["barbarian", "berserker", "Unarmored Defense"],
+  ["barbarian", "berserker", "Danger Sense"],
+  ["barbarian", "berserker", "Reckless Attack"],
+  ["barbarian", "berserker", "Feral Instinct"],
+  ["barbarian", "berserker", "Relentless Rage"],
+  ["barbarian", "berserker", "Persistent Rage"],
+  ["barbarian", "berserker", "Indomitable Might"],
+  ["barbarian", "berserker", "Primal Champion"],
+  ["barbarian", "berserker", "Frenzy"],
+  ["barbarian", "berserker", "Mindless Rage"],
+  ["barbarian", "berserker", "Retaliation"],
+  ["barbarian", "berserker", "Intimidating Presence"],
   ["fighter", "undefined", "Fighting Style"],
   ["fighter", "undefined", "Second Wind"],
   ["fighter", "undefined", "Action Surge"],

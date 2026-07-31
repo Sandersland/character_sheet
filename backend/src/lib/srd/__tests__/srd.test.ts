@@ -129,22 +129,48 @@ describe("deriveResources — Druid Wild Shape", () => {
 });
 
 // ── Barbarian — Rage ──────────────────────────────────────────────────────────
+// #1223: the level 1-19 tier table is IDENTICAL in both editions, but level 20
+// forks — SRD 5.1 keeps the 99 "unlimited" sentinel (long rest only, no
+// shortRestRegain); SRD 5.2 p.20 caps at 6 (the level-17 tier still applies)
+// and adds shortRestRegain: 1 on every tier. Before this issue, both editions
+// resolved barbarian.ts's single edition-blind resourceFn, so a 2024
+// character's level-20 sheet wrongly showed "Unlimited uses at level 20" —
+// the headline bug this test used to encode as EXPECTED (>10) rather than
+// catch; it now asserts the fixed, edition-split values instead.
 
-describe("deriveResources — Barbarian Rage", () => {
+describe("deriveResources — Barbarian Rage (both editions agree on levels 1-19)", () => {
   const PROF_4 = 4;
 
   it.each([
     [1, 2], [2, 2], [3, 3], [5, 3], [6, 4], [9, 4], [11, 4], [12, 5], [16, 5], [17, 6], [19, 6],
-  ])("level %i → %i rage uses", (level, expectedTotal) => {
+  ])("EDITION_2024 level %i → %i rage uses", (level, expectedTotal) => {
     const result = deriveResources("barbarian", undefined, level, ABILITY_SCORES, PROF_2, testFeatureRowsFor("barbarian", undefined), "EDITION_2024");
     const rage = result!.resources.find((r) => r.key === "rage");
     expect(rage!.total).toBe(expectedTotal);
     expect(rage!.recharge).toBe("longRest");
   });
 
-  it("level 20 → unlimited sentinel", () => {
+  it.each([
+    [1, 2], [2, 2], [3, 3], [5, 3], [6, 4], [9, 4], [11, 4], [12, 5], [16, 5], [17, 6], [19, 6],
+  ])("EDITION_2014 level %i → %i rage uses", (level, expectedTotal) => {
+    const result = deriveResources("barbarian", undefined, level, ABILITY_SCORES, PROF_2, testFeatureRowsFor("barbarian", undefined), "EDITION_2014");
+    const rage = result!.resources.find((r) => r.key === "rage");
+    expect(rage!.total).toBe(expectedTotal);
+    expect(rage!.recharge).toBe("longRest");
+  });
+
+  it("EDITION_2024 level 20: caps at 6 (SRD 5.2 p.20 — no L20 tier, level 17's tier still applies)", () => {
     const result = deriveResources("barbarian", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("barbarian", undefined), "EDITION_2024");
-    expect(result!.resources.find((r) => r.key === "rage")!.total).toBeGreaterThan(10);
+    expect(result!.resources.find((r) => r.key === "rage")!.total).toBe(6);
+  });
+
+  it("EDITION_2014 level 20: unlimited sentinel (SRD 5.1 p.21 — unaffected by the 2024 fix)", () => {
+    const result = deriveResources("barbarian", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("barbarian", undefined), "EDITION_2014");
+    // 99, not just "> 10": the sibling EDITION_2024 case above pins its value
+    // exactly, and a loose bound on the one number this whole issue turns on
+    // would still pass if the 2014 tier were silently rewritten to any other
+    // large total.
+    expect(result!.resources.find((r) => r.key === "rage")!.total).toBe(99);
   });
 });
 

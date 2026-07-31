@@ -7,7 +7,6 @@
 // in seed.ts main().
 import { describe, it, expect } from "vitest";
 
-import { barbarian } from "@/lib/classes/barbarian.js";
 import { bard } from "@/lib/classes/bard.js";
 import { cleric } from "@/lib/classes/cleric.js";
 import { druid } from "@/lib/classes/druid.js";
@@ -534,7 +533,7 @@ describe("referential integrity", () => {
   // comparison while only the catalog column carried 2014 values).
   it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
-      Barbarian: barbarian, Bard: bard, Cleric: cleric, Druid: druid,
+      Bard: bard, Cleric: cleric, Druid: druid,
       Monk: monk, Paladin: paladin, Ranger: ranger, Rogue: rogue, Sorcerer: sorcerer,
       Warlock: warlock, Wizard: wizard,
     };
@@ -547,15 +546,19 @@ describe("referential integrity", () => {
   });
 
   // Fighter left `defByName` above when lib/classes/fighter.ts was deleted
-  // (#1532) — its three subclasses (Champion/Battle Master/Eldritch Knight)
-  // are SUBCLASS_IDENTITY-only now, so there is no `sub.grantLevel` left to
+  // (#1532); Barbarian left it the same way when lib/classes/barbarian.ts was
+  // (#1223) — both classes' subclasses (Fighter: Champion/Battle
+  // Master/Eldritch Knight; Barbarian: Totem Warrior/Berserker) are
+  // SUBCLASS_IDENTITY-only now, so there is no `sub.grantLevel` left to
   // compare against. Assert directly on the seeded CharacterClass.subclassLevel
-  // value instead: SRD 5.2 grants every subclass at level 3, and PHB'14 p.72
-  // grants Martial Archetype at 3rd level too, so 3 is correct in BOTH
-  // editions — this row is edition-invariant.
-  it("Fighter's seeded subclassLevel is 3 in both editions (SRD 5.2 & PHB'14 p.72)", () => {
+  // value instead: SRD 5.2 grants every subclass at level 3, and PHB'14 grants
+  // Martial Archetype (p.72) and Primal Path (p.48) at 3rd level too, so 3 is
+  // correct in BOTH editions — these rows are edition-invariant.
+  it("Fighter's and Barbarian's seeded subclassLevel is 3 in both editions (SRD 5.2 & PHB'14 pp. 72/48)", () => {
     const fighterClass = CLASSES.find((c) => c.name === "Fighter");
+    const barbarianClass = CLASSES.find((c) => c.name === "Barbarian");
     expect(fighterClass?.subclassLevel).toBe(3);
+    expect(barbarianClass?.subclassLevel).toBe(3);
   });
 
   // Unlike the grantLevel drift test above (reverted to direct equality by
@@ -582,13 +585,14 @@ describe("referential integrity", () => {
 // the class definitions as ALREADY a perfect 1:1 bijection (31 rows, 31
 // definition keys) at the time of filing — each assertion below is a
 // toEqual([]) diff so a broken row names the offender instead of a boolean
-// pass/fail. Since #1532 deleted lib/classes/fighter.ts, that bijection is now
-// 31 rows / 28 definition keys: Fighter's three subclasses are
-// SUBCLASS_IDENTITY-only (no SubclassDefinition), which is exactly the
-// row-migrated case the fourth test below carves out.
+// pass/fail. #1532 deleted lib/classes/fighter.ts and #1223 deleted
+// lib/classes/barbarian.ts, so that bijection is now 31 rows / 26 definition
+// keys: Fighter's three subclasses and Barbarian's two are SUBCLASS_IDENTITY-
+// only (no SubclassDefinition), which is exactly the row-migrated case the
+// fourth test below carves out.
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   const CLASS_DEFS: Record<string, ClassDefinition> = {
-    barbarian, bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+    bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
   };
 
   // The named twin of scripts/check-class-ts-migration.sh's NOT_YET_MIGRATED
@@ -597,7 +601,7 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   // BOTH lists in the same PR, or this test and the guard script silently
   // drift apart. Deliberate-coupling latch: if you change one, update the
   // other.
-  const ROW_MIGRATED_CLASSES = ["fighter"];
+  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian"];
 
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
     const bad = SUBCLASSES.filter((s) => {

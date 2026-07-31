@@ -4,14 +4,18 @@
 // content changes here, a mechanical move with a checkable row count. Reading
 // these rows (retiring featureAppliesToEdition) is #1524's job, not this
 // file's; #1530 is the first descriptor column this file's own expandFeatureRow
-// populates (derivedStat/derivedStatTiers, off Barbarian/Bard/Monk/Paladin/
-// Ranger's AuthoredFeature entries) — every other descriptor column below
-// still resolves to DESCRIPTOR_RESET, populated nowhere yet (#1528+).
+// populates (derivedStat/derivedStatTiers, off Bard/Monk/Paladin/Ranger's
+// AuthoredFeature entries — Barbarian's own Extra Attack tier moved to
+// barbarian-features.ts's literal rows, #1223) — every other descriptor
+// column below still resolves to DESCRIPTOR_RESET, populated nowhere yet
+// (#1528+).
 //
-// Rows are DERIVED from the twelve class modules, not hand-transcribed: this
-// guarantees byte-identical `description`/`level` text (the migration's own
-// acceptance criterion) and means the row count is a property of the
-// registry, never a literal to keep in sync by hand.
+// Rows are DERIVED from the ten remaining TS-authored class modules (plus
+// Fighter's and Barbarian's own literal rows, concatenated in below), not
+// hand-transcribed: this guarantees byte-identical `description`/`level` text
+// for the derived half (the migration's own acceptance criterion) and means
+// that half's row count is a property of the registry, never a literal to
+// keep in sync by hand.
 //
 // DATA MODULE ONLY (#1277 AC 4, machine-enforced by
 // scripts/check-seed-data-modules.sh): no direct database calls or async
@@ -27,7 +31,6 @@ import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclas
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
 import type { SeedEdition } from "./edition.js";
 
-import { barbarian } from "../../src/lib/classes/barbarian.js";
 import { bard } from "../../src/lib/classes/bard.js";
 import { cleric } from "../../src/lib/classes/cleric.js";
 import { druid } from "../../src/lib/classes/druid.js";
@@ -38,17 +41,19 @@ import { rogue } from "../../src/lib/classes/rogue.js";
 import { sorcerer } from "../../src/lib/classes/sorcerer.js";
 import { warlock } from "../../src/lib/classes/warlock.js";
 import { wizard } from "../../src/lib/classes/wizard.js";
+import { BARBARIAN_FEATURES } from "./barbarian-features.js";
 import { FIGHTER_FEATURES } from "./fighter-features.js";
 
 // className must match a CharacterClass.name seed row (catalog-data.ts) —
-// title case, not the lowercase registry.ts dispatch key. Fighter is
-// deliberately ABSENT (#1227): its rows are literal data (fighter-features.ts),
-// not derived from a ClassDefinition.features array — see LITERAL_ROW_CLASSES
-// below. `lib/classes/fighter.ts` itself is gone (#1532); `features` stays
-// optional on ClassDefinition/SubclassDefinition for the eleven classes still
-// on the TS-authoring path, not because Fighter ever needed it to be.
+// title case, not the lowercase registry.ts dispatch key. Fighter and
+// Barbarian are deliberately ABSENT (#1227, #1223): their rows are literal
+// data (fighter-features.ts, barbarian-features.ts), not derived from a
+// ClassDefinition.features array — see LITERAL_ROW_CLASSES below.
+// `lib/classes/fighter.ts` (#1532) and `lib/classes/barbarian.ts` (#1223
+// commit 3 of 3) are both deleted outright. `features` stays optional on
+// ClassDefinition/SubclassDefinition for the ten classes still on the
+// TS-authoring path, not because Fighter or Barbarian ever needed it to be.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
-  Barbarian: barbarian,
   Bard: bard,
   Cleric: cleric,
   Druid: druid,
@@ -62,16 +67,16 @@ const CLASS_MODULES: Record<string, ClassDefinition> = {
 };
 
 // Classes whose CLASS_FEATURES rows are authored as LITERAL seed data
-// (fighter-features.ts) rather than derived from a lib/classes/<class>.ts
-// module's AuthoredFeature[] arrays via collectRawFeatures/expandFeatureRow
-// below. Exported so every test that needs to skip/scope around this class
-// (class-feature-migration.test.ts's derived-half scoping; the lowercase
-// sibling set in src/lib/classes/__tests__/class-subclasses.fixture.ts, kept
-// separate because backend/tsconfig.json's `rootDir: "src"` makes a src file
-// importing anything under prisma/ a compile error — verified empirically,
-// TS6059) keys off ONE authoritative set per side, never a second
-// hand-maintained list.
-export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set(["Fighter"]);
+// (fighter-features.ts, barbarian-features.ts) rather than derived from a
+// lib/classes/<class>.ts module's AuthoredFeature[] arrays via
+// collectRawFeatures/expandFeatureRow below. Exported so every test that needs
+// to skip/scope around these classes (class-feature-migration.test.ts's
+// derived-half scoping; the lowercase sibling set in
+// src/lib/classes/__tests__/class-subclasses.fixture.ts, kept separate
+// because backend/tsconfig.json's `rootDir: "src"` makes a src file importing
+// anything under prisma/ a compile error — verified empirically, TS6059) keys
+// off ONE authoritative set per side, never a second hand-maintained list.
+export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set(["Fighter", "Barbarian"]);
 
 // One entry per DerivedFeature exactly as authored in lib/classes/<class>.ts —
 // pre-expansion (an untagged feature is still ONE entry here; expandFeatureRow
@@ -96,11 +101,11 @@ interface RawFeatureRow {
 // branches down is the only lever, not adding coverage).
 function baseFeatureRows(className: string, classDef: ClassDefinition): RawFeatureRow[] {
   // `?? []` is Fighter-shaped defensive code that never fires today (Fighter
-  // is absent from CLASS_MODULES, #1227) — ClassDefinition.features is
-  // optional on the TYPE now that Fighter has no ClassDefinition module at
-  // all (`lib/classes/fighter.ts` deleted, #1532), so every caller through
-  // this shared type must narrow, even the eleven classes that still always
-  // set it.
+  // is absent from CLASS_MODULES, #1227; so is Barbarian, #1223) —
+  // ClassDefinition.features is optional on the TYPE now that Fighter has no
+  // ClassDefinition module at all (`lib/classes/fighter.ts` deleted, #1532),
+  // so every caller through this shared type must narrow, even the ten
+  // classes that still always set it.
   return (classDef.features ?? []).map((feature) => ({ className, subclassSlug: null, feature }));
 }
 
@@ -216,13 +221,15 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
 }
 
 // The full seed family: every derived-class row (re-derived from the
-// eleven-class registry by class-feature-migration.test.ts, never hardcoded
-// there either) PLUS Fighter's literal rows (fighter-features.ts, #1227) —
-// concatenated, not merged through expandFeatureRow, since FIGHTER_FEATURES
-// is already in final ClassFeatureSeedRow[] shape.
+// ten-class registry by class-feature-migration.test.ts, never hardcoded
+// there either) PLUS Fighter's and Barbarian's literal rows
+// (fighter-features.ts #1227, barbarian-features.ts #1223) — concatenated,
+// not merged through expandFeatureRow, since FIGHTER_FEATURES/
+// BARBARIAN_FEATURES are already in final ClassFeatureSeedRow[] shape.
 export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
   ...collectRawFeatures().flatMap(expandFeatureRow),
   ...FIGHTER_FEATURES,
+  ...BARBARIAN_FEATURES,
 ];
 
 // Shared ascending-by-minLevel invariant (#1522 decision: tier arrays are
