@@ -52,17 +52,6 @@ interface OpenPickSelectProps {
   selectedToolChoices: string[];
 }
 
-// Mirrors the backend's openPickFilterError dispatch order exactly (#1564,
-// PR #1567 fix 2): a toolCategory filter (if present) gates first; a
-// boundToToolChoice pick (Monk's "Artisan's Tools or Musical Instrument
-// chosen for the tool proficiency above" — spans two tool categories, so it
-// carries no single filter.toolCategory) then requires membership in the
-// character's OWN chosen tool proficiencies instead of falling through to
-// the weapon pool — the old fallback offered every weapon in the catalog,
-// which the server's boundToolChoiceError would reject outright (#1336: a
-// picker offering what the write path rejects is a dead end). A plain
-// toolCategory pick (no binding) accepts anything in that category; anything
-// else keeps the pre-#1564 weapon-only behaviour unchanged.
 // The pre-#1564 weapon-only behaviour, unchanged — split out of matchesPick
 // purely to keep its own cyclomatic complexity low (mirrors the backend's
 // own openPickFilterError -> weaponFilterError split, character-create.ts).
@@ -75,6 +64,17 @@ function matchesWeaponFilter(item: Item, pick: OpenWeaponPick): boolean {
   );
 }
 
+// Mirrors the backend's openPickFilterError dispatch order exactly (#1564): a
+// toolCategory filter (if present) gates first; a boundToToolChoice pick
+// (Monk's "Artisan's Tools or Musical Instrument chosen for the tool
+// proficiency above" — spans two tool categories, so it carries no single
+// filter.toolCategory) then requires membership in the character's OWN chosen
+// tool proficiencies instead of falling through to the weapon pool. That
+// fallback offered every weapon in the catalog, which the server's
+// boundToolChoiceError rejects outright — #1336's lesson that a picker
+// offering what the write path refuses is a dead end. A plain toolCategory
+// pick (no binding) accepts anything in that category; anything else keeps
+// the pre-#1564 weapon-only behaviour unchanged.
 function matchesPick(item: Item, pick: OpenWeaponPick, selectedToolChoices: string[]): boolean {
   if (pick.filter.toolCategory && item.toolCategory !== pick.filter.toolCategory) return false;
   if (pick.boundToToolChoice) return selectedToolChoices.includes(item.name);
