@@ -14,7 +14,7 @@ import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 // reference-types entry point (flowing through the @/types/character barrel).
 // ClassStartingEquipment is also used locally by ClassOption below.
 export type { ClassStartingEquipment };
-export type { EquipmentBundle, EquipmentChoiceGroup, OpenWeaponPick, StartingGold } from "@character-sheet/shared-types";
+export type { EquipmentBundle, EquipmentChoiceGroup, OpenPick, StartingGold } from "@character-sheet/shared-types";
 
 /** Subclass option (from GET /api/reference). */
 export interface SubclassOption {

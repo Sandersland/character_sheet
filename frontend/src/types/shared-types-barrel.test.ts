@@ -12,7 +12,7 @@ import type * as Shared from "@character-sheet/shared-types";
 import type {
   ClassStartingEquipment,
   EquipmentBundle,
-  OpenWeaponPick,
+  OpenPick,
 } from "@/types/character";
 import type {
   CastElementalBurstOperation,
@@ -130,6 +130,6 @@ describe("@/types/character barrel", () => {
   it("re-exports the shared starting-equipment wire types", () => {
     expectTypeOf<ClassStartingEquipment>().toEqualTypeOf<Shared.ClassStartingEquipment>();
     expectTypeOf<EquipmentBundle>().toEqualTypeOf<Shared.EquipmentBundle>();
-    expectTypeOf<OpenWeaponPick>().toEqualTypeOf<Shared.OpenWeaponPick>();
+    expectTypeOf<OpenPick>().toEqualTypeOf<Shared.OpenPick>();
   });
 });

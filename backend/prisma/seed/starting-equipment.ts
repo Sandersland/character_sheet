@@ -37,7 +37,7 @@ const fixedItemSchema = z.object({
   quantity: z.number().int().positive().optional(),
 });
 
-const openWeaponPickSchema = z.object({
+const openPickSchema = z.object({
   label: z.string().min(1),
   filter: z.object({
     weaponClass: weaponClassSchema.optional(),
@@ -53,7 +53,7 @@ const openWeaponPickSchema = z.object({
 const equipmentBundleSchema = z.object({
   label: z.string().min(1),
   items: z.array(fixedItemSchema).optional(),
-  openPicks: z.array(openWeaponPickSchema).optional(),
+  openPicks: z.array(openPickSchema).optional(),
   // PHB'24 per-option GP (#1564) — every EDITION_2014 option omits this (0).
   gold: z.number().int().positive().optional(),
 });

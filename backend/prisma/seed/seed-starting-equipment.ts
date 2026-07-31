@@ -11,7 +11,7 @@ import type {
   EquipmentBundle,
   EquipmentChoiceGroup,
   FixedItemRef,
-  OpenWeaponPick,
+  OpenPick,
 } from "@character-sheet/shared-types";
 
 import { CLASSES } from "./catalog-data.js";
@@ -39,7 +39,7 @@ function itemCreateInput(item: FixedItemRef, position: number) {
 // to keep that function's own cyclomatic complexity low (this file's header
 // on why prisma/seed/** floors at the uncovered-CRAP formula regardless of
 // real test coverage).
-function openPickFilterCreateInput(filter: OpenWeaponPick["filter"]) {
+function openPickFilterCreateInput(filter: OpenPick["filter"]) {
   return {
     weaponClass: filter.weaponClass ?? null,
     weaponRange: filter.range ?? null,
@@ -50,7 +50,7 @@ function openPickFilterCreateInput(filter: OpenWeaponPick["filter"]) {
 // boundToToolChoice/quantity are this function's inverse of mapOpenPick's own
 // omission rules — a false/undefined boundToToolChoice defaults to the
 // column's own default (false).
-function openPickCreateInput(pick: OpenWeaponPick, position: number) {
+function openPickCreateInput(pick: OpenPick, position: number) {
   return {
     position,
     label: pick.label,

@@ -12,7 +12,7 @@ import type {
   EquipmentBundle,
   EquipmentChoiceGroup,
   Item,
-  OpenWeaponPick,
+  OpenPick,
   PackageSelection,
   StartingGold,
 } from "@/types/character";
@@ -45,7 +45,7 @@ function bundleFixedSummary(bundle: EquipmentBundle): string {
 }
 
 interface OpenPickSelectProps {
-  pick: OpenWeaponPick;
+  pick: OpenPick;
   catalog: Item[];
   currentPick: string;
   onPick: (itemName: string) => void;
@@ -55,7 +55,7 @@ interface OpenPickSelectProps {
 // The pre-#1564 weapon-only behaviour, unchanged — split out of matchesPick
 // purely to keep its own cyclomatic complexity low (mirrors the backend's
 // own openPickFilterError -> weaponFilterError split, character-create.ts).
-function matchesWeaponFilter(item: Item, pick: OpenWeaponPick): boolean {
+function matchesWeaponFilter(item: Item, pick: OpenPick): boolean {
   return (
     item.category === "weapon" &&
     item.weapon !== undefined &&
@@ -75,7 +75,7 @@ function matchesWeaponFilter(item: Item, pick: OpenWeaponPick): boolean {
 // offering what the write path refuses is a dead end. A plain toolCategory
 // pick (no binding) accepts anything in that category; anything else keeps
 // the pre-#1564 weapon-only behaviour unchanged.
-function matchesPick(item: Item, pick: OpenWeaponPick, selectedToolChoices: string[]): boolean {
+function matchesPick(item: Item, pick: OpenPick, selectedToolChoices: string[]): boolean {
   if (pick.filter.toolCategory && item.toolCategory !== pick.filter.toolCategory) return false;
   if (pick.boundToToolChoice) return selectedToolChoices.includes(item.name);
   if (pick.filter.toolCategory) return true;
