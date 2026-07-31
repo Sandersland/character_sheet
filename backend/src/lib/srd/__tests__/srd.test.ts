@@ -166,7 +166,11 @@ describe("deriveResources — Barbarian Rage (both editions agree on levels 1-19
 
   it("EDITION_2014 level 20: unlimited sentinel (SRD 5.1 p.21 — unaffected by the 2024 fix)", () => {
     const result = deriveResources("barbarian", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("barbarian", undefined), "EDITION_2014");
-    expect(result!.resources.find((r) => r.key === "rage")!.total).toBeGreaterThan(10);
+    // 99, not just "> 10": the sibling EDITION_2024 case above pins its value
+    // exactly, and a loose bound on the one number this whole issue turns on
+    // would still pass if the 2014 tier were silently rewritten to any other
+    // large total.
+    expect(result!.resources.find((r) => r.key === "rage")!.total).toBe(99);
   });
 });
 
