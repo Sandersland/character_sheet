@@ -16,7 +16,7 @@
  */
 
 import { abilityModifier } from "@/lib/abilities";
-import type { Character } from "@/types/character";
+import type { AvailableAction, Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
 
 /**
@@ -40,6 +40,40 @@ export type ResolutionKind =
   | "heal-input"
   | "loadout-picker"
   | "simple-confirm";
+
+// Runtime membership list for ResolutionKind, used only to validate a
+// row-served `AvailableAction.resolverKind` string (isResolutionKind below) —
+// the type itself stays the documented union above. A ResolutionKind added to
+// the union without a matching entry here fails typecheck (mirrors registry.ts's
+// EXTRAS_FIELDS latch), which is what keeps the two from silently drifting.
+const RESOLUTION_KINDS = [
+  "attack-picker",
+  "twf-picker",
+  "flurry-picker",
+  "spell-picker",
+  "item-picker",
+  "heal-roll",
+  "heal-input",
+  "loadout-picker",
+  "simple-confirm",
+] as const satisfies readonly ResolutionKind[];
+type _ResolutionKindsCoverResolutionKind = ResolutionKind extends (typeof RESOLUTION_KINDS)[number] ? true : never;
+const _resolutionKindsCoverResolutionKind: _ResolutionKindsCoverResolutionKind = true;
+void _resolutionKindsCoverResolutionKind;
+
+/**
+ * Type guard for a served `resolverKind` string (#1528). Without this,
+ * `resolverFromRow` used to do a bare `as ResolutionKind` cast behind only a
+ * truthiness check — any non-empty string passed, `partitionClassActions` kept
+ * the action, and `planActionClick`'s switch (exhaustive only at compile time
+ * over the real union) fell through with no runtime default, returning
+ * `undefined` and crashing `useTurnActions` on click. Validating here makes an
+ * unknown kind behave like "no resolver at all" (filtered out by
+ * `partitionClassActions`), never a silent runtime type violation.
+ */
+function isResolutionKind(kind: string): kind is ResolutionKind {
+  return (RESOLUTION_KINDS as readonly string[]).includes(kind);
+}
 
 export type SlotCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -108,15 +142,11 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
 
   wildShape:         { key: "wildShape",         kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "wildShape" },
 
-  secondWind: {
-    key: "secondWind",
-    kind: "heal-roll",
-    slot: "bonusAction",
-    serverEffect: true,
-    resourceKey: "secondWind",
-    healRoll: (c) => ({ count: 1, faces: 10, modifier: c.level }),
-  },
-  actionSurge:       { key: "actionSurge",       kind: "simple-confirm", slot: "special",     serverEffect: true,  resourceKey: "actionSurge" },
+  // Second Wind / Action Surge retired from this table (#1528): both are
+  // row-driven now, served via AvailableAction.resolverKind — resolverFor's
+  // fallback path (below) synthesizes their ActionResolver from the wire
+  // instead of a hand-authored entry here. Second Wind's heal is also
+  // server-rolled now (was client `healRoll`, #1528) — see resolverFromRow.
 
   // Martial Arts Bonus Unarmed Strike (#1218) — reuses the twf-picker economy
   // path (single bonusAction-source swing), locked to the Unarmed Strike
@@ -203,9 +233,44 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   metamagic:         { key: "metamagic",         kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "sorceryPoints" },
 };
 
-/** Returns the resolver for the given action key, or undefined if unrecognized. */
-export function resolverFor(key: string): ActionResolver | undefined {
-  return ACTION_RESOLVERS[key];
+// A row-driven action's resolver, synthesized from the wire (#1528) — the
+// ONLY fallback path resolverFor falls to, and ONLY when no keyed entry
+// above exists. `resourceKey: action.key` is a scoped assumption (true for
+// Second Wind/Action Surge, the only two rows populating `resolverKind`
+// today, since a Fighter action's key IS its own pool key) — never assumed
+// for the keyed ACTION_RESOLVERS table above, several of whose entries
+// (flurryOfBlows, metamagic, …) spend a DIFFERENT pool than their own key.
+// `healRoll` is deliberately absent: Second Wind's heal is now rolled
+// server-side (`effectModifierSource: "classLevel"`, backend/effects.ts) and
+// reported back via ExecuteActionResult, not computed here — the served
+// `action.reminder` (built server-side from the same row) is the subtitle
+// classActionOption falls back to when `healRoll` is unset.
+function resolverFromRow(action: AvailableAction, kind: ResolutionKind): ActionResolver {
+  return {
+    key: action.key,
+    kind,
+    slot: action.cost,
+    serverEffect: true,
+    resourceKey: action.key,
+  };
+}
+
+/**
+ * Returns the resolver for the given action key, or undefined if
+ * unrecognized. `action` is optional context for the fallback path (#1528):
+ * when no keyed ACTION_RESOLVERS entry exists but the served action carries
+ * a `resolverKind` that names a real ResolutionKind, one is synthesized from
+ * the wire instead of a hand-authored entry. A served `resolverKind` that
+ * doesn't match any ResolutionKind (unknown class feature retab, server/client
+ * skew) falls through to `undefined` here — same as no resolver at all — rather
+ * than reaching `planActionClick`'s switch with a value outside its exhaustive
+ * union. Every existing call site keeps working key-only (undefined action).
+ */
+export function resolverFor(key: string, action?: AvailableAction): ActionResolver | undefined {
+  const known = ACTION_RESOLVERS[key];
+  if (known) return known;
+  if (!action?.resolverKind || !isResolutionKind(action.resolverKind)) return undefined;
+  return resolverFromRow(action, action.resolverKind);
 }
 
 /**

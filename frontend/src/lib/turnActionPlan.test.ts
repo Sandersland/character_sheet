@@ -25,14 +25,20 @@ describe("planActionClick", () => {
     expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "plain" });
   });
 
-  it("heal-roll consumes the slot and rolls the heal spec (Second Wind)", () => {
-    const plan = planActionClick(resolverFor("secondWind"), character);
-    expect(plan).toEqual({
-      consumeSlot: true,
-      openResolution: false,
-      send: "healRoll",
-      healRoll: { count: 1, faces: 10, modifier: 5 },
-    });
+  it("heal-roll consumes the slot and rolls the heal spec (Wholeness of Body — a still-client-rolled heal-roll resolver)", () => {
+    const plan = planActionClick(resolverFor("wholenessOfBody"), { ...character, unarmedStrike: { damage: { faces: 8 } }, abilityScores: { wisdom: 14 } } as unknown as Character);
+    expect(plan.consumeSlot).toBe(true);
+    expect(plan.openResolution).toBe(false);
+    expect(plan.send).toBe("healRoll");
+    expect(plan.healRoll).toBeDefined();
+  });
+
+  it("heal-roll with no client healRoll (Second Wind, #1528 — server-rolled now) sends plain instead of healRoll", () => {
+    const secondWindResolver = {
+      key: "secondWind", kind: "heal-roll" as const, slot: "bonusAction" as const, serverEffect: true, resourceKey: "secondWind",
+    };
+    const plan = planActionClick(secondWindResolver, character);
+    expect(plan).toEqual({ consumeSlot: true, openResolution: false, send: "plain" });
   });
 
   it("heal-input does NOT consume the slot (committed on heal, #765)", () => {

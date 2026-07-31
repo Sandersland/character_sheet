@@ -14,12 +14,13 @@ import {
   matchesActionGate,
   actionGrantLevel,
   ACTION_EFFECT_FN,
-  ACTION_CAST_FN,
+  castSpecFromRow,
   REGRANTED_UNIVERSAL_KEYS,
   rageMeleeDamageBonus,
   type AvailableAction,
   type ResourcePool,
 } from "@/lib/classes/actions.js";
+import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { monk } from "@/lib/classes/monk.js";
 import { SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
 
@@ -58,14 +59,10 @@ const at = (
 // ── deriveActions ─────────────────────────────────────────────────────────────
 
 describe("deriveActions — class gates", () => {
-  it("Fighter L1 gets secondWind, L2 adds actionSurge", () => {
-    const l1 = keys(at("fighter", undefined, 1, []));
-    expect(l1).toContain("secondWind");
-    expect(l1).not.toContain("actionSurge");
-
+  it("Fighter has no DERIVED_ACTIONS entries (#1528 — Second Wind/Action Surge are row-driven now; see entry-scoped-actions.test.ts's deriveEntryScopedActions coverage)", () => {
     const l2 = keys(at("fighter", undefined, 2, []));
-    expect(l2).toContain("secondWind");
-    expect(l2).toContain("actionSurge");
+    expect(l2).not.toContain("secondWind");
+    expect(l2).not.toContain("actionSurge");
   });
 
   it("Barbarian L1 gets rage, L2 adds recklessAttack", () => {
@@ -169,9 +166,11 @@ describe("deriveActions — regrants (#1431)", () => {
   });
 
   it("a row with no regrants omits the field entirely", () => {
-    const secondWind = at("fighter", undefined, 2, []).find((a) => a.key === "secondWind");
-    expect(secondWind).toBeDefined();
-    expect(secondWind).not.toHaveProperty("regrants");
+    // Second Wind (formerly this test's fixture) is row-driven now (#1528) —
+    // wildShape is any other DERIVED_ACTIONS row with no `regrants` key.
+    const wildShape = at("druid", undefined, 2, []).find((a) => a.key === "wildShape");
+    expect(wildShape).toBeDefined();
+    expect(wildShape).not.toHaveProperty("regrants");
   });
 
   it("REGRANTED_UNIVERSAL_KEYS is the deduped union of every row's keys", () => {
@@ -201,8 +200,10 @@ describe("deriveActions — Fast Hands (Thief L3, #1431)", () => {
 
 describe("deriveActions — case-insensitivity", () => {
   it("matches class name regardless of case", () => {
-    expect(keys(at("Fighter", undefined, 2, []))).toContain("secondWind");
-    expect(keys(at("FIGHTER", undefined, 2, []))).toContain("actionSurge");
+    // Fighter (formerly this test's fixture) has no DERIVED_ACTIONS entries
+    // left (#1528 — row-driven now); paladin/barbarian cover the same gate.
+    expect(keys(at("Paladin", undefined, 1, []))).toContain("divineSense");
+    expect(keys(at("PALADIN", undefined, 3, []))).toContain("channelDivinity");
     expect(keys(at("Barbarian", undefined, 1, []))).toContain("rage");
   });
 });
@@ -243,11 +244,15 @@ describe("deriveActions — resource gating", () => {
   });
 
   it("empty pools default to 0 remaining (action disabled)", () => {
-    // No pool entry for "secondWind" → defaults to remaining=0 → disabled.
-    const actions = at("fighter", undefined, 1, []);
-    const secondWind = actions.find((a) => a.key === "secondWind");
-    expect(secondWind?.enabled).toBe(false);
-    expect(secondWind?.disabledReason).toBe("No secondWind remaining");
+    // No pool entry for "wildShape" → defaults to remaining=0 → disabled.
+    // (Second Wind, formerly this test's fixture, is row-driven now — #1528 —
+    // its own enablement gate is covered by deriveEntryScopedActions'
+    // "a row-driven Fighter action (actionSurge) is disabled when its pool is
+    // exhausted" case in entry-scoped-actions.test.ts.)
+    const actions = at("druid", undefined, 2, []);
+    const wildShape = actions.find((a) => a.key === "wildShape");
+    expect(wildShape?.enabled).toBe(false);
+    expect(wildShape?.disabledReason).toBe("No wildShape remaining");
   });
 });
 
@@ -303,7 +308,8 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
     ["bardicInspiration", "bardicInspiration"],
     ["channelDivinity", "channelDivinity"],
     ["wildShape", "wildShape"],
-    ["actionSurge", "actionSurge"],
+    // actionSurge is row-driven now (#1528) — no ACTION_EFFECT_FN entry; its
+    // pure-counter spend is covered by actions-cast.test.ts (routes).
     ["divineSense", "divineSense"],
   ];
 
@@ -424,9 +430,7 @@ describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (
 
   it("free variants are pure reminder actions — no server effect fn (like Shadow Step/Opportunist)", () => {
     expect(ACTION_EFFECT_FN.patientDefense).toBeUndefined();
-    expect(ACTION_CAST_FN.patientDefense).toBeUndefined();
     expect(ACTION_EFFECT_FN.stepOfTheWind).toBeUndefined();
-    expect(ACTION_CAST_FN.stepOfTheWind).toBeUndefined();
   });
 
   it("patientDefenseFocus spends exactly 1 focus", () => {
@@ -555,9 +559,8 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
     expect(flurry?.reminder).toBeUndefined();
   });
 
-  it("is a pure reminder action — no server effect fn (no ACTION_EFFECT_FN/ACTION_CAST_FN)", () => {
+  it("is a pure reminder action — no server effect fn (no ACTION_EFFECT_FN entry)", () => {
     expect(ACTION_EFFECT_FN.shadowStep).toBeUndefined();
-    expect(ACTION_CAST_FN.shadowStep).toBeUndefined();
   });
 });
 
@@ -583,7 +586,6 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
     // 1d10 + Dex + monk level and never calls the transactions endpoint for the
     // base reduction (nothing persisted). Only the redirect spends Focus.
     expect(ACTION_EFFECT_FN.deflectAttacks).toBeUndefined();
-    expect(ACTION_CAST_FN.deflectAttacks).toBeUndefined();
   });
 
   it("deflectAttacksRedirect is granted at monk L3 as a free-cost Focus spend", () => {
@@ -676,41 +678,72 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024
   });
 });
 
-describe("ACTION_CAST_FN — secondWind (#420)", () => {
-  it("is a cast-core action, not an op-list action", () => {
-    // The migration moved Second Wind off ACTION_EFFECT_FN onto the cast core.
-    expect(ACTION_CAST_FN.secondWind).toBeDefined();
+// A synthetic Second Wind row (EDITION_2014 shape) matching
+// prisma/seed/fighter-features.ts's authored descriptor columns — the
+// row-driven counterpart to ACTION_CAST_FN's retired secondWind closure (#1528).
+function secondWindRow(): ClassFeatureRow {
+  return {
+    name: "Second Wind",
+    level: 1,
+    description: "As a bonus action, regain 1d10 + your fighter level HP.",
+    edition: "EDITION_2014",
+    resourceKey: "secondWind",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
+    activationCost: "bonusAction",
+    resolverKind: "heal-roll",
+    costKind: "pool",
+    costPoolKey: "secondWind",
+    costBase: 1,
+    effectKind: "heal",
+    effectDiceCount: 1,
+    effectDiceFaces: 10,
+    effectModifierSource: "classLevel",
+  };
+}
+
+describe("castSpecFromRow — Second Wind, row-driven (#1528, retired ACTION_CAST_FN)", () => {
+  it("is row-driven now, not an ACTION_EFFECT_FN op-list action", () => {
     expect(ACTION_EFFECT_FN.secondWind).toBeUndefined();
   });
 
-  it("spends the secondWind pool (base 1) and self-heals 1d10 with the client roll", () => {
-    const spec = ACTION_CAST_FN.secondWind({ roll: 7 });
+  it("spends the secondWind pool (base 1), rolls 1d10 + Fighter level server-side, and self-heals the total", () => {
+    const { spec, roll } = castSpecFromRow(secondWindRow(), 3, () => 7); // fixed die roll of 7
     expect(spec.name).toBe("Second Wind");
     expect(spec.cost).toEqual({ kind: "pool", key: "secondWind", base: 1 });
     expect(spec.effect.effectType).toBe("heal");
-    expect(spec.effect.dice).toEqual({ count: 1, faces: 10 });
-    expect(spec.apply).toEqual({ target: "self", kind: "heal", amount: 7 });
+    expect(spec.effect.dice).toEqual({ count: 1, faces: 10, modifier: 0 });
+    expect(roll).toBe(10); // 7 (die) + 3 (level)
+    expect(spec.apply).toEqual({ target: "self", kind: "heal", amount: 10 });
   });
 
-  it("without a roll: spends the pool but applies no heal", () => {
-    const spec = ACTION_CAST_FN.secondWind({});
-    expect(spec.cost).toEqual({ kind: "pool", key: "secondWind", base: 1 });
+  it("a die roll of 0 with level 0 applies no heal (self-apply is guarded on amount > 0)", () => {
+    const { spec, roll } = castSpecFromRow(secondWindRow(), 0, () => 0);
+    expect(roll).toBe(0);
     expect(spec.apply).toBeUndefined();
   });
 
-  it("with roll=0: applies no heal (self-apply is guarded on amount > 0)", () => {
-    const spec = ACTION_CAST_FN.secondWind({ roll: 0 });
-    expect(spec.apply).toBeUndefined();
+  // Mutation proof (#1528's own AC): changing the SEEDED modifierSource
+  // changes the served heal with no frontend edit — effectModifierSource is
+  // read purely off the row, so a level-14 cast with the axis REMOVED must
+  // roll noticeably lower than the SAME cast with it present, for the exact
+  // die roll fixed in both branches.
+  it("mutation proof: removing the row's effectModifierSource drops the level term from the served roll", () => {
+    const withAxis = castSpecFromRow(secondWindRow(), 14, () => 4);
+    expect(withAxis.roll).toBe(18); // 4 (die) + 14 (level)
+
+    const rowWithoutAxis: ClassFeatureRow = { ...secondWindRow(), effectModifierSource: undefined };
+    const withoutAxis = castSpecFromRow(rowWithoutAxis, 14, () => 4);
+    expect(withoutAxis.roll).toBe(4); // die only — the level term never applied
   });
 });
 
-describe("ACTION_EFFECT_FN — actionSurge stays a counter (#420)", () => {
-  it("spends the actionSurge resource with no heal/extra-action server effect", () => {
-    // The extra-action grant is client-side (grantExtraAction) — nothing to apply.
-    expect(ACTION_EFFECT_FN.actionSurge({})).toEqual([
-      { type: "spendResource", key: "actionSurge" },
-    ]);
-    expect(ACTION_CAST_FN.actionSurge).toBeUndefined();
+describe("Action Surge stays a counter, row-driven (#1528, retired ACTION_CAST_FN/ACTION_EFFECT_FN entries)", () => {
+  it("has no ACTION_EFFECT_FN entry — the pure-counter spend is dispatched via the row's costKind, not this table", () => {
+    // The extra-action grant is client-side (grantExtraAction) — nothing to
+    // apply server-side; routes/character/__tests__/actions-cast.test.ts
+    // covers the end-to-end spend through the row-driven dispatcher.
+    expect(ACTION_EFFECT_FN.actionSurge).toBeUndefined();
   });
 });
 
@@ -786,7 +819,6 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
 
   it("fleetStep is a pure reminder — no server effect fn (like recklessAttack/metamagic's free cost siblings)", () => {
     expect(ACTION_EFFECT_FN.fleetStep).toBeUndefined();
-    expect(ACTION_CAST_FN.fleetStep).toBeUndefined();
   });
 
   it("subclass gate: a non-Open-Hand monk gets neither at L11+", () => {
@@ -943,11 +975,9 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
     expect(noSub).not.toContain("cloakOfShadows");
   });
 
-  it("both cast through the dedicated /abilities/shadow-arts endpoint — no ACTION_EFFECT_FN/ACTION_CAST_FN entry", () => {
+  it("both cast through the dedicated /abilities/shadow-arts endpoint — no ACTION_EFFECT_FN entry", () => {
     expect(ACTION_EFFECT_FN.shadowArts).toBeUndefined();
-    expect(ACTION_CAST_FN.shadowArts).toBeUndefined();
     expect(ACTION_EFFECT_FN.cloakOfShadows).toBeUndefined();
-    expect(ACTION_CAST_FN.cloakOfShadows).toBeUndefined();
   });
 });
 
@@ -988,11 +1018,9 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
     expect(noSub).not.toContain("elementalBurst");
   });
 
-  it("both cast through the dedicated /abilities/warrior-of-elements endpoint — no ACTION_EFFECT_FN/ACTION_CAST_FN entry", () => {
+  it("both cast through the dedicated /abilities/warrior-of-elements endpoint — no ACTION_EFFECT_FN entry", () => {
     expect(ACTION_EFFECT_FN.elementalAttunement).toBeUndefined();
-    expect(ACTION_CAST_FN.elementalAttunement).toBeUndefined();
     expect(ACTION_EFFECT_FN.elementalBurst).toBeUndefined();
-    expect(ACTION_CAST_FN.elementalBurst).toBeUndefined();
   });
 });
 

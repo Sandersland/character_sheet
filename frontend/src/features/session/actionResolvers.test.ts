@@ -10,7 +10,10 @@ import { describe, it, expect } from "vitest";
 import { SERVER_EFFECT_KEYS, resolverFor, ACTION_RESOLVERS } from "./actionResolvers";
 
 // The backend ACTION_EFFECT_FN keys, copied here as a stable reference list.
-// Update this list when adding new actions to the backend.
+// Update this list when adding new actions to the backend. secondWind/
+// actionSurge are row-driven now (#1528) — dispatched via
+// routes/character/actions.ts's row-driven path, not this table, so they're
+// deliberately absent here too (parity would otherwise falsely fail).
 const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "attack", "castSpell", "dodge", "dash", "disengage", "help", "hide",
   "search", "ready", "grapple", "opportunityAttack", "castSpellReaction",
@@ -19,7 +22,6 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "bardicInspiration",
   "channelDivinity",
   "wildShape",
-  "secondWind", "actionSurge",
   "bonusUnarmedStrike",
   "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus",
   "deflectAttacksRedirect",
@@ -194,12 +196,22 @@ describe("actionResolvers", () => {
     }
   });
 
-  it("secondWind healRoll produces correct spec at level 5", () => {
-    const resolver = resolverFor("secondWind");
-    expect(resolver).toBeDefined();
-    const healRoll = resolver!.healRoll!;
-    const spec = healRoll({ level: 5 } as Parameters<typeof healRoll>[0]);
-    expect(spec).toEqual({ count: 1, faces: 10, modifier: 5 });
+  it("secondWind has no ACTION_RESOLVERS entry — it resolves via the row-driven fallback now (#1528)", () => {
+    expect(ACTION_RESOLVERS.secondWind).toBeUndefined();
+    expect(resolverFor("secondWind")).toBeUndefined(); // no `action` context → no fallback
+  });
+
+  it("secondWind's fallback resolver (#1528) is synthesized from the served action, with no client healRoll — the server rolls it", () => {
+    const action = { key: "secondWind", name: "Second Wind", cost: "bonusAction" as const, enabled: true, resolverKind: "heal-roll" };
+    const resolver = resolverFor("secondWind", action);
+    expect(resolver).toEqual({
+      key: "secondWind",
+      kind: "heal-roll",
+      slot: "bonusAction",
+      serverEffect: true,
+      resourceKey: "secondWind",
+    });
+    expect(resolver!.healRoll).toBeUndefined();
   });
 
   it("wholenessOfBody healRoll produces Martial Arts die + Wis modifier (#1245)", () => {
@@ -216,5 +228,15 @@ describe("actionResolvers", () => {
   it("resolverFor returns undefined for unknown keys", () => {
     expect(resolverFor("notAnAction")).toBeUndefined();
     expect(resolverFor("")).toBeUndefined();
+  });
+
+  it("resolverFor's row-driven fallback rejects a resolverKind outside ResolutionKind (#1528 finding 4) — never synthesizes a bogus resolver", () => {
+    // A served resolverKind that names no real ResolutionKind (a future class
+    // retab shipping a typo, or client/server skew) must be treated exactly
+    // like "no resolver" — partitionClassActions filters the action out —
+    // rather than reaching planActionClick's switch with a value outside its
+    // exhaustive union (that used to crash useTurnActions on click).
+    const action = { key: "unknownRowAction", name: "Unknown Row Action", cost: "action" as const, enabled: true, resolverKind: "not-a-real-kind" };
+    expect(resolverFor("unknownRowAction", action)).toBeUndefined();
   });
 });

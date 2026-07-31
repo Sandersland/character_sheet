@@ -9,7 +9,7 @@ import { editionOf } from "@/lib/rules/edition.js";
 
 import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";
-import { featuresFromRows, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
+import { featuresFromRows, poolsFromRows, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { cleric } from "./cleric.js";
 import { druid } from "./druid.js";
 import { fighter } from "./fighter.js";
@@ -61,6 +61,24 @@ interface ClassLayer {
   features: DerivedFeature[];
 }
 
+// A resourceFn pool wins over a row-declared pool of the same key (mirrors
+// mergeLayers' base-wins policy) — no production collision exists today
+// (only Fighter's rows declare a resourceKey, #1528, and Fighter's base
+// resourceFn no longer emits Second Wind/Action Surge/Indomitable), but this
+// keeps a class mid-migration (resourceFn for some pools, rows for others)
+// from silently doubling a pool up if a row and a resourceFn ever named the
+// same key during the transition.
+function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]): DerivedResource[] {
+  if (fromRows.length === 0) return fromFn;
+  const seenKeys = new Set(fromFn.map((p) => p.key));
+  return [...fromFn, ...fromRows.filter((p) => !seenKeys.has(p.key))];
+}
+
+// Row-driven pools are DATA-gated, not class-gated: `poolsFromRows` reads
+// whatever `resourceKey` a class's rows actually populate, which today is
+// Fighter alone (#1528) — every other class's rows carry no resourceKey, so
+// this is a no-op for them until their own wave-2 retab (#1134) populates
+// theirs. No `=== "fighter"` check anywhere (CLAUDE.md).
 function deriveBaseLayer(
   classDef: ClassDefinition | undefined,
   level: number,
@@ -70,8 +88,10 @@ function deriveBaseLayer(
   featureRows: ClassFeatureRowsCarrier | undefined,
   edition: RulesEdition,
 ): ClassLayer {
+  const fnPools = classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [];
+  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, edition);
   return {
-    pools: classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [],
+    pools: mergePoolSources(fnPools, rowPools),
     features: featuresFromRows(featureRows?.classRows ?? [], level, "class", edition),
   };
 }
@@ -110,16 +130,18 @@ function deriveSubclassLayer(
 ): SubclassLayer {
   const def = SUBCLASSES[subclassKey];
   if (!isSubclassActive(def, level, edition)) return { active: false, def, pools: [], features: [] };
+  // subclassKey is `undefined` here, not this function's own `subclassKey`
+  // param (#1499) — ResourceFn's subclassKey exists so the BASE layer can
+  // resolve #906's wildShape pool-key collision against the active
+  // subclass; a subclass's own resourceFn is already scoped to that
+  // subclass, so passing it again would be a silent semantic change under
+  // deriveResources' byte-identical-2024-output AC.
+  const fnPools = def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [];
+  const rowPools = poolsFromRows(featureRows?.subclassRows ?? [], level, edition);
   return {
     active: true,
     def,
-    // subclassKey is `undefined` here, not this function's own `subclassKey`
-    // param (#1499) — ResourceFn's subclassKey exists so the BASE layer can
-    // resolve #906's wildShape pool-key collision against the active
-    // subclass; a subclass's own resourceFn is already scoped to that
-    // subclass, so passing it again would be a silent semantic change under
-    // deriveResources' byte-identical-2024-output AC.
-    pools: def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [],
+    pools: mergePoolSources(fnPools, rowPools),
     features: featuresFromRows(featureRows?.subclassRows ?? [], level, "subclass", edition),
   };
 }
@@ -266,17 +288,26 @@ export function deriveResourcesForCharacterRow(row: {
  * subclass, level}[]` for EVERY entry (not just the primary) — used by the
  * focus-cast/maneuver action seams so a secondary Monk's or Battle Master's own
  * level drives its gate/DC/per-cast cap (#1072).
+ *
+ * `getFeatureRows` is optional (#1528 chunk 0) — a caller whose select carries
+ * `FEATURE_ROWS_ENTRY_SELECT` passes `featureRowsOf` (feature-rows-select.ts)
+ * so a Fighter's row-driven pools (Second Wind/Action Surge/Indomitable)
+ * resolve here too, not only through buildResourcesView's own real carrier.
+ * Absent (as before #1528) for a caller with no such relation loaded.
  */
-export function deriveEntryScopedResourcesForCharacterRow(row: {
-  experiencePoints: number;
-  abilityScores: unknown;
-  classEntries: EntryScopedClassEntry[];
-  rulesEdition: RulesEdition;
-}): { derived: DerivedClassInfo | null; level: number } {
+export function deriveEntryScopedResourcesForCharacterRow<E extends EntryScopedClassEntry>(
+  row: {
+    experiencePoints: number;
+    abilityScores: unknown;
+    classEntries: E[];
+    rulesEdition: RulesEdition;
+  },
+  getFeatureRows?: GetFeatureRows<E>,
+): { derived: DerivedClassInfo | null; level: number } {
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  const { derived } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus, editionOf(row));
+  const { derived } = deriveEntryScopedResources(row.classEntries, level, abilityScores, profBonus, editionOf(row), getFeatureRows);
   return { derived, level };
 }
 

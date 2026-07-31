@@ -49,6 +49,7 @@ import {
 } from "@/lib/classes/resources.js";
 import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { clampPreparedToLimit, normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
@@ -339,7 +340,7 @@ async function loadResourcesReconcileState(
       abilityScores: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { name: true, subclass: true, level: true },
+        select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
       },
     },
   });
@@ -349,7 +350,13 @@ async function loadResourcesReconcileState(
   const abilityScores = row.abilityScores as Record<string, number>;
   const profBonus = proficiencyBonusForLevel(newDerivedLevel);
   // ctx.edition (not a fresh row read) — write-once (#1285), constant for the whole pass.
-  const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus, edition);
+  // featureRowsOf (#1528 chunk 0): reconcileKnownList/reconcileSubclassChoices
+  // only read maneuverChoiceCount/toolProfChoiceCount/subclassChoices today
+  // (ClassExtras — still code, unaffected by Fighter's row migration), but the
+  // carrier is threaded through anyway so this select matches every other
+  // deriveEntryScopedResources call site and stays correct if a future
+  // reconciler ever needs a row-driven pool's `used` cap.
+  const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus, edition, featureRowsOf);
   return { state, derived };
 }
 

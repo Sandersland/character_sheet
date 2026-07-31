@@ -103,7 +103,11 @@ describe("deriveResourcesForCharacterRow", () => {
     // type carries no class/subclassRef), so `.features` is now always empty
     // here — expected (no production caller exists; see registry.ts's own
     // comment). Snapshotting `withoutFeatures` keeps this pinned to what the
-    // function's real contract still guarantees.
+    // function's real contract still guarantees. #1528: the same absent-
+    // carrier gap now also means Fighter's row-driven base pools (Second
+    // Wind/Action Surge/Indomitable) are absent from `.resources` here too —
+    // only Battle Master's superiorityDice survives (still resourceFn-driven,
+    // unaffected by the missing carrier).
     expect(withoutFeatures(derived)).toMatchSnapshot();
   });
 

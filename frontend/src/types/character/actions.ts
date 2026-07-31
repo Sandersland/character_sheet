@@ -1,6 +1,7 @@
 /**
  * Action-economy catalog types and the executeAction operation.
  */
+import type { ExecuteActionResult } from "@character-sheet/shared-types";
 
 /**
  * Action-economy cost — which slot an action consumes on the character's turn.
@@ -35,7 +36,23 @@ export interface AvailableAction {
    * in SRD 5.1, Utilize in SRD 5.2).
    */
   regrants?: string[];
+  /**
+   * Which inline resolution tool to render for this action (#1528) — served
+   * only for a row-driven action (backend's actionsFromRows); a class still
+   * on the DERIVED_ACTIONS/ACTION_RESOLVERS path leaves this undefined, and
+   * `resolverFor` keeps reading its own keyed table for those. Values mirror
+   * `ResolutionKind` (actionResolvers.ts) — the wire-served vocabulary a
+   * ClassFeature row can name, retiring the frontend's per-key mirror one
+   * row at a time (#1383).
+   */
+  resolverKind?: string;
 }
+
+// ExecuteActionResult (#1528) is defined in @character-sheet/shared-types —
+// re-exported here so existing imports from "@/types/character" keep working.
+// Was a hand-mirrored duplicate of the backend route's own copy (the exact
+// #1369/#1370 failure mode), caught in review.
+export type { ExecuteActionResult };
 
 // The action op is derived from the route zod schema in
 // @character-sheet/contracts (#1390) — `import type` only, so zod never enters

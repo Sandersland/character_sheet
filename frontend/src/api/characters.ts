@@ -7,6 +7,7 @@ import type {
   ConditionOperation,
   CampaignPreferences,
   CreateCharacterInput,
+  ExecuteActionResult,
   ExperienceOperation,
   HitPointOperation,
   ResourceOperation,
@@ -182,11 +183,14 @@ export async function revertBatch(
 // and passed as `op.roll`; the server validates and records but does not re-roll.
 // batchId rides alongside the character (#758) so turn undo can revert this exact
 // batch server-side before restoring the local economy slot.
+// `results` (#1528) is index-aligned 1:1 with `operations` — a row-driven
+// cast-core op (Second Wind) reports its server roll there; every other op
+// reports `{}`. Mirrors rollInitiativeTransaction's own `results` shape below.
 export async function applyActionTransactions(
   characterId: string,
   operations: ActionOperation[]
-): Promise<Character & { batchId?: string }> {
-  return request<Character & { batchId?: string }>(
+): Promise<Character & { batchId?: string; results?: ExecuteActionResult[] }> {
+  return request<Character & { batchId?: string; results?: ExecuteActionResult[] }>(
     `/characters/${characterId}/actions/transactions`,
     jsonBody({ operations }),
     "Failed to apply action operations",

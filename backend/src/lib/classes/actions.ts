@@ -26,21 +26,28 @@
  *   the seed array had already drifted out of sync on 6 pre-existing rows before
  *   this file added 4 more, without anything breaking; #1431 closes that drift.)
  *
- * 3. `ACTION_CAST_FN` — cast-core actions that route through `castAbilityInTx`
- *    (pay pool cost → self-apply) instead of the op-list dispatch. Second Wind
- *    (#420) is the first: the fighter spends its Second Wind pool and self-heals
- *    1d10 + level via the shared cast core's self-apply heal path. Action Surge
- *    intentionally stays an `ACTION_EFFECT_FN` counter — its extra-action grant
- *    is a client-side economy effect with no server state to apply.
+ * 3. Row-driven actions (`actionsFromRows` + `castSpecFromRow`, #1528) — a
+ *    `ClassFeature` row whose `activationCost` column is populated becomes an
+ *    `AvailableAction` directly, no `DERIVED_ACTIONS` entry needed; casting one
+ *    with an `effectKind` set routes through `castAbilityInTx` the same way the
+ *    (retired) `ACTION_CAST_FN` table used to — the difference is the die is
+ *    now rolled HERE, server-side, from the row's effect columns
+ *    (`castManeuver`, maneuvers.ts, is the server-roll precedent), not supplied
+ *    by the client. A row with no `effectKind` (Action Surge — a pure counter,
+ *    the extra-action grant is client-side) spends its pool directly instead.
+ *    Today only Fighter's rows populate `activationCost`; every other class
+ *    still goes through `DERIVED_ACTIONS`/`ACTION_EFFECT_FN` until its own
+ *    wave-2 retab (#1134).
  */
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import type { ActiveBuff } from "@/lib/combat/active-effects.js";
-import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
-import type { EffectSpec } from "@/lib/combat/effects.js";
+import { readAbilityCost, type AbilityCost } from "@/lib/spellcasting/ability-cost.js";
+import { readEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
+import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -169,6 +176,17 @@ export interface AvailableAction {
    *  universalActions for its edition-correct name; it never knows what a key
    *  means. */
   regrants?: string[];
+  /**
+   * Which inline resolution tool the client renders for this action (#1528) —
+   * served only for a row-driven action (`actionsFromRows` below); a
+   * DERIVED_ACTIONS row leaves this undefined, and the frontend's
+   * ACTION_RESOLVERS table (keyed by actionKey, not this) still owns those.
+   * Values mirror the frontend's own ResolutionKind enum
+   * (frontend/src/features/session/actionResolvers.ts) — e.g. "heal-roll",
+   * "simple-confirm" — moved here as the wire-served vocabulary a row can
+   * name, retiring the frontend's per-key mirror one row at a time (#1383).
+   */
+  resolverKind?: string;
 }
 
 /** Resource pool shape — typed subset of what serializeCharacter builds. */
@@ -219,9 +237,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Druid
   { key: "wildShape", name: "Wild Shape", cost: "action", grantClass: "druid", grantLevel: 2, resourceKey: "wildShape", resourceAmount: 1 },
 
-  // Fighter
-  { key: "secondWind", name: "Second Wind", cost: "bonusAction", grantClass: "fighter", grantLevel: 1, resourceKey: "secondWind", resourceAmount: 1 },
-  { key: "actionSurge", name: "Action Surge", cost: "special", grantClass: "fighter", grantLevel: 2, resourceKey: "actionSurge", resourceAmount: 1 },
+  // Fighter — Second Wind / Action Surge retired from this table (#1528):
+  // both are now row-driven (actionsFromRows below), read off Fighter's own
+  // ClassFeature rows (activationCost/resolverKind/cost*/effect* columns,
+  // prisma/seed/fighter-features.ts) instead of a DERIVED_ACTIONS entry.
 
   // Monk
   // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no
@@ -614,19 +633,34 @@ export const REGRANTED_UNIVERSAL_KEYS: readonly string[] = [
  * function shadow-arts.ts's cast guards call, so the wire value and the guard
  * can never independently drift on the gate.
  */
-export function deriveEntryScopedActions(
-  classEntries: (SubclassIdentityInput & { name: string; level: number })[],
+// `getFeatureRows` is optional (#1528 chunk 0) — mirrors registry.ts's
+// GetFeatureRows convention: a caller with FEATURE_ROWS_ENTRY_SELECT loaded
+// passes `featureRowsOf` so a Fighter entry's row-driven actions (Second
+// Wind/Action Surge) surface here too; absent for a caller with no such
+// relation (shadow-arts.ts / warrior-of-elements.ts's `pools: []` callers —
+// harmless, since only monk-gated keys matter to them and no monk row
+// populates `activationCost`).
+export function deriveEntryScopedActions<E extends SubclassIdentityInput & { name: string; level: number }>(
+  classEntries: E[],
   totalLevel: number,
   pools: ResourcePool[],
   unarmoredUnshielded = true,
   edition: RulesEdition,
+  getFeatureRows?: (entry: E) => ClassFeatureRowsCarrier | undefined,
 ): AvailableAction[] {
+  const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
   const seenKeys = new Set<string>();
   const actions: AvailableAction[] = [];
   for (const entry of classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
     const slug = resolveSubclassSlug(entry.name, entry);
-    for (const action of deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded, edition)) {
+    const rows = getFeatureRows?.(entry);
+    const entryActions = [
+      ...deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded, edition),
+      ...actionsFromRows(rows?.classRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
+      ...actionsFromRows(rows?.subclassRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
+    ];
+    for (const action of entryActions) {
       if (seenKeys.has(action.key)) continue;
       seenKeys.add(action.key);
       actions.push(action);
@@ -655,12 +689,18 @@ export function actionGrantLevel(key: string, edition: RulesEdition): number | u
   return levels.length > 0 ? Math.min(...levels) : undefined;
 }
 
+// The subset of a DERIVED_ACTIONS row (or a row-driven action, actionFromRow
+// above) resolveEnablement needs — narrowed to exactly these three fields so
+// a row-driven caller can build a plain object literal instead of a
+// structurally-lying cast to the full (key/name/cost-requiring) DerivedActionRecord.
+type EnablementInput = Pick<DerivedActionRecord, "resourceKey" | "resourceAmount" | "requiresUnarmored">;
+
 // One action row's enabled/disabledReason — pulled out of the `.map()` above to
 // keep that callback's complexity low. Resource-pool gate first, then the
 // Martial Arts unarmored/unshielded gate (mutually exclusive today, but a
 // future action could carry both — resource wins the reason if so).
 function resolveEnablement(
-  a: DerivedActionRecord,
+  a: EnablementInput,
   poolMap: Map<string, number>,
   unarmoredUnshielded: boolean,
 ): { enabled: boolean; disabledReason?: string } {
@@ -783,10 +823,12 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // Druid
   wildShape: () => [{ type: "spendResource", key: "wildShape" }],
 
-  // Fighter
-  // secondWind is a cast-core action — see ACTION_CAST_FN below.
-  // actionSurge stays a pure counter: the extra-action grant is client-side.
-  actionSurge: () => [{ type: "spendResource", key: "actionSurge" }],
+  // Fighter — secondWind/actionSurge retired from this table (#1528): both
+  // are row-driven now (routes/character/actions.ts's row-driven dispatch),
+  // which decides the cast-core-vs-spend-only split per row itself (a row
+  // with an `effectKind` routes through castAbilityInTx; one without, like
+  // Action Surge — a pure counter, the extra-action grant is client-side —
+  // spends its pool directly).
 
   // Monk
   // bonusUnarmedStrike is economy-only, like `attack`/`twf` — no server state
@@ -878,9 +920,9 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
 
 // Cast-core actions: the orchestrator routes these through castAbilityInTx (pay
 // pool cost → self-apply heal), not the op-list dispatch. The 5e rule lives here
-// (pool key + base spend + the self-heal effect); the die value is the client roll.
+// (pool key + base spend + the self-heal effect).
 
-/** A cast-core action's cost + effect, resolved from the client roll. */
+/** A cast-core action's cost + effect + resolved self-apply, if any. */
 export interface ActionCastSpec {
   name: string;
   cost: AbilityCost;
@@ -888,20 +930,136 @@ export interface ActionCastSpec {
   apply?: { target: "self"; kind: "heal" | "damage" | "tempHp"; amount: number };
 }
 
-// Second Wind's self-heal effect: 1d10 + fighter level (the client rolls the total).
-const secondWindEffect: EffectSpec = {
-  effectType: "heal",
-  dice: { count: 1, faces: 10 },
-  scaling: { mode: "none" },
-};
+/**
+ * One row's AvailableAction, or null when the row declares no activation
+ * (`activationCost` absent) or the character hasn't reached its grant level.
+ * Data-gated like `poolsFromRows` (class-feature-rows.ts): only a row with
+ * BOTH `activationCost` and `resourceKey` populated contributes — today, only
+ * Fighter's Second Wind/Action Surge rows (#1528). `enabled`/`disabledReason`
+ * reuse `resolveEnablement` so a row's gate can never diverge from a
+ * DERIVED_ACTIONS row's.
+ */
+// The row-driven gate: right edition, grant level reached, and the two
+// fields that make a row an action at all (activationCost + resourceKey —
+// see actionFromRow's own comment). Split out so actionFromRow's own
+// cyclomatic count stays low (the fallow health gate).
+function rowIsAnAvailableAction(row: ClassFeatureRow, level: number, edition: RulesEdition): boolean {
+  return row.edition === edition && row.level <= level && Boolean(row.activationCost) && Boolean(row.resourceKey);
+}
 
-export const ACTION_CAST_FN: Record<string, (ctx: ActionContext) => ActionCastSpec> = {
-  secondWind: (ctx) => ({
-    name: "Second Wind",
-    cost: { kind: "pool", key: "secondWind", base: 1 },
-    effect: secondWindEffect,
-    ...(ctx.roll !== undefined && ctx.roll > 0
-      ? { apply: { target: "self" as const, kind: "heal" as const, amount: ctx.roll } }
-      : {}),
-  }),
-};
+// Assembles the AvailableAction object once enablement is known — pulled out
+// of actionFromRow to keep its own branching budget for the gate check
+// (fallow's cyclomatic/CRAP gate; the four conditional-spread fields below
+// are what pushed this over as one function).
+function buildRowAction(
+  row: ClassFeatureRow,
+  level: number,
+  enabled: boolean,
+  disabledReason: string | undefined,
+): AvailableAction {
+  const reminder = describeRowReminder(row, level);
+  return {
+    key: row.resourceKey as string,
+    name: row.name,
+    cost: row.activationCost as ActionCost,
+    enabled,
+    ...(disabledReason ? { disabledReason } : {}),
+    ...(reminder ? { reminder } : {}),
+    ...(row.resolverKind ? { resolverKind: row.resolverKind } : {}),
+    ...(row.regrants && row.regrants.length > 0 ? { regrants: [...row.regrants] } : {}),
+  };
+}
+
+function actionFromRow(
+  row: ClassFeatureRow,
+  level: number,
+  edition: RulesEdition,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): AvailableAction | null {
+  if (!rowIsAnAvailableAction(row, level, edition)) return null;
+  const cost = readAbilityCost(row);
+  const record: EnablementInput = {
+    resourceKey: row.resourceKey as string,
+    resourceAmount: cost.kind === "pool" ? cost.base : undefined,
+    requiresUnarmored: row.requiresUnarmored ?? false,
+  };
+  const { enabled, disabledReason } = resolveEnablement(record, poolMap, unarmoredUnshielded);
+  return buildRowAction(row, level, enabled, disabledReason);
+}
+
+/**
+ * A dynamic subtitle for a row-driven heal (e.g. "Regain 1d10 + 3 HP") built
+ * from the row's own effect columns rather than a second hand-authored
+ * string — the level-scaled modifier (`effectModifierSource: "classLevel"`)
+ * is resolved here since the row itself only knows the grant level, not the
+ * character's current one. Undefined for a non-heal or dice-less row (Action
+ * Surge).
+ */
+function describeRowReminder(row: ClassFeatureRow, level: number): string | undefined {
+  if (row.effectKind !== "heal" || !row.effectDiceCount || !row.effectDiceFaces) return undefined;
+  const modifier = row.effectModifierSource === "classLevel" ? level : 0;
+  return `Regain ${row.effectDiceCount}d${row.effectDiceFaces}${modifier > 0 ? ` + ${modifier}` : ""} HP`;
+}
+
+/**
+ * Every row-driven action declared across a class/subclass's rows, at one
+ * character level — the row-driven counterpart to `deriveActions`' filter
+ * over `DERIVED_ACTIONS`. Called once per class-rows and once per
+ * subclass-rows by `deriveEntryScopedActions` below (mirrors
+ * `deriveBaseLayer`/`deriveSubclassLayer`'s split in registry.ts).
+ */
+function actionsFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): AvailableAction[] {
+  const actions: AvailableAction[] = [];
+  for (const row of rows) {
+    const action = actionFromRow(row, level, edition, poolMap, unarmoredUnshielded);
+    if (action) actions.push(action);
+  }
+  return actions;
+}
+
+/**
+ * Builds a row-driven cast-core action's spec AND rolls its effect
+ * server-side (#1528) — the row-driven counterpart to the retired
+ * `ACTION_CAST_FN` table. Unlike that table (whose die value was the client
+ * roll), the roll happens HERE: `castManeuver` (maneuvers.ts) is the
+ * server-authoritative-roll precedent this mirrors. `rollDie` is injected
+ * (not imported directly) so this stays a pure function the route's own
+ * `rollDie` (lib/core/dice.ts) is threaded into, same as
+ * computeHeightenedFocusTempHp's pattern one file over.
+ *
+ * The `{ ...row, level: 0 }` adapter is the #1528 EffectRow landmine fix:
+ * `EffectRow`'s `level` decides the SCALING axis (cantrip/upcast), which a
+ * ClassFeature row has no use for — `row.level` here is the CHARACTER level
+ * the feature is GRANTED at, a different number entirely. Passing it through
+ * unadapted would let `resolveEffectScaling` reinterpret Second Wind's grant
+ * level as a spell level. Level 0 with no `cantripScaling`/`upcastDicePerLevel`
+ * (never authored on this row shape — see ClassFeatureRow's own comment)
+ * lands on `{ mode: "none" }`, the only scaling mode any Fighter descriptor
+ * can ever resolve to (pinned by a dedicated test).
+ */
+export function castSpecFromRow(
+  row: ClassFeatureRow,
+  characterLevel: number,
+  rollDie: (faces: number) => number,
+): { spec: ActionCastSpec; roll: number } {
+  const cost = readAbilityCost(row);
+  const effect = readEffectSpec({ ...row, level: 0 });
+  const resolved = resolveEffectSpec(effect, 0, { characterLevel });
+  let roll = 0;
+  if (resolved) {
+    for (let i = 0; i < resolved.count; i++) roll += rollDie(resolved.faces);
+    roll += resolved.modifier;
+  }
+  const apply =
+    effect.effectType === "heal" && roll > 0
+      ? ({ target: "self", kind: "heal", amount: roll } as const)
+      : undefined;
+  return { spec: { name: row.name, cost, effect, apply }, roll };
+}

@@ -152,7 +152,12 @@ export interface ClassFeatureSeedRow {
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  resourceTotals?: { minLevel: number; total: number }[];
+  // shortRestRegain (#1528) rides the SAME tier object as `total` rather than
+  // a fifth top-level column — see class-feature-rows.ts's ResourceTotalTier
+  // for why (the #1221 partial short-rest top-up had no column to populate
+  // when #1523 shipped resourceTotals). Second Wind's 2024 row is the first
+  // to set it.
+  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
   activationCost?: string;
   resolverKind?: string;
@@ -231,7 +236,16 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 // because #1528/#1530 hadn't landed yet — un-exporting removes both problems
 // at once.
 const resourceTotalsTierSchema = z
-  .array(z.object({ minLevel: z.number().int().positive(), total: z.number().int().nonnegative() }))
+  .array(
+    z.object({
+      minLevel: z.number().int().positive(),
+      total: z.number().int().nonnegative(),
+      // #1528: Second Wind's 2024 partial short-rest top-up (#1221) — see
+      // ClassFeatureSeedRow.resourceTotals' own comment for why this rides
+      // the tier object rather than a fifth top-level column.
+      shortRestRegain: z.number().int().nonnegative().optional(),
+    }),
+  )
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 const resourceDieTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), die: z.string().min(1) }))
