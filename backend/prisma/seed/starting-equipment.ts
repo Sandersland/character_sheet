@@ -50,6 +50,8 @@ const equipmentBundleSchema = z.object({
   label: z.string().min(1),
   items: z.array(fixedItemSchema).optional(),
   openPicks: z.array(openWeaponPickSchema).optional(),
+  // PHB'24 per-option GP (#1564) — every EDITION_2014 option omits this (0).
+  gold: z.number().int().positive().optional(),
 });
 
 // options: z.array(...).min(1) — strictly stronger than the deleted

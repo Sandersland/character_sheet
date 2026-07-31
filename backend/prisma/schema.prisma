@@ -897,6 +897,14 @@ model StartingEquipmentOption {
   group    StartingEquipmentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   position Int
   label    String
+  // GP this option grants on top of (or instead of) its items (#1564). Forced
+  // by PHB'24's shape, not a preference: every non-final option across all
+  // twelve 2024 class packages carries 4-28 GP, and the flat final option
+  // (50-155 GP) is just an option with this set and no items — same
+  // presentation the book itself uses, so no separate "gold mode" per option.
+  // Every EDITION_2014 option is 0 (2014's gold is the package-level dice
+  // roll, StartingEquipmentPackage.goldDiceCount/Faces/Multiplier, untouched).
+  gold     Int                    @default(0)
 
   items     StartingEquipmentItem[]
   openPicks StartingEquipmentOpenPick[]

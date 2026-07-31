@@ -48,6 +48,7 @@ function optionCreateInput(option: EquipmentBundle, position: number) {
   return {
     position,
     label: option.label,
+    gold: option.gold ?? 0,
     items: { create: (option.items ?? []).map((item, i) => itemCreateInput(item, i)) },
     openPicks: { create: (option.openPicks ?? []).map((pick, i) => openPickCreateInput(pick, i)) },
   };

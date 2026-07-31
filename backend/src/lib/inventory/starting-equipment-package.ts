@@ -69,7 +69,10 @@ function mapOpenPick(pick: RowOpenPick): OpenWeaponPick {
   };
 }
 
-// items/openPicks omitted when empty, never `[]`.
+// items/openPicks omitted when empty, gold omitted when 0 (every 2014 option,
+// and any 2024 option that grants none) — never a redundant `gold: 0` that
+// seed-starting-equipment.ts's optionCreateInput would then write straight
+// back as the literal default.
 function mapOption(option: RowOption): EquipmentBundle {
   const items = option.items.map(mapItem);
   const openPicks = option.openPicks.map(mapOpenPick);
@@ -77,6 +80,7 @@ function mapOption(option: RowOption): EquipmentBundle {
     label: option.label,
     ...(items.length ? { items } : {}),
     ...(openPicks.length ? { openPicks } : {}),
+    ...(option.gold ? { gold: option.gold } : {}),
   };
 }
 

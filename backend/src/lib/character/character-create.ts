@@ -563,12 +563,13 @@ async function collectOpenPickRefs(
 }
 
 // Validate one selected group (optionIndex in range) and collect its fixed +
-// open-pick refs (packs expanded downstream).
+// open-pick refs (packs expanded downstream) plus the chosen bundle's gold
+// (#1564 — PHB'24's per-option GP; 0 for every 2014 option).
 async function collectGroupRefs(
   group: EquipmentGroup,
   sel: PackageSelection,
   groupIdx: number
-): Promise<PhaseResult<{ refs: FixedRef[] }>> {
+): Promise<PhaseResult<{ refs: FixedRef[]; gold: number }>> {
   if (sel.optionIndex < 0 || sel.optionIndex >= group.options.length) {
     return {
       ok: false,
@@ -581,15 +582,15 @@ async function collectGroupRefs(
   const openPickRefs = await collectOpenPickRefs(bundle, sel, groupIdx);
   if (!openPickRefs.ok) return openPickRefs;
 
-  return { ok: true, refs: [...bundleFixedRefs(bundle), ...openPickRefs.refs] };
+  return { ok: true, refs: [...bundleFixedRefs(bundle), ...openPickRefs.refs], gold: bundle.gold ?? 0 };
 }
 
 // Walk the class package groups, validating each selection and collecting the
-// fixed catalog refs across all groups.
+// fixed catalog refs AND the summed gold (#1564) across all groups.
 async function collectPackageRefs(
   se: PackageEquipment,
   classDef: ClassEquipmentDef
-): Promise<PhaseResult<{ allFixedRefs: FixedRef[] }>> {
+): Promise<PhaseResult<{ allFixedRefs: FixedRef[]; totalGold: number }>> {
   if (se.selections.length !== classDef.groups.length) {
     return {
       ok: false,
@@ -599,12 +600,14 @@ async function collectPackageRefs(
   }
 
   const allFixedRefs: FixedRef[] = [];
+  let totalGold = 0;
   for (let groupIdx = 0; groupIdx < classDef.groups.length; groupIdx++) {
     const group = await collectGroupRefs(classDef.groups[groupIdx], se.selections[groupIdx], groupIdx);
     if (!group.ok) return group;
     allFixedRefs.push(...group.refs);
+    totalGold += group.gold;
   }
-  return { ok: true, allFixedRefs };
+  return { ok: true, allFixedRefs, totalGold };
 }
 
 // The one (classId, edition) lookup both starting-equipment phases share —
@@ -620,14 +623,14 @@ async function loadClassEquipmentDef(classId: string, edition: RulesEdition): Pr
 }
 
 // Re-resolve a package selection authoritatively against the loaded package
-// and expand it into InventoryItem create payloads. `classDef` null means no
-// seeded package for this class — preserves the pre-#1534 "no entry" 400
-// (characters.test.ts:901).
+// and expand it into InventoryItem create payloads plus the summed gold
+// (#1564) across the chosen options. `classDef` null means no seeded package
+// for this class — preserves the pre-#1534 "no entry" 400 (characters.test.ts:901).
 async function resolvePackageInventory(
   se: PackageEquipment,
   primaryClassName: string,
   classDef: ClassEquipmentDef | null,
-): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[] }>> {
+): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[]; totalGold: number }>> {
   if (!classDef) {
     return {
       ok: false,
@@ -641,7 +644,7 @@ async function resolvePackageInventory(
 
   const { inventoryCreates, error } = await resolveFixedItems(refs.allFixedRefs);
   if (error) return { ok: false, status: 400, error };
-  return { ok: true, inventoryItemCreates: inventoryCreates };
+  return { ok: true, inventoryItemCreates: inventoryCreates, totalGold: refs.totalGold };
 }
 
 // Phase 2 — starting-equipment materialization. Optional: omitting it yields an
@@ -670,6 +673,11 @@ async function materializeStartingEquipment(
       const pkg = await resolvePackageInventory(se, primaryClassName, classDef);
       if (!pkg.ok) return pkg;
       inventoryItemCreates = pkg.inventoryItemCreates;
+      // Explicit even when 0 (every EDITION_2014 package) — same persisted
+      // value deriveCreatedCharacter's default already writes, but written
+      // here so #1535's PHB'24 packages can't silently drop their GP the way
+      // an untouched `startingCurrency` would (#1564).
+      startingCurrency = { cp: 0, sp: 0, gp: pkg.totalGold, pp: 0 };
     }
   }
 

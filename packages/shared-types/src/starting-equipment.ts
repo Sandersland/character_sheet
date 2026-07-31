@@ -31,12 +31,16 @@ export interface OpenWeaponPick {
 
 /**
  * One selectable bundle within a choice group — a set of fixed items plus
- * zero or more open picks the player fills in from the filtered catalog.
+ * zero or more open picks the player fills in from the filtered catalog, and/
+ * or a flat GP amount (PHB'24: every non-final option carries GP, and the
+ * final flat-gold option is just an option with `gold` set and no items).
+ * Omitted (not 0) when the option grants none — every 2014 option.
  */
 export interface EquipmentBundle {
   label: string;
   items?: FixedItemRef[];
   openPicks?: OpenWeaponPick[];
+  gold?: number;
 }
 
 /**

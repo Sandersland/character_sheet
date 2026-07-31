@@ -30,6 +30,7 @@ function optionRow(overrides: Partial<StartingEquipmentPackageRow["groups"][numb
     groupId: "group-1",
     position: 0,
     label: "An option",
+    gold: 0,
     items: [],
     openPicks: [],
     ...overrides,
@@ -226,6 +227,30 @@ describe("mapStartingEquipmentPackage", () => {
       { label: "one martial weapon", filter: { weaponClass: "martial" } },
       { label: "two martial weapons at once", filter: { weaponClass: "martial" }, quantity: 2 },
     ]);
+  });
+
+  // #1564: every PHB'24 option carries GP (4-28 for a non-final option, 50-155
+  // for the flat final option); omitted on the wire when 0 (every 2014 option,
+  // and the PHB'24 non-gold options), same discipline as quantity/items/openPicks.
+  it("maps a nonzero option gold onto the wire's gold field", () => {
+    const row = packageRow({
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "(a) chain mail or (b) leather armor and 20 gp",
+          options: [
+            optionRow({ label: "Chain Mail", items: [{ id: "item-1", optionId: "opt-1", position: 0, catalogName: "Chain Mail", quantity: 1 }] }),
+            optionRow({ label: "20 GP", gold: 20 }),
+          ],
+        },
+      ],
+    });
+
+    const mapped = mapStartingEquipmentPackage(row);
+    expect(mapped.groups[0].options[0]).not.toHaveProperty("gold");
+    expect(mapped.groups[0].options[1].gold).toBe(20);
   });
 
   it("renames weaponRange to range on the wire", () => {
