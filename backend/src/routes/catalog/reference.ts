@@ -32,14 +32,22 @@ referenceRouter.get("/reference", async (req, res) => {
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
   const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
+  // Narrowed to at-most-two-per-key at the DB (withEditionOrShared), then
+  // resolveEditionCatalog picks the one row per business key — same D3 shape
+  // as originFeatRows/universalActionRows below. `edition` rides along
+  // unselected-out (no `select` here, so the full row includes it) purely to
+  // drive the resolution; the projections below never forward it to the wire.
   const rawClasses = await prisma.characterClass.findMany({
     orderBy: { name: "asc" },
-    include: { subclasses: { orderBy: { name: "asc" } } },
+    include: { subclasses: { where: withEditionOrShared({}, edition), orderBy: { name: "asc" } } },
   });
-  const backgrounds = await prisma.background.findMany({
+  const rawBackgrounds = await prisma.background.findMany({
+    where: withEditionOrShared({}, edition),
     orderBy: { name: "asc" },
     include: { originFeat: { select: { id: true, name: true, description: true, category: true } } },
   });
+  // keyOf is `name` (Background's business key, D2) — same as originFeatByName below.
+  const backgrounds = resolveEditionCatalog(rawBackgrounds, edition, (b) => b.name);
 
   // Resolved per-edition BY NAME, not by following the FK: Background.originFeatId
   // is whatever seed-time resolveOriginFeatId baked on (EDITION_2024), and a
@@ -51,11 +59,16 @@ referenceRouter.get("/reference", async (req, res) => {
   // a 2014 Criminal saw 2024 Alert text). The FK survives only as a name source
   // until #1348 replaces it with originFeatName.
   //
-  // Scope latch (#1325 vs #1336): this endpoint resolves edition-dependent RULE
-  // VALUES and this one feat text. WHICH catalog ROWS it returns (classes,
-  // subclasses, backgrounds, spells) is still edition-unfiltered and is #1336's
-  // job — no forked class/subclass/background rows are seeded today, so the lists
-  // are identical for both editions and nothing is silently wrong yet.
+  // Scope latch (#1336): backgrounds and each class's subclasses (below) are now
+  // resolved per the requesting edition, same mechanism as originFeatRows and
+  // universalActionRows. Still deliberately unfiltered by this endpoint:
+  // `races` (species divergence is real — ability increases, roster
+  // membership — but not representable by an edition column alone, #1518);
+  // `classes` themselves (one CharacterClass row serves both editions by
+  // design, subclassGateLevel is the only field that forks, #1308); and
+  // `startingEquipment` (2014 Basic Rules packages served to both editions
+  // today, a live 2024 bug, #1534/#1535). The spell catalog (`GET
+  // /api/spells`) is a separate endpoint with its own edition gap, #1517.
   const originFeatNames = [
     ...new Set(backgrounds.map((b) => b.originFeat?.name).filter((n): n is string => n != null)),
   ];
@@ -94,7 +107,15 @@ referenceRouter.get("/reference", async (req, res) => {
     toolProficiencies: c.toolProficiencies,
     toolChoices: c.toolChoices,
     toolChoiceCount: c.toolChoiceCount,
-    subclasses: c.subclasses.map((s) => ({ id: s.id, name: s.name, description: s.description })),
+    // keyOf is `name` alone, not `${classId}::${name}` (D2): classId is
+    // constant within one class's own subclasses array, so the compound key
+    // resolveEditionCatalog's docstring prescribes for cross-class groups
+    // would be harmless here but misleading.
+    subclasses: resolveEditionCatalog(c.subclasses, edition, (s) => s.name).map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+    })),
     startingEquipment: STARTING_EQUIPMENT[c.name] ?? null,
     // #1161/#1529: PHB'24 primary ability/abilities, off the catalog column; [] for a homebrew class.
     primaryAbility: primaryAbilities(c.primaryAbilities),
