@@ -23,13 +23,16 @@ import {
   type AdvancementEntry,
   type FeatImprovement,
 } from "@/lib/classes/resources.js";
-import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
+import {
+  mapStartingEquipmentPackage,
+  EQUIPMENT_PACKAGE_INCLUDE,
+} from "@/lib/inventory/starting-equipment-package.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
+import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
 // Discriminated result: return just the new id so the route re-fetches by id
@@ -67,7 +70,7 @@ type PackageEquipment = Extract<
   NonNullable<CreateCharacterBody["startingEquipment"]>,
   { mode: "package" }
 >;
-type ClassEquipmentDef = NonNullable<(typeof STARTING_EQUIPMENT)[string]>;
+type ClassEquipmentDef = ClassStartingEquipment;
 type InventoryCreate = ReturnType<typeof buildInventoryCreateFromCatalog>;
 
 type ResolvedSelections = {
@@ -461,12 +464,16 @@ async function resolveBackgroundGrants(
   };
 }
 
-// Validate a chosen-gold amount against the class's dice range.
+// Validate a chosen-gold amount against the class's dice range. `classDef` is
+// null for a class with no seeded package (e.g. a homebrew/test-fixture
+// class) — the range check is skipped rather than rejected, preserving the
+// pre-#1534 behaviour for an unknown class (characters.test.ts:901's sibling
+// gold-mode case).
 function resolveStartingGold(
   gold: number,
-  className: string
+  className: string,
+  classDef: ClassEquipmentDef | null,
 ): PhaseResult<{ startingCurrency: { cp: number; sp: number; gp: number; pp: number } }> {
-  const classDef = STARTING_EQUIPMENT[className];
   if (classDef) {
     const { diceCount, diceFaces, multiplier } = classDef.gold;
     const min = diceCount * multiplier;
@@ -600,13 +607,27 @@ async function collectPackageRefs(
   return { ok: true, allFixedRefs };
 }
 
-// Re-resolve a package selection authoritatively against STARTING_EQUIPMENT and
-// expand it into InventoryItem create payloads.
+// The one (classId, edition) lookup both starting-equipment phases share —
+// exact match, not resolveEditionRow: StartingEquipmentPackage.edition is
+// non-nullable, so there is no shared/NULL row to fall back to (#1534). Null
+// for a class with no seeded package (homebrew/test-fixture classes).
+async function loadClassEquipmentDef(classId: string, edition: RulesEdition): Promise<ClassEquipmentDef | null> {
+  const row = await prisma.startingEquipmentPackage.findUnique({
+    where: { classId_edition: { classId, edition } },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  return row ? mapStartingEquipmentPackage(row) : null;
+}
+
+// Re-resolve a package selection authoritatively against the loaded package
+// and expand it into InventoryItem create payloads. `classDef` null means no
+// seeded package for this class — preserves the pre-#1534 "no entry" 400
+// (characters.test.ts:901).
 async function resolvePackageInventory(
   se: PackageEquipment,
-  primaryClassName: string
+  primaryClassName: string,
+  classDef: ClassEquipmentDef | null,
 ): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[] }>> {
-  const classDef = STARTING_EQUIPMENT[primaryClassName];
   if (!classDef) {
     return {
       ok: false,
@@ -627,22 +648,29 @@ async function resolvePackageInventory(
 // empty-inventory character. The gold path sets currency; the package path
 // materializes InventoryItem payloads. Starting weapons/armor are auto-equipped
 // so the in-session Attack picker isn't empty on a fresh sheet (issue #51).
+// The package is keyed by (classId, edition) — see loadClassEquipmentDef;
+// primaryClassName is kept only for player-facing error messages.
 async function materializeStartingEquipment(
   input: CreateCharacterBody,
-  primaryClassName: string
+  classId: string,
+  primaryClassName: string,
+  edition: RulesEdition,
 ): Promise<PhaseResult<MaterializedEquipment>> {
   let inventoryItemCreates: InventoryCreate[] = [];
   let startingCurrency: MaterializedEquipment["startingCurrency"];
 
   const se = input.startingEquipment;
-  if (se?.mode === "gold") {
-    const gold = resolveStartingGold(se.gold, primaryClassName);
-    if (!gold.ok) return gold;
-    startingCurrency = gold.startingCurrency;
-  } else if (se) {
-    const pkg = await resolvePackageInventory(se, primaryClassName);
-    if (!pkg.ok) return pkg;
-    inventoryItemCreates = pkg.inventoryItemCreates;
+  if (se) {
+    const classDef = await loadClassEquipmentDef(classId, edition);
+    if (se.mode === "gold") {
+      const gold = resolveStartingGold(se.gold, primaryClassName, classDef);
+      if (!gold.ok) return gold;
+      startingCurrency = gold.startingCurrency;
+    } else {
+      const pkg = await resolvePackageInventory(se, primaryClassName, classDef);
+      if (!pkg.ok) return pkg;
+      inventoryItemCreates = pkg.inventoryItemCreates;
+    }
   }
 
   // The 5e selection rule lives in lib/ (selectAutoEquip); apply its decision
@@ -849,7 +877,16 @@ export async function createCharacter(
   const grants = await resolveBackgroundGrants(input, selections.background, input.rulesEdition ?? DEFAULT_RULES_EDITION);
   if (!grants.ok) return grants;
 
-  const equipment = await materializeStartingEquipment(input, selections.primaryClassChoice.name);
+  const equipment = await materializeStartingEquipment(
+    input,
+    selections.characterClass.id,
+    selections.primaryClassChoice.name,
+    // Re-derives the same edition resolveSelections used, same reasoning as
+    // grants above and the rulesEdition write below — resolveSelections'
+    // `edition` local is scoped to that function, so this independently
+    // recomputes it from the same formula rather than threading it through.
+    input.rulesEdition ?? DEFAULT_RULES_EDITION,
+  );
   if (!equipment.ok) return equipment;
 
   const spells = await resolveCreationSpells(input, selections);

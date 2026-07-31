@@ -899,7 +899,7 @@ describe("characters routes", () => {
       });
 
       it("rejects mode:package for a class with no package definition with 400", async () => {
-        // TEST_CLASS ("Test Class") is not in STARTING_EQUIPMENT
+        // TEST_CLASS ("Test Class") has no seeded StartingEquipmentPackage row (#1534)
         const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
@@ -908,6 +908,23 @@ describe("characters routes", () => {
           });
 
         expect(response.status).toBe(400);
+      });
+
+      // gold mode's range check is wrapped in `if (classDef)` (resolveStartingGold,
+      // #1534) — a class with no package row accepts ANY gold amount unvalidated.
+      // An absurd amount (999999) that would fail every real class's dice range
+      // proves this isn't accidentally passing a narrow check.
+      it("accepts any gold amount unvalidated for a class with no package definition", async () => {
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+          .post("/api/characters")
+          .send({
+            ...createBody,
+            startingEquipment: { mode: "gold", gold: 999999 },
+          });
+
+        expect(response.status).toBe(201);
+        createdCharacterIds.push(response.body.id);
+        expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 999999, pp: 0 });
       });
     });
 
