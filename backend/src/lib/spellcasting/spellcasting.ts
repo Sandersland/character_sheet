@@ -39,6 +39,7 @@ import type {
 } from "./spell-state.js";
 import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
+import { FEATURE_ROWS_ORDER_BY, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import {
   normalizeResourcesMutable,
@@ -901,8 +902,26 @@ const SPELLCASTING_SELECT = {
       name: true,
       level: true,
       subclass: true,
+      // #1528 finding 5: resolveArcaneRecoveryContext reads `.resources`
+      // through deriveResources, whose only pool source besides a resourceFn
+      // is row-driven (poolsFromRows) — an absent featureRows carrier here
+      // was harmless while every resourceFn-declared pool (arcaneRecovery
+      // included) bypassed rows entirely, but is the one remaining undefined
+      // carrier whose `.resources` output is actually consumed, so it would
+      // silently go pool-less the day Wizard's rows retab under #1134.
+      class: { select: { features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } } },
       // Subclass-granted spells (#898) injected into the working view below.
-      subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
+      // Switched from `include` to `select` (#1528) to add `features` without
+      // widening the fetched columns further — `name` is kept explicitly since
+      // injectDerivedSpells' GrantedSpellSource (granted-spells.ts) reads it
+      // (an `include` used to carry every scalar column along for free).
+      subclassRef: {
+        select: {
+          name: true,
+          grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } },
+          features: { orderBy: FEATURE_ROWS_ORDER_BY },
+        },
+      },
     },
   },
   inventoryItems: {
@@ -925,7 +944,20 @@ function resolveArcaneRecoveryContext(
 ): { resources: ResourcesMutableState; available: boolean; wizardLevel: number } {
   const primary = row.classEntries[0];
   const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
-  const resourceInfo = deriveResources(className, primary?.subclass ?? undefined, wizardLevel, abilityScores, profBonus, editionOf(row));
+  // SPELLCASTING_SELECT carries class/subclassRef.features (#1528 finding 5) so
+  // this caller's `.resources` read resolves a row-driven arcaneRecovery pool
+  // too, not only a resourceFn one — inert today (Wizard's Arcane Recovery is
+  // still resourceFn-declared; only Fighter's rows populate resourceKey), but
+  // no longer the one remaining undefined carrier whose output is consumed.
+  const resourceInfo = deriveResources(
+    className,
+    primary?.subclass ?? undefined,
+    wizardLevel,
+    abilityScores,
+    profBonus,
+    primary ? featureRowsOf(primary) : undefined,
+    editionOf(row),
+  );
   return {
     resources: normalizeResourcesMutable(row.resources),
     available: Boolean(resourceInfo?.resources.some((r) => r.key === "arcaneRecovery")),

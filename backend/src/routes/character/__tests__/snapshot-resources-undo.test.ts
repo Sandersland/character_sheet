@@ -20,6 +20,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-snapshot-undo";
 let COOKIE: string;
@@ -67,13 +68,18 @@ let bmSubclassId: string;
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   COOKIE = await authCookie(OWNER_ID);
+  // extraAsiLevels/fightingStyleFeatLevel (#1529): the ASI/fs-slot caps
+  // resolve via these columns through the class FK relation now, matching
+  // Fighter's real values so twoAdvancements()'s ASI + fs feat both survive
+  // the slot-cap clamp exactly as the old className-keyed lookup did.
   const fighter = await prisma.characterClass.upsert({
     where: { name: FIGHTER_CATALOG_NAME },
     create: {
       name: FIGHTER_CATALOG_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"],
       skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3,
+      extraAsiLevels: [6, 14], fightingStyleFeatLevel: 1,
     },
-    update: { subclassLevel: 3 },
+    update: { subclassLevel: 3, extraAsiLevels: [6, 14], fightingStyleFeatLevel: 1 },
   });
   fighterClassId = fighter.id;
   const bm = await upsertEditionRow(
@@ -85,6 +91,9 @@ beforeAll(async () => {
     {},
   );
   bmSubclassId = bm.id;
+  // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy.
+  await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+  await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });
 
 afterAll(async () => {
@@ -96,8 +105,9 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 });
 
-// Class entry name is exactly "fighter" so the Fighting Style feat slot +
-// advancementSlotsForLevel recognize the Fighter schedule.
+// The class entry links classId to the real Fighter row above (#1529) so the
+// Fighting Style feat slot + advancementSlotsForLevel recognize the Fighter
+// schedule — resolution is by FK now, not by the entry's `name`.
 async function createBattleMaster() {
   return prisma.character.create({
     data: {

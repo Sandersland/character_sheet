@@ -1,6 +1,6 @@
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-const RANGER_FEATURES: DerivedFeature[] = [
+const RANGER_FEATURES: AuthoredFeature[] = [
   {
     name: "Favored Enemy",
     level: 1,
@@ -41,6 +41,10 @@ const RANGER_FEATURES: DerivedFeature[] = [
     level: 5,
     source: "class",
     description: "You can attack twice whenever you take the Attack action on your turn.",
+    // #1530: edition-invariant (SRD 5.1 / SRD 5.2 Ranger, Extra Attack) — one
+    // flat tier, no further scaling at higher levels (unlike Fighter).
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
   },
   {
     name: "Land's Stride",
@@ -79,7 +83,7 @@ const RANGER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const HUNTER_FEATURES: DerivedFeature[] = [
+const HUNTER_FEATURES: AuthoredFeature[] = [
   {
     name: "Hunter's Prey",
     level: 3,
@@ -110,7 +114,7 @@ const HUNTER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const BEAST_MASTER_FEATURES: DerivedFeature[] = [
+const BEAST_MASTER_FEATURES: AuthoredFeature[] = [
   {
     name: "Ranger's Companion",
     level: 3,

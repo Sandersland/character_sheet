@@ -1,6 +1,6 @@
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-const DRUID_FEATURES: DerivedFeature[] = [
+const DRUID_FEATURES: AuthoredFeature[] = [
   {
     name: "Druidic",
     level: 1,
@@ -45,7 +45,7 @@ const DRUID_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const CIRCLE_OF_THE_LAND_FEATURES: DerivedFeature[] = [
+const CIRCLE_OF_THE_LAND_FEATURES: AuthoredFeature[] = [
   {
     name: "Bonus Cantrip",
     level: 2,
@@ -90,7 +90,7 @@ const CIRCLE_OF_THE_LAND_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const CIRCLE_OF_THE_MOON_FEATURES: DerivedFeature[] = [
+const CIRCLE_OF_THE_MOON_FEATURES: AuthoredFeature[] = [
   {
     name: "Combat Wild Shape",
     level: 2,

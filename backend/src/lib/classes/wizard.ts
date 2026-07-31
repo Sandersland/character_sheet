@@ -1,6 +1,6 @@
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-const WIZARD_FEATURES: DerivedFeature[] = [
+const WIZARD_FEATURES: AuthoredFeature[] = [
   {
     name: "Spellcasting",
     level: 1,
@@ -31,7 +31,7 @@ const WIZARD_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const SCHOOL_OF_EVOCATION_FEATURES: DerivedFeature[] = [
+const SCHOOL_OF_EVOCATION_FEATURES: AuthoredFeature[] = [
   {
     name: "Evocation Savant",
     level: 2,
@@ -69,7 +69,7 @@ const SCHOOL_OF_EVOCATION_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const SCHOOL_OF_ABJURATION_FEATURES: DerivedFeature[] = [
+const SCHOOL_OF_ABJURATION_FEATURES: AuthoredFeature[] = [
   {
     name: "Abjuration Savant",
     level: 2,
@@ -107,7 +107,7 @@ const SCHOOL_OF_ABJURATION_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const SCHOOL_OF_ILLUSION_FEATURES: DerivedFeature[] = [
+const SCHOOL_OF_ILLUSION_FEATURES: AuthoredFeature[] = [
   {
     name: "Illusion Savant",
     level: 2,

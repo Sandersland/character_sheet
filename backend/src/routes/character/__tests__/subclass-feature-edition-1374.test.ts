@@ -17,6 +17,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+import { loadDbFeatureRows } from "@/lib/classes/__tests__/db-feature-rows.fixture.js";
 
 const OWNER_ID = "owner-1374-subclass-feature-edition";
 let COOKIE: string;
@@ -126,12 +127,20 @@ describe("2014 Cleric renders 2014 Domain Spells text; 2024 Cleric text is uncha
 
     // Anti-vacuity control: without this half, the assertion above passes
     // trivially if the fork vanished entirely (no feature would ever carry a
-    // tag to strip). Confirms deriveResources itself DOES tag the 2014 row —
-    // the wire-level absence is toWireFeatures stripping it, not the fork
-    // never existing.
-    const info = deriveResources("cleric", "life domain", 1, BASE_ABILITY_SCORES, proficiencyBonusForLevel(1), "EDITION_2014");
-    const tagged = (info?.features ?? []).filter((f) => f.edition === "EDITION_2014");
-    expect(tagged).toHaveLength(1);
+    // tag to strip). #1524: DerivedFeature.edition is now ALWAYS set (every
+    // row — tagged or the untagged ~256-entry default expanded to both
+    // editions at seed time — carries its resolved edition), so `f.edition
+    // === "EDITION_2014"` alone no longer isolates a GENUINE fork from an
+    // untagged feature merely resolved at 2014. Confirm the real property
+    // instead: deriveResources' 2014 row is the 2014-WORDED text (byte
+    // distinct from the 2024 row) — proving the fork resolved, not merely tagged.
+    const featureRows = await loadDbFeatureRows("cleric", "life domain");
+    const info2014 = deriveResources("cleric", "life domain", 1, BASE_ABILITY_SCORES, proficiencyBonusForLevel(1), featureRows, "EDITION_2014");
+    const info2024 = deriveResources("cleric", "life domain", 3, BASE_ABILITY_SCORES, proficiencyBonusForLevel(3), featureRows, "EDITION_2024");
+    const domainSpells2014 = (info2014?.features ?? []).find((f) => f.name === "Domain Spells");
+    const domainSpells2024 = (info2024?.features ?? []).find((f) => f.name === "Domain Spells");
+    expect(domainSpells2014?.edition).toBe("EDITION_2014");
+    expect(domainSpells2014?.description).not.toBe(domainSpells2024?.description);
   });
 });
 
@@ -175,8 +184,15 @@ describe("2014 Warlock renders 2014 Expanded Spell List text; 2024 patrons are u
     const features = res.body.resources.features as Record<string, unknown>[];
     expect(features.every((f) => !("edition" in f))).toBe(true);
 
-    const info = deriveResources("warlock", "the fiend", 1, BASE_ABILITY_SCORES, proficiencyBonusForLevel(1), "EDITION_2014");
-    const tagged = (info?.features ?? []).filter((f) => f.edition === "EDITION_2014");
-    expect(tagged).toHaveLength(1);
+    // See the Cleric block's identical comment: #1524 makes DerivedFeature.edition
+    // always-set, so the anti-vacuity control asserts the fork's TEXT differs
+    // per edition rather than merely checking a tag's presence.
+    const featureRows = await loadDbFeatureRows("warlock", "the fiend");
+    const info2014 = deriveResources("warlock", "the fiend", 1, BASE_ABILITY_SCORES, proficiencyBonusForLevel(1), featureRows, "EDITION_2014");
+    const info2024 = deriveResources("warlock", "the fiend", 3, BASE_ABILITY_SCORES, proficiencyBonusForLevel(3), featureRows, "EDITION_2024");
+    const expanded2014 = (info2014?.features ?? []).find((f) => f.name === "Expanded Spell List");
+    const expanded2024 = (info2024?.features ?? []).find((f) => f.name === "Expanded Spell List");
+    expect(expanded2014?.edition).toBe("EDITION_2014");
+    expect(expanded2014?.description).not.toBe(expanded2024?.description);
   });
 });

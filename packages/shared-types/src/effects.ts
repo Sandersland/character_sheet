@@ -30,6 +30,18 @@ export interface EffectSpec {
   // applied while the granting concentration holds. Present only for effectType "buff".
   buffTarget?: string | null;
   buffModifier?: number | null;
+  /**
+   * A second flat-modifier source beyond `addAbilityModToHeal` (#1528) —
+   * structurally the same job (one more term added to the rolled dice total),
+   * not a new expression language (#416 rejected that twice; this is one more
+   * enumerated value in a flat field). `"classLevel"` adds the character's
+   * class level (Second Wind's `1d10 + Fighter level`); `"abilityMod:<ability>"`
+   * (reserved — no consumer yet resolves this arm; Rally's die+Cha-mod temp HP
+   * is still hardcoded behind GrantedAbility.selfTempHp, out of this issue's
+   * scope) would add a named ability's modifier. `resolveEffectSpec` reads
+   * `ctx.characterLevel` (already a parameter) for the one arm it implements.
+   */
+  modifierSource?: string | null;
 }
 
 // The 10 flat effect columns snapshotted from the catalog, shared by every

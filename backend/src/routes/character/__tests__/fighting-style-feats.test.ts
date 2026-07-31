@@ -24,6 +24,7 @@ const L5_XP = 6500;
 const app = createApp();
 let archeryFeatId: string;
 let defenseFeatId: string;
+let fighterClassId: string;
 
 const advUrl = `/api/characters/${FIXTURE_ID}/advancement/transactions`;
 const invUrl = `/api/characters/${FIXTURE_ID}/inventory/transactions`;
@@ -64,6 +65,10 @@ beforeAll(async () => {
     { category: "fighting_style", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue },
   );
   defenseFeatId = defense.id;
+  // #1529: the fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel
+  // through the class FK relation now — the fixture below must link classId
+  // to the real seeded Fighter row, or takeStyle's fs feat gets clamped out.
+  fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
 });
 
 afterAll(async () => {
@@ -83,7 +88,7 @@ beforeEach(async () => {
       savingThrowProficiencies: [], skills: [], toolProficiencies: [],
       currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
       spellcasting: Prisma.JsonNull,
-      classEntries: { create: [{ position: 0, name: "Fighter", level: 5 }] },
+      classEntries: { create: [{ position: 0, name: "Fighter", classId: fighterClassId, level: 5 }] },
       inventoryItems: {
         create: [
           { name: "Longbow", category: "weapon", equippedSlot: "MAIN_HAND",

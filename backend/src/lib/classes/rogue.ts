@@ -1,5 +1,5 @@
 import { readEffectSpec, resolveEffectSpec, type ClassDieResolver, type EffectRow } from "@/lib/combat/effects.js";
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
 // Sneak Attack is a C5 referenced-class-die consumer: a fixed d6 whose COUNT is
 // rogue-level-derived. The die is resolved through the same effects.ts machinery
@@ -44,7 +44,7 @@ export function canApplySneakAttack(input: { eligible: boolean; usedThisTurn: bo
   return input.eligible && !input.usedThisTurn;
 }
 
-const ROGUE_FEATURES: DerivedFeature[] = [
+const ROGUE_FEATURES: AuthoredFeature[] = [
   {
     name: "Expertise",
     level: 1,
@@ -123,7 +123,7 @@ const ROGUE_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const ARCANE_TRICKSTER_FEATURES: DerivedFeature[] = [
+const ARCANE_TRICKSTER_FEATURES: AuthoredFeature[] = [
   {
     name: "Arcane Trickster Spellcasting",
     level: 3,
@@ -161,7 +161,7 @@ const ARCANE_TRICKSTER_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const ASSASSIN_FEATURES: DerivedFeature[] = [
+const ASSASSIN_FEATURES: AuthoredFeature[] = [
   {
     name: "Bonus Proficiencies",
     level: 3,
@@ -199,7 +199,7 @@ const ASSASSIN_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const THIEF_FEATURES: DerivedFeature[] = [
+const THIEF_FEATURES: AuthoredFeature[] = [
   {
     name: "Fast Hands",
     level: 3,

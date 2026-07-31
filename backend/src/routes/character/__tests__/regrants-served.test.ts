@@ -87,9 +87,14 @@ describe("GET /api/characters/:id — availableActions[].regrants", () => {
     it(`${edition}: every regranted key is served as a universal action still costing an action`, async () => {
       const rogueL2 = await makeCharacter(edition, "Rogue", `Regrants Rogue L2 ${edition}`, 2);
       const thiefL3 = await makeCharacter(edition, "Rogue", `Regrants Thief L3 ${edition}`, 3, "Thief");
-      // The monk is here for `dodge`: patientDefenseFocus is the only row that
-      // regrants it, so without a monk the loop below would never reach that
-      // key and the route gate would be narrower than REGRANTED_UNIVERSAL_KEYS.
+      // The monk is here for `dodge` on EDITION_2024: patientDefenseFocus is the
+      // only row that regrants it, so without a monk the loop below would never
+      // reach that key and the route gate would be narrower than
+      // REGRANTED_UNIVERSAL_KEYS. #1499 tags patientDefenseFocus (and its three
+      // Patient Defense / Step of the Wind siblings) EDITION_2024 — SRD 5.1's
+      // versions cost a flat 1 ki with no free/paid split, so a 2014 monk no
+      // longer sees this row at all (matchesActionGate filters it before
+      // `regrants` is ever read), and "dodge" drops out of the 2014 seen set.
       const monkL2 = await makeCharacter(edition, "Monk", `Regrants Monk L2 ${edition}`, 2);
       const served = await servedUniversals(edition);
 
@@ -106,9 +111,21 @@ describe("GET /api/characters/:id — availableActions[].regrants", () => {
       }
 
       // Without this the loop above passes vacuously on an empty payload. The
-      // set is every key any DERIVED_ACTIONS row regrants today, so a new row
-      // regranting something else has to widen this deliberately.
-      expect([...seen].sort()).toEqual(["dash", "disengage", "dodge", "hide", "useObject"]);
+      // set is every key any DERIVED_ACTIONS row regrants today FOR THIS
+      // edition, so a new row regranting something else has to widen this
+      // deliberately. EDITION_2014 omits "dodge" (see the comment above);
+      // EDITION_2024 is unchanged. This narrowed 2014 list is a snapshot of an
+      // intentionally incomplete slice, not settled 5e: SRD 5.1 Patient Defense
+      // (PHB'14 p. 78) does buy Dodge for 1 ki ("You can spend 1 ki point to
+      // take the Dodge action as a bonus action on your turn"). #1500 authors
+      // the ki-costed 2014 Patient Defense row and must widen EDITION_2014's
+      // expected keys back to include "dodge" — do not read this list as
+      // settled.
+      const expectedKeys =
+        edition === "EDITION_2024"
+          ? ["dash", "disengage", "dodge", "hide", "useObject"]
+          : ["dash", "disengage", "hide", "useObject"];
+      expect([...seen].sort()).toEqual(expectedKeys);
 
       // The reason the class row stores keys: this ONE key resolves to two
       // different names, and only the served row knows which one applies.

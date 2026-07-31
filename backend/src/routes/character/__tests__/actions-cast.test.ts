@@ -1,19 +1,25 @@
 /**
- * Second Wind cast-core route tests (#420).
+ * Second Wind row-driven cast-core route tests (#420, re-mechanized #1528).
  *
- * Second Wind now routes through castAbilityInTx (pay the secondWind pool + self-
- * apply the 1d10+level heal) instead of the op-list dispatch. These tests pin the
- * observable byte-parity the migration must preserve:
- *   - the pool is spent and the client heal roll is applied, atomically
+ * Second Wind is row-driven now: castSpecFromRow reads its ClassFeature row
+ * (resourceKey/costKind/effectKind/effectModifierSource) and the SERVER rolls
+ * 1d10 + Fighter level (castManeuver, maneuvers.ts, is the server-roll
+ * precedent) — the client no longer sends `roll`. These tests pin the
+ * observable behaviour the migration must preserve:
+ *   - the pool is spent and the server-rolled heal is applied, atomically
+ *   - the roll is reported back via `results[0].roll` (#1528 wire contract)
  *   - the batch logs exactly a spendResource event + a heal event (no new cast
  *     event) — history unchanged
  *   - LIFO revert restores BOTH the pool and the HP together
- *   - no roll → spend only (no heal event); roll=0 rejected at the schema
- *   - Action Surge stays a pure counter (spend, no heal)
+ *   - Action Surge stays a pure counter (spend, no heal), dispatched via the
+ *     same row-driven path but with no effectKind
  *   - unknown action key → 400
  *
  * Real Postgres in beforeEach; supertest against createApp(). Uniquely-named
- * catalog fixtures per testing.md so afterAll cleanup never touches seeded rows.
+ * catalog fixtures per testing.md so afterAll cleanup never touches seeded
+ * rows — fighterResourceRowsData seeds this fixture's OWN ClassFeature rows
+ * (#1528: Second Wind/Action Surge are tied to a specific classId now, not
+ * derivable from the class NAME alone), cascade-deleted with the class.
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -23,6 +29,7 @@ import { createApp } from "@/app.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const app = () => createApp();
 
@@ -33,10 +40,17 @@ const FIGHTER_ID = "test-actions-cast-fighter";
 const FIGHTER_CATALOG_NAME = "Actions Cast Test Fighter";
 
 // Level-5 Fighter (6500 XP), damaged to 20/44 so a Second Wind heal is visible.
+// Pinned to EDITION_2014 (#1227): this suite is about the CAST MECHANISM (pool
+// spend + heal + revert atomicity), not resource counts, and 2014's Second
+// Wind stays a single-use pool (byte-identical to before #1227) — the
+// default EDITION_2024 now grants 3 uses at level 5, which would make
+// "second cast fails once exhausted" require two casts first, entangling an
+// unrelated content change into a mechanism test.
 const FIGHTER_BASE = {
   id: FIGHTER_ID,
   name: "Actions Cast Test Fighter",
   alignment: "Lawful Neutral",
+  rulesEdition: "EDITION_2014" as const,
   experiencePoints: 6500,
   initiativeBonus: 2,
   speed: 30,
@@ -74,19 +88,22 @@ async function latestBatchId(): Promise<string> {
   return batchId!;
 }
 
-function execute(actionKey: string, roll?: number) {
+// No client-supplied roll (#1528) — the server rolls a row-driven cast-core
+// action itself; a still-client-rolled action (layOnHands, etc.) is out of
+// this suite's scope.
+function execute(actionKey: string) {
   return supertest
     .agent(app())
     .set("Cookie", COOKIE)
     .post(`/api/characters/${FIGHTER_ID}/actions/transactions`)
-    .send({ operations: [{ type: "executeAction", actionKey, ...(roll !== undefined ? { roll } : {}) }] });
+    .send({ operations: [{ type: "executeAction", actionKey }] });
 }
 
 function pool(body: { resources: { pools: Array<{ key: string; used: number; remaining: number }> } }, key: string) {
   return body.resources.pools.find((p) => p.key === key)!;
 }
 
-describe("POST /:id/actions/transactions — Second Wind via the cast core (#420)", () => {
+describe("POST /:id/actions/transactions — Second Wind, row-driven (#420, #1528)", () => {
   let fighterClassId: string;
 
   afterAll(async () => {
@@ -110,6 +127,8 @@ describe("POST /:id/actions/transactions — Second Wind via the cast core (#420
       update: {},
     });
     fighterClassId = cls.id;
+    await prisma.classFeature.deleteMany({ where: { classId: fighterClassId } });
+    await prisma.classFeature.createMany({ data: fighterResourceRowsData(fighterClassId) });
 
     await prisma.character.create({
       data: {
@@ -124,22 +143,26 @@ describe("POST /:id/actions/transactions — Second Wind via the cast core (#420
     await prisma.character.deleteMany({ where: { id: FIGHTER_ID } });
   });
 
-  it("spends the pool and applies the client heal roll atomically", async () => {
-    const res = await execute("secondWind", 7);
+  it("spends the pool and applies the server-rolled heal atomically, reporting the roll in `results`", async () => {
+    const res = await execute("secondWind");
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(27); // 20 + 7
+    const roll = res.body.results[0].roll as number;
+    // 1d10 + Fighter level 5 → 6-15.
+    expect(roll).toBeGreaterThanOrEqual(6);
+    expect(roll).toBeLessThanOrEqual(15);
+    expect(res.body.hitPoints.current).toBe(20 + roll);
     expect(pool(res.body, "secondWind")).toMatchObject({ used: 1, remaining: 0 });
   });
 
   it("response body carries the written batchId (matches the activity batch) — #758", async () => {
-    const res = await execute("secondWind", 4);
+    const res = await execute("secondWind");
     expect(res.status).toBe(200);
     expect(typeof res.body.batchId).toBe("string");
     expect(res.body.batchId).toBe(await latestBatchId());
   });
 
   it("logs exactly a spendResource + heal event, and no cast event (history unchanged)", async () => {
-    await execute("secondWind", 6);
+    await execute("secondWind");
     const batchId = await latestBatchId();
     const inBatch = (await activity()).filter((e) => e.batchId === batchId);
     const types = inBatch.map((e) => e.type).sort();
@@ -149,7 +172,8 @@ describe("POST /:id/actions/transactions — Second Wind via the cast core (#420
   });
 
   it("LIFO revert restores BOTH the pool and the HP together", async () => {
-    await execute("secondWind", 9);
+    const cast = await execute("secondWind");
+    const roll = cast.body.results[0].roll as number;
     const batchId = await latestBatchId();
     const revert = await supertest
       .agent(app())
@@ -157,38 +181,22 @@ describe("POST /:id/actions/transactions — Second Wind via the cast core (#420
       .post(`/api/characters/${FIGHTER_ID}/events/${batchId}/revert`);
     expect(revert.status).toBe(200);
     expect(revert.body.hitPoints.current).toBe(20); // heal undone
+    void roll;
     expect(pool(revert.body, "secondWind")).toMatchObject({ used: 0, remaining: 1 }); // spend undone
   });
 
-  it("without a roll: spends the pool but applies no heal", async () => {
-    const res = await execute("secondWind");
-    expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(20); // unchanged
-    expect(pool(res.body, "secondWind")).toMatchObject({ used: 1, remaining: 0 });
-
-    const batchId = await latestBatchId();
-    const types = (await activity()).filter((e) => e.batchId === batchId).map((e) => e.type);
-    expect(types).toEqual(["spendResource"]); // no heal at 0
-  });
-
-  it("roll=0 is rejected at the schema (roll must be positive) → 400, pool untouched", async () => {
-    const res = await execute("secondWind", 0);
-    expect(res.status).toBe(400);
-    const check = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${FIGHTER_ID}`);
-    expect(pool(check.body, "secondWind")).toMatchObject({ used: 0, remaining: 1 });
-  });
-
   it("second Second Wind fails with 400 once the pool is exhausted (whole batch rolls back)", async () => {
-    await execute("secondWind", 5);
-    const res = await execute("secondWind", 5);
+    await execute("secondWind");
+    const res = await execute("secondWind");
     expect(res.status).toBe(400);
   });
 
-  it("Action Surge stays a pure counter — spends actionSurge, no heal", async () => {
+  it("Action Surge stays a pure counter — spends actionSurge, no heal, no roll reported", async () => {
     const res = await execute("actionSurge");
     expect(res.status).toBe(200);
     expect(res.body.hitPoints.current).toBe(20); // no heal
     expect(pool(res.body, "actionSurge").used).toBe(1);
+    expect(res.body.results[0]).toEqual({});
 
     const batchId = await latestBatchId();
     const types = (await activity()).filter((e) => e.batchId === batchId).map((e) => e.type);
@@ -196,7 +204,102 @@ describe("POST /:id/actions/transactions — Second Wind via the cast core (#420
   });
 
   it("unknown action key → 400", async () => {
-    const res = await execute("notAnAction", 3);
+    const res = await execute("notAnAction");
     expect(res.status).toBe(400);
+  });
+});
+
+// Second Wind is `1d10 + your Fighter level` (SRD 5.1 p. 23 / SRD 5.2 p. 48) —
+// the FIGHTER entry's level, not the XP-derived character total. The two
+// coincide for a single-class Fighter, which is why every suite above can
+// ignore the distinction; a multiclass Fighter is the only shape that tells
+// them apart, so it is the only shape that can pin the level the cast path
+// feeds `effectModifierSource: "classLevel"`.
+//
+// Fighter 1 / Wizard 19 makes the two readings DISJOINT: the correct heal is
+// 1d10+1 (2-11) and the character-total reading is 1d10+20 (21-30), so no die
+// roll can produce a value both readings allow. Ranges that merely overlap
+// would let a lucky roll pass a broken build.
+const MC_ID = "test-actions-cast-mc-fighter";
+const MC_FIGHTER_CATALOG_NAME = "Actions Cast MC Test Fighter";
+const MC_WIZARD_CATALOG_NAME = "Actions Cast MC Test Wizard";
+
+describe("POST /:id/actions/transactions — Second Wind on a MULTICLASS Fighter (#1557 review)", () => {
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({
+      where: { name: { in: [MC_FIGHTER_CATALOG_NAME, MC_WIZARD_CATALOG_NAME] } },
+    });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const fighter = await prisma.characterClass.upsert({
+      where: { name: MC_FIGHTER_CATALOG_NAME },
+      create: {
+        name: MC_FIGHTER_CATALOG_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+        subclassLevel: 3,
+      },
+      update: {},
+    });
+    // No ClassFeature rows of its own — this entry exists only to make the
+    // character multiclass, so `effectiveEntryLevel` stops falling back to the
+    // XP-derived total and reads each entry's own `level`.
+    const wizard = await prisma.characterClass.upsert({
+      where: { name: MC_WIZARD_CATALOG_NAME },
+      create: {
+        name: MC_WIZARD_CATALOG_NAME,
+        hitDie: "d6",
+        savingThrows: ["intelligence", "wisdom"],
+        skillChoiceCount: 2,
+        skillChoices: ["arcana", "history"],
+        isSpellcaster: false,
+        subclassLevel: 2,
+      },
+      update: {},
+    });
+    await prisma.classFeature.deleteMany({ where: { classId: fighter.id } });
+    await prisma.classFeature.createMany({ data: fighterResourceRowsData(fighter.id) });
+
+    await prisma.character.create({
+      data: {
+        ...FIGHTER_BASE,
+        id: MC_ID,
+        name: "Actions Cast MC Test Fighter",
+        ownerId: OWNER_ID,
+        experiencePoints: 355000, // level 20
+        hitPoints: { current: 20, max: 140, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 20, die: "d10", spent: 0 },
+        classEntries: {
+          create: [
+            { name: "fighter", classId: fighter.id, position: 0, level: 1 },
+            { name: "wizard", classId: wizard.id, position: 1, level: 19 },
+          ],
+        },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MC_ID } });
+  });
+
+  it("heals 1d10 + FIGHTER level, not 1d10 + total character level", async () => {
+    const res = await supertest
+      .agent(app())
+      .set("Cookie", COOKIE)
+      .post(`/api/characters/${MC_ID}/actions/transactions`)
+      .send({ operations: [{ type: "executeAction", actionKey: "secondWind" }] });
+    expect(res.status).toBe(200);
+
+    const roll = res.body.results[0].roll as number;
+    expect(roll).toBeGreaterThanOrEqual(2); // 1d10 + 1
+    expect(roll).toBeLessThanOrEqual(11);
+    expect(res.body.hitPoints.current).toBe(20 + roll);
   });
 });

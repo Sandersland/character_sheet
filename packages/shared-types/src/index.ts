@@ -3,6 +3,7 @@
 // (#820). Pure types only: every consumer imports via `import type`, so nothing
 // here reaches either runtime bundle. Add one file per mirror family and re-export
 // it here.
+export type * from "./action-result.js";
 export type * from "./attack-row.js";
 export type * from "./capabilities.js";
 export type * from "./class-resources.js";

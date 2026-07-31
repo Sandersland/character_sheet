@@ -246,6 +246,7 @@ describe("readEffectSpec — die-source × heal/buff combos (#685)", () => {
       addAbilityModToHeal: false,
       buffTarget: "attackRolls",
       buffModifier: 1,
+      modifierSource: null, // #1528
     });
     expect(resolveBuffSpec(spec)).toEqual({ target: "attackRolls", modifier: 1 });
   });

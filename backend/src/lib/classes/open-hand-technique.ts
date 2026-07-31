@@ -24,7 +24,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
-import { focusSaveDC } from "./monk.js";
+import { monkSaveDC } from "./monk.js";
 import { resolveSubclassSlug } from "./subclass-slug.js";
 
 export class InvalidOpenHandTechniqueOperationError extends Error {}
@@ -124,7 +124,7 @@ async function imposeOpenHandRider(
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  const dc = focusSaveDC(abilityScores, profBonus);
+  const dc = monkSaveDC(abilityScores, profBonus);
 
   const roll = op.rider === "addle" ? undefined : 1 + Math.floor(Math.random() * 20);
   const outcome = resolveOpenHandRiderOutcome(op.rider, roll ?? 0, dc);

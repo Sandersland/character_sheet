@@ -13,6 +13,8 @@ import {
 // now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
 // would close an import cycle back through combat/hitpoints.ts.
 import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources-state.js";
+import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { FEATURE_ROWS_ORDER_BY } from "@/lib/classes/feature-rows-select.js";
 import {
   InvalidHitPointOperationError,
   normalizeHitPoints,
@@ -63,7 +65,17 @@ export interface ClassEntryRow {
   subclass: string | null;
   classId: string | null;
   position: number;
-  class: { hitDie: string } | null;
+  // `features` (#1528 chunk 0) sits alongside `hitDie` rather than reusing
+  // FEATURE_ROWS_ENTRY_SELECT's own `class` shape verbatim: this row already
+  // declares its OWN unrelated `class` shape (hitDie), and TS's weak-type
+  // check rejects assigning that to a type declaring a differently-shaped
+  // `class` field even though both are optional/nullable (registry.ts's
+  // EntryScopedClassEntry comment documents the same collision) — so this
+  // select widens its EXISTING `class`/adds its own `subclassRef` rather than
+  // spreading the shared fragment in.
+  // `extraAsiLevels` (#1529): characterAdvancementSlots' featSlotCap read below.
+  class: { hitDie: string; extraAsiLevels: number[]; features: ClassFeatureRow[] } | null;
+  subclassRef: { features: ClassFeatureRow[] } | null;
 }
 
 export interface HpOpResult {
@@ -115,7 +127,22 @@ export async function buildHpOpContext(
           subclass: true,
           classId: true,
           position: true,
-          class: { select: { hitDie: true } },
+          // `features` (#1528 chunk 0): deriveRestPools' featureRows carrier —
+          // see ClassEntryRow's own comment for why this can't just spread
+          // FEATURE_ROWS_ENTRY_SELECT in. It still has to repeat that
+          // fragment's FEATURE_ROWS_ORDER_BY: Postgres makes no ordering
+          // guarantee absent an explicit orderBy, and this is the one feature
+          // read that cannot share the fragment, so it is where drift hides
+          // (#1545). `extraAsiLevels` (#1529): the featSlotCap read below
+          // (characterAdvancementSlots).
+          class: {
+            select: {
+              hitDie: true,
+              extraAsiLevels: true,
+              features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+            },
+          },
+          subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
         },
       },
     },
@@ -130,7 +157,12 @@ export async function buildHpOpContext(
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
   const faces = hitDieFace(hd.die);
 
-  const primaryEntry = row.classEntries[0];
+  // classEntries' `class.features`/`subclassRef.features` (#1528 chunk 0) are
+  // Prisma.JsonValue-typed internally (resourceTotals/etc. are opaque Json
+  // columns) — cast to ClassFeatureRow[] here, once, mirroring
+  // feature-rows-select.ts's featureRowsOf.
+  const classEntries = row.classEntries as unknown as ClassEntryRow[];
+  const primaryEntry = classEntries[0];
 
   // Compute the effective HP maximum including feat improvements (e.g. Tough).
   // This is a read-time overlay — hp.max itself stays the feat-free base so
@@ -148,7 +180,7 @@ export async function buildHpOpContext(
   return {
     tx,
     characterId,
-    row,
+    row: { ...row, classEntries },
     hp,
     hd,
     conMod,

@@ -1,6 +1,6 @@
-import type { ClassDefinition, DerivedFeature } from "./types.js";
+import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-const BARBARIAN_FEATURES: DerivedFeature[] = [
+const BARBARIAN_FEATURES: AuthoredFeature[] = [
   {
     name: "Rage",
     level: 1,
@@ -34,6 +34,10 @@ const BARBARIAN_FEATURES: DerivedFeature[] = [
     level: 5,
     source: "class",
     description: "You can attack twice whenever you take the Attack action on your turn.",
+    // #1530: edition-invariant (SRD 5.1 / SRD 5.2 Barbarian, Extra Attack) —
+    // one flat tier, no further scaling at higher levels (unlike Fighter).
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
   },
   {
     name: "Fast Movement",
@@ -84,7 +88,7 @@ const BARBARIAN_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const TOTEM_WARRIOR_FEATURES: DerivedFeature[] = [
+const TOTEM_WARRIOR_FEATURES: AuthoredFeature[] = [
   {
     name: "Spirit Seeker",
     level: 3,
@@ -122,7 +126,7 @@ const TOTEM_WARRIOR_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const BERSERKER_FEATURES: DerivedFeature[] = [
+const BERSERKER_FEATURES: AuthoredFeature[] = [
   {
     name: "Frenzy",
     level: 3,

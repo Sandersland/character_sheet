@@ -12,6 +12,11 @@ const OWNER_ID = "owner-migrate-fs";
 const L5_XP = 6500;
 const app = createApp();
 let COOKIE: string;
+// #1529: fightingStyleFeatSlots now resolves via the class FK relation
+// (CharacterClass.fightingStyleFeatLevel), not a name lookup — this fixture
+// must link classId to the real seeded Fighter row, or the FS feat this suite
+// migrates gets clamped out as over-cap (fightingStyleSlotTotal 0, homebrew).
+let fighterClassId: string;
 
 const BASE = {
   alignment: "Neutral", initiativeBonus: 3, speed: 30,
@@ -32,7 +37,7 @@ async function seedFighter(id: string, styleKey: string | null, inventory: Prism
       ...BASE, id, name: `MigFS ${id}`, ownerId: OWNER_ID, experiencePoints: L5_XP,
       spellcasting: Prisma.JsonNull,
       resources: resources as unknown as Prisma.InputJsonValue,
-      classEntries: { create: [{ position: 0, name: "Fighter", level: 5 }] },
+      classEntries: { create: [{ position: 0, name: "Fighter", classId: fighterClassId, level: 5 }] },
       ...(inventory.length ? { inventoryItems: { create: inventory } } : {}),
     },
   });
@@ -45,6 +50,7 @@ async function get(id: string) {
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   COOKIE = await authCookie(OWNER_ID);
+  fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
 });
 
 afterEach(async () => {

@@ -198,13 +198,14 @@ describe("classActionOption", () => {
     ...overrides,
   });
 
-  it("derives the heal subtitle + pool badge for Second Wind", () => {
+  it("derives the heal subtitle + pool badge for Second Wind (#1528: row-driven fallback resolver, server-computed reminder)", () => {
     const c = makeCharacter({
       resources: {
         pools: [{ key: "secondWind", label: "Second Wind", total: 1, used: 0, remaining: 1, recharge: "shortRest" }],
       },
     } as Partial<Character>);
-    const option = classActionOption(available(), resolverFor("secondWind"), c, []);
+    const action = available({ resolverKind: "heal-roll", reminder: "Regain 1d10 + 5 HP" });
+    const option = classActionOption(action, resolverFor("secondWind", action), c, []);
     expect(option).toMatchObject({
       key: "secondWind",
       title: "Second Wind",
@@ -463,11 +464,16 @@ describe("twfHint", () => {
 });
 
 describe("partitionClassActions", () => {
-  const action = (key: string, cost: AvailableAction["cost"]): AvailableAction => ({
+  // resolverKind (#1528, optional 4th arg) — a row-driven action (secondWind)
+  // is only reachable through resolverFor's fallback when the served row
+  // actually carries it; every other call site below deliberately omits it
+  // (shadowArts/cloakOfShadows/elementalBurst have none in production either).
+  const action = (key: string, cost: AvailableAction["cost"], resolverKind?: string): AvailableAction => ({
     key,
     name: key,
     cost,
     enabled: true,
+    ...(resolverKind ? { resolverKind } : {}),
   });
 
   // #1315: shadowArts/cloakOfShadows/elementalBurst are cost:"action"
@@ -482,7 +488,7 @@ describe("partitionClassActions", () => {
   // action with no resolver instead of letting it through.
   it("drops action-cost rows with no resolver instead of letting them consume the slot", () => {
     const { classActions } = partitionClassActions(
-      [action("secondWind", "action"), action("shadowArts", "action"), action("cloakOfShadows", "action"), action("elementalBurst", "action")],
+      [action("secondWind", "action", "heal-roll"), action("shadowArts", "action"), action("cloakOfShadows", "action"), action("elementalBurst", "action")],
       false,
     );
     const keys = classActions.map((a) => a.key);
@@ -511,7 +517,7 @@ describe("partitionClassActions", () => {
   });
 
   it("partitions by cost (action/bonusAction/reaction) same as before", () => {
-    const availableActions = [action("secondWind", "bonusAction"), action("deflectAttacks", "reaction"), action("cunningAction", "bonusAction")];
+    const availableActions = [action("secondWind", "bonusAction", "heal-roll"), action("deflectAttacks", "reaction"), action("cunningAction", "bonusAction")];
     const { classActions, classBonusActions, classReactions } = partitionClassActions(availableActions, false);
     expect(classActions).toEqual([]);
     expect(classBonusActions.map((a) => a.key)).toEqual(["secondWind", "cunningAction"]);

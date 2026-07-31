@@ -53,13 +53,22 @@ function resolveEffectType(effectKind: string | null | undefined): EffectType {
   return "utility";
 }
 
+// `effectModifierSource` is deliberately NOT in shared-types' EffectColumns
+// (#1528 decision 3 — it's earned by ClassFeature content, not every
+// EffectColumns consumer), so it's added here as a call-site-local widening
+// rather than a shared-type change. Optional so every existing EffectRow
+// caller (Spell/GrantedAbility snapshots, none of which set it) keeps typing.
+type EffectRowWithModifierSource = EffectRow & { effectModifierSource?: string | null };
+
 // Adapter over the existing flat columns — no schema migration. When a row
 // carries effectDieSource, `resolveDie` supplies the faces (superseding the fixed
 // effectDiceFaces); fixed-dice rows are unaffected. Callers: buildSpellcastingView
-// (spell rows, no resolveDie) and deriveManeuverEffect (maneuver rows, via
-// resolveClassDie) — both serializer-side, so the client only ever sees the
-// resolved EffectSpec, never these raw columns.
-export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): EffectSpec {
+// (spell rows, no resolveDie), deriveManeuverEffect (maneuver rows, via
+// resolveClassDie), and castSpecFromRow (ClassFeature rows, #1528, via the
+// `{ ...row, level: 0 }` adapter — see its own comment for the EffectRow
+// landmine this sidesteps) — all serializer/cast-side, so the client only
+// ever sees the resolved EffectSpec, never these raw columns.
+export function readEffectSpec(row: EffectRowWithModifierSource, resolveDie?: ClassDieResolver): EffectSpec {
   return {
     effectType: resolveEffectType(row.effectKind),
     dice: resolveEffectDice(row, resolveDie),
@@ -72,6 +81,7 @@ export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): E
     addAbilityModToHeal: row.effectKind === "heal",
     buffTarget: row.buffTarget ?? null,
     buffModifier: row.buffModifier ?? null,
+    modifierSource: row.effectModifierSource ?? null,
   };
 }
 
@@ -142,7 +152,7 @@ export function resolveBuffSpec(spec: EffectSpec): BuffDescriptor | null {
 export function resolveEffectSpec(
   spec: EffectSpec,
   effectiveStep: number,
-  ctx: { characterLevel: number; abilityMod?: number },
+  ctx: { characterLevel: number; classLevel?: number; abilityMod?: number },
 ): { count: number; faces: number; modifier: number } | null {
   if (!spec.dice) return null;
 
@@ -158,6 +168,24 @@ export function resolveEffectSpec(
   let modifier = spec.dice.modifier ?? 0;
   if (spec.effectType === "heal" && spec.addAbilityModToHeal) {
     modifier += ctx.abilityMod ?? 0;
+  }
+  // One more enumerated modifier source beside addAbilityModToHeal (#1528) —
+  // Second Wind's `1d10 + Fighter level`. Only "classLevel" resolves today;
+  // "abilityMod:<ability>" is reserved for a future consumer (Rally, still
+  // hardcoded in maneuvers.ts, out of this issue's scope) and falls through
+  // unresolved rather than guessing which ability.
+  //
+  // This reads `classLevel`, NOT `characterLevel` — the two axes above and
+  // below this line want DIFFERENT levels for a multiclass character, and
+  // collapsing them onto one field is what made a Fighter 1/Wizard 19 heal
+  // 1d10+20. `cantripLevel` scaling is by total character level in both
+  // editions; `classLevel` is the granting class entry's own level. The
+  // fallback covers callers for which the distinction is unreachable — a
+  // single-class character (identical numbers) and every spell/sneak-attack
+  // caller (no row can carry `modifierSource` there) — so a caller resolving a
+  // ClassFeature row for a possibly-multiclass character MUST pass classLevel.
+  if (spec.modifierSource === "classLevel") {
+    modifier += ctx.classLevel ?? ctx.characterLevel;
   }
 
   return { count, faces: spec.dice.faces, modifier };

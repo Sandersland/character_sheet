@@ -23,7 +23,8 @@ import { runCharacterTransaction, type CharacterTxContext } from "@/lib/characte
 import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { actionGrantLevel, deriveEntryScopedActions } from "./actions.js";
-import { focusSaveDC } from "./monk.js";
+import { monkSaveDC } from "./monk.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import type {
   CastElementalBurstOperation,
   ElementalBurstResult,
@@ -61,6 +62,7 @@ const WARRIOR_OF_ELEMENTS_SELECT = {
   experiencePoints: true,
   abilityScores: true,
   activeEffects: true,
+  rulesEdition: true,
   // subclassRef.slug (#1277) is what deriveEntryScopedActions' assertWarriorOfElements
   // gate resolves the subclass identity through — see resolveSubclassSlug.
   // NOT in #1339's handover (measured 2026-07-26): this select was missed
@@ -93,10 +95,11 @@ function monkEntry(row: WarriorOfElementsRow) {
 function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, feature: string): number {
   const monk = monkEntry(row);
   const totalLevel = levelForExperience(row.experiencePoints);
-  const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true).some((a) => a.key === actionKey);
+  const edition = editionOf(row);
+  const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true, edition).some((a) => a.key === actionKey);
   if (!monk || !granted) {
     throw new InvalidWarriorOfElementsOperationError(
-      `Only a Warrior of the Elements monk (level ${actionGrantLevel(actionKey) ?? "?"}+) has ${feature}`,
+      `Only a Warrior of the Elements monk (level ${actionGrantLevel(actionKey, edition) ?? "?"}+) has ${feature}`,
     );
   }
   return monk.level;
@@ -105,7 +108,7 @@ function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, f
 function focusDcFor(row: WarriorOfElementsRow): number {
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
-  return focusSaveDC(row.abilityScores as Record<string, number>, profBonus);
+  return monkSaveDC(row.abilityScores as Record<string, number>, profBonus);
 }
 
 function attunementActive(row: WarriorOfElementsRow): boolean {

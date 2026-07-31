@@ -7,6 +7,7 @@
 import type { LevelUpTarget } from "@character-sheet/contracts";
 
 import type { AdvancementOperation, TakeFeatOperation } from "@/lib/leveling/advancement.js";
+import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import type {
   LearnManeuverOperation,
   LearnToolProficiencyOperation,
@@ -98,12 +99,24 @@ export function resolveLevelUpPlan(
   character: LevelUpPlanCharacter,
   target: TargetClassEntry,
   chosenSubclassName: string | null,
+  // #1546 Part B-i: the not-yet-committed `?subclassId=` pick's own feature
+  // rows — mirrors persistedGrantSource/pickedGrantSource (level-up.ts),
+  // which solves this exact persisted/picked split for #898's granted
+  // spells. Absent/undefined whenever chosenSubclassName is null (no pick
+  // submitted, so the re-plan branch below never runs).
+  pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
 ): LevelUpStep[] {
   const basePlan = buildLevelUpPlan(character, target);
   if (!chosenSubclassName || !basePlan.some((step) => step.kind === "subclass")) {
     return basePlan;
   }
-  const replan = buildLevelUpPlan(character, { ...target, subclass: chosenSubclassName });
+  const replan = buildLevelUpPlan(character, {
+    ...target,
+    subclass: chosenSubclassName,
+    // The PICKED subclass's own rows, not target's (there is none — the
+    // subclass step being present is exactly what "not yet chosen" means).
+    subclassFeatureRows: pickedSubclassFeatureRows ?? [],
+  });
   return insertSubclassStep(replan);
 }
 
@@ -114,8 +127,9 @@ function resolveEffectivePlan(
   target: TargetClassEntry,
   chosenSubclassName: string | null,
   submission: LevelUpSubmission,
+  pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
 ): LevelUpStep[] {
-  const plan = resolveLevelUpPlan(character, target, chosenSubclassName);
+  const plan = resolveLevelUpPlan(character, target, chosenSubclassName, pickedSubclassFeatureRows);
   const needsSubclass = plan.some((step) => step.kind === "subclass");
   if (needsSubclass && !chosenSubclassName) {
     throw new InvalidLevelUpError("this level-up requires choosing a subclass");
@@ -238,15 +252,18 @@ function assertCantrips(plan: LevelUpStep[], submission: LevelUpSubmission): voi
  * ordered steps. Throws InvalidLevelUpError on any subclass-contract violation,
  * count mismatch, or excess field. `chosenSubclassName` is the resolved catalog
  * name for `submission.subclassId` (null when not submitted); the caller resolves
- * the id — this module never touches the DB.
+ * the id — this module never touches the DB. `pickedSubclassFeatureRows`
+ * (#1546 Part B-i) is that same pick's own ClassFeature rows, threaded to
+ * resolveLevelUpPlan's re-plan branch — see its own comment.
  */
 export function validateLevelUpSubmission(
   character: LevelUpPlanCharacter,
   target: TargetClassEntry,
   chosenSubclassName: string | null,
   submission: LevelUpSubmission,
+  pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
 ): LevelUpStep[] {
-  const plan = resolveEffectivePlan(character, target, chosenSubclassName, submission);
+  const plan = resolveEffectivePlan(character, target, chosenSubclassName, submission, pickedSubclassFeatureRows);
   assertCounts(plan, chosenSubclassName, submission);
   assertNoExcess(plan, submission);
   assertForgets(plan, character, submission);

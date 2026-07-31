@@ -1,0 +1,119 @@
+/**
+ * #1499 arbiter finding: `buildUnarmedAttacksView` (backend
+ * lib/character/serialize/combat.ts) passes `editionOf(row)` into
+ * `deriveUnarmedStrike`, which resolves the Martial Arts die via
+ * `deriveMartialArtsDie`. That argument had zero DB-backed coverage — the
+ * whole backend suite stayed green when the arbiter mutated the call site to
+ * the literal `"EDITION_2024"`, which would silently roll a 2014 Monk's
+ * unarmed strike on the 2024 die (d6 instead of d4 at L1, d12 instead of d10
+ * at L17) forever. Both editions asserted side by side end to end through
+ * GET /api/characters/:id, mirroring exhaustion-edition.test.ts's pattern —
+ * a separate DB-backed both-editions file is the established answer to the
+ * "no 2014 fixture in the snapshot file" constraint documented in
+ * character-serialize-snapshot.test.ts's header.
+ */
+
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
+
+const OWNER_ID = "owner-unarmed-strike-edition";
+let COOKIE: string;
+const app = createApp();
+
+const BASE = {
+  alignment: "Lawful Neutral",
+  race: "Hill Dwarf",
+  background: "Sage",
+  classes: [{ name: "Monk" }],
+  abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 8 },
+};
+
+// Level threshold XP so the total character level (proficiency bonus etc.)
+// agrees with the monk class-entry level being asserted, matching the
+// pattern in regrants-served.test.ts.
+const XP_BY_LEVEL: Record<number, number> = { 1: 0, 17: 225000, 20: 355000 };
+
+async function createMonkAt(
+  rulesEdition: "EDITION_2014" | "EDITION_2024",
+  name: string,
+  level: 1 | 17 | 20,
+): Promise<string> {
+  const res = await supertest(app)
+    .post("/api/characters")
+    .set("Cookie", COOKIE)
+    .send({ ...BASE, name, rulesEdition });
+  expect(res.status).toBe(201);
+  const id = res.body.id as string;
+
+  await prisma.character.update({ where: { id }, data: { experiencePoints: XP_BY_LEVEL[level] } });
+  await prisma.characterClassEntry.updateMany({ where: { characterId: id }, data: { level } });
+  return id;
+}
+
+function get(id: string) {
+  return supertest(app).get(`/api/characters/${id}`).set("Cookie", COOKIE);
+}
+
+beforeAll(async () => {
+  await ensureTestOwner(OWNER_ID);
+  COOKIE = await authCookie(OWNER_ID);
+});
+
+const cleanup = () => prisma.character.deleteMany({ where: { name: { startsWith: "UnarmedEdition" } } });
+afterEach(cleanup);
+afterAll(cleanup);
+
+describe("unarmedStrike Martial Arts die forks on rulesEdition (#1499)", () => {
+  it("L1: EDITION_2014 rolls d4 (PHB'14 p.78), EDITION_2024 rolls d6 (SRD 5.2 / PHB'24 p.88)", async () => {
+    const id2014 = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-L1", 1);
+    const id2024 = await createMonkAt("EDITION_2024", "UnarmedEdition 2024-L1", 1);
+
+    const char2014 = (await get(id2014)).body;
+    const char2024 = (await get(id2024)).body;
+
+    expect(char2014.unarmedStrike.damage.faces).toBe(4);
+    expect(char2024.unarmedStrike.damage.faces).toBe(6);
+  });
+
+  it("L17: EDITION_2014 rolls d10, EDITION_2024 rolls d12", async () => {
+    const id2014 = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-L17", 17);
+    const id2024 = await createMonkAt("EDITION_2024", "UnarmedEdition 2024-L17", 17);
+
+    const char2014 = (await get(id2014)).body;
+    const char2024 = (await get(id2024)).body;
+
+    expect(char2014.unarmedStrike.damage.faces).toBe(10);
+    expect(char2024.unarmedStrike.damage.faces).toBe(12);
+  });
+
+  // #1499's seven EDITION_2024-tagged rows (flurryOfBlows, patientDefense,
+  // patientDefenseFocus, stepOfTheWind, stepOfTheWindFocus, deflectAttacks,
+  // deflectAttacksRedirect — see actions.test.ts's TAGGED_2024_ROWS) must not
+  // reach a 2014 monk's wire payload, while the untagged, shared
+  // bonusUnarmedStrike row still does. Asserted here (not just in the pure
+  // actions.test.ts unit test) so the AC is direct against the composed
+  // GET response rather than inferred across two files.
+  it("L20 EDITION_2014 monk: availableActions has none of the seven 2024-tagged rows, still has bonusUnarmedStrike", async () => {
+    const id = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-L20", 20);
+    const char = (await get(id)).body;
+    const keys = (char.availableActions as { key: string }[]).map((a) => a.key);
+
+    for (const tagged of [
+      "flurryOfBlows",
+      "patientDefense",
+      "patientDefenseFocus",
+      "stepOfTheWind",
+      "stepOfTheWindFocus",
+      "deflectAttacks",
+      "deflectAttacksRedirect",
+    ]) {
+      expect(keys).not.toContain(tagged);
+    }
+    expect(keys).toContain("bonusUnarmedStrike");
+  });
+});

@@ -10,9 +10,10 @@ import {
 import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
 import { currencyOrEmpty } from "@/lib/inventory/inventory-currency.js";
 import { sneakAttackSpec } from "@/lib/classes/rogue.js";
-import { focusSaveDC } from "@/lib/classes/monk.js";
+import { monkSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
+import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
@@ -68,7 +69,7 @@ function stunningStrikeRider(
   profBonus: number,
 ): SaveRider | undefined {
   const monkLevel = classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
-  return monkLevel >= 5 ? { saveDC: focusSaveDC(abilityScores, profBonus) } : undefined;
+  return monkLevel >= 5 ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
 }
 
 type RiderClassEntry = SubclassIdentityInput & { name: string; level: number };
@@ -93,7 +94,7 @@ function openHandTechniqueRider(
   profBonus: number,
 ): SaveRider | undefined {
   const monk = openHandMonkEntry(classEntries);
-  return monk && monk.level >= 3 ? { saveDC: focusSaveDC(abilityScores, profBonus) } : undefined;
+  return monk && monk.level >= 3 ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
 }
 
 // Quivering Palm (Warrior of the Open Hand L17, #1245): the focus save DC for
@@ -109,7 +110,7 @@ function quiveringPalmRider(
   const monk = openHandMonkEntry(classEntries);
   if (!monk || monk.level < 17) return undefined;
   return {
-    saveDC: focusSaveDC(abilityScores, profBonus),
+    saveDC: monkSaveDC(abilityScores, profBonus),
     active: activeEffects.buffs.some((b) => b.key === QUIVERING_PALM_BUFF_KEY),
   };
 }
@@ -454,7 +455,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
 
     // Class-specific available actions for the turn tracker (universal ones ride
     // GET /api/reference instead, resolved per edition — #1430).
-    availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded),
+    availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded, editionOf(row)),
 
     // Combat attack rows — derived at read time so the session turn sheets render
     // served numbers instead of recomputing attack math on the client (#1434).
@@ -463,8 +464,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
     unarmedStrike,
     improvisedWeapon,
     attackRows,
-    // Weapon attacks per Attack action (Extra Attack), max across multiclass.
-    attacksPerAction: deriveAttacksPerAction(row.classEntries),
+    // Weapon attacks per Attack action (Extra Attack), max across multiclass
+    // (#1530) — row-driven from each entry's seeded ClassFeature rows,
+    // featureRowsOf is the SAME "class"/"subclassRef" -> carrier extractor
+    // buildResourcesView/buildAvailableActionsView already use.
+    attacksPerAction: deriveAttacksPerAction(row.classEntries, editionOf(row), featureRowsOf),
     // A two-handed weapon in MAIN_HAND locks OFF_HAND (#1433) — a property of the
     // whole loadout, hence one top-level boolean rather than a per-row flag. NOT
     // the same rule as `offHandBusy` (an internal of buildInventoryContext):

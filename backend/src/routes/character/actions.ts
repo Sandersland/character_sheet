@@ -5,7 +5,13 @@
  *   Phase-C orchestrator: applies a batch of action ops cross-domain in
  *   one Prisma $transaction (shared batchId → atomic, LIFO-undoable).
  *   Each op's effect list comes from ACTION_EFFECT_FN (hardcoded TS, not
- *   interpreted JSON) so no scripting engine lives in the DB.
+ *   interpreted JSON) so no scripting engine lives in the DB — EXCEPT a
+ *   row-driven action (#1528: a ClassFeature row with `activationCost` set,
+ *   e.g. Fighter's Second Wind/Action Surge), which is dispatched from that
+ *   row's own resource/cost/effect columns instead of a hardcoded key. This
+ *   is not an interpreted engine either — it's the same "flat columns → one
+ *   of a few enumerated shapes" adapter readAbilityCost/readEffectSpec
+ *   already are, just resolved through a DB row instead of a TS closure.
  *
  *   For ops that have zero server-side effects (Dodge, Dash, etc.) the
  *   endpoint returns 200 with the current character state unchanged — the
@@ -18,13 +24,14 @@
 import { randomUUID } from "node:crypto";
 
 import { executeActionOpSchema, type ExecuteActionOperation } from "@character-sheet/contracts";
+import type { ExecuteActionResult } from "@character-sheet/shared-types";
 import { Router } from "express";
 import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus, UnknownActionError } from "@/lib/classes/actions.js";
+import { ACTION_EFFECT_FN, castSpecFromRow, rageMeleeDamageBonus, UnknownActionError } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import type { PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import type { SpendResourceOperation } from "@/lib/classes/resources.js";
@@ -33,12 +40,17 @@ import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
 import { applyHealInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import { applySpendResourceInTx } from "@/lib/classes/resources.js";
 import { deriveMartialArtsDie } from "@/lib/srd/srd.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { levelForExperience } from "@/lib/leveling/experience.js";
+import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
+import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 
 export const actionsRouter = Router({ mergeParams: true });
 
@@ -46,13 +58,64 @@ const actionTransactionsSchema = z.object({
   operations: z.array(executeActionOpSchema).min(1),
 });
 
+// ExecuteActionResult (#1528) now lives in @character-sheet/shared-types —
+// was a hand-written duplicate of frontend/src/types/character/actions.ts'
+// own copy (#1369/#1370's exact failure mode), caught in review.
+
+// Every class entry's own row-driven action rows (activationCost set), at
+// that entry's own effective level — the ONE place a row-driven actionKey
+// resolves to its ClassFeature row, shared by assertKnownActionKeys (the
+// pre-transaction 400 gate) and applyRowDrivenActionInTx (the dispatcher), so
+// the two can never independently disagree on which keys are legal.
+const ROW_ACTION_SELECT = {
+  experiencePoints: true,
+  rulesEdition: true,
+  classEntries: {
+    orderBy: { position: "asc" as const },
+    select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
+  },
+} satisfies Prisma.CharacterSelect;
+
+type RowActionCharacter = Prisma.CharacterGetPayload<{ select: typeof ROW_ACTION_SELECT }>;
+
+// A row paired with the effective level of the class entry that granted it —
+// the level any `modifierSource: "classLevel"` effect on that row scales by
+// (Second Wind is `1d10 + your Fighter level`). The pairing is what keeps the
+// dispatcher from reaching for the XP-derived character total, which is a
+// different number the moment the character multiclasses.
+interface EligibleRowAction {
+  row: ClassFeatureRow;
+  entryLevel: number;
+}
+
+// Every row-driven action row available to this character right now — each
+// class entry's classRows + subclassRows, filtered to activation rows
+// (`activationCost` set), the right edition, and reached (row.level <=
+// that entry's own effective level). Mirrors deriveEntryScopedActions'
+// per-entry gate exactly, so the wire's `availableActions[]` and this
+// dispatcher's legality check can never drift.
+function eligibleRowActions(character: RowActionCharacter): EligibleRowAction[] {
+  const totalLevel = levelForExperience(character.experiencePoints);
+  const edition = editionOf(character);
+  const rows: EligibleRowAction[] = [];
+  for (const entry of character.classEntries) {
+    const effLevel = effectiveEntryLevel(entry.level, character.classEntries.length, totalLevel);
+    const { classRows, subclassRows } = featureRowsOf(entry);
+    for (const row of [...classRows, ...subclassRows]) {
+      if (row.activationCost && row.edition === edition && row.level <= effLevel) rows.push({ row, entryLevel: effLevel });
+    }
+  }
+  return rows;
+}
+
 /**
- * Apply a single action op inside the shared transaction. A cast-core action
- * (`ACTION_CAST_FN`) pays its pool cost + self-applies through the shared caster;
- * otherwise `ACTION_EFFECT_FN` yields a list of primitive ops (spend / adjust /
- * heal / tempHp / buff) applied in order. Split out of the /transactions
- * handler so the route stays a thin parse → validate → transaction →
- * serialize shell.
+ * Apply a single action op inside the shared transaction. `ACTION_EFFECT_FN`
+ * yields a list of primitive ops (spend / adjust / heal / tempHp / buff)
+ * applied in order; an actionKey it doesn't recognize falls through to the
+ * row-driven dispatcher (#1528) — a ClassFeature row with `activationCost`
+ * set, resolved by `eligibleRowActions` above. Split out of the
+ * /transactions handler so the route stays a thin parse → validate →
+ * transaction → serialize shell.
  */
 async function applyActionOpInTx(
   tx: Prisma.TransactionClient,
@@ -62,41 +125,80 @@ async function applyActionOpInTx(
   sessionId: string | null,
   rageDamageBonus: number,
   heightenedFocusTempHp: number,
-): Promise<void> {
-  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus, heightenedFocusTempHp };
-
-  // Cast-core actions (Second Wind #420): pay the pool cost + self-apply the
-  // heal through the shared caster. The OpOutcome is intentionally not logged —
-  // byte-parity keeps only the spend + heal events.
-  const castFn = ACTION_CAST_FN[op.actionKey];
-  if (castFn) {
-    const spec = castFn(ctx);
-    const cRow = await tx.character.findUnique({
-      where: { id: characterId },
-      select: { spellcasting: true },
-    });
-    if (!cRow) throw new Error(`Character not found: ${characterId}`);
-    const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
-    await castAbilityInTx(
-      { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: normalizeSpellcastingMutable(cRow.spellcasting) },
-      {
-        name: spec.name,
-        entryId: op.actionKey,
-        cost: spec.cost,
-        effect: spec.effect,
-        roll: spec.apply?.amount ?? 0,
-        eventType: "castSpell", // discarded — see comment above
-        concentrates: false,
-        apply: spec.apply,
-      },
-    );
-    return;
+): Promise<ExecuteActionResult> {
+  const effectFn = ACTION_EFFECT_FN[op.actionKey];
+  if (!effectFn) {
+    return applyRowDrivenActionInTx(tx, characterId, op, batchId, sessionId);
   }
 
-  const ops = ACTION_EFFECT_FN[op.actionKey](ctx);
+  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus, heightenedFocusTempHp };
+  const ops = effectFn(ctx);
   for (const effect of ops) {
     await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
   }
+  return {};
+}
+
+/**
+ * Row-driven dispatch (#1528) — the retired `ACTION_CAST_FN`/DERIVED_ACTIONS
+ * counterpart for a ClassFeature row. A row with no `effectKind` (Action
+ * Surge — a pure counter) just spends its pool; a row WITH one (Second Wind)
+ * routes through `castAbilityInTx`, but unlike the retired table, THIS
+ * function rolls the effect itself — `castManeuver` (maneuvers.ts) is the
+ * server-authoritative-roll precedent. The OpOutcome is intentionally not
+ * logged for the cast-core path — byte-parity keeps only the spend + heal
+ * events, same as before #1528.
+ */
+async function applyRowDrivenActionInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: ExecuteActionOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<ExecuteActionResult> {
+  const character = await tx.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
+  if (!character) throw new Error(`Character not found: ${characterId}`);
+
+  const eligible = eligibleRowActions(character).find((e) => e.row.resourceKey === op.actionKey);
+  // `resourceKey` is what the find matched on, so a hit always has one — the
+  // separate binding is only to carry that through to the narrowed type.
+  const resourceKey = eligible?.row.resourceKey;
+  if (!eligible || !resourceKey) {
+    throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
+  }
+  const { row, entryLevel } = eligible;
+
+  if (!row.effectKind) {
+    // A pure counter (Action Surge) — the extra-action grant is client-side.
+    await applySpendResourceInTx(
+      tx,
+      characterId,
+      { type: "spendResource", key: resourceKey },
+      batchId,
+      sessionId,
+    );
+    return {};
+  }
+
+  const { spec, roll } = castSpecFromRow(row, entryLevel, rollDie);
+
+  const cRow = await tx.character.findUnique({ where: { id: characterId }, select: { spellcasting: true } });
+  if (!cRow) throw new Error(`Character not found: ${characterId}`);
+  const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
+  await castAbilityInTx(
+    { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: normalizeSpellcastingMutable(cRow.spellcasting) },
+    {
+      name: spec.name,
+      entryId: op.actionKey,
+      cost: spec.cost,
+      effect: spec.effect,
+      roll,
+      eventType: "castSpell", // discarded — see castAbilityInTx's own OpOutcome note
+      concentrates: false,
+      apply: spec.apply,
+    },
+  );
+  return { roll };
 }
 
 /** The primitive op types `ACTION_EFFECT_FN` yields for a non-cast action. */
@@ -151,10 +253,20 @@ async function applyActionEffectInTx(
   }
 }
 
-/** Fail fast (400) on an op whose actionKey isn't in either dispatch table. */
-function assertKnownActionKeys(operations: ExecuteActionOperation[]): void {
+/**
+ * Fail fast (400) on an op whose actionKey isn't in ACTION_EFFECT_FN or a
+ * row-driven action currently available to this character (#1528) — reuses
+ * `eligibleRowActions`, the SAME gate `applyRowDrivenActionInTx` dispatches
+ * through, so a key this rejects can never be one the dispatcher would have
+ * accepted (or vice versa).
+ */
+async function assertKnownActionKeys(operations: ExecuteActionOperation[], characterId: string): Promise<void> {
+  const character = await prisma.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
+  const rowKeys = new Set(
+    (character ? eligibleRowActions(character) : []).map((e) => e.row.resourceKey).filter((k): k is string => k !== undefined && k !== null),
+  );
   for (const op of operations) {
-    if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
+    if (!ACTION_EFFECT_FN[op.actionKey] && !rowKeys.has(op.actionKey)) {
       throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
     }
   }
@@ -186,11 +298,12 @@ async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[]
   if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
   const classRow = await prisma.character.findUnique({
     where: { id: characterId },
-    select: { classEntries: { select: { name: true, level: true } } },
+    select: { classEntries: { select: { name: true, level: true } }, rulesEdition: true },
   });
-  const monkLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
+  if (!classRow) return 0;
+  const monkLevel = classRow.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
   if (monkLevel < 10) return 0;
-  const dieFaces = deriveMartialArtsDie(monkLevel);
+  const dieFaces = deriveMartialArtsDie(monkLevel, editionOf(classRow));
   return rollDie(dieFaces) + rollDie(dieFaces);
 }
 
@@ -215,7 +328,7 @@ actionsRouter.post<{ id: string }>(
     // OperationError) carries an explicit `status`, so an op-validation failure
     // flows to the central `errorHandler` as its 400 and an unexpected throw as a
     // clean 500 — no message-string sniffing, no hand-rolled 500 here.
-    assertKnownActionKeys(operations);
+    await assertKnownActionKeys(operations, characterId);
 
     const rageDamageBonus = await computeRageDamageBonus(operations, characterId);
     const heightenedFocusTempHp = await computeHeightenedFocusTempHp(operations, characterId);
@@ -225,9 +338,13 @@ actionsRouter.post<{ id: string }>(
     // Cross-domain atomic transaction — every op (cast-core, spendResource,
     // adjustQuantity, heal, tempHp) shares the same batchId so they appear as
     // one batch on the activity timeline and a single revertBatch undoes them all.
+    // `results` is index-aligned 1:1 with `operations` (mirrors
+    // applyManeuverOperations) so the client can fold a row-driven roll into
+    // its dice animation without re-deriving the number (#1528).
+    const results: ExecuteActionResult[] = [];
     await prisma.$transaction(async (tx) => {
       for (const op of operations) {
-        await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus, heightenedFocusTempHp);
+        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus, heightenedFocusTempHp));
       }
     });
 
@@ -242,7 +359,8 @@ actionsRouter.post<{ id: string }>(
     }
 
     // batchId is additive alongside the serialized character so the client
-    // can revert this exact batch on turn undo (#758).
-    res.json({ ...serializeCharacter(row), batchId });
+    // can revert this exact batch on turn undo (#758); `results` is the
+    // #1528 wire-contract addition (was `Promise<void>`/no per-op result).
+    res.json({ ...serializeCharacter(row), batchId, results });
   }
 );
