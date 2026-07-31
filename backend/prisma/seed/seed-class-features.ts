@@ -341,8 +341,23 @@ const MIN_ROWS_PER_PAIR = 10;
 // this guard cannot distinguish "genuinely 2024" from "still a copy" for any
 // class, Fighter included. The residual is disclosed here, not hidden by the
 // ratchet reading green.
+//
+// "Barbarian" removed here (#1223, same diff as the content that makes its
+// rows genuinely diverge: base 12->17 EDITION_2024 rows — Brutal Critical
+// drops out, six new 2024-only features join — while both editions still
+// land at 21 total rows apiece, since Path of the Totem Warrior authors 5
+// EDITION_2014 rows and 0 EDITION_2024 ones). This removal is NOT "all of
+// Barbarian's 2024 content is real" — two residuals stay undisclosed nowhere
+// else but here: Path of the Totem Warrior has no 2024 successor authored at
+// all (out of scope, #1223 research finding 5 — a 2024 character can still
+// pick it and gets zero subclass features, since no read path filters
+// Subclass by edition), and several of the 2024-only rows are TEXT ONLY with
+// no mechanics behind them yet (Weapon Mastery, Primal Knowledge's skill
+// grant, Persistent Rage's regain-on-Initiative automation, the Brutal
+// Strike/Improved Brutal Strike effect menu, Frenzy's bonus dice,
+// Intimidating Presence's announced save DC, Epic Boon's feat grant — #1223
+// research finding 6).
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
-  "Barbarian",
   "Bard",
   "Cleric",
   "Druid",
