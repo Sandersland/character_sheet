@@ -62,5 +62,8 @@ export interface StartingGold {
 
 export interface ClassStartingEquipment {
   groups: EquipmentChoiceGroup[];
-  gold: StartingGold;
+  // NULL = this edition has no roll-for-gold alternative at all (PHB'24 —
+  // its gold is reached through a lettered EquipmentBundle.gold option
+  // instead, #1564). Every EDITION_2014 package keeps a real StartingGold.
+  gold: StartingGold | null;
 }

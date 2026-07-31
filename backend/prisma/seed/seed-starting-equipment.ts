@@ -62,14 +62,17 @@ function groupCreateInput(group: EquipmentChoiceGroup, position: number) {
   };
 }
 
+// gold is null on the wire when this edition has no roll-for-gold rule at all
+// (#1564 commit 3, PHB'24) — the three columns are jointly null in that case,
+// never independently, mirroring the wire's single StartingGold | null field.
 function packageCreateData(classId: string, className: string, edition: SeedEdition, pkg: ClassStartingEquipment) {
   return {
     classId,
     name: className,
     edition,
-    goldDiceCount: pkg.gold.diceCount,
-    goldDiceFaces: pkg.gold.diceFaces,
-    goldMultiplier: pkg.gold.multiplier,
+    goldDiceCount: pkg.gold?.diceCount ?? null,
+    goldDiceFaces: pkg.gold?.diceFaces ?? null,
+    goldMultiplier: pkg.gold?.multiplier ?? null,
     groups: { create: pkg.groups.map((group, i) => groupCreateInput(group, i)) },
   };
 }

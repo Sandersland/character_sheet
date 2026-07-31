@@ -70,7 +70,10 @@ const startingGoldSchema = z.object({
 
 const classStartingEquipmentSchema = z.object({
   groups: z.array(equipmentChoiceGroupSchema),
-  gold: startingGoldSchema,
+  // Nullable (#1564 commit 3): PHB'24 has no roll-for-gold rule at all. Every
+  // EDITION_2014 package below still sets a real StartingGold; #1535 is where
+  // a null-gold PHB'24 package would first land.
+  gold: startingGoldSchema.nullable(),
 });
 
 export const startingEquipmentSeedSchema = z.object({

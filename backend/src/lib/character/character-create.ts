@@ -469,12 +469,26 @@ async function resolveBackgroundGrants(
 // class) — the range check is skipped rather than rejected, preserving the
 // pre-#1534 behaviour for an unknown class (characters.test.ts:901's sibling
 // gold-mode case).
+//
+// classDef.gold is null for a package with no roll-for-gold rule at all
+// (PHB'24, #1564 commit 3) — reject rather than silently compute, since a
+// range derived from null dice is meaningless, not just wrong. This makes
+// `mode: "gold"` a 2014-only path in practice: PHB'24 reaches its gold
+// through a lettered StartingEquipmentOption.gold in package mode instead
+// (commit 2), never this dice-roll alternative.
 function resolveStartingGold(
   gold: number,
   className: string,
   classDef: ClassEquipmentDef | null,
 ): PhaseResult<{ startingCurrency: { cp: number; sp: number; gp: number; pp: number } }> {
   if (classDef) {
+    if (!classDef.gold) {
+      return {
+        ok: false,
+        status: 400,
+        error: `${className} has no roll-for-gold alternative under this ruleset — choose a starting-equipment package option instead`,
+      };
+    }
     const { diceCount, diceFaces, multiplier } = classDef.gold;
     const min = diceCount * multiplier;
     const max = diceCount * diceFaces * multiplier;

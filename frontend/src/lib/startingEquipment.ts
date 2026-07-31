@@ -9,6 +9,7 @@ import type {
   ClassStartingEquipment,
   PackageSelection,
   StartingEquipmentInput,
+  StartingGold,
 } from "@/types/character";
 
 // One set of selections for a "package" mode submission — parallel array to
@@ -54,16 +55,24 @@ export function isPackageComplete(
   return true;
 }
 
-export function goldMin(gold: ClassStartingEquipment["gold"]): number {
+// These four take a non-null StartingGold, never ClassStartingEquipment["gold"]
+// directly — that keeps the null case (PHB'24: no roll-for-gold rule at all,
+// #1564 commit 3) a caller-side guard (isGoldValid below, and the picker
+// hiding the gold-mode toggle entirely) rather than a fifth null-check
+// duplicated into every one of these.
+export function goldMin(gold: StartingGold): number {
   return gold.diceCount * gold.multiplier;
 }
 
-export function goldMax(gold: ClassStartingEquipment["gold"]): number {
+export function goldMax(gold: StartingGold): number {
   return gold.diceCount * gold.diceFaces * gold.multiplier;
 }
 
-/** Returns true if the gold draft is a valid amount within the class range. */
+/** Returns true if the gold draft is a valid amount within the class range.
+ *  Always false when this edition has no roll-for-gold rule (gold: null) —
+ *  there is no range to be valid within. */
 export function isGoldValid(startingEquipment: ClassStartingEquipment, gold: number): boolean {
+  if (!startingEquipment.gold) return false;
   return gold >= goldMin(startingEquipment.gold) && gold <= goldMax(startingEquipment.gold);
 }
 
@@ -90,12 +99,12 @@ export function draftToInput(
 }
 
 /** Formats a gold dice expression like "5d4×10". */
-export function goldLabel(gold: ClassStartingEquipment["gold"]): string {
+export function goldLabel(gold: StartingGold): string {
   return `${gold.diceCount}d${gold.diceFaces}×${gold.multiplier}`;
 }
 
 /** Rolls the gold dice client-side and returns the total. */
-export function rollGold(gold: ClassStartingEquipment["gold"]): number {
+export function rollGold(gold: StartingGold): number {
   let total = 0;
   for (let i = 0; i < gold.diceCount; i++) {
     total += Math.floor(Math.random() * gold.diceFaces) + 1;

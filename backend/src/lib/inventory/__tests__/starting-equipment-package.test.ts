@@ -11,6 +11,9 @@ import { mapStartingEquipmentPackage, type StartingEquipmentPackageRow } from ".
 // so this compiles against the real Prisma payload shape, not a loosened stand-in.
 function packageRow(overrides: {
   groups: StartingEquipmentPackageRow["groups"];
+  goldDiceCount?: number | null;
+  goldDiceFaces?: number | null;
+  goldMultiplier?: number | null;
 }): StartingEquipmentPackageRow {
   return {
     id: "pkg-1",
@@ -251,6 +254,28 @@ describe("mapStartingEquipmentPackage", () => {
     const mapped = mapStartingEquipmentPackage(row);
     expect(mapped.groups[0].options[0]).not.toHaveProperty("gold");
     expect(mapped.groups[0].options[1].gold).toBe(20);
+  });
+
+  // #1564 commit 3: PHB'24 has no roll-for-gold rule at all — NULL states
+  // that truthfully (0/0/0 would read as "roll zero gold", the same class of
+  // lie as encoding a flat 155 GP as {1,1,155}).
+  it("maps jointly-null gold dice columns to gold: null on the wire", () => {
+    const row = packageRow({
+      goldDiceCount: null,
+      goldDiceFaces: null,
+      goldMultiplier: null,
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "Choose an option",
+          options: [optionRow({ label: "An option", gold: 10 })],
+        },
+      ],
+    });
+
+    expect(mapStartingEquipmentPackage(row).gold).toBeNull();
   });
 
   it("renames weaponRange to range on the wire", () => {

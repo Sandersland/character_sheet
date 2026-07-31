@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
-import { emptyPackageState, type EquipmentDraft } from "@/lib/startingEquipment";
+import { draftToInput, emptyPackageState, isGoldValid, type EquipmentDraft } from "@/lib/startingEquipment";
 import type { ClassStartingEquipment, Item, WeaponDetail } from "@/types/character";
 
 function weaponItem(props: {
@@ -139,5 +139,40 @@ describe("StartingEquipmentEditor open picks", () => {
       mode: "package",
       selections: [{ optionIndex: 0, openPicks: ["Shortbow"] }],
     });
+  });
+});
+
+// #1564 commit 3: PHB'24 packages have no roll-for-gold rule at all —
+// gold: null on the wire. The picker must not offer that path at all rather
+// than rendering a broken range (0-0, or a crash reading .diceCount off null).
+describe("StartingEquipmentEditor — null gold (#1564)", () => {
+  it("does not render the starting-gold toggle when the class has no gold dice", () => {
+    const startingEquipment: ClassStartingEquipment = {
+      groups: [
+        { label: "Auto-granted", options: [{ label: "Dagger", items: [{ catalogName: "Dagger" }] }] },
+      ],
+      gold: null,
+    };
+    const onChange = vi.fn();
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={startingEquipment}
+        catalog={catalog}
+        value={packageDraft(startingEquipment)}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.queryByText(/Starting gold/)).not.toBeInTheDocument();
+  });
+
+  it("isGoldValid/draftToInput reject a gold draft when the class has no gold dice at all", () => {
+    const startingEquipment: ClassStartingEquipment = {
+      groups: [{ label: "Auto-granted", options: [{ label: "Dagger", items: [{ catalogName: "Dagger" }] }] }],
+      gold: null,
+    };
+    expect(isGoldValid(startingEquipment, 0)).toBe(false);
+    expect(isGoldValid(startingEquipment, 25)).toBe(false);
+    expect(draftToInput(startingEquipment, { mode: "gold", gold: 25 })).toBeNull();
   });
 });

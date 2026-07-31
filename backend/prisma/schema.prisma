@@ -866,9 +866,18 @@ model StartingEquipmentPackage {
   name    String
   edition RulesEdition
 
-  goldDiceCount  Int
-  goldDiceFaces  Int
-  goldMultiplier Int
+  // Nullable (#1564 commit 3): PHB'24 has no roll-for-gold rule at all — NULL
+  // states that truthfully ("this package has no dice alternative"), where
+  // 0/0/0 would read as "roll zero gold", the same class of lie as encoding a
+  // flat 155 GP as {1,1,155}. Jointly null, never partially — a package
+  // either has all three or none. Every EDITION_2014 package keeps its
+  // existing non-null values; resolveStartingGold (character-create.ts)
+  // rejects rather than computing when handed a NULL-dice package, since
+  // PHB'24 reaches its gold through a lettered StartingEquipmentOption.gold
+  // instead (#1564 commit 2).
+  goldDiceCount  Int?
+  goldDiceFaces  Int?
+  goldMultiplier Int?
 
   groups StartingEquipmentGroup[]
 

@@ -117,6 +117,10 @@ export default function StartingEquipmentEditor({
 
   const isPackage = value.mode === "package";
   const isGold = value.mode === "gold";
+  // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564
+  // commit 3) — narrowed once here so every render below can pass a non-null
+  // StartingGold to goldMin/goldMax/goldLabel/rollGold without re-checking.
+  const gold = startingEquipment.gold;
 
   function setMode(mode: "package" | "gold") {
     if (mode === "package") {
@@ -168,17 +172,22 @@ export default function StartingEquipmentEditor({
         >
           Class equipment package
         </button>
-        <button
-          type="button"
-          onClick={() => setMode("gold")}
-          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            isGold
-              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
-              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
-          }`}
-        >
-          Starting gold ({goldLabel(startingEquipment.gold)})
-        </button>
+        {/* No roll-for-gold path is offered at all when this edition has none
+            (PHB'24, #1564) — PHB'24 reaches gold through a lettered package
+            option instead (StartingEquipmentOption.gold). */}
+        {gold && (
+          <button
+            type="button"
+            onClick={() => setMode("gold")}
+            className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              isGold
+                ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+                : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
+            }`}
+          >
+            Starting gold ({goldLabel(gold)})
+          </button>
+        )}
       </div>
 
       {isPackage && value.mode === "package" && (
@@ -273,32 +282,32 @@ export default function StartingEquipmentEditor({
         </div>
       )}
 
-      {isGold && value.mode === "gold" && (
+      {isGold && value.mode === "gold" && gold && (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-parchment-700">
-            Roll {goldLabel(startingEquipment.gold)} gp (
-            {goldMin(startingEquipment.gold)}–{goldMax(startingEquipment.gold)} gp) and spend it on
+            Roll {goldLabel(gold)} gp (
+            {goldMin(gold)}–{goldMax(gold)} gp) and spend it on
             equipment from the shop after creation.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => setGold(rollGold(startingEquipment.gold))}
+              onClick={() => setGold(rollGold(gold))}
               className="rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover"
             >
-              Roll {goldLabel(startingEquipment.gold)}
+              Roll {goldLabel(gold)}
             </button>
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                min={goldMin(startingEquipment.gold)}
-                max={goldMax(startingEquipment.gold)}
+                min={goldMin(gold)}
+                max={goldMax(gold)}
                 value={value.gold || ""}
                 onChange={(e) => {
                   const n = parseInt(e.target.value, 10);
                   if (!isNaN(n)) setGold(n);
                 }}
-                placeholder={`${goldMin(startingEquipment.gold)}–${goldMax(startingEquipment.gold)}`}
+                placeholder={`${goldMin(gold)}–${goldMax(gold)}`}
                 className="w-24 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-center text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
               />
               <span className="text-sm text-parchment-600">gp</span>
@@ -306,8 +315,8 @@ export default function StartingEquipmentEditor({
           </div>
           {value.gold > 0 && !isGoldValid(startingEquipment, value.gold) && (
             <p className="text-xs text-red-600">
-              Amount must be between {goldMin(startingEquipment.gold)} and{" "}
-              {goldMax(startingEquipment.gold)} gp.
+              Amount must be between {goldMin(gold)} and{" "}
+              {goldMax(gold)} gp.
             </p>
           )}
         </div>

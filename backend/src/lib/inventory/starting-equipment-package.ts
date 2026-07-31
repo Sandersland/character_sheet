@@ -88,10 +88,18 @@ function mapGroup(group: RowGroup): EquipmentChoiceGroup {
   return { label: group.label, options: group.options.map(mapOption) };
 }
 
+// Jointly null, never partially (#1564 commit 3 — schema.prisma's comment on
+// StartingEquipmentPackage's three columns): PHB'24 has no roll-for-gold rule
+// at all, so NULL here means that truthfully rather than "roll zero gold".
+function mapGold(pkg: StartingEquipmentPackageRow): ClassStartingEquipment["gold"] {
+  if (pkg.goldDiceCount == null) return null;
+  return { diceCount: pkg.goldDiceCount, diceFaces: pkg.goldDiceFaces!, multiplier: pkg.goldMultiplier! };
+}
+
 /** Rows -> wire (#1534): the one shape both read sites resolve a package through. */
 export function mapStartingEquipmentPackage(pkg: StartingEquipmentPackageRow): ClassStartingEquipment {
   return {
-    gold: { diceCount: pkg.goldDiceCount, diceFaces: pkg.goldDiceFaces, multiplier: pkg.goldMultiplier },
+    gold: mapGold(pkg),
     groups: pkg.groups.map(mapGroup),
   };
 }
