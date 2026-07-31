@@ -125,7 +125,6 @@ function OpenPickList({ bundle, catalog, currentPicks, onPick }: OpenPickListPro
 interface OptionChoiceProps {
   option: EquipmentBundle;
   groupIdx: number;
-  optionIdx: number;
   isChosen: boolean;
   catalog: Item[];
   currentPicks: string[] | undefined;
@@ -232,7 +231,6 @@ function EquipmentGroupCard({ group, groupIdx, sel, catalog, onSetOptionIndex, o
               key={optionIdx}
               option={option}
               groupIdx={groupIdx}
-              optionIdx={optionIdx}
               isChosen={chosenOptionIdx === optionIdx}
               catalog={catalog}
               currentPicks={sel?.openPicks}
