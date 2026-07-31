@@ -43,10 +43,16 @@ export function staleCatalogRowsWhere(
   const editions: (SeedEdition | null)[] = [null, "EDITION_2014", "EDITION_2024"];
   // Three explicit branches rather than a computed key: a computed key would
   // give the clause an index signature, which no Prisma WhereInput accepts.
+  // Exhaustive by `never` rather than a fall-through `return`: widening the
+  // union above without adding a branch here must be a COMPILE error, not rows
+  // silently swept under whichever column the fall-through happened to name
+  // (#1527's principle, applied to an identity column instead of an edition).
   const identityNotIn = (values: string[]) => {
     if (identityColumn === "name") return { name: { notIn: values } };
     if (identityColumn === "key") return { key: { notIn: values } };
-    return { slug: { notIn: values } };
+    if (identityColumn === "slug") return { slug: { notIn: values } };
+    const unhandled: never = identityColumn;
+    throw new Error(`staleCatalogRowsWhere: unhandled identity column ${String(unhandled)}`);
   };
   return {
     AND: [

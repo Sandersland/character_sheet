@@ -588,6 +588,11 @@ function groupPresentEditionsBySubclassId(
 ): Map<string, SeedEdition[]> {
   const bySubclassId = new Map<string, SeedEdition[]>();
   for (const f of featureCounts) {
+    // A TYPE narrowing, not a runtime possibility: the caller's groupBy filters
+    // `subclassId: { in: [...] }` and SQL's IN never matches NULL, so a
+    // base-class row cannot reach here. But the column is nullable, so Prisma
+    // types the field `string | null` and the Map below needs `string`. Deleting
+    // this line costs a non-null assertion, which is strictly worse.
     if (!f.subclassId) continue;
     const present = bySubclassId.get(f.subclassId) ?? [];
     present.push(f.edition);
