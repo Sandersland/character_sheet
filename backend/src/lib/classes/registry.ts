@@ -18,6 +18,7 @@ import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
 import { rogue } from "./rogue.js";
 import { sorcerer } from "./sorcerer.js";
+import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
@@ -40,7 +41,34 @@ const CLASSES: Record<string, ClassDefinition> = {
 // Subclass keys are global (not scoped per class) — matching the original
 // class-features.ts dispatch tables, where a subclass name is looked up
 // independent of the character's base class.
+//
+// Seeded identity-only FIRST, from SUBCLASS_IDENTITY (subclass-slug.ts,
+// #1277's sanctioned join table) — #1546 Part A. An identity-only entry is
+// just `{ slug }`, no `grantLevel`, so isSubclassActive resolves it through
+// subclassActiveAt/subclassGateLevel's undefined-grantLevel fallback, which is
+// already 3 in BOTH editions (effective-levels.ts) — the same value every
+// class not yet migrated off `lib/classes/<class>.ts` still supplies
+// explicitly. This is what lets deriveSubclassLayer resolve a subclass's
+// seeded ClassFeature rows (poolsFromRows/featuresFromRows) even when no
+// ClassDefinition registers it in TS at all (Fighter's three, once fighter.ts
+// is deleted, #1532) — before this, a missing TS entry meant
+// `deriveSubclassLayer` returned early with EMPTY pools and features,
+// silently deleting every seeded row for that subclass (see this issue's
+// probe).
+//
+// THEN overlaid by the CLASSES-derived definitions, in a second pass — order
+// matters: a class still on the TS migration path (a non-3 grantLevel,
+// resourceFn, deriveExtras, or the `choices` catalog) must win over its own
+// identity-only stub, or those fields would silently vanish for the eleven
+// classes not yet fully row-driven. `SUBCLASS_IDENTITY` is a perfect 31<->31
+// bijection with today's TS registrations, so this overlay is behaviour-
+// preserving by construction: every key the first loop seeds is immediately
+// replaced by the second loop's richer definition, for every class still on
+// the TS path.
 const SUBCLASSES: Record<string, SubclassDefinition> = {};
+for (const [slug, { nameKey }] of Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]) {
+  SUBCLASSES[nameKey] = { slug };
+}
 for (const classDef of Object.values(CLASSES)) {
   for (const [subclassKey, subclassDef] of Object.entries(classDef.subclasses ?? {})) {
     SUBCLASSES[subclassKey] = subclassDef;
