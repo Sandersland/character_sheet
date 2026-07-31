@@ -33,8 +33,10 @@
 // IDENTICAL text (the 2014-is-a-transcription invariant; today that's only
 // Eldritch Knight, parked below). `edition` set -> exactly the one row named.
 // A 2014 row's text is NEVER edited by this issue for any reason other than
-// the #1221 short-rest-recharge fix (which lives in fighter.ts's resourceFn,
-// not here) — every EDITION_2014 row below is a byte-identical copy of what
+// the #1221 short-rest-recharge fix (which lives on Second Wind/Action
+// Surge's own resourceRecharge/resourceTotals columns below, #1528 — no
+// top-level resourceFn remains in fighter.ts to hold it) — every EDITION_2014
+// row below is a byte-identical copy of what
 // fighter.ts's FIGHTER_FEATURES/CHAMPION_FEATURES/BATTLE_MASTER_FEATURES/
 // ELDRITCH_KNIGHT_FEATURES said before this migration (pinned by
 // class-feature-migration.test.ts's 2014-snapshot test). A "removed in 2024"
@@ -115,15 +117,18 @@ function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
 // text describes all three tiers.
 // Every row below EXCEPT Second Wind/Action Surge/Indomitable (populated
 // above) leaves every descriptor column NULL because the feature has NO SUCH
-// AXIS: Fighting Style/Weapon Mastery/Extra Attack/Tactical Shift/Two Extra
-// Attacks/Studied Attacks/Epic Boon/Three Extra Attacks are all passive text
+// AXIS: Fighting Style/Weapon Mastery/Tactical Shift/Two Extra Attacks/Studied
+// Attacks/Epic Boon/Three Extra Attacks/Tactical Master are all passive text
 // or feat grants with no resource pool, no clickable action, and no roll this
-// app computes (Extra Attack's own count is `deriveAttacksPerAction`, a
-// separate TS rule for its cross-multiclass max — #1530 may attach
-// derivedStat/derivedStatTiers to the Extra Attack row itself, but that is
-// "not done yet", the one exception in this list). Tactical Mind is the other
-// "not done yet": its conditional not-expended-on-failure refund has no
-// AbilityCost shape (see its own comment below).
+// app computes. Extra Attack is the one row that's NO SUCH AXIS for some
+// columns and NOT DONE YET for another: its resource/activation/effect
+// columns are NO SUCH AXIS like the rest of this list (its own count is
+// `deriveAttacksPerAction`, a separate TS rule for its cross-multiclass max),
+// but #1530 may attach derivedStat/derivedStatTiers to this same row, which
+// makes that ONE column pair NOT DONE YET rather than a permanent NULL.
+// Tactical Mind is the other "not done yet" row: its conditional
+// not-expended-on-failure refund has no AbilityCost shape (see its own
+// comment below).
 const FIGHTER_BASE_RAW: RawFighterFeature[] = [
   {
     subclassSlug: null,
@@ -246,8 +251,9 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     edition: "EDITION_2024",
     // SRD 5.2 p. 48. Recharge is "Short or Long Rest" in BOTH editions — NOT
     // the #1221 partial shape (only Second Wind is). The live recharge bug
-    // (today's resourceFn says "shortRest" only, in both editions) is fixed
-    // in fighter.ts, not here.
+    // (was "shortRest" only, in both editions) is fixed by this row's own
+    // resourceRecharge: "short-or-long" below (#1528) — no top-level
+    // resourceFn remains in fighter.ts to hold it.
     description:
       "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
     resourceKey: "actionSurge",
@@ -643,7 +649,13 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
 // for both editions. This is the one Fighter subclass EDITIONS_STILL_IDENTICAL's
 // removal comment (seed-class-features.ts) discloses as a residual — do not
 // read Fighter's removal from that ratchet as "all of Fighter's 2024 text is
-// verified". #1531 owns authoring EK's real 2024 text.
+// verified". #1531 owns authoring EK's real 2024 text. Every row below also
+// leaves every descriptor column NULL — NOT DONE YET for all six, not NO SUCH
+// AXIS: unlike Champion/Battle Master above, EK's own rows (Eldritch Strike's
+// on-hit rider, War Magic/Improved War Magic's bonus-action attack trigger)
+// plausibly need real resource/activation/effect columns of their own, so
+// #1531 owns descriptor population here too, alongside EK's verified 2024
+// text — none of it is authored ahead of that pass.
 const ELDRITCH_KNIGHT_SLUG = slug("fighter-eldritch-knight");
 const ELDRITCH_KNIGHT_RAW: RawFighterFeature[] = [
   {

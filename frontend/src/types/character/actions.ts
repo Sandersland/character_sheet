@@ -1,6 +1,7 @@
 /**
  * Action-economy catalog types and the executeAction operation.
  */
+import type { ExecuteActionResult } from "@character-sheet/shared-types";
 
 /**
  * Action-economy cost — which slot an action consumes on the character's turn.
@@ -47,16 +48,11 @@ export interface AvailableAction {
   resolverKind?: string;
 }
 
-/**
- * One executeAction op's server-computed result (#1528) — mirrors
- * `ManeuverCastResult` (classes.ts): a row-driven cast-core action (Second
- * Wind) rolls its effect server-side and reports the roll here so the client
- * can fold it into a dice animation without re-deriving the number. Index-
- * aligned 1:1 with the request's `operations`; every other op reports `{}`.
- */
-export interface ExecuteActionResult {
-  roll?: number;
-}
+// ExecuteActionResult (#1528) is defined in @character-sheet/shared-types —
+// re-exported here so existing imports from "@/types/character" keep working.
+// Was a hand-mirrored duplicate of the backend route's own copy (the exact
+// #1369/#1370 failure mode), caught in review.
+export type { ExecuteActionResult };
 
 // The action op is derived from the route zod schema in
 // @character-sheet/contracts (#1390) — `import type` only, so zod never enters

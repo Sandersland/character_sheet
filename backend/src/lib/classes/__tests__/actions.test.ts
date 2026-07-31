@@ -59,7 +59,7 @@ const at = (
 // ── deriveActions ─────────────────────────────────────────────────────────────
 
 describe("deriveActions — class gates", () => {
-  it("Fighter has no DERIVED_ACTIONS entries (#1528 — Second Wind/Action Surge are row-driven now; see actionsFromRows.test.ts)", () => {
+  it("Fighter has no DERIVED_ACTIONS entries (#1528 — Second Wind/Action Surge are row-driven now; see entry-scoped-actions.test.ts's deriveEntryScopedActions coverage)", () => {
     const l2 = keys(at("fighter", undefined, 2, []));
     expect(l2).not.toContain("secondWind");
     expect(l2).not.toContain("actionSurge");
@@ -246,7 +246,9 @@ describe("deriveActions — resource gating", () => {
   it("empty pools default to 0 remaining (action disabled)", () => {
     // No pool entry for "wildShape" → defaults to remaining=0 → disabled.
     // (Second Wind, formerly this test's fixture, is row-driven now — #1528 —
-    // and its own enablement gate is covered by actionsFromRows.test.ts.)
+    // its own enablement gate is covered by deriveEntryScopedActions'
+    // "a row-driven Fighter action (actionSurge) is disabled when its pool is
+    // exhausted" case in entry-scoped-actions.test.ts.)
     const actions = at("druid", undefined, 2, []);
     const wildShape = actions.find((a) => a.key === "wildShape");
     expect(wildShape?.enabled).toBe(false);

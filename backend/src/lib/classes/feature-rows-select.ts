@@ -25,9 +25,17 @@ import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-r
  * further filter needed. Both editions load — the in-memory per-edition
  * filter is featuresFromRows'/poolsFromRows' job, not the query's.
  */
+// Postgres makes no ordering guarantee absent an explicit `orderBy` — without
+// one, two rows at the same level (e.g. Second Wind/Action Surge, both L1)
+// come back in unspecified order, so pools/actions built from these rows
+// (poolsFromRows, actionsFromRows) would nondeterministically swap position
+// on every read. `level` then `name` gives a stable, content-derived order
+// with no dependency on insertion order.
+export const FEATURE_ROWS_ORDER_BY = [{ level: "asc" }, { name: "asc" }] satisfies Prisma.ClassFeatureOrderByWithRelationInput[];
+
 export const FEATURE_ROWS_ENTRY_SELECT = {
-  class: { select: { features: { where: { subclassId: null } } } },
-  subclassRef: { select: { features: true } },
+  class: { select: { features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } } },
+  subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 export type FeatureRowsEntry = Prisma.CharacterClassEntryGetPayload<{ select: typeof FEATURE_ROWS_ENTRY_SELECT }>;

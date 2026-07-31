@@ -41,6 +41,40 @@ export type ResolutionKind =
   | "loadout-picker"
   | "simple-confirm";
 
+// Runtime membership list for ResolutionKind, used only to validate a
+// row-served `AvailableAction.resolverKind` string (isResolutionKind below) —
+// the type itself stays the documented union above. A ResolutionKind added to
+// the union without a matching entry here fails typecheck (mirrors registry.ts's
+// EXTRAS_FIELDS latch), which is what keeps the two from silently drifting.
+const RESOLUTION_KINDS = [
+  "attack-picker",
+  "twf-picker",
+  "flurry-picker",
+  "spell-picker",
+  "item-picker",
+  "heal-roll",
+  "heal-input",
+  "loadout-picker",
+  "simple-confirm",
+] as const satisfies readonly ResolutionKind[];
+type _ResolutionKindsCoverResolutionKind = ResolutionKind extends (typeof RESOLUTION_KINDS)[number] ? true : never;
+const _resolutionKindsCoverResolutionKind: _ResolutionKindsCoverResolutionKind = true;
+void _resolutionKindsCoverResolutionKind;
+
+/**
+ * Type guard for a served `resolverKind` string (#1528). Without this,
+ * `resolverFromRow` used to do a bare `as ResolutionKind` cast behind only a
+ * truthiness check — any non-empty string passed, `partitionClassActions` kept
+ * the action, and `planActionClick`'s switch (exhaustive only at compile time
+ * over the real union) fell through with no runtime default, returning
+ * `undefined` and crashing `useTurnActions` on click. Validating here makes an
+ * unknown kind behave like "no resolver at all" (filtered out by
+ * `partitionClassActions`), never a silent runtime type violation.
+ */
+function isResolutionKind(kind: string): kind is ResolutionKind {
+  return (RESOLUTION_KINDS as readonly string[]).includes(kind);
+}
+
 export type SlotCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
 export interface ActionResolver {
@@ -211,10 +245,10 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
 // reported back via ExecuteActionResult, not computed here — the served
 // `action.reminder` (built server-side from the same row) is the subtitle
 // classActionOption falls back to when `healRoll` is unset.
-function resolverFromRow(action: AvailableAction): ActionResolver {
+function resolverFromRow(action: AvailableAction, kind: ResolutionKind): ActionResolver {
   return {
     key: action.key,
-    kind: action.resolverKind as ResolutionKind,
+    kind,
     slot: action.cost,
     serverEffect: true,
     resourceKey: action.key,
@@ -225,13 +259,18 @@ function resolverFromRow(action: AvailableAction): ActionResolver {
  * Returns the resolver for the given action key, or undefined if
  * unrecognized. `action` is optional context for the fallback path (#1528):
  * when no keyed ACTION_RESOLVERS entry exists but the served action carries
- * `resolverKind`, one is synthesized from the wire instead of a hand-authored
- * entry. Every existing call site keeps working key-only (undefined action).
+ * a `resolverKind` that names a real ResolutionKind, one is synthesized from
+ * the wire instead of a hand-authored entry. A served `resolverKind` that
+ * doesn't match any ResolutionKind (unknown class feature retab, server/client
+ * skew) falls through to `undefined` here — same as no resolver at all — rather
+ * than reaching `planActionClick`'s switch with a value outside its exhaustive
+ * union. Every existing call site keeps working key-only (undefined action).
  */
 export function resolverFor(key: string, action?: AvailableAction): ActionResolver | undefined {
   const known = ACTION_RESOLVERS[key];
   if (known) return known;
-  return action?.resolverKind ? resolverFromRow(action) : undefined;
+  if (!action?.resolverKind || !isResolutionKind(action.resolverKind)) return undefined;
+  return resolverFromRow(action, action.resolverKind);
 }
 
 /**

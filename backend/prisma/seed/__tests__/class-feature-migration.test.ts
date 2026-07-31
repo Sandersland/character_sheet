@@ -14,7 +14,8 @@ import { describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { readEffectSpec } from "@/lib/combat/effects.js";
+import { castSpecFromRow } from "@/lib/classes/actions.js";
+import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 
 import { CLASS_FEATURES, LITERAL_ROW_CLASSES } from "../class-features.js";
 import { seedClassFeatures } from "../seed-class-features.js";
@@ -375,23 +376,52 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
 // the feature is GRANTED at — a different number entirely. The
 // `{ ...row, level: 0 }` adapter (castSpecFromRow, actions.ts) is what keeps
 // `resolveEffectScaling` from reinterpreting a grant level as a spell level.
-// This is a DB-backed proof over every REAL Fighter row with effect columns
-// set, not just the one hand-built fixture in actions.test.ts — it would
-// catch a future row that sets upcastDicePerLevel/cantripScaling (columns
-// #1523 deliberately omitted from ClassFeature; #1528 must never add them
-// back, per class-feature-rows.ts's own comment).
+// Both tests below go THROUGH castSpecFromRow itself (the production call
+// site), not a re-implementation of its `{ ...row, level: 0 }` adapter inline
+// — a prior version of this test called readEffectSpec directly with the same
+// adapter hand-copied in, which stayed green even with the adapter deleted
+// from castSpecFromRow, because it was testing its own copy of the fix, not
+// the fix.
 describe("ClassFeature EffectRow landmine — no Fighter row ever resolves a non-'none' scaling mode (#1528)", () => {
-  it("every Fighter row with effectKind set resolves { mode: 'none' } via the level:0 adapter", async () => {
+  it("every REAL Fighter row with effectKind set resolves { mode: 'none' } through castSpecFromRow", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { class: { name: "Fighter" }, effectKind: { not: null } },
     });
     // Second Wind (both editions) is the only Fighter row with effectKind set
     // today — asserting length keeps this pin honest as a real DB count, not
-    // an early-return over an accidentally-empty result set.
+    // an early-return over an accidentally-empty result set. NOTE: this loop
+    // alone is NOT mutation-proof against deleting the `level: 0` adapter —
+    // ClassFeature has no cantripScaling/upcastDicePerLevel columns (schema.prisma's
+    // own comment: must never gain them), so no REAL row can ever arm the
+    // landmine and this loop stays green either way. The adversarial test
+    // below is the one that actually exercises the adapter.
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
-      const spec = readEffectSpec({ ...row, level: 0 });
-      expect(spec.scaling, `${row.name} (${row.edition})`).toEqual({ mode: "none" });
+      // Prisma types resourceTotals/resourceDieTiers as opaque JsonValue —
+      // cast to ClassFeatureRow's concrete shape once, same as featureRowsOf's
+      // own comment (feature-rows-select.ts) explains for the identical cast.
+      const { spec } = castSpecFromRow(row as unknown as ClassFeatureRow, 14, () => 0);
+      expect(spec.effect.scaling, `${row.name} (${row.edition})`).toEqual({ mode: "none" });
     }
+  });
+
+  // The mutation-provable half: simulates a future migration mistake (an
+  // upcastDicePerLevel value landing on a ClassFeature row despite the "must
+  // never" comment) on top of a REAL Second Wind row, whose grant `level` (1,
+  // both editions) already satisfies resolveEffectScaling's `row.level > 0`
+  // guard on its own. With castSpecFromRow's `level: 0` override in place,
+  // that guard can't fire no matter what upcastDicePerLevel says, so scaling
+  // stays `{ mode: "none" }`. Deleting the override arms it: `row.level`
+  // reverts to the real grant level (1 > 0) and a truthy upcastDicePerLevel
+  // flips scaling to `{ mode: "slotUpcast", dicePerStep: 2 }` — confirmed by
+  // temporarily removing the override and re-running this test (went red).
+  it("castSpecFromRow's level:0 override neutralizes an upcastDicePerLevel leaked onto a real row", async () => {
+    const [row] = await prisma.classFeature.findMany({
+      where: { class: { name: "Fighter" }, name: "Second Wind", edition: "EDITION_2014" },
+    });
+    expect(row).toBeDefined();
+    const armed = { ...row, upcastDicePerLevel: 2 } as unknown as ClassFeatureRow;
+    const { spec } = castSpecFromRow(armed, 14, () => 0);
+    expect(spec.effect.scaling).toEqual({ mode: "none" });
   });
 });

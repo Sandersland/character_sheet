@@ -1,5 +1,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 
+import { FEATURE_ROWS_ORDER_BY } from "@/lib/classes/feature-rows-select.js";
+
 // Shared `include` for fetching a full character with its race/background/
 // class selections. classEntries is ordered so index 0 is always the
 // primary class (v1 creates exactly one; multiclass support will append
@@ -20,7 +22,12 @@ export const characterInclude = {
       // load (this `include` is a module-level const with no access to the
       // character's rulesEdition); featuresFromRows (lib/classes/
       // class-feature-rows.ts) does the in-memory per-edition filter.
-      class: { select: { subclassLevel: true, features: { where: { subclassId: null } } } },
+      class: {
+        select: {
+          subclassLevel: true,
+          features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+        },
+      },
       // Subclass-granted spells (#898), resolved live at serialize time from the
       // catalog rows this join loads (never snapshotted). Null when no subclass or
       // a homebrew subclass without a catalog row (#911).
@@ -29,7 +36,7 @@ export const characterInclude = {
       subclassRef: {
         include: {
           grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } },
-          features: true,
+          features: { orderBy: FEATURE_ROWS_ORDER_BY },
         },
       },
     },

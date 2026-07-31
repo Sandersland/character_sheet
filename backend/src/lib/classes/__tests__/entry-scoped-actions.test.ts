@@ -60,6 +60,21 @@ describe("deriveEntryScopedActions", () => {
     expect(actions.some((a) => a.key === "actionSurge")).toBe(true);
   });
 
+  // #1528: actionFromRow (actions.ts) resolves a row-driven action's
+  // enabled/disabledReason through the SAME resolveEnablement function the
+  // DERIVED_ACTIONS path uses (proven generically by wildShape's test in
+  // actions.test.ts) — but nothing exercised that shared function actually
+  // getting called correctly off a Fighter row's own resourceKey/cost until
+  // this test (actions.test.ts's two references to a nonexistent
+  // "actionsFromRows.test.ts" claimed this coverage lived here; it didn't).
+  it("a row-driven Fighter action (actionSurge) is disabled when its pool is exhausted", () => {
+    const entries = [{ name: "fighter", subclass: undefined, level: 2 }];
+    const actions = deriveEntryScopedActions(entries, 2, [{ key: "actionSurge", remaining: 0 }], true, "EDITION_2024", getFeatureRows);
+    const card = actions.find((a) => a.key === "actionSurge");
+    expect(card?.enabled).toBe(false);
+    expect(card?.disabledReason).toBe("No actionSurge remaining");
+  });
+
   it("dedupes by key when two entries could both match (base/primary wins ties, mirrors mergeLayers)", () => {
     const entries = [
       { name: "monk", subclass: "warrior of shadow", level: 6 },

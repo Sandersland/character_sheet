@@ -227,12 +227,13 @@ export function useTurnActions({
 
   // Surfaces a server-rolled heal-roll result (#1528 — Second Wind, no client
   // `healRoll` to preview from) as a toast, same spot surfaceReminder below
-  // writes to. There is no dice-animation for a server-decided roll yet
-  // (DiceRoller's `forcedResult` exists for it —
-  // features/dice/diceRollerTypes.ts — but wiring it into this click flow
-  // needs its own follow-up); the toast is the interim confirmation so the
-  // heal is never silently unconfirmed. Split out of sendForPlan to keep
-  // that function's own branching budget (fallow's cyclomatic/CRAP gate).
+  // writes to. There is no dice-animation for a server-decided roll yet —
+  // animating toward a result the server already picked needs its own design
+  // pass (how to reconstruct a single die face from the summed total, and
+  // where in TurnHub's tree to mount it) — the toast is the interim
+  // confirmation so the heal is never silently unconfirmed. Split out of
+  // sendForPlan to keep that function's own branching budget (fallow's
+  // cyclomatic/CRAP gate).
   function surfaceServerRoll(
     key: string,
     resolver: ActionResolver | undefined,

@@ -10,8 +10,6 @@ interface DiceRollModalProps {
   onResult: (result: RollResult) => void;
   /** Early dismiss (backdrop tap) while the dice are still tumbling. */
   onClose: () => void;
-  /** A server-decided result to animate toward (#1528) — see DiceRoller's own comment. */
-  forcedResult?: RollResult;
 }
 
 /**
@@ -21,7 +19,7 @@ interface DiceRollModalProps {
  * this overlay, so the 3D tray visibly "settles into" that one seal rather than
  * a separate in-modal breakdown.
  */
-export default function DiceRollModal({ spec, label, onResult, onClose, forcedResult }: DiceRollModalProps) {
+export default function DiceRollModal({ spec, label, onResult, onClose }: DiceRollModalProps) {
   return (
     <Modal title={label} onClose={onClose}>
       <div className="flex flex-col items-center gap-4 text-center">
@@ -35,7 +33,6 @@ export default function DiceRollModal({ spec, label, onResult, onClose, forcedRe
           // this overlay unmounting in favour of the seal.
           showTotal={false}
           className="w-full"
-          forcedResult={forcedResult}
         />
       </div>
     </Modal>

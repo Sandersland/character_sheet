@@ -229,4 +229,14 @@ describe("actionResolvers", () => {
     expect(resolverFor("notAnAction")).toBeUndefined();
     expect(resolverFor("")).toBeUndefined();
   });
+
+  it("resolverFor's row-driven fallback rejects a resolverKind outside ResolutionKind (#1528 finding 4) — never synthesizes a bogus resolver", () => {
+    // A served resolverKind that names no real ResolutionKind (a future class
+    // retab shipping a typo, or client/server skew) must be treated exactly
+    // like "no resolver" — partitionClassActions filters the action out —
+    // rather than reaching planActionClick's switch with a value outside its
+    // exhaustive union (that used to crash useTurnActions on click).
+    const action = { key: "unknownRowAction", name: "Unknown Row Action", cost: "action" as const, enabled: true, resolverKind: "not-a-real-kind" };
+    expect(resolverFor("unknownRowAction", action)).toBeUndefined();
+  });
 });

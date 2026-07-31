@@ -24,6 +24,7 @@
 import { randomUUID } from "node:crypto";
 
 import { executeActionOpSchema, type ExecuteActionOperation } from "@character-sheet/contracts";
+import type { ExecuteActionResult } from "@character-sheet/shared-types";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -57,16 +58,9 @@ const actionTransactionsSchema = z.object({
   operations: z.array(executeActionOpSchema).min(1),
 });
 
-/**
- * One op's server-computed result surfaced to the client (#1528) — mirrors
- * `ManeuverCastResult` (maneuvers.ts): a row-driven cast-core op rolls its
- * effect server-side and reports the roll here so the client can fold it
- * into an animation without re-deriving the number. Every other op (spend,
- * adjust, no-op) reports an empty object, index-aligned 1:1 with `operations`.
- */
-interface ExecuteActionResult {
-  roll?: number;
-}
+// ExecuteActionResult (#1528) now lives in @character-sheet/shared-types —
+// was a hand-written duplicate of frontend/src/types/character/actions.ts'
+// own copy (#1369/#1370's exact failure mode), caught in review.
 
 // Every class entry's own row-driven action rows (activationCost set), at
 // that entry's own effective level — the ONE place a row-driven actionKey
