@@ -16,15 +16,49 @@
 # NOT_YET_MIGRATED is the honest, ratcheting tracker of #1134 / epic #1522 —
 # an allow-list of what's STILL TS, not of what's forbidden. It starts at
 # ELEVEN (Fighter is deliberately absent — #1532 is what put it under this
-# guard's scan in the first place) and only ever shrinks: the only edit that
-# ADDS a line is a genuinely new thirteenth class, which the completeness
-# check below forces you to classify explicitly rather than let default to
-# "migrated". Cross-linked: #1134 tracks the retab wave itself; #1522 is the
-# ClassFeature foundation epic each retab depends on.
+# guard's scan in the first place) and only ever shrinks. A genuinely new
+# thirteenth class's lib/classes/<name>.ts is forced to be classified onto
+# EITHER ALL_CLASSES/NOT_YET_MIGRATED or NON_CLASS_MODULES below by the
+# reverse completeness check (search "reverse check") — without it, a new
+# file there defaults to unscanned, not "migrated": #1532's own arbiter review
+# found this guard exiting 0 against a lib/classes/artificer.ts probe file for
+# exactly that reason. Cross-linked: #1134 tracks the retab wave itself;
+# #1522 is the ClassFeature foundation epic each retab depends on.
 set -eu
 
 ALL_CLASSES="barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer warlock wizard"
 NOT_YET_MIGRATED="barbarian bard cleric druid monk paladin ranger rogue sorcerer warlock wizard"
+
+# Every OTHER backend/src/lib/classes/*.ts file (shared infrastructure, not a
+# per-class module) — forced to stay in sync with the tree by the reverse
+# check below, which fails loudly the moment a file in that directory is
+# neither here nor in ALL_CLASSES, rather than silently scanning it as
+# "migrated" (a thirteenth class's module would otherwise land unclassified).
+NON_CLASS_MODULES="ability-registry actions channel-divinity class class-feature-rows class-features feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
+
+# Reverse check: every backend/src/lib/classes/*.ts file's basename must be
+# classified as EITHER a class (ALL_CLASSES) or shared infrastructure
+# (NON_CLASS_MODULES) — the completeness check just above only validates
+# NOT_YET_MIGRATED against ALL_CLASSES, which says nothing about a NEW file
+# that never gets added to either list. Without this, a 13th class's module
+# silently falls out of NOT_YET_MIGRATED (so it's read as "already migrated")
+# and out of this scan entirely (so it's never checked at all).
+unclassified=""
+for f in backend/src/lib/classes/*.ts; do
+  base=$(basename "$f" .ts)
+  case " $ALL_CLASSES " in
+    *" $base "*) continue ;;
+  esac
+  case " $NON_CLASS_MODULES " in
+    *" $base "*) continue ;;
+  esac
+  unclassified="$unclassified $base"
+done
+if [ -n "$unclassified" ]; then
+  echo "error: check-class-ts-migration.sh found backend/src/lib/classes/*.ts file(s) classified as neither a class nor shared infrastructure:$unclassified" >&2
+  echo "Add it to ALL_CLASSES (+ NOT_YET_MIGRATED, unless it's already fully row-driven) if it's a new class, or to NON_CLASS_MODULES if it's shared infrastructure." >&2
+  exit 1
+fi
 
 # Pin on FILE EXISTENCE, never a line number — #1553 is the filed defect
 # against the catalog-id guard's positional pinning, and this issue's own
@@ -137,6 +171,14 @@ scan_names() {
   # shellcheck disable=SC2086 -- word-splitting is the point, not a bug
   set -- $1
   pattern=$(IFS='|'; echo "$*")
+  # Guard an empty name list (e.g. MIGRATED emptied out by an edit that makes
+  # ALL_CLASSES == NOT_YET_MIGRATED): an empty $pattern builds the degenerate
+  # regex `\b()\b`, an empty alternation that hangs some grep implementations
+  # (measured >2min) instead of failing loudly. No names to scan for means no
+  # hits, not a hang.
+  if [ -z "$pattern" ]; then
+    return 0
+  fi
   for f in $FILES; do
     hits=$(grep -inE "\\b($pattern)\\b" "$f" || true)
     [ -z "$hits" ] && continue
@@ -180,16 +222,19 @@ for allowed in $FILE_ALLOWLIST; do
   fi
 done
 
-bad=""
+# A fixed /tmp path would let two concurrent worktree runs (this guard is
+# invoked from both lefthook and CI) clobber each other's scratch file;
+# mktemp gives each invocation its own.
+bad_file=$(mktemp)
+trap 'rm -f "$bad_file"' EXIT
 printf '%s\n' "$occurrences" | while IFS= read -r occ; do
   [ -z "$occ" ] && continue
   file=${occ%:*}
   if ! is_allowlisted_file "$file"; then
     echo "$occ"
   fi
-done > /tmp/check-class-ts-migration.bad
-bad=$(cat /tmp/check-class-ts-migration.bad)
-rm -f /tmp/check-class-ts-migration.bad
+done > "$bad_file"
+bad=$(cat "$bad_file")
 
 if [ -n "$bad" ]; then
   echo "error: a MIGRATED class ($MIGRATED) name reappeared as class-specific TS outside its data source (#1522/#1134/#1532):" >&2

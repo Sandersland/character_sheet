@@ -30,23 +30,49 @@ const ABILITY_SCORES = {
 
 const EDITIONS = ["EDITION_2014", "EDITION_2024"] as const;
 
-// Six cells: 3 subclasses x 2 editions. Level 5 clears every subclass's L3
-// grant gate in both editions (subclassGateLevel's undefined-grantLevel
-// fallback is 3 either way, per registry.ts's SUBCLASSES overlay comment).
-describe("Champion, Battle Master and Eldritch Knight all still resolve their seeded subclass rows with fighter.ts gone", () => {
-  const LEVEL = 5;
+// Named, not counted: `mergeLayers` merges base + subclass features, so
+// Fighter's BASE rows (Second Wind, Extra Attack, ...) alone satisfy a bare
+// `features.length > 0` — that shape passed vacuously against the arbiter's
+// mutation (registry.ts's SUBCLASS_IDENTITY seeding loop skipping
+// `classKey === "fighter"`), which silently drops every one of these three
+// subclasses' rows and was caught by NOTHING for Eldritch Knight (its 2024
+// rows are parked verbatim copies of 2014 pending #1531, so a dropped row
+// produces no diff against 2014 either). Naming one subclass-scoped row per
+// subclass — each confirmed present in fighter-features.ts — is what
+// actually proves a subclass-scoped row survived, in both editions.
+const SUBCLASS_SCOPED_FEATURES: Record<"champion" | "battle master" | "eldritch knight", readonly [string, string]> = {
+  champion: ["Improved Critical", "Remarkable Athlete"],
+  "battle master": ["Combat Superiority", "Student of War"],
+  "eldritch knight": ["Eldritch Knight Spellcasting", "Weapon Bond"],
+};
 
-  it.each(["champion", "battle master", "eldritch knight"] as const)(
-    "%s: features resolve in both editions",
-    async (subclass) => {
-      const featureRows = await loadDbFeatureRows("fighter", subclass);
-      for (const edition of EDITIONS) {
-        const info = deriveResources("fighter", subclass, LEVEL, ABILITY_SCORES, proficiencyBonusForLevel(LEVEL), featureRows, edition);
-        expect(info, `${subclass}/${edition}`).not.toBeNull();
-        expect(info?.features.length ?? 0, `${subclass}/${edition} features`).toBeGreaterThan(0);
-      }
-    },
-  );
+// Six cells: 3 subclasses x 2 editions, each its own it.each row (not a
+// subclass-level test looping editions internally) so a mutation that drops
+// every subclass's rows shows as six independently-red lines, not one test
+// that aborts at the first failing edition and never reports the second.
+const CELLS = (Object.keys(SUBCLASS_SCOPED_FEATURES) as (keyof typeof SUBCLASS_SCOPED_FEATURES)[]).flatMap((subclass) =>
+  EDITIONS.map((edition) => [subclass, edition] as const),
+);
+
+// Level 7, not 5: every subclass activates at L3 (subclassGateLevel's
+// undefined-grantLevel fallback, both editions), but Champion's 2014
+// "Remarkable Athlete" row is itself gated at L7 (SRD 5.2 level-shifts it to
+// L3, PHB'14 p.72 keeps it at L7) — L5 would clear the subclass gate while
+// still missing that one row's OWN level gate, silently narrowing this test
+// back to a "some rows resolve" check instead of "the named rows resolve".
+// L7 clears every SUBCLASS_SCOPED_FEATURES row's own level in both editions.
+describe("Champion, Battle Master and Eldritch Knight all still resolve their OWN seeded subclass-scoped rows with fighter.ts gone", () => {
+  const LEVEL = 7;
+
+  it.each(CELLS)("%s/%s: its own subclass-scoped feature rows survive", async (subclass, edition) => {
+    const featureRows = await loadDbFeatureRows("fighter", subclass);
+    const info = deriveResources("fighter", subclass, LEVEL, ABILITY_SCORES, proficiencyBonusForLevel(LEVEL), featureRows, edition);
+    expect(info, `${subclass}/${edition}`).not.toBeNull();
+    const names = info?.features.map((f) => f.name) ?? [];
+    for (const expectedName of SUBCLASS_SCOPED_FEATURES[subclass]) {
+      expect(names, `${subclass}/${edition} missing "${expectedName}"`).toContain(expectedName);
+    }
+  });
 
   // Only Champion and Battle Master have their own subclass-scoped resource
   // pool (Champion's crit-range work is a #1120 gap, not a pool; Eldritch
@@ -64,11 +90,15 @@ describe("Champion, Battle Master and Eldritch Knight all still resolve their se
     }
   });
 
-  it("champion: carries features but declares no resource pool of its own (its crit-range bonus is a #1120 gap, not a pool)", async () => {
+  it("champion: carries its own subclass-scoped features but declares no resource pool of its own (its crit-range bonus is a #1120 gap, not a pool)", async () => {
     const featureRows = await loadDbFeatureRows("fighter", "champion");
     for (const edition of EDITIONS) {
       const info = deriveResources("fighter", "champion", LEVEL, ABILITY_SCORES, proficiencyBonusForLevel(LEVEL), featureRows, edition);
-      expect(info?.features.length ?? 0, edition).toBeGreaterThan(0);
+      const names = info?.features.map((f) => f.name) ?? [];
+      for (const expectedName of SUBCLASS_SCOPED_FEATURES.champion) {
+        expect(names, `${edition} missing "${expectedName}"`).toContain(expectedName);
+      }
+      expect(info?.resources.map((r) => r.key) ?? [], edition).not.toContain("superiorityDice");
     }
   });
 });
