@@ -67,11 +67,14 @@ async function resolveSubclassId(className: string, subclass: string): Promise<s
  */
 export async function loadDbFeatureRows(className: string, subclass: string | undefined): Promise<ClassFeatureRowsCarrier> {
   const classId = await resolveClassId(className);
-  const classRows = await prisma.classFeature.findMany({ where: { classId, subclassId: null } });
+  // Prisma types resourceTotals/resourceDieTiers/derivedStatTiers as opaque
+  // Prisma.JsonValue — cast to ClassFeatureRow's tiered shape here, mirroring
+  // feature-rows-select.ts's featureRowsOf (#1528).
+  const classRows = (await prisma.classFeature.findMany({ where: { classId, subclassId: null } })) as unknown as ClassFeatureRow[];
   let subclassRows: ClassFeatureRow[] = [];
   if (subclass) {
     const subclassId = await resolveSubclassId(className, subclass);
-    subclassRows = await prisma.classFeature.findMany({ where: { classId, subclassId } });
+    subclassRows = (await prisma.classFeature.findMany({ where: { classId, subclassId } })) as unknown as ClassFeatureRow[];
   }
   return { classRows, subclassRows };
 }

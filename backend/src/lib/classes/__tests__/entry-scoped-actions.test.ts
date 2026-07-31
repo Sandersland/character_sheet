@@ -9,11 +9,17 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveActions, deriveEntryScopedActions } from "@/lib/classes/actions.js";
+import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
+
+// Fighter's Second Wind/Action Surge are row-driven now (#1528) — every
+// deriveEntryScopedActions call below that expects to see them needs this
+// carrier callback (mirrors production's featureRowsOf).
+const getFeatureRows = (entry: { name: string; subclass?: string }) => testFeatureRowsFor(entry.name, entry.subclass);
 
 describe("deriveEntryScopedActions", () => {
   it("single-class parity: output is identical to a bare deriveActions call", () => {
     const entries = [{ name: "monk", subclass: "warrior of shadow", level: 6 }];
-    const entryScoped = deriveEntryScopedActions(entries, 6, [], true, "EDITION_2024");
+    const entryScoped = deriveEntryScopedActions(entries, 6, [], true, "EDITION_2024", getFeatureRows);
     // deriveActions is slug-native (#1277) — "warrior of shadow" resolves to
     // this slug via resolveSubclassSlug, which deriveEntryScopedActions calls
     // internally; this bare comparison passes the resolved slug directly.
@@ -26,7 +32,7 @@ describe("deriveEntryScopedActions", () => {
       { name: "fighter", subclass: undefined, level: 5 },
       { name: "monk", subclass: "warrior of shadow", level: 3 },
     ];
-    const actions = deriveEntryScopedActions(entries, 8, [], true, "EDITION_2024");
+    const actions = deriveEntryScopedActions(entries, 8, [], true, "EDITION_2024", getFeatureRows);
     expect(actions.some((a) => a.key === "shadowArts")).toBe(true);
     // cloakOfShadows needs monk entry level 17 — nowhere near reached at entry level 3,
     // even though the (irrelevant) total level of 8 is well past shadowArts' own gate.
@@ -38,7 +44,7 @@ describe("deriveEntryScopedActions", () => {
       { name: "fighter", subclass: undefined, level: 5 },
       { name: "monk", subclass: "warrior of shadow", level: 2 },
     ];
-    const actions = deriveEntryScopedActions(entries, 7, [], true, "EDITION_2024");
+    const actions = deriveEntryScopedActions(entries, 7, [], true, "EDITION_2024", getFeatureRows);
     expect(actions.some((a) => a.key === "shadowArts")).toBe(false);
   });
 
@@ -50,7 +56,7 @@ describe("deriveEntryScopedActions", () => {
       { name: "wizard", subclass: undefined, level: 5 },
       { name: "fighter", subclass: undefined, level: 2 },
     ];
-    const actions = deriveEntryScopedActions(entries, 7, [], true, "EDITION_2024");
+    const actions = deriveEntryScopedActions(entries, 7, [], true, "EDITION_2024", getFeatureRows);
     expect(actions.some((a) => a.key === "actionSurge")).toBe(true);
   });
 
@@ -59,7 +65,7 @@ describe("deriveEntryScopedActions", () => {
       { name: "monk", subclass: "warrior of shadow", level: 6 },
       { name: "monk", subclass: "warrior of shadow", level: 6 },
     ];
-    const actions = deriveEntryScopedActions(entries, 12, [], true, "EDITION_2024");
+    const actions = deriveEntryScopedActions(entries, 12, [], true, "EDITION_2024", getFeatureRows);
     expect(actions.filter((a) => a.key === "shadowStep")).toHaveLength(1);
   });
 
@@ -74,7 +80,7 @@ describe("deriveEntryScopedActions", () => {
         { name: "cleric", subclass: "life domain", level: 2 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
       ];
-      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024");
+      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024", getFeatureRows);
       expect(actions.filter((a) => a.key === "channelDivinity")).toHaveLength(1);
       expect(actions.filter((a) => a.name === "Channel Divinity")).toHaveLength(1);
       expect(actions.some((a) => a.key === "channelDivinityCleric")).toBe(false);
@@ -86,7 +92,7 @@ describe("deriveEntryScopedActions", () => {
         { name: "paladin", subclass: "oath of devotion", level: 4 },
         { name: "cleric", subclass: "life domain", level: 6 },
       ];
-      const actions = deriveEntryScopedActions(entries, 10, [{ key: "channelDivinity", remaining: 2 }], true, "EDITION_2024");
+      const actions = deriveEntryScopedActions(entries, 10, [{ key: "channelDivinity", remaining: 2 }], true, "EDITION_2024", getFeatureRows);
       expect(actions.filter((a) => a.key === "channelDivinity")).toHaveLength(1);
     });
 
@@ -95,7 +101,7 @@ describe("deriveEntryScopedActions", () => {
         { name: "cleric", subclass: "life domain", level: 1 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
       ];
-      const actions = deriveEntryScopedActions(entries, 4, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024");
+      const actions = deriveEntryScopedActions(entries, 4, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024", getFeatureRows);
       expect(actions.some((a) => a.key === "channelDivinity")).toBe(true);
     });
 
@@ -104,7 +110,7 @@ describe("deriveEntryScopedActions", () => {
         { name: "cleric", subclass: "life domain", level: 1 },
         { name: "paladin", subclass: "oath of devotion", level: 2 },
       ];
-      const actions = deriveEntryScopedActions(entries, 3, [], true, "EDITION_2024");
+      const actions = deriveEntryScopedActions(entries, 3, [], true, "EDITION_2024", getFeatureRows);
       expect(actions.some((a) => a.key === "channelDivinity")).toBe(false);
     });
 
@@ -113,7 +119,7 @@ describe("deriveEntryScopedActions", () => {
         { name: "cleric", subclass: "life domain", level: 2 },
         { name: "paladin", subclass: "oath of devotion", level: 2 },
       ];
-      const actions = deriveEntryScopedActions(entries, 4, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024");
+      const actions = deriveEntryScopedActions(entries, 4, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024", getFeatureRows);
       expect(actions.some((a) => a.key === "channelDivinity")).toBe(true);
     });
 
@@ -122,7 +128,7 @@ describe("deriveEntryScopedActions", () => {
         { name: "cleric", subclass: "life domain", level: 2 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
       ];
-      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024");
+      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 1 }], true, "EDITION_2024", getFeatureRows);
       const card = actions.find((a) => a.key === "channelDivinity");
       expect(card?.reminder).toMatch(/Cleric/);
       expect(card?.reminder).toMatch(/Paladin/);
@@ -133,7 +139,7 @@ describe("deriveEntryScopedActions", () => {
         { name: "cleric", subclass: "life domain", level: 2 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
       ];
-      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 0 }], true, "EDITION_2024");
+      const actions = deriveEntryScopedActions(entries, 5, [{ key: "channelDivinity", remaining: 0 }], true, "EDITION_2024", getFeatureRows);
       const card = actions.find((a) => a.key === "channelDivinity");
       expect(card?.enabled).toBe(false);
     });

@@ -9,6 +9,7 @@ import {
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import type { DerivedFeature } from "@/lib/classes/types.js";
 import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { deriveManeuverEffect } from "@/lib/classes/maneuver-effect.js";
@@ -39,15 +40,18 @@ export function buildResourcesView(
 ): { resources: object | undefined; maneuverSaveDC: number | undefined } {
   // The ONE production caller that supplies real ClassFeature rows (#1524):
   // characterInclude loaded entry.class.features (already subclassId:null
-  // filtered) and entry.subclassRef.features — featuresFromRows does the
-  // per-edition filter inside deriveResources itself.
+  // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
+  // do the per-edition filter inside deriveResources itself. featureRowsOf
+  // (feature-rows-select.ts, #1528 chunk 0) is the SAME extractor every
+  // narrow-select caller now uses too, so this stays the one place the
+  // "class"/"subclassRef" → carrier mapping is written.
   const { derived: derivedRes } = deriveEntryScopedResources(
     row.classEntries,
     level,
     abilityScores,
     proficiencyBonus,
     editionOf(row),
-    (entry) => ({ classRows: entry.class?.features ?? [], subclassRows: entry.subclassRef?.features ?? [] }),
+    featureRowsOf,
   );
 
   const resources = derivedRes
@@ -211,7 +215,10 @@ export function buildAvailableActionsView(
     resources && "pools" in resources
       ? (resources as { pools: { key: string; remaining: number }[] }).pools
       : [];
-  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition);
+  // featureRowsOf (#1528 chunk 0): a Fighter entry's row-driven actions
+  // (Second Wind/Action Surge) surface here through the SAME carrier
+  // buildResourcesView passes for its pools/features.
+  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf);
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

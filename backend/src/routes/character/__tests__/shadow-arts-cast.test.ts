@@ -16,6 +16,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-shadow-cast";
 let COOKIE: string;
@@ -374,6 +375,13 @@ describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
       update: {},
     });
     mc2ClassId = cls.id;
+    // Second Wind/Action Surge are row-driven now (#1528) and tied to a
+    // specific classId — this fixture's fighter entry shares its classId with
+    // the monk entry (both point at the same bespoke row), so seeding these
+    // rows here covers the "PRIMARY Fighter's own actions still surface too"
+    // assertion below.
+    await prisma.classFeature.deleteMany({ where: { classId: mc2ClassId } });
+    await prisma.classFeature.createMany({ data: fighterResourceRowsData(mc2ClassId) });
   });
 
   afterAll(async () => {
@@ -402,7 +410,17 @@ describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
         classEntries: {
           create: [
             { name: "fighter", subclass: null, classId: mc2ClassId, level: 8 - monkLevel, position: 0 },
-            { name: "monk", subclass: "warrior of shadow", classId: mc2ClassId, level: monkLevel, position: 1 },
+            // classId: null (#1528) — this entry previously shared mc2ClassId
+            // with the fighter entry above, which was harmless while
+            // resourceFn dispatched by className string alone; now that
+            // Second Wind/Action Surge are row-driven (classId-scoped
+            // ClassFeature rows, keyed independent of entry.name), sharing
+            // one classId across two logically-different class entries
+            // makes BOTH entries see the fighter rows — an unsanctioned
+            // "secondWind"/"actionSurge" pool-key collision 500s in
+            // collectEntryScopedPools. Monk needs no classId here (its own
+            // gates resolve off entry.name/subclass, never entry.classId).
+            { name: "monk", subclass: "warrior of shadow", classId: null, level: monkLevel, position: 1 },
           ],
         },
       },

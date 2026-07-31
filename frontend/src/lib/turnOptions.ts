@@ -161,7 +161,12 @@ export function partitionClassActions(
   availableActions: AvailableAction[],
   raging: boolean,
 ): ClassActionPartitions {
-  const withResolver = availableActions.filter((a) => resolverFor(a.key) !== undefined);
+  // resolverFor(a.key, a) — passing the action itself (#1528) so a row-driven
+  // key (Second Wind/Action Surge, no ACTION_RESOLVERS entry anymore) still
+  // resolves via its served `resolverKind` instead of being filtered out here
+  // silently (the exact "vanishes with no test failure" hazard the ordering
+  // matters for).
+  const withResolver = availableActions.filter((a) => resolverFor(a.key, a) !== undefined);
   return {
     classActions: withResolver.filter((a) => a.cost === "action"),
     // While raging, swap the Rage affordance for End Rage (both are bonus actions).

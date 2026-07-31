@@ -271,6 +271,7 @@ export default function DiceRoller({
   skip = false,
   showTotal = true,
   className = "",
+  forcedResult,
 }: DiceRollerProps) {
   const [result, setResult] = useState<RollResult | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -287,6 +288,8 @@ export default function DiceRoller({
   onResultRef.current = onResult;
   const skipRef = useRef(skip);
   skipRef.current = skip;
+  const forcedResultRef = useRef(forcedResult);
+  forcedResultRef.current = forcedResult;
   const resultRef = useRef(result);
   resultRef.current = result;
   const lastRollKeyRef = useRef<number | string | undefined>(undefined);
@@ -371,7 +374,9 @@ export default function DiceRoller({
   function roll() {
     if (timeoutRef.current !== undefined) clearTimeout(timeoutRef.current);
 
-    const next = rollSpec(specRef.current);
+    // A forced (server-decided) result animates toward that number instead of
+    // rolling a fresh client-side one (#1528) — see forcedResult's own comment.
+    const next = forcedResultRef.current ?? rollSpec(specRef.current);
     setResult(next);
     setRollId((id) => id + 1);
 

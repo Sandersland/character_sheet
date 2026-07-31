@@ -3438,7 +3438,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3453,7 +3453,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3461,7 +3461,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3475,7 +3475,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3483,7 +3483,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3497,7 +3497,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3505,7 +3505,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3519,7 +3519,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3527,7 +3527,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3541,7 +3541,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3549,7 +3549,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3563,7 +3563,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3571,7 +3571,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3585,7 +3585,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3593,7 +3593,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3607,7 +3607,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3615,14 +3615,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3636,7 +3636,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3644,14 +3644,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3665,7 +3665,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3673,14 +3673,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3694,7 +3694,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3702,14 +3702,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3723,7 +3723,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3731,14 +3731,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3752,7 +3752,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3760,14 +3760,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3781,7 +3781,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3789,14 +3789,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3810,7 +3810,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3818,14 +3818,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3839,7 +3839,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3847,14 +3847,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3868,7 +3868,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3876,14 +3876,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3897,7 +3897,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3905,14 +3905,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3926,7 +3926,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3934,14 +3934,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -3960,7 +3960,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3975,7 +3975,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -3983,7 +3983,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -3999,7 +3999,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 13,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4007,7 +4007,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4032,7 +4032,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 13,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4040,7 +4040,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4065,7 +4065,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4073,7 +4073,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4098,7 +4098,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4106,7 +4106,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4131,7 +4131,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4139,7 +4139,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4164,7 +4164,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 14,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4172,7 +4172,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4197,7 +4197,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4205,14 +4205,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4237,7 +4237,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4245,14 +4245,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4277,7 +4277,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4285,14 +4285,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4317,7 +4317,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 15,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4325,14 +4325,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4357,7 +4357,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4365,14 +4365,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4397,7 +4397,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4405,14 +4405,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4437,7 +4437,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4445,14 +4445,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4477,7 +4477,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 16,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4485,14 +4485,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4517,7 +4517,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4525,14 +4525,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4557,7 +4557,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4565,14 +4565,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4597,7 +4597,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4605,14 +4605,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4637,7 +4637,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
       "maneuverSaveDC": 17,
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4645,14 +4645,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4680,7 +4680,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4695,7 +4695,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4703,7 +4703,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4717,7 +4717,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4725,7 +4725,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4739,7 +4739,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4747,7 +4747,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4761,7 +4761,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4769,7 +4769,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4783,7 +4783,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4791,7 +4791,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4805,7 +4805,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4813,7 +4813,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4827,7 +4827,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4835,7 +4835,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -4849,7 +4849,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4857,14 +4857,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4878,7 +4878,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4886,14 +4886,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4907,7 +4907,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4915,14 +4915,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4936,7 +4936,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4944,14 +4944,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4965,7 +4965,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -4973,14 +4973,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -4994,7 +4994,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5002,14 +5002,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5023,7 +5023,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5031,14 +5031,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5052,7 +5052,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5060,14 +5060,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5081,7 +5081,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5089,14 +5089,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5110,7 +5110,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5118,14 +5118,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5139,7 +5139,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5147,14 +5147,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5168,7 +5168,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5176,14 +5176,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5202,7 +5202,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 1 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5217,7 +5217,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 2 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5225,7 +5225,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -5239,7 +5239,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 3 HP. You have 2 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5247,7 +5247,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 2,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -5261,7 +5261,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 4 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5269,7 +5269,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -5283,7 +5283,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 5 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5291,7 +5291,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -5305,7 +5305,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 6 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5313,7 +5313,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -5327,7 +5327,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 7 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5335,7 +5335,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -5349,7 +5349,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 8 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5357,7 +5357,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
@@ -5371,7 +5371,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 9 HP. You have 3 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5379,14 +5379,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 3,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5400,7 +5400,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 10 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5408,14 +5408,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5429,7 +5429,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 11 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5437,14 +5437,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5458,7 +5458,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 12 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5466,14 +5466,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5487,7 +5487,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 13 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5495,14 +5495,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5516,7 +5516,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 14 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5524,14 +5524,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5545,7 +5545,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 15 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5553,14 +5553,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5574,7 +5574,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 16 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5582,14 +5582,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5603,7 +5603,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 17 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5611,14 +5611,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5632,7 +5632,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 18 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5640,14 +5640,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5661,7 +5661,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 19 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5669,14 +5669,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -5690,7 +5690,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
+          "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
           "key": "secondWind",
           "label": "Second Wind",
           "recharge": "longRest",
@@ -5698,14 +5698,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "total": 4,
         },
         {
-          "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
+          "description": "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
           "key": "actionSurge",
           "label": "Action Surge",
           "recharge": "short-or-long",
           "total": 2,
         },
         {
-          "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
+          "description": "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
           "key": "indomitable",
           "label": "Indomitable",
           "recharge": "longRest",
@@ -15235,28 +15235,6 @@ exports[`deriveResourcesForCharacterRow > derives level + resources from XP and 
   "maneuverChoiceCount": 9,
   "maneuverSaveDC": 17,
   "resources": [
-    {
-      "description": "Bonus action: regain 1d10 + 20 HP. You have 4 uses. Regain one expended use on a short rest, all on a long rest.",
-      "key": "secondWind",
-      "label": "Second Wind",
-      "recharge": "longRest",
-      "shortRestRegain": 1,
-      "total": 4,
-    },
-    {
-      "description": "Take one additional action on your turn. Regain use(s) on a short or long rest.",
-      "key": "actionSurge",
-      "label": "Action Surge",
-      "recharge": "short-or-long",
-      "total": 2,
-    },
-    {
-      "description": "Reroll a failed saving throw (must accept the new result). Regain use(s) on a long rest.",
-      "key": "indomitable",
-      "label": "Indomitable",
-      "recharge": "longRest",
-      "total": 3,
-    },
     {
       "description": "Spend to fuel maneuvers. Maneuver save DC 17. Regain all on a short or long rest.",
       "die": "d12",

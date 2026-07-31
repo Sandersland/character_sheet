@@ -35,6 +35,27 @@ export interface AvailableAction {
    * in SRD 5.1, Utilize in SRD 5.2).
    */
   regrants?: string[];
+  /**
+   * Which inline resolution tool to render for this action (#1528) — served
+   * only for a row-driven action (backend's actionsFromRows); a class still
+   * on the DERIVED_ACTIONS/ACTION_RESOLVERS path leaves this undefined, and
+   * `resolverFor` keeps reading its own keyed table for those. Values mirror
+   * `ResolutionKind` (actionResolvers.ts) — the wire-served vocabulary a
+   * ClassFeature row can name, retiring the frontend's per-key mirror one
+   * row at a time (#1383).
+   */
+  resolverKind?: string;
+}
+
+/**
+ * One executeAction op's server-computed result (#1528) — mirrors
+ * `ManeuverCastResult` (classes.ts): a row-driven cast-core action (Second
+ * Wind) rolls its effect server-side and reports the roll here so the client
+ * can fold it into a dice animation without re-deriving the number. Index-
+ * aligned 1:1 with the request's `operations`; every other op reports `{}`.
+ */
+export interface ExecuteActionResult {
+  roll?: number;
 }
 
 // The action op is derived from the route zod schema in

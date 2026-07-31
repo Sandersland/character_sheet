@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-hitpoints";
 let COOKIE: string;
@@ -494,6 +495,13 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
       },
       update: {},
     });
+    // Second Wind/Action Surge are row-driven now (#1528) and tied to a
+    // specific classId — Battle Master's superiorityDice pool is unaffected
+    // (still resourceFn, keyed by subclass NAME in registry.ts's SUBCLASSES
+    // dict, not this row's DB id), but this bespoke class needs its own rows
+    // for the base pools this test's `used` snapshot asserts on.
+    await prisma.classFeature.deleteMany({ where: { classId: cls.id } });
+    await prisma.classFeature.createMany({ data: fighterResourceRowsData(cls.id) });
     await prisma.character.create({
       data: {
         ...BM_FIXTURE,

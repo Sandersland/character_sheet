@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { readEffectSpec } from "@/lib/combat/effects.js";
 
 import { CLASS_FEATURES, LITERAL_ROW_CLASSES } from "../class-features.js";
 import { seedClassFeatures } from "../seed-class-features.js";
@@ -146,15 +147,44 @@ describe("ClassFeature migration — the 5 already-forked pairs were not duplica
   });
 });
 
-describe("ClassFeature migration — every descriptor column is NULL/default across all 522 rows (#1523)", () => {
-  it("no row has a populated descriptor column yet — mechanics wiring belongs to #1528+", async () => {
-    const rows = await prisma.classFeature.findMany();
+// Second Wind/Action Surge/Indomitable (base Fighter, both editions — 6 rows)
+// are the FIRST descriptor columns populated (#1528, the ClassFeature pilot):
+// resourceKey/resourceTotals/resourceRecharge for all three, plus
+// activation/cost/effect columns for the two that are selectable actions
+// (Indomitable never was — see fighter-features.ts's own comment). Every
+// OTHER row — including every OTHER Fighter row — stays NULL/default until
+// its own wave-2 retab (#1134).
+const POPULATED_ROW_NAMES = new Set(["Second Wind", "Action Surge", "Indomitable"]);
+
+function isPopulatedFighterRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return row.className === "Fighter" && row.subclassSlug === null && POPULATED_ROW_NAMES.has(row.name);
+}
+
+describe("ClassFeature migration — every descriptor column is NULL/default, except Fighter's #1528 pilot rows", () => {
+  it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528)", async () => {
+    const rows = await prisma.classFeature.findMany({
+      select: { name: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
+        resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
+        activationCost: true, resolverKind: true, requiresUnarmored: true, regrants: true,
+        costKind: true, costPoolKey: true, costBase: true, costPerStep: true,
+        effectKind: true, effectDiceCount: true, effectDiceFaces: true, effectDieSource: true,
+        effectModifier: true, effectModifierSource: true, damageType: true, attackType: true,
+        saveAbility: true, saveEffect: true, buffTarget: true, buffModifier: true,
+        derivedStat: true, derivedStatTiers: true,
+      },
+    });
     // Pinned to the registry-derived count, not `> 0`: a row silently dropped
     // by the seeder (or left over from a previous test's partial write) would
     // still pass every per-row expectation below and read as "all clear".
     expect(rows.length).toBe(CLASS_FEATURES.length);
 
     for (const row of rows) {
+      const populated = isPopulatedFighterRow({ className: row.class.name, subclassSlug: row.subclass?.slug ?? null, name: row.name });
+      if (populated) {
+        // Populated by #1528 — asserted precisely in the describe block below.
+        expect(row.resourceKey, row.name).not.toBeNull();
+        continue;
+      }
       expect(row.resourceKey, row.name).toBeNull();
       expect(row.resourceLabel, row.name).toBeNull();
       expect(row.resourceRecharge, row.name).toBeNull();
@@ -194,14 +224,97 @@ describe("ClassFeature migration — every descriptor column is NULL/default acr
   // the SQL-level state directly for the three Json? columns so a future
   // regression to JsonNull goes red here instead of only showing up as a
   // `WHERE col IS NULL` filter silently matching zero rows four stages from
-  // now (#1525's population guards).
-  it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null", async () => {
+  // now (#1525's population guards). resourceTotals excludes #1528's six
+  // populated Fighter rows (Second Wind ×2/Action Surge ×2/Indomitable ×2,
+  // all of which set it); resourceDieTiers/derivedStatTiers are untouched by
+  // #1528 (no Fighter row sets a die-size tier), so their counts stay
+  // CLASS_FEATURES.length exactly.
+  it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere #1528 didn't populate them", async () => {
+    const populatedResourceTotalsCount = 6;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
+      const expectedDbNull = column === "resourceTotals" ? CLASS_FEATURES.length - populatedResourceTotalsCount : CLASS_FEATURES.length;
       const dbNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.DbNull } } });
-      expect(dbNullCount, column).toBe(CLASS_FEATURES.length);
+      expect(dbNullCount, column).toBe(expectedDbNull);
 
       const jsonNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.JsonNull } } });
       expect(jsonNullCount, column).toBe(0);
+    }
+  });
+});
+
+// #1528: precise pin for the six populated rows — proves the pilot's write
+// landed exactly as authored, not just "something is non-null" (the loose
+// check above).
+describe("ClassFeature migration — Fighter's #1528 pilot rows are populated exactly as authored", () => {
+  it("Second Wind: resourceKey/recharge/totals + activation/cost/effect columns, per edition", async () => {
+    const rows = await prisma.classFeature.findMany({
+      where: { name: "Second Wind", class: { name: "Fighter" }, subclassId: null },
+      orderBy: { edition: "asc" },
+    });
+    expect(rows).toHaveLength(2);
+    const [row2014, row2024] = rows[0].edition === "EDITION_2014" ? [rows[0], rows[1]] : [rows[1], rows[0]];
+
+    expect(row2014.resourceKey).toBe("secondWind");
+    expect(row2014.resourceRecharge).toBe("short-or-long");
+    expect(row2014.resourceTotals).toEqual([{ minLevel: 1, total: 1 }]);
+
+    expect(row2024.resourceKey).toBe("secondWind");
+    expect(row2024.resourceRecharge).toBe("longRest");
+    expect(row2024.resourceTotals).toEqual([
+      { minLevel: 1, total: 2, shortRestRegain: 1 },
+      { minLevel: 4, total: 3, shortRestRegain: 1 },
+      { minLevel: 10, total: 4, shortRestRegain: 1 },
+    ]);
+
+    for (const row of rows) {
+      expect(row.activationCost, row.edition).toBe("bonusAction");
+      expect(row.resolverKind, row.edition).toBe("heal-roll");
+      expect(row.costKind, row.edition).toBe("pool");
+      expect(row.costPoolKey, row.edition).toBe("secondWind");
+      expect(row.costBase, row.edition).toBe(1);
+      expect(row.effectKind, row.edition).toBe("heal");
+      expect(row.effectDiceCount, row.edition).toBe(1);
+      expect(row.effectDiceFaces, row.edition).toBe(10);
+      expect(row.effectModifierSource, row.edition).toBe("classLevel");
+    }
+  });
+
+  it("Action Surge: resourceKey/recharge/totals identical across both editions + activation/cost columns, no effect columns (pure counter)", async () => {
+    const rows = await prisma.classFeature.findMany({
+      where: { name: "Action Surge", class: { name: "Fighter" }, subclassId: null },
+    });
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.resourceKey, row.edition).toBe("actionSurge");
+      expect(row.resourceRecharge, row.edition).toBe("short-or-long");
+      expect(row.resourceTotals, row.edition).toEqual([
+        { minLevel: 2, total: 1 },
+        { minLevel: 17, total: 2 },
+      ]);
+      expect(row.activationCost, row.edition).toBe("special");
+      expect(row.resolverKind, row.edition).toBe("simple-confirm");
+      expect(row.costKind, row.edition).toBe("pool");
+      expect(row.costPoolKey, row.edition).toBe("actionSurge");
+      expect(row.costBase, row.edition).toBe(1);
+      expect(row.effectKind, row.edition).toBeNull(); // no such axis — a pure counter
+    }
+  });
+
+  it("Indomitable: resourceKey/recharge/totals only — no activation (never a selectable action)", async () => {
+    const rows = await prisma.classFeature.findMany({
+      where: { name: "Indomitable", class: { name: "Fighter" }, subclassId: null },
+    });
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.resourceKey, row.edition).toBe("indomitable");
+      expect(row.resourceRecharge, row.edition).toBe("longRest");
+      expect(row.resourceTotals, row.edition).toEqual([
+        { minLevel: 9, total: 1 },
+        { minLevel: 13, total: 2 },
+        { minLevel: 17, total: 3 },
+      ]);
+      expect(row.activationCost, row.edition).toBeNull();
+      expect(row.costKind, row.edition).toBeNull();
     }
   });
 });
@@ -254,5 +367,31 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(target.id);
     expect(rows[0].description).toBe(canonical.description);
+  });
+});
+
+// #1528 EffectRow landmine pin: EffectRow's `level` decides the SCALING axis
+// (cantrip/upcast), but a ClassFeature row's `level` is the CHARACTER level
+// the feature is GRANTED at — a different number entirely. The
+// `{ ...row, level: 0 }` adapter (castSpecFromRow, actions.ts) is what keeps
+// `resolveEffectScaling` from reinterpreting a grant level as a spell level.
+// This is a DB-backed proof over every REAL Fighter row with effect columns
+// set, not just the one hand-built fixture in actions.test.ts — it would
+// catch a future row that sets upcastDicePerLevel/cantripScaling (columns
+// #1523 deliberately omitted from ClassFeature; #1528 must never add them
+// back, per class-feature-rows.ts's own comment).
+describe("ClassFeature EffectRow landmine — no Fighter row ever resolves a non-'none' scaling mode (#1528)", () => {
+  it("every Fighter row with effectKind set resolves { mode: 'none' } via the level:0 adapter", async () => {
+    const rows = await prisma.classFeature.findMany({
+      where: { class: { name: "Fighter" }, effectKind: { not: null } },
+    });
+    // Second Wind (both editions) is the only Fighter row with effectKind set
+    // today — asserting length keeps this pin honest as a real DB count, not
+    // an early-return over an accidentally-empty result set.
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const spec = readEffectSpec({ ...row, level: 0 });
+      expect(spec.scaling, `${row.name} (${row.edition})`).toEqual({ mode: "none" });
+    }
   });
 });

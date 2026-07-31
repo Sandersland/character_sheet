@@ -14,12 +14,20 @@
 // shape class-features.ts's own expandFeatureRow/collectRawFeatures already
 // establishes in this same directory.
 //
-// SCOPE (#1227): this issue authors Fighter's FEATURE TEXT only. Every
-// resource pool stays in fighter.ts's resourceFn (forked on edition, #1499);
-// every activation stays in classes/actions.ts's DERIVED_ACTIONS. No
-// descriptor column (resourceKey, activationCost, effectKind, ...) is
-// populated by any row below — #1528 is what populates those, for whichever
-// class it lands on next.
+// SCOPE (#1227) then #1528: #1227 authored Fighter's FEATURE TEXT only, with
+// every descriptor column left NULL (resource pools stayed in fighter.ts's
+// resourceFn, every activation in classes/actions.ts's DERIVED_ACTIONS).
+// #1528 populated the base class's resource+activation+cost+effect columns
+// for Second Wind/Action Surge/Indomitable (the pilot's proof-of-authoring)
+// and retired the matching resourceFn/DERIVED_ACTIONS entries — see
+// fighter.ts's own header. Every OTHER row below (Champion/Battle
+// Master/Eldritch Knight, and Fighting Style/Weapon Mastery/Extra Attack on
+// the base) still leaves its descriptor columns NULL: some because the
+// feature has no such axis (a passive, e.g. Improved Critical), some because
+// it isn't done yet (Champion's crit range needs a derivedStat axis this
+// issue doesn't add — filed separately; Tactical Mind's conditional-refund
+// wrinkle has no AbilityCost shape yet) — see each row's own comment for
+// which.
 //
 // EDITION RULE: `edition` omitted -> expand() seeds ONE row per edition with
 // IDENTICAL text (the 2014-is-a-transcription invariant; today that's only
@@ -53,10 +61,47 @@ interface RawFighterFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
+  // ---- Descriptor columns (#1528) — populated only for Second Wind/Action
+  // ---- Surge/Indomitable today; every other row leaves these undefined,
+  // ---- which `expand()` passes straight through as `undefined` (never
+  // ---- writing a stray `null`/`Prisma.DbNull` override for a row this
+  // ---- issue doesn't touch).
+  resourceKey?: string;
+  resourceLabel?: string;
+  resourceRecharge?: string;
+  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  activationCost?: string;
+  resolverKind?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
+  effectKind?: string;
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifierSource?: string;
 }
 
 function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
-  const base = { className: "Fighter", subclassSlug: raw.subclassSlug, name: raw.name, level: raw.level, description: raw.description };
+  const base: Omit<ClassFeatureSeedRow, "edition"> = {
+    className: "Fighter",
+    subclassSlug: raw.subclassSlug,
+    name: raw.name,
+    level: raw.level,
+    description: raw.description,
+    resourceKey: raw.resourceKey,
+    resourceLabel: raw.resourceLabel,
+    resourceRecharge: raw.resourceRecharge,
+    resourceTotals: raw.resourceTotals,
+    activationCost: raw.activationCost,
+    resolverKind: raw.resolverKind,
+    costKind: raw.costKind,
+    costPoolKey: raw.costPoolKey,
+    costBase: raw.costBase,
+    effectKind: raw.effectKind,
+    effectDiceCount: raw.effectDiceCount,
+    effectDiceFaces: raw.effectDiceFaces,
+    effectModifierSource: raw.effectModifierSource,
+  };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
 }
@@ -68,6 +113,17 @@ function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
 // even though their MECHANICS are #1138/#1137's; Extra Attack decomposes into
 // three separately-named/leveled 2024 features instead of one feature whose
 // text describes all three tiers.
+// Every row below EXCEPT Second Wind/Action Surge/Indomitable (populated
+// above) leaves every descriptor column NULL because the feature has NO SUCH
+// AXIS: Fighting Style/Weapon Mastery/Extra Attack/Tactical Shift/Two Extra
+// Attacks/Studied Attacks/Epic Boon/Three Extra Attacks are all passive text
+// or feat grants with no resource pool, no clickable action, and no roll this
+// app computes (Extra Attack's own count is `deriveAttacksPerAction`, a
+// separate TS rule for its cross-multiclass max — #1530 may attach
+// derivedStat/derivedStatTiers to the Extra Attack row itself, but that is
+// "not done yet", the one exception in this list). Tactical Mind is the other
+// "not done yet": its conditional not-expended-on-failure refund has no
+// AbilityCost shape (see its own comment below).
 const FIGHTER_BASE_RAW: RawFighterFeature[] = [
   {
     subclassSlug: null,
@@ -96,18 +152,54 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 1,
     edition: "EDITION_2014",
     description: "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
+    // #1528: resourceFn's pools moved onto this row. SRD 5.1 p. 23 fully
+    // resets on EITHER rest (no #1221 partial shape) — "short-or-long" is the
+    // #1227 live-bug fix (was "shortRest" only, which never recharged on a
+    // long rest despite the feature's own text promising it).
+    resourceKey: "secondWind",
+    resourceLabel: "Second Wind",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
+    activationCost: "bonusAction",
+    resolverKind: "heal-roll",
+    costKind: "pool",
+    costPoolKey: "secondWind",
+    costBase: 1,
+    effectKind: "heal",
+    effectDiceCount: 1,
+    effectDiceFaces: 10,
+    // classLevel: SRD 5.1's "regain 1d10 + your fighter level HP" — the ONE
+    // new EffectSpec axis #1528 adds (effectModifierSource), earned by this
+    // row + Rally's analogous (out-of-scope) case.
+    effectModifierSource: "classLevel",
   },
   {
     subclassSlug: null,
     name: "Second Wind",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 48. Uses 2/3/4 at L1/4/10 and the shortRestRegain: 1 partial
-    // top-up live in fighter.ts's resourceFn (#1499/#1221) — this row is text
-    // only, and its description states the same rule the pool descriptor
-    // enforces mechanically.
     description:
       "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
+    // #1528: SRD 5.2 p. 48's 2/3/4-at-L1/4/10 tiering plus the #1221 partial
+    // short-rest top-up (shortRestRegain: 1 on every tier — it's flat, not
+    // level-scaled) now live on this row instead of fighter.ts's resourceFn.
+    resourceKey: "secondWind",
+    resourceLabel: "Second Wind",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 1, total: 2, shortRestRegain: 1 },
+      { minLevel: 4, total: 3, shortRestRegain: 1 },
+      { minLevel: 10, total: 4, shortRestRegain: 1 },
+    ],
+    activationCost: "bonusAction",
+    resolverKind: "heal-roll",
+    costKind: "pool",
+    costPoolKey: "secondWind",
+    costBase: 1,
+    effectKind: "heal",
+    effectDiceCount: 1,
+    effectDiceFaces: 10,
+    effectModifierSource: "classLevel",
   },
   {
     subclassSlug: null,
@@ -127,6 +219,25 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     edition: "EDITION_2014",
     description:
       "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17.",
+    // #1528: genuinely no edition fork on the pool mechanics (SRD 5.1 p. 24 /
+    // SRD 5.2 p. 48 both read "you can't do so again until you finish a Short
+    // or Long Rest") — "short-or-long" is the #1227 live-bug fix, both
+    // editions, unlike Second Wind's genuine 2014/2024 shape difference.
+    resourceKey: "actionSurge",
+    resourceLabel: "Action Surge",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [
+      { minLevel: 2, total: 1 },
+      { minLevel: 17, total: 2 },
+    ],
+    activationCost: "special",
+    resolverKind: "simple-confirm",
+    costKind: "pool",
+    costPoolKey: "actionSurge",
+    costBase: 1,
+    // No effectKind (NULL, "no such axis"): Action Surge is a pure counter —
+    // the extra-action grant is a client-side economy effect with no roll/
+    // heal to compute, same as before #1528.
   },
   {
     subclassSlug: null,
@@ -139,6 +250,18 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     // in fighter.ts, not here.
     description:
       "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
+    resourceKey: "actionSurge",
+    resourceLabel: "Action Surge",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [
+      { minLevel: 2, total: 1 },
+      { minLevel: 17, total: 2 },
+    ],
+    activationCost: "special",
+    resolverKind: "simple-confirm",
+    costKind: "pool",
+    costPoolKey: "actionSurge",
+    costBase: 1,
   },
   {
     subclassSlug: null,
@@ -186,6 +309,20 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     edition: "EDITION_2014",
     description:
       "Reroll a failed saving throw (you must use the new roll). Regain use(s) on a long rest. Two uses at level 13, three at level 17.",
+    // #1528: resource block only — no activationCost/resolverKind/cost*/
+    // effect* ("no such axis"): Indomitable was never a DERIVED_ACTIONS entry
+    // (it has no action-economy cost; it's a reactive reroll the player
+    // narrates, not a button this app dispatches through the actions
+    // endpoint), so there is no activation to populate here, before or after
+    // #1528.
+    resourceKey: "indomitable",
+    resourceLabel: "Indomitable",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 9, total: 1 },
+      { minLevel: 13, total: 2 },
+      { minLevel: 17, total: 3 },
+    ],
   },
   {
     subclassSlug: null,
@@ -196,6 +333,14 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     // (9/13/17 -> 1/2/3) are unchanged from 2014.
     description:
       "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
+    resourceKey: "indomitable",
+    resourceLabel: "Indomitable",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 9, total: 1 },
+      { minLevel: 13, total: 2 },
+      { minLevel: 17, total: 3 },
+    ],
   },
   {
     subclassSlug: null,
@@ -240,6 +385,13 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
 ];
 
 // ---- Champion — SRD 5.1 p. 25 (2014) / SRD 5.2 p. 49 (2024) ---------------
+// Every row below leaves every descriptor column NULL — Champion has no
+// resource pool and no clickable action at any of its levels. Improved
+// Critical / Superior Critical are NOT DONE YET (a crit-range derivedStat
+// axis doesn't exist — filed as its own issue, earned by this content, see
+// the Improved Critical row's comment); Remarkable Athlete / Additional
+// Fighting Style / Heroic Warrior / Survivor have NO SUCH AXIS (passive text
+// with no roll/pool/action this app computes).
 const CHAMPION_SLUG = slug("fighter-champion");
 const CHAMPION_RAW: RawFighterFeature[] = [
   {
@@ -345,6 +497,16 @@ const CHAMPION_RAW: RawFighterFeature[] = [
 // Mirrors: dnd2024.wikidot.com/fighter:battle-master and Roll20's licensed
 // compendium agree verbatim; no first-party SRD text exists for this
 // subclass in either edition, so it is never cited as "SRD 5.2".
+// Every row below leaves every descriptor column NULL. Combat Superiority is
+// NOT DONE YET: its superiority-dice pool total/die tier COULD move onto
+// resourceTotals/resourceDieTiers, but its description embeds the computed
+// maneuver save DC (8 + prof + max(Str,Dex)) — no tier array expresses that,
+// so it stays fighter.ts's subclass resourceFn (see that file's own header)
+// rather than a half-migrated row. Student of War / Know Your Enemy /
+// Improved Combat Superiority / Relentless / Ultimate Combat Superiority have
+// NO SUCH AXIS (passive text/proficiency grants with no clickable action this
+// app dispatches — maneuvers themselves are their own GrantedAbility catalog,
+// castManeuver/maneuvers.ts, not ClassFeature rows at all).
 const BATTLE_MASTER_SLUG = slug("fighter-battle-master");
 const BATTLE_MASTER_RAW: RawFighterFeature[] = [
   {

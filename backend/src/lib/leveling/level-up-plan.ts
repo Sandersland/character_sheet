@@ -89,7 +89,14 @@ function derivedAt(
   if (level < 1) return null;
   // A pure planner (LevelUpPlanCharacter has no DB relation, see its own
   // comment) — no featureRows carrier to pass, so this preview never lists
-  // features (#1524's Fact 2: no consumer of this planner reads them).
+  // features or row-driven pools (#1524's Fact 2: no consumer of this planner
+  // reads DerivedClassInfo.resources/features). Audited for #1528 chunk 0:
+  // every step this file builds (hitPointsStep, advancementStep, subclassStep,
+  // choiceCountStep, fightingStyleFeatStep, subclassChoiceSteps, newSpellsStep)
+  // reads only ClassExtras fields (maneuverChoiceCount/toolProfChoiceCount,
+  // still code via SubclassDefinition.deriveExtras) and subclassChoices (still
+  // code via SubclassDefinition.choices) — neither moved onto ClassFeature
+  // rows, so an absent carrier here is a confirmed no-op, not a latent gap.
   return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), undefined, edition);
 }
 

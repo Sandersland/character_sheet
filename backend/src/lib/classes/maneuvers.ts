@@ -18,6 +18,7 @@ import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { deriveEntryScopedResourcesForCharacterRow, resolveClassDie } from "./class-features.js";
+import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "./feature-rows-select.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
@@ -60,15 +61,20 @@ const MANEUVER_SELECT = {
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, subclass: true, level: true },
+    select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
   },
 } satisfies Prisma.CharacterSelect;
 
 type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }>;
 
 // Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
+// featureRowsOf (#1528 chunk 0) — Battle Master's own superiority-dice pool
+// still comes from its subclass resourceFn (unaffected), but the carrier is
+// threaded through anyway so this call site matches every other narrow
+// select and stays correct the day Battle Master's pool description no
+// longer needs the computed save DC embedded in it.
 function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
-  const { derived } = deriveEntryScopedResourcesForCharacterRow(row);
+  const { derived } = deriveEntryScopedResourcesForCharacterRow(row, featureRowsOf);
 
   const saveDcBase = derived?.maneuverSaveDC;
   const dieFaces = derived ? resolveClassDie("superiorityDice", derived) : null;

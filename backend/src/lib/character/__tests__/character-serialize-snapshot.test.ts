@@ -71,8 +71,28 @@ beforeAll(async () => {
   await prisma.classFeature.createMany({
     data: [
       { classId: fighterClassId, subclassId: null, name: "Fighting Style", level: 1, edition: "EDITION_2024", description: "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage)." },
-      { classId: fighterClassId, subclassId: null, name: "Second Wind", level: 1, edition: "EDITION_2024", description: "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest." },
-      { classId: fighterClassId, subclassId: null, name: "Action Surge", level: 2, edition: "EDITION_2024", description: "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17." },
+      // Second Wind/Action Surge (#1528): resource + activation + cost columns
+      // populated too, mirroring prisma/seed/fighter-features.ts's real values
+      // — Second Wind is a selectable action this suite's own snapshot pins
+      // (see the availableActions assertion below), so an empty descriptor
+      // set would silently drop it from the wire again.
+      {
+        classId: fighterClassId, subclassId: null, name: "Second Wind", level: 1, edition: "EDITION_2024",
+        description: "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
+        resourceKey: "secondWind", resourceLabel: "Second Wind", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 1, total: 1 }],
+        activationCost: "bonusAction", resolverKind: "heal-roll",
+        costKind: "pool", costPoolKey: "secondWind", costBase: 1,
+        effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 10, effectModifierSource: "classLevel",
+      },
+      {
+        classId: fighterClassId, subclassId: null, name: "Action Surge", level: 2, edition: "EDITION_2024",
+        description: "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17.",
+        resourceKey: "actionSurge", resourceLabel: "Action Surge", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: 1 }, { minLevel: 17, total: 2 }],
+        activationCost: "special", resolverKind: "simple-confirm",
+        costKind: "pool", costPoolKey: "actionSurge", costBase: 1,
+      },
       { classId: fighterClassId, subclassId: null, name: "Extra Attack", level: 5, edition: "EDITION_2024", description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20." },
       { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Combat Superiority", level: 3, edition: "EDITION_2024", description: "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated." },
       { classId: fighterClassId, subclassId: battleMasterSubclassId, name: "Student of War", level: 3, edition: "EDITION_2024", description: "You gain proficiency with one type of artisan's tools of your choice." },
@@ -275,9 +295,16 @@ describe("serializeCharacter snapshot lock (#1003)", () => {
     // #1341: pinned outside the snapshot too, so a primary-entry-only regression
     // (#1315's widest behavioural change) fails with a readable diff instead of
     // one line inside a 500-line blob. Fighter is the SECONDARY entry at its own
-    // level 1 — Second Wind is the only row fighter 1 grants.
+    // level 1 — Second Wind is the only row fighter 1 grants. `reminder`/
+    // `resolverKind` (#1528) are the row-driven descriptor's own contribution
+    // — reminder is server-computed from the row's effect columns (never a
+    // second hand-authored string), and resolverKind names the client's
+    // inline tool without a hand-authored ACTION_RESOLVERS entry.
     expect(serialized.availableActions).toEqual([
-      { key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true },
+      {
+        key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true,
+        reminder: "Regain 1d10 + 1 HP", resolverKind: "heal-roll",
+      },
     ]);
     expect(serialized).toMatchSnapshot();
   });

@@ -16,6 +16,7 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "./class-features.js";
+import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "./feature-rows-select.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -618,7 +619,7 @@ const RESOURCES_SELECT = {
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, subclass: true, level: true },
+    select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -658,6 +659,7 @@ export async function applyResourceOpInTx(
     abilityScores,
     profBonus,
     edition,
+    featureRowsOf,
   );
 
   const state = normalizeResourcesMutable(row.resources);

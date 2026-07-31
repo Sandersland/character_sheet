@@ -192,12 +192,16 @@ export function restPoolRegain(
  */
 function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
   const level = levelForExperience(row.experiencePoints);
+  // getFeatureRows (#1528 chunk 0) — a rest must recharge/top-up a Fighter's
+  // row-driven pools (Second Wind/Action Surge/Indomitable) same as any
+  // resourceFn-declared pool; without this carrier they'd never appear here.
   const { derived } = deriveEntryScopedResources(
     row.classEntries,
     level,
     row.abilityScores as Record<string, number>,
     proficiencyBonusForLevel(level),
     editionOf(row),
+    (entry) => ({ classRows: entry.class?.features ?? [], subclassRows: entry.subclassRef?.features ?? [] }),
   );
   return derived;
 }

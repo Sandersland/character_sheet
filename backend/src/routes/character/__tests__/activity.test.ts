@@ -53,6 +53,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 // Sessions are campaign-level (#245): create a throwaway campaign to host a
 // Session row when a test only needs a valid sessionId to tag events with.
@@ -484,6 +485,10 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
       update: {},
     });
     fighterClassId = cls.id;
+    // Second Wind/Action Surge/Indomitable are row-driven now (#1528) and tied
+    // to a specific classId — this bespoke Fighter fixture needs its own rows.
+    await prisma.classFeature.deleteMany({ where: { classId: fighterClassId } });
+    await prisma.classFeature.createMany({ data: fighterResourceRowsData(fighterClassId) });
 
     const subclass = await upsertEditionRow(
       prisma.subclass,

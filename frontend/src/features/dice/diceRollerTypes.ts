@@ -11,6 +11,16 @@ export interface DiceRollerProps {
   spec: RollSpec;
   /** Called once the roll settles, with the full per-die result. */
   onResult?: (result: RollResult) => void;
+  /**
+   * A result already decided elsewhere (#1528) — a server-authoritative roll
+   * (Second Wind's heal: `resolveEffectSpec`, backend) that the dice must
+   * animate TOWARD rather than decide themselves. When set, `roll()` skips
+   * its own `rollSpec()` call and tumbles onto this result instead — the
+   * roll stays deterministic (the server already applied it), only the
+   * animation is client-side. Absent for every other caller, which keeps
+   * rolling client-side as before.
+   */
+  forcedResult?: RollResult;
   /** Bump this (e.g. a counter) to trigger a fresh roll, including re-rolls. */
   rollKey?: number | string;
   /** Roll immediately on mount if no `rollKey` is driving this instance. */

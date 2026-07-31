@@ -16,7 +16,7 @@
  */
 
 import { abilityModifier } from "@/lib/abilities";
-import type { Character } from "@/types/character";
+import type { AvailableAction, Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
 
 /**
@@ -108,15 +108,11 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
 
   wildShape:         { key: "wildShape",         kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "wildShape" },
 
-  secondWind: {
-    key: "secondWind",
-    kind: "heal-roll",
-    slot: "bonusAction",
-    serverEffect: true,
-    resourceKey: "secondWind",
-    healRoll: (c) => ({ count: 1, faces: 10, modifier: c.level }),
-  },
-  actionSurge:       { key: "actionSurge",       kind: "simple-confirm", slot: "special",     serverEffect: true,  resourceKey: "actionSurge" },
+  // Second Wind / Action Surge retired from this table (#1528): both are
+  // row-driven now, served via AvailableAction.resolverKind — resolverFor's
+  // fallback path (below) synthesizes their ActionResolver from the wire
+  // instead of a hand-authored entry here. Second Wind's heal is also
+  // server-rolled now (was client `healRoll`, #1528) — see resolverFromRow.
 
   // Martial Arts Bonus Unarmed Strike (#1218) — reuses the twf-picker economy
   // path (single bonusAction-source swing), locked to the Unarmed Strike
@@ -203,9 +199,39 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   metamagic:         { key: "metamagic",         kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "sorceryPoints" },
 };
 
-/** Returns the resolver for the given action key, or undefined if unrecognized. */
-export function resolverFor(key: string): ActionResolver | undefined {
-  return ACTION_RESOLVERS[key];
+// A row-driven action's resolver, synthesized from the wire (#1528) — the
+// ONLY fallback path resolverFor falls to, and ONLY when no keyed entry
+// above exists. `resourceKey: action.key` is a scoped assumption (true for
+// Second Wind/Action Surge, the only two rows populating `resolverKind`
+// today, since a Fighter action's key IS its own pool key) — never assumed
+// for the keyed ACTION_RESOLVERS table above, several of whose entries
+// (flurryOfBlows, metamagic, …) spend a DIFFERENT pool than their own key.
+// `healRoll` is deliberately absent: Second Wind's heal is now rolled
+// server-side (`effectModifierSource: "classLevel"`, backend/effects.ts) and
+// reported back via ExecuteActionResult, not computed here — the served
+// `action.reminder` (built server-side from the same row) is the subtitle
+// classActionOption falls back to when `healRoll` is unset.
+function resolverFromRow(action: AvailableAction): ActionResolver {
+  return {
+    key: action.key,
+    kind: action.resolverKind as ResolutionKind,
+    slot: action.cost,
+    serverEffect: true,
+    resourceKey: action.key,
+  };
+}
+
+/**
+ * Returns the resolver for the given action key, or undefined if
+ * unrecognized. `action` is optional context for the fallback path (#1528):
+ * when no keyed ACTION_RESOLVERS entry exists but the served action carries
+ * `resolverKind`, one is synthesized from the wire instead of a hand-authored
+ * entry. Every existing call site keeps working key-only (undefined action).
+ */
+export function resolverFor(key: string, action?: AvailableAction): ActionResolver | undefined {
+  const known = ACTION_RESOLVERS[key];
+  if (known) return known;
+  return action?.resolverKind ? resolverFromRow(action) : undefined;
 }
 
 /**
