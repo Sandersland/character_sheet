@@ -6,13 +6,20 @@
 // EMPTY pools AND features when a subclass key had no TS entry — so removing a
 // class from `CLASSES` (#1532's whole point for Fighter) silently deleted
 // every seeded subclass row for that class's subclasses. Champion is the
-// sharpest case: its lib/classes/fighter.ts entry is pure registration
+// sharpest case: its old lib/classes/fighter.ts entry was pure registration
 // (`{ slug, grantLevel }`, no resourceFn/deriveExtras), so it looked like the
 // safest deletion in the file — and would have been the most silent regression.
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+//
+// Originally proved with `fighter.ts` mocked to register no subclasses,
+// simulating #1532's end state before that issue existed. #1532 has since
+// deleted `lib/classes/fighter.ts` outright, so the real (unmocked) registry
+// already IS that end state — the tests below import the real module and
+// assert against it directly, with no `vi.doMock` scaffolding left to retire.
+import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
@@ -20,8 +27,8 @@ import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 12, intelligence: 14, wisdom: 16, charisma: 16 };
 
 // Fabricated rows standing in for seeded ClassFeature rows — proves the
-// derivation reads ROWS, not the TS SubclassDefinition, once "champion" is
-// gone from fighter.ts's `subclasses`.
+// derivation reads ROWS, not a TS SubclassDefinition, for a subclass whose
+// class has none (Fighter's three, since #1532).
 const FAKE_SUBCLASS_ROWS = (["EDITION_2014", "EDITION_2024"] as const).map((edition) => ({
   name: "Fake Champion Feature",
   level: 3,
@@ -33,30 +40,8 @@ const FAKE_SUBCLASS_ROWS = (["EDITION_2014", "EDITION_2024"] as const).map((edit
   resourceTotals: [{ minLevel: 3, total: 2 }],
 }));
 
-async function loadRegistryWithFighterUnregistered() {
-  vi.resetModules();
-  // Mock fighter.ts to register NO subclasses at all — simulating the
-  // post-#1532 state (fighter.ts deleted) without actually deleting the file,
-  // since Part A only changes the registration mechanism, not fighter.ts's
-  // content (that's Part B / #1532).
-  vi.doMock("@/lib/classes/fighter.js", () => ({
-    fighter: { subclasses: {} },
-  }));
-  return import("@/lib/classes/class-features.js");
-}
-
 describe("#1546 Part A — SUBCLASSES resolves from SUBCLASS_IDENTITY when a class has no TS SubclassDefinition", () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    vi.doUnmock("@/lib/classes/fighter.js");
-    vi.resetModules();
-  });
-
-  it("champion resolves its seeded rows (pools AND features) with fighter.ts registering nothing", async () => {
-    const { deriveResources } = await loadRegistryWithFighterUnregistered();
+  it("champion resolves its seeded rows (pools AND features) with no lib/classes/fighter.ts to register it", () => {
     const featureRows = { classRows: [], subclassRows: FAKE_SUBCLASS_ROWS };
     const info = deriveResources(
       "fighter",
@@ -72,8 +57,7 @@ describe("#1546 Part A — SUBCLASSES resolves from SUBCLASS_IDENTITY when a cla
     expect(info?.resources.map((r) => r.key)).toEqual(["fakeChampionPool"]);
   });
 
-  it("battle master resolves its rows too — not just the no-resourceFn Champion case", async () => {
-    const { deriveResources } = await loadRegistryWithFighterUnregistered();
+  it("battle master resolves its rows too — not just the no-resourceFn Champion case", () => {
     const featureRows = { classRows: [], subclassRows: FAKE_SUBCLASS_ROWS };
     const info = deriveResources(
       "fighter",
@@ -88,8 +72,7 @@ describe("#1546 Part A — SUBCLASSES resolves from SUBCLASS_IDENTITY when a cla
     expect(info?.resources.map((r) => r.key)).toEqual(["fakeChampionPool"]);
   });
 
-  it("the identity-only entry still gates at level 3 in BOTH editions (undefined grantLevel -> subclassGateLevel's fallback)", async () => {
-    const { deriveResources } = await loadRegistryWithFighterUnregistered();
+  it("the identity-only entry still gates at level 3 in BOTH editions (undefined grantLevel -> subclassGateLevel's fallback)", () => {
     const featureRows = { classRows: [], subclassRows: FAKE_SUBCLASS_ROWS };
     const infoAt = (level: number, edition: RulesEdition) =>
       deriveResources("fighter", "champion", level, ABILITIES, proficiencyBonusForLevel(level), featureRows, edition);
@@ -100,26 +83,23 @@ describe("#1546 Part A — SUBCLASSES resolves from SUBCLASS_IDENTITY when a cla
     expect(infoAt(3, "EDITION_2014")).not.toBeNull();
   });
 
-  it("an unknown subclass name absent from SUBCLASS_IDENTITY too still resolves to nothing (the guard isn't disabled)", async () => {
-    const { deriveResources } = await loadRegistryWithFighterUnregistered();
+  it("an unknown subclass name absent from SUBCLASS_IDENTITY too still resolves to nothing (the guard isn't disabled)", () => {
     const info = deriveResources("fighter", "not-a-real-subclass", 5, ABILITIES, proficiencyBonusForLevel(5), { classRows: [], subclassRows: [] }, "EDITION_2024");
     expect(info).toBeNull();
   });
 });
 
-describe("#1546 Part A — real (unmocked) registry: the overlay still wins for every class still on the TS path", () => {
-  it("champion (currently TS-registered) resolves through the real registry unchanged", async () => {
-    const { deriveResources } = await import("@/lib/classes/class-features.js");
+describe("real registry: the overlay still wins for every class still on the TS path", () => {
+  it("champion (identity-only in SUBCLASS_IDENTITY, no TS SubclassDefinition since fighter.ts's deletion) resolves to 'active but empty' with no rows supplied", async () => {
     const info = deriveResources("fighter", "champion", 3, ABILITIES, proficiencyBonusForLevel(3), { classRows: [], subclassRows: [] }, "EDITION_2024");
     // Champion carries no resourceFn/deriveExtras/features array — pure
     // registration — so with no rows supplied there is nothing to derive.
-    // This just pins that the real (non-mocked) path still resolves it as
-    // "active, empty" rather than null-because-unregistered.
+    // This just pins that the real registry still resolves it as "active,
+    // empty" rather than null-because-unregistered.
     expect(info).toBeNull();
   });
 
   it("Wizard (a class still fully on the TS path) is untouched by the identity-only seeding pass — its authored .features still resolve", async () => {
-    const { deriveResources } = await import("@/lib/classes/class-features.js");
     const info2 = deriveResources(
       "wizard",
       "school of evocation",
@@ -145,6 +125,5 @@ describe("#1546 Part A — real (unmocked) registry: the overlay still wins for 
   // Master was the last), so the overlay-wins-on-extras claim has no live
   // subject to test empirically; the overlay mechanism itself (registry.ts's
   // second SUBCLASSES loop unconditionally overwriting the identity-only
-  // seed) is still covered structurally by the mocked-unregistration tests
-  // above and by Champion's/Wizard's cases here.
+  // seed) is still covered structurally by Champion's/Wizard's cases here.
 });

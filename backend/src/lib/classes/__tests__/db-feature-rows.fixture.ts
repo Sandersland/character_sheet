@@ -8,24 +8,7 @@
 // SubclassDefinition.slug -> the matching Subclass row.
 import { prisma } from "@/lib/core/prisma.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
-
-import { barbarian } from "@/lib/classes/barbarian.js";
-import { bard } from "@/lib/classes/bard.js";
-import { cleric } from "@/lib/classes/cleric.js";
-import { druid } from "@/lib/classes/druid.js";
-import { fighter } from "@/lib/classes/fighter.js";
-import { monk } from "@/lib/classes/monk.js";
-import { paladin } from "@/lib/classes/paladin.js";
-import { ranger } from "@/lib/classes/ranger.js";
-import { rogue } from "@/lib/classes/rogue.js";
-import { sorcerer } from "@/lib/classes/sorcerer.js";
-import type { ClassDefinition } from "@/lib/classes/types.js";
-import { warlock } from "@/lib/classes/warlock.js";
-import { wizard } from "@/lib/classes/wizard.js";
-
-const TEST_CLASSES: Record<string, ClassDefinition> = {
-  barbarian, bard, cleric, druid, fighter, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
-};
+import { resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
 
 // registry.ts's lowercase dispatch key -> the seeded CharacterClass.name
 // (Title Case, single word for all twelve — prisma/seed/class-features.ts's
@@ -45,17 +28,19 @@ async function resolveClassId(className: string): Promise<string> {
   return row.id;
 }
 
-// Resolved via SubclassDefinition.slug (the stable identity join, #1277) —
-// never by display name, which can diverge from the registry key (e.g.
-// "totem warrior" -> "Totem Warrior").
+// Resolved via resolveSubclassSlug (subclass-slug.ts, #1277's sanctioned
+// identity resolver) rather than a per-class TEST_CLASSES map of
+// lib/classes/<class>.ts modules — the same resolver production now uses
+// post-#1532, and it drops this fixture's dependence on every class module,
+// not just the one being deleted. Never by display name, which can diverge
+// from the registry key (e.g. "totem warrior" -> "Totem Warrior").
 async function resolveSubclassId(className: string, subclass: string): Promise<string> {
   const cacheKey = `${className}|${subclass}`;
   const cached = subclassIdCache.get(cacheKey);
   if (cached) return cached;
-  const classDef = TEST_CLASSES[className.toLowerCase()];
-  const subDef = classDef?.subclasses?.[subclass.toLowerCase()];
-  if (!subDef) throw new Error(`db-feature-rows.fixture: no SubclassDefinition for ${className}/${subclass}`);
-  const row = await prisma.subclass.findFirstOrThrow({ where: { slug: subDef.slug } });
+  const slug = resolveSubclassSlug(className, { subclass });
+  if (!slug) throw new Error(`db-feature-rows.fixture: no SubclassSlug for ${className}/${subclass}`);
+  const row = await prisma.subclass.findFirstOrThrow({ where: { slug } });
   subclassIdCache.set(cacheKey, row.id);
   return row.id;
 }

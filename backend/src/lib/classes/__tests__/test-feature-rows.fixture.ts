@@ -1,7 +1,7 @@
 // Test-only helper (#1524): builds the `ClassFeatureRowsCarrier` deriveResources'
 // `featureRows` parameter expects, directly from the TS class/subclass
-// definitions — the twelve lib/classes/<class>.ts modules stay the seed's
-// AUTHORING input even though production now reads seeded rows instead
+// definitions — the ELEVEN remaining lib/classes/<class>.ts modules stay the
+// seed's AUTHORING input even though production now reads seeded rows instead
 // (#1524's Fact 1). Lets every unit test that asserts on `.features` keep
 // calling deriveResources with a bare class/subclass name (no DB round-trip)
 // while still exercising the real read path (featuresFromRows). The DB-backed
@@ -9,7 +9,7 @@
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
 //
-// FIGHTER (#1227, #1528): `fighter.ts` carries no `.features` at all any more
+// FIGHTER (#1227, #1528, #1532): `lib/classes/fighter.ts` is deleted outright
 // — its rows are literal seed data (prisma/seed/fighter-features.ts), which
 // this src-side fixture can't import (backend/tsconfig.json's `rootDir:
 // "src"` makes a src file importing anything under prisma/ a compile error,
@@ -26,7 +26,6 @@ import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { cleric } from "@/lib/classes/cleric.js";
 import { druid } from "@/lib/classes/druid.js";
-import { fighter } from "@/lib/classes/fighter.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
@@ -37,7 +36,7 @@ import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
 
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  barbarian, bard, cleric, druid, fighter, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+  barbarian, bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring

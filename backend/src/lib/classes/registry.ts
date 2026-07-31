@@ -13,7 +13,6 @@ import { bard } from "./bard.js";
 import { derivedStatFromRows, featuresFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { cleric } from "./cleric.js";
 import { druid } from "./druid.js";
-import { fighter } from "./fighter.js";
 import { monk } from "./monk.js";
 import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
@@ -24,12 +23,15 @@ import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, De
 import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
 
+// Fighter is deliberately absent (#1532 — lib/classes/fighter.ts is deleted).
+// Its three subclasses (Champion/Battle Master/Eldritch Knight) resolve
+// entirely through the SUBCLASS_IDENTITY seeding pass below; deriveBaseLayer's
+// optional-chaining on `classDef` already tolerates a missing key.
 const CLASSES: Record<string, ClassDefinition> = {
   barbarian,
   bard,
   cleric,
   druid,
-  fighter,
   monk,
   paladin,
   ranger,
@@ -51,8 +53,8 @@ const CLASSES: Record<string, ClassDefinition> = {
 // class not yet migrated off `lib/classes/<class>.ts` still supplies
 // explicitly. This is what lets deriveSubclassLayer resolve a subclass's
 // seeded ClassFeature rows (poolsFromRows/featuresFromRows) even when no
-// ClassDefinition registers it in TS at all (Fighter's three, once fighter.ts
-// is deleted, #1532) — before this, a missing TS entry meant
+// ClassDefinition registers it in TS at all (Fighter's three, now that
+// fighter.ts is deleted, #1532) — before this, a missing TS entry meant
 // `deriveSubclassLayer` returned early with EMPTY pools and features,
 // silently deleting every seeded row for that subclass (see this issue's
 // probe).
@@ -61,11 +63,14 @@ const CLASSES: Record<string, ClassDefinition> = {
 // matters: a class still on the TS migration path (a non-3 grantLevel,
 // resourceFn, deriveExtras, or the `choices` catalog) must win over its own
 // identity-only stub, or those fields would silently vanish for the eleven
-// classes not yet fully row-driven. `SUBCLASS_IDENTITY` is a perfect 31<->31
-// bijection with today's TS registrations, so this overlay is behaviour-
-// preserving by construction: every key the first loop seeds is immediately
-// replaced by the second loop's richer definition, for every class still on
-// the TS path.
+// classes not yet fully row-driven. `SUBCLASS_IDENTITY` is 31 entries against
+// 28 TS registrations now that Fighter's three (Champion/Battle
+// Master/Eldritch Knight) have none — so the overlay is behaviour-preserving
+// by construction only for those 28: every key the first loop seeds for a
+// still-TS-registered class is immediately replaced by the second loop's
+// richer definition; Fighter's three keep their identity-only seed as their
+// final definition, which is correct — there is no richer TS definition left
+// to overlay it with.
 const SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const [slug, { nameKey }] of Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]) {
   SUBCLASSES[nameKey] = { slug };

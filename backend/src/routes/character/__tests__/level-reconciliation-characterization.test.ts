@@ -121,10 +121,11 @@ beforeAll(async () => {
   bmSubclassId = bm.id;
   // #1546 Part B-i (Ruling 2): this bespoke Battle Master Subclass row has no
   // ClassFeature children unless seeded here — the shared helper, not a
-  // per-file copy. This suite exercises maneuverChoiceCount/toolProfChoiceCount
-  // via fighter.ts's still-code deriveExtras (name-keyed, unaffected by B-i);
-  // these rows are attached for fixture hygiene ahead of #1546 Part B-ii,
-  // which is what makes them load-bearing.
+  // per-file copy. This suite exercises maneuverChoiceCount/toolProfChoiceCount,
+  // which Part B-ii moved onto these very rows' derivedStat/derivedStatTiers
+  // columns (registry.ts's deriveRowExtras) — lib/classes/fighter.ts's old
+  // deriveExtras is gone (#1532), so these rows are what makes the assertion
+  // resolve at all now.
   await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
   await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });

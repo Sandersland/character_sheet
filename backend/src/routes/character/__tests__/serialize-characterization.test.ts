@@ -62,10 +62,12 @@ beforeAll(async () => {
   );
   bmSubclassId = bm.id;
   // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy — this
-  // suite doesn't assert on `.features` today (attacksPerAction/pool/count
-  // assertions all still resolve through fighter.ts's still-code
-  // deriveExtras/resourceFn), but every bespoke Battle Master Subclass row
-  // gets these rows attached for fixture hygiene ahead of #1546 Part B-ii.
+  // suite doesn't assert on `.features` today, but every bespoke Battle
+  // Master Subclass row needs these rows attached: Part B-ii moved the
+  // pool/count derivation onto the seeded ClassFeature rows themselves
+  // (registry.ts's deriveRowExtras), retiring lib/classes/fighter.ts's old
+  // resourceFn/deriveExtras entirely (#1532) — a bespoke Subclass row with no
+  // rows attached now derives nothing.
   await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
   await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
   const warlock = await prisma.characterClass.upsert({

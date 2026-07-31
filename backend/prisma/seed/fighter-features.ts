@@ -1,10 +1,12 @@
 // --- Fighter ClassFeature rows, authored as LITERAL data (#1227) -----------
 // The pilot for #1522's "content is data" direction: Fighter's rows no longer
-// derive from lib/classes/fighter.ts's AuthoredFeature[] arrays (deleted in
-// this same diff — fallow's repo-wide dead-code gate would otherwise flag
-// them as orphaned) — they are transcribed/authored directly here, once, in
-// their final DB-row shape. class-features.ts concatenates FIGHTER_FEATURES
-// onto the eleven still-derived classes' rows to build CLASS_FEATURES; see
+// derive from lib/classes/fighter.ts's AuthoredFeature[] arrays. That module
+// stayed alive only for its resourceFn/deriveExtras/subclass-registration
+// stubs (retired piecemeal by #1528/#1546) until #1532 deleted it outright,
+// once nothing depended on it any more — they are transcribed/authored
+// directly here, once, in their final DB-row shape. class-features.ts
+// concatenates FIGHTER_FEATURES onto the eleven still-derived classes' rows
+// to build CLASS_FEATURES; see
 // its LITERAL_ROW_CLASSES export for the set of classes (today: just this
 // one) whose rows tests must not compare against a TS-array "old" side.
 //
