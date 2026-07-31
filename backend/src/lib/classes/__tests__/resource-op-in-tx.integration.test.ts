@@ -8,7 +8,13 @@ import { InvalidResourceOperationError, applyResourceOpInTx } from "@/lib/classe
 const OWNER_ID = "owner-resource-in-tx";
 const BATCH = "batch-resource-in-tx";
 
-// Barbarian L1 → 2 rage uses, derived purely from SRD data (no catalog rows).
+// Barbarian L1 → 2 rage uses. Rage's pool is row-driven since #1223 (moved off
+// barbarian.ts's resourceFn onto the Rage ClassFeature row's own descriptor
+// columns) — deriving it now requires the classEntry's `classId` FK so
+// deriveEntryScopedResources' featureRows carrier can load `class.features`;
+// a bare `name: "Barbarian"` with no `classId` (the pre-#1223 shape, when the
+// pool resolved off the class NAME alone via resourceFn) resolves to an empty
+// classRows and throws "Resource not available" — see fixture() below.
 const BASE_CHAR = {
   name: "Resource In-Tx Fixture",
   alignment: "Chaotic Neutral",
@@ -36,12 +42,13 @@ describe("applyResourceOpInTx (#885 seam)", () => {
   });
 
   async function fixture() {
+    const barbarianClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Barbarian" } })).id;
     const character = await prisma.character.create({
       data: {
         ...BASE_CHAR,
         ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
-        classEntries: { create: { name: "Barbarian", level: 1, position: 0 } },
+        classEntries: { create: { name: "Barbarian", level: 1, position: 0, classId: barbarianClassId } },
       },
     });
     created.push(character.id);

@@ -9,19 +9,26 @@
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
 //
-// FIGHTER (#1227, #1528, #1532): `lib/classes/fighter.ts` is deleted outright
-// — its rows are literal seed data (prisma/seed/fighter-features.ts), which
-// this src-side fixture can't import (backend/tsconfig.json's `rootDir:
-// "src"` makes a src file importing anything under prisma/ a compile error,
-// TS6059). `testFeatureRowsFor("fighter", ...)`'s classRows are therefore
-// FIGHTER_BASE_ROWS below (a hardcoded mirror of fighter-features.ts's
-// RESOURCE columns only — the TEXT stays empty, which is harmless for
-// class-features-snapshot.test.ts: that suite records
+// FIGHTER (#1227, #1528, #1532) and BARBARIAN (#1223): `lib/classes/
+// fighter.ts` and `lib/classes/barbarian.ts` are both deleted outright —
+// their rows are literal seed data (prisma/seed/fighter-features.ts,
+// barbarian-features.ts), which this src-side fixture can't import
+// (backend/tsconfig.json's `rootDir: "src"` makes a src file importing
+// anything under prisma/ a compile error, TS6059). `testFeatureRowsFor(
+// "fighter"/"barbarian", ...)`'s classRows are therefore FIGHTER_BASE_ROWS/
+// BARBARIAN_BASE_ROWS below (hardcoded mirrors of each seed file's RESOURCE
+// columns) — class-features-snapshot.test.ts records
 // `withoutFeatures(deriveResources(...))`, stripping `.features` before
-// snapshotting). class-feature-parity.test.ts is the suite that DOES assert
-// on `.features` content, and it skips Fighter entirely for the same
-// underlying reason (its own file's LITERAL_ROW_CLASSES check).
-import { barbarian } from "@/lib/classes/barbarian.js";
+// snapshotting, so the row TEXT matters only for readability here, never for
+// a passing assertion. class-feature-parity.test.ts is the suite that DOES
+// assert on `.features` content, and it skips both classes entirely for the
+// same underlying reason (its own file's LITERAL_ROW_CLASSES check).
+// Barbarian's two subclasses (Totem Warrior, Berserker) need no equivalent
+// hardcoded subclassRows stand-in: neither declares a resourceKey/derivedStat
+// in barbarian-features.ts, so falling through to `toRows(subDef?.features ??
+// [])` -> `toRows([])` -> `[]` (TEST_SUBCLASSES has no entry for either,
+// same as Champion/Eldritch Knight) loses nothing a `.resources`-observing
+// test could see.
 import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { cleric } from "@/lib/classes/cleric.js";
@@ -36,7 +43,7 @@ import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
 
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  barbarian, bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+  bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
@@ -225,11 +232,58 @@ export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_
     : { name: "Ultimate Combat Superiority", level: 18, edition, description: "Your Superiority Dice turn into d12s." },
 ]);
 
+// BARBARIAN's Rage pool (#1223): moved off barbarian.ts's resourceFn
+// (rageCountForLevel) onto the Rage row's own descriptor columns
+// (prisma/seed/barbarian-features.ts) — the same rootDir boundary FIGHTER_
+// BASE_ROWS' comment explains. Hardcoded here, once, mirroring
+// barbarian-features.ts's own resourceKey/resourceTotals values exactly. 2014
+// keeps the pre-existing 99-at-L20 "unlimited" encoding with no
+// shortRestRegain; 2024 caps at 6 from L17 (no L20 tier) with
+// shortRestRegain: 1 on every tier (SRD 5.2 p.20).
+export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Rage",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "As a bonus action, enter a rage lasting up to 1 minute. You gain advantage on Strength checks and saves, a bonus to melee damage (+2 at L1; +3 at L9; +4 at L16), and resistance to bludgeoning, piercing, and slashing damage. You can't cast or concentrate on spells while raging.",
+    resourceKey: "rage",
+    resourceLabel: "Rage",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 1, total: 2 },
+      { minLevel: 3, total: 3 },
+      { minLevel: 6, total: 4 },
+      { minLevel: 12, total: 5 },
+      { minLevel: 17, total: 6 },
+      { minLevel: 20, total: 99 },
+    ],
+  },
+  {
+    name: "Rage",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
+    resourceKey: "rage",
+    resourceLabel: "Rage",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 1, total: 2, shortRestRegain: 1 },
+      { minLevel: 3, total: 3, shortRestRegain: 1 },
+      { minLevel: 6, total: 4, shortRestRegain: 1 },
+      { minLevel: 12, total: 5, shortRestRegain: 1 },
+      { minLevel: 17, total: 6, shortRestRegain: 1 },
+    ],
+  },
+];
+
 /** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */
 export function testFeatureRowsFor(className: string, subclass: string | undefined): ClassFeatureRowsCarrier {
   const classDef = TEST_CLASSES[(className ?? "").toLowerCase()];
   const subDef = subclass ? TEST_SUBCLASSES[subclass.toLowerCase()] : undefined;
   const isFighter = (className ?? "").toLowerCase() === "fighter";
+  const isBarbarian = (className ?? "").toLowerCase() === "barbarian";
   // #1546 Part B-ii: Battle Master's SubclassDefinition (fighter.ts) carries
   // no `.features` at all any more (its rows are BATTLE_MASTER_ROWS above,
   // the same rootDir-boundary reason FIGHTER_BASE_ROWS exists) — so
@@ -237,7 +291,7 @@ export function testFeatureRowsFor(className: string, subclass: string | undefin
   // failure mode FIGHTER_BASE_ROWS' own isFighter branch fixes for the base class.
   const isBattleMaster = (subclass ?? "").toLowerCase() === "battle master";
   return {
-    classRows: isFighter ? FIGHTER_BASE_ROWS : toRows(classDef?.features ?? []),
+    classRows: isFighter ? FIGHTER_BASE_ROWS : isBarbarian ? BARBARIAN_BASE_ROWS : toRows(classDef?.features ?? []),
     subclassRows: isBattleMaster ? BATTLE_MASTER_ROWS : toRows(subDef?.features ?? []),
   };
 }

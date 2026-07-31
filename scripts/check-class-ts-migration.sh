@@ -14,9 +14,10 @@
 # bypassed by the --no-verify this repo's automation routinely uses.
 #
 # NOT_YET_MIGRATED is the honest, ratcheting tracker of #1134 / epic #1522 —
-# an allow-list of what's STILL TS, not of what's forbidden. It starts at
-# ELEVEN (Fighter is deliberately absent — #1532 is what put it under this
-# guard's scan in the first place) and only ever shrinks. A genuinely new
+# an allow-list of what's STILL TS, not of what's forbidden. It started at
+# ELEVEN (Fighter deliberately absent — #1532 is what put it under this
+# guard's scan in the first place), now TEN (Barbarian dropped off too, #1223)
+# — and only ever shrinks. A genuinely new
 # thirteenth class's lib/classes/<name>.ts is forced to be classified onto
 # EITHER ALL_CLASSES/NOT_YET_MIGRATED or NON_CLASS_MODULES below by the
 # reverse completeness check (search "reverse check") — without it, a new
@@ -27,7 +28,7 @@
 set -eu
 
 ALL_CLASSES="barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer warlock wizard"
-NOT_YET_MIGRATED="barbarian bard cleric druid monk paladin ranger rogue sorcerer warlock wizard"
+NOT_YET_MIGRATED="bard cleric druid monk paladin ranger rogue sorcerer warlock wizard"
 
 # Every OTHER backend/src/lib/classes/*.ts file (shared infrastructure, not a
 # per-class module) — forced to stay in sync with the tree by the reverse
@@ -135,8 +136,29 @@ fi
 #     that deletion by failing loudly the moment the key it depends on
 #     stops existing, rather than letting the entry rot as a permanent-
 #     looking exemption.
+#   - classes/actions.ts, routes/character/actions.ts: PERMANENT (#1223).
+#     Barbarian's DERIVED_ACTIONS "rage"/"endRage" entries (grantClass:
+#     "barbarian") and computeRageDamageBonus' classEntries lookup are Rage's
+#     ACTIVATION/buff half, not its resource pool — #1223's own scope decision
+#     is that this half stays here: the buff carries resistDamageTypes/
+#     rollEffects, for which ClassFeature has no descriptor columns. Unlike
+#     starting-equipment.ts above, there is no follow-up issue that retires
+#     this — it is the same permanent gap Rage's DERIVED_ACTIONS entry always
+#     had, not migration debt.
+#   - character/serialize/combat.ts, srd/armor-class.ts: PERMANENT (#1223).
+#     Fast Movement's speed bonus (deriveFastMovement) and Unarmored Defense's
+#     AC candidate were never part of barbarian.ts's row-migrated surface —
+#     both are computed rule functions keyed off classEntryLevel(row,
+#     "barbarian") / a class-name list, independent of the
+#     AuthoredFeature/resourceFn machinery #1223 retired. Legitimate rule-
+#     function homes under CLAUDE.md ("Rules logic is backend-owned"), not a
+#     reappearance of migrated content.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
-backend/src/lib/inventory/starting-equipment.ts"
+backend/src/lib/inventory/starting-equipment.ts
+backend/src/lib/classes/actions.ts
+backend/src/routes/character/actions.ts
+backend/src/lib/character/serialize/combat.ts
+backend/src/lib/srd/armor-class.ts"
 
 is_allowlisted_file() {
   target="$1"

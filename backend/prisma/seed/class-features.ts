@@ -49,12 +49,10 @@ import { FIGHTER_FEATURES } from "./fighter-features.js";
 // Barbarian are deliberately ABSENT (#1227, #1223): their rows are literal
 // data (fighter-features.ts, barbarian-features.ts), not derived from a
 // ClassDefinition.features array — see LITERAL_ROW_CLASSES below.
-// `lib/classes/fighter.ts` itself is gone (#1532); `lib/classes/barbarian.ts`
-// stays for now (#1223 commit 1 of 3 — its features array is unused by this
-// file but the module still holds resourceFn/subclass-registration used
-// elsewhere). `features` stays optional on ClassDefinition/SubclassDefinition
-// for the ten classes still on the TS-authoring path, not because Fighter or
-// Barbarian ever needed it to be.
+// `lib/classes/fighter.ts` (#1532) and `lib/classes/barbarian.ts` (#1223
+// commit 3 of 3) are both deleted outright. `features` stays optional on
+// ClassDefinition/SubclassDefinition for the ten classes still on the
+// TS-authoring path, not because Fighter or Barbarian ever needed it to be.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
   Bard: bard,
   Cleric: cleric,

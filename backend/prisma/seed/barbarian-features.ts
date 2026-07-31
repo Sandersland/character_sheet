@@ -2,14 +2,16 @@
 // Commit 1 of 3 (mirrors Fighter's pilot, #1227/#1528/#1532) moved these rows
 // off lib/classes/barbarian.ts's AuthoredFeature[] arrays into literal seed
 // data, byte-identical to the old TS-derived text (pinned by
-// barbarian-2014-snapshot.test.ts). Commit 2 (this one) authors Barbarian's
-// REAL SRD 5.2 (2024) content, transcribed from the parsed progression table
-// + full extracted SRD 5.2 text researched for this issue — never from "the
-// 2014 text with a coat of paint". Deleting lib/classes/barbarian.ts once
-// nothing depends on it is commit 3's job. class-features.ts concatenates
-// BARBARIAN_FEATURES onto the still-derived classes' rows to build
-// CLASS_FEATURES; see its LITERAL_ROW_CLASSES export for the set of classes
-// whose rows tests must not compare against a TS-array "old" side.
+// barbarian-2014-snapshot.test.ts). Commit 2 authored Barbarian's REAL SRD
+// 5.2 (2024) content, transcribed from the parsed progression table + full
+// extracted SRD 5.2 text researched for this issue — never from "the 2014
+// text with a coat of paint". Commit 3 (this one) moves Rage's resource pool
+// onto its two rows (see the RESOURCE POOL block below) and deletes
+// lib/classes/barbarian.ts outright, now that nothing depends on it.
+// class-features.ts concatenates BARBARIAN_FEATURES onto the still-derived
+// classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
+// for the set of classes whose rows tests must not compare against a
+// TS-array "old" side.
 //
 // DATA MODULE ONLY (#1277 AC 4, scripts/check-seed-data-modules.sh): no
 // direct database calls or async write logic may live in this file. expand()
@@ -29,13 +31,26 @@
 // "EDITION_2014") tag alongside new 2024 text; it never edits a 2014 row's
 // own name/level/description.
 //
-// RESOURCE POOLS ARE OUT OF SCOPE HERE: Rage's uses-per-rest total/recharge
-// stay off every row this commit authors (no `resourceKey` anywhere below,
-// 2014 or 2024) — that's commit 3's job, mirroring how Fighter's Second
-// Wind/Action Surge/Indomitable pools landed in a LATER pass (#1528) than
-// their initial text-authoring commit (#1227). The Barbarian research file's
-// own aside claiming Rage's pool moves "in this whole PR" is superseded by
-// this file's actual commit boundary — see the PR description.
+// RESOURCE POOL (commit 3 of 3, mirrors Fighter's #1227 -> #1528 two-step):
+// Rage's uses-per-rest total/recharge now live on both Rage rows'
+// resourceKey/resourceLabel/resourceRecharge/resourceTotals below, replacing
+// lib/classes/barbarian.ts's resourceFn (rageCountForLevel), which this same
+// commit deletes. SRD 5.1 grants unlimited Rages at level 20 (encoded as 99,
+// same as the retired resourceFn did); SRD 5.2 caps at 6 from level 17 on —
+// the headline bug this issue fixes (today a level-20 2024 Barbarian
+// resolves the 2014 table and is told "Unlimited uses at level 20"). Only
+// the POOL moved: Rage's ACTIVATION (DERIVED_ACTIONS' "rage"/"endRage"
+// entries, ACTION_EFFECT_FN.rage's resistDamageTypes/rollEffects buff) stays
+// in classes/actions.ts — ClassFeature has no descriptor columns for a
+// buff's resistance list or roll-effect set, so that half isn't a candidate
+// for this migration. #1528's "no-second-string" rule (poolFromRow reads the
+// row's own `description`, never a second hand-written pool string) means
+// the 2014 Rage pool's description is now this row's feature text below,
+// which no longer mentions "Regain all rages on a long rest." or "Unlimited
+// uses at level 20." — those sentences lived only in the retired resourceFn
+// string, not in the byte-identical-pinned row text
+// (barbarian-2014-snapshot.test.ts), so dropping them is this commit's
+// accepted, intended consequence, not a regression to fix.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -64,6 +79,12 @@ interface RawBarbarianFeature {
   // axis.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  // Rage's resource-pool descriptor columns (#1223 commit 3) — see this
+  // file's own header for why only Rage's two rows below ever set these.
+  resourceKey?: string;
+  resourceLabel?: string;
+  resourceRecharge?: string;
+  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
 }
 
 function expand(raw: RawBarbarianFeature): ClassFeatureSeedRow[] {
@@ -75,6 +96,10 @@ function expand(raw: RawBarbarianFeature): ClassFeatureSeedRow[] {
     description: raw.description,
     derivedStat: raw.derivedStat,
     derivedStatTiers: raw.derivedStatTiers,
+    resourceKey: raw.resourceKey,
+    resourceLabel: raw.resourceLabel,
+    resourceRecharge: raw.resourceRecharge,
+    resourceTotals: raw.resourceTotals,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -98,6 +123,21 @@ const BARBARIAN_BASE_RAW: RawBarbarianFeature[] = [
     edition: "EDITION_2014",
     description:
       "As a bonus action, enter a rage lasting up to 1 minute. You gain advantage on Strength checks and saves, a bonus to melee damage (+2 at L1; +3 at L9; +4 at L16), and resistance to bludgeoning, piercing, and slashing damage. You can't cast or concentrate on spells while raging.",
+    // #1223 commit 3: reproduces rageCountForLevel's old table exactly — 2/3/4/
+    // 5/6 at L1/3/6/12/17, then unlimited (encoded as 99, matching the retired
+    // resourceFn) at L20. SRD 5.1 p.21 recharges on a long rest only — no
+    // shortRestRegain on any tier.
+    resourceKey: "rage",
+    resourceLabel: "Rage",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 1, total: 2 },
+      { minLevel: 3, total: 3 },
+      { minLevel: 6, total: 4 },
+      { minLevel: 12, total: 5 },
+      { minLevel: 17, total: 6 },
+      { minLevel: 20, total: 99 },
+    ],
   },
   {
     subclassSlug: null,
@@ -114,6 +154,23 @@ const BARBARIAN_BASE_RAW: RawBarbarianFeature[] = [
     // row; see the file header for why.
     description:
       "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
+    // #1223 commit 3: SRD 5.2 p.20 caps Rages at 6 from level 17 on — NO L20
+    // tier (unlike the 2014 row above), which is the headline bug this issue
+    // fixes (today a level-20 2024 Barbarian resolves the 2014 resourceFn's
+    // 99 and is told "Unlimited uses at level 20"). shortRestRegain: 1 on
+    // every tier is the row-object-carried #1221 partial short-rest top-up
+    // (class-feature-rows.ts's ResourceTotalTier) — "regain one expended use
+    // on a Short Rest, and all on a Long Rest" (SRD 5.2 p.20).
+    resourceKey: "rage",
+    resourceLabel: "Rage",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 1, total: 2, shortRestRegain: 1 },
+      { minLevel: 3, total: 3, shortRestRegain: 1 },
+      { minLevel: 6, total: 4, shortRestRegain: 1 },
+      { minLevel: 12, total: 5, shortRestRegain: 1 },
+      { minLevel: 17, total: 6, shortRestRegain: 1 },
+    ],
   },
   {
     subclassSlug: null,

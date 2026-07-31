@@ -6,10 +6,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -20,10 +21,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -34,10 +36,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -48,10 +51,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -62,10 +66,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -76,10 +81,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -90,10 +96,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -104,10 +111,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -118,10 +126,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -132,10 +141,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -146,10 +156,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -160,10 +171,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -174,10 +186,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -188,10 +201,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -202,10 +216,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -216,10 +231,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -230,10 +246,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -244,10 +261,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -258,10 +276,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -272,11 +291,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest. Unlimited uses at level 20.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
-          "total": 99,
+          "shortRestRegain": 1,
+          "total": 6,
         },
       ],
     },
@@ -291,10 +311,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -305,10 +326,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -319,10 +341,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -333,10 +356,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -347,10 +371,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -361,10 +386,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -375,10 +401,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -389,10 +416,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -403,10 +431,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -417,10 +446,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -431,10 +461,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -445,10 +476,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -459,10 +491,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -473,10 +506,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -487,10 +521,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -501,10 +536,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -515,10 +551,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -529,10 +566,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -543,10 +581,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -557,11 +596,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest. Unlimited uses at level 20.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
-          "total": 99,
+          "shortRestRegain": 1,
+          "total": 6,
         },
       ],
     },
@@ -576,10 +616,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -590,10 +631,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -604,10 +646,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -618,10 +661,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -632,10 +676,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 3,
         },
       ],
@@ -646,10 +691,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -660,10 +706,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -674,10 +721,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -688,10 +736,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -702,10 +751,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -716,10 +766,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 4,
         },
       ],
@@ -730,10 +781,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -744,10 +796,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -758,10 +811,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -772,10 +826,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -786,10 +841,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 5,
         },
       ],
@@ -800,10 +856,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -814,10 +871,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -828,10 +886,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 6,
         },
       ],
@@ -842,11 +901,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest. Unlimited uses at level 20.",
+          "description": "As a Bonus Action, enter a Rage if you aren't wearing Heavy armor. While raging, you have Resistance to Bludgeoning, Piercing, and Slashing damage, Advantage on Strength checks and saving throws, and a bonus to damage when you attack using Strength with a weapon or an Unarmed Strike (the Rage Damage column); you can't cast spells or maintain Concentration. The Rage lasts until the end of your next turn, ending early if you don Heavy armor or have the Incapacitated condition, and extends another round if you make an attack roll, force a saving throw, or take a Bonus Action to extend it — for up to 10 minutes total. You regain one expended use on a Short Rest and all expended uses on a Long Rest.",
           "key": "rage",
           "label": "Rage",
           "recharge": "longRest",
-          "total": 99,
+          "shortRestRegain": 1,
+          "total": 6,
         },
       ],
     },

@@ -19,7 +19,6 @@ import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
-import { barbarian } from "@/lib/classes/barbarian.js";
 import { bard } from "@/lib/classes/bard.js";
 import { cleric } from "@/lib/classes/cleric.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -152,7 +151,6 @@ describe("real registry: the overlay still wins for every class still on the TS 
 // deriveExtras, no choices — while the richer definition sits unreachable. That
 // is a behaviour regression no type and no existing test could see, so assert it.
 const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
-  barbarian,
   bard,
   cleric,
   druid,
@@ -185,9 +183,10 @@ describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () 
   // but not here would leave its subclasses unchecked by the test above, and
   // nothing else would notice. CLASS_SUBCLASSES is maintained by two other
   // suites, so tying to it means the omission fails HERE rather than silently
-  // shrinking coverage. Fighter is the one class with no TS module at all
-  // (#1532 deleted it) — its three subclasses are identity-only by design.
-  it("covers every class in CLASS_SUBCLASSES except Fighter, which has no TS module", () => {
-    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter"])).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
+  // shrinking coverage. Fighter (#1532) and Barbarian (#1223) are the two
+  // classes with no TS module at all — their subclasses are identity-only by
+  // design.
+  it("covers every class in CLASS_SUBCLASSES except Fighter and Barbarian, which have no TS module", () => {
+    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian"])).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
   });
 });

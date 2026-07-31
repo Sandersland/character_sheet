@@ -16,11 +16,24 @@
  *     ≠ refund — endRage's op list is clearBuff only)
  *   - LIFO revert of the activation restores the pool AND removes the buff together
  *
- * Real Postgres in each test; supertest against createApp(). Uniquely-named class
- * fixture per testing.md so afterAll cleanup never touches seeded rows.
+ * Real Postgres in each test; supertest against createApp().
+ *
+ * #1223 UPDATE: Rage's resource pool moved off lib/classes/barbarian.ts's
+ * resourceFn (which resolved purely off the classEntry NAME, "barbarian",
+ * regardless of its `classId`) onto the seeded Barbarian ClassFeature rows'
+ * own descriptor columns — deriving the pool now requires the real seeded
+ * "Barbarian" CharacterClass's `classId` FK so the row relation resolves.
+ * This file previously used testing.md's uniquely-named bespoke-catalog-row
+ * pattern (a fresh "Actions Rage Test Barbarian" CharacterClass per run) to
+ * avoid touching seeded rows; that pattern is no longer viable for Rage
+ * specifically, since a bespoke class row has no seeded ClassFeature rows of
+ * its own, and no test-only class can carry the real Rage pool without
+ * duplicating barbarian-features.ts's authored content — findFirstOrThrow
+ * against the real "Barbarian" catalog row instead (read-only; nothing here
+ * writes to or deletes seeded rows).
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "@/app.js";
@@ -34,7 +47,6 @@ const OWNER_ID = "owner-actions-rage";
 let COOKIE: string;
 
 const BARB_ID = "test-actions-rage-barbarian";
-const BARB_CATALOG_NAME = "Actions Rage Test Barbarian";
 let barbClassId: string;
 
 // XP thresholds: L1 = 0, L9 = 48000, L16 = 195000. The rage-count pool derives
@@ -128,27 +140,10 @@ function pool(body: { resources: { pools: Array<{ key: string; used: number; rem
 }
 
 describe("POST /:id/actions/transactions — Rage (#458)", () => {
-  afterAll(async () => {
-    await prisma.characterClass.deleteMany({ where: { name: BARB_CATALOG_NAME } });
-  });
-
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
-    const cls = await prisma.characterClass.upsert({
-      where: { name: BARB_CATALOG_NAME },
-      create: {
-        name: BARB_CATALOG_NAME,
-        hitDie: "d12",
-        savingThrows: ["strength", "constitution"],
-        skillChoiceCount: 2,
-        skillChoices: ["athletics", "intimidation"],
-        isSpellcaster: false,
-        subclassLevel: 3,
-      },
-      update: {},
-    });
-    barbClassId = cls.id;
+    barbClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Barbarian" } })).id;
   });
 
   afterEach(async () => {
