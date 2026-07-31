@@ -6,7 +6,8 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
-import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData, fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-hitpoints";
 let COOKIE: string;
@@ -455,8 +456,11 @@ const BM_FIXTURE = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
+const BM_SUBCLASS_NAME = "battle master"; // exact lowercase key deriveResources reads
+
 describe("POST /api/characters/:id/hp — rest undo preserves resource sub-fields", () => {
   let bmCookie: string;
+  let bmSubclassId: string;
 
   async function bmPost(body: object) {
     return supertest(app).post(`/api/characters/${BM_FIXTURE_ID}/hp`).set("Cookie", bmCookie).send(body);
@@ -496,23 +500,37 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
         skillChoices: ["athletics", "intimidation"],
         isSpellcaster: false,
         fightingStyleFeatLevel: 1,
+        subclassLevel: 3,
       },
-      update: { fightingStyleFeatLevel: 1 },
+      update: { fightingStyleFeatLevel: 1, subclassLevel: 3 },
     });
-    // Second Wind/Action Surge are row-driven now (#1528) and tied to a
-    // specific classId — Battle Master's superiorityDice pool is unaffected
-    // (still resourceFn, keyed by subclass NAME in registry.ts's SUBCLASSES
-    // dict, not this row's DB id), but this bespoke class needs its own rows
-    // for the base pools this test's `used` snapshot asserts on.
+    // Second Wind/Action Surge are row-driven (#1528) and tied to a specific
+    // classId — this bespoke class needs its own rows for the base pools this
+    // test's `used` snapshot asserts on.
     await prisma.classFeature.deleteMany({ where: { classId: cls.id } });
     await prisma.classFeature.createMany({ data: fighterResourceRowsData(cls.id) });
+    // #1546 Part B-ii: Battle Master's superiorityDice pool + maneuver/tool
+    // choice counts are ROW-driven now too (fighter.ts's resourceFn/
+    // deriveExtras are gone) — a bespoke Subclass row with no ClassFeature
+    // children would silently lose them, same failure mode as the base
+    // class's rows above (#1546 Part B-i, Ruling 2). Shared helper, not a
+    // per-file copy.
+    const bm = await upsertEditionRow(
+      prisma.subclass,
+      { classId: cls.id, name: BM_SUBCLASS_NAME, edition: null },
+      { classId: cls.id, name: BM_SUBCLASS_NAME, description: "Maneuvers.", slug: "fighter-battle-master-hp-rest-undo-test" },
+      {},
+    );
+    bmSubclassId = bm.id;
+    await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+    await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(cls.id, bmSubclassId) });
     await prisma.character.create({
       data: {
         ...BM_FIXTURE,
         ownerId: FS_OWNER_ID,
         spellcasting: Prisma.JsonNull,
         resources: BM_RESOURCES as unknown as Prisma.InputJsonValue,
-        classEntries: { create: [{ name: "fighter", subclass: "battle master", classId: cls.id, position: 0 }] },
+        classEntries: { create: [{ name: "fighter", subclass: "battle master", subclassId: bmSubclassId, classId: cls.id, position: 0 }] },
       },
     });
   });

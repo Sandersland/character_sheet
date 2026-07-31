@@ -140,17 +140,21 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
   },
 ]);
 
-// BATTLE MASTER's own subclass rows (#1546 Part B-i): mirrors
-// prisma/seed/fighter-features.ts's BATTLE_MASTER_RAW verbatim (name/level/
-// description/edition only — no resourceKey/derivedStat columns, since
-// neither exists on the real seeded rows yet; that's #1546 Part B-ii's job).
-// Same rootDir boundary as FIGHTER_BASE_ROWS above (a src file can't import
-// prisma/), same reason for hardcoding rather than re-deriving. Exported so
-// test-support/fighter-resource-rows.ts's battleMasterResourceRowsData can
-// scope it to a bespoke fixture's classId/subclassId, the same way
-// fighterResourceRowsData derives from FIGHTER_BASE_ROWS — one shared source
-// for every suite that builds its own Battle Master Subclass row, instead of
-// each hand-copying the descriptor text a second (or third) time.
+// BATTLE MASTER's own subclass rows (#1546 Part B-i scaffolding, descriptor
+// columns filled in by Part B-ii): mirrors prisma/seed/fighter-features.ts's
+// BATTLE_MASTER_RAW verbatim, INCLUDING the resourceKey/resourceTotals/
+// resourceDieTiers/derivedStat/derivedStatTiers/saveDcAbilities columns Part
+// B-ii adds there — Combat Superiority's superiority-dice pool +
+// maneuverChoiceCount + maneuverSaveDC, and Student of War's
+// toolProfChoiceCount, are now ALL row-driven (fighter.ts's old
+// resourceFn/deriveExtras are gone). Same rootDir boundary as
+// FIGHTER_BASE_ROWS above (a src file can't import prisma/), same reason for
+// hardcoding rather than re-deriving. Exported so test-support/
+// fighter-resource-rows.ts's battleMasterResourceRowsData can scope it to a
+// bespoke fixture's classId/subclassId, the same way fighterResourceRowsData
+// derives from FIGHTER_BASE_ROWS — one shared source for every suite that
+// builds its own Battle Master Subclass row, instead of each hand-copying the
+// descriptor text a second (or third) time.
 export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Combat Superiority",
@@ -160,6 +164,27 @@ export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_
       edition === "EDITION_2014"
         ? "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated."
         : "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
+    resourceKey: "superiorityDice",
+    resourceLabel: "Superiority Dice",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [
+      { minLevel: 3, total: 4 },
+      { minLevel: 7, total: 5 },
+      { minLevel: 15, total: 6 },
+    ],
+    resourceDieTiers: [
+      { minLevel: 3, die: "d8" },
+      { minLevel: 10, die: "d10" },
+      { minLevel: 18, die: "d12" },
+    ],
+    derivedStat: "maneuverChoiceCount",
+    derivedStatTiers: [
+      { minLevel: 3, value: 3 },
+      { minLevel: 7, value: 5 },
+      { minLevel: 10, value: 7 },
+      { minLevel: 15, value: 9 },
+    ],
+    saveDcAbilities: ["strength", "dexterity"],
   },
   {
     name: "Student of War",
@@ -169,6 +194,8 @@ export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_
       edition === "EDITION_2014"
         ? "You gain proficiency with one type of artisan's tools of your choice."
         : "You gain proficiency with one type of artisan's tools of your choice, and you gain proficiency in one skill of your choice from the Fighter's level 1 skill list.",
+    derivedStat: "toolProfChoiceCount",
+    derivedStatTiers: [{ minLevel: 3, value: 1 }],
   },
   {
     name: "Know Your Enemy",
@@ -204,8 +231,14 @@ export function testFeatureRowsFor(className: string, subclass: string | undefin
   const classDef = TEST_CLASSES[(className ?? "").toLowerCase()];
   const subDef = subclass ? TEST_SUBCLASSES[subclass.toLowerCase()] : undefined;
   const isFighter = (className ?? "").toLowerCase() === "fighter";
+  // #1546 Part B-ii: Battle Master's SubclassDefinition (fighter.ts) carries
+  // no `.features` at all any more (its rows are BATTLE_MASTER_ROWS above,
+  // the same rootDir-boundary reason FIGHTER_BASE_ROWS exists) — so
+  // `toRows(subDef?.features ?? [])` would silently go empty for it, same
+  // failure mode FIGHTER_BASE_ROWS' own isFighter branch fixes for the base class.
+  const isBattleMaster = (subclass ?? "").toLowerCase() === "battle master";
   return {
     classRows: isFighter ? FIGHTER_BASE_ROWS : toRows(classDef?.features ?? []),
-    subclassRows: toRows(subDef?.features ?? []),
+    subclassRows: isBattleMaster ? BATTLE_MASTER_ROWS : toRows(subDef?.features ?? []),
   };
 }

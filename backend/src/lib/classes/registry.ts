@@ -6,10 +6,11 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
+import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
 import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";
-import { featuresFromRows, poolsFromRows, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
+import { derivedStatFromRows, featuresFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { cleric } from "./cleric.js";
 import { druid } from "./druid.js";
 import { fighter } from "./fighter.js";
@@ -201,6 +202,48 @@ function deriveSubclassClassExtras(
   return sub.def.deriveExtras(level, abilityScores, profBonus, edition);
 }
 
+// Row-driven counterpart to deriveSubclassClassExtras above (#1546) — the
+// generic EXTRAS_FIELDS reader chunk B2 asks for. maneuverChoiceCount/
+// toolProfChoiceCount resolve via derivedStatFromRows, the same tiered-value
+// mechanism #1530 uses for attacksPerAction; maneuverSaveDC is a closed-form
+// formula, not a tier, so it resolves separately through
+// deriveAnnouncedSaveDC (lib/srd) keyed off `saveDcAbilities`'s own presence,
+// never a `derivedStat` name match — Combat Superiority's single
+// `derivedStat` column already names "maneuverChoiceCount" on the SAME row,
+// so a second field can't also claim that slot for "maneuverSaveDC". Gated
+// by `sub.active` to mirror deriveSubclassClassExtras' own gate (a below-gate
+// subclass contributes nothing, even if its rows are loaded).
+function deriveRowExtras(
+  sub: SubclassLayer,
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): ClassExtras | undefined {
+  if (!sub.active) return undefined;
+  const extras: ClassExtras = {};
+  const maneuverChoiceCount = derivedStatFromRows(rows, level, edition, "maneuverChoiceCount");
+  if (maneuverChoiceCount !== undefined) extras.maneuverChoiceCount = maneuverChoiceCount;
+  const toolProfChoiceCount = derivedStatFromRows(rows, level, edition, "toolProfChoiceCount");
+  if (toolProfChoiceCount !== undefined) extras.toolProfChoiceCount = toolProfChoiceCount;
+  const maneuverSaveDC = deriveAnnouncedSaveDC(rows, level, edition, abilityScores, profBonus);
+  if (maneuverSaveDC !== undefined) extras.maneuverSaveDC = maneuverSaveDC;
+  return Object.keys(extras).length > 0 ? extras : undefined;
+}
+
+// Merges the code-authored (ExtrasFn) and row-authored extras for one
+// subclass — defined-wins, fn side last so a class mid-migration (some
+// extras still in TS, some already on rows) never has a row silently
+// overwrite a still-live ExtrasFn value. No production subclass sets both
+// sources for the same field today (Battle Master is rows-only after this
+// issue; the other eleven classes' subclasses are ExtrasFn-only), so the
+// merge order is defense-in-depth, not a live collision.
+function combineExtras(fromFn: ClassExtras | undefined, fromRows: ClassExtras | undefined): ClassExtras | undefined {
+  if (!fromFn && !fromRows) return undefined;
+  return { ...fromRows, ...fromFn };
+}
+
 // The generic subclass "choose N" list (#899): each catalog entry's level-gated
 // count, dropping any not yet available. Its own unit because #899's catalog
 // (`choices`) is independent of a subclass's bespoke deriveExtras above — a
@@ -261,7 +304,10 @@ export function deriveResources(
   // actually empty for a known class — would silently drop a subclass's
   // deriveExtras/choices contribution for exactly those classes, so `hasExtras`
   // must be computed BEFORE the null check below, never folded into it.
-  const extras = deriveSubclassClassExtras(sub, level, abilityScores, profBonus, edition);
+  const extras = combineExtras(
+    deriveSubclassClassExtras(sub, level, abilityScores, profBonus, edition),
+    deriveRowExtras(sub, featureRows?.subclassRows ?? [], level, edition, abilityScores, profBonus),
+  );
   const subclassChoices = deriveSubclassChoiceList(sub, level);
   const hasExtras = (extras !== undefined && Object.keys(extras).length > 0) || subclassChoices !== undefined;
 

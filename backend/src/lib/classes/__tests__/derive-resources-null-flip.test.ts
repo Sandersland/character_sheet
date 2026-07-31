@@ -17,6 +17,8 @@ import { describe, expect, it } from "vitest";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
+import { BATTLE_MASTER_ROWS } from "./test-feature-rows.fixture.js";
+
 const ABILITY_SCORES = {
   strength: 10, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10,
 };
@@ -63,5 +65,42 @@ describe("the exact null-safe expressions resolveArcaneRecoveryContext / loadRes
     const nullDerived = deriveResources("not-a-class", undefined, 5, ABILITY_SCORES, 3, undefined, "EDITION_2024");
     expect(nullDerived?.maneuverChoiceCount ?? 0).toBe(0);
     expect(nullDerived?.toolProfChoiceCount ?? 0).toBe(0);
+  });
+});
+
+// #1546 Part B-ii opens a SECOND null-flip channel, distinct from #1524's
+// above: before this issue, Battle Master's maneuverChoiceCount/
+// toolProfChoiceCount/maneuverSaveDC came from fighter.ts's `deriveExtras` —
+// CODE, unaffected by whether a featureRows carrier was supplied at all — so
+// an EMPTY carrier for a Battle Master fighter still produced a fully
+// populated DerivedClassInfo. After this issue, that same content is ONLY on
+// the Combat Superiority/Student of War rows (registry.ts's deriveRowExtras),
+// so an empty carrier now genuinely has nothing to contribute, and (with no
+// resourceFn pools either) deriveResources' null guard trips: the SAME call
+// that used to return a real object now returns null. This is exactly why
+// derivedAt (level-up-plan.ts) needed a comment update, not just a value
+// check — see its own comment for the plan-level consequence
+// (choiceCountStep's `?? 0` stops being a coincidental no-op).
+describe("#1546 Part B-ii: the featureRows carrier can flip a Battle Master's result between null and non-null", () => {
+  it("an EMPTY carrier for a Battle Master fighter now returns null — nothing left to contribute without rows", () => {
+    const info = deriveResources("fighter", "battle master", 5, ABILITY_SCORES, proficiencyBonusForLevel(5), { classRows: [], subclassRows: [] }, "EDITION_2024");
+    expect(info).toBeNull();
+  });
+
+  it("the SAME call with the real Combat Superiority/Student of War rows attached flips to non-null, maneuver count/DC populated", () => {
+    const info = deriveResources(
+      "fighter",
+      "battle master",
+      5,
+      ABILITY_SCORES,
+      proficiencyBonusForLevel(5),
+      { classRows: [], subclassRows: BATTLE_MASTER_ROWS },
+      "EDITION_2024",
+    );
+    expect(info).not.toBeNull();
+    expect(info?.maneuverChoiceCount).toBe(3); // gained at 3, no tier crossed again before 7
+    expect(info?.toolProfChoiceCount).toBe(1);
+    expect(typeof info?.maneuverSaveDC).toBe("number");
+    expect(info?.resources.map((r) => r.key)).toContain("superiorityDice");
   });
 });

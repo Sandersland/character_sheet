@@ -816,6 +816,20 @@ model ClassFeature {
   derivedStat      String?
   derivedStatTiers Json?   // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
 
+  // A closed-form save DC a subclass announces from the abilities named here
+  // (#1546): 8 + proficiency bonus + the higher of these abilities' modifiers
+  // (Battle Master maneuvers, PHB'14 p.73 / PHB'24 p.83). Genuinely generic —
+  // Monk's focus DC, Cleric's turn DC, Barbarian's frighten DC and Rogue's
+  // assassin DC are the same closed form hardcoded into class TS strings
+  // today — not a Fighter special case. Deliberately NOT layered onto
+  // derivedStat/derivedStatTiers: the DC is per-character ability math, not a
+  // level tier, and Combat Superiority's own derivedStat slot is already
+  // claimed by maneuverChoiceCount's tiers on the SAME row — one nullable
+  // String column cannot name both, so this is read directly (a non-empty
+  // list IS the trigger), never matched by a derivedStat name. Empty (the
+  // default) means "no such axis" for every row but Combat Superiority.
+  saveDcAbilities String[] @default([])
+
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // express it) — subclassId is nullable and base-class features are the
   // majority of rows, so without it two identical (fighter, NULL, "Second

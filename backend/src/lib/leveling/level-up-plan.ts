@@ -108,19 +108,23 @@ function derivedAt(
   edition: RulesEdition,
 ): DerivedClassInfo | null {
   if (level < 1) return null;
-  // #1546 Part B-i: the carrier is now threaded (target.classFeatureRows/
+  // #1546 Part B-i threaded this carrier (target.classFeatureRows/
   // subclassFeatureRows, resolved by the caller — see TargetClassEntry's own
-  // comment), replacing the `undefined` this call passed before. This is
-  // still a behavior no-op for every step built below: every one of them
-  // (hitPointsStep, advancementStep, subclassStep, choiceCountStep,
-  // fightingStyleFeatStep, subclassChoiceSteps, newSpellsStep) reads only
-  // ClassExtras fields (maneuverChoiceCount/toolProfChoiceCount, still code
-  // via SubclassDefinition.deriveExtras) and subclassChoices (still code via
-  // SubclassDefinition.choices) — NOT DerivedClassInfo.resources/.features,
-  // which is all this carrier feeds (poolsFromRows/featuresFromRows). Part
-  // B-ii's row-driven ClassExtras reader is what makes this carrier
-  // load-bearing; until then, the plan output stays byte-identical (proven by
-  // level-up-plan.test.ts's existing assertions, unedited by this change).
+  // comment), replacing the `undefined` this call passed before. #1546 Part
+  // B-ii is what makes it load-bearing: Battle Master's maneuverChoiceCount/
+  // toolProfChoiceCount/maneuverSaveDC moved OFF SubclassDefinition.deriveExtras
+  // (code) onto these rows (registry.ts's deriveRowExtras), so choiceCountStep
+  // below now genuinely diffs row-driven counts, not a coincidental `?? 0` over
+  // two absent code-authored values. That also opens a null-flip channel this
+  // function's callers must tolerate: with an EMPTY carrier (a bare test
+  // fixture, or a class/subclass whose only content is now row-driven),
+  // deriveResources' `resources.length === 0 && features.length === 0 &&
+  // !hasExtras` guard can return null here where a real carrier would have
+  // returned a populated object — see derive-resources-null-flip.test.ts and
+  // level-up-plan-feature-rows.test.ts's explicit boundary assertion. Every
+  // step below stays null-safe through `now?.[field] ?? 0` /
+  // `prev?.[field] ?? 0` regardless (choiceCountStep), so a flip to null here
+  // only ever reads as "nothing granted yet", never throws.
   const featureRows: ClassFeatureRowsCarrier = {
     classRows: target.classFeatureRows ?? [],
     subclassRows: target.subclassFeatureRows ?? [],
