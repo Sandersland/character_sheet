@@ -22,7 +22,9 @@ describe("Subclass catalog is seeded with slugs (#1277)", () => {
   it("every SUBCLASSES row is seeded with its exact (class, name, slug)", async () => {
     for (const sub of SUBCLASSES) {
       const row = await prisma.subclass.findFirst({
-        where: { name: sub.name, edition: null, class: { name: sub.className } },
+        // edition matches this row's OWN seeded tag, not a hardcoded null —
+        // Path of the Totem Warrior seeds EDITION_2014, not shared (#1559).
+        where: { name: sub.name, edition: sub.edition ?? null, class: { name: sub.className } },
         select: { slug: true },
       });
       expect(row, `missing seeded row: ${sub.className}/${sub.name}`).not.toBeNull();

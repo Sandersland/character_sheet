@@ -7,7 +7,6 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 // every data array below is imported from a per-domain module under seed/.
 import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/catalog-data.js";
 import { ACTIONS } from "./seed/actions.js";
-import { SUBCLASSES } from "./seed/subclasses.js";
 import { MANEUVERS } from "./seed/maneuvers.js";
 import { SHADOW_ARTS } from "./seed/shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
@@ -17,6 +16,7 @@ import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
+import { seedSubclasses } from "./seed/seed-subclasses.js";
 import { seedStartingEquipment } from "./seed/seed-starting-equipment.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
@@ -76,27 +76,10 @@ async function seedClasses(prisma: PrismaClient) {
   return classIds;
 }
 
-// Upsert by (slug, edition) — the immutable identity key (#1277), not
-// (classId, name, edition): keying on slug is what makes a display-name
-// RENAME a pure content edit (renaming `sub.name` alone under a name-keyed
-// upsert would miss the find, `create` a duplicate row, and hit the new
-// slug_edition index — see R3). `classId`/`name` still flow through as UPDATE
-// fields so a rename actually lands on the existing row. Prisma's compound-key
-// `where: { slug_edition: {...} }` shorthand can't express a null edition (see
-// upsertEditionRow), so this finds-then-writes instead.
-async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string>) {
-  for (const sub of SUBCLASSES) {
-    const classId = classIds.get(sub.className);
-    if (!classId) throw new Error(`Seed error: unknown class "${sub.className}" in SUBCLASSES`);
-    const edition = sub.edition ?? null;
-    await upsertEditionRow(
-      prisma.subclass,
-      { slug: sub.slug, edition },
-      { classId, name: sub.name, description: sub.description, slug: sub.slug, edition },
-      { classId, name: sub.name, description: sub.description },
-    );
-  }
-}
+// seedSubclasses (upsert-by-slug + the retag-safe stale-row prune, #1559) now
+// lives in ./seed/seed-subclasses.ts — split out the same way seedClassFeatures
+// is, so a test can import its guard/prune directly (seed.ts self-invokes
+// main() at module load and can't be re-run from a test).
 
 // Resolve one granted-spell seed row's subclass + catalog spell to ids and upsert
 // it. A missing class/subclass/spell is a hard seed error (mirrors the other
