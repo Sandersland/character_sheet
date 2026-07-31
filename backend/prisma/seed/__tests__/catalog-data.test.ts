@@ -167,3 +167,164 @@ describe("ITEMS catalog", () => {
     }
   });
 });
+
+// #1564: the twelve items every PHB'24 class package needs that #1534's ITEMS
+// catalog didn't carry yet — parsed from raw HTML (5e24srd.com, CC-BY-4.0,
+// SRD 5.2) and cross-checked against SRD 5.1 (5thsrd.org); every value is
+// identical in both editions (that identity is WHY one untagged Item row can
+// serve both — see this issue's research comment). "Musical Instrument" is a
+// category, not one item: nine of its ten concrete instruments are new here
+// (Lute already existed); each entry below pins name/category/weight/cost so
+// a future edit can't silently drift from the cited SRD 5.2 tables.
+describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
+  const byName = (name: string) => ITEMS.find((i) => i.name === name);
+
+  it("adds Greatsword: 2d6 slashing, heavy, two-handed, martial melee, 6 lb, 50 gp", () => {
+    const item = byName("Greatsword");
+    expect(item).toBeDefined();
+    expect(item!.category).toBe("weapon");
+    expect(item!.weight).toBe(6);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 50, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 2,
+      damageDiceFaces: 6,
+      damageType: "slashing",
+      heavy: true,
+      twoHanded: true,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Flail: 1d8 bludgeoning, martial melee, no special properties, 2 lb, 10 gp", () => {
+    const item = byName("Flail");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(2);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "bludgeoning",
+      weaponClass: "martial",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Spear: 1d6 piercing, thrown 20/60, versatile 1d8, simple melee, 3 lb, 1 gp", () => {
+    const item = byName("Spear");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(3);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 1, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "piercing",
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+      versatileDiceCount: 1,
+      versatileDiceFaces: 8,
+      weaponClass: "simple",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Sickle: 1d4 slashing, light, simple melee, 2 lb, 1 gp", () => {
+    const item = byName("Sickle");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(2);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 1, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 1,
+      damageDiceFaces: 4,
+      damageType: "slashing",
+      light: true,
+      weaponClass: "simple",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Studded Leather Armor: light, AC 12 + Dex, 13 lb, 45 gp", () => {
+    const item = byName("Studded Leather Armor");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(13);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 45, pp: 0 });
+    expect(item!.armor).toEqual({
+      armorCategory: "light",
+      baseArmorClass: 12,
+      dexModifierApplies: true,
+    });
+  });
+
+  it("adds Chain Shirt: medium, AC 13 + Dex (max 2), 20 lb, 50 gp", () => {
+    const item = byName("Chain Shirt");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(20);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 50, pp: 0 });
+    expect(item!.armor).toEqual({
+      armorCategory: "medium",
+      baseArmorClass: 13,
+      dexModifierApplies: true,
+      dexModifierMax: 2,
+    });
+  });
+
+  it("adds Quiver, Robe, Crystal, Orb, Herbalism Kit as gear with the SRD 5.2 weight/cost", () => {
+    const expectations: [string, number, number][] = [
+      ["Quiver", 1, 1],
+      ["Robe", 4, 1],
+      ["Crystal", 1, 10],
+      ["Orb", 3, 20],
+      ["Herbalism Kit", 3, 5],
+    ];
+    for (const [name, weight, gp] of expectations) {
+      const item = byName(name);
+      expect(item, `"${name}" missing from ITEMS`).toBeDefined();
+      expect(item!.category, `"${name}" category`).toBe("gear");
+      expect(item!.weight, `"${name}" weight`).toBe(weight);
+      expect(item!.cost, `"${name}" cost`).toEqual({ cp: 0, sp: 0, gp, pp: 0 });
+    }
+  });
+
+  it("adds the nine missing musical instruments as gear (Lute already existed)", () => {
+    const expectations: [string, number, number][] = [
+      ["Bagpipes", 6, 30],
+      ["Drum", 3, 6],
+      ["Dulcimer", 10, 25],
+      ["Flute", 1, 2],
+      ["Horn", 2, 3],
+      ["Lyre", 2, 30],
+      ["Pan Flute", 2, 12],
+      ["Shawm", 1, 2],
+      ["Viol", 1, 30],
+    ];
+    for (const [name, weight, gp] of expectations) {
+      const item = byName(name);
+      expect(item, `"${name}" missing from ITEMS`).toBeDefined();
+      expect(item!.category, `"${name}" category`).toBe("gear");
+      expect(item!.weight, `"${name}" weight`).toBe(weight);
+      expect(item!.cost, `"${name}" cost`).toEqual({ cp: 0, sp: 0, gp, pp: 0 });
+    }
+  });
+
+  // Lute is untouched by this issue — pinned so a future edit can't drift it
+  // while adding its nine siblings.
+  it("leaves the existing Lute (35 gp, 2 lb) unchanged", () => {
+    const item = byName("Lute");
+    expect(item!.weight).toBe(2);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 35, pp: 0 });
+  });
+
+  // No weapon-mastery properties (Graze/Sap/Nick/Vex/Topple, SRD 5.2) exist
+  // anywhere in WeaponDetailInput — this just documents that Greatsword/
+  // Flail/Spear/Sickle above carry nothing beyond the shared 5.1/5.2 stat
+  // line, rather than a reader wondering if mastery was forgotten.
+  it("does not model SRD 5.2 weapon-mastery properties on the new weapons", () => {
+    for (const name of ["Greatsword", "Flail", "Spear", "Sickle"]) {
+      const keys = Object.keys(byName(name)!.weapon ?? {});
+      for (const masteryKey of ["mastery", "graze", "sap", "nick", "vex", "topple"]) {
+        expect(keys.map((k) => k.toLowerCase())).not.toContain(masteryKey);
+      }
+    }
+  });
+});

@@ -81,4 +81,32 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
     ];
     expect(() => assertCatalogNamesResolve(okFixture)).not.toThrow();
   });
+
+  // #1564: the twelve PHB'24 catalog additions (11 fixed items + 9 new
+  // musical instruments, Lute already existed) must resolve the same way any
+  // other ITEMS row does — a FIXTURE package referencing all of them, never
+  // the real STARTING_EQUIPMENT_PACKAGES (which doesn't cite them until #1535).
+  it("assertCatalogNamesResolve accepts every #1564 catalog addition", () => {
+    const newNames = [
+      "Greatsword", "Flail", "Spear", "Sickle", "Studded Leather Armor", "Chain Shirt",
+      "Quiver", "Robe", "Crystal", "Orb", "Herbalism Kit",
+      "Bagpipes", "Drum", "Dulcimer", "Flute", "Horn", "Lyre", "Pan Flute", "Shawm", "Viol",
+    ];
+    const fixture = [
+      {
+        className: "Fighter",
+        edition: "EDITION_2014" as const,
+        package: {
+          gold: { diceCount: 1, diceFaces: 4, multiplier: 1 },
+          groups: [
+            {
+              label: "test group",
+              options: [{ label: "test option", items: newNames.map((catalogName) => ({ catalogName })) }],
+            },
+          ],
+        },
+      },
+    ];
+    expect(() => assertCatalogNamesResolve(fixture)).not.toThrow();
+  });
 });
