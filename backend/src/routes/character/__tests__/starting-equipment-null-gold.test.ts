@@ -1,0 +1,129 @@
+// resolveStartingGold rejects a NULL-dice package rather than silently
+// computing (#1564 commit 3). PHB'24 packages have no roll-for-gold rule at
+// all — StartingEquipmentPackage.goldDiceCount/Faces/Multiplier are jointly
+// NULL for them — so `mode: "gold"` becomes a 2014-only path once per-option
+// GP (commit 2) gives PHB'24 its own lettered-option route to gold. No real
+// seeded package is null-gold yet (every EDITION_2014/2024 row keeps 2014's
+// dice, #1533's interim copy), so a fixture class proves the reject path the
+// same way starting-equipment-edition.test.ts proves per-edition resolution.
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { authCookie } from "@/test-support/auth.js";
+
+const OWNER_ID = "owner-starting-equipment-null-gold";
+let COOKIE: string;
+
+const FIXTURE_CLASS = {
+  name: "Zzz Fixture Null Gold Class (#1564)",
+  hitDie: "d8",
+  savingThrows: ["dexterity"],
+  skillChoiceCount: 0,
+  skillChoices: [] as string[],
+  isSpellcaster: false,
+};
+
+let fixtureClassId: string;
+const createdCharacterIds: string[] = [];
+
+describe("resolveStartingGold rejects a NULL-dice package (#1564)", () => {
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: FIXTURE_CLASS.name },
+      create: FIXTURE_CLASS,
+      update: FIXTURE_CLASS,
+    });
+    fixtureClassId = cls.id;
+
+    await prisma.startingEquipmentPackage.create({
+      data: {
+        classId: fixtureClassId,
+        name: FIXTURE_CLASS.name,
+        edition: "EDITION_2014",
+        goldDiceCount: null,
+        goldDiceFaces: null,
+        goldMultiplier: null,
+        groups: {
+          create: [
+            {
+              position: 0,
+              label: "(a) a dagger or (b) 10 gp",
+              options: {
+                create: [
+                  { position: 0, label: "Dagger", items: { create: [{ position: 0, catalogName: "Dagger" }] } },
+                  { position: 1, label: "10 gp", gold: 10 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    COOKIE = await authCookie(OWNER_ID);
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
+    await prisma.characterClass.deleteMany({ where: { name: FIXTURE_CLASS.name } });
+  });
+
+  it("mode: gold 400s with a clear message instead of computing a range from null dice", async () => {
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .post("/api/characters")
+      .send({
+        name: "Fixture Null Gold Character",
+        alignment: "True Neutral",
+        race: "Human",
+        background: "Soldier",
+        classes: [{ name: FIXTURE_CLASS.name }],
+        abilityScores: {
+          strength: 10,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        skillProficiencies: [] as string[],
+        rulesEdition: "EDITION_2014",
+        startingEquipment: { mode: "gold", gold: 25 },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/no roll-for-gold|no gold dice|gold/i);
+    if (response.status === 201) createdCharacterIds.push(response.body.id);
+  });
+
+  it("mode: package still works for the same class (per-option gold, commit 2)", async () => {
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .post("/api/characters")
+      .send({
+        name: "Fixture Null Gold Character (package)",
+        alignment: "True Neutral",
+        race: "Human",
+        background: "Soldier",
+        classes: [{ name: FIXTURE_CLASS.name }],
+        abilityScores: {
+          strength: 10,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        skillProficiencies: [] as string[],
+        rulesEdition: "EDITION_2014",
+        startingEquipment: { mode: "package", selections: [{ optionIndex: 1 }] },
+      });
+
+    expect(response.status).toBe(201);
+    createdCharacterIds.push(response.body.id);
+    expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 });
+  });
+});

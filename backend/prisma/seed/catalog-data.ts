@@ -13,6 +13,7 @@
 // runtime lib). Relative, not @/, since the seed's tsx context doesn't alias.
 import type {
   ItemCategory,
+  ToolCategory,
   WeaponDetailInput,
   ArmorDetailInput,
   ConsumableDetailInput,
@@ -352,6 +353,10 @@ export interface CatalogItem {
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetailInput;
+  // Tool-proficiency category (#1564) — set ONLY for the small set of rows
+  // that ARE tools (the ten musical instruments, Herbalism Kit, Thieves'
+  // Tools), so a starting-equipment open pick can filter on it as a column.
+  toolCategory?: ToolCategory;
 }
 
 // --- Item catalog -------------------------------------------------------
@@ -616,8 +621,8 @@ export const ITEMS: CatalogItem[] = [
   { name: "Component Pouch", category: "gear", weight: 2, cost: coins(25), description: "A small watertight pouch holding what a spellcaster needs to cast spells with material components." },
   { name: "Pearl (arcane focus)", category: "gear", weight: 0.1, cost: coins(100), description: "Used by a spellcaster as an arcane focus in place of components." },
   { name: "Holy Symbol", category: "gear", weight: 1, cost: coins(5), description: "An amulet, reliquary, or other symbol of a deity. Clerics and paladins use this as a spellcasting focus." },
-  { name: "Lute", category: "gear", weight: 2, cost: coins(35), description: "A musical instrument; bards use it as a spellcasting focus." },
-  { name: "Thieves' Tools", category: "gear", weight: 1, cost: coins(25), description: "Lockpicks, a small file, mirror, scissors, and tweezers." },
+  { name: "Lute", category: "gear", weight: 2, cost: coins(35), description: "A musical instrument; bards use it as a spellcasting focus.", toolCategory: "musicalInstrument" },
+  { name: "Thieves' Tools", category: "gear", weight: 1, cost: coins(25), description: "Lockpicks, a small file, mirror, scissors, and tweezers.", toolCategory: "other" },
   { name: "Ink and Quill", category: "gear", cost: coins(10) },
   { name: "Healer's Kit", category: "gear", weight: 3, cost: coins(5), description: "Has 10 uses. As an action, expend one use to stabilize a creature without a Wisdom (Medicine) check." },
   // ── Equipment packs (also available as single gear items for the shop) ────
@@ -696,4 +701,98 @@ export const ITEMS: CatalogItem[] = [
     cost: coins(1),
     description: "A sprig of mistletoe, a totem, a staff, or a wooden rod used by druids as a spellcasting focus in place of material components.",
   },
+  // ── PHB'24 package additions (#1564) ──────────────────────────────────────
+  // Twelve items every PHB'24 class package needs that weren't yet in this
+  // catalog. Parsed from raw HTML (5e24srd.com, CC-BY-4.0, SRD 5.2) and
+  // cross-checked against SRD 5.1 (5thsrd.org): every value below is IDENTICAL
+  // in both editions, which is why one untagged Item row serves both (Item
+  // carries no `edition` column). Deliberately NOT modelling SRD 5.2's
+  // weapon-mastery properties (Graze/Sap/Nick/Vex/Topple) on the four weapons
+  // below — nothing in this codebase reads them yet; that's a separate feature.
+  {
+    name: "Greatsword",
+    category: "weapon",
+    weight: 6,
+    cost: coins(50),
+    weapon: {
+      damageDiceCount: 2,
+      damageDiceFaces: 6,
+      damageType: "slashing",
+      heavy: true,
+      twoHanded: true,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    },
+  },
+  {
+    name: "Flail",
+    category: "weapon",
+    weight: 2,
+    cost: coins(10),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "bludgeoning", weaponClass: "martial", weaponRange: "melee" },
+  },
+  {
+    name: "Spear",
+    category: "weapon",
+    weight: 3,
+    cost: coins(1),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "piercing",
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+      versatileDiceCount: 1,
+      versatileDiceFaces: 8,
+      weaponClass: "simple",
+      weaponRange: "melee",
+    },
+  },
+  {
+    name: "Sickle",
+    category: "weapon",
+    weight: 2,
+    cost: coins(1),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageType: "slashing", light: true, weaponClass: "simple", weaponRange: "melee" },
+  },
+  {
+    name: "Studded Leather Armor",
+    category: "armor",
+    weight: 13,
+    cost: coins(45),
+    armor: { armorCategory: "light", baseArmorClass: 12, dexModifierApplies: true },
+  },
+  {
+    name: "Chain Shirt",
+    category: "armor",
+    weight: 20,
+    cost: coins(50),
+    armor: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true, dexModifierMax: 2 },
+  },
+  { name: "Quiver", category: "gear", weight: 1, cost: coins(1) },
+  // SRD 5.1 names this "Robes"; SRD 5.2 "Robe" — the latter spelling is used
+  // here since both editions share this one untagged row.
+  { name: "Robe", category: "gear", weight: 4, cost: coins(1) },
+  { name: "Crystal", category: "gear", weight: 1, cost: coins(10), description: "Used by a spellcaster as an arcane focus in place of components." },
+  { name: "Orb", category: "gear", weight: 3, cost: coins(20), description: "Used by a spellcaster as an arcane focus in place of components." },
+  { name: "Herbalism Kit", category: "gear", weight: 3, cost: coins(5), description: "Used to identify plants and to craft potions of healing and antitoxin.", toolCategory: "other" },
+  // ── Musical instruments (PHB'14/SRD 5.2 p. 154) ───────────────────────────
+  // "Musical Instrument" is a category, not one item — SRD 5.2 names ten
+  // concrete instruments with distinct cost/weight (lib/srd/tools.ts's TOOLS
+  // already carries all ten, matching SRD 5.2 exactly). Lute already existed
+  // as an Item row (see above); these are the nine that didn't, needed so the
+  // Bard's "musical instrument of your choice" open pick has a real pool to
+  // choose from (resolveFixedItems resolves against Item ∪ Pack, never TOOLS).
+  // toolCategory: "musicalInstrument" (#1564) is what lets that open pick
+  // filter on a column rather than a rules TS import.
+  { name: "Bagpipes", category: "gear", weight: 6, cost: coins(30), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Drum", category: "gear", weight: 3, cost: coins(6), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Dulcimer", category: "gear", weight: 10, cost: coins(25), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Flute", category: "gear", weight: 1, cost: coins(2), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Horn", category: "gear", weight: 2, cost: coins(3), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Lyre", category: "gear", weight: 2, cost: coins(30), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Pan Flute", category: "gear", weight: 2, cost: coins(12), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Shawm", category: "gear", weight: 1, cost: coins(2), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Viol", category: "gear", weight: 1, cost: coins(30), description: "A musical instrument.", toolCategory: "musicalInstrument" },
 ];

@@ -95,6 +95,7 @@ function EquipmentStepBody({ c }: StepBodyProps) {
       value={c.draft.equipmentDraft}
       catalog={c.catalog}
       onChange={(eq) => c.update({ equipmentDraft: eq })}
+      selectedToolChoices={c.toolChoices.selectedToolChoices}
     />
   );
 }

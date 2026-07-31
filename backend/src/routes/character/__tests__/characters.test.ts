@@ -670,7 +670,11 @@ describe("characters routes", () => {
         // Scholar's Pack is expanded — its individual items appear, not the pack itself
         expect(names).not.toContain("Scholar's Pack");
         expect(names).toContain("Backpack");
-        // Starting gold should be zero for the package path
+        // Starting gold should be zero for the package path — also the #1564
+        // regression check: every EDITION_2014 option carries gold: 0, so
+        // this real package's currency must stay exactly what it is today
+        // now that package-mode selections can add gold (starting-equipment-
+        // gold.test.ts covers the nonzero accumulation with a fixture package).
         expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
       });
 

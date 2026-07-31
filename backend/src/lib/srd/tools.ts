@@ -3,7 +3,12 @@
 // Tool proficiency in 5e adds proficiency bonus to ability checks — the
 // governing ability is chosen per check by the DM, not fixed per tool.
 
-export type ToolCategory = "artisan" | "gamingSet" | "musicalInstrument" | "other";
+// Canonical definition lives in shared-types (#1564) — Item.toolCategory and
+// StartingEquipmentOpenPick.toolCategory both key against it, so a starting-
+// equipment open pick can filter "musical instrument" as a column read
+// without this module (or a rules TS import) reaching the equipment resolver.
+import type { ToolCategory } from "@character-sheet/shared-types";
+export type { ToolCategory };
 
 export interface ToolDefinition {
   name: string;

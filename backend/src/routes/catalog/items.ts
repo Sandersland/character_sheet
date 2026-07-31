@@ -32,6 +32,9 @@ function serializeItem(row: ItemWithDetails) {
     weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
+    // Set only for the small set of rows that ARE tools (#1564) — the
+    // starting-equipment open-pick dropdown filters on it directly.
+    toolCategory: row.toolCategory ?? undefined,
   };
 }
 

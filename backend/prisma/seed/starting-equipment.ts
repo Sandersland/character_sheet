@@ -31,6 +31,9 @@ import type { SeedEdition } from "./edition.js";
 
 const weaponClassSchema = z.enum(["simple", "martial"]);
 const weaponRangeSchema = z.enum(["melee", "ranged"]);
+// Mirrors backend lib/srd/tools.ts's ToolCategory / the ToolCategory Prisma
+// enum (#1564) — the non-weapon open-pick filter axis.
+const toolCategorySchema = z.enum(["artisan", "gamingSet", "musicalInstrument", "other"]);
 
 const fixedItemSchema = z.object({
   catalogName: z.string().min(1),
@@ -42,14 +45,20 @@ const openWeaponPickSchema = z.object({
   filter: z.object({
     weaponClass: weaponClassSchema.optional(),
     range: weaponRangeSchema.optional(),
+    toolCategory: toolCategorySchema.optional(),
   }),
   quantity: z.number().int().positive().optional(),
+  // Bound to a tool the character already chose proficiency in (Monk's
+  // "chosen for the tool proficiency above") rather than a free pick — #1564.
+  boundToToolChoice: z.boolean().optional(),
 });
 
 const equipmentBundleSchema = z.object({
   label: z.string().min(1),
   items: z.array(fixedItemSchema).optional(),
   openPicks: z.array(openWeaponPickSchema).optional(),
+  // PHB'24 per-option GP (#1564) — every EDITION_2014 option omits this (0).
+  gold: z.number().int().positive().optional(),
 });
 
 // options: z.array(...).min(1) — strictly stronger than the deleted
@@ -68,7 +77,10 @@ const startingGoldSchema = z.object({
 
 const classStartingEquipmentSchema = z.object({
   groups: z.array(equipmentChoiceGroupSchema),
-  gold: startingGoldSchema,
+  // Nullable (#1564 commit 3): PHB'24 has no roll-for-gold rule at all. Every
+  // EDITION_2014 package below still sets a real StartingGold; #1535 is where
+  // a null-gold PHB'24 package would first land.
+  gold: startingGoldSchema.nullable(),
 });
 
 export const startingEquipmentSeedSchema = z.object({

@@ -11,6 +11,9 @@ import { mapStartingEquipmentPackage, type StartingEquipmentPackageRow } from ".
 // so this compiles against the real Prisma payload shape, not a loosened stand-in.
 function packageRow(overrides: {
   groups: StartingEquipmentPackageRow["groups"];
+  goldDiceCount?: number | null;
+  goldDiceFaces?: number | null;
+  goldMultiplier?: number | null;
 }): StartingEquipmentPackageRow {
   return {
     id: "pkg-1",
@@ -30,8 +33,28 @@ function optionRow(overrides: Partial<StartingEquipmentPackageRow["groups"][numb
     groupId: "group-1",
     position: 0,
     label: "An option",
+    gold: 0,
     items: [],
     openPicks: [],
+    ...overrides,
+  };
+}
+
+// #1564: every existing weapon open pick fixture defaults toolCategory: null,
+// boundToToolChoice: false — the pre-#1564 shape, unaffected by the new axes.
+function openPickRow(
+  overrides: Partial<StartingEquipmentPackageRow["groups"][number]["options"][number]["openPicks"][number]>,
+) {
+  return {
+    id: "pick-1",
+    optionId: "opt-1",
+    position: 0,
+    label: "a pick",
+    weaponClass: null,
+    weaponRange: null,
+    toolCategory: null,
+    boundToToolChoice: false,
+    quantity: 1,
     ...overrides,
   };
 }
@@ -80,17 +103,7 @@ describe("mapStartingEquipmentPackage", () => {
           options: [
             optionRow({
               label: "Anything",
-              openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "any item",
-                  weaponClass: null,
-                  weaponRange: null,
-                  quantity: 1,
-                },
-              ],
+              openPicks: [openPickRow({ label: "any item" })],
             }),
           ],
         },
@@ -113,17 +126,7 @@ describe("mapStartingEquipmentPackage", () => {
           options: [
             optionRow({
               label: "Two martial weapons",
-              openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "a martial weapon",
-                  weaponClass: "martial",
-                  weaponRange: null,
-                  quantity: 1,
-                },
-              ],
+              openPicks: [openPickRow({ label: "a martial weapon", weaponClass: "martial" })],
             }),
           ],
         },
@@ -196,24 +199,8 @@ describe("mapStartingEquipmentPackage", () => {
             optionRow({
               label: "Two of the same weapon",
               openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "one martial weapon",
-                  weaponClass: "martial",
-                  weaponRange: null,
-                  quantity: 1,
-                },
-                {
-                  id: "pick-2",
-                  optionId: "opt-1",
-                  position: 1,
-                  label: "two martial weapons at once",
-                  weaponClass: "martial",
-                  weaponRange: null,
-                  quantity: 2,
-                },
+                openPickRow({ label: "one martial weapon", weaponClass: "martial" }),
+                openPickRow({ id: "pick-2", position: 1, label: "two martial weapons at once", weaponClass: "martial", quantity: 2 }),
               ],
             }),
           ],
@@ -228,6 +215,52 @@ describe("mapStartingEquipmentPackage", () => {
     ]);
   });
 
+  // #1564: every PHB'24 option carries GP (4-28 for a non-final option, 50-155
+  // for the flat final option); omitted on the wire when 0 (every 2014 option,
+  // and the PHB'24 non-gold options), same discipline as quantity/items/openPicks.
+  it("maps a nonzero option gold onto the wire's gold field", () => {
+    const row = packageRow({
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "(a) chain mail or (b) leather armor and 20 gp",
+          options: [
+            optionRow({ label: "Chain Mail", items: [{ id: "item-1", optionId: "opt-1", position: 0, catalogName: "Chain Mail", quantity: 1 }] }),
+            optionRow({ label: "20 GP", gold: 20 }),
+          ],
+        },
+      ],
+    });
+
+    const mapped = mapStartingEquipmentPackage(row);
+    expect(mapped.groups[0].options[0]).not.toHaveProperty("gold");
+    expect(mapped.groups[0].options[1].gold).toBe(20);
+  });
+
+  // #1564 commit 3: PHB'24 has no roll-for-gold rule at all — NULL states
+  // that truthfully (0/0/0 would read as "roll zero gold", the same class of
+  // lie as encoding a flat 155 GP as {1,1,155}).
+  it("maps jointly-null gold dice columns to gold: null on the wire", () => {
+    const row = packageRow({
+      goldDiceCount: null,
+      goldDiceFaces: null,
+      goldMultiplier: null,
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "Choose an option",
+          options: [optionRow({ label: "An option", gold: 10 })],
+        },
+      ],
+    });
+
+    expect(mapStartingEquipmentPackage(row).gold).toBeNull();
+  });
+
   it("renames weaponRange to range on the wire", () => {
     const row = packageRow({
       groups: [
@@ -239,17 +272,7 @@ describe("mapStartingEquipmentPackage", () => {
           options: [
             optionRow({
               label: "Any simple melee weapon",
-              openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "any simple melee weapon",
-                  weaponClass: "simple",
-                  weaponRange: "melee",
-                  quantity: 1,
-                },
-              ],
+              openPicks: [openPickRow({ label: "any simple melee weapon", weaponClass: "simple", weaponRange: "melee" })],
             }),
           ],
         },
@@ -258,5 +281,60 @@ describe("mapStartingEquipmentPackage", () => {
 
     const mapped = mapStartingEquipmentPackage(row);
     expect(mapped.groups[0].options[0].openPicks?.[0].filter).toEqual({ weaponClass: "simple", range: "melee" });
+  });
+
+  // #1564 commit 4: the non-weapon filter axis — a genuine "musical
+  // instrument of your choice" pick (Bard) filters on toolCategory instead of
+  // weaponClass/range.
+  it("maps toolCategory onto the wire's filter.toolCategory", () => {
+    const row = packageRow({
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "Musical instrument",
+          options: [
+            optionRow({
+              label: "A musical instrument",
+              openPicks: [openPickRow({ label: "musical instrument", toolCategory: "musicalInstrument" })],
+            }),
+          ],
+        },
+      ],
+    });
+
+    const mapped = mapStartingEquipmentPackage(row);
+    expect(mapped.groups[0].options[0].openPicks?.[0].filter).toEqual({ toolCategory: "musicalInstrument" });
+  });
+
+  // boundToToolChoice omitted when false (every existing weapon pick),
+  // present when true (Monk's tool-bound pick, #1564).
+  it("omits boundToToolChoice when false, keeps it when true", () => {
+    const row = packageRow({
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "Tool bound to proficiency",
+          options: [
+            optionRow({
+              label: "Free weapon pick",
+              openPicks: [openPickRow({ label: "any simple weapon", weaponClass: "simple" })],
+            }),
+            optionRow({
+              label: "Bound tool pick",
+              position: 1,
+              openPicks: [openPickRow({ label: "the tool chosen above", boundToToolChoice: true })],
+            }),
+          ],
+        },
+      ],
+    });
+
+    const mapped = mapStartingEquipmentPackage(row);
+    expect(mapped.groups[0].options[0].openPicks?.[0]).not.toHaveProperty("boundToToolChoice");
+    expect(mapped.groups[0].options[1].openPicks?.[0].boundToToolChoice).toBe(true);
   });
 });

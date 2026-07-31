@@ -404,11 +404,11 @@ async function seedSpells(prisma: PrismaClient) {
 async function seedItems(prisma: PrismaClient) {
   const itemIdsByName = new Map<string, string>();
   for (const item of ITEMS) {
-    const { name, category, weight, cost, description } = item;
+    const { name, category, weight, cost, description, toolCategory } = item;
     const row = await prisma.item.upsert({
       where: { name },
-      create: { name, category, weight, cost, description, ...itemDetailCreateFields(item) },
-      update: { name, category, weight, cost, description, ...itemDetailUpsertFields(item) },
+      create: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), ...itemDetailCreateFields(item) },
+      update: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), ...itemDetailUpsertFields(item) },
     });
     itemIdsByName.set(row.name, row.id);
   }

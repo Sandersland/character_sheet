@@ -866,9 +866,22 @@ model StartingEquipmentPackage {
   name    String
   edition RulesEdition
 
-  goldDiceCount  Int
-  goldDiceFaces  Int
-  goldMultiplier Int
+  // Nullable (#1564 commit 3): PHB'24 has no roll-for-gold rule at all — NULL
+  // states that truthfully ("this package has no dice alternative"), where
+  // 0/0/0 would read as "roll zero gold", the same class of lie as encoding a
+  // flat 155 GP as {1,1,155}. Jointly null, never partially — a package
+  // either has all three or none — ENFORCED by a hand-written CHECK
+  // constraint (20260731160000_starting_equipment_package_gold_dice_check;
+  // Prisma's DSL has no `@@check` attribute, same DSL gap as the schema's
+  // NULLS NOT DISTINCT indexes), not just a convention mapGold's non-null
+  // assertions rest on. Every EDITION_2014 package keeps its existing
+  // non-null values; resolveStartingGold (character-create.ts) rejects
+  // rather than computing when handed a NULL-dice package, since PHB'24
+  // reaches its gold through a lettered StartingEquipmentOption.gold instead
+  // (#1564 commit 2).
+  goldDiceCount  Int?
+  goldDiceFaces  Int?
+  goldMultiplier Int?
 
   groups StartingEquipmentGroup[]
 
@@ -897,6 +910,14 @@ model StartingEquipmentOption {
   group    StartingEquipmentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   position Int
   label    String
+  // GP this option grants on top of (or instead of) its items (#1564). Forced
+  // by PHB'24's shape, not a preference: every non-final option across all
+  // twelve 2024 class packages carries 4-28 GP, and the flat final option
+  // (50-155 GP) is just an option with this set and no items — same
+  // presentation the book itself uses, so no separate "gold mode" per option.
+  // Every EDITION_2014 option is 0 (2014's gold is the package-level dice
+  // roll, StartingEquipmentPackage.goldDiceCount/Faces/Multiplier, untouched).
+  gold     Int                    @default(0)
 
   items     StartingEquipmentItem[]
   openPicks StartingEquipmentOpenPick[]
@@ -926,12 +947,25 @@ model StartingEquipmentOpenPick {
   position Int
   label    String
   // Named after ItemWeaponDetail's columns, which openPickFilterError
-  // compares against — NOT after the wire field. The wire's WeaponPoolFilter
+  // compares against — NOT after the wire field. The wire's OpenPickFilter
+  // (renamed from WeaponPoolFilter, #1564 — it filters more than weapons now)
   // calls the second one `range`; mapStartingEquipmentPackage's mapOpenPick
   // (backend lib/inventory/starting-equipment-package.ts, #1534) is the mapper
   // that renames it. If you rename either side, rename the mapper in the same diff.
   weaponClass WeaponClass? // null = any
   weaponRange WeaponRange? // null = any
+  // Non-weapon filter axis (#1564): "musical instrument" / "artisan tool"
+  // pool, e.g. the Bard's "musical instrument of your choice". Mirrors
+  // Item.toolCategory, which openPickFilterError compares against.
+  toolCategory ToolCategory? // null = not tool-filtered
+  // True when this pick isn't a free choice at all but must match ONE OF the
+  // character's own creation tool choices (creationToolProfs) — Monk's
+  // "Artisan's Tools or Musical Instrument chosen for the tool proficiency
+  // above". A free pick would let a Monk take an instrument with no
+  // proficiency in it, which the book does not permit. Also serves the
+  // Soldier background's "Gaming Set (same as above)" (#1565) — same
+  // mechanism, no second one built for it.
+  boundToToolChoice Boolean @default(false)
   quantity    Int          @default(1)
 
   @@unique([optionId, position])
@@ -1063,6 +1097,21 @@ enum WeaponClass {
 enum WeaponRange {
   melee
   ranged
+}
+
+// Tool-proficiency category (SRD 5.1 / SRD 5.2 — both editions' tools pages
+// list all three categories: Artisan's Tools, Gaming Set, Musical Instrument)
+// — mirrors backend lib/srd/tools.ts's TOOLS list (#1564). Lets a starting-
+// equipment open pick filter on "is this a musical instrument" as a COLUMN
+// the validator reads, rather than the DB-driven equipment resolver reaching
+// into a rules TS module. Only the items that are actual tools carry this on
+// Item (the ten instruments,
+// Herbalism Kit, Thieves' Tools) — most of TOOLS has no Item row at all.
+enum ToolCategory {
+  artisan
+  gamingSet
+  musicalInstrument
+  other
 }
 
 // Lifecycle of a play session: active while in progress, ended when the
@@ -1402,6 +1451,12 @@ model Item {
   // and body armor derive their slot from detail data, so this is only set for
   // wearable gear (rings, cloaks, amulets, boots, etc.).
   slot        EquipSlot?
+  // Tool-proficiency category (#1564) — set ONLY for the small set of Item
+  // rows that ARE tools (the ten musical instruments, Herbalism Kit,
+  // Thieves' Tools); null for everything else. Lets a StartingEquipmentOpenPick
+  // filter "musical instrument" / "artisan tool" as a column read, never a
+  // reach into lib/srd/tools.ts from the equipment resolver.
+  toolCategory ToolCategory?
 
   weaponDetail     ItemWeaponDetail?
   armorDetail      ItemArmorDetail?

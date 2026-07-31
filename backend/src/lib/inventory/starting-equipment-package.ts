@@ -57,19 +57,26 @@ function mapItem(item: RowItem): FixedItemRef {
 // rename either. `filter` is ALWAYS emitted, even `{}`: StartingEquipmentEditor
 // .tsx reads `pick.filter.weaponClass` unguarded, so an omitted filter would
 // throw the first time an unfiltered open pick is authored (no seeded row
-// exercises that yet).
+// exercises that yet). toolCategory (#1564) is the non-weapon axis; boundToToolChoice
+// is omitted when false (every existing weapon pick) so it round-trips
+// through seed-starting-equipment.ts's openPickCreateInput unchanged.
 function mapOpenPick(pick: RowOpenPick): OpenWeaponPick {
   return {
     label: pick.label,
     filter: {
       ...(pick.weaponClass ? { weaponClass: pick.weaponClass } : {}),
       ...(pick.weaponRange ? { range: pick.weaponRange } : {}),
+      ...(pick.toolCategory ? { toolCategory: pick.toolCategory } : {}),
     },
     ...(pick.quantity === 1 ? {} : { quantity: pick.quantity }),
+    ...(pick.boundToToolChoice ? { boundToToolChoice: true } : {}),
   };
 }
 
-// items/openPicks omitted when empty, never `[]`.
+// items/openPicks omitted when empty, gold omitted when 0 (every 2014 option,
+// and any 2024 option that grants none) — never a redundant `gold: 0` that
+// seed-starting-equipment.ts's optionCreateInput would then write straight
+// back as the literal default.
 function mapOption(option: RowOption): EquipmentBundle {
   const items = option.items.map(mapItem);
   const openPicks = option.openPicks.map(mapOpenPick);
@@ -77,6 +84,7 @@ function mapOption(option: RowOption): EquipmentBundle {
     label: option.label,
     ...(items.length ? { items } : {}),
     ...(openPicks.length ? { openPicks } : {}),
+    ...(option.gold ? { gold: option.gold } : {}),
   };
 }
 
@@ -84,10 +92,18 @@ function mapGroup(group: RowGroup): EquipmentChoiceGroup {
   return { label: group.label, options: group.options.map(mapOption) };
 }
 
+// Jointly null, never partially (#1564 commit 3 — schema.prisma's comment on
+// StartingEquipmentPackage's three columns): PHB'24 has no roll-for-gold rule
+// at all, so NULL here means that truthfully rather than "roll zero gold".
+function mapGold(pkg: StartingEquipmentPackageRow): ClassStartingEquipment["gold"] {
+  if (pkg.goldDiceCount == null) return null;
+  return { diceCount: pkg.goldDiceCount, diceFaces: pkg.goldDiceFaces!, multiplier: pkg.goldMultiplier! };
+}
+
 /** Rows -> wire (#1534): the one shape both read sites resolve a package through. */
 export function mapStartingEquipmentPackage(pkg: StartingEquipmentPackageRow): ClassStartingEquipment {
   return {
-    gold: { diceCount: pkg.goldDiceCount, diceFaces: pkg.goldDiceFaces, multiplier: pkg.goldMultiplier },
+    gold: mapGold(pkg),
     groups: pkg.groups.map(mapGroup),
   };
 }

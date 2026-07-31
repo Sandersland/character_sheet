@@ -34,12 +34,28 @@ function itemCreateInput(item: FixedItemRef, position: number) {
 // weaponClass/weaponRange (NOT the wire's `range`) — named after
 // ItemWeaponDetail's columns per the schema's own comment; this is the ONE
 // mapper that renames the wire's `filter.range` onto `weaponRange`.
+// toolCategory (#1564) is this function's inverse of mapOpenPick's own
+// omission rule for the same field. Split out of openPickCreateInput purely
+// to keep that function's own cyclomatic complexity low (this file's header
+// on why prisma/seed/** floors at the uncovered-CRAP formula regardless of
+// real test coverage).
+function openPickFilterCreateInput(filter: OpenWeaponPick["filter"]) {
+  return {
+    weaponClass: filter.weaponClass ?? null,
+    weaponRange: filter.range ?? null,
+    toolCategory: filter.toolCategory ?? null,
+  };
+}
+
+// boundToToolChoice/quantity are this function's inverse of mapOpenPick's own
+// omission rules — a false/undefined boundToToolChoice defaults to the
+// column's own default (false).
 function openPickCreateInput(pick: OpenWeaponPick, position: number) {
   return {
     position,
     label: pick.label,
-    weaponClass: pick.filter.weaponClass ?? null,
-    weaponRange: pick.filter.range ?? null,
+    ...openPickFilterCreateInput(pick.filter),
+    boundToToolChoice: pick.boundToToolChoice ?? false,
     quantity: pick.quantity ?? 1,
   };
 }
@@ -48,6 +64,7 @@ function optionCreateInput(option: EquipmentBundle, position: number) {
   return {
     position,
     label: option.label,
+    gold: option.gold ?? 0,
     items: { create: (option.items ?? []).map((item, i) => itemCreateInput(item, i)) },
     openPicks: { create: (option.openPicks ?? []).map((pick, i) => openPickCreateInput(pick, i)) },
   };
@@ -61,14 +78,22 @@ function groupCreateInput(group: EquipmentChoiceGroup, position: number) {
   };
 }
 
+// gold is null on the wire when this edition has no roll-for-gold rule at all
+// (#1564 commit 3, PHB'24) — the three columns are jointly null in that case,
+// never independently, mirroring the wire's single StartingGold | null field.
+// Split out of packageCreateData purely to keep that function's own
+// cyclomatic complexity low (this file's header explains why).
+function goldColumnsCreateInput(gold: ClassStartingEquipment["gold"]) {
+  if (!gold) return { goldDiceCount: null, goldDiceFaces: null, goldMultiplier: null };
+  return { goldDiceCount: gold.diceCount, goldDiceFaces: gold.diceFaces, goldMultiplier: gold.multiplier };
+}
+
 function packageCreateData(classId: string, className: string, edition: SeedEdition, pkg: ClassStartingEquipment) {
   return {
     classId,
     name: className,
     edition,
-    goldDiceCount: pkg.gold.diceCount,
-    goldDiceFaces: pkg.gold.diceFaces,
-    goldMultiplier: pkg.gold.multiplier,
+    ...goldColumnsCreateInput(pkg.gold),
     groups: { create: pkg.groups.map((group, i) => groupCreateInput(group, i)) },
   };
 }
