@@ -653,6 +653,9 @@ model CharacterClass {
   // Back-relation only — not a column, appears on no payload unless included
   // (#1522/#1523's ClassFeature foundation).
   features   ClassFeature[]
+  // Back-relation only — not a column, appears on no payload unless included
+  // (#1519/#1533's StartingEquipmentPackage foundation).
+  startingEquipmentPackages StartingEquipmentPackage[]
 }
 
 // Subclass catalog — Pattern A (like Race/CharacterClass). Each row is a
@@ -821,6 +824,103 @@ model ClassFeature {
   // The read path (#1524) joins on subclassId alone; the compound unique
   // above is classId-prefixed and cannot serve it.
   @@index([subclassId])
+}
+
+// Seeded home for the per-class starting-equipment packages that live in
+// backend/src/lib/inventory/starting-equipment.ts's STARTING_EQUIPMENT
+// (#1519/#1533). Relational, not a JSON blob (settled on #1519, not re-opened
+// here): the nesting IS the content — group -> option -> (fixed items and/or
+// open picks) plus a dice-expression gold alternative — and a JSON blob would
+// put catalogName/weaponClass references beyond zod's reach (#1247/#1408).
+// `edition` is NON-NULLABLE: there is no edition-neutral starting package, and
+// a nullable column here is exactly how a 2014 package would silently serve a
+// 2024 character (the bug this issue exists to eventually fix, #1535). With
+// `edition` NOT NULL, @@unique([classId, edition]) needs no NULLS NOT
+// DISTINCT clause (contrast ClassFeature's nullable-subclassId trap).
+//
+// No reader yet (#1534) — STARTING_EQUIPMENT keeps serving both read sites
+// unchanged for the whole of this issue.
+model StartingEquipmentPackage {
+  id      String         @id @default(uuid())
+  classId String
+  class   CharacterClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  // Mirror of CharacterClass.name, carried ONLY so staleCatalogRowsWhere can
+  // partition this family's prune by (identity, edition) — that helper filters
+  // on a scalar `name`/`key` column on the row itself and cannot build a
+  // relation filter. Every LOOKUP goes through classId; nothing may key on
+  // this column (#1388/#1529: display-name keying is what we are moving away
+  // from).
+  name    String
+  edition RulesEdition
+
+  goldDiceCount  Int
+  goldDiceFaces  Int
+  goldMultiplier Int
+
+  groups StartingEquipmentGroup[]
+
+  @@unique([classId, edition])
+}
+
+model StartingEquipmentGroup {
+  id        String                   @id @default(uuid())
+  packageId String
+  package   StartingEquipmentPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  // Load-bearing, not cosmetic: the creation client indexes options
+  // positionally (collectGroupRefs), and rows come back in arbitrary order
+  // without an explicit orderBy — assigned by array index at seed time from a
+  // nested literal, so it's deterministic by construction (#1545's lesson).
+  position Int
+  label    String
+
+  options StartingEquipmentOption[]
+
+  @@unique([packageId, position])
+}
+
+model StartingEquipmentOption {
+  id       String                 @id @default(uuid())
+  groupId  String
+  group    StartingEquipmentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  position Int
+  label    String
+
+  items     StartingEquipmentItem[]
+  openPicks StartingEquipmentOpenPick[]
+
+  @@unique([groupId, position])
+}
+
+model StartingEquipmentItem {
+  id       String                  @id @default(uuid())
+  optionId String
+  option   StartingEquipmentOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  position Int
+  // NAME reference, deliberately not a FK to Item: resolveFixedItems looks a
+  // ref up against Pack FIRST and falls through to Item, so an Item FK would
+  // make "Dungeoneer's Pack" unexpressible. The seed validator checks
+  // ITEMS ∪ PACKS instead (assertSeedContentValid).
+  catalogName String
+  quantity    Int    @default(1)
+
+  @@unique([optionId, position])
+}
+
+model StartingEquipmentOpenPick {
+  id       String                  @id @default(uuid())
+  optionId String
+  option   StartingEquipmentOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  position Int
+  label    String
+  // Named after ItemWeaponDetail's columns, which openPickFilterError
+  // compares against — NOT after the wire field. The wire's WeaponPoolFilter
+  // calls the second one `range`; the (future, #1534) mapper renames it. If
+  // you rename either side, rename the mapper in the same diff.
+  weaponClass WeaponClass? // null = any
+  weaponRange WeaponRange? // null = any
+  quantity    Int          @default(1)
+
+  @@unique([optionId, position])
 }
 
 model Background {

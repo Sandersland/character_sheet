@@ -17,6 +17,7 @@ import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
+import { seedStartingEquipment } from "./seed/seed-starting-equipment.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
 import { assertSeedContentValid } from "./seed/validate.js";
@@ -479,6 +480,11 @@ async function main() {
   await seedSubclassGrantedSpells(prisma, classIds);
   const itemIdsByName = await seedItems(prisma);
   await seedPacks(prisma, itemIdsByName);
+  // No reader yet (#1534) — StartingEquipmentPackage rows are inert until
+  // then. Runs after seedPacks/seedItems so its own catalogName resolution
+  // logic (validated against ITEMS/PACKS at assertSeedContentValid time,
+  // before ANY of this ran) reflects the just-seeded catalog rows too.
+  await seedStartingEquipment(prisma);
 }
 
 main()

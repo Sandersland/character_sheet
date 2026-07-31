@@ -8,15 +8,23 @@
 //
 // SEED_FAMILIES is a registry, not a hardcoded list of calls — adding a
 // family is one entry here, demonstrated by the second member (SUBCLASS_
-// GRANTED_SPELLS) landing alongside the first, not merely asserted, and the
-// third (CLASS_FEATURES, #1523) landing the same way. Deliberately in scope
-// for only these three today; the other ten seed families already carry
-// structural coverage via seed-data.test.ts and are a named follow-up.
+// GRANTED_SPELLS) landing alongside the first, not merely asserted, the third
+// (CLASS_FEATURES, #1523) landing the same way, and the fourth
+// (STARTING_EQUIPMENT_PACKAGES, #1533) too. Deliberately in scope for only
+// these four today; the other seed families already carry structural
+// coverage via seed-data.test.ts and are a named follow-up.
 import { z } from "zod";
 
 import { SUBCLASSES, subclassSeedSchema } from "./subclasses.js";
 import { SUBCLASS_GRANTED_SPELLS, subclassGrantedSpellSeedSchema } from "./subclass-granted-spells.js";
 import { CLASS_FEATURES, classFeatureSeedSchema } from "./class-features.js";
+import {
+  STARTING_EQUIPMENT_PACKAGES,
+  startingEquipmentSeedSchema,
+  type StartingEquipmentSeed,
+} from "./starting-equipment.js";
+import { ITEMS } from "./catalog-data.js";
+import { PACKS } from "./packs.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -27,6 +35,7 @@ const SEED_FAMILIES: Record<string, SeedFamily> = {
   SUBCLASSES: { schema: subclassSeedSchema, rows: SUBCLASSES },
   SUBCLASS_GRANTED_SPELLS: { schema: subclassGrantedSpellSeedSchema, rows: SUBCLASS_GRANTED_SPELLS },
   CLASS_FEATURES: { schema: classFeatureSeedSchema, rows: CLASS_FEATURES },
+  STARTING_EQUIPMENT_PACKAGES: { schema: startingEquipmentSeedSchema, rows: STARTING_EQUIPMENT_PACKAGES },
 };
 
 export interface SeedValidationSummary {
@@ -34,13 +43,54 @@ export interface SeedValidationSummary {
   rowsChecked: number;
 }
 
+// Split into one function per tree level — purely to keep each function's
+// cyclomatic/cognitive complexity low: prisma/seed/** carries no coverage
+// instrumentation (vitest.config.ts's coverage `include` is `src/**/*.ts`
+// only), so a single triple-nested-loop version of this floors at the
+// uncovered-CRAP formula regardless of real test coverage — the same reason
+// collectClassPairCounts/pairCount (seed-class-features.ts) are split out.
+function catalogNamesInOption(option: StartingEquipmentSeed["package"]["groups"][number]["options"][number]): string[] {
+  return (option.items ?? []).map((item) => item.catalogName);
+}
+
+function catalogNamesInGroup(group: StartingEquipmentSeed["package"]["groups"][number]): string[] {
+  return group.options.flatMap(catalogNamesInOption);
+}
+
+// Every catalogName a STARTING_EQUIPMENT_PACKAGES row references, walking the
+// nested group -> option -> items tree. Pure and literal-vs-literal (#1533
+// [R3]): assertSeedContentValid runs at seed.ts:459, BEFORE seedClasses/
+// seedItems/seedPacks, so it cannot query the database — it fails the seed
+// before anything is written instead.
+function collectCatalogNames(rows: readonly StartingEquipmentSeed[]): string[] {
+  return rows.flatMap((row) => row.package.groups.flatMap(catalogNamesInGroup));
+}
+
+// resolveFixedItems (character-create.ts) looks a catalogName up against Pack
+// FIRST, then Item — so a catalogName is valid if it resolves against EITHER
+// catalog. All seven packs also exist as ITEMS rows today (#1533 [R4]), so an
+// Item-only check would pass by luck and only diverge the first time they do.
+// Exported so a test can call it against a FIXTURE row with a nonexistent
+// catalogName (never the real STARTING_EQUIPMENT_PACKAGES) — same "broken
+// fixture, never real content" pattern subclassSeedSchema's test uses below.
+export function assertCatalogNamesResolve(rows: readonly StartingEquipmentSeed[]): void {
+  const known = new Set<string>([...ITEMS.map((i) => i.name), ...PACKS.map((p) => p.name)]);
+  for (const name of collectCatalogNames(rows)) {
+    if (!known.has(name)) {
+      throw new Error(`Seed content invalid — STARTING_EQUIPMENT_PACKAGES references unknown catalogName "${name}"`);
+    }
+  }
+}
+
 /**
  * Validates every registered family's rows against its schema, throwing on the
  * FIRST invalid row with its family/index/path so the failure names the
- * offender. Also enforces the one cross-row invariant no per-row schema can
+ * offender. Also enforces two cross-row invariants no per-row schema can
  * express: two SUBCLASSES rows must never share a slug (M2, #1277) — a
  * duplicate would silently collapse two subclasses' seeded content onto one
- * DB row under the new slug_edition unique index.
+ * DB row under the new slug_edition unique index — and every
+ * STARTING_EQUIPMENT_PACKAGES catalogName must resolve against ITEMS ∪ PACKS
+ * (#1533 [R3]/[R4]).
  *
  * Returns a summary so a permanent test can assert this function actually
  * visited real content (families/rows counts) rather than reporting "valid"
@@ -71,6 +121,8 @@ export function assertSeedContentValid(): SeedValidationSummary {
     }
     rowsBySlug.set(sub.slug, index);
   });
+
+  assertCatalogNamesResolve(STARTING_EQUIPMENT_PACKAGES);
 
   return { familiesChecked: Object.keys(SEED_FAMILIES).length, rowsChecked };
 }
