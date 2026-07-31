@@ -3,7 +3,10 @@
 // lib/classes/<class>.ts modules into seeded ClassFeature rows — no rules
 // content changes here, a mechanical move with a checkable row count. Reading
 // these rows (retiring featureAppliesToEdition) is #1524's job, not this
-// file's; every descriptor column below is populated nowhere yet (#1528+).
+// file's; #1530 is the first descriptor column this file's own expandFeatureRow
+// populates (derivedStat/derivedStatTiers, off Barbarian/Bard/Monk/Paladin/
+// Ranger's AuthoredFeature entries) — every other descriptor column below
+// still resolves to DESCRIPTOR_RESET, populated nowhere yet (#1528+).
 //
 // Rows are DERIVED from the twelve class modules, not hand-transcribed: this
 // guarantees byte-identical `description`/`level` text (the migration's own
@@ -231,17 +234,20 @@ function isAscendingByMinLevel(tiers: { minLevel: number }[]): boolean {
 
 const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending by minLevel" };
 
-// Authored now, for #1528/#1530 to reuse when they first populate
-// resourceTotals/resourceDieTiers/derivedStatTiers — this stage's own rows
-// never set them (seed-class-features.ts always writes Prisma.DbNull), so no
-// production import of these three exists until #1528/#1530 land. Not
-// exported: classFeatureSeedSchema (below) is the surface anything outside
-// this file — including class-feature-tier-schema.test.ts — should validate
-// against, since that's the schema that actually ships. Exporting these three
+// Authored for #1528/#1530 to reuse when they first populate
+// resourceTotals/resourceDieTiers/derivedStatTiers. #1530 has landed:
+// expandFeatureRow above now sets derivedStatTiers on five classes' own rows
+// here (Barbarian/Bard/Monk/Paladin/Ranger's Extra Attack) and
+// fighter-features.ts sets it directly on Fighter's — so derivedStatTiersSchema
+// is load-bearing today. resourceTotals/resourceDieTiers stay unset by any row
+// in this file (#1528's resource pools are Fighter-only and authored directly
+// in fighter-features.ts) until #1528 reaches another class. Not exported:
+// classFeatureSeedSchema (below) is the surface anything outside this file —
+// including class-feature-tier-schema.test.ts — should validate against,
+// since that's the schema that actually ships. Exporting these three
 // individually would let a caller bypass classFeatureSeedSchema's other
-// fields and required an unused-export lint suppression on all three purely
-// because #1528/#1530 hadn't landed yet — un-exporting removes both problems
-// at once.
+// fields for no benefit now that at least one is load-bearing — un-exporting
+// keeps ONE validation surface.
 const resourceTotalsTierSchema = z
   .array(
     z.object({

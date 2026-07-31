@@ -14,20 +14,21 @@
 // shape class-features.ts's own expandFeatureRow/collectRawFeatures already
 // establishes in this same directory.
 //
-// SCOPE (#1227) then #1528: #1227 authored Fighter's FEATURE TEXT only, with
-// every descriptor column left NULL (resource pools stayed in fighter.ts's
-// resourceFn, every activation in classes/actions.ts's DERIVED_ACTIONS).
-// #1528 populated the base class's resource+activation+cost+effect columns
-// for Second Wind/Action Surge/Indomitable (the pilot's proof-of-authoring)
-// and retired the matching resourceFn/DERIVED_ACTIONS entries — see
-// fighter.ts's own header. Every OTHER row below (Champion/Battle
-// Master/Eldritch Knight, and Fighting Style/Weapon Mastery/Extra Attack on
-// the base) still leaves its descriptor columns NULL: some because the
-// feature has no such axis (a passive, e.g. Improved Critical), some because
-// it isn't done yet (Champion's crit range needs a derivedStat axis this
-// issue doesn't add — filed separately; Tactical Mind's conditional-refund
-// wrinkle has no AbilityCost shape yet) — see each row's own comment for
-// which.
+// SCOPE (#1227) then #1528 then #1530: #1227 authored Fighter's FEATURE TEXT
+// only, with every descriptor column left NULL (resource pools stayed in
+// fighter.ts's resourceFn, every activation in classes/actions.ts's
+// DERIVED_ACTIONS). #1528 populated the base class's resource+activation+
+// cost+effect columns for Second Wind/Action Surge/Indomitable (the pilot's
+// proof-of-authoring) and retired the matching resourceFn/DERIVED_ACTIONS
+// entries — see fighter.ts's own header. #1530 populated the base class's L5
+// Extra Attack row's derivedStat/derivedStatTiers (see that row's own comment
+// below). Every OTHER row below (Champion/Battle Master/Eldritch Knight, and
+// Fighting Style/Weapon Mastery on the base) still leaves its descriptor
+// columns NULL: some because the feature has no such axis (a passive, e.g.
+// Improved Critical), some because it isn't done yet (Champion's crit range
+// needs a derivedStat axis this issue doesn't add — filed separately;
+// Tactical Mind's conditional-refund wrinkle has no AbilityCost shape yet) —
+// see each row's own comment for which.
 //
 // EDITION RULE: `edition` omitted -> expand() seeds ONE row per edition with
 // IDENTICAL text (the 2014-is-a-transcription invariant; today that's only
@@ -63,11 +64,13 @@ interface RawFighterFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // ---- Descriptor columns (#1528) — populated only for Second Wind/Action
-  // ---- Surge/Indomitable today; every other row leaves these undefined,
-  // ---- which `expand()` passes straight through as `undefined` (never
-  // ---- writing a stray `null`/`Prisma.DbNull` override for a row this
-  // ---- issue doesn't touch).
+  // ---- Descriptor columns (#1528) — resourceKey through effectModifierSource
+  // ---- below are populated only for Second Wind/Action Surge/Indomitable
+  // ---- today; every other row leaves these undefined, which `expand()`
+  // ---- passes straight through as `undefined` (never writing a stray
+  // ---- `null`/`Prisma.DbNull` override for a row this issue doesn't touch).
+  // ---- derivedStat/derivedStatTiers are the exception — see their own
+  // ---- comment just below (#1530).
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;

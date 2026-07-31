@@ -165,10 +165,13 @@ function isPopulatedFighterRow(row: { className: string; subclassSlug: string | 
 // six (class, subclass) pairs — the base-class row for Fighter/Barbarian/
 // Monk/Paladin/Ranger, plus Bard's College of Valor subclass row (the only
 // subclass-gated Extra Attack, #1277's slug join). Keyed by (className,
-// subclassSlug, name) tuple, not by name alone: "Extra Attack" also names
-// Fighter's OTHER subclasses' rows (none of which set it) and Two/Three Extra
-// Attacks are a DIFFERENT name entirely, so name-alone would either
-// under- or over-match.
+// subclassSlug, name) tuple, not by (className, name): Bard is the row that
+// needs it — base Bard has no "Extra Attack" row at all, only College of
+// Valor's subclass-tagged one, so subclassSlug is what lets this set name
+// THAT row precisely instead of a bare className+name pair that would stop
+// being unambiguous the moment any class gains a same-named row under both
+// its base and a subclass. Two/Three Extra Attacks are a different name
+// entirely and never need the tuple for that reason.
 const DERIVED_STAT_ROW_KEYS = new Set([
   "Fighter::null::Extra Attack",
   "Barbarian::null::Extra Attack",
