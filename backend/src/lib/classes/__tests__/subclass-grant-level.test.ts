@@ -20,12 +20,22 @@ function subclassFeatures(className: string, subclass: string, level: number, ed
   return (info?.features ?? []).filter((f) => f.source === "subclass");
 }
 
-// One representative subclass per class whose subclass grant moved to 3.
+// The full twelve non-3 `grantLevel` subclasses (#1546 Part A's verified
+// list) whose 2014 gate moved to 3 under 2024 — every one of them, not just a
+// representative sample, since Part A's registration change touches every
+// class's subclass lookup and this is the surface it must leave unchanged.
 const MOVED: Array<[string, string]> = [
   ["cleric", "life domain"],
+  ["cleric", "trickery domain"],
   ["sorcerer", "draconic bloodline"],
+  ["sorcerer", "wild magic"],
   ["warlock", "the archfey"],
+  ["warlock", "the fiend"],
+  ["warlock", "the great old one"],
   ["wizard", "school of evocation"],
+  ["wizard", "school of abjuration"],
+  ["wizard", "school of illusion"],
+  ["druid", "circle of the land"],
   ["druid", "circle of the moon"],
 ];
 
@@ -67,19 +77,34 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
 // open at 1, Druid/Wizard at 2 (PHB'14), the opposite of the 2024 table above.
 // Pins deriveResources agreeing with buildClassesView's per-class gate (the
 // live bug: they used to disagree the moment #1308 seeded real 2014 values).
-describe("subclass grant level is edition-aware for 2014 (#1291)", () => {
+// #1546 Part A: the full twelve non-3 `grantLevel` subclasses (the arbiter's
+// verified list — everything else gates at 3, including all three Fighter
+// subclasses via their identity-only SUBCLASS_IDENTITY entry, #1546). Part A's
+// registration change is behaviour-preserving by construction (the TS overlay
+// always wins for a class still on the migration path), so these twelve stay
+// exactly as gated as before — this is the exhaustive version of the
+// GATE_1/GATE_2 spot-checks below, closing the gap between "5 representative
+// subclasses" and "all twelve the issue names".
+describe("subclass grant level is edition-aware for 2014 (#1291) — full twelve", () => {
   const GATE_1: Array<[string, string]> = [
     ["cleric", "life domain"],
+    ["cleric", "trickery domain"],
     ["sorcerer", "draconic bloodline"],
+    ["sorcerer", "wild magic"],
     ["warlock", "the archfey"],
+    ["warlock", "the fiend"],
+    ["warlock", "the great old one"],
   ];
   it.each(GATE_1)("%s / %s contributes subclass features at level 1 under 2014", (className, subclass) => {
     expect(subclassFeatures(className, subclass, 1, "EDITION_2014").length).toBeGreaterThan(0);
   });
 
   const GATE_2: Array<[string, string]> = [
+    ["druid", "circle of the land"],
     ["druid", "circle of the moon"],
     ["wizard", "school of evocation"],
+    ["wizard", "school of abjuration"],
+    ["wizard", "school of illusion"],
   ];
   it.each(GATE_2)("%s / %s contributes no subclass features at level 1 but does at level 2 under 2014", (className, subclass) => {
     expect(subclassFeatures(className, subclass, 1, "EDITION_2014")).toEqual([]);
