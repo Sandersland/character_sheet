@@ -57,15 +57,19 @@ function mapItem(item: RowItem): FixedItemRef {
 // rename either. `filter` is ALWAYS emitted, even `{}`: StartingEquipmentEditor
 // .tsx reads `pick.filter.weaponClass` unguarded, so an omitted filter would
 // throw the first time an unfiltered open pick is authored (no seeded row
-// exercises that yet).
+// exercises that yet). toolCategory (#1564) is the non-weapon axis; boundToToolChoice
+// is omitted when false (every existing weapon pick) so it round-trips
+// through seed-starting-equipment.ts's openPickCreateInput unchanged.
 function mapOpenPick(pick: RowOpenPick): OpenWeaponPick {
   return {
     label: pick.label,
     filter: {
       ...(pick.weaponClass ? { weaponClass: pick.weaponClass } : {}),
       ...(pick.weaponRange ? { range: pick.weaponRange } : {}),
+      ...(pick.toolCategory ? { toolCategory: pick.toolCategory } : {}),
     },
     ...(pick.quantity === 1 ? {} : { quantity: pick.quantity }),
+    ...(pick.boundToToolChoice ? { boundToToolChoice: true } : {}),
   };
 }
 

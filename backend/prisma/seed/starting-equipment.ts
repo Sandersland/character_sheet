@@ -31,6 +31,9 @@ import type { SeedEdition } from "./edition.js";
 
 const weaponClassSchema = z.enum(["simple", "martial"]);
 const weaponRangeSchema = z.enum(["melee", "ranged"]);
+// Mirrors backend lib/srd/tools.ts's ToolCategory / the ToolCategory Prisma
+// enum (#1564) — the non-weapon open-pick filter axis.
+const toolCategorySchema = z.enum(["artisan", "gamingSet", "musicalInstrument", "other"]);
 
 const fixedItemSchema = z.object({
   catalogName: z.string().min(1),
@@ -42,8 +45,12 @@ const openWeaponPickSchema = z.object({
   filter: z.object({
     weaponClass: weaponClassSchema.optional(),
     range: weaponRangeSchema.optional(),
+    toolCategory: toolCategorySchema.optional(),
   }),
   quantity: z.number().int().positive().optional(),
+  // Bound to a tool the character already chose proficiency in (Monk's
+  // "chosen for the tool proficiency above") rather than a free pick — #1564.
+  boundToToolChoice: z.boolean().optional(),
 });
 
 const equipmentBundleSchema = z.object({

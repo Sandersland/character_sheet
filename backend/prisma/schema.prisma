@@ -943,12 +943,25 @@ model StartingEquipmentOpenPick {
   position Int
   label    String
   // Named after ItemWeaponDetail's columns, which openPickFilterError
-  // compares against — NOT after the wire field. The wire's WeaponPoolFilter
+  // compares against — NOT after the wire field. The wire's OpenPickFilter
+  // (renamed from WeaponPoolFilter, #1564 — it filters more than weapons now)
   // calls the second one `range`; mapStartingEquipmentPackage's mapOpenPick
   // (backend lib/inventory/starting-equipment-package.ts, #1534) is the mapper
   // that renames it. If you rename either side, rename the mapper in the same diff.
   weaponClass WeaponClass? // null = any
   weaponRange WeaponRange? // null = any
+  // Non-weapon filter axis (#1564): "musical instrument" / "artisan tool"
+  // pool, e.g. the Bard's "musical instrument of your choice". Mirrors
+  // Item.toolCategory, which openPickFilterError compares against.
+  toolCategory ToolCategory? // null = not tool-filtered
+  // True when this pick isn't a free choice at all but must match ONE OF the
+  // character's own creation tool choices (creationToolProfs) — Monk's
+  // "Artisan's Tools or Musical Instrument chosen for the tool proficiency
+  // above". A free pick would let a Monk take an instrument with no
+  // proficiency in it, which the book does not permit. Also serves the
+  // Soldier background's "Gaming Set (same as above)" (#1565) — same
+  // mechanism, no second one built for it.
+  boundToToolChoice Boolean @default(false)
   quantity    Int          @default(1)
 
   @@unique([optionId, position])
@@ -1080,6 +1093,19 @@ enum WeaponClass {
 enum WeaponRange {
   melee
   ranged
+}
+
+// Tool-proficiency category (PHB p.154) — mirrors backend lib/srd/tools.ts's
+// TOOLS list (#1564). Lets a starting-equipment open pick filter on "is this
+// a musical instrument" as a COLUMN the validator reads, rather than the
+// DB-driven equipment resolver reaching into a rules TS module. Only the
+// items that are actual tools carry this on Item (the ten instruments,
+// Herbalism Kit, Thieves' Tools) — most of TOOLS has no Item row at all.
+enum ToolCategory {
+  artisan
+  gamingSet
+  musicalInstrument
+  other
 }
 
 // Lifecycle of a play session: active while in progress, ended when the
@@ -1419,6 +1445,12 @@ model Item {
   // and body armor derive their slot from detail data, so this is only set for
   // wearable gear (rings, cloaks, amulets, boots, etc.).
   slot        EquipSlot?
+  // Tool-proficiency category (#1564) — set ONLY for the small set of Item
+  // rows that ARE tools (the ten musical instruments, Herbalism Kit,
+  // Thieves' Tools); null for everything else. Lets a StartingEquipmentOpenPick
+  // filter "musical instrument" / "artisan tool" as a column read, never a
+  // reach into lib/srd/tools.ts from the equipment resolver.
+  toolCategory ToolCategory?
 
   weaponDetail     ItemWeaponDetail?
   armorDetail      ItemArmorDetail?

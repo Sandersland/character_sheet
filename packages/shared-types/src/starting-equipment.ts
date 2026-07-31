@@ -8,12 +8,19 @@
 // from GET /api/reference; pack expansion runs server-side at character
 // creation from the DB-backed packs.
 
-import type { WeaponClass, WeaponRange } from "./item-detail-inputs.js";
+import type { ToolCategory, WeaponClass, WeaponRange } from "./item-detail-inputs.js";
 
-/** Filter used for open picks — omitting a field means "any". */
-export interface WeaponPoolFilter {
+/**
+ * Filter used for open picks — omitting a field means "any" on that axis.
+ * Renamed from WeaponPoolFilter (#1564): it now also filters the tool/
+ * instrument pool (`toolCategory`), not only weapons. weaponClass/range and
+ * toolCategory are mutually exclusive in practice — a pick is either
+ * weapon-shaped or tool-shaped, never both.
+ */
+export interface OpenPickFilter {
   weaponClass?: WeaponClass;
   range?: WeaponRange;
+  toolCategory?: ToolCategory;
 }
 
 /** Reference to a concrete catalog Item by its unique name, with a quantity. */
@@ -22,11 +29,18 @@ export interface FixedItemRef {
   quantity?: number; // default 1
 }
 
-/** An open pick from the weapon pool, e.g. "any martial weapon". */
+/**
+ * An open pick from a filtered catalog pool, e.g. "any martial weapon" or
+ * "musical instrument of your choice" (#1564). `boundToToolChoice: true`
+ * means this isn't a free pick at all — the chosen item must be one of the
+ * character's own creation tool choices (Monk's "Artisan's Tools or Musical
+ * Instrument chosen for the tool proficiency above"; omitted when false).
+ */
 export interface OpenWeaponPick {
   label: string;
-  filter: WeaponPoolFilter;
+  filter: OpenPickFilter;
   quantity?: number; // default 1
+  boundToToolChoice?: boolean;
 }
 
 /**

@@ -32,10 +32,16 @@ function weaponItem(props: {
   };
 }
 
+function toolItem(props: { id: string; name: string; toolCategory: Item["toolCategory"] }): Item {
+  return { id: props.id, name: props.name, category: "gear", toolCategory: props.toolCategory };
+}
+
 const catalog: Item[] = [
   weaponItem({ id: "longsword", name: "Longsword", weapon: { weaponClass: "martial", weaponRange: "melee" } }),
   weaponItem({ id: "shortbow", name: "Shortbow", weapon: { weaponClass: "simple", weaponRange: "ranged" } }),
   weaponItem({ id: "dagger", name: "Dagger", weapon: { weaponClass: "simple", weaponRange: "melee" } }),
+  toolItem({ id: "flute", name: "Flute", toolCategory: "musicalInstrument" }),
+  toolItem({ id: "herbalism-kit", name: "Herbalism Kit", toolCategory: "other" }),
 ];
 
 function packageDraft(
@@ -174,5 +180,51 @@ describe("StartingEquipmentEditor — null gold (#1564)", () => {
     expect(isGoldValid(startingEquipment, 0)).toBe(false);
     expect(isGoldValid(startingEquipment, 25)).toBe(false);
     expect(draftToInput(startingEquipment, { mode: "gold", gold: 25 })).toBeNull();
+  });
+});
+
+// #1564 commit 4: open picks widen past weapons — a genuine "musical
+// instrument of your choice" pick filters the dropdown on toolCategory
+// instead of weaponClass/range.
+describe("StartingEquipmentEditor — toolCategory open pick (#1564)", () => {
+  it("filters the dropdown to matching tools, not weapons, for a toolCategory pick", async () => {
+    const startingEquipment: ClassStartingEquipment = {
+      groups: [
+        {
+          label: "A musical instrument of your choice",
+          options: [
+            {
+              label: "A musical instrument",
+              openPicks: [{ label: "Musical instrument", filter: { toolCategory: "musicalInstrument" } }],
+            },
+          ],
+        },
+      ],
+      gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
+    };
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const draft = packageDraft(startingEquipment, {
+      selections: [{ optionIndex: 0, openPicks: [""] }],
+    });
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={startingEquipment}
+        catalog={catalog}
+        value={draft}
+        onChange={onChange}
+      />,
+    );
+
+    const select = screen.getByRole("combobox");
+    expect(screen.getByRole("option", { name: "Flute" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Herbalism Kit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Longsword" })).not.toBeInTheDocument();
+
+    await user.selectOptions(select, "Flute");
+    expect(onChange).toHaveBeenCalledWith({
+      mode: "package",
+      selections: [{ optionIndex: 0, openPicks: ["Flute"] }],
+    });
   });
 });

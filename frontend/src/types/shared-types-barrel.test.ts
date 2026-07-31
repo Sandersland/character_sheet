@@ -61,6 +61,7 @@ import type {
   SessionSummary,
   SessionSummaryAdvancement,
   SessionSummaryItem,
+  ToolCategory,
   WeaponClass,
   WeaponDetailInput,
   WeaponRange,
@@ -99,6 +100,7 @@ describe("@/types/character barrel", () => {
     expectTypeOf<ItemCategory>().toEqualTypeOf<Shared.ItemCategory>();
     expectTypeOf<ItemProficiencyGrant>().toEqualTypeOf<Shared.ItemProficiencyGrant>();
     expectTypeOf<ProficiencyKind>().toEqualTypeOf<Shared.ProficiencyKind>();
+    expectTypeOf<ToolCategory>().toEqualTypeOf<Shared.ToolCategory>();
     expectTypeOf<WeaponClass>().toEqualTypeOf<Shared.WeaponClass>();
     expectTypeOf<WeaponDetailInput>().toEqualTypeOf<Shared.WeaponDetailInput>();
     expectTypeOf<WeaponRange>().toEqualTypeOf<Shared.WeaponRange>();

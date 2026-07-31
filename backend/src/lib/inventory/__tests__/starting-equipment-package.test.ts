@@ -40,6 +40,25 @@ function optionRow(overrides: Partial<StartingEquipmentPackageRow["groups"][numb
   };
 }
 
+// #1564: every existing weapon open pick fixture defaults toolCategory: null,
+// boundToToolChoice: false — the pre-#1564 shape, unaffected by the new axes.
+function openPickRow(
+  overrides: Partial<StartingEquipmentPackageRow["groups"][number]["options"][number]["openPicks"][number]>,
+) {
+  return {
+    id: "pick-1",
+    optionId: "opt-1",
+    position: 0,
+    label: "a pick",
+    weaponClass: null,
+    weaponRange: null,
+    toolCategory: null,
+    boundToToolChoice: false,
+    quantity: 1,
+    ...overrides,
+  };
+}
+
 describe("mapStartingEquipmentPackage", () => {
   it("maps gold and a plain fixed-item bundle", () => {
     const row = packageRow({
@@ -84,17 +103,7 @@ describe("mapStartingEquipmentPackage", () => {
           options: [
             optionRow({
               label: "Anything",
-              openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "any item",
-                  weaponClass: null,
-                  weaponRange: null,
-                  quantity: 1,
-                },
-              ],
+              openPicks: [openPickRow({ label: "any item" })],
             }),
           ],
         },
@@ -117,17 +126,7 @@ describe("mapStartingEquipmentPackage", () => {
           options: [
             optionRow({
               label: "Two martial weapons",
-              openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "a martial weapon",
-                  weaponClass: "martial",
-                  weaponRange: null,
-                  quantity: 1,
-                },
-              ],
+              openPicks: [openPickRow({ label: "a martial weapon", weaponClass: "martial" })],
             }),
           ],
         },
@@ -200,24 +199,8 @@ describe("mapStartingEquipmentPackage", () => {
             optionRow({
               label: "Two of the same weapon",
               openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "one martial weapon",
-                  weaponClass: "martial",
-                  weaponRange: null,
-                  quantity: 1,
-                },
-                {
-                  id: "pick-2",
-                  optionId: "opt-1",
-                  position: 1,
-                  label: "two martial weapons at once",
-                  weaponClass: "martial",
-                  weaponRange: null,
-                  quantity: 2,
-                },
+                openPickRow({ label: "one martial weapon", weaponClass: "martial" }),
+                openPickRow({ id: "pick-2", position: 1, label: "two martial weapons at once", weaponClass: "martial", quantity: 2 }),
               ],
             }),
           ],
@@ -289,17 +272,7 @@ describe("mapStartingEquipmentPackage", () => {
           options: [
             optionRow({
               label: "Any simple melee weapon",
-              openPicks: [
-                {
-                  id: "pick-1",
-                  optionId: "opt-1",
-                  position: 0,
-                  label: "any simple melee weapon",
-                  weaponClass: "simple",
-                  weaponRange: "melee",
-                  quantity: 1,
-                },
-              ],
+              openPicks: [openPickRow({ label: "any simple melee weapon", weaponClass: "simple", weaponRange: "melee" })],
             }),
           ],
         },
@@ -308,5 +281,60 @@ describe("mapStartingEquipmentPackage", () => {
 
     const mapped = mapStartingEquipmentPackage(row);
     expect(mapped.groups[0].options[0].openPicks?.[0].filter).toEqual({ weaponClass: "simple", range: "melee" });
+  });
+
+  // #1564 commit 4: the non-weapon filter axis — a genuine "musical
+  // instrument of your choice" pick (Bard) filters on toolCategory instead of
+  // weaponClass/range.
+  it("maps toolCategory onto the wire's filter.toolCategory", () => {
+    const row = packageRow({
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "Musical instrument",
+          options: [
+            optionRow({
+              label: "A musical instrument",
+              openPicks: [openPickRow({ label: "musical instrument", toolCategory: "musicalInstrument" })],
+            }),
+          ],
+        },
+      ],
+    });
+
+    const mapped = mapStartingEquipmentPackage(row);
+    expect(mapped.groups[0].options[0].openPicks?.[0].filter).toEqual({ toolCategory: "musicalInstrument" });
+  });
+
+  // boundToToolChoice omitted when false (every existing weapon pick),
+  // present when true (Monk's tool-bound pick, #1564).
+  it("omits boundToToolChoice when false, keeps it when true", () => {
+    const row = packageRow({
+      groups: [
+        {
+          id: "group-1",
+          packageId: "pkg-1",
+          position: 0,
+          label: "Tool bound to proficiency",
+          options: [
+            optionRow({
+              label: "Free weapon pick",
+              openPicks: [openPickRow({ label: "any simple weapon", weaponClass: "simple" })],
+            }),
+            optionRow({
+              label: "Bound tool pick",
+              position: 1,
+              openPicks: [openPickRow({ label: "the tool chosen above", boundToToolChoice: true })],
+            }),
+          ],
+        },
+      ],
+    });
+
+    const mapped = mapStartingEquipmentPackage(row);
+    expect(mapped.groups[0].options[0].openPicks?.[0]).not.toHaveProperty("boundToToolChoice");
+    expect(mapped.groups[0].options[1].openPicks?.[0].boundToToolChoice).toBe(true);
   });
 });

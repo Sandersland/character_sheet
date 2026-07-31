@@ -13,6 +13,7 @@ import type {
   ProficiencyKind,
   RollEventAttackComponents,
   SerializedCapability,
+  ToolCategory,
   WeaponClass,
   WeaponDetailInput,
   WeaponRange,
@@ -32,6 +33,7 @@ export type {
   CastStatMode,
   ItemCategory,
   ProficiencyKind,
+  ToolCategory,
   WeaponClass,
   WeaponRange,
 };
@@ -164,6 +166,10 @@ export interface Item {
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
+  // Set only for the small set of Item rows that ARE tools (the ten musical
+  // instruments, Herbalism Kit, Thieves' Tools) — lets the starting-equipment
+  // open-pick dropdown filter on it directly (#1564).
+  toolCategory?: ToolCategory;
 }
 
 /** Item-granted-spell metadata on a Spell whose source is "item" (#528). */

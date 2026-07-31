@@ -327,4 +327,26 @@ describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
       }
     }
   });
+
+  // #1564 commit 4: only the small set of Item rows that ARE tools carry
+  // toolCategory — the open-pick validator reads this column so a Bard's
+  // "musical instrument of your choice" or a Monk's tool-bound pick never
+  // reaches into lib/srd/tools.ts. Everything else stays untagged (null).
+  it("tags the ten musical instruments with toolCategory: musicalInstrument", () => {
+    for (const name of ["Bagpipes", "Drum", "Dulcimer", "Flute", "Horn", "Lute", "Lyre", "Pan Flute", "Shawm", "Viol"]) {
+      expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBe("musicalInstrument");
+    }
+  });
+
+  it("tags Herbalism Kit and Thieves' Tools with toolCategory: other", () => {
+    for (const name of ["Herbalism Kit", "Thieves' Tools"]) {
+      expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBe("other");
+    }
+  });
+
+  it("leaves non-tool items untagged (toolCategory undefined)", () => {
+    for (const name of ["Greatsword", "Spellbook", "Backpack"]) {
+      expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBeUndefined();
+    }
+  });
 });

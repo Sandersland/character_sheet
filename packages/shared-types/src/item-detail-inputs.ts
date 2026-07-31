@@ -14,6 +14,12 @@ export type ArmorCategory = "light" | "medium" | "heavy" | "shield";
 export type WeaponClass = "simple" | "martial";
 export type WeaponRange = "melee" | "ranged";
 
+// Tool-proficiency category (PHB p.154). Mirrors backend lib/srd/tools.ts's
+// ToolCategory (which re-exports this rather than declaring its own, #1564)
+// and Item.toolCategory / StartingEquipmentOpenPick.toolCategory — set only
+// for the small set of Item rows that are actual tools.
+export type ToolCategory = "artisan" | "gamingSet" | "musicalInstrument" | "other";
+
 // Dice are count/faces/modifier (matching the frontend dice RollSpec), not a
 // "1d6" string — see schema.prisma's comment on ItemWeaponDetail for why.
 export interface WeaponDetailInput {
