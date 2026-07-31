@@ -21,6 +21,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-serialize-char";
 let COOKIE: string;
@@ -60,6 +61,13 @@ beforeAll(async () => {
     {},
   );
   bmSubclassId = bm.id;
+  // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy — this
+  // suite doesn't assert on `.features` today (attacksPerAction/pool/count
+  // assertions all still resolve through fighter.ts's still-code
+  // deriveExtras/resourceFn), but every bespoke Battle Master Subclass row
+  // gets these rows attached for fixture hygiene ahead of #1546 Part B-ii.
+  await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+  await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
   const warlock = await prisma.characterClass.upsert({
     where: { name: WARLOCK_CLASS_NAME },
     create: { name: WARLOCK_CLASS_NAME, hitDie: "d8", savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2, skillChoices: ["arcana", "deception"], isSpellcaster: true },
@@ -257,7 +265,12 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     expect(a.level).toBe(5);
     expect(a.proficiencyBonus).toBe(3);
     expect(a.speed).toBe(25); // base 30 − exhaustion 1 (−5 ft×level, SRD 5.2 / #1136)
-    expect(a.attacksPerAction).toBe(1); // Extra Attack not until fighter 5? locked as current
+    // 1, not 2 — this suite's throwaway CharacterClass row carries no Extra
+    // Attack ClassFeature row, so deriveAttacksPerAction's floor applies. A
+    // real seeded Fighter 5 gets 2 (extra-attack-seeded.test.ts). Dates to
+    // #616, predates #1530 — this is a fixture artifact, not a product bug
+    // (#1546 Ruling 3).
+    expect(a.attacksPerAction).toBe(1);
     // Unarmored AC = 10 + Dex(+2).
     expect(a.armorClass).toBe(12);
     expect(a.armorClassBreakdown).toEqual([{ label: "Unarmored", value: 10 }, { label: "Dex", value: 2 }]);

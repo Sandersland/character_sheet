@@ -24,6 +24,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-levelrecon-char";
 let COOKIE: string;
@@ -118,6 +119,14 @@ beforeAll(async () => {
     {},
   );
   bmSubclassId = bm.id;
+  // #1546 Part B-i (Ruling 2): this bespoke Battle Master Subclass row has no
+  // ClassFeature children unless seeded here — the shared helper, not a
+  // per-file copy. This suite exercises maneuverChoiceCount/toolProfChoiceCount
+  // via fighter.ts's still-code deriveExtras (name-keyed, unaffected by B-i);
+  // these rows are attached for fixture hygiene ahead of #1546 Part B-ii,
+  // which is what makes them load-bearing.
+  await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+  await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });
 
 afterAll(async () => {
