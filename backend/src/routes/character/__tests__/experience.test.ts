@@ -745,6 +745,18 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
     advancements, fightingStyle: null,
   } as unknown as Prisma.InputJsonValue);
 
+  // #1529: the fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel
+  // through the class FK relation now — every entry below must link classId
+  // to its real seeded row, or the slot cap is 0 (homebrew) regardless of
+  // `name`, which would make every "removed" assertion in this block true
+  // vacuously (the feat was never validly granted in the first place).
+  let classIds: Record<string, string>;
+
+  beforeAll(async () => {
+    const rows = await prisma.characterClass.findMany({ where: { name: { in: ["Fighter", "Paladin", "Wizard"] } }, select: { id: true, name: true } });
+    classIds = Object.fromEntries(rows.map((r) => [r.name, r.id]));
+  });
+
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { name: { startsWith: "FSFeatRecon" } } });
   });
@@ -756,7 +768,7 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
         ...BASE_CHARACTER, ownerId: OWNER_ID, id, name: `FSFeatRecon ${id}`,
         experiencePoints: xp, hitDice: { total: entries.reduce((s, e) => s + e.level, 0), die: "d10", spent: 0 },
         spellcasting: Prisma.JsonNull, resources: resourcesWith(advancements),
-        classEntries: { create: entries },
+        classEntries: { create: entries.map((e) => ({ ...e, classId: classIds[e.name] })) },
       },
     });
   }

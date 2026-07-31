@@ -12,7 +12,7 @@ import {
 } from "./active-effects.js";
 import { itemImmuneDamageTypes, itemResistedDamageTypes } from "@/lib/inventory/capabilities.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
-import { multiclassPrerequisitesMet } from "@/lib/srd/srd.js";
+import { multiclassPrerequisitesMet, type MulticlassPrerequisiteOption } from "@/lib/srd/srd.js";
 import { advancingHitDie } from "./advancing-hit-die.js";
 import {
   InvalidHitPointOperationError,
@@ -182,7 +182,7 @@ async function applyNewClassLevelUp(
   const { tx, characterId, row, conMod } = ctx;
   const catalog = await tx.characterClass.findUnique({
     where: { id: target.classId },
-    select: { id: true, name: true, hitDie: true },
+    select: { id: true, name: true, hitDie: true, multiclassPrerequisites: true },
   });
   if (!catalog) {
     throw new InvalidHitPointOperationError(`Class not found: ${target.classId}`);
@@ -193,7 +193,11 @@ async function applyNewClassLevelUp(
     );
   }
   const abilityScores = row.abilityScores as Record<string, number>;
-  const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
+  // `multiclassPrerequisites` (#1529): the catalog row's own Json column.
+  const prereq = multiclassPrerequisitesMet(
+    catalog.multiclassPrerequisites as MulticlassPrerequisiteOption[] | null,
+    abilityScores,
+  );
   if (!prereq.met) {
     throw new InvalidHitPointOperationError(
       `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`

@@ -64,6 +64,13 @@ export interface TargetClassEntry {
   // let a future construction site silently fall back to the character's
   // persisted position-0 die, which is the multiclass wrong-die bug.
   hitDie: string;
+  // #1529: CharacterClass.extraAsiLevels/fightingStyleFeatLevel, already
+  // resolved by the caller (resolveLevelUpContext, alongside subclassLevel) —
+  // a pure planner has no DB relation to read them from itself. Defaults ([]
+  // / null) match a homebrew class's catalog-less fallback, same shape as
+  // subclassLevel's own default-3 comment.
+  extraAsiLevels?: number[];
+  fightingStyleFeatLevel?: number | null;
 }
 
 // The target plus its derived resources at N and N-1 — the context each step reads.
@@ -133,7 +140,8 @@ function hitPointsStep({ target, abilityScores }: PlanContext): LevelUpStep {
 }
 
 function advancementStep({ target }: PlanContext): LevelUpStep | null {
-  const delta = advancementSlotsForLevel(target.name, target.newLevel) - advancementSlotsForLevel(target.name, target.newLevel - 1);
+  const extraAsiLevels = target.extraAsiLevels ?? [];
+  const delta = advancementSlotsForLevel(extraAsiLevels, target.newLevel) - advancementSlotsForLevel(extraAsiLevels, target.newLevel - 1);
   return delta > 0 ? { kind: "advancement", count: delta } : null;
 }
 
@@ -146,7 +154,8 @@ function subclassStep({ target }: PlanContext): LevelUpStep | null {
 // A Fighting Style feat pick (#1137): Fighter's arrives with a new level-1 entry,
 // Paladin's and Ranger's at level 2. Derived from the fightingStyleFeatSlots delta.
 function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
-  const delta = fightingStyleFeatSlots(target.name, target.newLevel) - fightingStyleFeatSlots(target.name, target.newLevel - 1);
+  const fightingStyleFeatLevel = target.fightingStyleFeatLevel ?? null;
+  const delta = fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel) - fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel - 1);
   return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 

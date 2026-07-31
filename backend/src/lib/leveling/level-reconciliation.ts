@@ -522,9 +522,13 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
       initiativeBonus: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        // All entries (name + level) — both the ASI/feat-slot cap (#1073) and
-        // the fs cap (#1137) sum entitlement per class entry, not just the primary.
-        select: { name: true, level: true },
+        // All entries (level + the class relation) — both the ASI/feat-slot
+        // cap (#1073) and the fs cap (#1137) sum entitlement per class entry,
+        // not just the primary. `class` (#1529): the reconciler's half of the
+        // reconciler/clamp-on-read pair CLAUDE.md governs — must resolve
+        // extraAsiLevels/fightingStyleFeatLevel through the SAME columns
+        // applyAdvancementClamp reads via characterInclude.
+        select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
       },
     },
   });

@@ -582,8 +582,15 @@ describe("Advancement — Fighting Style feat slot (#1137)", () => {
   const FS_ID = "test-adv-fs-1";
   let fsDefenseId: string;
   let generalId: string;
+  // #1529: the fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel
+  // through the class FK relation now — these fixtures must link classId to
+  // the real seeded Fighter/Paladin rows, or the slot cap is 0 (homebrew).
+  let fighterClassId: string;
+  let paladinClassId: string;
 
   beforeAll(async () => {
+    fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
+    paladinClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Paladin" }, select: { id: true } })).id;
     const defense = await upsertEditionRow(
       prisma.feat,
       { name: "Defense (FS Suite)", edition: null },
@@ -625,7 +632,7 @@ describe("Advancement — Fighting Style feat slot (#1137)", () => {
         ...FIXTURE, id: FS_ID, ownerId: OWNER_ID, experiencePoints: xp,
         hitDice: { total: level, die: "d10", spent: 0 },
         spellcasting: Prisma.JsonNull,
-        classEntries: { create: [{ position: 0, name: "Fighter", level }] },
+        classEntries: { create: [{ position: 0, name: "Fighter", classId: fighterClassId, level }] },
       },
     });
   }
@@ -684,8 +691,8 @@ describe("Advancement — Fighting Style feat slot (#1137)", () => {
         hitDice: { total: 3, die: "d10", spent: 0 },
         spellcasting: Prisma.JsonNull,
         classEntries: { create: [
-          { position: 0, name: "Fighter", level: 1 },
-          { position: 1, name: "Paladin", level: 2 },
+          { position: 0, name: "Fighter", classId: fighterClassId, level: 1 },
+          { position: 1, name: "Paladin", classId: paladinClassId, level: 2 },
         ] },
       },
     });

@@ -29,6 +29,18 @@ function char(
 // describe), and this default would silently give a Wizard the Fighter's d10.
 const ANY_DIE = "d10";
 
+// #1529: TargetClassEntry.extraAsiLevels/fightingStyleFeatLevel are now
+// resolved by the CALLER from CharacterClass columns (resolveLevelUpContext
+// does this in production); this pure-planner test fixture stands in with the
+// same real per-class values the deleted EXTRA_ASI_LEVELS/
+// fightingStyleFeatSlots records held, keyed the same lowercase way.
+const CLASS_TABLE_DEFAULTS: Record<string, { extraAsiLevels: number[]; fightingStyleFeatLevel: number | null }> = {
+  fighter: { extraAsiLevels: [6, 14], fightingStyleFeatLevel: 1 },
+  rogue: { extraAsiLevels: [10], fightingStyleFeatLevel: null },
+  paladin: { extraAsiLevels: [], fightingStyleFeatLevel: 2 },
+  ranger: { extraAsiLevels: [], fightingStyleFeatLevel: 2 },
+};
+
 function target(
   name: string,
   newLevel: number,
@@ -36,7 +48,8 @@ function target(
   subclassLevel?: number,
   hitDie = ANY_DIE,
 ): TargetClassEntry {
-  return { name, newLevel, subclass, subclassLevel, hitDie };
+  const defaults = CLASS_TABLE_DEFAULTS[name.toLowerCase()] ?? { extraAsiLevels: [], fightingStyleFeatLevel: null };
+  return { name, newLevel, subclass, subclassLevel, hitDie, ...defaults };
 }
 
 // Extracts just the step kinds in order (the plan's ordered shape).

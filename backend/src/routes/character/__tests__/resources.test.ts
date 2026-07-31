@@ -104,6 +104,9 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
 
+    // fightingStyleFeatLevel (#1529): the fs-slot cap resolves via this
+    // column through the class FK relation now — needed for the fs feat
+    // "a resource op → undo preserves a previously taken Fighting Style feat" asserts on.
     const cls = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -113,8 +116,9 @@ describe("POST /api/characters/:id/resources/transactions", () => {
         skillChoiceCount: 2,
         skillChoices: ["athletics", "intimidation"],
         isSpellcaster: false,
+        fightingStyleFeatLevel: 1,
       },
-      update: {},
+      update: { fightingStyleFeatLevel: 1 },
     });
 
     const maneuver = await upsertEditionRow(

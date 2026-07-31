@@ -59,6 +59,12 @@ type WeaponFixture = {
 };
 
 const createdIds: string[] = [];
+// #1529: weapon/armor proficiency AND the Fighting Style feat slot cap both
+// resolve via the class FK relation now — this fixture must link classId to
+// the real seeded Fighter row, or (a) the Longsword proficiency bonus goes
+// missing and (b) TWF_STYLE's advancement gets clamped out as over-cap
+// (fightingStyleSlotTotal 0 for a homebrew entry).
+let fighterClassId: string;
 
 async function createFighter(
   weapons: WeaponFixture[],
@@ -86,7 +92,7 @@ async function createFighter(
             },
           }
         : {}),
-      classEntries: { create: [{ name: "Fighter", position: 0, level: 1 }] },
+      classEntries: { create: [{ name: "Fighter", classId: fighterClassId, position: 0, level: 1 }] },
       inventoryItems: {
         create: weapons.map((w, position) => ({
           name: w.name,
@@ -149,6 +155,7 @@ function offHandRow(payload: Payload) {
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
+  fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
 });
 
 afterEach(async () => {

@@ -6,10 +6,11 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
-// The served placement/proficiency flags (#1433). The snapshot suite cannot cover
-// these: its fixtures carry lowercase class names that miss
-// CLASS_PROFICIENCY_GRANTS (#1388) and no two-handed weapon, so `proficient: true`
-// and `offHandLocked: true` are both unreachable there.
+// The served placement/proficiency flags (#1433). The snapshot suite cannot
+// cover these: its fixtures' CharacterClass rows are suite-local with empty
+// armorProficiencies/weaponProficiencies columns (#1529) and it carries no
+// two-handed weapon, so `proficient: true` and `offHandLocked: true` are both
+// unreachable there.
 
 const OWNER_ID = "owner-serialize-placement";
 
@@ -33,18 +34,23 @@ const LONGSWORD = {
 
 let characterIds: string[] = [];
 
+// #1529: armor/weapon proficiency grants resolve via the class FK relation
+// now, not a name lookup — every fixture below must link classId to the REAL
+// seeded catalog row for its className, or the class half of "proficient"
+// silently becomes the homebrew fallback (nothing granted).
 async function createCharacter(data: {
   className: string;
   raceName?: string;
   items?: Prisma.InventoryItemCreateWithoutCharacterInput[];
 }) {
+  const classId = (await prisma.characterClass.findFirstOrThrow({ where: { name: data.className }, select: { id: true } })).id;
   const character = await prisma.character.create({
     data: {
       ...BASE_CHAR,
       name: `Placement ${data.className}`,
       ownerId: OWNER_ID,
       spellcasting: Prisma.JsonNull,
-      classEntries: { create: { name: data.className, level: 1, position: 0 } },
+      classEntries: { create: { name: data.className, classId, level: 1, position: 0 } },
       ...(data.raceName ? { raceSelection: { create: { name: data.raceName } } } : {}),
       ...(data.items ? { inventoryItems: { create: data.items } } : {}),
     },

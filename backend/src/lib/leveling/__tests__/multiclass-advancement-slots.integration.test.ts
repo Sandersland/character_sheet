@@ -38,9 +38,18 @@ const BASE_CHAR = {
 
 describe("Multiclass ASI/feat slot cap (#1073)", () => {
   const created: string[] = [];
+  // #1529: extraAsiLevels now rides CharacterClass.extraAsiLevels via the FK
+  // relation, not a name lookup — this fixture must link classId to the REAL
+  // seeded Wizard/Fighter rows or these entries resolve as homebrew (base
+  // 5-slot schedule, no Fighter L6/L14 bonus), which is exactly the wrong
+  // schedule this suite exists to prove is NOT used.
+  let wizardClassId: string;
+  let fighterClassId: string;
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    wizardClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" }, select: { id: true } })).id;
+    fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
   });
 
   afterEach(async () => {
@@ -56,8 +65,8 @@ describe("Multiclass ASI/feat slot cap (#1073)", () => {
         spellcasting: Prisma.JsonNull,
         classEntries: {
           create: [
-            { name: "Wizard", level: 3, position: 0 },
-            { name: "Fighter", level: 8, position: 1 },
+            { name: "Wizard", classId: wizardClassId, level: 3, position: 0 },
+            { name: "Fighter", classId: fighterClassId, level: 8, position: 1 },
           ],
         },
       },

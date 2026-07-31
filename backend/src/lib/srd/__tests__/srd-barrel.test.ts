@@ -35,7 +35,7 @@ describe("srd.ts topical decomposition (#663)", () => {
     expect(spellcastingTables.deriveSpellcasting).toBeInstanceOf(Function);
     expect(math.abilityModifier).toBeInstanceOf(Function);
     expect(advancementSlots.advancementSlotsForLevel).toBeInstanceOf(Function);
-    expect(proficiencies.CLASS_PROFICIENCY_GRANTS).toBeDefined();
+    expect(proficiencies.isProficientWithWeapon).toBeInstanceOf(Function);
     expect(weaponDamage.deriveWeaponDamage).toBeInstanceOf(Function);
     expect(characterDerive.deriveCreatedCharacter).toBeInstanceOf(Function);
     expect(feats.deriveFeatBonuses).toBeInstanceOf(Function);
@@ -52,7 +52,7 @@ describe("srd.ts topical decomposition (#663)", () => {
     expect(barrel.deriveSpellcasting).toBe(spellcastingTables.deriveSpellcasting);
     expect(barrel.abilityModifier).toBe(math.abilityModifier);
     expect(barrel.advancementSlotsForLevel).toBe(advancementSlots.advancementSlotsForLevel);
-    expect(barrel.CLASS_PROFICIENCY_GRANTS).toBe(proficiencies.CLASS_PROFICIENCY_GRANTS);
+    expect(barrel.isProficientWithWeapon).toBe(proficiencies.isProficientWithWeapon);
     expect(barrel.deriveWeaponDamage).toBe(weaponDamage.deriveWeaponDamage);
     expect(barrel.deriveCreatedCharacter).toBe(characterDerive.deriveCreatedCharacter);
     expect(barrel.deriveFeatBonuses).toBe(feats.deriveFeatBonuses);

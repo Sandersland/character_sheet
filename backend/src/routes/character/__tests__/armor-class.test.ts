@@ -209,10 +209,13 @@ describe("derived armorClass", () => {
   it("applies the Defense Fighting Style feat's armorClassWhileArmored only while armored (#1137)", async () => {
     // Fighter L1 so the fs feat survives the read-clamp; the feat carries the
     // armorClassWhileArmored improvement the former Defense scalar applied.
+    // #1529: the fs-slot cap now resolves via CharacterClass.fightingStyleFeatLevel
+    // through the class FK relation — classId must link to the real seeded row.
+    const fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
-        classEntries: { create: [{ name: "Fighter", position: 0, level: 1 }] },
+        classEntries: { create: [{ name: "Fighter", classId: fighterClassId, position: 0, level: 1 }] },
         resources: {
           used: {},
           maneuversKnown: [],

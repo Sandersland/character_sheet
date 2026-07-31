@@ -48,6 +48,13 @@ export const RACES = [
   { name: "Gnome",         speed: 25 },
 ];
 
+// #1529: armorProficiencies/weaponProficiencies are SRD 5.1/PHB'14 ONLY —
+// relocated verbatim from the deleted CLASS_PROFICIENCY_GRANTS record.
+// At least Bard/Druid/Monk/Rogue/Sorcerer/Wizard differ in SRD 5.2/PHB'24;
+// authoring those lists is an explicit follow-up (#1548), never guessed here.
+// extraAsiLevels/multiclassPrerequisites are PHB'14 p. 163/PHB'14 p. 38
+// (2014 and 2024 agree — CLAUDE.md). primaryAbilities is PHB'24's by-class
+// table only (no 2014 counterpart).
 export const CLASSES = [
   {
     name: "Wizard",
@@ -57,6 +64,12 @@ export const CLASSES = [
     skillChoices: ["arcana", "history", "insight", "investigation", "medicine", "religion"],
     isSpellcaster: true,
     subclassLevel: 2, // PHB'14 p. 114: Arcane Tradition at 2nd level.
+    armorProficiencies: [],
+    weaponProficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ intelligence: 13 }],
+    primaryAbilities: ["intelligence"],
   },
   {
     name: "Fighter",
@@ -75,6 +88,13 @@ export const CLASSES = [
     ],
     isSpellcaster: false,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "heavy", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [6, 14],
+    fightingStyleFeatLevel: 1,
+    // Fighter is the only OR class: Str 13 OR Dex 13.
+    multiclassPrerequisites: [{ strength: 13 }, { dexterity: 13 }],
+    primaryAbilities: ["strength", "dexterity"],
   },
   {
     name: "Rogue",
@@ -97,6 +117,12 @@ export const CLASSES = [
     isSpellcaster: false,
     subclassLevel: 3,
     toolProficiencies: ["Thieves' Tools"], // class always grants this
+    armorProficiencies: ["light"],
+    weaponProficiencies: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"],
+    extraAsiLevels: [10],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ dexterity: 13 }],
+    primaryAbilities: ["dexterity"],
   },
   {
     name: "Cleric",
@@ -106,6 +132,12 @@ export const CLASSES = [
     skillChoices: ["history", "insight", "medicine", "persuasion", "religion"],
     isSpellcaster: true,
     subclassLevel: 1, // PHB'14 p. 57: Divine Domain at 1st level.
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: ["Simple Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ wisdom: 13 }],
+    primaryAbilities: ["wisdom"],
   },
   {
     name: "Barbarian",
@@ -115,6 +147,12 @@ export const CLASSES = [
     skillChoices: ["animalHandling", "athletics", "intimidation", "nature", "perception", "survival"],
     isSpellcaster: false,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ strength: 13 }],
+    primaryAbilities: ["strength"],
   },
   {
     name: "Bard",
@@ -149,6 +187,12 @@ export const CLASSES = [
       "Bagpipes", "Drum", "Dulcimer", "Flute", "Lute",
       "Lyre", "Horn", "Pan Flute", "Shawm", "Viol",
     ],
+    armorProficiencies: ["light"],
+    weaponProficiencies: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ charisma: 13 }],
+    primaryAbilities: ["charisma"],
   },
   {
     name: "Druid",
@@ -158,6 +202,15 @@ export const CLASSES = [
     skillChoices: ["arcana", "animalHandling", "insight", "medicine", "nature", "perception", "religion", "survival"],
     isSpellcaster: true,
     subclassLevel: 2, // PHB'14 p. 66: Druid Circle at 2nd level.
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: [
+      "Clubs", "Daggers", "Darts", "Javelins", "Maces", "Quarterstaffs",
+      "Scimitars", "Sickles", "Slings", "Spears",
+    ],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ wisdom: 13 }],
+    primaryAbilities: ["wisdom"],
   },
   {
     name: "Monk",
@@ -179,6 +232,12 @@ export const CLASSES = [
       "Bagpipes", "Drum", "Dulcimer", "Flute", "Lute",
       "Lyre", "Horn", "Pan Flute", "Shawm", "Viol",
     ],
+    armorProficiencies: [],
+    weaponProficiencies: ["Simple Weapons", "Shortswords"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ dexterity: 13, wisdom: 13 }],
+    primaryAbilities: ["dexterity", "wisdom"],
   },
   {
     name: "Paladin",
@@ -188,6 +247,12 @@ export const CLASSES = [
     skillChoices: ["athletics", "insight", "intimidation", "medicine", "persuasion", "religion"],
     isSpellcaster: true,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "heavy", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: 2,
+    multiclassPrerequisites: [{ strength: 13, charisma: 13 }],
+    primaryAbilities: ["strength", "charisma"],
   },
   {
     name: "Ranger",
@@ -197,6 +262,12 @@ export const CLASSES = [
     skillChoices: ["animalHandling", "athletics", "insight", "investigation", "nature", "perception", "stealth", "survival"],
     isSpellcaster: true,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: 2,
+    multiclassPrerequisites: [{ dexterity: 13, wisdom: 13 }],
+    primaryAbilities: ["dexterity", "wisdom"],
   },
   {
     name: "Sorcerer",
@@ -206,6 +277,12 @@ export const CLASSES = [
     skillChoices: ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"],
     isSpellcaster: true,
     subclassLevel: 1, // PHB'14 p. 99: Sorcerous Origin at 1st level.
+    armorProficiencies: [],
+    weaponProficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ charisma: 13 }],
+    primaryAbilities: ["charisma"],
   },
   {
     name: "Warlock",
@@ -215,6 +292,12 @@ export const CLASSES = [
     skillChoices: ["arcana", "deception", "history", "intimidation", "investigation", "nature", "religion"],
     isSpellcaster: true,
     subclassLevel: 1, // PHB'14 p. 105: Otherworldly Patron at 1st level.
+    armorProficiencies: ["light"],
+    weaponProficiencies: ["Simple Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ charisma: 13 }],
+    primaryAbilities: ["charisma"],
   },
 ];
 
