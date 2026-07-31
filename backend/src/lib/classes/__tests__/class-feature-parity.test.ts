@@ -35,14 +35,15 @@ import { wizard } from "@/lib/classes/wizard.js";
 import { CLASS_SUBCLASSES, LITERAL_ROW_CLASSES } from "./class-subclasses.fixture.js";
 import { loadDbFeatureRows } from "./db-feature-rows.fixture.js";
 
-// Fighter deliberately absent (#1227): its ClassDefinition no longer carries
-// ANY AuthoredFeature[] arrays (features moved to literal seed data,
-// fighter-features.ts), so `oldDeriveFeatures`'s TS-derived "OLD" side would
-// read `classDef?.features` as always empty — comparing that against the
-// real rows-fed "NEW" side would fail on content this migration deliberately
-// changed, not a regression. See LITERAL_ROW_CLASSES' comment for why this
-// header's own reminder ("MUST be replaced once the TS arrays are finally
-// retired") is now true FOR FIGHTER; the other eleven classes still need it.
+// Fighter deliberately absent (#1227, #1532): `lib/classes/fighter.ts` no
+// longer exists at all (features moved to literal seed data,
+// fighter-features.ts), so `oldDeriveFeatures`'s TS-derived "OLD" side has no
+// ClassDefinition left to read `classDef?.features` from — comparing that
+// against the real rows-fed "NEW" side would fail on content this migration
+// deliberately changed, not a regression. See LITERAL_ROW_CLASSES' comment
+// for why this header's own reminder ("MUST be replaced once the TS arrays
+// are finally retired") is now true FOR FIGHTER; the other eleven classes
+// still need it.
 const REFERENCE_CLASSES: Record<string, ClassDefinition> = {
   barbarian, bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
 };

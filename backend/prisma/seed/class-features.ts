@@ -44,9 +44,9 @@ import { FIGHTER_FEATURES } from "./fighter-features.js";
 // title case, not the lowercase registry.ts dispatch key. Fighter is
 // deliberately ABSENT (#1227): its rows are literal data (fighter-features.ts),
 // not derived from a ClassDefinition.features array — see LITERAL_ROW_CLASSES
-// below and fighter.ts's own header for why `features` stays optional on
-// ClassDefinition/SubclassDefinition even though Fighter's resourceFn/
-// deriveExtras/subclasses (unrelated to this migration) still live there.
+// below. `lib/classes/fighter.ts` itself is gone (#1532); `features` stays
+// optional on ClassDefinition/SubclassDefinition for the eleven classes still
+// on the TS-authoring path, not because Fighter ever needed it to be.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
   Barbarian: barbarian,
   Bard: bard,
@@ -97,9 +97,10 @@ interface RawFeatureRow {
 function baseFeatureRows(className: string, classDef: ClassDefinition): RawFeatureRow[] {
   // `?? []` is Fighter-shaped defensive code that never fires today (Fighter
   // is absent from CLASS_MODULES, #1227) — ClassDefinition.features is
-  // optional on the TYPE now that fighter.ts's arrays are gone, so every
-  // caller through this shared type must narrow, even the eleven classes
-  // that still always set it.
+  // optional on the TYPE now that Fighter has no ClassDefinition module at
+  // all (`lib/classes/fighter.ts` deleted, #1532), so every caller through
+  // this shared type must narrow, even the eleven classes that still always
+  // set it.
   return (classDef.features ?? []).map((feature) => ({ className, subclassSlug: null, feature }));
 }
 
@@ -244,9 +245,11 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 // expandFeatureRow above now sets derivedStatTiers on five classes' own rows
 // here (Barbarian/Bard/Monk/Paladin/Ranger's Extra Attack) and
 // fighter-features.ts sets it directly on Fighter's — so derivedStatTiersSchema
-// is load-bearing today. resourceTotals/resourceDieTiers stay unset by any row
-// in this file (#1528's resource pools are Fighter-only and authored directly
-// in fighter-features.ts) until #1528 reaches another class. Not exported:
+// is load-bearing today. resourceTotals/resourceDieTiers stay unset by any
+// row THIS FILE derives — they're populated only on FIGHTER_FEATURES' literal
+// rows (concatenated in below, not derived here) — until wave 2 (#1134)
+// reaches one of the eleven classes still on this file's TS-authoring path.
+// Not exported:
 // classFeatureSeedSchema (below) is the surface anything outside this file —
 // including class-feature-tier-schema.test.ts — should validate against,
 // since that's the schema that actually ships. Exporting these three
