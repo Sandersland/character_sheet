@@ -540,4 +540,32 @@ describe("GET /api/reference", () => {
     );
     expect(res2014.body.races).toEqual(res2024.body.races);
   });
+
+  // #1559: proves #1336's edition-scoping and #1559's Subclass tag compose —
+  // the REAL seeded Path of the Totem Warrior row (never the Zzz fixtures
+  // above, which stand in for a forked row no real subclass has yet), tagged
+  // EDITION_2014 because SRD 5.2 replaces it with Path of the Wild Heart
+  // rather than retabbing it. A 2024 Barbarian must no longer be offered a
+  // subclass with zero features in its own edition.
+  it("no longer offers the real Path of the Totem Warrior to a 2024 Barbarian, but still offers it to a 2014 one (#1559)", async () => {
+    const app = createApp();
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const barbarianOf = (body: any) => body.classes.find((c: { name: string }) => c.name === "Barbarian");
+
+    const barbarian2014 = barbarianOf(res2014.body);
+    const barbarian2024 = barbarianOf(res2024.body);
+    expect(barbarian2014).toBeDefined();
+    expect(barbarian2024).toBeDefined();
+
+    const totemWarrior2014 = barbarian2014.subclasses.find((s: { name: string }) => s.name === "Totem Warrior");
+    const totemWarrior2024 = barbarian2024.subclasses.find((s: { name: string }) => s.name === "Totem Warrior");
+    expect(totemWarrior2014).toBeDefined();
+    expect(totemWarrior2024).toBeUndefined();
+
+    // Berserker is edition: null (shared) — still offered to both, so this
+    // isn't "2024 Barbarian sees no subclasses", only Totem Warrior's absence.
+    expect(barbarian2024.subclasses.map((s: { name: string }) => s.name)).toContain("Berserker");
+  });
 });

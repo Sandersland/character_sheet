@@ -8,6 +8,7 @@ import { upsertEditionRow, resolveEditionRow } from "../../src/lib/rules/catalog
 import type { SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import { CLASS_FEATURES, type ClassFeatureSeedRow } from "./class-features.js";
+import { SUBCLASSES } from "./subclasses.js";
 
 // Every descriptor column reset to NULL/default — the literal "populated
 // nowhere" state #1523's acceptance criteria pin. Spread onto every row this
@@ -303,6 +304,11 @@ export async function seedClassFeatures(prisma: PrismaClient): Promise<void> {
   // their deletions — a guard that ran first could not see the very emptying
   // it exists to catch (#1525).
   await assertEveryClassEditionPopulated(prisma);
+  // Same ordering requirement, one level down: a subclass offered for an
+  // edition with zero ClassFeature rows is this bug's general form (#1559,
+  // Path of the Totem Warrior's original disclosure) and must also see
+  // whatever the prune passes above just deleted.
+  await assertEverySubclassEditionPopulated(prisma);
 }
 
 const EDITIONS: readonly SeedEdition[] = ["EDITION_2014", "EDITION_2024"];
@@ -523,4 +529,109 @@ export async function assertEveryClassEditionPopulated(
 
   const { pairsChecked, rowsCounted, minPairCount } = summarizePairCounts(entries);
   return { pairsChecked, classRowCount: classes.length, minPairCount, rowsCounted };
+}
+
+// The editions a Subclass row is OFFERED for: `edition: null` is shared (both
+// editions), an exact tag is that one edition only (#1306's own convention,
+// reused here rather than re-deriving it).
+function offeredEditions(edition: SeedEdition | null): SeedEdition[] {
+  return edition === null ? [...EDITIONS] : [edition];
+}
+
+// One seeded Subclass row, pre-joined for the pure check below: `edition` is
+// the row's own tag (what it's offered for) and `presentEditions` is which
+// editions actually have >= 1 ClassFeature row — kept separate from the DB
+// query so subclassPopulationFailures can be unit-tested against fabricated
+// input, the same split assertCatalogNamesResolve/collectCatalogNames use in
+// validate.ts.
+export interface SubclassPresenceInput {
+  slug: string;
+  edition: SeedEdition | null;
+  presentEditions: readonly SeedEdition[];
+}
+
+// The guard's own logic, isolated from Prisma: a subclass offered for an
+// edition that isn't in `presentEditions` is the general form of #1559's Path
+// of the Totem Warrior bug — offered, but zero features once a character
+// picks it.
+export function subclassPopulationFailures(rows: readonly SubclassPresenceInput[]): string[] {
+  return rows.flatMap((row) =>
+    offeredEditions(row.edition)
+      .filter((offered) => !row.presentEditions.includes(offered))
+      .map((offered) => `  ${row.slug} / ${offered}: 0 ClassFeature rows (expected >= 1)`),
+  );
+}
+
+export interface SubclassEditionPopulationSummary {
+  subclassesChecked: number;
+  pairsChecked: number;
+}
+
+/**
+ * Post-seed presence guard (#1559): every seeded Subclass row must have at
+ * least one ClassFeature row in every edition it is OFFERED for — this bug's
+ * general form, disclosed by Path of the Totem Warrior (#1223 authored zero
+ * EDITION_2024 rows for it, correctly, since SRD 5.2 replaces it with Path of
+ * the Wild Heart, but nothing stopped a 2024 character from still being
+ * offered it and landing on a featureless sheet). Every remaining 2024 retab
+ * that drops a subclass hits this same shape; this is what turns "we
+ * remembered to tag it" into something the seed checks, per-row, forever.
+ *
+ * PRESENCE ONLY, same caveat as assertEveryClassEditionPopulated: "a row
+ * exists" is not "the row is genuine content for that edition".
+ *
+ * Scoped to `prisma.subclass` rows whose `slug` is in SUBCLASSES — the seed's
+ * OWN emitted set — never a bare table scan. A long-lived database can hold
+ * an ORPHANED Subclass row the seed no longer produces at all (three
+ * `monk-way-of-*` rows stranded by the 2024 rename to `monk-warrior-of-*`,
+ * #1559 disclosure); those have zero ClassFeature rows in either edition too,
+ * but they are a separate, already-disclosed bug with its own fix (remap the
+ * two characters that still reference them, then delete the rows) — this
+ * guard scanning every DB row would hard-fail seeding for anyone carrying
+ * that orphan, bricking the seed for a bug this guard doesn't own.
+ *
+ * Exported so a test can call it directly against a deliberately broken DB
+ * state, same reasoning as assertEveryClassEditionPopulated's own JSDoc.
+ */
+export async function assertEverySubclassEditionPopulated(
+  prisma: PrismaClient,
+): Promise<SubclassEditionPopulationSummary> {
+  const seededSlugs = [...new Set(SUBCLASSES.map((s) => s.slug))];
+  const subclassRows = await prisma.subclass.findMany({
+    where: { slug: { in: seededSlugs } },
+    select: { id: true, slug: true, edition: true },
+  });
+  const featureCounts = await prisma.classFeature.groupBy({
+    by: ["subclassId", "edition"],
+    where: { subclassId: { in: subclassRows.map((r) => r.id) } },
+    _count: { _all: true },
+  });
+  const presentEditionsBySubclassId = new Map<string, SeedEdition[]>();
+  for (const f of featureCounts) {
+    if (!f.subclassId) continue;
+    const present = presentEditionsBySubclassId.get(f.subclassId) ?? [];
+    present.push(f.edition);
+    presentEditionsBySubclassId.set(f.subclassId, present);
+  }
+
+  const inputs: SubclassPresenceInput[] = subclassRows.map((row) => ({
+    slug: row.slug,
+    edition: row.edition as SeedEdition | null,
+    presentEditions: presentEditionsBySubclassId.get(row.id) ?? [],
+  }));
+  const failures = subclassPopulationFailures(inputs);
+
+  if (failures.length > 0) {
+    throw new Error(
+      [
+        "seedClassFeatures: Subclass population guard failed (#1559) —",
+        ...failures,
+        "Every Subclass row must have at least one ClassFeature row in every edition it is",
+        "offered for (edition: null offers both). Either author the missing ClassFeature",
+        "rows, or tag the Subclass row's `edition` to the edition(s) it actually has content for.",
+      ].join("\n"),
+    );
+  }
+
+  return { subclassesChecked: subclassRows.length, pairsChecked: inputs.reduce((n, r) => n + offeredEditions(r.edition).length, 0) };
 }

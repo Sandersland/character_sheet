@@ -22,27 +22,32 @@ import type { SeedEdition } from "./edition.js";
 // fragment (see withEditionOrShared) applies here too, so this composes the
 // caller's filter in rather than exposing one.
 //
-// Model-agnostic by shape (any table with a `name` or `key` column plus
-// `edition`), so seedFeats, seedShadowArts's GrantedAbility prune and
-// seedActions share this one function rather than three copies. All three are
-// genuinely partitioned: #1415 widened GrantedAbility to @@unique([name,
-// edition]) and #1430 widened Action to @@unique([key, edition]), so a
-// divergent row CAN exist in each and the partitioning stopped being a no-op.
+// Model-agnostic by shape (any table with a `name`, `key`, or `slug` column
+// plus `edition`), so seedFeats, seedShadowArts's GrantedAbility prune,
+// seedActions, and seedSubclasses share this one function rather than four
+// copies. All are genuinely partitioned: #1415 widened GrantedAbility to
+// @@unique([name, edition]), #1430 widened Action to @@unique([key,
+// edition]), and Subclass has carried @@unique([slug, edition]) since
+// #1306's own migration, so a divergent row CAN exist in each and the
+// partitioning stopped being a no-op.
 //
 // A caller passing only `edition: null` entries gives the 2014/2024 partitions
 // an empty `notIn: []`, which matches EVERY row in them — correct for a source
 // that authors no forked content, fatal for one that does. So a source gaining
 // forked rows must thread their editions into `seeded` in the same change.
 export function staleCatalogRowsWhere(
-  identityColumn: "name" | "key",
+  identityColumn: "name" | "key" | "slug",
   seeded: readonly { identity: string; edition: SeedEdition | null }[],
   extraWhere: object = {},
 ) {
   const editions: (SeedEdition | null)[] = [null, "EDITION_2014", "EDITION_2024"];
-  // Two explicit branches rather than a computed key: a computed key would give
-  // the clause an index signature, which no Prisma WhereInput accepts.
-  const identityNotIn = (values: string[]) =>
-    identityColumn === "name" ? { name: { notIn: values } } : { key: { notIn: values } };
+  // Three explicit branches rather than a computed key: a computed key would
+  // give the clause an index signature, which no Prisma WhereInput accepts.
+  const identityNotIn = (values: string[]) => {
+    if (identityColumn === "name") return { name: { notIn: values } };
+    if (identityColumn === "key") return { key: { notIn: values } };
+    return { slug: { notIn: values } };
+  };
   return {
     AND: [
       extraWhere,

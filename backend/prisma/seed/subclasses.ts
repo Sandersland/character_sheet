@@ -16,8 +16,11 @@ export interface SubclassSeed {
   // Authored once per row at seed-authoring time (never derived at read time);
   // must equal the SubclassDefinition's own `slug` in lib/classes/<class>.ts.
   slug: SubclassSlug;
-  // Omitted = shared (NULL column, valid in both editions, #1306). No seeded
-  // subclass diverges yet — the field exists so a future one can.
+  // Omitted = shared (NULL column, valid in both editions, #1306). Path of
+  // the Totem Warrior (Barbarian) is the first row to set this —
+  // EDITION_2014 only, since SRD 5.2 replaces it with Path of the Wild Heart
+  // rather than retabbing it (#1559) — so a 2024 character is no longer
+  // offered a subclass with zero features in its edition.
   edition?: SeedEdition;
 }
 
@@ -123,6 +126,7 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You forge a connection to a spirit animal. Totem choices include Bear (resistance while raging), Eagle (disengage/dash as bonus action), and Wolf (allies have advantage on melee attacks vs. nearby targets).",
     slug: "barbarian-totem-warrior",
+    edition: "EDITION_2014",
   },
   {
     className: "Barbarian",
