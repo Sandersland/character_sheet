@@ -88,7 +88,12 @@ export interface ActionResolver {
   resourceAmount?: number;
   /**
    * For heal-roll kind: produces the dice spec to roll for the heal total.
-   * e.g. Second Wind → { count: 1, faces: 10, modifier: character.level }
+   * e.g. Hand of Healing → Martial Arts die + Wisdom modifier. Every surviving
+   * user scales off an ability modifier, never a level — a level-scaled heal
+   * (Second Wind's `1d10 + Fighter level`) is server-rolled off its
+   * ClassFeature row instead, precisely because the client cannot see which
+   * class entry granted the feature and a multiclass character's total level
+   * is the wrong number.
    */
   healRoll?: (character: Character) => RollSpec;
   /**

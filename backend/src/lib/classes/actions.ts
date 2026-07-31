@@ -1046,12 +1046,19 @@ function actionsFromRows(
  */
 export function castSpecFromRow(
   row: ClassFeatureRow,
-  characterLevel: number,
+  classLevel: number,
   rollDie: (faces: number) => number,
 ): { spec: ActionCastSpec; roll: number } {
   const cost = readAbilityCost(row);
   const effect = readEffectSpec({ ...row, level: 0 });
-  const resolved = resolveEffectSpec(effect, 0, { characterLevel });
+  // Both level axes get the GRANTING ENTRY's level, not the character total:
+  // `classLevel` because that is what `modifierSource: "classLevel"` means
+  // (Second Wind is `1d10 + your Fighter level`), and `characterLevel` because
+  // the only axis reading it — cantrip scaling — is unreachable from a
+  // ClassFeature row, whose scaling mode is pinned to "none" by the adapter
+  // above and its dedicated test. If a row ever CAN scale by cantrip level,
+  // this call has to start threading the character total separately.
+  const resolved = resolveEffectSpec(effect, 0, { characterLevel: classLevel, classLevel });
   let roll = 0;
   if (resolved) {
     for (let i = 0; i < resolved.count; i++) roll += rollDie(resolved.faces);

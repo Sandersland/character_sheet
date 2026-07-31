@@ -78,21 +78,31 @@ const ROW_ACTION_SELECT = {
 
 type RowActionCharacter = Prisma.CharacterGetPayload<{ select: typeof ROW_ACTION_SELECT }>;
 
+// A row paired with the effective level of the class entry that granted it —
+// the level any `modifierSource: "classLevel"` effect on that row scales by
+// (Second Wind is `1d10 + your Fighter level`). The pairing is what keeps the
+// dispatcher from reaching for the XP-derived character total, which is a
+// different number the moment the character multiclasses.
+interface EligibleRowAction {
+  row: ClassFeatureRow;
+  entryLevel: number;
+}
+
 // Every row-driven action row available to this character right now — each
 // class entry's classRows + subclassRows, filtered to activation rows
 // (`activationCost` set), the right edition, and reached (row.level <=
 // that entry's own effective level). Mirrors deriveEntryScopedActions'
 // per-entry gate exactly, so the wire's `availableActions[]` and this
 // dispatcher's legality check can never drift.
-function eligibleRowActions(character: RowActionCharacter): ClassFeatureRow[] {
+function eligibleRowActions(character: RowActionCharacter): EligibleRowAction[] {
   const totalLevel = levelForExperience(character.experiencePoints);
   const edition = editionOf(character);
-  const rows: ClassFeatureRow[] = [];
+  const rows: EligibleRowAction[] = [];
   for (const entry of character.classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, character.classEntries.length, totalLevel);
     const { classRows, subclassRows } = featureRowsOf(entry);
     for (const row of [...classRows, ...subclassRows]) {
-      if (row.activationCost && row.edition === edition && row.level <= effLevel) rows.push(row);
+      if (row.activationCost && row.edition === edition && row.level <= effLevel) rows.push({ row, entryLevel: effLevel });
     }
   }
   return rows;
@@ -149,25 +159,28 @@ async function applyRowDrivenActionInTx(
   const character = await tx.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
   if (!character) throw new Error(`Character not found: ${characterId}`);
 
-  const row = eligibleRowActions(character).find((r) => r.resourceKey === op.actionKey);
-  if (!row || !row.resourceKey) {
+  const eligible = eligibleRowActions(character).find((e) => e.row.resourceKey === op.actionKey);
+  // `resourceKey` is what the find matched on, so a hit always has one — the
+  // separate binding is only to carry that through to the narrowed type.
+  const resourceKey = eligible?.row.resourceKey;
+  if (!eligible || !resourceKey) {
     throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
   }
+  const { row, entryLevel } = eligible;
 
   if (!row.effectKind) {
     // A pure counter (Action Surge) — the extra-action grant is client-side.
     await applySpendResourceInTx(
       tx,
       characterId,
-      { type: "spendResource", key: row.resourceKey },
+      { type: "spendResource", key: resourceKey },
       batchId,
       sessionId,
     );
     return {};
   }
 
-  const totalLevel = levelForExperience(character.experiencePoints);
-  const { spec, roll } = castSpecFromRow(row, totalLevel, rollDie);
+  const { spec, roll } = castSpecFromRow(row, entryLevel, rollDie);
 
   const cRow = await tx.character.findUnique({ where: { id: characterId }, select: { spellcasting: true } });
   if (!cRow) throw new Error(`Character not found: ${characterId}`);
@@ -250,7 +263,7 @@ async function applyActionEffectInTx(
 async function assertKnownActionKeys(operations: ExecuteActionOperation[], characterId: string): Promise<void> {
   const character = await prisma.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
   const rowKeys = new Set(
-    (character ? eligibleRowActions(character) : []).map((r) => r.resourceKey).filter((k): k is string => k !== undefined && k !== null),
+    (character ? eligibleRowActions(character) : []).map((e) => e.row.resourceKey).filter((k): k is string => k !== undefined && k !== null),
   );
   for (const op of operations) {
     if (!ACTION_EFFECT_FN[op.actionKey] && !rowKeys.has(op.actionKey)) {

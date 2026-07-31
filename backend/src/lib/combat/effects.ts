@@ -152,7 +152,7 @@ export function resolveBuffSpec(spec: EffectSpec): BuffDescriptor | null {
 export function resolveEffectSpec(
   spec: EffectSpec,
   effectiveStep: number,
-  ctx: { characterLevel: number; abilityMod?: number },
+  ctx: { characterLevel: number; classLevel?: number; abilityMod?: number },
 ): { count: number; faces: number; modifier: number } | null {
   if (!spec.dice) return null;
 
@@ -174,8 +174,18 @@ export function resolveEffectSpec(
   // "abilityMod:<ability>" is reserved for a future consumer (Rally, still
   // hardcoded in maneuvers.ts, out of this issue's scope) and falls through
   // unresolved rather than guessing which ability.
+  //
+  // This reads `classLevel`, NOT `characterLevel` — the two axes above and
+  // below this line want DIFFERENT levels for a multiclass character, and
+  // collapsing them onto one field is what made a Fighter 1/Wizard 19 heal
+  // 1d10+20. `cantripLevel` scaling is by total character level in both
+  // editions; `classLevel` is the granting class entry's own level. The
+  // fallback covers callers for which the distinction is unreachable — a
+  // single-class character (identical numbers) and every spell/sneak-attack
+  // caller (no row can carry `modifierSource` there) — so a caller resolving a
+  // ClassFeature row for a possibly-multiclass character MUST pass classLevel.
   if (spec.modifierSource === "classLevel") {
-    modifier += ctx.characterLevel;
+    modifier += ctx.classLevel ?? ctx.characterLevel;
   }
 
   return { count, faces: spec.dice.faces, modifier };

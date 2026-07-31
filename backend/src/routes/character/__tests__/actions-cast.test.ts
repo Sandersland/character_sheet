@@ -208,3 +208,98 @@ describe("POST /:id/actions/transactions — Second Wind, row-driven (#420, #152
     expect(res.status).toBe(400);
   });
 });
+
+// Second Wind is `1d10 + your Fighter level` (SRD 5.1 p. 23 / SRD 5.2 p. 48) —
+// the FIGHTER entry's level, not the XP-derived character total. The two
+// coincide for a single-class Fighter, which is why every suite above can
+// ignore the distinction; a multiclass Fighter is the only shape that tells
+// them apart, so it is the only shape that can pin the level the cast path
+// feeds `effectModifierSource: "classLevel"`.
+//
+// Fighter 1 / Wizard 19 makes the two readings DISJOINT: the correct heal is
+// 1d10+1 (2-11) and the character-total reading is 1d10+20 (21-30), so no die
+// roll can produce a value both readings allow. Ranges that merely overlap
+// would let a lucky roll pass a broken build.
+const MC_ID = "test-actions-cast-mc-fighter";
+const MC_FIGHTER_CATALOG_NAME = "Actions Cast MC Test Fighter";
+const MC_WIZARD_CATALOG_NAME = "Actions Cast MC Test Wizard";
+
+describe("POST /:id/actions/transactions — Second Wind on a MULTICLASS Fighter (#1557 review)", () => {
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({
+      where: { name: { in: [MC_FIGHTER_CATALOG_NAME, MC_WIZARD_CATALOG_NAME] } },
+    });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const fighter = await prisma.characterClass.upsert({
+      where: { name: MC_FIGHTER_CATALOG_NAME },
+      create: {
+        name: MC_FIGHTER_CATALOG_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+        subclassLevel: 3,
+      },
+      update: {},
+    });
+    // No ClassFeature rows of its own — this entry exists only to make the
+    // character multiclass, so `effectiveEntryLevel` stops falling back to the
+    // XP-derived total and reads each entry's own `level`.
+    const wizard = await prisma.characterClass.upsert({
+      where: { name: MC_WIZARD_CATALOG_NAME },
+      create: {
+        name: MC_WIZARD_CATALOG_NAME,
+        hitDie: "d6",
+        savingThrows: ["intelligence", "wisdom"],
+        skillChoiceCount: 2,
+        skillChoices: ["arcana", "history"],
+        isSpellcaster: false,
+        subclassLevel: 2,
+      },
+      update: {},
+    });
+    await prisma.classFeature.deleteMany({ where: { classId: fighter.id } });
+    await prisma.classFeature.createMany({ data: fighterResourceRowsData(fighter.id) });
+
+    await prisma.character.create({
+      data: {
+        ...FIGHTER_BASE,
+        id: MC_ID,
+        name: "Actions Cast MC Test Fighter",
+        ownerId: OWNER_ID,
+        experiencePoints: 355000, // level 20
+        hitPoints: { current: 20, max: 140, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 20, die: "d10", spent: 0 },
+        classEntries: {
+          create: [
+            { name: "fighter", classId: fighter.id, position: 0, level: 1 },
+            { name: "wizard", classId: wizard.id, position: 1, level: 19 },
+          ],
+        },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MC_ID } });
+  });
+
+  it("heals 1d10 + FIGHTER level, not 1d10 + total character level", async () => {
+    const res = await supertest
+      .agent(app())
+      .set("Cookie", COOKIE)
+      .post(`/api/characters/${MC_ID}/actions/transactions`)
+      .send({ operations: [{ type: "executeAction", actionKey: "secondWind" }] });
+    expect(res.status).toBe(200);
+
+    const roll = res.body.results[0].roll as number;
+    expect(roll).toBeGreaterThanOrEqual(2); // 1d10 + 1
+    expect(roll).toBeLessThanOrEqual(11);
+    expect(res.body.hitPoints.current).toBe(20 + roll);
+  });
+});
