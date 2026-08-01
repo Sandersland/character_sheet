@@ -52,8 +52,11 @@ referenceRouter.get("/reference", async (req, res) => {
     where: { classId: { in: rawClasses.map((c) => c.id) }, edition },
     include: EQUIPMENT_PACKAGE_INCLUDE,
   });
+  // classId is non-null for every row here (filtered by `classId: { in }`
+  // above) — the `!` narrows StartingEquipmentPackage.classId's schema type
+  // (nullable since #1565's background reuse), never a runtime assumption.
   const startingEquipmentByClassId = new Map(
-    startingEquipmentPackages.map((p) => [p.classId, mapStartingEquipmentPackage(p)]),
+    startingEquipmentPackages.map((p) => [p.classId!, mapStartingEquipmentPackage(p)]),
   );
 
   const rawBackgrounds = await prisma.background.findMany({
@@ -63,6 +66,22 @@ referenceRouter.get("/reference", async (req, res) => {
   });
   // keyOf is `name` (Background's business key, D2) — same as originFeatByName below.
   const backgrounds = resolveEditionCatalog(rawBackgrounds, edition, (b) => b.name);
+
+  // One findMany for every background's package (#1565), same N+1-avoidance
+  // reasoning as startingEquipmentPackages above. `edition` is non-nullable on
+  // StartingEquipmentPackage — an exact-match filter, not resolveEditionCatalog
+  // (no shared/NULL row to fall back to). Most backgrounds resolve to `null`
+  // here: Charlatan/Folk Hero/Noble have no SRD text to cite in either
+  // edition and get no package at all (#1565's scope finding), and 2014
+  // Criminal/Sage/Soldier likewise (SRD 5.1 ships only Acolyte) — `null` is
+  // the correct, intentional answer for those rows, not a gap.
+  const backgroundEquipmentPackages = await prisma.startingEquipmentPackage.findMany({
+    where: { backgroundId: { in: backgrounds.map((b) => b.id) }, edition },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  const startingEquipmentByBackgroundId = new Map(
+    backgroundEquipmentPackages.map((p) => [p.backgroundId!, mapStartingEquipmentPackage(p)]),
+  );
 
   // Resolved per-edition BY NAME, not by following the FK: Background.originFeatId
   // is whatever seed-time resolveOriginFeatId baked on (EDITION_2024), and a
@@ -183,6 +202,11 @@ referenceRouter.get("/reference", async (req, res) => {
     abilityChoices: b.abilityChoices,
     // Resolved for the requested edition — see the originFeatByName comment above.
     originFeat: b.originFeat ? (originFeatByName.get(b.originFeat.name) ?? null) : null,
+    // #1565: null for a background with no seeded package under this edition
+    // (see startingEquipmentByBackgroundId's comment) — never a placeholder
+    // empty-groups package, so the picker can tell "no equipment choices"
+    // apart from "equipment choices, but this background chose none".
+    startingEquipment: startingEquipmentByBackgroundId.get(b.id) ?? null,
   }));
 
   // Artisan tools for the sheet's Proficiencies-card dropdown (the only category consumed).

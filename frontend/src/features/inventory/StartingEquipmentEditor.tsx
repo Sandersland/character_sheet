@@ -32,6 +32,13 @@ interface StartingEquipmentEditorProps {
    *  matching the server's boundToolChoiceError so the picker never offers a
    *  choice the write path would reject (#1336). */
   selectedToolChoices: string[];
+  /** #1565: "class" (default) or "background". Two jobs — it labels the
+   *  package-mode button on the rare path where both modes exist (a background
+   *  never has a gold-roll alternative, so its own toggle row never renders at
+   *  all), and it namespaces this instance's native radio groups so the two
+   *  editors mounted on the creation step stay independent. See OptionChoice's
+   *  radioGroupName for what went wrong when they did not. */
+  kind?: "class" | "background";
 }
 
 /** Describes the fixed-item contents of a bundle (no open pick placeholders). */
@@ -147,7 +154,13 @@ function OpenPickList({ bundle, catalog, currentPicks, onPick, selectedToolChoic
 
 interface OptionChoiceProps {
   option: EquipmentBundle;
-  groupIdx: number;
+  /** Native radio-group name — must be unique across every editor instance on
+   *  the page, not just across groups within one. Since #1565 the creation step
+   *  mounts TWO editors (class and background); a bare `group-${idx}` made both
+   *  cards' first groups one native radio group, so choosing a background
+   *  option visually cleared the class option (the draft kept both, since the
+   *  radios are React-controlled, so only the rendering lied). */
+  radioGroupName: string;
   isChosen: boolean;
   catalog: Item[];
   currentPicks: string[] | undefined;
@@ -197,7 +210,7 @@ function ChosenFixedSummary({ isChosen, option }: { isChosen: boolean; option: E
  *  EquipmentGroupCard purely to keep its own cyclomatic complexity low. */
 function OptionChoice({
   option,
-  groupIdx,
+  radioGroupName,
   isChosen,
   catalog,
   currentPicks,
@@ -216,7 +229,7 @@ function OptionChoice({
       <div className="flex items-start gap-2">
         <input
           type="radio"
-          name={`group-${groupIdx}`}
+          name={radioGroupName}
           checked={isChosen}
           onChange={onChoose}
           className="mt-0.5 accent-arcane-600"
@@ -239,6 +252,9 @@ function OptionChoice({
 interface EquipmentGroupCardProps {
   group: EquipmentChoiceGroup;
   groupIdx: number;
+  /** Namespaces this card's radio group per editor instance — see OptionChoice's
+   *  radioGroupName. */
+  radioGroupPrefix: string;
   sel: PackageSelection | undefined;
   catalog: Item[];
   onSetOptionIndex: (groupIdx: number, optionIdx: number) => void;
@@ -252,6 +268,7 @@ interface EquipmentGroupCardProps {
 function EquipmentGroupCard({
   group,
   groupIdx,
+  radioGroupPrefix,
   sel,
   catalog,
   onSetOptionIndex,
@@ -279,7 +296,7 @@ function EquipmentGroupCard({
             <OptionChoice
               key={optionIdx}
               option={option}
-              groupIdx={groupIdx}
+              radioGroupName={`${radioGroupPrefix}-group-${groupIdx}`}
               isChosen={chosenOptionIdx === optionIdx}
               catalog={catalog}
               currentPicks={sel?.openPicks}
@@ -406,11 +423,15 @@ interface ModeToggleProps {
   gold: StartingGold | null;
   onSelectPackage: () => void;
   onSelectGold: () => void;
+  /** #1565: this editor's own package-mode button label — a background reuse
+   *  of this component never has a gold alternative (so this button always
+   *  renders alone), but it must still say "Background", not "Class". */
+  packageModeLabel: string;
 }
 
 // Split out of StartingEquipmentEditor purely to keep its own cyclomatic
 // complexity low.
-function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold }: ModeToggleProps) {
+function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold, packageModeLabel }: ModeToggleProps) {
   return (
     <div className="flex flex-wrap gap-2">
       <button
@@ -422,11 +443,12 @@ function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold }: 
             : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
         }`}
       >
-        Class equipment package
+        {packageModeLabel}
       </button>
-      {/* No roll-for-gold path is offered at all when this edition has none
-          (PHB'24, #1564) — PHB'24 reaches gold through a lettered package
-          option instead (StartingEquipmentOption.gold). */}
+      {/* A TYPE narrowing, not a runtime branch: the caller no longer renders
+          this component at all when `gold` is null (#1565), but the prop is
+          still nullable and goldLabel below needs a StartingGold. Deleting it
+          costs a non-null assertion, which is strictly worse. */}
       {gold && (
         <button
           type="button"
@@ -450,11 +472,13 @@ export default function StartingEquipmentEditor({
   value,
   onChange,
   selectedToolChoices,
+  kind = "class",
 }: StartingEquipmentEditorProps) {
   if (!startingEquipment) return null;
 
   const isPackage = value.mode === "package";
   const isGold = value.mode === "gold";
+  const packageModeLabel = kind === "background" ? "Background equipment package" : "Class equipment package";
   // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564
   // commit 3) — narrowed once here so every render below can pass a non-null
   // StartingGold to goldMin/goldMax/goldLabel/rollGold without re-checking.
@@ -472,13 +496,22 @@ export default function StartingEquipmentEditor({
 
   return (
     <div className="flex flex-col gap-5">
-      <ModeToggle
-        isPackage={isPackage}
-        isGold={isGold}
-        gold={gold}
-        onSelectPackage={() => onChange(draftForMode(startingEquipment!, "package"))}
-        onSelectGold={() => onChange(draftForMode(startingEquipment!, "gold"))}
-      />
+      {/* Package mode is always available, so the toggle row is only
+          meaningful when a SECOND mode (gold) also exists — a 2014 class
+          package. A 2024 class package and every background package have
+          `gold: null` and therefore exactly one mode, and a one-option toggle
+          group is not a choice, so the row is hidden rather than rendering a
+          lone button that does nothing when pressed (#1565). */}
+      {gold && (
+        <ModeToggle
+          isPackage={isPackage}
+          isGold={isGold}
+          gold={gold}
+          onSelectPackage={() => onChange(draftForMode(startingEquipment!, "package"))}
+          onSelectGold={() => onChange(draftForMode(startingEquipment!, "gold"))}
+          packageModeLabel={packageModeLabel}
+        />
+      )}
 
       {isPackage && value.mode === "package" && (
         <div className="flex flex-col gap-5">
@@ -487,6 +520,7 @@ export default function StartingEquipmentEditor({
               key={groupIdx}
               group={group}
               groupIdx={groupIdx}
+              radioGroupPrefix={kind}
               sel={value.selections[groupIdx]}
               catalog={catalog}
               onSetOptionIndex={setOptionIndex}

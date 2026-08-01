@@ -15,15 +15,16 @@ import { assertSeedContentValid, assertCatalogNamesResolve } from "../validate.j
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
-  // 4 families today: SUBCLASSES, SUBCLASS_GRANTED_SPELLS, CLASS_FEATURES
-  // (#1523, 522 rows), and STARTING_EQUIPMENT_PACKAGES (#1533, 24 rows) —
-  // >= floors rather than exact counts so this doesn't need editing every
-  // time a family is added. The floor is bumped 3->4 in the SAME diff that
-  // registers the fourth family — writing toBe(3)/31 here would keep passing
-  // if the registration were silently dropped (#1370's exact failure shape).
-  it("visited at least 4 families and 60 rows", () => {
+  // 5 families today: SUBCLASSES, SUBCLASS_GRANTED_SPELLS, CLASS_FEATURES
+  // (#1523, 522 rows), STARTING_EQUIPMENT_PACKAGES (#1533, 24 rows), and
+  // BACKGROUND_STARTING_EQUIPMENT_PACKAGES (#1565, 5 rows) — >= floors rather
+  // than exact counts so this doesn't need editing every time a family is
+  // added. The floor is bumped 4->5 in the SAME diff that registers the fifth
+  // family — writing toBe(4)/60 here would keep passing if the registration
+  // were silently dropped (#1370's exact failure shape).
+  it("visited at least 5 families and 60 rows", () => {
     const summary = assertSeedContentValid();
-    expect(summary.familiesChecked).toBeGreaterThanOrEqual(4);
+    expect(summary.familiesChecked).toBeGreaterThanOrEqual(5);
     expect(summary.rowsChecked).toBeGreaterThanOrEqual(60);
   });
 
@@ -91,6 +92,34 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
       "Greatsword", "Flail", "Spear", "Sickle", "Studded Leather Armor", "Chain Shirt",
       "Quiver", "Robe", "Crystal", "Orb", "Herbalism Kit",
       "Bagpipes", "Drum", "Dulcimer", "Flute", "Horn", "Lyre", "Pan Flute", "Shawm", "Viol",
+    ];
+    const fixture = [
+      {
+        className: "Fighter",
+        edition: "EDITION_2014" as const,
+        package: {
+          gold: { diceCount: 1, diceFaces: 4, multiplier: 1 },
+          groups: [
+            {
+              label: "test group",
+              options: [{ label: "test option", items: newNames.map((catalogName) => ({ catalogName })) }],
+            },
+          ],
+        },
+      },
+    ];
+    expect(() => assertCatalogNamesResolve(fixture)).not.toThrow();
+  });
+
+  // #1565: the nine background-package catalog additions must resolve the
+  // same way any other ITEMS row does — a FIXTURE package referencing all of
+  // them, never the real BACKGROUND_STARTING_EQUIPMENT_PACKAGES (which cites
+  // them via `backgroundName`, not `className`, but assertCatalogNamesResolve
+  // only reads `.package`, so a class-shaped fixture proves the same thing).
+  it("assertCatalogNamesResolve accepts every #1565 catalog addition", () => {
+    const newNames = [
+      "Traveler's Clothes", "Common Clothes", "Pouch", "Calligrapher's Supplies", "Prayer Book",
+      "Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set",
     ];
     const fixture = [
       {

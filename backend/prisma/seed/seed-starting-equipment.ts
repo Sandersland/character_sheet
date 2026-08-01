@@ -1,10 +1,24 @@
-// --- StartingEquipmentPackage seeder (#1519/#1533) ---------------------------
+// --- StartingEquipmentPackage seeder (#1519/#1533 classes; #1565 backgrounds) -
 // The executable counterpart to starting-equipment.ts's DATA
-// (STARTING_EQUIPMENT_PACKAGES) — split out per #1277 AC 4 /
-// scripts/check-seed-data-modules.sh, which forbids prisma/upsert/await logic
-// in a seed DATA module. Mirrors seed-class-features.ts's content/logic
-// split for the same family shape (one class-authoring unit per row, here
-// per (classId, edition) rather than per (classId, subclassId, name, edition)).
+// (STARTING_EQUIPMENT_PACKAGES, BACKGROUND_STARTING_EQUIPMENT_PACKAGES) —
+// split out per #1277 AC 4 / scripts/check-seed-data-modules.sh, which
+// forbids prisma/upsert/await logic in a seed DATA module. Mirrors
+// seed-class-features.ts's content/logic split for the same family shape
+// (one class- or background-authoring unit per row, here per (classId,
+// edition) or (backgroundId, edition) rather than per (classId, subclassId,
+// name, edition)).
+//
+// No assertEveryBackgroundEditionHasPackage guard exists here, unlike
+// assertEveryClassEditionHasPackage below (deliberate, not an oversight):
+// BACKGROUND_STARTING_EQUIPMENT_PACKAGES covers exactly five (backgroundName,
+// edition) pairs by design — Charlatan/Folk Hero/Noble have no SRD text to
+// cite in either edition, and 2014 Criminal/Sage/Soldier likewise (SRD 5.1
+// ships only Acolyte) — so a guard requiring every seeded Background to have
+// a package in both editions would fail on content this issue leaves
+// unfinished ON PURPOSE (see starting-equipment.ts's background-section
+// header). Content correctness for the five pairs that DO exist is
+// starting-equipment.test.ts's job, same division of labour as the class
+// guard's own docstring describes.
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import type {
   ClassStartingEquipment,
@@ -15,7 +29,12 @@ import type {
 } from "@character-sheet/shared-types";
 
 import { CLASSES } from "./catalog-data.js";
-import { STARTING_EQUIPMENT_PACKAGES, type StartingEquipmentSeed } from "./starting-equipment.js";
+import {
+  STARTING_EQUIPMENT_PACKAGES,
+  BACKGROUND_STARTING_EQUIPMENT_PACKAGES,
+  type StartingEquipmentSeed,
+  type BackgroundStartingEquipmentSeed,
+} from "./starting-equipment.js";
 import type { SeedEdition } from "./edition.js";
 
 const EDITIONS: readonly SeedEdition[] = ["EDITION_2014", "EDITION_2024"];
@@ -88,10 +107,30 @@ function goldColumnsCreateInput(gold: ClassStartingEquipment["gold"]) {
   return { goldDiceCount: gold.diceCount, goldDiceFaces: gold.diceFaces, goldMultiplier: gold.multiplier };
 }
 
-function packageCreateData(classId: string, className: string, edition: SeedEdition, pkg: ClassStartingEquipment) {
+function classPackageCreateData(classId: string, className: string, edition: SeedEdition, pkg: ClassStartingEquipment) {
   return {
     classId,
     name: className,
+    edition,
+    ...goldColumnsCreateInput(pkg.gold),
+    groups: { create: pkg.groups.map((group, i) => groupCreateInput(group, i)) },
+  };
+}
+
+// #1565's twin of classPackageCreateData above — backgroundId instead of
+// classId (StartingEquipmentPackage's two owner FKs are mutually exclusive,
+// enforced by the model's CHECK constraint; omitting classId here leaves it
+// at the column's NULL default, same as classPackageCreateData omitting
+// backgroundId).
+function backgroundPackageCreateData(
+  backgroundId: string,
+  backgroundName: string,
+  edition: SeedEdition,
+  pkg: ClassStartingEquipment,
+) {
+  return {
+    backgroundId,
+    name: backgroundName,
     edition,
     ...goldColumnsCreateInput(pkg.gold),
     groups: { create: pkg.groups.map((group, i) => groupCreateInput(group, i)) },
@@ -106,10 +145,23 @@ function packageCreateData(classId: string, className: string, edition: SeedEdit
 // each run start from empty, so the recreated tree is identical every time —
 // proven by starting-equipment-migration.test.ts running the seeder twice
 // and asserting group counts are unchanged.
-async function writeOnePackage(prisma: PrismaClient, classId: string, seed: StartingEquipmentSeed): Promise<void> {
+async function writeOneClassPackage(prisma: PrismaClient, classId: string, seed: StartingEquipmentSeed): Promise<void> {
   await prisma.startingEquipmentPackage.deleteMany({ where: { classId, edition: seed.edition } });
   await prisma.startingEquipmentPackage.create({
-    data: packageCreateData(classId, seed.className, seed.edition, seed.package),
+    data: classPackageCreateData(classId, seed.className, seed.edition, seed.package),
+  });
+}
+
+// #1565's twin of writeOneClassPackage above — same delete-then-recreate
+// reasoning, keyed by (backgroundId, edition) instead of (classId, edition).
+async function writeOneBackgroundPackage(
+  prisma: PrismaClient,
+  backgroundId: string,
+  seed: BackgroundStartingEquipmentSeed,
+): Promise<void> {
+  await prisma.startingEquipmentPackage.deleteMany({ where: { backgroundId, edition: seed.edition } });
+  await prisma.startingEquipmentPackage.create({
+    data: backgroundPackageCreateData(backgroundId, seed.backgroundName, seed.edition, seed.package),
   });
 }
 
@@ -121,13 +173,68 @@ async function resolveClassIdsByName(prisma: PrismaClient, classNames: string[])
   return new Map(rows.map((c) => [c.name, c.id]));
 }
 
+// #1565's twin of resolveClassIdsByName above — NOT interchangeable the way
+// the naming suggests: CharacterClass.name is genuinely unique, but
+// Background is @@unique([name, edition]), so one name can legitimately own
+// up to three rows (NULL/2014/2024, #1306). Guarantees the returned Map has
+// at most one id per name — throws, naming the background and every edition
+// found, rather than letting a name that resolves to more than one row
+// silently pick whichever `findMany` happened to return last (a real hazard
+// the moment Charlatan/Folk Hero/Noble get tagged EDITION_2014, or any
+// background forks per #1348 generally: a fork sharing a name with an
+// existing packaged background would silently misfile that package onto the
+// wrong row with no error anywhere). Every background this module actually
+// resolves today has exactly one row per name, so this throws on nobody yet.
+export async function resolveBackgroundIdsByName(
+  prisma: PrismaClient,
+  backgroundNames: string[],
+): Promise<Map<string, string>> {
+  const rows = await prisma.background.findMany({
+    where: { name: { in: backgroundNames } },
+    select: { id: true, name: true, edition: true },
+  });
+
+  const rowsByName = new Map<string, typeof rows>();
+  for (const row of rows) {
+    rowsByName.set(row.name, [...(rowsByName.get(row.name) ?? []), row]);
+  }
+
+  const ambiguous = [...rowsByName.entries()].filter(([, group]) => group.length > 1);
+  if (ambiguous.length > 0) {
+    const detail = ambiguous
+      .map(([name, group]) => `"${name}" (${group.map((r) => r.edition ?? "shared").join(", ")})`)
+      .join("; ");
+    throw new Error(
+      `seedStartingEquipment: ambiguous background name(s) resolve to more than one Background row — ${detail}. ` +
+        "A BACKGROUND_STARTING_EQUIPMENT_PACKAGES entry cannot be written against a forked background by name alone.",
+    );
+  }
+
+  return new Map([...rowsByName.entries()].map(([name, group]) => [name, group[0].id]));
+}
+
 async function writeAllPackages(prisma: PrismaClient, classIdByName: Map<string, string>): Promise<void> {
   for (const seed of STARTING_EQUIPMENT_PACKAGES) {
     const classId = classIdByName.get(seed.className);
     if (!classId) {
       throw new Error(`seedStartingEquipment: unknown class "${seed.className}" in STARTING_EQUIPMENT_PACKAGES`);
     }
-    await writeOnePackage(prisma, classId, seed);
+    await writeOneClassPackage(prisma, classId, seed);
+  }
+}
+
+async function writeAllBackgroundPackages(
+  prisma: PrismaClient,
+  backgroundIdByName: Map<string, string>,
+): Promise<void> {
+  for (const seed of BACKGROUND_STARTING_EQUIPMENT_PACKAGES) {
+    const backgroundId = backgroundIdByName.get(seed.backgroundName);
+    if (!backgroundId) {
+      throw new Error(
+        `seedStartingEquipment: unknown background "${seed.backgroundName}" in BACKGROUND_STARTING_EQUIPMENT_PACKAGES`,
+      );
+    }
+    await writeOneBackgroundPackage(prisma, backgroundId, seed);
   }
 }
 
@@ -168,32 +275,66 @@ export function startingEquipmentStaleWhere(
   };
 }
 
-// Prunes any StartingEquipmentPackage row (and its cascaded children) whose
-// (name, edition) pair isn't in STARTING_EQUIPMENT_PACKAGES — both editions
-// threaded (24 entries), never just EDITION_2014: the notIn:[] empty-
-// partition trap is live here exactly as it is for every staleCatalogRowsWhere
-// caller (#1533 [R7]) — a `seeded` list that omitted EDITION_2024 would give
-// that partition `notIn: []`, which matches (and deletes) every 2024 package
-// on the next reseed. This seeder owns the whole table, so no extraWhere.
-async function pruneStalePackages(prisma: PrismaClient): Promise<void> {
+// Prunes any CLASS StartingEquipmentPackage row (and its cascaded children)
+// whose (name, edition) pair isn't in STARTING_EQUIPMENT_PACKAGES — both
+// editions threaded (24 entries), never just EDITION_2014: the notIn:[]
+// empty-partition trap is live here exactly as it is for every
+// staleCatalogRowsWhere caller (#1533 [R7]) — a `seeded` list that omitted
+// EDITION_2024 would give that partition `notIn: []`, which matches (and
+// deletes) every 2024 package on the next reseed.
+//
+// extraWhere: { classId: { not: null } } (#1565) — this family's table is no
+// longer class-only, so this sweep must touch ONLY class rows. Without this
+// partition, a background row's `name` (which never appears in
+// STARTING_EQUIPMENT_PACKAGES' className list) would satisfy BOTH editions'
+// `notIn` and get deleted by the class prune the moment a background package
+// was ever written — the exact cross-family notIn:[] trap this model's
+// schema.prisma comment warns about, just one level up from the usual
+// single-edition version.
+async function pruneStaleClassPackages(prisma: PrismaClient): Promise<void> {
   const seeded = STARTING_EQUIPMENT_PACKAGES.map((r) => ({ identity: r.className, edition: r.edition }));
-  await prisma.startingEquipmentPackage.deleteMany({ where: startingEquipmentStaleWhere(seeded) });
+  await prisma.startingEquipmentPackage.deleteMany({
+    where: startingEquipmentStaleWhere(seeded, { classId: { not: null } }),
+  });
+}
+
+// #1565's twin of pruneStaleClassPackages above — same reasoning, mirrored:
+// extraWhere: { backgroundId: { not: null } } confines this sweep to
+// background rows only, so it can never delete a class package (whose `name`
+// never appears in BACKGROUND_STARTING_EQUIPMENT_PACKAGES' backgroundName list).
+async function pruneStaleBackgroundPackages(prisma: PrismaClient): Promise<void> {
+  const seeded = BACKGROUND_STARTING_EQUIPMENT_PACKAGES.map((r) => ({
+    identity: r.backgroundName,
+    edition: r.edition,
+  }));
+  await prisma.startingEquipmentPackage.deleteMany({
+    where: startingEquipmentStaleWhere(seeded, { backgroundId: { not: null } }),
+  });
 }
 
 /**
- * Seeds every StartingEquipmentPackage row (#1519/#1533) and prunes stale
- * ones. Exported (not module-private) so a test can call it directly, the
- * same reason seedClassFeatures is exported.
+ * Seeds every StartingEquipmentPackage row — class (#1519/#1533) and
+ * background (#1565) — and prunes stale ones in two independent sweeps (see
+ * pruneStaleClassPackages/pruneStaleBackgroundPackages). Exported (not
+ * module-private) so a test can call it directly, the same reason
+ * seedClassFeatures is exported.
  */
 export async function seedStartingEquipment(prisma: PrismaClient): Promise<void> {
   const classNames = [...new Set(STARTING_EQUIPMENT_PACKAGES.map((r) => r.className))];
   const classIdByName = await resolveClassIdsByName(prisma, classNames);
-
   await writeAllPackages(prisma, classIdByName);
-  await pruneStalePackages(prisma);
+  await pruneStaleClassPackages(prisma);
 
-  // Runs LAST, after the prune, so the window this inspects includes its
-  // deletions — mirrors seedClassFeatures' own ordering rationale.
+  const backgroundNames = [...new Set(BACKGROUND_STARTING_EQUIPMENT_PACKAGES.map((r) => r.backgroundName))];
+  const backgroundIdByName = await resolveBackgroundIdsByName(prisma, backgroundNames);
+  await writeAllBackgroundPackages(prisma, backgroundIdByName);
+  await pruneStaleBackgroundPackages(prisma);
+
+  // Runs LAST, after both prunes, so the window this inspects includes their
+  // deletions — mirrors seedClassFeatures' own ordering rationale. Class-only
+  // by design (#1565 deliberately adds no background analog — see this
+  // module's header for why a "every background has a package" guard would
+  // fail on the three backgrounds left without one on purpose).
   await assertEveryClassEditionHasPackage(prisma);
 }
 
@@ -213,7 +354,10 @@ async function loadPackageGroupCounts(prisma: PrismaClient, classIds: string[]):
     where: { classId: { in: classIds } },
     select: { classId: true, edition: true, _count: { select: { groups: true } } },
   });
-  return rows.map((r) => ({ classId: r.classId, edition: r.edition, groupCount: r._count.groups }));
+  // classId is non-null for every row here (filtered by `classId: { in }`
+  // above) — the `!` narrows the column's schema type (nullable since #1565's
+  // background reuse), never a runtime assumption.
+  return rows.map((r) => ({ classId: r.classId!, edition: r.edition, groupCount: r._count.groups }));
 }
 
 function buildGroupCountByPair(groupCounts: readonly PackageGroupCount[]): Map<string, number> {

@@ -840,30 +840,46 @@ model ClassFeature {
   @@index([subclassId])
 }
 
-// Seeded home for the per-class starting-equipment packages (#1519/#1533),
-// read at both read sites (GET /api/reference, character-create.ts) through
-// mapStartingEquipmentPackage (#1534) — STARTING_EQUIPMENT, the TS module this
-// table replaced, no longer exists. Relational, not a JSON blob (settled on
-// #1519, not re-opened here): the nesting IS the content — group -> option ->
-// (fixed items and/or open picks) plus a dice-expression gold alternative —
-// and a JSON blob would put catalogName/weaponClass references beyond zod's
-// reach (#1247/#1408). `edition` is NON-NULLABLE: there is no edition-neutral
-// starting package, and a nullable column here is exactly how a 2014 package
-// would silently serve a 2024 character — the bug #1519 was filed for, which
-// #1534 relocated from a TS module into rows and #1535 finally fixed by
-// authoring the real SRD 5.2 packages. With `edition` NOT NULL,
-// @@unique([classId, edition]) needs no NULLS NOT DISTINCT clause (contrast
-// ClassFeature's nullable-subclassId trap).
+// Seeded home for the per-class AND per-background starting-equipment
+// packages (#1519/#1533 classes; #1565 backgrounds), read at both read sites
+// (GET /api/reference, character-create.ts) through mapStartingEquipmentPackage
+// (#1534) — STARTING_EQUIPMENT, the TS module this table replaced, no longer
+// exists. Relational, not a JSON blob (settled on #1519, not re-opened here):
+// the nesting IS the content — group -> option -> (fixed items and/or open
+// picks) plus a dice-expression gold alternative — and a JSON blob would put
+// catalogName/weaponClass references beyond zod's reach (#1247/#1408).
+// `edition` is NON-NULLABLE: there is no edition-neutral starting package, and
+// a nullable column here is exactly how a 2014 package would silently serve a
+// 2024 character — the bug #1519 was filed for, which #1534 relocated from a
+// TS module into rows and #1535 finally fixed by authoring the real SRD 5.2
+// packages. With `edition` NOT NULL, @@unique([classId, edition]) needs no
+// NULLS NOT DISTINCT clause (contrast ClassFeature's nullable-subclassId trap).
+//
+// classId/backgroundId (#1565): a background's 2024 equipment shape (one
+// choice group, lettered options, per-option GP) is structurally identical to
+// a class's, so this row is reused rather than growing a second Background-
+// EquipmentPackage/Group/Option/Item/OpenPick family — mapStartingEquipmentPackage
+// needs no change at all. Exactly one of the two FKs is set per row, enforced
+// by a hand-written CHECK constraint (20260801120000_starting_equipment_package_background,
+// same Prisma-DSL-has-no-@@check gap as the gold-dice-jointly-null check
+// above) rather than trusting every future write path to honour it.
 model StartingEquipmentPackage {
-  id      String         @id @default(uuid())
-  classId String
-  class   CharacterClass @relation(fields: [classId], references: [id], onDelete: Cascade)
-  // Mirror of CharacterClass.name, carried ONLY so staleCatalogRowsWhere can
+  id         String          @id @default(uuid())
+  classId    String?
+  class      CharacterClass? @relation(fields: [classId], references: [id], onDelete: Cascade)
+  backgroundId String?
+  background   Background?   @relation(fields: [backgroundId], references: [id], onDelete: Cascade)
+  // Mirror of CharacterClass.name / Background.name (whichever FK is set),
+  // carried ONLY so staleCatalogRowsWhere/startingEquipmentStaleWhere can
   // partition this family's prune by (identity, edition) — that helper filters
   // on a scalar `name`/`key` column on the row itself and cannot build a
-  // relation filter. Every LOOKUP goes through classId; nothing may key on
-  // this column (#1388/#1529: display-name keying is what we are moving away
-  // from).
+  // relation filter. Every LOOKUP goes through classId/backgroundId; nothing
+  // may key on this column (#1388/#1529: display-name keying is what we are
+  // moving away from). The prune partitions class rows (classId not null) and
+  // background rows (backgroundId not null) into two independent sweeps —
+  // see seed-starting-equipment.ts's pruneStaleClassPackages/
+  // pruneStaleBackgroundPackages — so a `notIn: []` empty-partition trap on
+  // one family can never delete the other's rows.
   name    String
   edition RulesEdition
 
@@ -875,11 +891,13 @@ model StartingEquipmentPackage {
   // constraint (20260731160000_starting_equipment_package_gold_dice_check;
   // Prisma's DSL has no `@@check` attribute, same DSL gap as the schema's
   // NULLS NOT DISTINCT indexes), not just a convention mapGold's non-null
-  // assertions rest on. Every EDITION_2014 package keeps its existing
-  // non-null values; resolveStartingGold (character-create.ts) rejects
-  // rather than computing when handed a NULL-dice package, since PHB'24
-  // reaches its gold through a lettered StartingEquipmentOption.gold instead
-  // (#1564 commit 2).
+  // assertions rest on. Every EDITION_2014 CLASS package keeps its existing
+  // non-null values; every background package (both editions, #1565) is
+  // NULL here too — backgrounds have no roll-for-gold rule in either
+  // edition, only a fixed/per-option GP amount. resolveStartingGold
+  // (character-create.ts) rejects rather than computing when handed a
+  // NULL-dice package, since PHB'24 (and every background) reaches its gold
+  // through a lettered StartingEquipmentOption.gold instead (#1564 commit 2).
   goldDiceCount  Int?
   goldDiceFaces  Int?
   goldMultiplier Int?
@@ -887,6 +905,7 @@ model StartingEquipmentPackage {
   groups StartingEquipmentGroup[]
 
   @@unique([classId, edition])
+  @@unique([backgroundId, edition])
 }
 
 model StartingEquipmentGroup {
@@ -990,6 +1009,9 @@ model Background {
   edition            RulesEdition?
 
   selections CharacterBackground[]
+  // Back-relation only — not a column, appears on no payload unless included
+  // (#1565's StartingEquipmentPackage reuse, see that model's own comment).
+  startingEquipmentPackages StartingEquipmentPackage[]
 
   @@unique([name, edition])
 }

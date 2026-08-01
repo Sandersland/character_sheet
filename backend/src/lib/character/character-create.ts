@@ -702,13 +702,35 @@ async function loadClassEquipmentDef(classId: string, edition: RulesEdition): Pr
   return row ? mapStartingEquipmentPackage(row) : null;
 }
 
+// #1565's twin of loadClassEquipmentDef above — (backgroundId, edition), the
+// compound unique StartingEquipmentPackage.@@unique([backgroundId, edition])
+// generates. `backgroundId` is null for a homebrew/unresolved background
+// (resolveSelections' background is allowed to miss a catalog anchor), which
+// this treats identically to "no seeded package for this class": null in,
+// null out, no query at all.
+async function loadBackgroundEquipmentDef(
+  backgroundId: string | null,
+  edition: RulesEdition,
+): Promise<ClassEquipmentDef | null> {
+  if (!backgroundId) return null;
+  const row = await prisma.startingEquipmentPackage.findUnique({
+    where: { backgroundId_edition: { backgroundId, edition } },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  return row ? mapStartingEquipmentPackage(row) : null;
+}
+
 // Re-resolve a package selection authoritatively against the loaded package
 // and expand it into InventoryItem create payloads plus the summed gold
 // (#1564) across the chosen options. `classDef` null means no seeded package
-// for this class — preserves the pre-#1534 "no entry" 400 (characters.test.ts:901).
+// for this subject — preserves the pre-#1534 "no entry" 400
+// (characters.test.ts:901) for a class, and is the SAME shape #1565 reuses
+// for a background with no package (Charlatan/Folk Hero/Noble, or homebrew).
+// `subjectLabel` (e.g. "class: Fighter" / "background: Criminal") is
+// player-facing only — never used to resolve anything.
 async function resolvePackageInventory(
   se: PackageEquipment,
-  primaryClassName: string,
+  subjectLabel: string,
   classDef: ClassEquipmentDef | null,
   creationToolProfs: CreationToolProf[],
 ): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[]; totalGold: number }>> {
@@ -716,7 +738,7 @@ async function resolvePackageInventory(
     return {
       ok: false,
       status: 400,
-      error: `No starting equipment package defined for class: ${primaryClassName}`,
+      error: `No starting equipment package defined for ${subjectLabel}`,
     };
   }
 
@@ -728,44 +750,93 @@ async function resolvePackageInventory(
   return { ok: true, inventoryItemCreates: inventoryCreates, totalGold: refs.totalGold };
 }
 
-// Phase 2 — starting-equipment materialization. Optional: omitting it yields an
-// empty-inventory character. The gold path sets currency; the package path
-// materializes InventoryItem payloads. Starting weapons/armor are auto-equipped
-// so the in-session Attack picker isn't empty on a fresh sheet (issue #51).
-// The package is keyed by (classId, edition) — see loadClassEquipmentDef;
-// primaryClassName is kept only for player-facing error messages.
-// creationToolProfs (#1564) is threaded through so a boundToToolChoice open
-// pick (Monk's tool-bound entry) can check membership against the SAME
-// resolved+validated list resolveProficiencies already produced — never a
-// second, independent re-resolution of the character's tool choices.
+// The background half of Phase 2 (#1565) — split out purely to keep
+// materializeStartingEquipment's own cyclomatic complexity low. A background
+// never has a roll-for-gold dice alternative in either edition (unlike a 2014
+// class), so `mode: "gold"` here is always a 400, never a resolveStartingGold
+// range check. `backgroundId` null (homebrew/unresolved background, or one of
+// the three with no SRD package — Charlatan/Folk Hero/Noble) makes
+// loadBackgroundEquipmentDef's null propagate into resolvePackageInventory's
+// existing "no seeded package" 400 — the same shape a class with no package hits.
+async function resolveBackgroundEquipmentInventory(
+  bse: NonNullable<CreateCharacterBody["backgroundStartingEquipment"]>,
+  backgroundId: string | null,
+  backgroundDisplayName: string,
+  edition: RulesEdition,
+  creationToolProfs: CreationToolProf[],
+): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[]; totalGold: number }>> {
+  if (bse.mode === "gold") {
+    return {
+      ok: false,
+      status: 400,
+      error: `${backgroundDisplayName} has no roll-for-gold alternative under this ruleset — choose a starting-equipment package option instead`,
+    };
+  }
+  const backgroundDef = await loadBackgroundEquipmentDef(backgroundId, edition);
+  return resolvePackageInventory(bse, `background: ${backgroundDisplayName}`, backgroundDef, creationToolProfs);
+}
+
+// Phase 2 — starting-equipment materialization. Optional: omitting BOTH
+// fields yields an empty-inventory character. The class gold path sets an
+// explicit currency; the class AND background package paths each contribute
+// InventoryItem payloads plus their own GP, and the two GP amounts ADD
+// (#1565 — a 2024 Criminal Fighter picking option A on both gets 4+16=20 GP,
+// never one silently overwriting the other). Starting weapons/armor are
+// auto-equipped so the in-session Attack picker isn't empty on a fresh sheet
+// (issue #51). The class package is keyed by (classId, edition) — see
+// loadClassEquipmentDef; the background package by (backgroundId, edition) —
+// see loadBackgroundEquipmentDef. primaryClassName/backgroundDisplayName are
+// kept only for player-facing error messages. creationToolProfs (#1564) is
+// threaded through so a boundToToolChoice open pick (Monk's tool-bound entry,
+// Soldier's "Gaming Set (same as above)") can check membership against the
+// SAME resolved+validated list resolveProficiencies already produced — never
+// a second, independent re-resolution of the character's tool choices.
 async function materializeStartingEquipment(
   input: CreateCharacterBody,
   classId: string,
   primaryClassName: string,
+  backgroundId: string | null,
+  backgroundDisplayName: string,
   edition: RulesEdition,
   creationToolProfs: CreationToolProf[],
 ): Promise<PhaseResult<MaterializedEquipment>> {
-  let inventoryItemCreates: InventoryCreate[] = [];
-  let startingCurrency: MaterializedEquipment["startingCurrency"];
+  const inventoryItemCreates: InventoryCreate[] = [];
+  let totalGold = 0;
+  // Currency is only overridden when at least one of class/background
+  // equipment was actually chosen — omitting BOTH keeps deriveCreatedCharacter's
+  // own default currency untouched, same as the pre-#1565 "no `se`" behaviour.
+  let anyEquipmentChosen = false;
 
   const se = input.startingEquipment;
   if (se) {
+    anyEquipmentChosen = true;
     const classDef = await loadClassEquipmentDef(classId, edition);
     if (se.mode === "gold") {
       const gold = resolveStartingGold(se.gold, primaryClassName, classDef);
       if (!gold.ok) return gold;
-      startingCurrency = gold.startingCurrency;
+      totalGold += se.gold;
     } else {
-      const pkg = await resolvePackageInventory(se, primaryClassName, classDef, creationToolProfs);
+      const pkg = await resolvePackageInventory(se, `class: ${primaryClassName}`, classDef, creationToolProfs);
       if (!pkg.ok) return pkg;
-      inventoryItemCreates = pkg.inventoryItemCreates;
-      // Explicit even when 0 (every EDITION_2014 package) — same persisted
-      // value deriveCreatedCharacter's default already writes, but written
-      // here so #1535's PHB'24 packages can't silently drop their GP the way
-      // an untouched `startingCurrency` would (#1564).
-      startingCurrency = { cp: 0, sp: 0, gp: pkg.totalGold, pp: 0 };
+      inventoryItemCreates.push(...pkg.inventoryItemCreates);
+      totalGold += pkg.totalGold;
     }
   }
+
+  const bse = input.backgroundStartingEquipment;
+  if (bse) {
+    anyEquipmentChosen = true;
+    const pkg = await resolveBackgroundEquipmentInventory(bse, backgroundId, backgroundDisplayName, edition, creationToolProfs);
+    if (!pkg.ok) return pkg;
+    inventoryItemCreates.push(...pkg.inventoryItemCreates);
+    totalGold += pkg.totalGold;
+  }
+
+  // Explicit even when 0 (every EDITION_2014 class package, and any package
+  // combination that nets 0 GP) — same persisted value deriveCreatedCharacter's
+  // default already writes, but written here so a chosen package can't
+  // silently drop its GP the way an untouched `startingCurrency` would (#1564).
+  const startingCurrency = anyEquipmentChosen ? { cp: 0, sp: 0, gp: totalGold, pp: 0 } : undefined;
 
   // The 5e selection rule lives in lib/ (selectAutoEquip); apply its decision
   // by assigning each chosen payload its paper-doll slot (#565).
@@ -975,6 +1046,11 @@ export async function createCharacter(
     input,
     selections.characterClass.id,
     selections.primaryClassChoice.name,
+    // background is null for a homebrew/unresolved name (#1565) — the same
+    // "allowed to miss a catalog anchor" shape resolveSelections already
+    // documents for the background lookup itself.
+    selections.background?.id ?? null,
+    input.background,
     // Re-derives the same edition resolveSelections used, same reasoning as
     // grants above and the rulesEdition write below — resolveSelections'
     // `edition` local is scoped to that function, so this independently

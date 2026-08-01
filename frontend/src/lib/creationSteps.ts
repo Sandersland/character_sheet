@@ -58,6 +58,10 @@ function equipmentMissing(draft: CharacterDraft, selections: CreationSelections)
     backgroundName: resolveBackgroundName(draft),
     startingEquipment: selections.class?.startingEquipment ?? null,
     equipmentDraft: draft.equipmentDraft,
+    // #1565: the background's own package sits in the SAME equipment step —
+    // its missing-labels ride the same slice as the class ones above.
+    backgroundStartingEquipment: selections.background?.startingEquipment ?? null,
+    backgroundEquipmentDraft: draft.backgroundEquipmentDraft,
   });
   return full.slice(identityMissing(draft).length);
 }

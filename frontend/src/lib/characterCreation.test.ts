@@ -5,12 +5,14 @@ import {
   deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
+  resolveBackgroundEquipmentInput,
   resolveBackgroundName,
   resolveEquipmentInput,
   resolveSelections,
 } from "@/lib/characterCreation";
+import { emptyPackageState } from "@/lib/startingEquipment";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
-import type { ClassOption, ReferenceData } from "@/types/character";
+import type { ClassOption, ClassStartingEquipment, ReferenceData } from "@/types/character";
 
 function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
   return {
@@ -34,11 +36,28 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
   };
 }
 
+// #1565: a real (multi-option) background package, used by
+// resolveBackgroundEquipmentInput/buildCreatePayload tests below — shaped
+// like Criminal's real SRD 5.2 package (a choice group, two lettered
+// options).
+const CRIMINAL_PACKAGE: ClassStartingEquipment = {
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        { label: "(A) 2 Daggers and 16 GP", items: [{ catalogName: "Dagger", quantity: 2 }], gold: 16 },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+  gold: null,
+};
+
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
   classes: [makeClass()],
   backgrounds: [
-    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null },
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
     {
       id: "bg-crim",
       name: "Criminal",
@@ -46,6 +65,7 @@ const reference: ReferenceData = {
       toolProficiencies: ["Thieves' Tools"],
       abilityChoices: ["dexterity", "constitution", "intelligence"],
       originFeat: { id: "feat-alert", name: "Alert", description: "Bonus to initiative.", category: "origin" },
+      startingEquipment: CRIMINAL_PACKAGE,
     },
   ],
   alignments: ["Neutral Good"],
@@ -91,6 +111,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    backgroundEquipmentDraft: null,
     step: "identity",
     rulesEdition: "EDITION_2024",
     campaignId: null,
@@ -152,6 +173,36 @@ describe("resolveEquipmentInput", () => {
   it("is undefined when the draft is untouched", () => {
     const draft = makeDraft({ className: "Rogue" });
     expect(resolveEquipmentInput(draft, resolveSelections(reference, draft).class)).toBeUndefined();
+  });
+});
+
+// #1565's twin of resolveEquipmentInput's own tests above, for the
+// background's OWN package.
+describe("resolveBackgroundEquipmentInput", () => {
+  it("is undefined when the background equipment draft is untouched (null)", () => {
+    const draft = makeDraft({ background: "Criminal" });
+    expect(resolveBackgroundEquipmentInput(draft, resolveSelections(reference, draft).background)).toBeUndefined();
+  });
+
+  it("is undefined for a background with no package (startingEquipment null), even with a draft set", () => {
+    const draft = makeDraft({
+      background: "Sage",
+      backgroundEquipmentDraft: { mode: "package", selections: [{ optionIndex: 0 }] },
+    });
+    expect(resolveBackgroundEquipmentInput(draft, resolveSelections(reference, draft).background)).toBeUndefined();
+  });
+
+  it("resolves a complete package draft into the wire PackageSelection shape", () => {
+    const draft = makeDraft({
+      background: "Criminal",
+      backgroundEquipmentDraft: { mode: "package", selections: [{ optionIndex: 0, openPicks: [] }] },
+    });
+    const input = resolveBackgroundEquipmentInput(draft, resolveSelections(reference, draft).background);
+    expect(input).toEqual({ mode: "package", selections: [{ optionIndex: 0, openPicks: [] }] });
+  });
+
+  it("emptyPackageState leaves a multi-option group unselected (-1), incomplete until the player picks", () => {
+    expect(emptyPackageState(CRIMINAL_PACKAGE)).toEqual([{ optionIndex: -1, openPicks: [] }]);
   });
 });
 
@@ -277,6 +328,7 @@ describe("buildCreatePayload", () => {
     expect(payload.toolChoices).toBeUndefined();
     expect(payload.portraitUrl).toBeNull();
     expect(payload.startingEquipment).toBeUndefined();
+    expect(payload.backgroundStartingEquipment).toBeUndefined();
   });
 
   it("passes through non-empty tool choices", () => {
@@ -285,6 +337,25 @@ describe("buildCreatePayload", () => {
     const skills = deriveSkillChoices(draft, selections);
     const payload = buildCreatePayload(draft, selections, skills, ["Thieves' Tools"]);
     expect(payload.toolChoices).toEqual(["Thieves' Tools"]);
+  });
+
+  // #1565: the background's own package selections ride a SEPARATE field,
+  // never merged into (or overwriting) `startingEquipment` (the class's).
+  it("includes backgroundStartingEquipment alongside a class package, never merged into one field", () => {
+    const draft = makeDraft({
+      name: "X",
+      className: "Rogue",
+      background: "Criminal",
+      backgroundEquipmentDraft: { mode: "package", selections: [{ optionIndex: 0, openPicks: [] }] },
+    });
+    const selections = resolveSelections(reference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.startingEquipment).toBeUndefined();
+    expect(payload.backgroundStartingEquipment).toEqual({
+      mode: "package",
+      selections: [{ optionIndex: 0, openPicks: [] }],
+    });
   });
 });
 

@@ -173,6 +173,10 @@ describe("StartingEquipmentEditor — null gold (#1564)", () => {
     );
 
     expect(screen.queryByText(/Starting gold/)).not.toBeInTheDocument();
+    // #1565 reviewer fix: with no gold alternative, package is the ONLY mode
+    // — a one-option toggle is meaningless, so the whole toggle row (package
+    // button included) is hidden, not just the gold button.
+    expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
   });
 
   it("isGoldValid/draftToInput reject a gold draft when the class has no gold dice at all", () => {
@@ -298,5 +302,124 @@ describe("StartingEquipmentEditor — boundToToolChoice open pick (#1564, #1336)
     screen.getByRole("combobox");
     expect(screen.queryByRole("option", { name: "Flute" })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Herbalism Kit" })).toBeInTheDocument();
+  });
+});
+
+// #1565: reusing this editor for a background's OWN package (rather than a
+// class's). The two real shapes background packages take: SRD 5.2's
+// multi-option "Choose A or B" (a real choice, radio buttons) and SRD 5.1
+// Acolyte's single fixed-list option (auto-granted display, same as any
+// single-option class group — e.g. Wizard's spellbook). No new rendering
+// logic exists for this — it's the SAME isAutoGrant branch every existing
+// single-option class group already takes; these tests pin that a
+// background reusing this component gets the SAME behavior.
+describe("StartingEquipmentEditor — background reuse (#1565)", () => {
+  const acolyte2024Shaped: ClassStartingEquipment = {
+    groups: [
+      {
+        label: "Starting Equipment",
+        options: [
+          { label: "(A) Holy Symbol and 8 GP", items: [{ catalogName: "Dagger" }], gold: 8 },
+          { label: "(B) 50 GP", gold: 50 },
+        ],
+      },
+    ],
+    gold: null,
+  };
+  const acolyte2014Shaped: ClassStartingEquipment = {
+    groups: [
+      {
+        label: "A holy symbol, a prayer book, and a pouch containing 15 GP",
+        options: [{ label: "Holy Symbol, Prayer Book, and 15 GP", items: [{ catalogName: "Dagger" }], gold: 15 }],
+      },
+    ],
+    gold: null,
+  };
+
+  // The toggle row (package/gold buttons) needs a SECOND mode to be
+  // meaningful (#1565 reviewer fix, below) — real background packages never
+  // have one (gold: null always), so the label tests below use a synthetic
+  // package WITH a gold alternative purely to exercise that row at all.
+  const packageWithGoldAlt: ClassStartingEquipment = {
+    groups: [{ label: "Weapon", options: [{ label: "Dagger", items: [{ catalogName: "Dagger" }] }] }],
+    gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
+  };
+
+  it("kind=\"class\" (the default) labels the package toggle \"Class equipment package\" when both modes exist", () => {
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={packageWithGoldAlt}
+        catalog={catalog}
+        value={packageDraft(packageWithGoldAlt)}
+        onChange={vi.fn()}
+        selectedToolChoices={[]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Class equipment package" })).toBeInTheDocument();
+  });
+
+  it("kind=\"background\" labels the package toggle \"Background equipment package\" when both modes exist", () => {
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={packageWithGoldAlt}
+        catalog={catalog}
+        value={packageDraft(packageWithGoldAlt)}
+        onChange={vi.fn()}
+        selectedToolChoices={[]}
+        kind="background"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Background equipment package" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
+  });
+
+  // #1565 reviewer fix: every real background package (and every 2024 class
+  // package) has gold: null, so there is only ONE mode — the toggle row
+  // itself (not just the gold button) must not render at all in that case,
+  // for either `kind`.
+  it("hides the toggle row entirely for a background package with no gold alternative (the real shape)", () => {
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={acolyte2024Shaped}
+        catalog={catalog}
+        value={packageDraft(acolyte2024Shaped)}
+        onChange={vi.fn()}
+        selectedToolChoices={[]}
+        kind="background"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Background equipment package" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Starting gold/)).not.toBeInTheDocument();
+  });
+
+  it("a 2024-shaped (multi-option) background package renders a real choice — two radio options", () => {
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={acolyte2024Shaped}
+        catalog={catalog}
+        value={packageDraft(acolyte2024Shaped)}
+        onChange={vi.fn()}
+        selectedToolChoices={[]}
+        kind="background"
+      />,
+    );
+    expect(screen.getAllByRole("radio")).toHaveLength(2);
+    expect(screen.queryByText("(auto-granted)")).not.toBeInTheDocument();
+  });
+
+  it("a 2014 Acolyte-shaped (single-option) background package renders as auto-granted, never a radio choice", () => {
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={acolyte2014Shaped}
+        catalog={catalog}
+        value={packageDraft(acolyte2014Shaped)}
+        onChange={vi.fn()}
+        selectedToolChoices={[]}
+        kind="background"
+      />,
+    );
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText("(auto-granted)")).toBeInTheDocument();
   });
 });

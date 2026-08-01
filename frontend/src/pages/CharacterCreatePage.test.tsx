@@ -82,7 +82,7 @@ const referenceFixture: ReferenceData = {
     },
   ],
   backgrounds: [
-    { id: "bg-sage", name: "Sage", skillProficiencies: ["history"], toolProficiencies: [], abilityChoices: [], originFeat: null },
+    { id: "bg-sage", name: "Sage", skillProficiencies: ["history"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
     {
       id: "bg-crim",
       name: "Criminal",
@@ -90,6 +90,7 @@ const referenceFixture: ReferenceData = {
       toolProficiencies: ["Thieves' Tools"],
       abilityChoices: ["dexterity", "constitution", "intelligence"],
       originFeat: { id: "feat-alert", name: "Alert", description: "You gain a bonus to Initiative.", category: "origin" },
+      startingEquipment: null,
     },
     {
       id: "bg-soldier",
@@ -98,6 +99,7 @@ const referenceFixture: ReferenceData = {
       toolProficiencies: ["Dice Set"],
       abilityChoices: ["strength", "dexterity", "constitution"],
       originFeat: { id: "feat-savage", name: "Savage Attacker", description: "Reroll weapon damage.", category: "origin" },
+      startingEquipment: null,
     },
   ],
   alignments: ["Lawful Good"],

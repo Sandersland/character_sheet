@@ -141,6 +141,66 @@ describe("missingRequirements", () => {
   });
 });
 
+// #1565: the background's OWN package, same completeness rule as the class
+// equipment block above but on the two backgroundStartingEquipment/
+// backgroundEquipmentDraft fields, with a distinct "Background equipment:"
+// label prefix so the two never collide.
+describe("missingRequirements — background equipment (#1565)", () => {
+  const backgroundEquipment: ClassStartingEquipment = {
+    groups: [
+      {
+        label: "Starting Equipment",
+        options: [
+          { label: "(A) 16 GP", gold: 16 },
+          { label: "(B) 50 GP", gold: 50 },
+        ],
+      },
+    ],
+    gold: null,
+  };
+
+  it("ignores an untouched background equipment draft (null)", () => {
+    expect(
+      missingRequirements({
+        ...VALID_IDENTITY,
+        startingEquipment: null,
+        equipmentDraft: null,
+        backgroundStartingEquipment: backgroundEquipment,
+        backgroundEquipmentDraft: null,
+      })
+    ).toEqual([]);
+  });
+
+  it("flags an unpicked background equipment group, distinctly from the class one", () => {
+    const draft: EquipmentDraft = { mode: "package", selections: [{ optionIndex: -1, openPicks: [] }] };
+    const result = missingRequirements({
+      ...VALID_IDENTITY,
+      startingEquipment: null,
+      equipmentDraft: null,
+      backgroundStartingEquipment: backgroundEquipment,
+      backgroundEquipmentDraft: draft,
+    });
+    expect(result).toEqual(['Background equipment: choose "Starting Equipment"']);
+  });
+
+  it("passes once the background package is complete, alongside an ALSO-incomplete class package (both flagged independently)", () => {
+    const classDraft: EquipmentDraft = {
+      mode: "package",
+      selections: [{ optionIndex: -1, openPicks: [] }, { optionIndex: 0, openPicks: [] }],
+    };
+    const backgroundDraft: EquipmentDraft = { mode: "package", selections: [{ optionIndex: 0, openPicks: [] }] };
+    const result = missingRequirements({
+      ...VALID_IDENTITY,
+      startingEquipment,
+      equipmentDraft: classDraft,
+      backgroundStartingEquipment: backgroundEquipment,
+      backgroundEquipmentDraft: backgroundDraft,
+    });
+    // Only the CLASS group is incomplete — the background one (complete) adds nothing.
+    expect(result).toEqual(['Equipment: choose "Primary weapon"']);
+  });
+});
+
 describe("isOpenPickUnfilled", () => {
   it("is true when the parent option is selected but the pick is empty", () => {
     const draft: EquipmentDraft = {

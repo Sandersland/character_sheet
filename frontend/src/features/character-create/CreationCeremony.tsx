@@ -82,21 +82,46 @@ function SpellsStepBody({ c }: StepBodyProps) {
 
 function EquipmentStepBody({ c }: StepBodyProps) {
   const startingEquipment = c.selections.class?.startingEquipment;
-  if (!startingEquipment) {
-    return (
-      <p className="p-4 text-sm text-parchment-600">
-        This class has no starting-equipment choices — you'll begin with an empty pack.
-      </p>
-    );
-  }
+  // #1565: the background's OWN package rides the same step, as a second card
+  // — most backgrounds have none (Charlatan/Folk Hero/Noble, every homebrew
+  // name, and a 2014 Criminal/Sage/Soldier), so this is usually absent.
+  const backgroundEquipment = c.selections.background?.startingEquipment;
+  // GRANTED tools as well as chosen ones — the same union the server's
+  // creationToolProfs assembles (background + class + race grants, plus the
+  // player's class picks). A boundToToolChoice pick filtered on chosen tools
+  // alone offered NOTHING for a 2024 Soldier, whose Gaming Set arrives as a
+  // background grant rather than a pick: an empty dropdown the step could
+  // never satisfy, so Continue stayed disabled forever (#1565). The picker
+  // must admit exactly what boundToolChoiceError admits, no less.
+  const boundToolCandidates = [...c.toolChoices.grantedToolProfs, ...c.toolChoices.selectedToolChoices];
   return (
-    <StartingEquipmentSection
-      startingEquipment={startingEquipment}
-      value={c.draft.equipmentDraft}
-      catalog={c.catalog}
-      onChange={(eq) => c.update({ equipmentDraft: eq })}
-      selectedToolChoices={c.toolChoices.selectedToolChoices}
-    />
+    <>
+      {!startingEquipment && (
+        <p className="p-4 text-sm text-parchment-600">
+          This class has no starting-equipment choices — you'll begin with an empty pack.
+        </p>
+      )}
+      {startingEquipment && (
+        <StartingEquipmentSection
+          startingEquipment={startingEquipment}
+          value={c.draft.equipmentDraft}
+          catalog={c.catalog}
+          onChange={(eq) => c.update({ equipmentDraft: eq })}
+          selectedToolChoices={boundToolCandidates}
+        />
+      )}
+      {backgroundEquipment && (
+        <StartingEquipmentSection
+          title="Background Equipment"
+          kind="background"
+          startingEquipment={backgroundEquipment}
+          value={c.draft.backgroundEquipmentDraft}
+          catalog={c.catalog}
+          onChange={(eq) => c.update({ backgroundEquipmentDraft: eq })}
+          selectedToolChoices={boundToolCandidates}
+        />
+      )}
+    </>
   );
 }
 

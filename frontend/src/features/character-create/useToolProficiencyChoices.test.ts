@@ -41,6 +41,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    backgroundEquipmentDraft: null,
     step: "identity",
     rulesEdition: "EDITION_2024",
     campaignId: null,
@@ -80,6 +81,7 @@ const background: BackgroundOption = {
   toolProficiencies: [],
   abilityChoices: [],
   originFeat: null,
+  startingEquipment: null,
 };
 
 function run(args: {
