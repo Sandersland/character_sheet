@@ -13,20 +13,38 @@ import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
 
-import { STARTING_EQUIPMENT_PACKAGES } from "../starting-equipment.js";
+import { STARTING_EQUIPMENT_PACKAGES, BACKGROUND_STARTING_EQUIPMENT_PACKAGES } from "../starting-equipment.js";
 import { assertEveryClassEditionHasPackage, seedStartingEquipment } from "../seed-starting-equipment.js";
 
-describe("StartingEquipmentPackage migration — row count (#1533)", () => {
-  it("the seeded table holds exactly one package per STARTING_EQUIPMENT_PACKAGES row (24)", async () => {
+describe("StartingEquipmentPackage migration — row count (#1533, #1565)", () => {
+  it("the seeded table holds exactly one row per (class + background) package literal (29)", async () => {
     const actual = await prisma.startingEquipmentPackage.count();
-    expect(actual).toBe(STARTING_EQUIPMENT_PACKAGES.length);
-    expect(actual).toBe(24);
+    expect(actual).toBe(STARTING_EQUIPMENT_PACKAGES.length + BACKGROUND_STARTING_EQUIPMENT_PACKAGES.length);
+    expect(actual).toBe(29);
   });
 
   it("every class has both an EDITION_2014 and an EDITION_2024 package with >= 1 group", async () => {
     const packages = await prisma.startingEquipmentPackage.findMany({
+      where: { classId: { not: null } },
       select: { name: true, edition: true, _count: { select: { groups: true } } },
     });
+    expect(packages.length).toBe(STARTING_EQUIPMENT_PACKAGES.length);
+    for (const row of packages) {
+      expect(row._count.groups, `${row.name}/${row.edition}`).toBeGreaterThan(0);
+    }
+  });
+
+  // #1565: exactly five background packages exist (Acolyte both editions;
+  // Criminal/Sage/Soldier 2024 only) — never the fourteen a full 7-background
+  // x 2-edition grid would suggest (Charlatan/Folk Hero/Noble get none, on
+  // purpose — see starting-equipment.ts's background-section header).
+  it("exactly 5 background packages exist, each with >= 1 group", async () => {
+    const packages = await prisma.startingEquipmentPackage.findMany({
+      where: { backgroundId: { not: null } },
+      select: { name: true, edition: true, _count: { select: { groups: true } } },
+    });
+    expect(packages.length).toBe(5);
+    expect(packages.length).toBe(BACKGROUND_STARTING_EQUIPMENT_PACKAGES.length);
     for (const row of packages) {
       expect(row._count.groups, `${row.name}/${row.edition}`).toBeGreaterThan(0);
     }

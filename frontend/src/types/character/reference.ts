@@ -93,6 +93,12 @@ export interface BackgroundOption {
   abilityChoices: AbilityName[];
   /** The Origin feat granted at creation; null for spec-less legacy rows. */
   originFeat: OriginFeatOption | null;
+  /** #1565: this background's own starting-equipment definition, null when
+   *  the background has no seeded package under this edition — either
+   *  Charlatan/Folk Hero/Noble (no SRD text to cite in either edition) or a
+   *  2014 Criminal/Sage/Soldier (SRD 5.1 ships only Acolyte). Same shape as
+   *  ClassOption.startingEquipment, reused rather than a second type. */
+  startingEquipment: ClassStartingEquipment | null;
 }
 
 /** One tool from the SRD TOOLS constant, served by GET /api/reference. */
@@ -195,6 +201,11 @@ export interface CreateCharacterInput {
   /** Tool names chosen by the player (from class toolChoices). */
   toolChoices?: string[];
   startingEquipment?: StartingEquipmentInput;
+  /** #1565: the background's OWN equipment package selections, resolved by
+   *  (backgroundId, edition) alongside `startingEquipment` above. A background
+   *  never has a roll-for-gold alternative, so the backend 400s a "gold" mode
+   *  input here; omitted for a background with no seeded package. */
+  backgroundStartingEquipment?: StartingEquipmentInput;
   /** #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids). */
   spells?: { cantripIds: string[]; spellIds: string[] };
   /** #1286: resolved by CreationEntryGate before the ceremony starts — inherited

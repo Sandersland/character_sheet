@@ -511,10 +511,72 @@ describe("GET /api/reference", () => {
           "name",
           "originFeat",
           "skillProficiencies",
+          "startingEquipment",
           "toolProficiencies",
         ]);
       }
     });
+  });
+
+  // #1565: background startingEquipment resolves by (backgroundId, edition)
+  // exactly like a class's — asserted against real SRD VALUES, never
+  // "differs from 2014" (which would pass on any wrong transcription just as
+  // readily as a correct one). Charlatan/Folk Hero/Noble get no package in
+  // EITHER edition (no SRD text to cite); 2014 Criminal/Sage/Soldier get none
+  // either (SRD 5.1 ships only Acolyte) — asserting null for those pairs is
+  // the other half of this issue's scope finding.
+  describe("background starting-equipment (#1565)", () => {
+    it("EDITION_2024 Acolyte/Criminal/Sage/Soldier each carry their own SRD 5.2 option-A GP and a null package-level gold", async () => {
+      const response = await supertest
+        .agent(createApp())
+        .set("Cookie", COOKIE)
+        .get("/api/reference?edition=EDITION_2024");
+      const byName = (name: string) =>
+        response.body.backgrounds.find((b: { name: string }) => b.name === name);
+
+      const expectedGoldA: Record<string, number> = { Acolyte: 8, Criminal: 16, Sage: 8, Soldier: 14 };
+      for (const [name, goldA] of Object.entries(expectedGoldA)) {
+        const bg = byName(name);
+        expect(bg.startingEquipment, `${name} 2024`).not.toBeNull();
+        expect(bg.startingEquipment.gold).toBeNull();
+        const options = bg.startingEquipment.groups[0].options;
+        expect(options[0].gold, `${name} option A gold`).toBe(goldA);
+        expect(options[1]).toEqual({ label: "(B) 50 GP", gold: 50 });
+      }
+
+      for (const name of ["Charlatan", "Folk Hero", "Noble"]) {
+        expect(byName(name).startingEquipment, `${name} 2024`).toBeNull();
+      }
+    });
+
+    it("EDITION_2014 Acolyte carries SRD 5.1's fixed one-option list with 15 GP; every other background is null", async () => {
+      const response = await supertest
+        .agent(createApp())
+        .set("Cookie", COOKIE)
+        .get("/api/reference?edition=EDITION_2014");
+      const byName = (name: string) =>
+        response.body.backgrounds.find((b: { name: string }) => b.name === name);
+
+      const acolyte = byName("Acolyte");
+      expect(acolyte.startingEquipment).not.toBeNull();
+      expect(acolyte.startingEquipment.gold).toBeNull();
+      expect(acolyte.startingEquipment.groups).toHaveLength(1);
+      expect(acolyte.startingEquipment.groups[0].options).toHaveLength(1);
+      expect(acolyte.startingEquipment.groups[0].options[0].gold).toBe(15);
+
+      for (const name of ["Charlatan", "Criminal", "Folk Hero", "Noble", "Sage", "Soldier"]) {
+        expect(byName(name).startingEquipment, `${name} 2014`).toBeNull();
+      }
+    });
+
+    // Mutation proof: drop the edition filter (change the query below to
+    // exact-match EDITION_2014 unconditionally, mirroring what a broken
+    // reference.ts would serve) and the 2024 test above goes red — its four
+    // backgrounds would report null instead of their real SRD 5.2 packages.
+    // Confirmed by temporarily hardcoding the `edition` variable passed to
+    // the startingEquipmentPackage.findMany query to "EDITION_2014" in
+    // reference.ts and re-running this file (see this PR's report for the
+    // red output), then reverting.
   });
 
   // #1308: CharacterClass has no edition column by design — one row serves

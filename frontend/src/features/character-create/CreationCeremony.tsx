@@ -82,21 +82,38 @@ function SpellsStepBody({ c }: StepBodyProps) {
 
 function EquipmentStepBody({ c }: StepBodyProps) {
   const startingEquipment = c.selections.class?.startingEquipment;
-  if (!startingEquipment) {
-    return (
-      <p className="p-4 text-sm text-parchment-600">
-        This class has no starting-equipment choices — you'll begin with an empty pack.
-      </p>
-    );
-  }
+  // #1565: the background's OWN package rides the same step, as a second card
+  // — most backgrounds have none (Charlatan/Folk Hero/Noble, every homebrew
+  // name, and a 2014 Criminal/Sage/Soldier), so this is usually absent.
+  const backgroundEquipment = c.selections.background?.startingEquipment;
   return (
-    <StartingEquipmentSection
-      startingEquipment={startingEquipment}
-      value={c.draft.equipmentDraft}
-      catalog={c.catalog}
-      onChange={(eq) => c.update({ equipmentDraft: eq })}
-      selectedToolChoices={c.toolChoices.selectedToolChoices}
-    />
+    <>
+      {!startingEquipment && (
+        <p className="p-4 text-sm text-parchment-600">
+          This class has no starting-equipment choices — you'll begin with an empty pack.
+        </p>
+      )}
+      {startingEquipment && (
+        <StartingEquipmentSection
+          startingEquipment={startingEquipment}
+          value={c.draft.equipmentDraft}
+          catalog={c.catalog}
+          onChange={(eq) => c.update({ equipmentDraft: eq })}
+          selectedToolChoices={c.toolChoices.selectedToolChoices}
+        />
+      )}
+      {backgroundEquipment && (
+        <StartingEquipmentSection
+          title="Background Equipment"
+          kind="background"
+          startingEquipment={backgroundEquipment}
+          value={c.draft.backgroundEquipmentDraft}
+          catalog={c.catalog}
+          onChange={(eq) => c.update({ backgroundEquipmentDraft: eq })}
+          selectedToolChoices={c.toolChoices.selectedToolChoices}
+        />
+      )}
+    </>
   );
 }
 

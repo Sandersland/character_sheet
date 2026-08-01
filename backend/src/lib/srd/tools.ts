@@ -36,9 +36,13 @@ export const TOOLS: readonly ToolDefinition[] = [
   { name: "Tinker's Tools",          category: "artisan",          cost: { gp: 50 },  weight: 10 },
   { name: "Weaver's Tools",          category: "artisan",          cost: { gp: 1  },  weight: 5  },
   { name: "Woodcarver's Tools",      category: "artisan",          cost: { gp: 1  },  weight: 5  },
-  // Gaming sets
+  // Gaming sets (#1565: Dragonchess/Three-Dragon Ante added alongside Dice/
+  // Playing Card so Soldier's "Gaming Set (same as above)" pick has all four
+  // SRD variants to resolve against, matching the Item catalog rows added there)
   { name: "Dice Set",                category: "gamingSet",        cost: { sp: 1  },  weight: 0  },
+  { name: "Dragonchess Set",         category: "gamingSet",        cost: { gp: 1  },  weight: 0  },
   { name: "Playing Card Set",        category: "gamingSet",        cost: { sp: 5  },  weight: 0  },
+  { name: "Three-Dragon Ante Set",   category: "gamingSet",        cost: { gp: 1  },  weight: 0  },
   // Musical instruments (PHB p. 154)
   { name: "Bagpipes",                category: "musicalInstrument", cost: { gp: 30 }, weight: 6  },
   { name: "Drum",                    category: "musicalInstrument", cost: { gp: 6  }, weight: 3  },

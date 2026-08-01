@@ -32,6 +32,10 @@ interface StartingEquipmentEditorProps {
    *  matching the server's boundToolChoiceError so the picker never offers a
    *  choice the write path would reject (#1336). */
   selectedToolChoices: string[];
+  /** #1565: "class" (default) or "background" — the only visible difference
+   *  when this editor is reused for a background's package instead of a
+   *  class's is the package-mode toggle button's label. */
+  kind?: "class" | "background";
 }
 
 /** Describes the fixed-item contents of a bundle (no open pick placeholders). */
@@ -406,11 +410,15 @@ interface ModeToggleProps {
   gold: StartingGold | null;
   onSelectPackage: () => void;
   onSelectGold: () => void;
+  /** #1565: this editor's own package-mode button label — a background reuse
+   *  of this component never has a gold alternative (so this button always
+   *  renders alone), but it must still say "Background", not "Class". */
+  packageModeLabel: string;
 }
 
 // Split out of StartingEquipmentEditor purely to keep its own cyclomatic
 // complexity low.
-function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold }: ModeToggleProps) {
+function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold, packageModeLabel }: ModeToggleProps) {
   return (
     <div className="flex flex-wrap gap-2">
       <button
@@ -422,7 +430,7 @@ function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold }: 
             : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
         }`}
       >
-        Class equipment package
+        {packageModeLabel}
       </button>
       {/* No roll-for-gold path is offered at all when this edition has none
           (PHB'24, #1564) — PHB'24 reaches gold through a lettered package
@@ -450,11 +458,13 @@ export default function StartingEquipmentEditor({
   value,
   onChange,
   selectedToolChoices,
+  kind = "class",
 }: StartingEquipmentEditorProps) {
   if (!startingEquipment) return null;
 
   const isPackage = value.mode === "package";
   const isGold = value.mode === "gold";
+  const packageModeLabel = kind === "background" ? "Background equipment package" : "Class equipment package";
   // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564
   // commit 3) — narrowed once here so every render below can pass a non-null
   // StartingGold to goldMin/goldMax/goldLabel/rollGold without re-checking.
@@ -478,6 +488,7 @@ export default function StartingEquipmentEditor({
         gold={gold}
         onSelectPackage={() => onChange(draftForMode(startingEquipment!, "package"))}
         onSelectGold={() => onChange(draftForMode(startingEquipment!, "gold"))}
+        packageModeLabel={packageModeLabel}
       />
 
       {isPackage && value.mode === "package" && (

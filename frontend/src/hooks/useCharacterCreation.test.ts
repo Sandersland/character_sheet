@@ -57,7 +57,7 @@ const reference: ReferenceData = {
     }),
   ],
   backgrounds: [
-    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null },
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
@@ -102,6 +102,7 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    backgroundEquipmentDraft: null,
     step: "identity",
     // Every test here exercises post-gate ceremony behavior (#1286); the gate
     // itself is CreationEntryGate.test.tsx's job.

@@ -168,7 +168,14 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
               />
               <button
                 type="button"
-                onClick={() => update({ useCustomBackground: false, customBackground: "", backgroundAbilities: {} })}
+                onClick={() =>
+                  update({
+                    useCustomBackground: false,
+                    customBackground: "",
+                    backgroundAbilities: {},
+                    backgroundEquipmentDraft: null,
+                  })
+                }
                 className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
               >
                 Use list
@@ -179,7 +186,23 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
               <select
                 aria-label="Background"
                 value={draft.background}
-                onChange={(e) => update({ background: e.target.value, skillProficiencies: [], toolChoices: [], backgroundAbilities: {} })}
+                onChange={(e) => {
+                  // Changing background resets skills/tools/ability-spread AND
+                  // its own equipment draft (#1565) — same reset-on-change shape
+                  // as the class select above, mirrored for the background's
+                  // independent package.
+                  const newBackgroundName = e.target.value;
+                  const newBackgroundDef = reference.backgrounds.find((b) => b.name === newBackgroundName);
+                  update({
+                    background: newBackgroundName,
+                    skillProficiencies: [],
+                    toolChoices: [],
+                    backgroundAbilities: {},
+                    backgroundEquipmentDraft: newBackgroundDef?.startingEquipment
+                      ? { mode: "package", selections: emptyPackageState(newBackgroundDef.startingEquipment) }
+                      : null,
+                  });
+                }}
                 className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
               >
                 <option value="">Select background…</option>
@@ -192,7 +215,14 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
               <button
                 type="button"
                 onClick={() =>
-                  update({ useCustomBackground: true, background: "", skillProficiencies: [], toolChoices: [], backgroundAbilities: {} })
+                  update({
+                    useCustomBackground: true,
+                    background: "",
+                    skillProficiencies: [],
+                    toolChoices: [],
+                    backgroundAbilities: {},
+                    backgroundEquipmentDraft: null,
+                  })
                 }
                 className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
               >

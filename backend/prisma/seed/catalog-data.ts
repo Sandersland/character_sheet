@@ -795,4 +795,35 @@ export const ITEMS: CatalogItem[] = [
   { name: "Pan Flute", category: "gear", weight: 2, cost: coins(12), description: "A musical instrument.", toolCategory: "musicalInstrument" },
   { name: "Shawm", category: "gear", weight: 1, cost: coins(2), description: "A musical instrument.", toolCategory: "musicalInstrument" },
   { name: "Viol", category: "gear", weight: 1, cost: coins(30), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  // ── #1565 background-package additions ────────────────────────────────
+  // Nine rows the seven backgrounds' equipment needed that weren't yet in
+  // this catalog (checked against both editions' Adventuring Gear tables,
+  // SRD 5.1 5thsrd.org / SRD 5.2 5e24srd.com, CC-BY-4.0) — same "catalog
+  // hasn't caught up to a class/background's package text" gap #1564 closed
+  // for the twelve PHB'24 class packages. Clothes/Pouch carry no edition tag:
+  // both editions' gear tables price them identically, so one row serves both
+  // (same reasoning as Robe's comment above).
+  { name: "Traveler's Clothes", category: "gear", weight: 4, cost: coins(2) },
+  { name: "Common Clothes", category: "gear", weight: 3, cost: coins(0, 5, 0) },
+  { name: "Pouch", category: "gear", weight: 1, cost: coins(0, 5, 0), description: "A small drawstring pouch that can hold coins or other small objects." },
+  // Already priced in lib/srd/tools.ts's TOOLS (10 GP / 5 lb) but had no Item
+  // row — the same two-registry split #1564 found for the instruments and
+  // Herbalism Kit (resolveFixedItems resolves against Item ∪ Pack only).
+  { name: "Calligrapher's Supplies", category: "gear", weight: 5, cost: coins(10), description: "Ink, a quill, and fine parchment for producing beautiful lettering.", toolCategory: "artisan" },
+  // SRD 5.1's Acolyte background grants "a prayer book or prayer wheel" — a
+  // named devotional book, priced on the SRD's generic "Book" adventuring-gear
+  // entry (25 GP / 5 lb, the same basis Book of Lore above already uses)
+  // rather than reusing that row outright: Book of Lore carries a
+  // knowledge-subject flavor (Sage/Warlock's "Book of Lore (history/occult
+  // lore)"), not the devotional one this fixed 2014 grant needs.
+  { name: "Prayer Book", category: "gear", weight: 5, cost: coins(25), description: "A book of prayers and devotions used in religious observances." },
+  // Four gaming sets (SRD 5.1/5.2 Adventuring Gear table) — TOOLS already
+  // carried Dice/Playing Card at these same values but neither had an Item
+  // row; Dragonchess/Three-Dragon Ante had neither. Weight 0 matches this
+  // catalog's existing convention for the two pre-existing sets (negligible,
+  // uninstrumented by either SRD).
+  { name: "Dice Set", category: "gear", weight: 0, cost: coins(0, 1, 0), description: "A gaming set.", toolCategory: "gamingSet" },
+  { name: "Dragonchess Set", category: "gear", weight: 0, cost: coins(1), description: "A gaming set.", toolCategory: "gamingSet" },
+  { name: "Playing Card Set", category: "gear", weight: 0, cost: coins(0, 5, 0), description: "A gaming set.", toolCategory: "gamingSet" },
+  { name: "Three-Dragon Ante Set", category: "gear", weight: 0, cost: coins(1), description: "A gaming set.", toolCategory: "gamingSet" },
 ];

@@ -92,6 +92,23 @@ export interface StartingEquipmentSeed {
   package: ClassStartingEquipment;
 }
 
+// #1565: the background family's twin of startingEquipmentSeedSchema/
+// StartingEquipmentSeed above — same classStartingEquipmentSchema tree (the
+// package shape is identical, StartingEquipmentPackage.backgroundId reuses
+// the whole class family, see that model's schema.prisma comment), keyed by
+// backgroundName instead of className.
+export const backgroundStartingEquipmentSeedSchema = z.object({
+  backgroundName: z.string().min(1),
+  edition: z.enum(["EDITION_2014", "EDITION_2024"]),
+  package: classStartingEquipmentSchema,
+});
+
+export interface BackgroundStartingEquipmentSeed {
+  backgroundName: string;
+  edition: SeedEdition;
+  package: ClassStartingEquipment;
+}
+
 // PHB'14 p. 72 (armor/weapons), p. 143 (Starting Wealth table). Transcribed
 // verbatim from STARTING_EQUIPMENT — see that module's own inline comments
 // for the three deliberate catalog shortcuts (Bard's duplicate Lute, Druid's
@@ -985,6 +1002,195 @@ export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = [
   })),
   ...Object.entries(PACKAGES_2024).map(([className, pkg]) => ({
     className,
+    edition: "EDITION_2024" as const,
+    package: pkg,
+  })),
+];
+
+// --- Background starting-equipment packages (#1565) ---------------------
+// Built EXACTLY what the SRD supports, which is squeezed from both ends:
+// SRD 5.1 (5thsrd.org) contains ONE background — Acolyte — and SRD 5.2
+// (5e24srd.com) contains FOUR — Acolyte, Criminal, Sage, Soldier. Charlatan,
+// Folk Hero and Noble are PHB'14-only content with no SRD text in either
+// edition to cite (CLAUDE.md: an unattributed rules citation is a bug) and
+// deliberately get no package here — they are not deleted or retagged (that
+// decision belongs to a follow-up issue; deleting a Background row would
+// strand any character holding it, #1559's landmine). So this seed covers
+// five (backgroundName, edition) pairs, not the fourteen a full 7×2 grid
+// would suggest, and the seeder's presence guard is scoped to exactly these
+// pairs (assertEveryBackgroundEditionHasPackage does not exist, on purpose —
+// see seed-starting-equipment.ts's comment on why one was NOT added here).
+//
+// Every package's top-level `gold` is null: unlike classes, NEITHER edition
+// gives a background a roll-for-gold dice alternative — a background's GP is
+// always the fixed/per-option amount on its one option (mirrors PHB'24
+// classes' own null top-level gold, #1564 commit 3, but for a different
+// reason: a background option's gold is never contrasted with a dice-roll
+// choice at all, in either edition).
+//
+// SRD 5.2's four backgrounds are all "Equipment: Choose A or B", B uniformly
+// 50 GP with no items — same shape as the twelve class packages above, so
+// option labels keep the book's own inline GP text for the same reason
+// (#1535 PR review): StartingEquipmentOption.gold is the machine-readable
+// half, but the picker renders `label`.
+const ACOLYTE_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) Calligrapher's Supplies, a Book of Lore (prayers), a Holy Symbol, 10 Sheets of Parchment, a Robe, and 8 GP",
+          items: [
+            { catalogName: "Calligrapher's Supplies" },
+            { catalogName: "Book of Lore" },
+            { catalogName: "Holy Symbol" },
+            { catalogName: "Parchment Sheet", quantity: 10 },
+            { catalogName: "Robe" },
+          ],
+          gold: 8,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+const CRIMINAL_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) 2 Daggers, Thieves' Tools, a Crowbar, 2 Pouches, Traveler's Clothes, and 16 GP",
+          items: [
+            { catalogName: "Dagger", quantity: 2 },
+            { catalogName: "Thieves' Tools" },
+            { catalogName: "Crowbar" },
+            { catalogName: "Pouch", quantity: 2 },
+            { catalogName: "Traveler's Clothes" },
+          ],
+          gold: 16,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+const SAGE_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) a Quarterstaff, Calligrapher's Supplies, a Book of Lore (history), 8 Sheets of Parchment, a Robe, and 8 GP",
+          items: [
+            { catalogName: "Quarterstaff" },
+            { catalogName: "Calligrapher's Supplies" },
+            { catalogName: "Book of Lore" },
+            { catalogName: "Parchment Sheet", quantity: 8 },
+            { catalogName: "Robe" },
+          ],
+          gold: 8,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+const SOLDIER_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label:
+            "(A) a Spear, a Shortbow, 20 Arrows, a Gaming Set (same as above), a Healer's Kit, a Quiver, Traveler's Clothes, and 14 GP",
+          items: [
+            { catalogName: "Spear" },
+            { catalogName: "Shortbow" },
+            { catalogName: "Arrows", quantity: 20 },
+            { catalogName: "Healer's Kit" },
+            { catalogName: "Quiver" },
+            { catalogName: "Traveler's Clothes" },
+          ],
+          // Bound to the gaming-set tool proficiency this background already
+          // grants (BACKGROUNDS' Soldier row, catalog-data.ts) — the SAME
+          // #1564 mechanism Monk's tool-or-instrument pick uses, filtered to
+          // just gamingSet (unlike Monk's empty filter, which has to span two
+          // categories). "same as above" in the book's own text refers to
+          // whichever gaming set the background granted proficiency in.
+          openPicks: [
+            {
+              label: "Gaming Set (same as above)",
+              filter: { toolCategory: "gamingSet" },
+              boundToToolChoice: true,
+            },
+          ],
+          gold: 14,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+const BACKGROUND_PACKAGES_2024: Record<string, ClassStartingEquipment> = {
+  Acolyte: ACOLYTE_2024,
+  Criminal: CRIMINAL_2024,
+  Sage: SAGE_2024,
+  Soldier: SOLDIER_2024,
+};
+
+// SRD 5.1 (5thsrd.org) Acolyte — the ONLY 2014 background with SRD text to
+// cite. A FIXED list, no A/B choice (unlike every 2024 background above):
+// modelled as one group with one option, the degenerate case of the same
+// group/option shape rather than a special "no choice" variant — the picker
+// already renders a single-option group as an auto-grant (isAutoGrant,
+// StartingEquipmentEditor.tsx).
+const ACOLYTE_2014: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "A holy symbol, a prayer book or prayer wheel, 5 sticks of incense, vestments, a set of common clothes, and a pouch containing 15 GP",
+      options: [
+        {
+          label: "Holy Symbol, Prayer Book, 5 Sticks of Incense, Vestments, Common Clothes, and 15 GP",
+          items: [
+            { catalogName: "Holy Symbol" },
+            { catalogName: "Prayer Book" },
+            { catalogName: "Incense Block", quantity: 5 },
+            { catalogName: "Vestments" },
+            { catalogName: "Common Clothes" },
+          ],
+          gold: 15,
+        },
+      ],
+    },
+  ],
+};
+
+const BACKGROUND_PACKAGES_2014: Record<string, ClassStartingEquipment> = {
+  Acolyte: ACOLYTE_2014,
+};
+
+// Flattened the same way STARTING_EQUIPMENT_PACKAGES is above — five rows,
+// not the fourteen a full cross product would produce (see this section's
+// header on why Charlatan/Folk Hero/Noble and 2014 Criminal/Sage/Soldier are
+// deliberately absent, not forgotten).
+export const BACKGROUND_STARTING_EQUIPMENT_PACKAGES: BackgroundStartingEquipmentSeed[] = [
+  ...Object.entries(BACKGROUND_PACKAGES_2014).map(([backgroundName, pkg]) => ({
+    backgroundName,
+    edition: "EDITION_2014" as const,
+    package: pkg,
+  })),
+  ...Object.entries(BACKGROUND_PACKAGES_2024).map(([backgroundName, pkg]) => ({
+    backgroundName,
     edition: "EDITION_2024" as const,
     package: pkg,
   })),

@@ -18,6 +18,9 @@ function packageRow(overrides: {
   return {
     id: "pkg-1",
     classId: "class-1",
+    // Nullable since #1565 (background reuse) — this fixture always
+    // represents a CLASS row, so backgroundId is always null.
+    backgroundId: null,
     name: "Fixture Class",
     edition: "EDITION_2014",
     goldDiceCount: 5,
