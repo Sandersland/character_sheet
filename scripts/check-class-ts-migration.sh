@@ -16,19 +16,20 @@
 # NOT_YET_MIGRATED is the honest, ratcheting tracker of #1134 / epic #1522 —
 # an allow-list of what's STILL TS, not of what's forbidden. It started at
 # ELEVEN (Fighter deliberately absent — #1532 is what put it under this
-# guard's scan in the first place), now TEN (Barbarian dropped off too, #1223)
-# — and only ever shrinks. A genuinely new
-# thirteenth class's lib/classes/<name>.ts is forced to be classified onto
-# EITHER ALL_CLASSES/NOT_YET_MIGRATED or NON_CLASS_MODULES below by the
-# reverse completeness check (search "reverse check") — without it, a new
-# file there defaults to unscanned, not "migrated": #1532's own arbiter review
-# found this guard exiting 0 against a lib/classes/artificer.ts probe file for
-# exactly that reason. Cross-linked: #1134 tracks the retab wave itself;
-# #1522 is the ClassFeature foundation epic each retab depends on.
+# guard's scan in the first place), then TEN (Barbarian dropped off too,
+# #1223), now NINE (Rogue dropped off too, #1231) — and only ever shrinks. A
+# genuinely new thirteenth class's lib/classes/<name>.ts is forced to be
+# classified onto EITHER ALL_CLASSES/NOT_YET_MIGRATED or NON_CLASS_MODULES
+# below by the reverse completeness check (search "reverse check") — without
+# it, a new file there defaults to unscanned, not "migrated": #1532's own
+# arbiter review found this guard exiting 0 against a lib/classes/
+# artificer.ts probe file for exactly that reason. Cross-linked: #1134 tracks
+# the retab wave itself; #1522 is the ClassFeature foundation epic each retab
+# depends on.
 set -eu
 
 ALL_CLASSES="barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer warlock wizard"
-NOT_YET_MIGRATED="bard cleric druid monk paladin ranger rogue sorcerer warlock wizard"
+NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 
 # Every OTHER backend/src/lib/classes/*.ts file (shared infrastructure, not a
 # per-class module) — forced to stay in sync with the tree by the reverse
@@ -130,15 +131,20 @@ fi
 #     mechanics — only a key that must be type-checked"). After #1546 Part A
 #     it also carries subclass REGISTRATION, which strengthens rather than
 #     weakens the ruling.
-#   - classes/actions.ts, routes/character/actions.ts: PERMANENT (#1223).
-#     Barbarian's DERIVED_ACTIONS "rage"/"endRage" entries (grantClass:
-#     "barbarian") and computeRageDamageBonus' classEntries lookup are Rage's
-#     ACTIVATION/buff half, not its resource pool — #1223's own scope decision
-#     is that this half stays here: the buff carries resistDamageTypes/
-#     rollEffects, for which ClassFeature has no descriptor columns. Unlike
-#     starting-equipment.ts above, there is no follow-up issue that retires
-#     this — it is the same permanent gap Rage's DERIVED_ACTIONS entry always
-#     had, not migration debt.
+#   - classes/actions.ts, routes/character/actions.ts: PERMANENT (#1223,
+#     #1231). Barbarian's DERIVED_ACTIONS "rage"/"endRage" entries
+#     (grantClass: "barbarian") and computeRageDamageBonus' classEntries
+#     lookup are Rage's ACTIVATION/buff half, not its resource pool — #1223's
+#     own scope decision is that this half stays here: the buff carries
+#     resistDamageTypes/rollEffects, for which ClassFeature has no descriptor
+#     columns. Rogue's own DERIVED_ACTIONS entries — "cunningAction"
+#     (grantClass: "rogue") and "fastHands" (grantSubclassSlugs:
+#     ["rogue-thief"]) — are the same shape: an action-economy grant with no
+#     resource pool of its own, so ClassFeature's descriptor columns have
+#     nothing for either to populate. Unlike starting-equipment.ts above,
+#     there is no follow-up issue that retires any of this — it is the same
+#     permanent gap a class-keyed DERIVED_ACTIONS entry always had, not
+#     migration debt.
 #   - character/serialize/combat.ts, srd/armor-class.ts: PERMANENT (#1223).
 #     Fast Movement's speed bonus (deriveFastMovement) and Unarmored Defense's
 #     AC candidate were never part of barbarian.ts's row-migrated surface —
@@ -147,11 +153,24 @@ fi
 #     AuthoredFeature/resourceFn machinery #1223 retired. Legitimate rule-
 #     function homes under CLAUDE.md ("Rules logic is backend-owned"), not a
 #     reappearance of migrated content.
+#   - classes/sneak-attack.ts: PERMANENT (#1231). Sneak Attack's Nd6
+#     progression, its d6 die source, and its once-per-turn eligibility guard
+#     (relocated from lib/classes/rogue.ts in #1231 commit 3, ahead of this
+#     guard's own commit 4) are computed rule functions keyed off the rogue
+#     class entry's own level — they never went through rogue.ts's
+#     AuthoredFeature/resourceFn machinery, and ClassFeature has no descriptor
+#     column for a once-per-turn eligibility predicate. Already classified as
+#     NON_CLASS_MODULES above (shared infrastructure, not a per-class
+#     module); this is its FILE_ALLOWLIST twin, needed now that "rogue"
+#     leaves NOT_YET_MIGRATED and this file's own `\brogue\b` hits (the
+#     "Only a rogue (level 1+) has Sneak Attack" error string, the
+#     `name.toLowerCase() === "rogue"` lookup) would otherwise flag red.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/routes/character/actions.ts
 backend/src/lib/character/serialize/combat.ts
-backend/src/lib/srd/armor-class.ts"
+backend/src/lib/srd/armor-class.ts
+backend/src/lib/classes/sneak-attack.ts"
 
 is_allowlisted_file() {
   target="$1"

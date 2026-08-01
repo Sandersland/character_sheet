@@ -1,6 +1,6 @@
 // Test-only helper (#1524): builds the `ClassFeatureRowsCarrier` deriveResources'
 // `featureRows` parameter expects, directly from the TS class/subclass
-// definitions — the ELEVEN remaining lib/classes/<class>.ts modules stay the
+// definitions — the NINE remaining lib/classes/<class>.ts modules stay the
 // seed's AUTHORING input even though production now reads seeded rows instead
 // (#1524's Fact 1). Lets every unit test that asserts on `.features` keep
 // calling deriveResources with a bare class/subclass name (no DB round-trip)
@@ -9,10 +9,11 @@
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
 //
-// FIGHTER (#1227, #1528, #1532) and BARBARIAN (#1223): `lib/classes/
-// fighter.ts` and `lib/classes/barbarian.ts` are both deleted outright —
-// their rows are literal seed data (prisma/seed/fighter-features.ts,
-// barbarian-features.ts), which this src-side fixture can't import
+// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223) and ROGUE (#1231):
+// `lib/classes/fighter.ts`, `lib/classes/barbarian.ts` and
+// `lib/classes/rogue.ts` are all deleted outright — their rows are literal
+// seed data (prisma/seed/fighter-features.ts, barbarian-features.ts,
+// rogue-features.ts), which this src-side fixture can't import
 // (backend/tsconfig.json's `rootDir: "src"` makes a src file importing
 // anything under prisma/ a compile error, TS6059). `testFeatureRowsFor(
 // "fighter"/"barbarian", ...)`'s classRows are therefore FIGHTER_BASE_ROWS/
@@ -21,14 +22,22 @@
 // `withoutFeatures(deriveResources(...))`, stripping `.features` before
 // snapshotting, so the row TEXT matters only for readability here, never for
 // a passing assertion. class-feature-parity.test.ts is the suite that DOES
-// assert on `.features` content, and it skips both classes entirely for the
-// same underlying reason (its own file's LITERAL_ROW_CLASSES check).
+// assert on `.features` content, and it skips all three classes entirely for
+// the same underlying reason (its own file's LITERAL_ROW_CLASSES check).
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no equivalent
 // hardcoded subclassRows stand-in: neither declares a resourceKey/derivedStat
 // in barbarian-features.ts, so falling through to `toRows(subDef?.features ??
 // [])` -> `toRows([])` -> `[]` (TEST_SUBCLASSES has no entry for either,
 // same as Champion/Eldritch Knight) loses nothing a `.resources`-observing
-// test could see.
+// test could see. ROGUE NEEDS NO HARDCODED classRows/subclassRows MIRROR AT
+// ALL, unlike Fighter/Barbarian: Rogue's rows (rogue-features.ts) declare no
+// resourceKey/derivedStat/saveDcAbilities on any row (Sneak Attack's Nd6 is a
+// computed rule function, never a persisted pool — see sneak-attack.ts), so
+// simply falling out of TEST_CLASSES/TEST_SUBCLASSES entirely — the same
+// `toRows(undefined?.features ?? [])` -> `[]` fallthrough — loses nothing a
+// `.resources`-observing test could see. rogue-thief.test.ts (which used to
+// call `testFeatureRowsFor("rogue", "thief")`) is rewritten onto
+// `loadDbFeatureRows` instead, same shape as fighter-unregistered.test.ts.
 import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { cleric } from "@/lib/classes/cleric.js";
@@ -36,14 +45,13 @@ import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
-import { rogue } from "@/lib/classes/rogue.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
 
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+  bard, cleric, druid, monk, paladin, ranger, sorcerer, warlock, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
