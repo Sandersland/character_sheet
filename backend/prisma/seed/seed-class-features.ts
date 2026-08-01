@@ -377,6 +377,22 @@ const MIN_ROWS_PER_PAIR = 10;
 // is TEXT ONLY with no mechanics behind it yet, same disclosed gap as
 // Barbarian's Brutal Strike menu (#1231 research, mirrors #1223's own
 // finding 6).
+//
+// "Wizard" removed here (#1234, same diff as the content that makes its rows
+// genuinely diverge: base 4->8 EDITION_2024 rows, Evocation/Abjuration/
+// Illusion each retab their level-2 features to level 3 and rework several
+// mechanics — Improved Abjuration/Malleable Illusions/Improved Minor Illusion
+// have no like-named 2024 successor, replaced by Spell Breaker/Phantasmal
+// Creatures/Improved Illusions respectively). This removal is NOT "all of
+// Wizard's 2024 content is real" — several residuals stay undisclosed nowhere
+// else but here: Scholar's Expertise mechanic, Epic Boon's feat grant, Ritual
+// Adept's ritual path, Memorize Spell's swap, and Spell Breaker's/Phantasmal
+// Creatures' always-prepared spells are all TEXT ONLY (the always-prepared
+// grants can't be SubclassGrantedSpell rows — that model has no `edition`
+// column and Subclass rows are edition-shared, a schema gap, not a scope
+// choice, #1234 research). Illusory Self's 2024 slot-expend restore is also
+// text-only (a player-initiated cost, not a rest regain — no descriptor
+// column exists for it).
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Bard",
   "Cleric",
@@ -386,7 +402,6 @@ const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Ranger",
   "Sorcerer",
   "Warlock",
-  "Wizard",
 ]);
 
 export interface ClassEditionPopulationSummary {
