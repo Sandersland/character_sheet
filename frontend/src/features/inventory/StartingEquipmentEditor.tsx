@@ -433,9 +433,10 @@ function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold, pa
       >
         {packageModeLabel}
       </button>
-      {/* No roll-for-gold path is offered at all when this edition has none
-          (PHB'24, #1564) — PHB'24 reaches gold through a lettered package
-          option instead (StartingEquipmentOption.gold). */}
+      {/* A TYPE narrowing, not a runtime branch: the caller no longer renders
+          this component at all when `gold` is null (#1565), but the prop is
+          still nullable and goldLabel below needs a StartingGold. Deleting it
+          costs a non-null assertion, which is strictly worse. */}
       {gold && (
         <button
           type="button"
@@ -483,12 +484,12 @@ export default function StartingEquipmentEditor({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* #1565 reviewer fix: package is always available, so the toggle row
-          itself is only meaningful when a SECOND mode (gold) also exists — a
-          2014 class package. A 2024 class package and every background
-          package (gold: null) have exactly one mode, and a one-option toggle
-          group is not a real choice, so the whole row is hidden rather than
-          rendering a single, unclickable-feeling button. */}
+      {/* Package mode is always available, so the toggle row is only
+          meaningful when a SECOND mode (gold) also exists — a 2014 class
+          package. A 2024 class package and every background package have
+          `gold: null` and therefore exactly one mode, and a one-option toggle
+          group is not a choice, so the row is hidden rather than rendering a
+          lone button that does nothing when pressed (#1565). */}
       {gold && (
         <ModeToggle
           isPackage={isPackage}
