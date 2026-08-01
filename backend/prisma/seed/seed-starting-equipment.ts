@@ -10,13 +10,13 @@
 //
 // No assertEveryBackgroundEditionHasPackage guard exists here, unlike
 // assertEveryClassEditionHasPackage below (deliberate, not an oversight):
-// BACKGROUND_STARTING_EQUIPMENT_PACKAGES covers exactly five (backgroundName,
-// edition) pairs by design — Charlatan/Folk Hero/Noble have no SRD text to
-// cite in either edition, and 2014 Criminal/Sage/Soldier likewise (SRD 5.1
-// ships only Acolyte) — so a guard requiring every seeded Background to have
-// a package in both editions would fail on content this issue leaves
+// BACKGROUND_STARTING_EQUIPMENT_PACKAGES covers exactly seven (backgroundName,
+// edition) pairs by design — Folk Hero has no package in either edition
+// (PHB'24 dropped it), and 2014 Charlatan/Criminal/Noble/Sage/Soldier have
+// none either (SRD 5.1 ships only Acolyte) — so a guard requiring every seeded
+// Background to have a package in both editions would fail on content left
 // unfinished ON PURPOSE (see starting-equipment.ts's background-section
-// header). Content correctness for the five pairs that DO exist is
+// header). Content correctness for the seven pairs that DO exist is
 // starting-equipment.test.ts's job, same division of labour as the class
 // guard's own docstring describes.
 import type { PrismaClient } from "../../src/generated/prisma/client.js";

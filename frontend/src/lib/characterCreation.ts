@@ -132,9 +132,9 @@ export function resolveEquipmentInput(
 }
 
 // #1565's twin of resolveEquipmentInput above, for the background's OWN
-// package (a background with no seeded package — Charlatan/Folk Hero/Noble,
-// or homebrew — never has a draft to resolve, same "untouched submits
-// nothing" shape).
+// package (a background with no seeded package — Folk Hero, a 2014 background
+// other than Acolyte, or homebrew — never has a draft to resolve, same
+// "untouched submits nothing" shape).
 export function resolveBackgroundEquipmentInput(
   draft: CharacterDraft,
   selectedBackground: BackgroundOption | undefined
