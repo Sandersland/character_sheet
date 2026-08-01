@@ -307,6 +307,50 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["rogue", "thief", "Supreme Sneak"],
   ["rogue", "thief", "Thief's Reflexes"],
   ["rogue", "thief", "Use Magic Device"],
+  // Wizard's 28 new triples (#1234): the 4 base names that genuinely fork
+  // (Spellcasting, Arcane Recovery, Spell Mastery, Signature Spells) show up
+  // under EVERY subclass context Wizard has (undefined/school of evocation/
+  // school of abjuration/school of illusion), same reason Fighter's 5 base
+  // names show up under all 4 of ITS contexts (collectTaggedFeatureKeys
+  // combines classRows with EVERY subclass's own rows) — 4 x 4 = 16, plus
+  // Evocation's own 5 (Evocation Savant, Sculpt Spells, Potent Cantrip,
+  // Empowered Evocation, Overchannel — ALL five share a name across editions,
+  // only level/wording shift), Abjuration's own 4 (Abjuration Savant, Arcane
+  // Ward, Projected Ward, Spell Resistance — Improved Abjuration/Spell
+  // Breaker share no name, so neither counts), and Illusion's own 3 (Illusion
+  // Savant, Illusory Self, Illusory Reality — Improved Minor Illusion/
+  // Improved Illusions and Malleable Illusions/Phantasmal Creatures each
+  // share no name, so none of those four count) = 16 + 5 + 4 + 3 = 28.
+  // Ritual Adept/Scholar/Memorize Spell/Epic Boon are NOT tagged (2024-only,
+  // no 2014 twin to diverge from).
+  ["wizard", "undefined", "Spellcasting"],
+  ["wizard", "undefined", "Arcane Recovery"],
+  ["wizard", "undefined", "Spell Mastery"],
+  ["wizard", "undefined", "Signature Spells"],
+  ["wizard", "school of evocation", "Spellcasting"],
+  ["wizard", "school of evocation", "Arcane Recovery"],
+  ["wizard", "school of evocation", "Spell Mastery"],
+  ["wizard", "school of evocation", "Signature Spells"],
+  ["wizard", "school of evocation", "Evocation Savant"],
+  ["wizard", "school of evocation", "Sculpt Spells"],
+  ["wizard", "school of evocation", "Potent Cantrip"],
+  ["wizard", "school of evocation", "Empowered Evocation"],
+  ["wizard", "school of evocation", "Overchannel"],
+  ["wizard", "school of abjuration", "Spellcasting"],
+  ["wizard", "school of abjuration", "Arcane Recovery"],
+  ["wizard", "school of abjuration", "Spell Mastery"],
+  ["wizard", "school of abjuration", "Signature Spells"],
+  ["wizard", "school of abjuration", "Abjuration Savant"],
+  ["wizard", "school of abjuration", "Arcane Ward"],
+  ["wizard", "school of abjuration", "Projected Ward"],
+  ["wizard", "school of abjuration", "Spell Resistance"],
+  ["wizard", "school of illusion", "Spellcasting"],
+  ["wizard", "school of illusion", "Arcane Recovery"],
+  ["wizard", "school of illusion", "Spell Mastery"],
+  ["wizard", "school of illusion", "Signature Spells"],
+  ["wizard", "school of illusion", "Illusion Savant"],
+  ["wizard", "school of illusion", "Illusory Self"],
+  ["wizard", "school of illusion", "Illusory Reality"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

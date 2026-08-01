@@ -9,35 +9,39 @@
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
 //
-// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223) and ROGUE (#1231):
-// `lib/classes/fighter.ts`, `lib/classes/barbarian.ts` and
-// `lib/classes/rogue.ts` are all deleted outright — their rows are literal
-// seed data (prisma/seed/fighter-features.ts, barbarian-features.ts,
-// rogue-features.ts), which this src-side fixture can't import
-// (backend/tsconfig.json's `rootDir: "src"` makes a src file importing
+// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), ROGUE (#1231) and WIZARD
+// (#1234): `lib/classes/fighter.ts`, `lib/classes/barbarian.ts` and
+// `lib/classes/rogue.ts` are all deleted outright, and `lib/classes/wizard.ts`'s
+// feature TEXT (all four schools) moved out while the module itself survives for
+// its subclass `grantLevel` (#1576). Every one of their rows is literal seed
+// data (prisma/seed/fighter-features.ts, barbarian-features.ts,
+// rogue-features.ts, wizard-features.ts), which this src-side fixture can't
+// import (backend/tsconfig.json's `rootDir: "src"` makes a src file importing
 // anything under prisma/ a compile error, TS6059). `testFeatureRowsFor(
-// "fighter"/"barbarian", ...)`'s classRows are therefore FIGHTER_BASE_ROWS/
-// BARBARIAN_BASE_ROWS below (hardcoded mirrors of each seed file's RESOURCE
-// columns) — class-features-snapshot.test.ts records
+// "fighter"/"barbarian"/"wizard", ...)`'s rows are therefore the hardcoded
+// mirrors below (LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS, mirroring each seed
+// file's RESOURCE columns) — class-features-snapshot.test.ts records
 // `withoutFeatures(deriveResources(...))`, stripping `.features` before
-// snapshotting, so the row TEXT matters only for readability here, never for
-// a passing assertion. class-feature-parity.test.ts is the suite that DOES
-// assert on `.features` content, and it skips all three classes entirely for
-// the same underlying reason (its own file's LITERAL_ROW_CLASSES check).
-// Barbarian's two subclasses (Totem Warrior, Berserker) need no equivalent
-// hardcoded subclassRows stand-in: neither declares a resourceKey/derivedStat
-// in barbarian-features.ts, so falling through to `toRows(subDef?.features ??
-// [])` -> `toRows([])` -> `[]` (TEST_SUBCLASSES has no entry for either,
-// same as Champion/Eldritch Knight) loses nothing a `.resources`-observing
-// test could see. ROGUE NEEDS NO HARDCODED classRows/subclassRows MIRROR AT
-// ALL, unlike Fighter/Barbarian: Rogue's rows (rogue-features.ts) declare no
-// resourceKey/derivedStat/saveDcAbilities on any row (Sneak Attack's Nd6 is a
-// computed rule function, never a persisted pool — see sneak-attack.ts), so
-// simply falling out of TEST_CLASSES/TEST_SUBCLASSES entirely — the same
+// snapshotting, so the row TEXT matters only for readability here, never for a
+// passing assertion. class-feature-parity.test.ts is the suite that DOES assert
+// on `.features` content, and it skips all four classes entirely for the same
+// underlying reason (its own file's LITERAL_ROW_CLASSES check).
+//
+// Barbarian's two subclasses (Totem Warrior, Berserker) need no hardcoded
+// subclassRows stand-in: neither declares a resourceKey/derivedStat in
+// barbarian-features.ts, so falling through to `toRows(subDef?.features ?? [])`
+// -> `toRows([])` -> `[]` (TEST_SUBCLASSES has no entry for either, same as
+// Champion/Eldritch Knight) loses nothing a `.resources`-observing test could
+// see.
+//
+// ROGUE NEEDS NO MIRROR AT ALL, unlike the other three: its rows declare no
+// resourceKey/derivedStat/saveDcAbilities anywhere (Sneak Attack's Nd6 is a
+// computed rule function, never a persisted pool — see sneakAttackSpec), so
+// falling out of LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS entirely — the same
 // `toRows(undefined?.features ?? [])` -> `[]` fallthrough — loses nothing a
-// `.resources`-observing test could see. rogue-thief.test.ts (which used to
-// call `testFeatureRowsFor("rogue", "thief")`) is rewritten onto
-// `loadDbFeatureRows` instead, same shape as fighter-unregistered.test.ts.
+// `.resources`-observing test could see. rogue-thief.test.ts (which used to call
+// `testFeatureRowsFor("rogue", "thief")`) is rewritten onto `loadDbFeatureRows`
+// instead, same shape as fighter-unregistered.test.ts.
 import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { cleric } from "@/lib/classes/cleric.js";
@@ -286,20 +290,358 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+// Applies Arcane Recovery's / Illusory Self's resource-pool descriptor
+// columns (#1234 commit 3) onto the matching row(s) of an already-built
+// ClassFeatureRow[] — `toRows` only carries name/level/description/edition
+// through (it takes AuthoredFeature[], which has no resource columns), so
+// this is a targeted post-map rather than a second row-builder, mirroring
+// wizard-features.ts's own resourceKey/resourceLabel/resourceRecharge/
+// resourceTotals values exactly (both editions: flat total 1; Arcane
+// Recovery longRest, Illusory Self short-or-long from level 10).
+function withPool(rows: ClassFeatureRow[], name: string, recharge: string, minLevel: number): ClassFeatureRow[] {
+  return rows.map((row) =>
+    row.name === name
+      ? { ...row, resourceKey: name === "Arcane Recovery" ? "arcaneRecovery" : "illusorySelf", resourceLabel: name, resourceRecharge: recharge, resourceTotals: [{ minLevel, total: 1 }] }
+      : row,
+  );
+}
+
+// WIZARD's base-class rows (#1234): `lib/classes/wizard.ts`'s feature TEXT
+// (base + all three schools) moved to literal seed data
+// (prisma/seed/wizard-features.ts) — the same rootDir boundary FIGHTER_BASE_
+// ROWS' comment explains (unlike Fighter/Barbarian, wizard.ts itself still
+// exists — see that file's own header for why it isn't deletable — but its
+// `.features` are gone). Hardcoded here, once, mirroring wizard-features.ts's
+// own EDITION_2014/EDITION_2024 text exactly (commit 2's real SRD 5.2 /
+// PHB'24 content — every row below now sets its own `edition`, per that
+// file's tagging rule) — Arcane Recovery's resource columns (commit 3) are
+// applied by withPool below, once, rather than repeated per edition.
+export const WIZARD_BASE_ROWS: ClassFeatureRow[] = withPool(
+  toRows([
+  {
+    name: "Spellcasting",
+    level: 1,
+    source: "class",
+    edition: "EDITION_2014",
+    description:
+      "You cast spells using Intelligence. Full-caster progression. You copy spells into your spellbook and prepare a number equal to your Intelligence modifier + your wizard level (minimum 1) after each long rest.",
+  },
+  {
+    name: "Spellcasting",
+    level: 1,
+    source: "class",
+    edition: "EDITION_2024",
+    description:
+      "You cast spells using Intelligence. Full-caster progression. You know three Wizard cantrips (one more at levels 4 and 10), replacing one on a Long Rest. Your spellbook holds your level 1+ spells: it starts with six 1st-level spells, and you add two spells of your choice whenever you gain a Wizard level after 1st. You regain all expended spell slots on a Long Rest, and you change your list of prepared spells whenever you finish a Long Rest.",
+  },
+  {
+    name: "Arcane Recovery",
+    level: 1,
+    source: "class",
+    edition: "EDITION_2014",
+    description:
+      "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
+  },
+  {
+    name: "Arcane Recovery",
+    level: 1,
+    source: "class",
+    edition: "EDITION_2024",
+    description:
+      "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+  },
+  {
+    name: "Ritual Adept",
+    level: 1,
+    source: "class",
+    edition: "EDITION_2024",
+    description:
+      "You can cast any spell in your spellbook as a Ritual if the spell has the Ritual tag, without needing it prepared — you must read from the book to cast it this way.",
+  },
+  {
+    name: "Scholar",
+    level: 2,
+    source: "class",
+    edition: "EDITION_2024",
+    description:
+      "Choose one skill in which you're proficient from Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.",
+  },
+  {
+    name: "Memorize Spell",
+    level: 5,
+    source: "class",
+    edition: "EDITION_2024",
+    description:
+      "When you finish a Short Rest, you can study your spellbook and replace one of the level 1+ Wizard spells you have prepared with another level 1+ spell from the book.",
+  },
+  {
+    name: "Spell Mastery",
+    level: 18,
+    source: "class",
+    edition: "EDITION_2014",
+    description:
+      "Choose one 1st-level and one 2nd-level wizard spell in your spellbook. You can cast each of those spells at their lowest level without expending a spell slot. Changing choices requires 8 hours of study.",
+  },
+  {
+    name: "Spell Mastery",
+    level: 18,
+    source: "class",
+    edition: "EDITION_2024",
+    description:
+      "Choose a 1st-level and a 2nd-level spell in your spellbook, each with a casting time of an action. You always have both prepared, and you can cast each at its lowest level without expending a spell slot — casting at a higher level still costs a slot. Whenever you finish a Long Rest, you can study your spellbook and replace either choice with an eligible spell of the same level.",
+  },
+  {
+    name: "Epic Boon",
+    level: 19,
+    source: "class",
+    edition: "EDITION_2024",
+    description: "You gain an Epic Boon feat of your choice (Boon of Spell Recall recommended). You can take this feat only once.",
+  },
+  {
+    name: "Signature Spells",
+    level: 20,
+    source: "class",
+    edition: "EDITION_2014",
+    description:
+      "Choose two 3rd-level wizard spells in your spellbook as signature spells. They are always prepared and don't count against your prepared spells count. You can cast each once without expending a slot; regain both uses after a short or long rest.",
+  },
+  {
+    name: "Signature Spells",
+    level: 20,
+    source: "class",
+    edition: "EDITION_2024",
+    description:
+      "Choose two 3rd-level spells in your spellbook as your signature spells. You always have them prepared, and you can cast each once at 3rd level without expending a spell slot. To cast either at a higher level, you must expend a spell slot; regain both uses after a Short Rest or Long Rest.",
+  },
+  ]),
+  "Arcane Recovery",
+  "longRest",
+  1,
+);
+
+/** WIZARD's per-subclass rows (#1234) — same hardcoding reason as WIZARD_BASE_ROWS above. */
+export const WIZARD_EVOCATION_ROWS: ClassFeatureRow[] = toRows([
+  { name: "Evocation Savant", level: 2, source: "subclass", edition: "EDITION_2014", description: "The gold and time you must spend to copy an evocation spell into your spellbook is halved." },
+  {
+    name: "Evocation Savant",
+    level: 3,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "Add two Evocation spells (each level 2 or lower) to your spellbook for free. Thereafter, whenever you gain access to a new level of spell slots, add one more Evocation spell of an eligible level to your spellbook for free.",
+  },
+  {
+    name: "Sculpt Spells",
+    level: 2,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "When you cast an evocation spell, choose a number of creatures equal to 1 + the spell's level. Those creatures automatically succeed on their saving throw and take no damage (even if they'd normally take half on a success).",
+  },
+  {
+    name: "Sculpt Spells",
+    level: 6,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "When you cast an Evocation spell that affects other creatures you can see, choose a number of them equal to 1 plus the spell's level. Those creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a success.",
+  },
+  { name: "Potent Cantrip", level: 6, source: "subclass", edition: "EDITION_2014", description: "When a creature succeeds on a saving throw against your cantrip, it takes half the cantrip's damage rather than none." },
+  {
+    name: "Potent Cantrip",
+    level: 3,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "When you cast a damaging cantrip at a creature and you miss with the attack roll, or the target succeeds on its saving throw against the cantrip, the target still takes half the cantrip's damage (if any), but suffers no other effect from it.",
+  },
+  { name: "Empowered Evocation", level: 10, source: "subclass", edition: "EDITION_2014", description: "Add your Intelligence modifier to one damage roll of any evocation spell you cast." },
+  {
+    name: "Empowered Evocation",
+    level: 10,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description: "Whenever you cast a Wizard spell from the Evocation school, you can add your Intelligence modifier to one damage roll of that spell.",
+  },
+  {
+    name: "Overchannel",
+    level: 14,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "When you cast a wizard spell of 1st–5th level that deals damage, you can deal maximum damage with it. The first time per long rest you do so, you suffer no ill effect. Each use thereafter costs 2d12 necrotic per spell level (before the rest).",
+  },
+  {
+    name: "Overchannel",
+    level: 14,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "When you cast a Wizard spell with a spell slot of levels 1-5 that deals damage, you can deal maximum damage with it. The first time you do this before finishing a Long Rest, you suffer no adverse effect. Each further time before that Long Rest, you take 2d12 Necrotic damage for each level of the spell slot, and that damage per spell level increases by 1d12 for each additional use — this damage ignores Resistance and Immunity.",
+  },
+]);
+
+export const WIZARD_ABJURATION_ROWS: ClassFeatureRow[] = toRows([
+  { name: "Abjuration Savant", level: 2, source: "subclass", edition: "EDITION_2014", description: "The gold and time you must spend to copy an abjuration spell into your spellbook is halved." },
+  {
+    name: "Abjuration Savant",
+    level: 3,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "Add two Abjuration spells (each level 2 or lower) to your spellbook for free. Thereafter, whenever you gain access to a new level of spell slots, add one more Abjuration spell of an eligible level to your spellbook for free.",
+  },
+  {
+    name: "Arcane Ward",
+    level: 2,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "When you cast an abjuration spell of 1st level or higher, a magical ward forms with HP equal to twice your wizard level + your Intelligence modifier. The ward absorbs damage before you do, and is recharged (2× the spell's level) each time you cast an abjuration spell.",
+  },
+  {
+    name: "Arcane Ward",
+    level: 3,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "When you cast an Abjuration spell with a spell slot, form (or recharge) a magical ward on yourself lasting until you finish a Long Rest, with HP equal to twice your Wizard level plus your Intelligence modifier. The ward absorbs damage before you do — apply any Resistances or Vulnerabilities you have before its HP is reduced — and it regains HP equal to twice the spell slot's level each time you cast an Abjuration spell with a slot, or, as a Bonus Action, by expending a spell slot for the same regain.",
+  },
+  { name: "Projected Ward", level: 6, source: "subclass", edition: "EDITION_2014", description: "When a creature within 30 ft takes damage, use your reaction to have your Arcane Ward absorb that damage instead." },
+  {
+    name: "Projected Ward",
+    level: 6,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "When a creature you can see within 30 feet of yourself takes damage, you can take a Reaction to have your Arcane Ward absorb that damage instead — apply that creature's Resistances or Vulnerabilities before the ward's HP is reduced.",
+  },
+  { name: "Improved Abjuration", level: 10, source: "subclass", edition: "EDITION_2014", description: "When you cast an abjuration spell that requires an ability check, you add your proficiency bonus to that check." },
+  {
+    name: "Spell Breaker",
+    level: 10,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "You always have Counterspell and Dispel Magic prepared. You can cast Dispel Magic as a Bonus Action, and you add your Proficiency Bonus to its ability check. A spell slot spent on either spell isn't expended if the spell fails to stop what it targeted.",
+  },
+  { name: "Spell Resistance", level: 14, source: "subclass", edition: "EDITION_2014", description: "You have advantage on saving throws against spells, and resistance to spell damage." },
+  { name: "Spell Resistance", level: 14, source: "subclass", edition: "EDITION_2024", description: "You have Advantage on saving throws against spells, and Resistance to the damage they deal." },
+]);
+
+export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = withPool(
+  toRows([
+  { name: "Illusion Savant", level: 2, source: "subclass", edition: "EDITION_2014", description: "The gold and time you must spend to copy an illusion spell into your spellbook is halved." },
+  {
+    name: "Illusion Savant",
+    level: 3,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "Add two Illusion spells (each level 2 or lower) to your spellbook for free. Thereafter, whenever you gain access to a new level of spell slots, add one more Illusion spell of an eligible level to your spellbook for free.",
+  },
+  {
+    name: "Improved Minor Illusion",
+    level: 2,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "You know the Minor Illusion cantrip (or a different wizard cantrip if you already know it). When you cast it, you can create both a sound and an image with a single casting.",
+  },
+  {
+    name: "Improved Illusions",
+    level: 3,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "You can cast Illusion spells without a Verbal component, and any Illusion spell you cast with a range of 10 feet or more has its range extended by 60 feet. You also know the Minor Illusion cantrip (or learn a different Wizard cantrip if you already know it, not counting against your cantrips known); you can create both a sound and an image with a single casting of it, and you can cast it as a Bonus Action.",
+  },
+  {
+    name: "Malleable Illusions",
+    level: 6,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "When you cast an illusion spell with a duration of 1 minute or longer, you can use your action to change the nature of that illusion (within its original parameters) while you can see it.",
+  },
+  {
+    name: "Phantasmal Creatures",
+    level: 6,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "You always have the Summon Beast and Summon Fey spells prepared. Casting either as its Illusion-school version (the summoned creature appears spectral) costs no spell slot, but halves the creature's Hit Points. Once you cast either spell this way, you must finish a Long Rest before doing so again.",
+  },
+  {
+    name: "Illusory Self",
+    level: 10,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "When a creature makes an attack roll against you, use your reaction to interpose an illusory duplicate — the attack automatically misses. Once used, you regain this ability on a short or long rest.",
+  },
+  {
+    name: "Illusory Self",
+    level: 10,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
+  },
+  {
+    name: "Illusory Reality",
+    level: 14,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "When you cast an illusion spell of 1st level or higher, you can make one inanimate, nonmagical object part of the illusion real for 1 minute. The object can't deal damage or cause harm.",
+  },
+  {
+    name: "Illusory Reality",
+    level: 14,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "When you cast an Illusion spell with a spell slot, you can make one inanimate, nonmagical object that's part of the illusion real for 1 minute — usable as a Bonus Action while the spell is ongoing. The object can't deal damage or otherwise cause harm.",
+  },
+  ]),
+  "Illusory Self",
+  "short-or-long",
+  10,
+);
+
+// The two lookup maps every LITERAL_ROW_CLASSES member's rows resolve
+// through (#1234): replaces the `isFighter ? … : isBarbarian ? … :
+// isBattleMaster ? …` ternary chain, which didn't survive a fourth class
+// cleanly. Keyed lowercase to match testFeatureRowsFor's own
+// `.toLowerCase()` calls. LITERAL_CLASS_ROWS scopes a class's BASE rows;
+// LITERAL_SUBCLASS_ROWS scopes one subclass's own rows (Battle Master's
+// SubclassDefinition, fighter.ts, carries no `.features` at all any more —
+// its rows are BATTLE_MASTER_ROWS above, the same rootDir-boundary reason
+// FIGHTER_BASE_ROWS exists — so falling through to `toRows(subDef?.features
+// ?? [])` would silently go empty for it, same failure mode this map exists
+// to avoid for every literal-row subclass).
+const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
+  fighter: FIGHTER_BASE_ROWS,
+  barbarian: BARBARIAN_BASE_ROWS,
+  wizard: WIZARD_BASE_ROWS,
+};
+
+const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
+  "battle master": BATTLE_MASTER_ROWS,
+  "school of evocation": WIZARD_EVOCATION_ROWS,
+  "school of abjuration": WIZARD_ABJURATION_ROWS,
+  "school of illusion": WIZARD_ILLUSION_ROWS,
+};
+
 /** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */
 export function testFeatureRowsFor(className: string, subclass: string | undefined): ClassFeatureRowsCarrier {
-  const classDef = TEST_CLASSES[(className ?? "").toLowerCase()];
-  const subDef = subclass ? TEST_SUBCLASSES[subclass.toLowerCase()] : undefined;
-  const isFighter = (className ?? "").toLowerCase() === "fighter";
-  const isBarbarian = (className ?? "").toLowerCase() === "barbarian";
-  // #1546 Part B-ii: Battle Master's SubclassDefinition (fighter.ts) carries
-  // no `.features` at all any more (its rows are BATTLE_MASTER_ROWS above,
-  // the same rootDir-boundary reason FIGHTER_BASE_ROWS exists) — so
-  // `toRows(subDef?.features ?? [])` would silently go empty for it, same
-  // failure mode FIGHTER_BASE_ROWS' own isFighter branch fixes for the base class.
-  const isBattleMaster = (subclass ?? "").toLowerCase() === "battle master";
+  const classKey = (className ?? "").toLowerCase();
+  const subclassKey = (subclass ?? "").toLowerCase();
+  const classDef = TEST_CLASSES[classKey];
+  const subDef = subclass ? TEST_SUBCLASSES[subclassKey] : undefined;
   return {
-    classRows: isFighter ? FIGHTER_BASE_ROWS : isBarbarian ? BARBARIAN_BASE_ROWS : toRows(classDef?.features ?? []),
-    subclassRows: isBattleMaster ? BATTLE_MASTER_ROWS : toRows(subDef?.features ?? []),
+    classRows: LITERAL_CLASS_ROWS[classKey] ?? toRows(classDef?.features ?? []),
+    subclassRows: LITERAL_SUBCLASS_ROWS[subclassKey] ?? toRows(subDef?.features ?? []),
   };
 }

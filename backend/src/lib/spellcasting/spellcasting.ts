@@ -902,13 +902,11 @@ const SPELLCASTING_SELECT = {
       name: true,
       level: true,
       subclass: true,
-      // #1528 finding 5: resolveArcaneRecoveryContext reads `.resources`
-      // through deriveResources, whose only pool source besides a resourceFn
-      // is row-driven (poolsFromRows) — an absent featureRows carrier here
-      // was harmless while every resourceFn-declared pool (arcaneRecovery
-      // included) bypassed rows entirely, but is the one remaining undefined
-      // carrier whose `.resources` output is actually consumed, so it would
-      // silently go pool-less the day Wizard's rows retab under #1134.
+      // #1528 finding 5 (now live, #1234 commit 3): resolveArcaneRecoveryContext
+      // reads `.resources` through deriveResources, whose only pool source
+      // besides a resourceFn is row-driven (poolsFromRows) — this featureRows
+      // carrier is what lets Wizard's arcaneRecovery pool resolve now that its
+      // resourceFn is deleted and the pool lives on the row instead.
       class: { select: { features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } } },
       // Subclass-granted spells (#898) injected into the working view below.
       // Switched from `include` to `select` (#1528) to add `features` without
@@ -945,10 +943,9 @@ function resolveArcaneRecoveryContext(
   const primary = row.classEntries[0];
   const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
   // SPELLCASTING_SELECT carries class/subclassRef.features (#1528 finding 5) so
-  // this caller's `.resources` read resolves a row-driven arcaneRecovery pool
-  // too, not only a resourceFn one — inert today (Wizard's Arcane Recovery is
-  // still resourceFn-declared; only Fighter's rows populate resourceKey), but
-  // no longer the one remaining undefined carrier whose output is consumed.
+  // this caller's `.resources` read resolves the row-driven arcaneRecovery pool
+  // (wizard-features.ts, #1234 commit 3) — wizard.ts's resourceFn that used to
+  // supply it is deleted, so this carrier is now load-bearing, not inert.
   const resourceInfo = deriveResources(
     className,
     primary?.subclass ?? undefined,

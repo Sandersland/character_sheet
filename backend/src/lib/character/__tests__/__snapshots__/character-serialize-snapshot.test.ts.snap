@@ -511,7 +511,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "choicesKnown": {},
     "features": [
       {
-        "description": "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
+        "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
         "level": 1,
         "name": "Arcane Recovery",
         "source": "class",
@@ -529,7 +529,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "source": "class",
       },
       {
-        "description": "You cast spells using Intelligence. Full-caster progression. You copy spells into your spellbook and prepare a number equal to your Intelligence modifier + your wizard level (minimum 1) after each long rest.",
+        "description": "You cast spells using Intelligence. Full-caster progression. You know three Wizard cantrips (one more at levels 4 and 10), replacing one on a Long Rest. Your spellbook holds your level 1+ spells: it starts with six 1st-level spells, and you add two spells of your choice whenever you gain a Wizard level after 1st. You regain all expended spell slots on a Long Rest, and you change your list of prepared spells whenever you finish a Long Rest.",
         "level": 1,
         "name": "Spellcasting",
         "source": "class",
@@ -539,7 +539,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "maneuversKnown": [],
     "pools": [
       {
-        "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+        "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
         "die": undefined,
         "key": "arcaneRecovery",
         "label": "Arcane Recovery",

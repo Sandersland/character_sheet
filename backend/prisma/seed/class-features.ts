@@ -39,24 +39,30 @@ import { paladin } from "../../src/lib/classes/paladin.js";
 import { ranger } from "../../src/lib/classes/ranger.js";
 import { sorcerer } from "../../src/lib/classes/sorcerer.js";
 import { warlock } from "../../src/lib/classes/warlock.js";
-import { wizard } from "../../src/lib/classes/wizard.js";
 import { BARBARIAN_FEATURES } from "./barbarian-features.js";
 import { FIGHTER_FEATURES } from "./fighter-features.js";
 import { ROGUE_FEATURES } from "./rogue-features.js";
+import { WIZARD_FEATURES } from "./wizard-features.js";
 
 // className must match a CharacterClass.name seed row (catalog-data.ts) —
-// title case, not the lowercase registry.ts dispatch key. Fighter, Barbarian
-// and Rogue are deliberately ABSENT (#1227, #1223, #1231 commit 1 of 4): their
+// title case, not the lowercase registry.ts dispatch key. Fighter, Barbarian,
+// Rogue and Wizard are deliberately ABSENT (#1227, #1223, #1231, #1234): their
 // rows are literal data (fighter-features.ts, barbarian-features.ts,
-// rogue-features.ts), not derived from a ClassDefinition.features array —
-// see LITERAL_ROW_CLASSES below. `lib/classes/fighter.ts` (#1532) and
-// `lib/classes/barbarian.ts` (#1223 commit 3 of 3) are both deleted outright;
-// `lib/classes/rogue.ts` stays for now (#1231 commit 1 of 4 — its `features`
-// array is unused by this file but the module still holds the Sneak Attack
-// rule exports consumed elsewhere, relocated in commit 3 and deleted in
-// commit 4). `features` stays optional on ClassDefinition/SubclassDefinition
-// for the nine classes still on the TS-authoring path, not because Fighter,
-// Barbarian or Rogue ever needed it to be.
+// rogue-features.ts, wizard-features.ts), not derived from a
+// ClassDefinition.features array — see LITERAL_ROW_CLASSES below.
+//
+// Absence here does NOT imply the class module is gone; there are two distinct
+// end states. `lib/classes/fighter.ts` (#1532), `lib/classes/barbarian.ts`
+// (#1223) and `lib/classes/rogue.ts` (#1231) are deleted outright — nothing was
+// left in them. Wizard is the THIRD state: `lib/classes/wizard.ts` stays
+// registered in registry.ts's CLASSES because it carries a subclass
+// `grantLevel` of 2 that no seeded row can express today (subclassGateLevel
+// falls back to 3, so deleting it would silently move every 2014 Wizard's
+// subclass gate — see that file's own header and #1576), while being absent
+// from CLASS_MODULES here because its FEATURE TEXT has moved to
+// wizard-features.ts. `features` stays optional on
+// ClassDefinition/SubclassDefinition for the eight classes still on the
+// TS-authoring path, not because these four ever needed it to be.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
   Bard: bard,
   Cleric: cleric,
@@ -66,20 +72,20 @@ const CLASS_MODULES: Record<string, ClassDefinition> = {
   Ranger: ranger,
   Sorcerer: sorcerer,
   Warlock: warlock,
-  Wizard: wizard,
 };
 
 // Classes whose CLASS_FEATURES rows are authored as LITERAL seed data
-// (fighter-features.ts, barbarian-features.ts, rogue-features.ts) rather than
-// derived from a lib/classes/<class>.ts module's AuthoredFeature[] arrays via
-// collectRawFeatures/expandFeatureRow below. Exported so every test that needs
-// to skip/scope around these classes (class-feature-migration.test.ts's
-// derived-half scoping; the lowercase sibling set in
+// (fighter-features.ts, barbarian-features.ts, rogue-features.ts,
+// wizard-features.ts) rather than derived from a lib/classes/<class>.ts
+// module's AuthoredFeature[] arrays via collectRawFeatures/expandFeatureRow
+// below. Exported so every test that needs to skip/scope around these classes
+// (class-feature-migration.test.ts's derived-half scoping; the lowercase
+// sibling set in
 // src/lib/classes/__tests__/class-subclasses.fixture.ts, kept separate
 // because backend/tsconfig.json's `rootDir: "src"` makes a src file importing
 // anything under prisma/ a compile error — verified empirically, TS6059) keys
 // off ONE authoritative set per side, never a second hand-maintained list.
-export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set(["Fighter", "Barbarian", "Rogue"]);
+export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set(["Fighter", "Barbarian", "Rogue", "Wizard"]);
 
 // One entry per DerivedFeature exactly as authored in lib/classes/<class>.ts —
 // pre-expansion (an untagged feature is still ONE entry here; expandFeatureRow
@@ -225,16 +231,17 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
 
 // The full seed family: every derived-class row (re-derived from the
 // nine-class registry by class-feature-migration.test.ts, never hardcoded
-// there either) PLUS Fighter's, Barbarian's and Rogue's literal rows
+// there either) PLUS Fighter's, Barbarian's, Rogue's and Wizard's literal rows
 // (fighter-features.ts #1227, barbarian-features.ts #1223, rogue-features.ts
-// #1231) — concatenated, not merged through expandFeatureRow, since
-// FIGHTER_FEATURES/BARBARIAN_FEATURES/ROGUE_FEATURES are already in final
+// #1231, wizard-features.ts #1234) — concatenated, not merged through
+// expandFeatureRow, since those four arrays are already in final
 // ClassFeatureSeedRow[] shape.
 export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
   ...collectRawFeatures().flatMap(expandFeatureRow),
   ...FIGHTER_FEATURES,
   ...BARBARIAN_FEATURES,
   ...ROGUE_FEATURES,
+  ...WIZARD_FEATURES,
 ];
 
 // Shared ascending-by-minLevel invariant (#1522 decision: tier arrays are

@@ -13919,7 +13919,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -13933,7 +13933,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -13947,7 +13947,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -13961,7 +13961,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -13975,7 +13975,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -13989,7 +13989,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14003,7 +14003,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14017,7 +14017,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14031,7 +14031,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14045,7 +14045,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14059,7 +14059,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14073,7 +14073,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14087,7 +14087,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14101,7 +14101,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14115,7 +14115,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14129,7 +14129,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14143,7 +14143,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14157,7 +14157,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14171,7 +14171,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14185,7 +14185,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14204,7 +14204,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14218,7 +14218,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14232,7 +14232,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14246,7 +14246,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14260,7 +14260,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14274,7 +14274,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14288,7 +14288,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14302,7 +14302,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14316,7 +14316,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14330,7 +14330,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14344,7 +14344,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14358,7 +14358,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14372,7 +14372,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14386,7 +14386,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14400,7 +14400,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14414,7 +14414,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14428,7 +14428,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14442,7 +14442,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14456,7 +14456,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14470,7 +14470,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14489,7 +14489,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14503,7 +14503,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14517,7 +14517,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14531,7 +14531,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14545,7 +14545,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14559,7 +14559,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14573,7 +14573,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14587,7 +14587,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14601,7 +14601,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14615,7 +14615,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14629,7 +14629,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14643,7 +14643,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14657,7 +14657,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14671,7 +14671,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14685,7 +14685,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14699,7 +14699,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14713,7 +14713,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14727,7 +14727,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14741,7 +14741,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14755,7 +14755,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14774,7 +14774,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14788,7 +14788,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14802,7 +14802,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14816,7 +14816,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14830,7 +14830,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14844,7 +14844,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14858,7 +14858,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14872,7 +14872,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14886,7 +14886,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14900,14 +14900,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -14921,14 +14921,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -14942,14 +14942,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -14963,14 +14963,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -14984,14 +14984,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15005,14 +15005,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15026,14 +15026,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15047,14 +15047,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15068,14 +15068,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15089,14 +15089,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15110,14 +15110,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",

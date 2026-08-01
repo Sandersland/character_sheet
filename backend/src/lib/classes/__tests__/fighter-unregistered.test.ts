@@ -156,11 +156,11 @@ describe("the narrow-select path (no featureRows carrier) still returns null", (
 });
 
 // Riskiest regression named by #1532's own AC: multiclass paths that iterate
-// `classEntries` must not special-case a missing `CLASSES` key. Fighter's row-
-// driven base pools (via `poolsFromRows`) and Wizard's still-TS-driven
-// `resourceFn` pool (`arcaneRecovery`) must compose in the SAME
-// `deriveEntryScopedResources` call, each scoped to its own entry's own
-// effective level (PHB'24 p.163) — proving `CLASSES[classKey]` inside
+// `classEntries` must not special-case a missing `CLASSES` key. Fighter's and
+// Wizard's row-driven base pools (via `poolsFromRows` — Wizard's `arcaneRecovery`
+// moved off wizard.ts's resourceFn onto its row in #1234 commit 3) must compose
+// in the SAME `deriveEntryScopedResources` call, each scoped to its own entry's
+// own effective level (PHB'24 p.163) — proving `CLASSES[classKey]` inside
 // `deriveResources` (the one `CLASSES` lookup in the repo, per this issue's
 // corrected AC) resolves to `undefined` for the Fighter entry without
 // disturbing the Wizard entry's own resolution in the same accumulator.
@@ -181,7 +181,7 @@ describe("a Fighter/Wizard multiclass still derives correctly with Fighter absen
       const poolKeys = derived?.resources.map((r) => r.key) ?? [];
       // Fighter's row-driven base pools survive absence from CLASSES...
       expect(poolKeys, `${edition} fighter pools`).toEqual(expect.arrayContaining(["secondWind", "actionSurge"]));
-      // ...alongside Wizard's still-TS-registered resourceFn pool, proving
+      // ...alongside Wizard's own row-driven pool (#1234 commit 3), proving
       // Fighter's absence doesn't disturb the OTHER entry's own CLASSES
       // lookup in the same accumulator.
       expect(poolKeys, `${edition} wizard pool`).toContain("arcaneRecovery");
