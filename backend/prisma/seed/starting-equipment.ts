@@ -1008,18 +1008,30 @@ export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = [
 ];
 
 // --- Background starting-equipment packages (#1565) ---------------------
-// Built EXACTLY what the SRD supports, which is squeezed from both ends:
-// SRD 5.1 (5thsrd.org) contains ONE background — Acolyte — and SRD 5.2
-// (5e24srd.com) contains FOUR — Acolyte, Criminal, Sage, Soldier. Charlatan,
-// Folk Hero and Noble are PHB'14-only content with no SRD text in either
-// edition to cite (CLAUDE.md: an unattributed rules citation is a bug) and
-// deliberately get no package here — they are not deleted or retagged (that
-// decision belongs to a follow-up issue; deleting a Background row would
-// strand any character holding it, #1559's landmine). So this seed covers
-// five (backgroundName, edition) pairs, not the fourteen a full 7×2 grid
-// would suggest, and the seeder's presence guard is scoped to exactly these
-// pairs (assertEveryBackgroundEditionHasPackage does not exist, on purpose —
-// see seed-starting-equipment.ts's comment on why one was NOT added here).
+// The SRD covers less than the app offers, from both ends: SRD 5.1
+// (5thsrd.org) contains ONE background — Acolyte — and SRD 5.2 (5e24srd.com)
+// contains FOUR — Acolyte, Criminal, Sage, Soldier.
+//
+// Charlatan and Noble are PHB'24 backgrounds transcribed from the book's own
+// stat blocks (#1570), which is NOT a new licensing step: this repo already
+// carries their 2024 abilityChoices, originFeatName and tool proficiency in
+// BACKGROUNDS, and an ability spread plus an Origin feat are 2024-only
+// concepts, so the rows were sourced from PHB'24 before any equipment existed.
+// Citations name the edition but no page — an invented page number to satisfy
+// the citation rule is a worse bug than an unpaged one.
+//
+// Folk Hero is the genuine hole: PHB'24 dropped it, so it has no 2024 package
+// and cannot get one. It is not deleted or retagged here — its seed row is
+// edition NULL (shared), so it is still offered to 2024 characters it cannot
+// serve, and fixing that means creating an EDITION_2014 row whose id differs
+// from the NULL one every existing character points at (#1559's landmine via
+// CharacterBackground's onDelete: SetNull). That needs its own guard, #1570.
+//
+// So this seed covers SEVEN (backgroundName, edition) pairs, not the fourteen
+// a full 7×2 grid would suggest, and the seeder's presence guard is scoped to
+// exactly these pairs (assertEveryBackgroundEditionHasPackage does not exist,
+// on purpose — see seed-starting-equipment.ts's comment on why one was NOT
+// added here).
 //
 // Every package's top-level `gold` is null: unlike classes, NEITHER edition
 // gives a background a roll-for-gold dice alternative — a background's GP is
@@ -1140,11 +1152,66 @@ const SOLDIER_2024: ClassStartingEquipment = {
   ],
 };
 
+// PHB'24 Charlatan. Not SRD — see this section's header on why transcribing it
+// is finishing a row rather than crossing a new line. "Costume" and "Perfume"
+// (Noble, below) are the book's names for catalog rows seeded as Costume
+// Clothes / Perfume Vial, the same naming gap Acolyte's "Book (occult lore)" →
+// Book of Lore hit in #1565.
+const CHARLATAN_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) a Forgery Kit, a Costume, Fine Clothes, and 15 GP",
+          items: [
+            { catalogName: "Forgery Kit" },
+            { catalogName: "Costume Clothes" },
+            { catalogName: "Fine Clothes" },
+          ],
+          gold: 15,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
+// PHB'24 Noble. Its gaming set is the SAME "same as above" construction
+// Soldier's package uses — bound to the gaming-set proficiency this background
+// grants, not a free pick from the four gaming sets.
+const NOBLE_2024: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "Starting Equipment",
+      options: [
+        {
+          label: "(A) a Gaming Set (same as above), Fine Clothes, a Perfume, and 29 GP",
+          items: [{ catalogName: "Fine Clothes" }, { catalogName: "Perfume Vial" }],
+          openPicks: [
+            {
+              label: "Gaming Set (same as above)",
+              filter: { toolCategory: "gamingSet" },
+              boundToToolChoice: true,
+            },
+          ],
+          gold: 29,
+        },
+        { label: "(B) 50 GP", gold: 50 },
+      ],
+    },
+  ],
+};
+
 const BACKGROUND_PACKAGES_2024: Record<string, ClassStartingEquipment> = {
   Acolyte: ACOLYTE_2024,
   Criminal: CRIMINAL_2024,
   Sage: SAGE_2024,
   Soldier: SOLDIER_2024,
+  Charlatan: CHARLATAN_2024,
+  Noble: NOBLE_2024,
 };
 
 // SRD 5.1 (5thsrd.org) Acolyte — the ONLY 2014 background with SRD text to
@@ -1179,10 +1246,10 @@ const BACKGROUND_PACKAGES_2014: Record<string, ClassStartingEquipment> = {
   Acolyte: ACOLYTE_2014,
 };
 
-// Flattened the same way STARTING_EQUIPMENT_PACKAGES is above — five rows,
+// Flattened the same way STARTING_EQUIPMENT_PACKAGES is above — seven rows,
 // not the fourteen a full cross product would produce (see this section's
-// header on why Charlatan/Folk Hero/Noble and 2014 Criminal/Sage/Soldier are
-// deliberately absent, not forgotten).
+// header on why Folk Hero and the 2014 halves of Charlatan/Criminal/Noble/
+// Sage/Soldier are deliberately absent, not forgotten).
 export const BACKGROUND_STARTING_EQUIPMENT_PACKAGES: BackgroundStartingEquipmentSeed[] = [
   ...Object.entries(BACKGROUND_PACKAGES_2014).map(([backgroundName, pkg]) => ({
     backgroundName,

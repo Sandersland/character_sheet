@@ -666,6 +666,10 @@ export const ITEMS: CatalogItem[] = [
   { name: "Soap", category: "gear", weight: 0, cost: coins(0, 0, 2) },
   { name: "Costume Clothes", category: "gear", weight: 4, cost: coins(5) },
   { name: "Disguise Kit", category: "gear", weight: 3, cost: coins(25), description: "Cosmetics, hair dye, small props, and a few costumes for creating disguises." },
+  // SRD 5.2 tools table (15 GP, 5 lb). toolCategory "other" like Thieves' Tools
+  // — a standalone kit, not one of the artisan/gaming/instrument families the
+  // open-pick filters span (#1564). Needed by the Charlatan package (#1570).
+  { name: "Forgery Kit", category: "gear", weight: 5, cost: coins(15), description: "Papers, parchments, inks, seals, and sealing wax for producing convincing forgeries.", toolCategory: "other" },
   { name: "Book of Lore", category: "gear", weight: 5, cost: coins(25), description: "A book containing knowledge in a particular field." },
   { name: "Parchment Sheet", category: "gear", weight: 0, cost: coins(0, 1, 0) },
   { name: "Knife", category: "gear", weight: 0.5, cost: coins(0, 2, 0) },

@@ -184,15 +184,19 @@ describe("real Acolyte background package resolves per-edition, never one servin
 });
 
 describe("a background with no package still creates successfully (#1565)", () => {
-  it("Charlatan (no SRD package in either edition) creates fine with no backgroundStartingEquipment sent", async () => {
+  // Folk Hero, not Charlatan: since #1570 Charlatan carries a PHB'24 package,
+  // so it would exercise the HAS-a-package path and pass for the wrong reason.
+  // Folk Hero is the only background with no package in either edition —
+  // PHB'24 dropped it and it has no SRD text.
+  it("Folk Hero (no package in either edition) creates fine with no backgroundStartingEquipment sent", async () => {
     const response = await supertest
       .agent(createApp())
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
         baseBody({
-          name: "Charlatan No Equipment",
-          background: "Charlatan",
+          name: "Folk Hero No Equipment",
+          background: "Folk Hero",
           classes: [{ name: "Rogue" }],
           rulesEdition: "EDITION_2024",
         }),
@@ -209,8 +213,8 @@ describe("a background with no package still creates successfully (#1565)", () =
       .post("/api/characters")
       .send(
         baseBody({
-          name: "Charlatan Rejected",
-          background: "Charlatan",
+          name: "Folk Hero Rejected",
+          background: "Folk Hero",
           classes: [{ name: "Rogue" }],
           rulesEdition: "EDITION_2024",
           backgroundStartingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] },

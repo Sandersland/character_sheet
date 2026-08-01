@@ -32,8 +32,8 @@ const PACKAGE_WITH_GOLD_ALT: ClassStartingEquipment = {
 // kind) and the background's own package (title="Background Equipment",
 // kind="background") — the acceptance criterion is that the picker renders a
 // background choice when the background HAS a package and renders nothing at
-// all when it doesn't (Charlatan/Folk Hero/Noble, or a 2014 Criminal/Sage/
-// Soldier — see BackgroundOption's own comment), same as a class with none.
+// all when it doesn't (Folk Hero, or any 2014 background but Acolyte — see
+// BackgroundOption's own comment), same as a class with none.
 describe("StartingEquipmentSection — background reuse (#1565)", () => {
   it("renders nothing when startingEquipment is null (a background with no seeded package)", () => {
     render(

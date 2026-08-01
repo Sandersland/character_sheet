@@ -83,8 +83,8 @@ function SpellsStepBody({ c }: StepBodyProps) {
 function EquipmentStepBody({ c }: StepBodyProps) {
   const startingEquipment = c.selections.class?.startingEquipment;
   // #1565: the background's OWN package rides the same step, as a second card
-  // — most backgrounds have none (Charlatan/Folk Hero/Noble, every homebrew
-  // name, and a 2014 Criminal/Sage/Soldier), so this is usually absent.
+  // — many backgrounds have none (Folk Hero in either edition, every homebrew
+  // name, and any 2014 background but Acolyte), so this is often absent.
   const backgroundEquipment = c.selections.background?.startingEquipment;
   // GRANTED tools as well as chosen ones — the same union the server's
   // creationToolProfs assembles (background + class + race grants, plus the
