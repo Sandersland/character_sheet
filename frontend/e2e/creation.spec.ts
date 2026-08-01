@@ -95,6 +95,52 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   expect(errors).toEqual([]);
 });
 
+// #1570: Noble's PHB'24 option (A) carries "Gaming Set (same as above)" — a
+// boundToToolChoice pick over the gaming-set proficiency the BACKGROUND itself
+// grants, not one the player chose. That is precisely the shape that shipped
+// broken in #1565 (the picker filtered on chosen tools only, so the dropdown
+// was empty and Continue stayed disabled forever), and no unit test catches it:
+// the draft is React-controlled, so only the rendered step is wrong.
+//
+// Landing on the sheet IS the assertion — it can only happen if the Equipment
+// step was completable, which requires the bound pick to have offered the
+// granted gaming set.
+test("creation: a Noble's background gaming-set pick is satisfiable from a granted tool", async ({ page }) => {
+  const name = uniqueName("Highborn");
+
+  await login(page);
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: "New Character" }).first().click();
+  await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page);
+
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
+  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Class/).selectOption({ label: "Rogue" });
+  await page.getByLabel("Background").selectOption({ label: "Noble" });
+  await continueStep(page);
+
+  // Noble's PHB'24 spread draws from Str/Int/Cha.
+  await page.getByRole("radio", { name: "+2 to Charisma" }).check();
+  await page.getByRole("radio", { name: "+1 to Intelligence" }).check();
+  await continueStep(page);
+
+  // Skills & Tools step.
+  await continueStep(page);
+
+  // Equipment step — two cards now (Rogue's package and Noble's own), and the
+  // background card's open pick must offer the granted Dice Set.
+  await chooseEquipmentOptionA(page);
+  await continueStep(page);
+
+  await page.getByRole("button", { name: /Create Character/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
 // #1131: a level-1 caster picks its cantrips + spells during creation and they
 // show up on the Magic tab — the flow that surfaced the missing-Eldritch-Blast bug.
 test("creation: a warlock picks cantrips + spells that show on the Magic tab", async ({ page }) => {
