@@ -22,8 +22,19 @@ async function serialize(id: string) {
 }
 
 describe("entry-scoped resource pools flow through serializeCharacter (#1071)", () => {
+  let monkId: string;
+  let fighterId: string;
+  let battleMasterId: string;
+
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    // #1524: production always sets classId/subclassId alongside the
+    // subclass string (routes/character/class.ts, level-up.ts); resolved
+    // here from the real seeded catalog rows since this test exercises
+    // characterInclude -> serializeCharacter directly.
+    monkId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } })).id;
+    fighterId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
+    battleMasterId = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighterId, name: "Battle Master" } })).id;
   });
 
   afterEach(async () => {
@@ -51,8 +62,8 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
         resources: { used: { focus: 5, superiorityDice: 4 } } as Prisma.InputJsonValue,
         classEntries: {
           create: [
-            { name: "monk", position: 0, level: 5 },
-            { name: "fighter", position: 1, level: 3, subclass: "battle master" },
+            { name: "monk", classId: monkId, position: 0, level: 5 },
+            { name: "fighter", subclass: "battle master", subclassId: battleMasterId, classId: fighterId, position: 1, level: 3 },
           ],
         },
       },
@@ -94,8 +105,8 @@ describe("entry-scoped resource pools flow through serializeCharacter (#1071)", 
         resources: { used: { focus: 5 } } as Prisma.InputJsonValue,
         classEntries: {
           create: [
-            { name: "monk", position: 0, level: 5 },
-            { name: "fighter", position: 1, level: 3, subclass: "battle master" },
+            { name: "monk", classId: monkId, position: 0, level: 5 },
+            { name: "fighter", subclass: "battle master", subclassId: battleMasterId, classId: fighterId, position: 1, level: 3 },
           ],
         },
       },

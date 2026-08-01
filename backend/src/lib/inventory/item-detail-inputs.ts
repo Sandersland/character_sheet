@@ -9,12 +9,13 @@ import type {
   ArmorCategory,
   ArmorDetailInput,
   ItemCategory,
+  ToolCategory,
   WeaponDetailInput,
 } from "@character-sheet/shared-types";
 
 // The category enums and the weapon/armor inputs are the wire contract and live
 // in shared-types (#1273); re-exported so importers keep resolving them here.
-export type { ArmorCategory, ArmorDetailInput, ItemCategory, WeaponDetailInput };
+export type { ArmorCategory, ArmorDetailInput, ItemCategory, ToolCategory, WeaponDetailInput };
 
 // No frontend twin (the client sends ConsumableDetail, which the API also
 // returns), so this one stays backend-local.

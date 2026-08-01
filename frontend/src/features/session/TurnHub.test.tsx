@@ -74,7 +74,11 @@ function makeCharacter(overrides: Partial<Character> = {}, weaponRows: AttackRow
     availableActions: [
       { key: "divineSense", name: "Divine Sense", cost: "action", enabled: true },
       { key: "layOnHands", name: "Lay on Hands", cost: "action", enabled: true },
-      { key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true },
+      // resolverKind (#1528) — Second Wind is row-driven now; without this,
+      // resolverFor's fallback synthesis never fires and the card silently
+      // drops out of partitionClassActions (the exact "vanishes with no test
+      // failure" hazard the ordering matters for).
+      { key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true, resolverKind: "heal-roll" },
       { key: "opportunityAttack", name: "Opportunity Attack", cost: "reaction", enabled: true },
     ],
     resources: {
@@ -477,9 +481,11 @@ describe("TurnHub — server-effect undo (#758)", () => {
     await user.click(screen.getByRole("button", { name: "Use Bonus" }));
     await user.click(screen.getByRole("button", { name: "Second Wind" }));
 
+    // No `roll` (#1528) — Second Wind is server-rolled now; the client sends
+    // a bare executeAction and the server reports the roll back in `results`.
     await waitFor(() =>
       expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
-        { type: "executeAction", actionKey: "secondWind", roll: expect.any(Number) },
+        { type: "executeAction", actionKey: "secondWind" },
       ]),
     );
 

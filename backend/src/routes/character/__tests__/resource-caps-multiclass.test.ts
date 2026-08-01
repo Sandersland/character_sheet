@@ -47,6 +47,11 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
     beforeEach(async () => {
       const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
       const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+      // #1524: production always sets subclassId alongside the subclass
+      // string (routes/character/class.ts, level-up.ts); resolved here so
+      // this fixture matches that shape.
+      const evocation = await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } });
+      const battleMaster = await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } });
       await prisma.character.create({
         data: {
           ...BASE,
@@ -60,8 +65,8 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
           resources: Prisma.JsonNull,
           classEntries: {
             create: [
-              { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 7 },
-              { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 3 },
+              { name: "wizard", subclass: "School of Evocation", subclassId: evocation.id, classId: wizard.id, position: 0, level: 7 },
+              { name: "fighter", subclass: "Battle Master", subclassId: battleMaster.id, classId: fighter.id, position: 1, level: 3 },
             ],
           },
         },
@@ -104,6 +109,11 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
     beforeEach(async () => {
       const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
       const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+      // #1524: production always sets subclassId alongside the subclass
+      // string (routes/character/class.ts, level-up.ts); resolved here so
+      // this fixture matches that shape.
+      const evocation = await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } });
+      const battleMaster = await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } });
       await prisma.character.create({
         data: {
           ...BASE,
@@ -117,8 +127,8 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
           resources: Prisma.JsonNull,
           classEntries: {
             create: [
-              { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 7 },
-              { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 3 },
+              { name: "wizard", subclass: "School of Evocation", subclassId: evocation.id, classId: wizard.id, position: 0, level: 7 },
+              { name: "fighter", subclass: "Battle Master", subclassId: battleMaster.id, classId: fighter.id, position: 1, level: 3 },
             ],
           },
         },

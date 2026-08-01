@@ -1,16 +1,33 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { abilityModifier, deriveMartialArtsDie } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature, DerivedResource, InitiativeRegen } from "./types.js";
+import type { AuthoredFeature, ClassDefinition, DerivedResource, InitiativeRegen } from "./types.js";
 
-// Focus save DC (Monk) — used by Stunning Strike (live-play automation lives in
-// stunning-strike.ts, which imports this), focus features, and Warrior of the
-// Elements (Elemental Burst / Elemental Strikes force this DC). Exported so it's
-// the single copy of the formula (SRD 5.2).
-export function focusSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
+// Monk save DC — used by Stunning Strike, Open Hand Technique, Quivering Palm
+// (live-play automation lives in their own modules, which import this), focus
+// features, and Warrior of the Elements (Elemental Burst / Elemental Strikes
+// force this DC). Renamed for #1499 — the old name cited only the 2024 pool
+// ("Focus"), which no longer holds once the derivation layer serves 2014
+// characters too. "Ki save DC = 8 + your proficiency bonus + your Wisdom
+// modifier" (SRD 5.1 Monk, Ki / PHB'14 p.78) and "Focus save DC = 8 + Wisdom
+// modifier + Proficiency Bonus" (SRD 5.2 Monk, Focus / PHB'24 p.88) are the
+// identical formula, so this takes no `edition` — only the pool NAME forks
+// (see monkPoolKey).
+export function monkSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
   return 8 + profBonus + abilityModifier(abilityScores.wisdom ?? 10);
 }
 
-const MONK_FEATURES: DerivedFeature[] = [
+// The Monk pool's vocabulary by edition (#1313 D3) — Ki Points (SRD 5.1 /
+// PHB'14 p.78) vs Focus Points (SRD 5.2 / PHB'24 p.88). Count, start level (2),
+// and recharge (short or long rest) are identical in both editions and don't
+// fork — only this name does. Nothing consumes the "ki" branch yet; #1500
+// wires up the 2014 monk's own pool under this key.
+export function monkPoolKey(edition: RulesEdition): "ki" | "focus" {
+  return edition === "EDITION_2014" ? "ki" : "focus";
+}
+
+const MONK_FEATURES: AuthoredFeature[] = [
   {
     name: "Unarmored Defense",
     level: 1,
@@ -65,6 +82,10 @@ const MONK_FEATURES: DerivedFeature[] = [
     level: 5,
     source: "class",
     description: "You can attack twice whenever you take the Attack action on your turn.",
+    // #1530: edition-invariant (SRD 5.1 / SRD 5.2 Monk, Extra Attack) — one
+    // flat tier, no further scaling at higher levels (unlike Fighter).
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
   },
   {
     name: "Stunning Strike",
@@ -138,7 +159,7 @@ const MONK_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_THE_OPEN_HAND_FEATURES: AuthoredFeature[] = [
   {
     name: "Open Hand Technique",
     level: 3,
@@ -173,7 +194,7 @@ const WARRIOR_OF_THE_OPEN_HAND_FEATURES: DerivedFeature[] = [
 // menu for a single 1-focus Darkness cast + passive Minor Illusion/Darkvision
 // grants; Cloak of Shadows moves 11 -> 17 (replacing Opportunist, retired —
 // no 2024 equivalent) and Improved Shadow Step fills the vacated L11 slot.
-const WARRIOR_OF_SHADOW_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_SHADOW_FEATURES: AuthoredFeature[] = [
   {
     name: "Shadow Arts",
     level: 3,
@@ -214,7 +235,7 @@ const WARRIOR_OF_SHADOW_FEATURES: DerivedFeature[] = [
 // Survivor's saving-throw proficiency above, it's feature text only; this
 // app has no mechanism for a subclass to auto-add to the persisted skill/tool
 // proficiency lists (those are chosen at creation).
-const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_MERCY_FEATURES: AuthoredFeature[] = [
   {
     name: "Implements of Mercy",
     level: 3,
@@ -265,7 +286,7 @@ const WARRIOR_OF_MERCY_FEATURES: DerivedFeature[] = [
 // Burst at L6, Stride of the Elements at L11, and the Elemental Epitome capstone
 // at L17. Elemental Attunement is modeled as a while-active buff + two Focus-
 // spending session actions (toggle + Elemental Burst) — see warrior-of-elements.ts.
-const WARRIOR_OF_THE_ELEMENTS_FEATURES: DerivedFeature[] = [
+const WARRIOR_OF_THE_ELEMENTS_FEATURES: AuthoredFeature[] = [
   {
     name: "Manipulate Elements",
     level: 3,
@@ -305,9 +326,14 @@ const WARRIOR_OF_THE_ELEMENTS_FEATURES: DerivedFeature[] = [
 
 export const monk: ClassDefinition = {
   features: MONK_FEATURES,
-  resourceFn: (level, abilityScores, profBonus) => {
+  // subclassKey is unused here — the base monk pool never needs to resolve a
+  // subclass-specific variant (unlike druid's wildShape, #906) — but the full
+  // parameter list must be declared so `edition` can reach deriveMartialArtsDie
+  // below (#1499; see ResourceFn's header for why a shorter list would also
+  // typecheck for every OTHER class's resourceFn).
+  resourceFn: (level, abilityScores, profBonus, _subclassKey, edition) => {
     if (level < 2) return [];
-    const focusDC = focusSaveDC(abilityScores, profBonus);
+    const focusDC = monkSaveDC(abilityScores, profBonus);
     // Uncanny Metabolism (L2, SRD 5.2): on rolling Initiative, regain all
     // expended Focus once per long rest, plus heal monk level + a Martial Arts
     // die roll (the roll itself happens in the impure rollInitiative op —
@@ -319,7 +345,7 @@ export const monk: ClassDefinition = {
         id: "uncannyMetabolism",
         amount: "all",
         oncePerLongRest: true,
-        bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: deriveMartialArtsDie(level), flatBonus: level },
+        bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: deriveMartialArtsDie(level, edition), flatBonus: level },
       },
     ];
     if (level >= 15) {

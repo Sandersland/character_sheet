@@ -14,7 +14,7 @@ import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 // reference-types entry point (flowing through the @/types/character barrel).
 // ClassStartingEquipment is also used locally by ClassOption below.
 export type { ClassStartingEquipment };
-export type { EquipmentBundle, OpenWeaponPick } from "@character-sheet/shared-types";
+export type { EquipmentBundle, EquipmentChoiceGroup, OpenPick, StartingGold } from "@character-sheet/shared-types";
 
 /** Subclass option (from GET /api/reference). */
 export interface SubclassOption {
@@ -93,6 +93,11 @@ export interface BackgroundOption {
   abilityChoices: AbilityName[];
   /** The Origin feat granted at creation; null for spec-less legacy rows. */
   originFeat: OriginFeatOption | null;
+  /** #1565: this background's own starting-equipment definition, null when
+   *  the background has no seeded package under this edition — any 2014
+   *  background but Acolyte (SRD 5.1's only one) and Folk Hero (PHB'14, #1570).
+   *  Same shape as ClassOption.startingEquipment, reused rather than a second type. */
+  startingEquipment: ClassStartingEquipment | null;
 }
 
 /** One tool from the SRD TOOLS constant, served by GET /api/reference. */
@@ -195,6 +200,11 @@ export interface CreateCharacterInput {
   /** Tool names chosen by the player (from class toolChoices). */
   toolChoices?: string[];
   startingEquipment?: StartingEquipmentInput;
+  /** #1565: the background's OWN equipment package selections, resolved by
+   *  (backgroundId, edition) alongside `startingEquipment` above. A background
+   *  never has a roll-for-gold alternative, so the backend 400s a "gold" mode
+   *  input here; omitted for a background with no seeded package. */
+  backgroundStartingEquipment?: StartingEquipmentInput;
   /** #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids). */
   spells?: { cantripIds: string[]; spellIds: string[] };
   /** #1286: resolved by CreationEntryGate before the ceremony starts — inherited

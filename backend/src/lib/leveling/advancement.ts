@@ -562,7 +562,10 @@ const ADVANCEMENT_SELECT = {
     orderBy: { position: "asc" as const },
     // All entries (name + level) — both the fs-slot cap (#1137) and the ASI/feat
     // slot cap (#1073) sum entitlement per class entry, not just the primary.
-    select: { name: true, level: true },
+    // `class` (#1529): a seventh reconciler/clamp-on-read query site beyond the
+    // issue's own enumerated six — found via the signature change + typecheck,
+    // resolving the SAME extraAsiLevels/fightingStyleFeatLevel columns.
+    select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 

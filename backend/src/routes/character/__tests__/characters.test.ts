@@ -620,11 +620,14 @@ describe("characters routes", () => {
     // race, Sage/Soldier backgrounds, and the weapon/armor/gear items) which
     // is applied via `prisma db seed` before running the test suite.
     describe("with startingEquipment (package mode)", () => {
-      // Simplest package path: Wizard with no open picks.
-      //   Group 0: Quarterstaff
-      //   Group 1: Component Pouch
-      //   Group 2: Scholar's Pack (expands via PACK_CONTENTS → 6 rows)
-      //   Group 3: Spellbook (auto-grant)
+      // Simplest package path: Wizard with no open picks. This whole describe
+      // block exercises the PHB'14 FOUR-group package shape (Group 0:
+      // Quarterstaff, Group 1: Component Pouch, Group 2: Scholar's Pack
+      // (expands via PACK_CONTENTS -> 6 rows), Group 3: Spellbook auto-grant)
+      // by fixed group/optionIndex — the EDITION_2024 Wizard package (#1535)
+      // is ONE group of two lettered options instead, so every body here
+      // pins rulesEdition explicitly rather than relying on
+      // DEFAULT_RULES_EDITION (2024).
       const wizardBody = {
         name: "Merlin",
         alignment: "Neutral Good",
@@ -640,6 +643,7 @@ describe("characters routes", () => {
           charisma: 10,
         },
         skillProficiencies: ["arcana", "history"],
+        rulesEdition: "EDITION_2014" as const,
         startingEquipment: {
           mode: "package",
           selections: [
@@ -670,12 +674,17 @@ describe("characters routes", () => {
         // Scholar's Pack is expanded — its individual items appear, not the pack itself
         expect(names).not.toContain("Scholar's Pack");
         expect(names).toContain("Backpack");
-        // Starting gold should be zero for the package path
+        // Starting gold should be zero for the package path — also the #1564
+        // regression check: every EDITION_2014 option carries gold: 0, so
+        // this real package's currency must stay exactly what it is today
+        // now that package-mode selections can add gold (starting-equipment-
+        // gold.test.ts covers the nonzero accumulation with a fixture package).
         expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
       });
 
       it("creates inventory rows with an open-pick weapon (Fighter martial weapon)", async () => {
         // Fighter group 1, option 0: martial weapon + shield. Open pick: Longsword
+        // (the PHB'14 four-group shape — pin the edition, see wizardBody's comment above)
         const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
@@ -693,6 +702,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -763,6 +773,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -850,6 +861,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -882,6 +894,7 @@ describe("characters routes", () => {
               charisma: 8,
             },
             skillProficiencies: ["athletics", "intimidation"],
+            rulesEdition: "EDITION_2014",
             startingEquipment: {
               mode: "package",
               selections: [
@@ -899,7 +912,7 @@ describe("characters routes", () => {
       });
 
       it("rejects mode:package for a class with no package definition with 400", async () => {
-        // TEST_CLASS ("Test Class") is not in STARTING_EQUIPMENT
+        // TEST_CLASS ("Test Class") has no seeded StartingEquipmentPackage row (#1534)
         const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
@@ -909,9 +922,29 @@ describe("characters routes", () => {
 
         expect(response.status).toBe(400);
       });
+
+      // gold mode's range check is wrapped in `if (classDef)` (resolveStartingGold,
+      // #1534) — a class with no package row accepts ANY gold amount unvalidated.
+      // An absurd amount (999999) that would fail every real class's dice range
+      // proves this isn't accidentally passing a narrow check.
+      it("accepts any gold amount unvalidated for a class with no package definition", async () => {
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+          .post("/api/characters")
+          .send({
+            ...createBody,
+            startingEquipment: { mode: "gold", gold: 999999 },
+          });
+
+        expect(response.status).toBe(201);
+        createdCharacterIds.push(response.body.id);
+        expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 999999, pp: 0 });
+      });
     });
 
     describe("with startingEquipment (gold mode)", () => {
+      // 2014-only: EDITION_2024's Wizard package has no roll-for-gold rule at
+      // all (gold: null, #1564/#1535) — pin the edition rather than relying
+      // on DEFAULT_RULES_EDITION (2024).
       const baseBody = {
         name: "Wealthy Adventurer",
         alignment: "True Neutral",
@@ -927,6 +960,7 @@ describe("characters routes", () => {
           charisma: 10,
         },
         skillProficiencies: ["arcana", "history"],
+        rulesEdition: "EDITION_2014" as const,
       };
 
       it("sets currency.gp and leaves inventory empty", async () => {

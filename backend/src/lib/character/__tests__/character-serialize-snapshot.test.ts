@@ -3,14 +3,17 @@
 // while the builders move into lib/character/serialize/*.
 //
 // #1341 audit: every class-entry `name` here must match the rule registries
-// that gate mechanical derivation off it. DERIVED_ACTIONS (matchesActionGate),
-// CLASSES (deriveResources), and the ASI/fighting-style/caster-fraction/
-// extra-attack tables all lowercase before lookup, so both fixtures' lowercase
-// entry names ("fighter"/"wizard") match them correctly. CLASS_PROFICIENCY_GRANTS
-// is the one exception: it's keyed on the capitalized catalog display name
-// ("Fighter"/"Wizard") and looked up case-sensitively, so both fixtures miss it
-// — a real production defect (#1388), not fixed here because correcting it
-// would change both fixtures' derived proficiency and weapon-attack values.
+// that gate mechanical derivation off it. DERIVED_ACTIONS (matchesActionGate)
+// and CLASSES (deriveResources) lowercase before lookup, so both fixtures'
+// lowercase entry names ("fighter"/"wizard") match them correctly.
+// Armor/weapon proficiencies AND the ASI-extra/Fighting-Style-feat schedule
+// resolve through the class FK relation now (#1529, fixing #1388's class
+// half — case no longer matters at all), so this fixture's CharacterClass
+// rows carry Fighter's real extraAsiLevels/fightingStyleFeatLevel values
+// explicitly (see the `characterClass.create` call below) to stay
+// byte-identical with pre-#1529 behavior; armorProficiencies/
+// weaponProficiencies are left at their column default ([]) since neither
+// fixture exercises a proficiency-gated assertion.
 //
 // #1322 audit: both fixtures are EDITION_2024 (the default), so
 // `exhaustionEffectText`'s +1-line-per-fixture delta never exercises the 2014
@@ -25,13 +28,17 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 const OWNER_ID = "owner-serialize-snapshot";
 const FIGHTER_CLASS_NAME = "Test Fighter (Snapshot Suite)";
+const WIZARD_CLASS_NAME = "Test Wizard (Snapshot Suite)";
 const CHAR_IDS = ["snap-char-multi", "snap-char-simple"];
 let fighterClassId: string;
+let wizardClassId: string;
+let battleMasterSubclassId: string;
 
 async function serialize(characterId: string) {
   const row = await prisma.character.findUniqueOrThrow({ where: { id: characterId }, include: characterInclude });
@@ -41,17 +48,95 @@ async function serialize(characterId: string) {
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   await prisma.character.deleteMany({ where: { id: { in: CHAR_IDS } } });
-  await prisma.characterClass.deleteMany({ where: { name: FIGHTER_CLASS_NAME } });
+  await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, WIZARD_CLASS_NAME] } } });
   // Fixed id so the classes view's classId snapshots deterministically.
+  // extraAsiLevels/fightingStyleFeatLevel (#1529) are set to Fighter's real
+  // values — this fixture's entry `name` is lowercase "fighter", which used to
+  // match EXTRA_ASI_LEVELS/fightingStyleFeatSlots' className lookup by
+  // coincidence; the FK-only resolution needs the SAME values on the row
+  // itself to stay byte-identical (a `mistyped value`, not a fix, per #1529).
   const fighter = await prisma.characterClass.create({
-    data: { id: "class-snap-fighter", name: FIGHTER_CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"], skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3 },
+    data: {
+      id: "class-snap-fighter", name: FIGHTER_CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"],
+      skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3,
+      extraAsiLevels: [6, 14], fightingStyleFeatLevel: 1,
+    },
   });
   fighterClassId = fighter.id;
+  const wizard = await prisma.characterClass.create({
+    data: { id: "class-snap-wizard", name: WIZARD_CLASS_NAME, hitDie: "d6", savingThrows: ["intelligence", "wisdom"], skillChoiceCount: 2, skillChoices: ["arcana"], isSpellcaster: true, subclassLevel: 2 },
+  });
+  wizardClassId = wizard.id;
+
+  // #1524: this fixture deliberately uses bespoke CharacterClass rows (fixed
+  // ids, for classId snapshot determinism) instead of the real seeded Fighter/
+  // Wizard rows, whose ids are fresh UUIDs per reseed. Now that feature TEXT
+  // is DB-linked via classId/subclassId (ClassFeature), these bespoke classes
+  // need their own ClassFeature rows too — Fighter/Wizard's own rows below
+  // are hand-copied verbatim from the real seeded EDITION_2024 rows (both
+  // fixtures below are EDITION_2024, the default); Battle Master's rows come
+  // from the shared battleMasterResourceRowsData helper instead (#1546 Part
+  // B-i, Ruling 2) rather than a third hand-copy of the same descriptor text
+  // — so the snapshot's pinned feature content still reflects production
+  // text, not a fixture-only string.
+  const battleMaster = await prisma.subclass.create({
+    data: { id: "subclass-snap-battle-master", classId: fighterClassId, name: "Test Battle Master (Snapshot Suite)", description: "Test fixture subclass.", slug: "battle-master" },
+  });
+  battleMasterSubclassId = battleMaster.id;
+
+  await prisma.classFeature.createMany({
+    data: [
+      { classId: fighterClassId, subclassId: null, name: "Fighting Style", level: 1, edition: "EDITION_2024", description: "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage)." },
+      // Second Wind/Action Surge (#1528): resource + activation + cost columns
+      // populated too, mirroring prisma/seed/fighter-features.ts's real values
+      // — Second Wind is a selectable action this suite's own snapshot pins
+      // (see the availableActions assertion below), so an empty descriptor
+      // set would silently drop it from the wire again.
+      {
+        classId: fighterClassId, subclassId: null, name: "Second Wind", level: 1, edition: "EDITION_2024",
+        description: "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
+        resourceKey: "secondWind", resourceLabel: "Second Wind", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 1, total: 1 }],
+        activationCost: "bonusAction", resolverKind: "heal-roll",
+        costKind: "pool", costPoolKey: "secondWind", costBase: 1,
+        effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 10, effectModifierSource: "classLevel",
+      },
+      {
+        classId: fighterClassId, subclassId: null, name: "Action Surge", level: 2, edition: "EDITION_2024",
+        description: "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17.",
+        resourceKey: "actionSurge", resourceLabel: "Action Surge", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: 1 }, { minLevel: 17, total: 2 }],
+        activationCost: "special", resolverKind: "simple-confirm",
+        costKind: "pool", costPoolKey: "actionSurge", costBase: 1,
+      },
+      // #1530: derivedStat/derivedStatTiers mirror the real seeded Fighter
+      // row (fighter-features.ts) — without these two fields, this fixture's
+      // hand-built row would go through with attacksPerAction=1 (floor),
+      // silently re-baselining the snapshot below instead of proving zero
+      // behaviour change.
+      {
+        classId: fighterClassId, subclassId: null, name: "Extra Attack", level: 5, edition: "EDITION_2024",
+        description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20.",
+        derivedStat: "attacksPerAction",
+        derivedStatTiers: [{ minLevel: 5, value: 2 }, { minLevel: 11, value: 3 }, { minLevel: 20, value: 4 }],
+      },
+      // #1546 Part B-i (Ruling 2): Battle Master's own rows, from the shared
+      // helper rather than a hand-copied pair — this also FIXES a stale
+      // mismatch the hand-copy had: the row below was tagged EDITION_2024 but
+      // carried the 2014 TEXT (no save-DC sentence). The 2024 text is longer,
+      // but this fixture's fighter entry is level 5 (< 7/10/15/18), so no
+      // higher-level Battle Master feature enters the snapshot — only the
+      // corrected Combat Superiority/Student of War text is new output.
+      ...battleMasterResourceRowsData(fighterClassId, battleMasterSubclassId),
+      { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You copy spells into your spellbook and prepare a number equal to your Intelligence modifier + your wizard level (minimum 1) after each long rest." },
+      { classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024", description: "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots)." },
+    ],
+  });
 });
 
 afterAll(async () => {
   await prisma.character.deleteMany({ where: { id: { in: CHAR_IDS } } });
-  await prisma.characterClass.deleteMany({ where: { name: FIGHTER_CLASS_NAME } });
+  await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, WIZARD_CLASS_NAME] } } });
 });
 
 // Fixture 1 — wizard 5 / fighter 1 multiclass caster: used slots + stale slot
@@ -112,7 +197,7 @@ async function createMulticlassCaster() {
       },
       classEntries: {
         create: [
-          { id: "ce-snap-wiz", name: "wizard", position: 0, level: 5 },
+          { id: "ce-snap-wiz", name: "wizard", classId: wizardClassId, position: 0, level: 5 },
           // name must match a DERIVED_ACTIONS grantClass ("fighter") or
           // availableActions[] is structurally empty and this snapshot can't
           // regress — #1315's entry-scoping fix shipped with zero snapshot
@@ -230,7 +315,7 @@ async function createSimpleFighter() {
         advancements: [{ id: "adv-asi", level: 4, kind: "asi", abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 }],
         fightingStyle: "defense", // entitled at fighter 5, kept
       },
-      classEntries: { create: [{ id: "ce-snap-simple", name: "fighter", position: 0, level: 5, subclass: "battle master" }] },
+      classEntries: { create: [{ id: "ce-snap-simple", name: "fighter", classId: fighterClassId, position: 0, level: 5, subclass: "battle master", subclassId: battleMasterSubclassId }] },
     },
   });
 }
@@ -242,9 +327,16 @@ describe("serializeCharacter snapshot lock (#1003)", () => {
     // #1341: pinned outside the snapshot too, so a primary-entry-only regression
     // (#1315's widest behavioural change) fails with a readable diff instead of
     // one line inside a 500-line blob. Fighter is the SECONDARY entry at its own
-    // level 1 — Second Wind is the only row fighter 1 grants.
+    // level 1 — Second Wind is the only row fighter 1 grants. `reminder`/
+    // `resolverKind` (#1528) are the row-driven descriptor's own contribution
+    // — reminder is server-computed from the row's effect columns (never a
+    // second hand-authored string), and resolverKind names the client's
+    // inline tool without a hand-authored ACTION_RESOLVERS entry.
     expect(serialized.availableActions).toEqual([
-      { key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true },
+      {
+        key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true,
+        reminder: "Regain 1d10 + 1 HP", resolverKind: "heal-roll",
+      },
     ]);
     expect(serialized).toMatchSnapshot();
   });

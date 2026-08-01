@@ -24,6 +24,8 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-hp-char";
 let COOKIE: string;
@@ -42,7 +44,9 @@ const BASE = {
 };
 
 const CLASS_NAME = "Test Fighter (HP Char Suite)";
+const BM_SUBCLASS_NAME = "Battle Master";
 let fighterClassId: string;
+let bmSubclassId: string;
 
 async function postHp(id: string, body: object) {
   return supertest(app).post(`/api/characters/${id}/hp`).set("Cookie", COOKIE).send(body);
@@ -60,6 +64,20 @@ beforeAll(async () => {
     update: {},
   });
   fighterClassId = fighter.id;
+  // #1546 Part B-ii: Battle Master's short-or-long resource pool is ROW-driven
+  // now (fighter.ts's resourceFn is gone) — a bespoke Subclass row with no
+  // ClassFeature children would silently lose it, same failure mode
+  // fighterResourceRowsData's own header describes for the base class (#1546
+  // Part B-i, Ruling 2). Shared helper, not a per-file copy.
+  const bm = await upsertEditionRow(
+    prisma.subclass,
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
+    { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers.", slug: "fighter-battle-master-hp-char-suite-test" },
+    {},
+  );
+  bmSubclassId = bm.id;
+  await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+  await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });
 afterAll(async () => {
   await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
@@ -346,7 +364,7 @@ describe("rest/level-up branch pins (#684)", () => {
 
   it("shortRest as Battle Master: short-or-long resource pools reset", async () => {
     await createPlain("hp684-bm", {
-      classEntries: { create: [{ name: "Fighter", subclass: "Battle Master", position: 0, level: 5 }] },
+      classEntries: { create: [{ name: CLASS_NAME, subclass: BM_SUBCLASS_NAME, subclassId: bmSubclassId, classId: fighterClassId, position: 0, level: 5 }] },
       resources: { used: { superiorityDice: 3 } },
     });
     const res = await postHp("hp684-bm", { operations: [{ type: "shortRest", rolls: [6] }] });

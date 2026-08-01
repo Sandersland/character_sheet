@@ -18,6 +18,7 @@ import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { deriveEntryScopedResourcesForCharacterRow, resolveClassDie } from "./class-features.js";
+import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "./feature-rows-select.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
@@ -60,21 +61,32 @@ const MANEUVER_SELECT = {
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, subclass: true, level: true },
+    select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
   },
 } satisfies Prisma.CharacterSelect;
 
 type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }>;
 
 // Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
+// featureRowsOf (#1528 chunk 0) — Battle Master's superiority-dice pool and
+// its maneuverSaveDC are now BOTH row-driven (#1546 Part B: resourceKey/
+// resourceTotals/resourceDieTiers + saveDcAbilities on the Combat Superiority
+// row, read via deriveEntryScopedResourcesForCharacterRow -> registry.ts's
+// deriveRowExtras), which is exactly why this carrier is threaded through
+// here — not a forward-looking comment anymore, but the live path. The gate
+// itself stays Battle-Master-specific in EFFECT (only that subclass's rows
+// ever populate maneuverSaveDC/superiorityDice) — only the thrown message's
+// TEXT is deliberately class-agnostic (#1532's goal grep), so nobody reads a
+// hardcoded class name here and "helpfully" restores it. Do not re-add the
+// class name to the string below; the why is recorded here, not there.
 function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
-  const { derived } = deriveEntryScopedResourcesForCharacterRow(row);
+  const { derived } = deriveEntryScopedResourcesForCharacterRow(row, featureRowsOf);
 
   const saveDcBase = derived?.maneuverSaveDC;
   const dieFaces = derived ? resolveClassDie("superiorityDice", derived) : null;
   if (saveDcBase === undefined || dieFaces === null) {
     throw new InvalidManeuverOperationError(
-      "Only a Battle Master fighter (level 3+) can spend maneuvers",
+      "No superiority dice or maneuver save DC available (level 3+ subclass feature required)",
     );
   }
   return { saveDcBase, dieFaces };

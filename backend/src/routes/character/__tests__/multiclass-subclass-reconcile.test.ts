@@ -153,9 +153,21 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
     spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
   };
 
+  let evocationWizardId: string;
+  let evocationSubclassId: string;
+  let battleMasterFighterId: string;
+  let battleMasterSubclassId: string;
+
   beforeEach(async () => {
     await ensureTestOwner(OWNER);
     cookie = await authCookie(OWNER);
+    // #1524: production always sets classId/subclassId alongside the
+    // subclass string (routes/character/class.ts, level-up.ts); resolved
+    // here so these fixtures match that shape.
+    evocationWizardId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } })).id;
+    evocationSubclassId = (await prisma.subclass.findFirstOrThrow({ where: { classId: evocationWizardId, name: "School of Evocation" } })).id;
+    battleMasterFighterId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
+    battleMasterSubclassId = (await prisma.subclass.findFirstOrThrow({ where: { classId: battleMasterFighterId, name: "Battle Master" } })).id;
   });
 
   it("level-down trims the secondary fighter's maneuvers to ITS OWN new cap (3), not to 0", async () => {
@@ -171,8 +183,8 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
         resources: resourcesWith(FIVE_MANEUVERS) as unknown as Prisma.InputJsonValue,
         classEntries: {
           create: [
-            { name: "wizard", subclass: "School of Evocation", position: 0, level: 3 },
-            { name: "fighter", subclass: "Battle Master", position: 1, level: 7 },
+            { name: "wizard", subclass: "School of Evocation", subclassId: evocationSubclassId, classId: evocationWizardId, position: 0, level: 3 },
+            { name: "fighter", subclass: "Battle Master", subclassId: battleMasterSubclassId, classId: battleMasterFighterId, position: 1, level: 7 },
           ],
         },
       },
@@ -219,8 +231,8 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
         resources: resourcesWith(FIVE_MANEUVERS) as unknown as Prisma.InputJsonValue,
         classEntries: {
           create: [
-            { name: "wizard", subclass: "School of Evocation", position: 0, level: 3 },
-            { name: "fighter", subclass: "Battle Master", position: 1, level: 6 },
+            { name: "wizard", subclass: "School of Evocation", subclassId: evocationSubclassId, classId: evocationWizardId, position: 0, level: 3 },
+            { name: "fighter", subclass: "Battle Master", subclassId: battleMasterSubclassId, classId: battleMasterFighterId, position: 1, level: 6 },
           ],
         },
       },

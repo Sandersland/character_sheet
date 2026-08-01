@@ -68,22 +68,75 @@ export interface DerivedResource {
    * Perfect Focus (every combat, top-up to 4). Inert when absent.
    */
   onInitiative?: InitiativeRegen | InitiativeRegen[];
+  /**
+   * Partial short-rest top-up (#1221, SRD 5.2's "regain one expended use on a
+   * Short Rest, and all on a Long Rest" — 2024 Rage / Channel Divinity /
+   * Second Wind / Wild Shape). Orthogonal to `recharge`, which keeps meaning a
+   * FULL restore on the named rest: `shortRestRegain: N` additionally regains
+   * up to N expended uses on a short rest. Where `recharge` already fires on a
+   * short rest (`shortRest` / `short-or-long`), the full reset wins and this
+   * field is a no-op for that rest — never subtracted twice. Absent ⇒ today's
+   * behaviour exactly (no partial top-up). Read only by `restPoolRegain`
+   * (lib/combat/rest.ts). Independent of `onInitiative`, which fires on a
+   * different trigger (combat start, not a rest) — a pool may declare both.
+   */
+  shortRestRegain?: number;
   description?: string;
 }
 
+/**
+ * A feature exactly as authored in a lib/classes/<class>.ts module (and the
+ * seed's mirroring `RawFeatureRow`, prisma/seed/class-features.ts) — the
+ * pre-migration shape, kept because the twelve class modules stay the seed's
+ * AUTHORING input even after #1524 (they no longer feed the derivation
+ * directly; `CLASS_FEATURES` compiles from them at seed time — #1524's Fact
+ * 1). `edition` optional: the ~256-entry majority never sets it (both
+ * editions share the text) and #1374 rejected a blanket tagging pass to force
+ * one. `DerivedFeature` below is the read-time counterpart — split out
+ * because the two can no longer share one type (see its own comment).
+ */
+export interface AuthoredFeature {
+  name: string;
+  level: number;        // character level at which this feature is gained
+  description: string;
+  source: "class" | "subclass";
+  edition?: RulesEdition;
+  /**
+   * ClassFeature's descriptor-column pair for a permanent, level-gated
+   * derived-stat modifier (#1530) — e.g. `"attacksPerAction"` for Extra
+   * Attack. Distinct from #900's C2b buff layer, which is duration-bound
+   * (`while-active`/`until-rest`); these two columns are for a modifier that
+   * never expires. Both threaded straight through expandFeatureRow into the
+   * seeded ClassFeatureSeedRow unchanged — this file never interprets them.
+   */
+  derivedStat?: string;
+  derivedStatTiers?: { minLevel: number; value: number | string }[];
+}
+
+/**
+ * A feature as DERIVED for one character (registry.ts's deriveResources
+ * output), resolved from seeded `ClassFeature` rows by `featuresFromRows`
+ * (lib/classes/class-feature-rows.ts) — now the ONE place the edition rule
+ * for feature TEXT lives, retiring `featureAppliesToEdition` (#1374/#1524).
+ * `edition` is REQUIRED here, unlike `AuthoredFeature.edition?` above:
+ * `ClassFeature.edition` is a non-nullable DB column (#1522 decision 3 — every
+ * row forks one-per-edition), so every row `featuresFromRows` reads already
+ * names its edition; an untagged *derived* feature would mean row-resolution
+ * failed, not a valid "both editions" state. (#1524 is what makes this split
+ * possible: before it, this type's `edition` was optional too, and its
+ * comment claimed "absent means both editions" / "a blanket tagging pass is
+ * not wanted" — both now false at the DERIVED layer, because #1522 already
+ * tagged every row at the AUTHORING layer; the untagged case didn't
+ * disappear, it relocated to `AuthoredFeature` above.) Still server-side
+ * only: `toWireFeatures` (serialize/classes.ts) strips this field at the wire
+ * boundary.
+ */
 export interface DerivedFeature {
   name: string;
   level: number;        // character level at which this feature is gained
   description: string;
   source: "class" | "subclass";
-  /**
-   * Absent means valid in both editions (the ~150-entry default). A feature
-   * whose text genuinely diverges between PHB'14 and PHB'24 forks into one
-   * row per edition sharing the same `name` — mirrors `Subclass.edition`
-   * (#1306) — filtered by `featureAppliesToEdition` (registry.ts), the one
-   * place this rule lives. A blanket tagging pass is not wanted (#1374).
-   */
-  edition?: RulesEdition;
+  edition: RulesEdition;
 }
 
 /**
@@ -147,11 +200,20 @@ export interface DerivedSubclassChoice {
   count: number;
 }
 
+// `subclassKey`/`edition` are both required (never optional) so `edition` can
+// sit last (the subclassGateLevel pattern, #1499) — a defaulted-then-skipped
+// middle parameter can't coexist with a later required one. Every existing
+// resourceFn implementation still typechecks: TS structurally allows a
+// function value with FEWER declared parameters than its target type (the
+// extra call args are simply ignored), so only monk.ts's own resourceFn (the
+// one implementation that needs `edition` for its Martial Arts die) declares
+// the full parameter list.
 export type ResourceFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
-  subclassKey?: string,
+  subclassKey: string | undefined,
+  edition: RulesEdition,
 ) => DerivedResource[];
 
 /**
@@ -165,11 +227,17 @@ export type ResourceFn = (
 type ClassExtrasOnly = Partial<ClassExtras> &
   Partial<Record<Exclude<keyof DerivedClassInfo, keyof ClassExtras>, never>>;
 
-/** A subclass's bespoke level-gated choice-cap fields beyond its resources/features layer — see ClassExtras. */
+/**
+ * A subclass's bespoke level-gated choice-cap fields beyond its resources/
+ * features layer — see ClassExtras. `edition` last, same rationale as
+ * ResourceFn (#1499) — no subclassKey here since an ExtrasFn is already
+ * scoped to one subclass.
+ */
 export type ExtrasFn = (
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
+  edition: RulesEdition,
 ) => ClassExtrasOnly;
 
 export interface SubclassDefinition {
@@ -190,7 +258,11 @@ export interface SubclassDefinition {
    * the same 2014 gate (#1308/#1291).
    */
   grantLevel?: number;
-  features: DerivedFeature[];
+  // Optional (#1227): Fighter's subclasses carry no AuthoredFeature[] at all
+  // — their text is literal seed data (prisma/seed/fighter-features.ts), and
+  // collectRawFeatures/baseFeatureRows (prisma/seed/class-features.ts) treat
+  // an absent array as zero rows to derive, never a crash.
+  features?: AuthoredFeature[];
   resourceFn?: ResourceFn;
   deriveExtras?: ExtrasFn;
   /**
@@ -202,7 +274,10 @@ export interface SubclassDefinition {
 }
 
 export interface ClassDefinition {
-  features: DerivedFeature[];
+  // Optional (#1227) — same rationale as SubclassDefinition.features above.
+  // Fighter is the only class today with no array at all: its base-class
+  // text is literal seed data too.
+  features?: AuthoredFeature[];
   resourceFn?: ResourceFn;
   /** Keyed by lowercase subclass name (entry.subclass.toLowerCase()). */
   subclasses?: Record<string, SubclassDefinition>;

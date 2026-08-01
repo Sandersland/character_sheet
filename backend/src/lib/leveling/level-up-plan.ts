@@ -5,6 +5,7 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
@@ -64,6 +65,26 @@ export interface TargetClassEntry {
   // let a future construction site silently fall back to the character's
   // persisted position-0 die, which is the multiclass wrong-die bug.
   hitDie: string;
+  // #1529: CharacterClass.extraAsiLevels/fightingStyleFeatLevel, already
+  // resolved by the caller (resolveLevelUpContext, alongside subclassLevel) —
+  // a pure planner has no DB relation to read them from itself. Defaults ([]
+  // / null) match a homebrew class's catalog-less fallback, same shape as
+  // subclassLevel's own default-3 comment.
+  extraAsiLevels?: number[];
+  fightingStyleFeatLevel?: number | null;
+  // #1546 Part B-i: the seeded ClassFeature rows for THIS target — the FK
+  // carrier resolveLevelUpContext resolves (TARGET_ENTRY_SELECT, mirroring
+  // characterInclude's class.features/subclassRef.features), same rationale
+  // as subclassLevel/extraAsiLevels above (a pure planner has no DB relation
+  // to read these itself). `subclassFeatureRows` is the PERSISTED subclass's
+  // own rows — absent when no subclass is chosen yet. The not-yet-committed
+  // `?subclassId=` pick's own rows travel separately, as resolveLevelUpPlan's
+  // own parameter (mirroring persistedGrantSource/pickedGrantSource,
+  // level-up.ts, which solves this exact persisted/picked split for #898's
+  // granted spells) — never baked onto this field, since a re-plan target
+  // hasn't actually committed to that subclass.
+  classFeatureRows?: ClassFeatureRow[];
+  subclassFeatureRows?: ClassFeatureRow[];
 }
 
 // The target plus its derived resources at N and N-1 — the context each step reads.
@@ -87,7 +108,28 @@ function derivedAt(
   edition: RulesEdition,
 ): DerivedClassInfo | null {
   if (level < 1) return null;
-  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), edition);
+  // #1546 Part B-i threaded this carrier (target.classFeatureRows/
+  // subclassFeatureRows, resolved by the caller — see TargetClassEntry's own
+  // comment), replacing the `undefined` this call passed before. #1546 Part
+  // B-ii is what makes it load-bearing: Battle Master's maneuverChoiceCount/
+  // toolProfChoiceCount/maneuverSaveDC moved OFF SubclassDefinition.deriveExtras
+  // (code) onto these rows (registry.ts's deriveRowExtras), so choiceCountStep
+  // below now genuinely diffs row-driven counts, not a coincidental `?? 0` over
+  // two absent code-authored values. That also opens a null-flip channel this
+  // function's callers must tolerate: with an EMPTY carrier (a bare test
+  // fixture, or a class/subclass whose only content is now row-driven),
+  // deriveResources' `resources.length === 0 && features.length === 0 &&
+  // !hasExtras` guard can return null here where a real carrier would have
+  // returned a populated object — see derive-resources-null-flip.test.ts and
+  // level-up-plan-feature-rows.test.ts's explicit boundary assertion. Every
+  // step below stays null-safe through `now?.[field] ?? 0` /
+  // `prev?.[field] ?? 0` regardless (choiceCountStep), so a flip to null here
+  // only ever reads as "nothing granted yet", never throws.
+  const featureRows: ClassFeatureRowsCarrier = {
+    classRows: target.classFeatureRows ?? [],
+    subclassRows: target.subclassFeatureRows ?? [],
+  };
+  return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), featureRows, edition);
 }
 
 // Everything the ceremony's HP step shows the player: the advancing die, the Con
@@ -123,7 +165,8 @@ function hitPointsStep({ target, abilityScores }: PlanContext): LevelUpStep {
 }
 
 function advancementStep({ target }: PlanContext): LevelUpStep | null {
-  const delta = advancementSlotsForLevel(target.name, target.newLevel) - advancementSlotsForLevel(target.name, target.newLevel - 1);
+  const extraAsiLevels = target.extraAsiLevels ?? [];
+  const delta = advancementSlotsForLevel(extraAsiLevels, target.newLevel) - advancementSlotsForLevel(extraAsiLevels, target.newLevel - 1);
   return delta > 0 ? { kind: "advancement", count: delta } : null;
 }
 
@@ -136,7 +179,8 @@ function subclassStep({ target }: PlanContext): LevelUpStep | null {
 // A Fighting Style feat pick (#1137): Fighter's arrives with a new level-1 entry,
 // Paladin's and Ranger's at level 2. Derived from the fightingStyleFeatSlots delta.
 function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
-  const delta = fightingStyleFeatSlots(target.name, target.newLevel) - fightingStyleFeatSlots(target.name, target.newLevel - 1);
+  const fightingStyleFeatLevel = target.fightingStyleFeatLevel ?? null;
+  const delta = fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel) - fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel - 1);
   return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -59,6 +59,19 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: CHAR_ID } });
+  });
+
+  // #1543: beforeEach upserts a transient TestMonkStale CharacterClass with no
+  // ClassFeature rows. Left behind, it trips seedClassFeatures's
+  // assertEveryClassEditionPopulated guard (#1525) in whichever OTHER test
+  // file happens to reseed later in the same worker — deterministic given
+  // vitest's file-shuffle sharding, not a flake. Delete by NAME (never a var
+  // that could read to Prisma as "no filter"), matching the idiom in
+  // maneuvers.test.ts / conditions.test.ts / class-add.test.ts. Subclass and
+  // SubclassGrantedSpell rows cascade off CharacterClass's onDelete: Cascade,
+  // so nothing else needs deleting here.
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
   });
 
   it("surfaces the L3 grant when entry.level is stale-low but XP-derived level meets the gate", async () => {

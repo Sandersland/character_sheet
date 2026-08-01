@@ -62,6 +62,16 @@ export const createCharacterSchema = z
      *  fixed grants from background/class/race are applied server-side). */
     toolChoices: z.array(z.string()).optional(),
     startingEquipment: startingEquipmentSchema.optional(),
+    // #1565: the background's OWN equipment package, resolved by
+    // (backgroundId, edition) alongside the class one above — a background
+    // never has a roll-for-gold dice alternative in either edition (unlike a
+    // 2014 class), so this reuses the SAME discriminated schema rather than a
+    // package-only one; materializeStartingEquipment 400s a "gold" mode here
+    // exactly as resolveStartingGold already does for a null-dice CLASS
+    // package. Omitted (not required) for a homebrew/unresolved background or
+    // one with no package under this edition (any 2014 background but Acolyte
+    // and Folk Hero).
+    backgroundStartingEquipment: startingEquipmentSchema.optional(),
     // #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids).
     // Optional for back-compat; strictly count/list/level-validated when present.
     spells: z

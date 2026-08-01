@@ -16,6 +16,7 @@ import {
 import { exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import type { TargetModifierMap } from "./effects.js";
 
 // The best equipped body armor snapshot (or null when unarmored) in the shape
@@ -173,11 +174,17 @@ export function buildUnarmedAttacksView(
   hasShield: boolean,
 ): { unarmedStrike: ReturnType<typeof deriveUnarmedStrike>; improvisedWeapon: ReturnType<typeof deriveImprovisedAttack> } {
   const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
-  const unarmedStrike = deriveUnarmedStrike(effectiveScores, proficiencyBonus, unarmedDie, {
-    level: classEntryLevel(row, "monk"),
-    isUnarmored: bestArmor === null,
-    hasShield,
-  });
+  const unarmedStrike = deriveUnarmedStrike(
+    effectiveScores,
+    proficiencyBonus,
+    unarmedDie,
+    {
+      level: classEntryLevel(row, "monk"),
+      isUnarmored: bestArmor === null,
+      hasShield,
+    },
+    editionOf(row),
+  );
   const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
   const improvisedWeapon = deriveImprovisedAttack(
     effectiveScores,

@@ -49,6 +49,7 @@ import {
 } from "@/lib/classes/resources.js";
 import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { clampPreparedToLimit, normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
@@ -339,7 +340,7 @@ async function loadResourcesReconcileState(
       abilityScores: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { name: true, subclass: true, level: true },
+        select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
       },
     },
   });
@@ -349,7 +350,16 @@ async function loadResourcesReconcileState(
   const abilityScores = row.abilityScores as Record<string, number>;
   const profBonus = proficiencyBonusForLevel(newDerivedLevel);
   // ctx.edition (not a fresh row read) — write-once (#1285), constant for the whole pass.
-  const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus, edition);
+  // featureRowsOf (#1528 chunk 0): reconcileKnownList/reconcileSubclassChoices
+  // read maneuverChoiceCount/toolProfChoiceCount/subclassChoices — Battle
+  // Master's two counts are ROW-driven now (#1546 Part B-ii: registry.ts's
+  // deriveRowExtras reads Combat Superiority/Student of War's derivedStat
+  // columns), so this carrier is load-bearing for reconcileManeuvers/
+  // reconcileToolProficiencies, not merely future-proofing; every other
+  // class's subclassChoices is still SubclassDefinition.choices (code). This
+  // select matches every other deriveEntryScopedResources call site and stays
+  // correct if a future reconciler ever needs a row-driven pool's `used` cap.
+  const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus, edition, featureRowsOf);
   return { state, derived };
 }
 
@@ -515,9 +525,13 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
       initiativeBonus: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        // All entries (name + level) — both the ASI/feat-slot cap (#1073) and
-        // the fs cap (#1137) sum entitlement per class entry, not just the primary.
-        select: { name: true, level: true },
+        // All entries (level + the class relation) — both the ASI/feat-slot
+        // cap (#1073) and the fs cap (#1137) sum entitlement per class entry,
+        // not just the primary. `class` (#1529): the reconciler's half of the
+        // reconciler/clamp-on-read pair CLAUDE.md governs — must resolve
+        // extraAsiLevels/fightingStyleFeatLevel through the SAME columns
+        // applyAdvancementClamp reads via characterInclude.
+        select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
       },
     },
   });

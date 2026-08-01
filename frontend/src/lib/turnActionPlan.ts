@@ -47,6 +47,10 @@ export function planActionClick(
       };
 
     case "heal-roll":
+      // `healRoll` absent (#1528) — a server-rolled row-driven action (Second
+      // Wind: effectModifierSource "classLevel", backend/effects.ts). Send
+      // plain (no client roll); the server rolls, applies, and reports it
+      // back via ExecuteActionResult for useTurnActions to surface.
       return resolver.healRoll
         ? {
             consumeSlot: true,
@@ -54,7 +58,7 @@ export function planActionClick(
             send: "healRoll",
             healRoll: resolver.healRoll(character),
           }
-        : { consumeSlot: true, openResolution: false, send: "none" };
+        : { consumeSlot: true, openResolution: false, send: "plain" };
 
     // Slot is committed by the picker on use/cast/heal, not on open (#765) —
     // closing the sheet without acting stays free, like the spell picker. The

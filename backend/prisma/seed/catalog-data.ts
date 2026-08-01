@@ -13,6 +13,7 @@
 // runtime lib). Relative, not @/, since the seed's tsx context doesn't alias.
 import type {
   ItemCategory,
+  ToolCategory,
   WeaponDetailInput,
   ArmorDetailInput,
   ConsumableDetailInput,
@@ -48,6 +49,13 @@ export const RACES = [
   { name: "Gnome",         speed: 25 },
 ];
 
+// #1529: armorProficiencies/weaponProficiencies are SRD 5.1/PHB'14 ONLY —
+// relocated verbatim from the deleted CLASS_PROFICIENCY_GRANTS record.
+// At least Bard/Druid/Monk/Rogue/Sorcerer/Wizard differ in SRD 5.2/PHB'24;
+// authoring those lists is an explicit follow-up (#1548), never guessed here.
+// extraAsiLevels/multiclassPrerequisites are PHB'14 p. 163/PHB'14 p. 38
+// (2014 and 2024 agree — CLAUDE.md). primaryAbilities is PHB'24's by-class
+// table only (no 2014 counterpart).
 export const CLASSES = [
   {
     name: "Wizard",
@@ -57,6 +65,12 @@ export const CLASSES = [
     skillChoices: ["arcana", "history", "insight", "investigation", "medicine", "religion"],
     isSpellcaster: true,
     subclassLevel: 2, // PHB'14 p. 114: Arcane Tradition at 2nd level.
+    armorProficiencies: [],
+    weaponProficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ intelligence: 13 }],
+    primaryAbilities: ["intelligence"],
   },
   {
     name: "Fighter",
@@ -75,6 +89,13 @@ export const CLASSES = [
     ],
     isSpellcaster: false,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "heavy", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [6, 14],
+    fightingStyleFeatLevel: 1,
+    // Fighter is the only OR class: Str 13 OR Dex 13.
+    multiclassPrerequisites: [{ strength: 13 }, { dexterity: 13 }],
+    primaryAbilities: ["strength", "dexterity"],
   },
   {
     name: "Rogue",
@@ -97,6 +118,12 @@ export const CLASSES = [
     isSpellcaster: false,
     subclassLevel: 3,
     toolProficiencies: ["Thieves' Tools"], // class always grants this
+    armorProficiencies: ["light"],
+    weaponProficiencies: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"],
+    extraAsiLevels: [10],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ dexterity: 13 }],
+    primaryAbilities: ["dexterity"],
   },
   {
     name: "Cleric",
@@ -106,6 +133,12 @@ export const CLASSES = [
     skillChoices: ["history", "insight", "medicine", "persuasion", "religion"],
     isSpellcaster: true,
     subclassLevel: 1, // PHB'14 p. 57: Divine Domain at 1st level.
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: ["Simple Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ wisdom: 13 }],
+    primaryAbilities: ["wisdom"],
   },
   {
     name: "Barbarian",
@@ -115,6 +148,12 @@ export const CLASSES = [
     skillChoices: ["animalHandling", "athletics", "intimidation", "nature", "perception", "survival"],
     isSpellcaster: false,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ strength: 13 }],
+    primaryAbilities: ["strength"],
   },
   {
     name: "Bard",
@@ -149,6 +188,12 @@ export const CLASSES = [
       "Bagpipes", "Drum", "Dulcimer", "Flute", "Lute",
       "Lyre", "Horn", "Pan Flute", "Shawm", "Viol",
     ],
+    armorProficiencies: ["light"],
+    weaponProficiencies: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ charisma: 13 }],
+    primaryAbilities: ["charisma"],
   },
   {
     name: "Druid",
@@ -158,6 +203,15 @@ export const CLASSES = [
     skillChoices: ["arcana", "animalHandling", "insight", "medicine", "nature", "perception", "religion", "survival"],
     isSpellcaster: true,
     subclassLevel: 2, // PHB'14 p. 66: Druid Circle at 2nd level.
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: [
+      "Clubs", "Daggers", "Darts", "Javelins", "Maces", "Quarterstaffs",
+      "Scimitars", "Sickles", "Slings", "Spears",
+    ],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ wisdom: 13 }],
+    primaryAbilities: ["wisdom"],
   },
   {
     name: "Monk",
@@ -179,6 +233,12 @@ export const CLASSES = [
       "Bagpipes", "Drum", "Dulcimer", "Flute", "Lute",
       "Lyre", "Horn", "Pan Flute", "Shawm", "Viol",
     ],
+    armorProficiencies: [],
+    weaponProficiencies: ["Simple Weapons", "Shortswords"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ dexterity: 13, wisdom: 13 }],
+    primaryAbilities: ["dexterity", "wisdom"],
   },
   {
     name: "Paladin",
@@ -188,6 +248,12 @@ export const CLASSES = [
     skillChoices: ["athletics", "insight", "intimidation", "medicine", "persuasion", "religion"],
     isSpellcaster: true,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "heavy", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: 2,
+    multiclassPrerequisites: [{ strength: 13, charisma: 13 }],
+    primaryAbilities: ["strength", "charisma"],
   },
   {
     name: "Ranger",
@@ -197,6 +263,12 @@ export const CLASSES = [
     skillChoices: ["animalHandling", "athletics", "insight", "investigation", "nature", "perception", "stealth", "survival"],
     isSpellcaster: true,
     subclassLevel: 3,
+    armorProficiencies: ["light", "medium", "shield"],
+    weaponProficiencies: ["Simple Weapons", "Martial Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: 2,
+    multiclassPrerequisites: [{ dexterity: 13, wisdom: 13 }],
+    primaryAbilities: ["dexterity", "wisdom"],
   },
   {
     name: "Sorcerer",
@@ -206,6 +278,12 @@ export const CLASSES = [
     skillChoices: ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"],
     isSpellcaster: true,
     subclassLevel: 1, // PHB'14 p. 99: Sorcerous Origin at 1st level.
+    armorProficiencies: [],
+    weaponProficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ charisma: 13 }],
+    primaryAbilities: ["charisma"],
   },
   {
     name: "Warlock",
@@ -215,21 +293,30 @@ export const CLASSES = [
     skillChoices: ["arcana", "deception", "history", "intimidation", "investigation", "nature", "religion"],
     isSpellcaster: true,
     subclassLevel: 1, // PHB'14 p. 105: Otherworldly Patron at 1st level.
+    armorProficiencies: ["light"],
+    weaponProficiencies: ["Simple Weapons"],
+    extraAsiLevels: [],
+    fightingStyleFeatLevel: null,
+    multiclassPrerequisites: [{ charisma: 13 }],
+    primaryAbilities: ["charisma"],
   },
 ];
 
-// 2024 backgrounds (SRD 5.2 for the 4 SRD rows; PHB'24 for Charlatan/Noble).
-// abilityChoices = the three abilities the +2/+1 (or 1/1/1) spread draws from;
-// originFeatName is resolved to originFeatId in seed.ts. Folk Hero has no 2024
-// version — kept spec-less (2014 legacy, no ability spread / Origin feat, #1130).
+// 2024 backgrounds (SRD 5.2 for the 4 SRD rows; PHB'24 for Charlatan/Noble),
+// plus PHB'14-only Folk Hero. abilityChoices = the three abilities the +2/+1
+// (or 1/1/1) spread draws from; originFeatName is resolved to originFeatId in
+// seed.ts. Both are 2024-only concepts, so the spec-less row IS the 2014 one.
 export interface BackgroundSeed {
   name: string;
   skillProficiencies: string[];
   toolProficiencies?: string[];
   abilityChoices?: string[];
   originFeatName?: string;
-  // Omitted = shared (NULL column, valid in both editions, #1306). No seeded
-  // background diverges yet — the field exists so a future one can.
+  // Omitted = shared (NULL column, valid in both editions, #1306). Only Folk
+  // Hero sets it, and by ABSENCE from PHB'24 rather than by divergent content
+  // (#1570) — a background whose mechanics differ between editions needs two
+  // rows, and resolveBackgroundIdsByName throws on that until it is taught to
+  // key by (name, edition) rather than name alone.
   edition?: SeedEdition;
 }
 
@@ -250,7 +337,14 @@ export const BACKGROUNDS: BackgroundSeed[] = [
   { name: "Criminal",  skillProficiencies: ["sleightOfHand", "stealth"],
     abilityChoices: ["dexterity", "constitution", "intelligence"],
     originFeatName: "Alert", toolProficiencies: ["Thieves' Tools"] },
-  { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"] },
+  // PHB'14 only — PHB'24's sixteen backgrounds have no Folk Hero (Farmer is its
+  // nearest successor), so this is the one background that genuinely forks by
+  // absence rather than by content (#1570). The tag is what stops it being
+  // offered to 2024 characters it cannot serve: with no abilityChoices and no
+  // originFeatName it would silently cost them +3 ability points and an Origin
+  // feat. Retagged in place by a migration — a delete-and-recreate would strand
+  // every character holding it (CharacterBackground.backgroundId is SetNull).
+  { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"], edition: "EDITION_2014" },
   { name: "Noble",     skillProficiencies: ["history", "persuasion"],
     abilityChoices: ["strength", "intelligence", "charisma"],
     originFeatName: "Skilled", toolProficiencies: ["Dice Set"] },
@@ -269,6 +363,10 @@ export interface CatalogItem {
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetailInput;
+  // Tool-proficiency category (#1564) — set ONLY for the small set of rows
+  // that ARE tools (the ten musical instruments, Herbalism Kit, Thieves'
+  // Tools), so a starting-equipment open pick can filter on it as a column.
+  toolCategory?: ToolCategory;
 }
 
 // --- Item catalog -------------------------------------------------------
@@ -533,8 +631,8 @@ export const ITEMS: CatalogItem[] = [
   { name: "Component Pouch", category: "gear", weight: 2, cost: coins(25), description: "A small watertight pouch holding what a spellcaster needs to cast spells with material components." },
   { name: "Pearl (arcane focus)", category: "gear", weight: 0.1, cost: coins(100), description: "Used by a spellcaster as an arcane focus in place of components." },
   { name: "Holy Symbol", category: "gear", weight: 1, cost: coins(5), description: "An amulet, reliquary, or other symbol of a deity. Clerics and paladins use this as a spellcasting focus." },
-  { name: "Lute", category: "gear", weight: 2, cost: coins(35), description: "A musical instrument; bards use it as a spellcasting focus." },
-  { name: "Thieves' Tools", category: "gear", weight: 1, cost: coins(25), description: "Lockpicks, a small file, mirror, scissors, and tweezers." },
+  { name: "Lute", category: "gear", weight: 2, cost: coins(35), description: "A musical instrument; bards use it as a spellcasting focus.", toolCategory: "musicalInstrument" },
+  { name: "Thieves' Tools", category: "gear", weight: 1, cost: coins(25), description: "Lockpicks, a small file, mirror, scissors, and tweezers.", toolCategory: "other" },
   { name: "Ink and Quill", category: "gear", cost: coins(10) },
   { name: "Healer's Kit", category: "gear", weight: 3, cost: coins(5), description: "Has 10 uses. As an action, expend one use to stabilize a creature without a Wisdom (Medicine) check." },
   // ── Equipment packs (also available as single gear items for the shop) ────
@@ -578,6 +676,10 @@ export const ITEMS: CatalogItem[] = [
   { name: "Soap", category: "gear", weight: 0, cost: coins(0, 0, 2) },
   { name: "Costume Clothes", category: "gear", weight: 4, cost: coins(5) },
   { name: "Disguise Kit", category: "gear", weight: 3, cost: coins(25), description: "Cosmetics, hair dye, small props, and a few costumes for creating disguises." },
+  // SRD 5.2 tools table (15 GP, 5 lb). toolCategory "other" like Thieves' Tools
+  // — a standalone kit, not one of the artisan/gaming/instrument families the
+  // open-pick filters span (#1564). Needed by the Charlatan package (#1570).
+  { name: "Forgery Kit", category: "gear", weight: 5, cost: coins(15), description: "Papers, parchments, inks, seals, and sealing wax for producing convincing forgeries.", toolCategory: "other" },
   { name: "Book of Lore", category: "gear", weight: 5, cost: coins(25), description: "A book containing knowledge in a particular field." },
   { name: "Parchment Sheet", category: "gear", weight: 0, cost: coins(0, 1, 0) },
   { name: "Knife", category: "gear", weight: 0.5, cost: coins(0, 2, 0) },
@@ -613,4 +715,159 @@ export const ITEMS: CatalogItem[] = [
     cost: coins(1),
     description: "A sprig of mistletoe, a totem, a staff, or a wooden rod used by druids as a spellcasting focus in place of material components.",
   },
+  // ── PHB'24 package additions (#1564) ──────────────────────────────────────
+  // Twelve items every PHB'24 class package needs that weren't yet in this
+  // catalog. Parsed from raw HTML (5e24srd.com, CC-BY-4.0, SRD 5.2) and
+  // cross-checked against SRD 5.1 (5thsrd.org): every value below is IDENTICAL
+  // in both editions, which is why one untagged Item row serves both (Item
+  // carries no `edition` column). Deliberately NOT modelling SRD 5.2's
+  // weapon-mastery properties (Graze/Sap/Nick/Vex/Topple) on the four weapons
+  // below — nothing in this codebase reads them yet; that's a separate feature.
+  {
+    name: "Greatsword",
+    category: "weapon",
+    weight: 6,
+    cost: coins(50),
+    weapon: {
+      damageDiceCount: 2,
+      damageDiceFaces: 6,
+      damageType: "slashing",
+      heavy: true,
+      twoHanded: true,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    },
+  },
+  {
+    name: "Flail",
+    category: "weapon",
+    weight: 2,
+    cost: coins(10),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "bludgeoning", weaponClass: "martial", weaponRange: "melee" },
+  },
+  {
+    name: "Spear",
+    category: "weapon",
+    weight: 3,
+    cost: coins(1),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "piercing",
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+      versatileDiceCount: 1,
+      versatileDiceFaces: 8,
+      weaponClass: "simple",
+      weaponRange: "melee",
+    },
+  },
+  {
+    name: "Sickle",
+    category: "weapon",
+    weight: 2,
+    cost: coins(1),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageType: "slashing", light: true, weaponClass: "simple", weaponRange: "melee" },
+  },
+  {
+    name: "Studded Leather Armor",
+    category: "armor",
+    weight: 13,
+    cost: coins(45),
+    armor: { armorCategory: "light", baseArmorClass: 12, dexModifierApplies: true },
+  },
+  {
+    name: "Chain Shirt",
+    category: "armor",
+    weight: 20,
+    cost: coins(50),
+    armor: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true, dexModifierMax: 2 },
+  },
+  { name: "Quiver", category: "gear", weight: 1, cost: coins(1) },
+  // SRD 5.1 names this "Robes"; SRD 5.2 "Robe" — the latter spelling is used
+  // here since both editions share this one untagged row.
+  { name: "Robe", category: "gear", weight: 4, cost: coins(1) },
+  { name: "Crystal", category: "gear", weight: 1, cost: coins(10), description: "Used by a spellcaster as an arcane focus in place of components." },
+  { name: "Orb", category: "gear", weight: 3, cost: coins(20), description: "Used by a spellcaster as an arcane focus in place of components." },
+  { name: "Herbalism Kit", category: "gear", weight: 3, cost: coins(5), description: "Used to identify plants and to craft potions of healing and antitoxin.", toolCategory: "other" },
+  // ── Musical instruments (PHB'14/SRD 5.2 p. 154) ───────────────────────────
+  // "Musical Instrument" is a category, not one item — SRD 5.2 names ten
+  // concrete instruments with distinct cost/weight (lib/srd/tools.ts's TOOLS
+  // already carries all ten, matching SRD 5.2 exactly). Lute already existed
+  // as an Item row (see above); these are the nine that didn't, needed so the
+  // Bard's "musical instrument of your choice" open pick has a real pool to
+  // choose from (resolveFixedItems resolves against Item ∪ Pack, never TOOLS).
+  // toolCategory: "musicalInstrument" (#1564) is what lets that open pick
+  // filter on a column rather than a rules TS import.
+  { name: "Bagpipes", category: "gear", weight: 6, cost: coins(30), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Drum", category: "gear", weight: 3, cost: coins(6), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Dulcimer", category: "gear", weight: 10, cost: coins(25), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Flute", category: "gear", weight: 1, cost: coins(2), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Horn", category: "gear", weight: 2, cost: coins(3), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Lyre", category: "gear", weight: 2, cost: coins(30), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Pan Flute", category: "gear", weight: 2, cost: coins(12), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Shawm", category: "gear", weight: 1, cost: coins(2), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  { name: "Viol", category: "gear", weight: 1, cost: coins(30), description: "A musical instrument.", toolCategory: "musicalInstrument" },
+  // ── #1565 background-package additions ────────────────────────────────
+  // Nine rows the seven backgrounds' equipment needed that weren't yet in
+  // this catalog (checked against both editions' Adventuring Gear tables,
+  // SRD 5.1 5thsrd.org / SRD 5.2 5e24srd.com, CC-BY-4.0) — same "catalog
+  // hasn't caught up to a class/background's package text" gap #1564 closed
+  // for the twelve PHB'24 class packages. Clothes/Pouch carry no edition tag:
+  // both editions' gear tables price them identically, so one row serves both
+  // (same reasoning as Robe's comment above).
+  { name: "Traveler's Clothes", category: "gear", weight: 4, cost: coins(2) },
+  { name: "Common Clothes", category: "gear", weight: 3, cost: coins(0, 5, 0) },
+  { name: "Pouch", category: "gear", weight: 1, cost: coins(0, 5, 0), description: "A small drawstring pouch that can hold coins or other small objects." },
+  // Already priced in lib/srd/tools.ts's TOOLS (10 GP / 5 lb) but had no Item
+  // row — the same two-registry split #1564 found for the instruments and
+  // Herbalism Kit (resolveFixedItems resolves against Item ∪ Pack only).
+  { name: "Calligrapher's Supplies", category: "gear", weight: 5, cost: coins(10), description: "Ink, a quill, and fine parchment for producing beautiful lettering.", toolCategory: "artisan" },
+  // SRD 5.1's Acolyte background grants "a prayer book or prayer wheel" — a
+  // named devotional book, priced on the SRD's generic "Book" adventuring-gear
+  // entry (25 GP / 5 lb, the same basis Book of Lore above already uses)
+  // rather than reusing that row outright: Book of Lore carries a
+  // knowledge-subject flavor (Sage/Warlock's "Book of Lore (history/occult
+  // lore)"), not the devotional one this fixed 2014 grant needs.
+  { name: "Prayer Book", category: "gear", weight: 5, cost: coins(25), description: "A book of prayers and devotions used in religious observances." },
+  // Four gaming sets (SRD 5.1/5.2 Adventuring Gear table) — TOOLS already
+  // carried Dice/Playing Card at these same values but neither had an Item
+  // row; Dragonchess/Three-Dragon Ante had neither. Weight 0 matches this
+  // catalog's existing convention for the two pre-existing sets (negligible,
+  // uninstrumented by either SRD).
+  { name: "Dice Set", category: "gear", weight: 0, cost: coins(0, 1, 0), description: "A gaming set.", toolCategory: "gamingSet" },
+  { name: "Dragonchess Set", category: "gear", weight: 0, cost: coins(1), description: "A gaming set.", toolCategory: "gamingSet" },
+  { name: "Playing Card Set", category: "gear", weight: 0, cost: coins(0, 5, 0), description: "A gaming set.", toolCategory: "gamingSet" },
+  { name: "Three-Dragon Ante Set", category: "gear", weight: 0, cost: coins(1), description: "A gaming set.", toolCategory: "gamingSet" },
+  // The other sixteen artisan's tools (SRD 5.1 / SRD 5.2 tools tables, which
+  // price them identically — one untagged row serves both editions, as with the
+  // instruments above). TOOLS has carried all seventeen since before this
+  // catalog existed, but only Calligrapher's Supplies had an Item row, and an
+  // open pick is offered from Item rows alone: Folk Hero's "artisan's tools of
+  // your choice" (#1570) would have been a one-entry dropdown. Values mirror
+  // TOOLS exactly and a test pins them equal, so the two registries can no
+  // longer drift apart the way they did here.
+  { name: "Alchemist's Supplies", category: "gear", weight: 8, cost: coins(50), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Brewer's Supplies", category: "gear", weight: 9, cost: coins(20), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Carpenter's Tools", category: "gear", weight: 6, cost: coins(8), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Cartographer's Tools", category: "gear", weight: 6, cost: coins(15), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Cobbler's Tools", category: "gear", weight: 5, cost: coins(5), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Cook's Utensils", category: "gear", weight: 8, cost: coins(1), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Glassblower's Tools", category: "gear", weight: 5, cost: coins(30), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Jeweler's Tools", category: "gear", weight: 2, cost: coins(25), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Leatherworker's Tools", category: "gear", weight: 5, cost: coins(5), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Mason's Tools", category: "gear", weight: 8, cost: coins(10), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Painter's Supplies", category: "gear", weight: 5, cost: coins(10), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Potter's Tools", category: "gear", weight: 3, cost: coins(10), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Smith's Tools", category: "gear", weight: 8, cost: coins(20), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Tinker's Tools", category: "gear", weight: 10, cost: coins(50), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Weaver's Tools", category: "gear", weight: 5, cost: coins(1), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Woodcarver's Tools", category: "gear", weight: 5, cost: coins(1), description: "Artisan's tools.", toolCategory: "artisan" },
+  // SRD 5.1 Adventuring Gear, for Folk Hero's PHB'14 package (#1570). "Iron
+  // Pot" is the SRD's "Pot, iron" — the same book-name-to-catalog-name gap
+  // Costume/Perfume hit. Neither is a tool: no toolCategory, so neither can
+  // ever surface in the artisan pick above.
+  { name: "Shovel", category: "gear", weight: 5, cost: coins(2) },
+  { name: "Iron Pot", category: "gear", weight: 10, cost: coins(2), description: "An iron pot for cooking over a campfire." },
 ];

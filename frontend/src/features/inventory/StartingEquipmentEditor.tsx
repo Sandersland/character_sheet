@@ -10,8 +10,11 @@ import {
 import type {
   ClassStartingEquipment,
   EquipmentBundle,
+  EquipmentChoiceGroup,
   Item,
-  OpenWeaponPick,
+  OpenPick,
+  PackageSelection,
+  StartingGold,
 } from "@/types/character";
 
 interface StartingEquipmentEditorProps {
@@ -22,6 +25,20 @@ interface StartingEquipmentEditorProps {
   /** Current draft value. */
   value: EquipmentDraft;
   onChange: (draft: EquipmentDraft) => void;
+  /** The character's own chosen tool proficiencies (creation toolChoices step,
+   *  #1564 PR #1567 fix — catalog item names). A boundToToolChoice pick
+   *  (Monk's "Artisan's Tools or Musical Instrument chosen for the tool
+   *  proficiency above") filters to exactly these, never the whole catalog —
+   *  matching the server's boundToolChoiceError so the picker never offers a
+   *  choice the write path would reject (#1336). */
+  selectedToolChoices: string[];
+  /** #1565: "class" (default) or "background". Two jobs — it labels the
+   *  package-mode button on the rare path where both modes exist (a background
+   *  never has a gold-roll alternative, so its own toggle row never renders at
+   *  all), and it namespaces this instance's native radio groups so the two
+   *  editors mounted on the creation step stay independent. See OptionChoice's
+   *  radioGroupName for what went wrong when they did not. */
+  kind?: "class" | "background";
 }
 
 /** Describes the fixed-item contents of a bundle (no open pick placeholders). */
@@ -35,21 +52,47 @@ function bundleFixedSummary(bundle: EquipmentBundle): string {
 }
 
 interface OpenPickSelectProps {
-  pick: OpenWeaponPick;
+  pick: OpenPick;
   catalog: Item[];
   currentPick: string;
   onPick: (itemName: string) => void;
+  selectedToolChoices: string[];
 }
 
-/** A single open-pick dropdown, filtered to the pick's weapon-class/range constraint. */
-function OpenPickSelect({ pick, catalog, currentPick, onPick }: OpenPickSelectProps) {
-  const matchingItems = catalog.filter(
-    (item) =>
-      item.category === "weapon" &&
-      item.weapon !== undefined &&
-      (!pick.filter.weaponClass || item.weapon.weaponClass === pick.filter.weaponClass) &&
-      (!pick.filter.range || item.weapon.weaponRange === pick.filter.range)
+// The pre-#1564 weapon-only behaviour, unchanged — split out of matchesPick
+// purely to keep its own cyclomatic complexity low (mirrors the backend's
+// own openPickFilterError -> weaponFilterError split, character-create.ts).
+function matchesWeaponFilter(item: Item, pick: OpenPick): boolean {
+  return (
+    item.category === "weapon" &&
+    item.weapon !== undefined &&
+    (!pick.filter.weaponClass || item.weapon.weaponClass === pick.filter.weaponClass) &&
+    (!pick.filter.range || item.weapon.weaponRange === pick.filter.range)
   );
+}
+
+// Mirrors the backend's openPickFilterError dispatch order exactly (#1564): a
+// toolCategory filter (if present) gates first; a boundToToolChoice pick
+// (Monk's "Artisan's Tools or Musical Instrument chosen for the tool
+// proficiency above" — spans two tool categories, so it carries no single
+// filter.toolCategory) then requires membership in the character's OWN chosen
+// tool proficiencies instead of falling through to the weapon pool. That
+// fallback offered every weapon in the catalog, which the server's
+// boundToolChoiceError rejects outright — #1336's lesson that a picker
+// offering what the write path refuses is a dead end. A plain toolCategory
+// pick (no binding) accepts anything in that category; anything else keeps
+// the pre-#1564 weapon-only behaviour unchanged.
+function matchesPick(item: Item, pick: OpenPick, selectedToolChoices: string[]): boolean {
+  if (pick.filter.toolCategory && item.toolCategory !== pick.filter.toolCategory) return false;
+  if (pick.boundToToolChoice) return selectedToolChoices.includes(item.name);
+  if (pick.filter.toolCategory) return true;
+  return matchesWeaponFilter(item, pick);
+}
+
+/** A single open-pick dropdown, filtered to the pick's weapon-class/range/
+ *  toolCategory/boundToToolChoice constraint (#1564). */
+function OpenPickSelect({ pick, catalog, currentPick, onPick, selectedToolChoices }: OpenPickSelectProps) {
+  const matchingItems = catalog.filter((item) => matchesPick(item, pick, selectedToolChoices));
   const unfilled = !currentPick;
   return (
     <div className="flex flex-col gap-1">
@@ -87,10 +130,11 @@ interface OpenPickListProps {
   catalog: Item[];
   currentPicks: string[] | undefined;
   onPick: (pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
 }
 
 /** Renders a bundle's open-pick dropdowns (may be none). */
-function OpenPickList({ bundle, catalog, currentPicks, onPick }: OpenPickListProps) {
+function OpenPickList({ bundle, catalog, currentPicks, onPick, selectedToolChoices }: OpenPickListProps) {
   if (!bundle.openPicks?.length) return null;
   return (
     <>
@@ -101,9 +145,324 @@ function OpenPickList({ bundle, catalog, currentPicks, onPick }: OpenPickListPro
           catalog={catalog}
           currentPick={currentPicks?.[pickIdx] ?? ""}
           onPick={(itemName) => onPick(pickIdx, itemName)}
+          selectedToolChoices={selectedToolChoices}
         />
       ))}
     </>
+  );
+}
+
+interface OptionChoiceProps {
+  option: EquipmentBundle;
+  /** Native radio-group name — must be unique across every editor instance on
+   *  the page, not just across groups within one. Since #1565 the creation step
+   *  mounts TWO editors (class and background); a bare `group-${idx}` made both
+   *  cards' first groups one native radio group, so choosing a background
+   *  option visually cleared the class option (the draft kept both, since the
+   *  radios are React-controlled, so only the rendering lied). */
+  radioGroupName: string;
+  isChosen: boolean;
+  catalog: Item[];
+  currentPicks: string[] | undefined;
+  onChoose: () => void;
+  onPick: (pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
+}
+
+// Split out of OptionChoice purely to keep its own cyclomatic complexity low
+// — visible only once this option is chosen AND it actually has open picks.
+function ChosenOpenPicks({
+  isChosen,
+  option,
+  catalog,
+  currentPicks,
+  onPick,
+  selectedToolChoices,
+}: {
+  isChosen: boolean;
+  option: EquipmentBundle;
+  catalog: Item[];
+  currentPicks: string[] | undefined;
+  onPick: (pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
+}) {
+  if (!isChosen || !option.openPicks?.length) return null;
+  return (
+    <div className="ml-5 flex flex-col gap-2">
+      <OpenPickList
+        bundle={option}
+        catalog={catalog}
+        currentPicks={currentPicks}
+        onPick={onPick}
+        selectedToolChoices={selectedToolChoices}
+      />
+    </div>
+  );
+}
+
+// Same split reasoning as ChosenOpenPicks above.
+function ChosenFixedSummary({ isChosen, option }: { isChosen: boolean; option: EquipmentBundle }) {
+  if (!isChosen || !option.items?.length) return null;
+  return <p className="ml-5 text-xs text-parchment-600">{bundleFixedSummary(option)}</p>;
+}
+
+/** One selectable radio option within a player-choice group — split out of
+ *  EquipmentGroupCard purely to keep its own cyclomatic complexity low. */
+function OptionChoice({
+  option,
+  radioGroupName,
+  isChosen,
+  catalog,
+  currentPicks,
+  onChoose,
+  onPick,
+  selectedToolChoices,
+}: OptionChoiceProps) {
+  return (
+    <label
+      className={`flex cursor-pointer flex-col gap-2 rounded-control border px-3 py-2 transition-colors ${
+        isChosen
+          ? "border-arcane-400 bg-arcane-50"
+          : "border-parchment-200 hover:border-arcane-300"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <input
+          type="radio"
+          name={radioGroupName}
+          checked={isChosen}
+          onChange={onChoose}
+          className="mt-0.5 accent-arcane-600"
+        />
+        <span className="text-sm text-parchment-800">{option.label}</span>
+      </div>
+      <ChosenOpenPicks
+        isChosen={isChosen}
+        option={option}
+        catalog={catalog}
+        currentPicks={currentPicks}
+        onPick={onPick}
+        selectedToolChoices={selectedToolChoices}
+      />
+      <ChosenFixedSummary isChosen={isChosen} option={option} />
+    </label>
+  );
+}
+
+interface EquipmentGroupCardProps {
+  group: EquipmentChoiceGroup;
+  groupIdx: number;
+  /** Namespaces this card's radio group per editor instance — see OptionChoice's
+   *  radioGroupName. */
+  radioGroupPrefix: string;
+  sel: PackageSelection | undefined;
+  catalog: Item[];
+  onSetOptionIndex: (groupIdx: number, optionIdx: number) => void;
+  onSetOpenPick: (groupIdx: number, pickIdx: number, itemName: string) => void;
+  selectedToolChoices: string[];
+}
+
+/** One choice group's card — auto-granted display or the player's option
+ *  radio list, plus any open picks. Split out of StartingEquipmentEditor
+ *  purely to keep its own cyclomatic complexity low. */
+function EquipmentGroupCard({
+  group,
+  groupIdx,
+  radioGroupPrefix,
+  sel,
+  catalog,
+  onSetOptionIndex,
+  onSetOpenPick,
+  selectedToolChoices,
+}: EquipmentGroupCardProps) {
+  const isAutoGrant = group.options.length === 1;
+  const chosenOptionIdx = sel?.optionIndex ?? -1;
+  const chosenBundle = chosenOptionIdx >= 0 ? group.options[chosenOptionIdx] : null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium text-parchment-800">{group.label}</p>
+
+      {isAutoGrant ? (
+        // Auto-granted — display only, no choice needed
+        <div className="rounded-control border border-parchment-200 bg-parchment-100 px-3 py-2 text-sm text-parchment-700">
+          {bundleFixedSummary(group.options[0])}
+          <span className="ml-2 text-xs text-parchment-600">(auto-granted)</span>
+        </div>
+      ) : (
+        // Player picks one option
+        <div className="flex flex-col gap-2">
+          {group.options.map((option, optionIdx) => (
+            <OptionChoice
+              key={optionIdx}
+              option={option}
+              radioGroupName={`${radioGroupPrefix}-group-${groupIdx}`}
+              isChosen={chosenOptionIdx === optionIdx}
+              catalog={catalog}
+              currentPicks={sel?.openPicks}
+              onChoose={() => onSetOptionIndex(groupIdx, optionIdx)}
+              onPick={(pickIdx, itemName) => onSetOpenPick(groupIdx, pickIdx, itemName)}
+              selectedToolChoices={selectedToolChoices}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Open picks on an auto-granted bundle (rare but possible) */}
+      {isAutoGrant && chosenBundle && (
+        <OpenPickList
+          bundle={chosenBundle}
+          catalog={catalog}
+          currentPicks={sel?.openPicks}
+          onPick={(pickIdx, itemName) => onSetOpenPick(groupIdx, pickIdx, itemName)}
+          selectedToolChoices={selectedToolChoices}
+        />
+      )}
+    </div>
+  );
+}
+
+interface GoldModeSectionProps {
+  gold: StartingGold;
+  value: number;
+  startingEquipment: ClassStartingEquipment;
+  onSetGold: (g: number) => void;
+}
+
+/** The "roll for starting gold" mode's content — split out of
+ *  StartingEquipmentEditor purely to keep its own cyclomatic complexity low.
+ *  Never rendered when `gold` is null (PHB'24 has no roll-for-gold rule at
+ *  all, #1564 commit 3) — the caller narrows before mounting this. */
+function GoldModeSection({ gold, value, startingEquipment, onSetGold }: GoldModeSectionProps) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-parchment-700">
+        Roll {goldLabel(gold)} gp ({goldMin(gold)}–{goldMax(gold)} gp) and spend it on equipment from the shop
+        after creation.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onSetGold(rollGold(gold))}
+          className="rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover"
+        >
+          Roll {goldLabel(gold)}
+        </button>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={goldMin(gold)}
+            max={goldMax(gold)}
+            value={value || ""}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10);
+              if (!isNaN(n)) onSetGold(n);
+            }}
+            placeholder={`${goldMin(gold)}–${goldMax(gold)}`}
+            className="w-24 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-center text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
+          />
+          <span className="text-sm text-parchment-600">gp</span>
+        </div>
+      </div>
+      {value > 0 && !isGoldValid(startingEquipment, value) && (
+        <p className="text-xs text-red-600">
+          Amount must be between {goldMin(gold)} and {goldMax(gold)} gp.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Pure draft-transition helpers, hoisted out of StartingEquipmentEditor
+// purely to keep its own cyclomatic complexity low (each closure below was
+// otherwise a branch fallow's analyzer folds into the enclosing component).
+// Each returns the next EquipmentDraft, or null when the transition doesn't
+// apply (wrong mode) — the component's own wrappers just guard-and-call
+// onChange, never re-implementing the branch.
+function draftForMode(startingEquipment: ClassStartingEquipment, mode: "package" | "gold"): EquipmentDraft {
+  return mode === "package"
+    ? { mode: "package", selections: emptyPackageState(startingEquipment) }
+    : { mode: "gold", gold: 0 };
+}
+
+function draftWithOptionIndex(
+  startingEquipment: ClassStartingEquipment,
+  value: EquipmentDraft,
+  groupIdx: number,
+  optionIdx: number,
+): EquipmentDraft | null {
+  if (value.mode !== "package") return null;
+  const bundle = startingEquipment.groups[groupIdx].options[optionIdx];
+  const openPickCount = bundle.openPicks?.length ?? 0;
+  const newSelections = [...value.selections];
+  newSelections[groupIdx] = { optionIndex: optionIdx, openPicks: Array(openPickCount).fill("") };
+  return { mode: "package", selections: newSelections };
+}
+
+function draftWithOpenPick(
+  value: EquipmentDraft,
+  groupIdx: number,
+  pickIdx: number,
+  itemName: string,
+): EquipmentDraft | null {
+  if (value.mode !== "package") return null;
+  const newSelections = [...value.selections];
+  const sel = { ...newSelections[groupIdx] };
+  const newPicks = [...(sel.openPicks ?? [])];
+  newPicks[pickIdx] = itemName;
+  sel.openPicks = newPicks;
+  newSelections[groupIdx] = sel;
+  return { mode: "package", selections: newSelections };
+}
+
+interface ModeToggleProps {
+  isPackage: boolean;
+  isGold: boolean;
+  // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564)
+  // — the toggle to that mode is simply not offered.
+  gold: StartingGold | null;
+  onSelectPackage: () => void;
+  onSelectGold: () => void;
+  /** #1565: this editor's own package-mode button label — a background reuse
+   *  of this component never has a gold alternative (so this button always
+   *  renders alone), but it must still say "Background", not "Class". */
+  packageModeLabel: string;
+}
+
+// Split out of StartingEquipmentEditor purely to keep its own cyclomatic
+// complexity low.
+function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold, packageModeLabel }: ModeToggleProps) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={onSelectPackage}
+        className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
+          isPackage
+            ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+            : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
+        }`}
+      >
+        {packageModeLabel}
+      </button>
+      {/* A TYPE narrowing, not a runtime branch: the caller no longer renders
+          this component at all when `gold` is null (#1565), but the prop is
+          still nullable and goldLabel below needs a StartingGold. Deleting it
+          costs a non-null assertion, which is strictly worse. */}
+      {gold && (
+        <button
+          type="button"
+          onClick={onSelectGold}
+          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            isGold
+              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
+          }`}
+        >
+          Starting gold ({goldLabel(gold)})
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -112,205 +471,73 @@ export default function StartingEquipmentEditor({
   catalog,
   value,
   onChange,
+  selectedToolChoices,
+  kind = "class",
 }: StartingEquipmentEditorProps) {
   if (!startingEquipment) return null;
 
   const isPackage = value.mode === "package";
   const isGold = value.mode === "gold";
-
-  function setMode(mode: "package" | "gold") {
-    if (mode === "package") {
-      onChange({ mode: "package", selections: emptyPackageState(startingEquipment!) });
-    } else {
-      onChange({ mode: "gold", gold: 0 });
-    }
-  }
+  const packageModeLabel = kind === "background" ? "Background equipment package" : "Class equipment package";
+  // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564
+  // commit 3) — narrowed once here so every render below can pass a non-null
+  // StartingGold to goldMin/goldMax/goldLabel/rollGold without re-checking.
+  const gold = startingEquipment.gold;
 
   function setOptionIndex(groupIdx: number, optionIdx: number) {
-    if (value.mode !== "package") return;
-    const bundle = startingEquipment!.groups[groupIdx].options[optionIdx];
-    const openPickCount = bundle.openPicks?.length ?? 0;
-    const newSelections = [...value.selections];
-    newSelections[groupIdx] = {
-      optionIndex: optionIdx,
-      openPicks: Array(openPickCount).fill(""),
-    };
-    onChange({ mode: "package", selections: newSelections });
+    const next = draftWithOptionIndex(startingEquipment!, value, groupIdx, optionIdx);
+    if (next) onChange(next);
   }
 
   function setOpenPick(groupIdx: number, pickIdx: number, itemName: string) {
-    if (value.mode !== "package") return;
-    const newSelections = [...value.selections];
-    const sel = { ...newSelections[groupIdx] };
-    const newPicks = [...(sel.openPicks ?? [])];
-    newPicks[pickIdx] = itemName;
-    sel.openPicks = newPicks;
-    newSelections[groupIdx] = sel;
-    onChange({ mode: "package", selections: newSelections });
-  }
-
-  function setGold(g: number) {
-    onChange({ mode: "gold", gold: g });
+    const next = draftWithOpenPick(value, groupIdx, pickIdx, itemName);
+    if (next) onChange(next);
   }
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Mode toggle */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setMode("package")}
-          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            isPackage
-              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
-              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
-          }`}
-        >
-          Class equipment package
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("gold")}
-          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            isGold
-              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
-              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
-          }`}
-        >
-          Starting gold ({goldLabel(startingEquipment.gold)})
-        </button>
-      </div>
+      {/* Package mode is always available, so the toggle row is only
+          meaningful when a SECOND mode (gold) also exists — a 2014 class
+          package. A 2024 class package and every background package have
+          `gold: null` and therefore exactly one mode, and a one-option toggle
+          group is not a choice, so the row is hidden rather than rendering a
+          lone button that does nothing when pressed (#1565). */}
+      {gold && (
+        <ModeToggle
+          isPackage={isPackage}
+          isGold={isGold}
+          gold={gold}
+          onSelectPackage={() => onChange(draftForMode(startingEquipment!, "package"))}
+          onSelectGold={() => onChange(draftForMode(startingEquipment!, "gold"))}
+          packageModeLabel={packageModeLabel}
+        />
+      )}
 
       {isPackage && value.mode === "package" && (
         <div className="flex flex-col gap-5">
-          {startingEquipment.groups.map((group, groupIdx) => {
-            const sel = value.selections[groupIdx];
-            const isAutoGrant = group.options.length === 1;
-            const chosenOptionIdx = sel?.optionIndex ?? -1;
-            const chosenBundle =
-              chosenOptionIdx >= 0 ? group.options[chosenOptionIdx] : null;
-
-            return (
-              <div key={groupIdx} className="flex flex-col gap-2">
-                {/* Group label */}
-                <p className="text-sm font-medium text-parchment-800">
-                  {group.label}
-                </p>
-
-                {isAutoGrant ? (
-                  // Auto-granted — display only, no choice needed
-                  <div className="rounded-control border border-parchment-200 bg-parchment-100 px-3 py-2 text-sm text-parchment-700">
-                    {bundleFixedSummary(group.options[0])}
-                    <span className="ml-2 text-xs text-parchment-600">
-                      (auto-granted)
-                    </span>
-                  </div>
-                ) : (
-                  // Player picks one option
-                  <div className="flex flex-col gap-2">
-                    {group.options.map((option, optionIdx) => {
-                      const isChosen = chosenOptionIdx === optionIdx;
-                      return (
-                        <label
-                          key={optionIdx}
-                          className={`flex cursor-pointer flex-col gap-2 rounded-control border px-3 py-2 transition-colors ${
-                            isChosen
-                              ? "border-arcane-400 bg-arcane-50"
-                              : "border-parchment-200 hover:border-arcane-300"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="radio"
-                              name={`group-${groupIdx}`}
-                              checked={isChosen}
-                              onChange={() => setOptionIndex(groupIdx, optionIdx)}
-                              className="mt-0.5 accent-arcane-600"
-                            />
-                            <span className="text-sm text-parchment-800">
-                              {option.label}
-                            </span>
-                          </div>
-
-                          {/* Open picks — only shown when this option is selected */}
-                          {isChosen && (option.openPicks?.length ?? 0) > 0 && (
-                            <div className="ml-5 flex flex-col gap-2">
-                              <OpenPickList
-                                bundle={option}
-                                catalog={catalog}
-                                currentPicks={sel?.openPicks}
-                                onPick={(pickIdx, itemName) =>
-                                  setOpenPick(groupIdx, pickIdx, itemName)
-                                }
-                              />
-                            </div>
-                          )}
-
-                          {/* Fixed item summary for the chosen option */}
-                          {isChosen && (option.items?.length ?? 0) > 0 && (
-                            <p className="ml-5 text-xs text-parchment-600">
-                              {bundleFixedSummary(option)}
-                            </p>
-                          )}
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Open picks on an auto-granted bundle (rare but possible) */}
-                {isAutoGrant && chosenBundle && (
-                  <OpenPickList
-                    bundle={chosenBundle}
-                    catalog={catalog}
-                    currentPicks={sel?.openPicks}
-                    onPick={(pickIdx, itemName) => setOpenPick(groupIdx, pickIdx, itemName)}
-                  />
-                )}
-              </div>
-            );
-          })}
+          {startingEquipment.groups.map((group, groupIdx) => (
+            <EquipmentGroupCard
+              key={groupIdx}
+              group={group}
+              groupIdx={groupIdx}
+              radioGroupPrefix={kind}
+              sel={value.selections[groupIdx]}
+              catalog={catalog}
+              onSetOptionIndex={setOptionIndex}
+              onSetOpenPick={setOpenPick}
+              selectedToolChoices={selectedToolChoices}
+            />
+          ))}
         </div>
       )}
 
-      {isGold && value.mode === "gold" && (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-parchment-700">
-            Roll {goldLabel(startingEquipment.gold)} gp (
-            {goldMin(startingEquipment.gold)}–{goldMax(startingEquipment.gold)} gp) and spend it on
-            equipment from the shop after creation.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setGold(rollGold(startingEquipment.gold))}
-              className="rounded-control bg-garnet-surface px-3 py-1.5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover"
-            >
-              Roll {goldLabel(startingEquipment.gold)}
-            </button>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={goldMin(startingEquipment.gold)}
-                max={goldMax(startingEquipment.gold)}
-                value={value.gold || ""}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value, 10);
-                  if (!isNaN(n)) setGold(n);
-                }}
-                placeholder={`${goldMin(startingEquipment.gold)}–${goldMax(startingEquipment.gold)}`}
-                className="w-24 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-center text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
-              />
-              <span className="text-sm text-parchment-600">gp</span>
-            </div>
-          </div>
-          {value.gold > 0 && !isGoldValid(startingEquipment, value.gold) && (
-            <p className="text-xs text-red-600">
-              Amount must be between {goldMin(startingEquipment.gold)} and{" "}
-              {goldMax(startingEquipment.gold)} gp.
-            </p>
-          )}
-        </div>
+      {isGold && value.mode === "gold" && gold && (
+        <GoldModeSection
+          gold={gold}
+          value={value.gold}
+          startingEquipment={startingEquipment}
+          onSetGold={(g) => onChange({ mode: "gold", gold: g })}
+        />
       )}
     </div>
   );

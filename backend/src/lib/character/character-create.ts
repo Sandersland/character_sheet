@@ -23,13 +23,16 @@ import {
   type AdvancementEntry,
   type FeatImprovement,
 } from "@/lib/classes/resources.js";
-import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
+import {
+  mapStartingEquipmentPackage,
+  EQUIPMENT_PACKAGE_INCLUDE,
+} from "@/lib/inventory/starting-equipment-package.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
+import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
 // Discriminated result: return just the new id so the route re-fetches by id
@@ -67,7 +70,7 @@ type PackageEquipment = Extract<
   NonNullable<CreateCharacterBody["startingEquipment"]>,
   { mode: "package" }
 >;
-type ClassEquipmentDef = NonNullable<(typeof STARTING_EQUIPMENT)[string]>;
+type ClassEquipmentDef = ClassStartingEquipment;
 type InventoryCreate = ReturnType<typeof buildInventoryCreateFromCatalog>;
 
 type ResolvedSelections = {
@@ -461,13 +464,31 @@ async function resolveBackgroundGrants(
   };
 }
 
-// Validate a chosen-gold amount against the class's dice range.
+// Validate a chosen-gold amount against the class's dice range. `classDef` is
+// null for a class with no seeded package (e.g. a homebrew/test-fixture
+// class) — the range check is skipped rather than rejected, preserving the
+// pre-#1534 behaviour for an unknown class (characters.test.ts:901's sibling
+// gold-mode case).
+//
+// classDef.gold is null for a package with no roll-for-gold rule at all
+// (PHB'24, #1564 commit 3) — reject rather than silently compute, since a
+// range derived from null dice is meaningless, not just wrong. This makes
+// `mode: "gold"` a 2014-only path in practice: PHB'24 reaches its gold
+// through a lettered StartingEquipmentOption.gold in package mode instead
+// (commit 2), never this dice-roll alternative.
 function resolveStartingGold(
   gold: number,
-  className: string
+  className: string,
+  classDef: ClassEquipmentDef | null,
 ): PhaseResult<{ startingCurrency: { cp: number; sp: number; gp: number; pp: number } }> {
-  const classDef = STARTING_EQUIPMENT[className];
   if (classDef) {
+    if (!classDef.gold) {
+      return {
+        ok: false,
+        status: 400,
+        error: `${className} has no roll-for-gold alternative under this ruleset — choose a starting-equipment package option instead`,
+      };
+    }
     const { diceCount, diceFaces, multiplier } = classDef.gold;
     const min = diceCount * multiplier;
     const max = diceCount * diceFaces * multiplier;
@@ -493,13 +514,44 @@ function bundleFixedRefs(bundle: EquipmentBundle): FixedRef[] {
   return (bundle.items ?? []).map((ref) => ({ catalogName: ref.catalogName, quantity: ref.quantity ?? 1 }));
 }
 
-// Check a looked-up catalog item against an open-pick filter; null when it passes.
-function openPickFilterError(
-  catalogItem: { category: string; weaponDetail?: { weaponClass: string | null; weaponRange: string | null } | null } | null,
-  pick: OpenPick,
-  chosenName: string
-): Fail | null {
-  if (!catalogItem || catalogItem.category !== "weapon") {
+type OpenPickCatalogItem = {
+  name: string;
+  category: string;
+  toolCategory: string | null;
+  weaponDetail?: { weaponClass: string | null; weaponRange: string | null } | null;
+};
+
+// One of openPickFilterError's three branches (#1564), split out purely to
+// keep that function's own cyclomatic/cognitive complexity low. A
+// toolCategory-filtered pick requires the catalog item's own toolCategory to
+// match; null (pass) when the pick carries no toolCategory filter at all.
+function toolCategoryFilterError(catalogItem: OpenPickCatalogItem, pick: OpenPick, chosenName: string): Fail | null {
+  if (!pick.filter.toolCategory || catalogItem.toolCategory === pick.filter.toolCategory) return null;
+  return {
+    ok: false,
+    status: 400,
+    error: `Open pick "${chosenName}" does not satisfy filter: toolCategory must be "${pick.filter.toolCategory}"`,
+  };
+}
+
+// A boundToToolChoice pick isn't a free choice at all — the chosen item must
+// be one of the character's own creation tool choices (creationToolProfs,
+// already resolved and validated by resolveProficiencies). Monk's "Artisan's
+// Tools or Musical Instrument chosen for the tool proficiency above."
+function boundToolChoiceError(chosenName: string, creationToolProfs: CreationToolProf[]): Fail | null {
+  const isChosenToolProf = creationToolProfs.some((p) => p.name === chosenName);
+  if (isChosenToolProf) return null;
+  return {
+    ok: false,
+    status: 400,
+    error: `Open pick "${chosenName}" is not one of this character's chosen tool proficiencies`,
+  };
+}
+
+// The pre-#1564 weapon-only behaviour, unchanged — reached only when the
+// pick carries neither toolCategory nor boundToToolChoice.
+function weaponFilterError(catalogItem: OpenPickCatalogItem, pick: OpenPick, chosenName: string): Fail | null {
+  if (catalogItem.category !== "weapon") {
     return { ok: false, status: 400, error: `Open pick "${chosenName}" is not a known weapon in the catalog` };
   }
   if (pick.filter.weaponClass && catalogItem.weaponDetail?.weaponClass !== pick.filter.weaponClass) {
@@ -519,13 +571,45 @@ function openPickFilterError(
   return null;
 }
 
+// Check a looked-up catalog item against an open-pick filter; null when it
+// passes. Dispatches to the three branches above (#1564): a weapon-filtered
+// pick (no toolCategory, no boundToToolChoice) keeps the original behaviour
+// exactly; a toolCategory-filtered pick requires the catalog item's own
+// toolCategory to match; a boundToToolChoice pick ADDITIONALLY (on top of any
+// toolCategory check) requires tool-choice membership, and — being bound to
+// an existing choice rather than a free pick — skips the weapon-category
+// requirement entirely (ANY category is fine, so long as it's a tool the
+// character is already proficient in).
+function openPickFilterError(
+  catalogItem: OpenPickCatalogItem | null,
+  pick: OpenPick,
+  chosenName: string,
+  creationToolProfs: CreationToolProf[],
+): Fail | null {
+  if (!catalogItem) {
+    return { ok: false, status: 400, error: `Open pick "${chosenName}" is not a known catalog item` };
+  }
+
+  const toolCategoryError = toolCategoryFilterError(catalogItem, pick, chosenName);
+  if (toolCategoryError) return toolCategoryError;
+
+  if (pick.boundToToolChoice) return boundToolChoiceError(chosenName, creationToolProfs);
+  if (pick.filter.toolCategory) return null;
+
+  return weaponFilterError(catalogItem, pick, chosenName);
+}
+
 // Validate one player open-pick (catalog lookup + filter) into a fixed ref.
-async function validateOpenPick(chosenName: string, pick: OpenPick): Promise<PhaseResult<{ ref: FixedRef }>> {
+async function validateOpenPick(
+  chosenName: string,
+  pick: OpenPick,
+  creationToolProfs: CreationToolProf[],
+): Promise<PhaseResult<{ ref: FixedRef }>> {
   const catalogItem = await prisma.item.findUnique({
     where: { name: chosenName },
     include: { weaponDetail: true },
   });
-  const error = openPickFilterError(catalogItem, pick, chosenName);
+  const error = openPickFilterError(catalogItem, pick, chosenName, creationToolProfs);
   if (error) return error;
   return { ok: true, ref: { catalogName: chosenName, quantity: pick.quantity ?? 1 } };
 }
@@ -534,7 +618,8 @@ async function validateOpenPick(chosenName: string, pick: OpenPick): Promise<Pha
 async function collectOpenPickRefs(
   bundle: EquipmentBundle,
   sel: PackageSelection,
-  groupIdx: number
+  groupIdx: number,
+  creationToolProfs: CreationToolProf[],
 ): Promise<PhaseResult<{ refs: FixedRef[] }>> {
   const openPicks = bundle.openPicks ?? [];
   const providedPicks = sel.openPicks ?? [];
@@ -548,7 +633,7 @@ async function collectOpenPickRefs(
 
   const refs: FixedRef[] = [];
   for (let pickIdx = 0; pickIdx < openPicks.length; pickIdx++) {
-    const pick = await validateOpenPick(providedPicks[pickIdx], openPicks[pickIdx]);
+    const pick = await validateOpenPick(providedPicks[pickIdx], openPicks[pickIdx], creationToolProfs);
     if (!pick.ok) return pick;
     refs.push(pick.ref);
   }
@@ -556,12 +641,14 @@ async function collectOpenPickRefs(
 }
 
 // Validate one selected group (optionIndex in range) and collect its fixed +
-// open-pick refs (packs expanded downstream).
+// open-pick refs (packs expanded downstream) plus the chosen bundle's gold
+// (#1564 — PHB'24's per-option GP; 0 for every 2014 option).
 async function collectGroupRefs(
   group: EquipmentGroup,
   sel: PackageSelection,
-  groupIdx: number
-): Promise<PhaseResult<{ refs: FixedRef[] }>> {
+  groupIdx: number,
+  creationToolProfs: CreationToolProf[],
+): Promise<PhaseResult<{ refs: FixedRef[]; gold: number }>> {
   if (sel.optionIndex < 0 || sel.optionIndex >= group.options.length) {
     return {
       ok: false,
@@ -571,18 +658,19 @@ async function collectGroupRefs(
   }
 
   const bundle = group.options[sel.optionIndex];
-  const openPickRefs = await collectOpenPickRefs(bundle, sel, groupIdx);
+  const openPickRefs = await collectOpenPickRefs(bundle, sel, groupIdx, creationToolProfs);
   if (!openPickRefs.ok) return openPickRefs;
 
-  return { ok: true, refs: [...bundleFixedRefs(bundle), ...openPickRefs.refs] };
+  return { ok: true, refs: [...bundleFixedRefs(bundle), ...openPickRefs.refs], gold: bundle.gold ?? 0 };
 }
 
 // Walk the class package groups, validating each selection and collecting the
-// fixed catalog refs across all groups.
+// fixed catalog refs AND the summed gold (#1564) across all groups.
 async function collectPackageRefs(
   se: PackageEquipment,
-  classDef: ClassEquipmentDef
-): Promise<PhaseResult<{ allFixedRefs: FixedRef[] }>> {
+  classDef: ClassEquipmentDef,
+  creationToolProfs: CreationToolProf[],
+): Promise<PhaseResult<{ allFixedRefs: FixedRef[]; totalGold: number }>> {
   if (se.selections.length !== classDef.groups.length) {
     return {
       ok: false,
@@ -592,58 +680,165 @@ async function collectPackageRefs(
   }
 
   const allFixedRefs: FixedRef[] = [];
+  let totalGold = 0;
   for (let groupIdx = 0; groupIdx < classDef.groups.length; groupIdx++) {
-    const group = await collectGroupRefs(classDef.groups[groupIdx], se.selections[groupIdx], groupIdx);
+    const group = await collectGroupRefs(classDef.groups[groupIdx], se.selections[groupIdx], groupIdx, creationToolProfs);
     if (!group.ok) return group;
     allFixedRefs.push(...group.refs);
+    totalGold += group.gold;
   }
-  return { ok: true, allFixedRefs };
+  return { ok: true, allFixedRefs, totalGold };
 }
 
-// Re-resolve a package selection authoritatively against STARTING_EQUIPMENT and
-// expand it into InventoryItem create payloads.
+// The one (classId, edition) lookup both starting-equipment phases share —
+// exact match, not resolveEditionRow: StartingEquipmentPackage.edition is
+// non-nullable, so there is no shared/NULL row to fall back to (#1534). Null
+// for a class with no seeded package (homebrew/test-fixture classes).
+async function loadClassEquipmentDef(classId: string, edition: RulesEdition): Promise<ClassEquipmentDef | null> {
+  const row = await prisma.startingEquipmentPackage.findUnique({
+    where: { classId_edition: { classId, edition } },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  return row ? mapStartingEquipmentPackage(row) : null;
+}
+
+// #1565's twin of loadClassEquipmentDef above — (backgroundId, edition), the
+// compound unique StartingEquipmentPackage.@@unique([backgroundId, edition])
+// generates. `backgroundId` is null for a homebrew/unresolved background
+// (resolveSelections' background is allowed to miss a catalog anchor), which
+// this treats identically to "no seeded package for this class": null in,
+// null out, no query at all.
+async function loadBackgroundEquipmentDef(
+  backgroundId: string | null,
+  edition: RulesEdition,
+): Promise<ClassEquipmentDef | null> {
+  if (!backgroundId) return null;
+  const row = await prisma.startingEquipmentPackage.findUnique({
+    where: { backgroundId_edition: { backgroundId, edition } },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  return row ? mapStartingEquipmentPackage(row) : null;
+}
+
+// Re-resolve a package selection authoritatively against the loaded package
+// and expand it into InventoryItem create payloads plus the summed gold
+// (#1564) across the chosen options. `classDef` null means no seeded package
+// for this subject — preserves the pre-#1534 "no entry" 400
+// (characters.test.ts:901) for a class, and is the SAME shape #1565 reuses
+// for a background with no package (a 2014 background other than Acolyte and
+// Folk Hero, or homebrew).
+// `subjectLabel` (e.g. "class: Fighter" / "background: Criminal") is
+// player-facing only — never used to resolve anything.
 async function resolvePackageInventory(
   se: PackageEquipment,
-  primaryClassName: string
-): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[] }>> {
-  const classDef = STARTING_EQUIPMENT[primaryClassName];
+  subjectLabel: string,
+  classDef: ClassEquipmentDef | null,
+  creationToolProfs: CreationToolProf[],
+): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[]; totalGold: number }>> {
   if (!classDef) {
     return {
       ok: false,
       status: 400,
-      error: `No starting equipment package defined for class: ${primaryClassName}`,
+      error: `No starting equipment package defined for ${subjectLabel}`,
     };
   }
 
-  const refs = await collectPackageRefs(se, classDef);
+  const refs = await collectPackageRefs(se, classDef, creationToolProfs);
   if (!refs.ok) return refs;
 
   const { inventoryCreates, error } = await resolveFixedItems(refs.allFixedRefs);
   if (error) return { ok: false, status: 400, error };
-  return { ok: true, inventoryItemCreates: inventoryCreates };
+  return { ok: true, inventoryItemCreates: inventoryCreates, totalGold: refs.totalGold };
 }
 
-// Phase 2 — starting-equipment materialization. Optional: omitting it yields an
-// empty-inventory character. The gold path sets currency; the package path
-// materializes InventoryItem payloads. Starting weapons/armor are auto-equipped
-// so the in-session Attack picker isn't empty on a fresh sheet (issue #51).
+// The background half of Phase 2 (#1565) — split out purely to keep
+// materializeStartingEquipment's own cyclomatic complexity low. A background
+// never has a roll-for-gold dice alternative in either edition (unlike a 2014
+// class), so `mode: "gold"` here is always a 400, never a resolveStartingGold
+// range check. `backgroundId` null (homebrew/unresolved background, or one
+// with no package under this edition — any 2014 background but Acolyte and
+// Folk Hero) makes
+// loadBackgroundEquipmentDef's null propagate into resolvePackageInventory's
+// existing "no seeded package" 400 — the same shape a class with no package hits.
+async function resolveBackgroundEquipmentInventory(
+  bse: NonNullable<CreateCharacterBody["backgroundStartingEquipment"]>,
+  backgroundId: string | null,
+  backgroundDisplayName: string,
+  edition: RulesEdition,
+  creationToolProfs: CreationToolProf[],
+): Promise<PhaseResult<{ inventoryItemCreates: InventoryCreate[]; totalGold: number }>> {
+  if (bse.mode === "gold") {
+    return {
+      ok: false,
+      status: 400,
+      error: `${backgroundDisplayName} has no roll-for-gold alternative under this ruleset — choose a starting-equipment package option instead`,
+    };
+  }
+  const backgroundDef = await loadBackgroundEquipmentDef(backgroundId, edition);
+  return resolvePackageInventory(bse, `background: ${backgroundDisplayName}`, backgroundDef, creationToolProfs);
+}
+
+// Phase 2 — starting-equipment materialization. Optional: omitting BOTH
+// fields yields an empty-inventory character. The class gold path sets an
+// explicit currency; the class AND background package paths each contribute
+// InventoryItem payloads plus their own GP, and the two GP amounts ADD
+// (#1565 — a 2024 Criminal Fighter picking option A on both gets 4+16=20 GP,
+// never one silently overwriting the other). Starting weapons/armor are
+// auto-equipped so the in-session Attack picker isn't empty on a fresh sheet
+// (issue #51). The class package is keyed by (classId, edition) — see
+// loadClassEquipmentDef; the background package by (backgroundId, edition) —
+// see loadBackgroundEquipmentDef. primaryClassName/backgroundDisplayName are
+// kept only for player-facing error messages. creationToolProfs (#1564) is
+// threaded through so a boundToToolChoice open pick (Monk's tool-bound entry,
+// Soldier's "Gaming Set (same as above)") can check membership against the
+// SAME resolved+validated list resolveProficiencies already produced — never
+// a second, independent re-resolution of the character's tool choices.
 async function materializeStartingEquipment(
   input: CreateCharacterBody,
-  primaryClassName: string
+  classId: string,
+  primaryClassName: string,
+  backgroundId: string | null,
+  backgroundDisplayName: string,
+  edition: RulesEdition,
+  creationToolProfs: CreationToolProf[],
 ): Promise<PhaseResult<MaterializedEquipment>> {
-  let inventoryItemCreates: InventoryCreate[] = [];
-  let startingCurrency: MaterializedEquipment["startingCurrency"];
+  const inventoryItemCreates: InventoryCreate[] = [];
+  let totalGold = 0;
+  // Currency is only overridden when at least one of class/background
+  // equipment was actually chosen — omitting BOTH keeps deriveCreatedCharacter's
+  // own default currency untouched, same as the pre-#1565 "no `se`" behaviour.
+  let anyEquipmentChosen = false;
 
   const se = input.startingEquipment;
-  if (se?.mode === "gold") {
-    const gold = resolveStartingGold(se.gold, primaryClassName);
-    if (!gold.ok) return gold;
-    startingCurrency = gold.startingCurrency;
-  } else if (se) {
-    const pkg = await resolvePackageInventory(se, primaryClassName);
-    if (!pkg.ok) return pkg;
-    inventoryItemCreates = pkg.inventoryItemCreates;
+  if (se) {
+    anyEquipmentChosen = true;
+    const classDef = await loadClassEquipmentDef(classId, edition);
+    if (se.mode === "gold") {
+      const gold = resolveStartingGold(se.gold, primaryClassName, classDef);
+      if (!gold.ok) return gold;
+      totalGold += se.gold;
+    } else {
+      const pkg = await resolvePackageInventory(se, `class: ${primaryClassName}`, classDef, creationToolProfs);
+      if (!pkg.ok) return pkg;
+      inventoryItemCreates.push(...pkg.inventoryItemCreates);
+      totalGold += pkg.totalGold;
+    }
   }
+
+  const bse = input.backgroundStartingEquipment;
+  if (bse) {
+    anyEquipmentChosen = true;
+    const pkg = await resolveBackgroundEquipmentInventory(bse, backgroundId, backgroundDisplayName, edition, creationToolProfs);
+    if (!pkg.ok) return pkg;
+    inventoryItemCreates.push(...pkg.inventoryItemCreates);
+    totalGold += pkg.totalGold;
+  }
+
+  // Explicit even when 0 (every EDITION_2014 class package, and any package
+  // combination that nets 0 GP) — same persisted value deriveCreatedCharacter's
+  // default already writes, but written here so a chosen package can't
+  // silently drop its GP the way an untouched `startingCurrency` would (#1564).
+  const startingCurrency = anyEquipmentChosen ? { cp: 0, sp: 0, gp: totalGold, pp: 0 } : undefined;
 
   // The 5e selection rule lives in lib/ (selectAutoEquip); apply its decision
   // by assigning each chosen payload its paper-doll slot (#565).
@@ -849,7 +1044,22 @@ export async function createCharacter(
   const grants = await resolveBackgroundGrants(input, selections.background, input.rulesEdition ?? DEFAULT_RULES_EDITION);
   if (!grants.ok) return grants;
 
-  const equipment = await materializeStartingEquipment(input, selections.primaryClassChoice.name);
+  const equipment = await materializeStartingEquipment(
+    input,
+    selections.characterClass.id,
+    selections.primaryClassChoice.name,
+    // background is null for a homebrew/unresolved name (#1565) — the same
+    // "allowed to miss a catalog anchor" shape resolveSelections already
+    // documents for the background lookup itself.
+    selections.background?.id ?? null,
+    input.background,
+    // Re-derives the same edition resolveSelections used, same reasoning as
+    // grants above and the rulesEdition write below — resolveSelections'
+    // `edition` local is scoped to that function, so this independently
+    // recomputes it from the same formula rather than threading it through.
+    input.rulesEdition ?? DEFAULT_RULES_EDITION,
+    selections.creationToolProfs,
+  );
   if (!equipment.ok) return equipment;
 
   const spells = await resolveCreationSpells(input, selections);

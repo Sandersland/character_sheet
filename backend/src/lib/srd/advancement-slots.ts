@@ -1,34 +1,41 @@
-// Per 5e PHB: most classes get ASI slots at levels 4, 8, 12, 16, 19.
-// Fighter gets two extras (levels 6 and 14); Rogue gets one extra (level 10).
-// Returns the *total* number of slots the character has earned at `level`.
+// Per 5e PHB: most classes get ASI slots at levels 4, 8, 12, 16, 19 — the
+// edition-invariant base schedule, which stays code (CLAUDE.md: ASI levels are
+// one of the rules where 2014/2024 agree). Per-class content — Fighter's two
+// extras (6/14), Rogue's one (10), the Fighting Style feat grant level, and the
+// multiclass ability prerequisite — moved onto CharacterClass columns (#1529);
+// these functions now read that content as parameters instead of looking it up
+// by class name in a Record. `classId: null` (homebrew) resolves to `[]`/`null`
+// at the caller (`entry.class?.… ?? …`), which is the base schedule / never
+// granted / no prerequisite — by FK, not by name (fixes #1388's class half).
 
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 
 const BASE_ASI_LEVELS = [4, 8, 12, 16, 19];
-const EXTRA_ASI_LEVELS: Record<string, number[]> = {
-  fighter: [6, 14],
-  rogue:   [10],
-};
 
 /**
  * Returns the cumulative number of Ability Score Improvement / Feat slots
- * the character has earned at `level`. Homebrew / unknown classes fall back
- * to the base 5-slot schedule.
+ * earned at `level`, given the class's own extra-ASI levels (`[]` for a class
+ * with none, or for homebrew — CharacterClass.extraAsiLevels).
  */
-export function advancementSlotsForLevel(className: string, level: number): number {
-  const extra = EXTRA_ASI_LEVELS[className.toLowerCase()] ?? [];
-  return [...BASE_ASI_LEVELS, ...extra].filter((l) => level >= l).length;
+export function advancementSlotsForLevel(extraAsiLevels: readonly number[], level: number): number {
+  return [...BASE_ASI_LEVELS, ...extraAsiLevels].filter((l) => level >= l).length;
 }
 
 // SRD 5.2: the Fighting Style feature grants a Fighting Style feat — Fighter at
-// level 1, Paladin and Ranger at level 2. Returns the cumulative number of such
-// feat slots the class has earned at `level`. Champion's second style at L7 is a
-// follow-up (#1148): add a `subclass` param here and one subclass-keyed branch.
-export function fightingStyleFeatSlots(className: string, level: number): number {
-  const c = className.toLowerCase();
-  if (c === "fighter") return level >= 1 ? 1 : 0;
-  if (c === "paladin" || c === "ranger") return level >= 2 ? 1 : 0;
-  return 0;
+// level 1, Paladin and Ranger at level 2 (CharacterClass.fightingStyleFeatLevel,
+// #1529); `null` means the class never grants one. Champion's second style at
+// L7 is a follow-up (#1148): add a `subclass` param here and one subclass-keyed
+// branch.
+export function fightingStyleFeatSlots(fightingStyleFeatLevel: number | null | undefined, level: number): number {
+  return fightingStyleFeatLevel != null && level >= fightingStyleFeatLevel ? 1 : 0;
+}
+
+// The minimal per-entry shape characterFightingStyleFeatSlots needs — a class
+// relation carrying just the grant level, `?? null` when the entry is homebrew
+// (CharacterClassEntry.classId is nullable by design, #1529).
+interface FightingStyleGatedEntry {
+  level: number;
+  class: { fightingStyleFeatLevel: number | null } | null;
 }
 
 // Total Fighting Style feat entitlement across every class entry, each judged at
@@ -37,13 +44,20 @@ export function fightingStyleFeatSlots(className: string, level: number): number
 // reconcileAdvancements' fs partition, and the serializeCharacter fightingStyleSlots
 // read — never inline a per-entry copy at those sites.
 export function characterFightingStyleFeatSlots(
-  entries: readonly { name: string; level: number }[],
+  entries: readonly FightingStyleGatedEntry[],
   derivedLevel: number,
 ): number {
   return entries.reduce(
-    (sum, e) => sum + fightingStyleFeatSlots(e.name, effectiveEntryLevel(e.level, entries.length, derivedLevel)),
+    (sum, e) =>
+      sum + fightingStyleFeatSlots(e.class?.fightingStyleFeatLevel ?? null, effectiveEntryLevel(e.level, entries.length, derivedLevel)),
     0,
   );
+}
+
+// The minimal per-entry shape characterAdvancementSlots needs.
+interface AdvancementGatedEntry {
+  level: number;
+  class: { extraAsiLevels: readonly number[] } | null;
 }
 
 // PHB'24 p.163: ASI/feat slots accrue per CLASS level, not primary-class ×
@@ -54,33 +68,22 @@ export function characterFightingStyleFeatSlots(
 // reconcileAdvancements, applyAdvancementClamp, and the three featSlotCap
 // readers — never inline a per-entry copy at those sites.
 export function characterAdvancementSlots(
-  entries: readonly { name: string; level: number }[],
+  entries: readonly AdvancementGatedEntry[],
   derivedLevel: number,
 ): number {
   return entries.reduce(
-    (sum, e) => sum + advancementSlotsForLevel(e.name, effectiveEntryLevel(e.level, entries.length, derivedLevel)),
+    (sum, e) =>
+      sum + advancementSlotsForLevel(e.class?.extraAsiLevels ?? [], effectiveEntryLevel(e.level, entries.length, derivedLevel)),
     0,
   );
 }
 
-// Adding a level in a NEW class via multiclassing requires a minimum ability
-// score (13). Each class maps to a list of OPTIONS: the prerequisite is met when
-// ANY one option is fully satisfied — abilities within an option are AND-ed,
-// options are OR-ed. Fighter is the only OR class ("Str 13 or Dex 13").
-export const MULTICLASS_PREREQUISITES: Readonly<Record<string, Record<string, number>[]>> = {
-  barbarian: [{ strength: 13 }],
-  bard: [{ charisma: 13 }],
-  cleric: [{ wisdom: 13 }],
-  druid: [{ wisdom: 13 }],
-  fighter: [{ strength: 13 }, { dexterity: 13 }],
-  monk: [{ dexterity: 13, wisdom: 13 }],
-  paladin: [{ strength: 13, charisma: 13 }],
-  ranger: [{ dexterity: 13, wisdom: 13 }],
-  rogue: [{ dexterity: 13 }],
-  sorcerer: [{ charisma: 13 }],
-  warlock: [{ charisma: 13 }],
-  wizard: [{ intelligence: 13 }],
-};
+// 5e multiclass ability prerequisite (PHB'14 p. 163): each class's options are AND
+// -ed within an option and OR-ed across options — e.g. Fighter's
+// `[{strength:13},{dexterity:13}]` (the only OR class), stored verbatim in
+// CharacterClass.multiclassPrerequisites (#1529). `null`/`undefined`/`[]`
+// (homebrew, no catalog row) carries no prerequisite and is always met.
+export type MulticlassPrerequisiteOption = Record<string, number>;
 
 export interface MulticlassPrerequisiteResult {
   met: boolean;
@@ -96,15 +99,15 @@ function capitalizeAbility(ability: string): string {
 }
 
 /**
- * Whether `abilityScores` satisfy the 5e multiclass ability prerequisite for
- * `className`. Unknown/homebrew classes carry no prerequisite and are always met.
+ * Whether `abilityScores` satisfy the 5e multiclass ability prerequisite
+ * described by `options` (CharacterClass.multiclassPrerequisites, or
+ * null/undefined for a homebrew class with no catalog row — always met).
  */
 export function multiclassPrerequisitesMet(
-  className: string,
+  options: readonly MulticlassPrerequisiteOption[] | null | undefined,
   abilityScores: Record<string, number>,
 ): MulticlassPrerequisiteResult {
-  const options = MULTICLASS_PREREQUISITES[className.toLowerCase()];
-  if (!options) return { met: true, description: "" };
+  if (!options || options.length === 0) return { met: true, description: "" };
   const met = options.some((option) =>
     Object.entries(option).every(([ability, min]) => (abilityScores[ability] ?? 0) >= min),
   );

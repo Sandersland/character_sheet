@@ -13,14 +13,15 @@
 
 import { applyActionTransactions, revertBatch, rollInitiativeTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import type { ActionOperation, Character, ResourceOpResult } from "@/types/character";
+import type { ActionOperation, Character, ExecuteActionResult, ResourceOpResult } from "@/types/character";
 
 export function useTurnActionMutations(characterId: string) {
   const actionMutation = useCharacterMutation({
     characterId,
     mutationFn: (ops: ActionOperation[]) => applyActionTransactions(characterId, ops),
-    toCharacter: ({ batchId, ...character }) => {
+    toCharacter: ({ batchId, results, ...character }) => {
       void batchId;
+      void results;
       return character;
     },
     fallbackMessage: "Action failed.",
@@ -55,7 +56,15 @@ export function useTurnActionMutations(characterId: string) {
     fallbackMessage: "Failed to roll initiative.",
   });
 
-  async function sendAction(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {
+  // Return type carries `results` (#1528) alongside `batchId` — a row-driven
+  // cast-core action (Second Wind) rolls server-side and reports it there;
+  // `toCharacter` above strips both before caching (#1283 shape B/C), but the
+  // caller still reads the raw mutateAsync result to fold the roll into a
+  // dice animation, same as it already does for `batchId` (#758).
+  async function sendAction(
+    actionKey: string,
+    opts?: { roll?: number; inventoryItemId?: string },
+  ): Promise<Character & { batchId?: string; results?: ExecuteActionResult[] }> {
     return actionMutation.mutateAsync([{ type: "executeAction", actionKey, ...opts }]);
   }
 

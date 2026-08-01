@@ -1,8 +1,9 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "@/app.js";
 import { authCookie } from "@/test-support/auth.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 const OWNER_ID = "owner-reference";
 let COOKIE: string;
@@ -58,11 +59,10 @@ describe("GET /api/reference", () => {
     expect(criminal.skillProficiencies).toEqual(["sleightOfHand", "stealth"]);
     expect(criminal.originFeat).toMatchObject({ name: "Alert", category: "origin" });
 
-    // Folk Hero has no 2024 spec — spec-less legacy row kept (#1130).
-    const folkHero = response.body.backgrounds.find((b: { name: string }) => b.name === "Folk Hero");
-    expect(folkHero).toBeDefined();
-    expect(folkHero.abilityChoices).toEqual([]);
-    expect(folkHero.originFeat).toBeNull();
+    // Folk Hero is absent from the 2024 list entirely (#1570) — PHB'24 has no
+    // Folk Hero, and offering it here is what silently cost a 2024 character
+    // their ability spread and Origin feat. Its 2014 half is asserted below.
+    expect(response.body.backgrounds.map((b: { name: string }) => b.name)).not.toContain("Folk Hero");
   });
 
   // #1131: each class carries its level-1 creation pick counts (or null for a
@@ -173,9 +173,10 @@ describe("GET /api/reference", () => {
     // otherwise ride along on the wire, widening the contract silently.
     expect(Object.keys(alert2014).sort()).toEqual(["category", "description", "id", "name"]);
 
-    // Folk Hero: no origin feat in either edition (spec-less legacy row, #1130).
+    // Folk Hero: 2014 only (#1570), and no origin feat there — an Origin feat is
+    // a 2024 concept, which is precisely why this row could never serve 2024.
     expect(byName(criminal2014.body, "Folk Hero").originFeat).toBeNull();
-    expect(byName(criminal2024.body, "Folk Hero").originFeat).toBeNull();
+    expect(byName(criminal2024.body, "Folk Hero")).toBeUndefined();
 
     // Soldier: Savage Attacker is edition: null (shared path) — same row both editions.
     expect(byName(criminal2014.body, "Soldier").originFeat.name).toBe("Savage Attacker");
@@ -301,5 +302,365 @@ describe("GET /api/reference", () => {
     }
 
     expect(res2024.body.itemRarities).toEqual(res2014.body.itemRarities);
+  });
+
+  // #1336: the write path (character-create.ts, level-up-transaction.ts)
+  // already rejects a cross-edition subclass/background id via
+  // crossEditionRejection — these fixture-seeded forked rows prove the read
+  // path (this endpoint) no longer offers what the write path would refuse.
+  // No real forked Subclass/Background row is seeded yet (that's #1559), so
+  // fixtures stand in, same discipline as catalog-edition-constraints.test.ts
+  // and subclass-in-tx.integration.test.ts.
+  describe("edition-scoping backgrounds and subclasses (#1336)", () => {
+    const FIGHTER = "Fighter";
+    const FORKED_SUBCLASS = "Zzz Fixture Forked Subclass (#1336)";
+    const SHARED_SUBCLASS = "Zzz Fixture Shared Subclass (#1336)";
+    const EXACT_OVER_SHARED_SUBCLASS = "Zzz Fixture Exact-over-Shared Subclass (#1336)";
+    const ONLY_2014_SUBCLASS = "Zzz Fixture 2014-Only Subclass (#1336)";
+    const SUBCLASS_NAMES = [FORKED_SUBCLASS, SHARED_SUBCLASS, EXACT_OVER_SHARED_SUBCLASS, ONLY_2014_SUBCLASS];
+
+    const FORKED_BACKGROUND = "Zzz Fixture Forked Background (#1336)";
+    const SHARED_BACKGROUND = "Zzz Fixture Shared Background (#1336)";
+    const EXACT_OVER_SHARED_BACKGROUND = "Zzz Fixture Exact-over-Shared Background (#1336)";
+    const ONLY_2014_BACKGROUND = "Zzz Fixture 2014-Only Background (#1336)";
+    const BACKGROUND_NAMES = [
+      FORKED_BACKGROUND,
+      SHARED_BACKGROUND,
+      EXACT_OVER_SHARED_BACKGROUND,
+      ONLY_2014_BACKGROUND,
+    ];
+
+    beforeAll(async () => {
+      const fighter = await prisma.characterClass.findUniqueOrThrow({ where: { name: FIGHTER } });
+
+      await prisma.subclass.createMany({
+        data: [
+          {
+            classId: fighter.id,
+            name: FORKED_SUBCLASS,
+            description: "2014 fork text",
+            slug: "zzz-fixture-forked-2014-1336",
+            edition: "EDITION_2014",
+          },
+          {
+            classId: fighter.id,
+            name: FORKED_SUBCLASS,
+            description: "2024 fork text",
+            slug: "zzz-fixture-forked-2024-1336",
+            edition: "EDITION_2024",
+          },
+          {
+            classId: fighter.id,
+            name: SHARED_SUBCLASS,
+            description: "shared text",
+            slug: "zzz-fixture-shared-1336",
+            edition: null,
+          },
+          {
+            classId: fighter.id,
+            name: EXACT_OVER_SHARED_SUBCLASS,
+            description: "shared fallback text",
+            slug: "zzz-fixture-exact-shared-fallback-1336",
+            edition: null,
+          },
+          {
+            classId: fighter.id,
+            name: EXACT_OVER_SHARED_SUBCLASS,
+            description: "2014 exact text",
+            slug: "zzz-fixture-exact-shared-exact-1336",
+            edition: "EDITION_2014",
+          },
+          {
+            classId: fighter.id,
+            name: ONLY_2014_SUBCLASS,
+            description: "2014-only text",
+            slug: "zzz-fixture-only-2014-1336",
+            edition: "EDITION_2014",
+          },
+        ],
+      });
+
+      // Background has no free-text field to carry a probe value, so
+      // toolProficiencies (a plain string array with no seeded overlap risk)
+      // stands in as the distinguishing marker between fixture rows.
+      await prisma.background.createMany({
+        data: [
+          { name: FORKED_BACKGROUND, skillProficiencies: [], toolProficiencies: ["2014 fork tool"], edition: "EDITION_2014" },
+          { name: FORKED_BACKGROUND, skillProficiencies: [], toolProficiencies: ["2024 fork tool"], edition: "EDITION_2024" },
+          { name: SHARED_BACKGROUND, skillProficiencies: [], toolProficiencies: ["shared tool"], edition: null },
+          {
+            name: EXACT_OVER_SHARED_BACKGROUND,
+            skillProficiencies: [],
+            toolProficiencies: ["shared fallback tool"],
+            edition: null,
+          },
+          {
+            name: EXACT_OVER_SHARED_BACKGROUND,
+            skillProficiencies: [],
+            toolProficiencies: ["2014 exact tool"],
+            edition: "EDITION_2014",
+          },
+          {
+            name: ONLY_2014_BACKGROUND,
+            skillProficiencies: [],
+            toolProficiencies: ["2014-only tool"],
+            edition: "EDITION_2014",
+          },
+        ],
+      });
+    });
+
+    afterAll(async () => {
+      // Never touch the real seeded catalog — delete only the Zzz-prefixed
+      // fixture rows this block created, so sibling tests in this file still
+      // see the unmodified Fighter roster and background list.
+      await prisma.subclass.deleteMany({ where: { name: { in: SUBCLASS_NAMES } } });
+      await prisma.background.deleteMany({ where: { name: { in: BACKGROUND_NAMES } } });
+    });
+
+    async function fetchBoth() {
+      const app = createApp();
+      const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+      const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+      const fighterOf = (body: any) => body.classes.find((c: { name: string }) => c.name === FIGHTER);
+      return { res2014, res2024, fighter2014: fighterOf(res2014.body), fighter2024: fighterOf(res2024.body) };
+    }
+
+    it("returns the exact-edition fixture subclass and excludes the other edition's fork", async () => {
+      const { fighter2014, fighter2024 } = await fetchBoth();
+
+      const forked2014 = fighter2014.subclasses.filter((s: { name: string }) => s.name === FORKED_SUBCLASS);
+      const forked2024 = fighter2024.subclasses.filter((s: { name: string }) => s.name === FORKED_SUBCLASS);
+
+      expect(forked2014).toHaveLength(1);
+      expect(forked2014[0].description).toBe("2014 fork text");
+      expect(forked2024).toHaveLength(1);
+      expect(forked2024[0].description).toBe("2024 fork text");
+    });
+
+    // withEditionOrShared's whole contract: a null-edition row is not
+    // exclusive to either edition.
+    it("returns a shared (edition: null) subclass and background to both editions", async () => {
+      const { res2014, res2024, fighter2014, fighter2024 } = await fetchBoth();
+
+      const shared2014 = fighter2014.subclasses.filter((s: { name: string }) => s.name === SHARED_SUBCLASS);
+      const shared2024 = fighter2024.subclasses.filter((s: { name: string }) => s.name === SHARED_SUBCLASS);
+      expect(shared2014).toHaveLength(1);
+      expect(shared2024).toHaveLength(1);
+      expect(shared2014[0].description).toBe("shared text");
+      expect(shared2024[0].description).toBe("shared text");
+
+      const bg2014 = res2014.body.backgrounds.find((b: { name: string }) => b.name === SHARED_BACKGROUND);
+      const bg2024 = res2024.body.backgrounds.find((b: { name: string }) => b.name === SHARED_BACKGROUND);
+      expect(bg2014).toBeDefined();
+      expect(bg2024).toBeDefined();
+      expect(bg2014.toolProficiencies).toEqual(["shared tool"]);
+      expect(bg2024.toolProficiencies).toEqual(["shared tool"]);
+    });
+
+    // resolveEditionCatalog's job, distinct from the shared-row case above: an
+    // exact-edition row must win over a same-name shared twin, not merely
+    // coexist with it.
+    it("resolves the exact-edition row over a shared same-name twin", async () => {
+      const { res2014, res2024, fighter2014, fighter2024 } = await fetchBoth();
+
+      const exact2014 = fighter2014.subclasses.filter(
+        (s: { name: string }) => s.name === EXACT_OVER_SHARED_SUBCLASS,
+      );
+      const exact2024 = fighter2024.subclasses.filter(
+        (s: { name: string }) => s.name === EXACT_OVER_SHARED_SUBCLASS,
+      );
+      expect(exact2014).toHaveLength(1);
+      expect(exact2014[0].description).toBe("2014 exact text");
+      expect(exact2024).toHaveLength(1);
+      expect(exact2024[0].description).toBe("shared fallback text");
+
+      const bg2014 = res2014.body.backgrounds.find((b: { name: string }) => b.name === EXACT_OVER_SHARED_BACKGROUND);
+      const bg2024 = res2024.body.backgrounds.find((b: { name: string }) => b.name === EXACT_OVER_SHARED_BACKGROUND);
+      expect(bg2014.toolProficiencies).toEqual(["2014 exact tool"]);
+      expect(bg2024.toolProficiencies).toEqual(["shared fallback tool"]);
+    });
+
+    // resolveEditionRow's documented "not in the catalog" semantics: a row
+    // tagged for the other edition with no shared twin is simply absent.
+    it("omits a subclass or background tagged only for the other edition", async () => {
+      const { res2014, res2024, fighter2014, fighter2024 } = await fetchBoth();
+
+      const only2014in2014 = fighter2014.subclasses.filter((s: { name: string }) => s.name === ONLY_2014_SUBCLASS);
+      const only2014in2024 = fighter2024.subclasses.filter((s: { name: string }) => s.name === ONLY_2014_SUBCLASS);
+      expect(only2014in2014).toHaveLength(1);
+      expect(only2014in2024).toHaveLength(0);
+
+      expect(res2014.body.backgrounds.find((b: { name: string }) => b.name === ONLY_2014_BACKGROUND)).toBeDefined();
+      expect(
+        res2024.body.backgrounds.find((b: { name: string }) => b.name === ONLY_2014_BACKGROUND),
+      ).toBeUndefined();
+    });
+
+    it("never puts edition on the wire for a subclass or background object", async () => {
+      const { res2014, res2024, fighter2014, fighter2024 } = await fetchBoth();
+
+      for (const s of [...fighter2014.subclasses, ...fighter2024.subclasses]) {
+        expect(Object.keys(s).sort()).toEqual(["description", "id", "name"]);
+      }
+      for (const b of [...res2014.body.backgrounds, ...res2024.body.backgrounds]) {
+        expect(Object.keys(b).sort()).toEqual([
+          "abilityChoices",
+          "id",
+          "name",
+          "originFeat",
+          "skillProficiencies",
+          "startingEquipment",
+          "toolProficiencies",
+        ]);
+      }
+    });
+  });
+
+  // #1565/#1570: background startingEquipment resolves by (backgroundId,
+  // edition) exactly like a class's — asserted against real BOOK VALUES, never
+  // "differs from 2014" (which would pass on any wrong transcription just as
+  // readily as a correct one). 2014 Charlatan/Criminal/Noble/Sage/Soldier get
+  // no package (SRD 5.1 ships only Acolyte, and PHB'14 equipment for the rest
+  // is unscoped) — asserting null for those pairs is the other half of the
+  // scope finding.
+  describe("background starting-equipment (#1565)", () => {
+    it("each EDITION_2024 background carries its own option-A GP and a null package-level gold", async () => {
+      const response = await supertest
+        .agent(createApp())
+        .set("Cookie", COOKIE)
+        .get("/api/reference?edition=EDITION_2024");
+      const byName = (name: string) =>
+        response.body.backgrounds.find((b: { name: string }) => b.name === name);
+
+      // Charlatan/Noble are PHB'24 rather than SRD 5.2 (#1570); the rest are SRD 5.2.
+      const expectedGoldA: Record<string, number> = {
+        Acolyte: 8,
+        Criminal: 16,
+        Sage: 8,
+        Soldier: 14,
+        Charlatan: 15,
+        Noble: 29,
+      };
+      for (const [name, goldA] of Object.entries(expectedGoldA)) {
+        const bg = byName(name);
+        expect(bg.startingEquipment, `${name} 2024`).not.toBeNull();
+        expect(bg.startingEquipment.gold).toBeNull();
+        const options = bg.startingEquipment.groups[0].options;
+        expect(options[0].gold, `${name} option A gold`).toBe(goldA);
+        expect(options[1]).toEqual({ label: "(B) 50 GP", gold: 50 });
+      }
+
+      // Folk Hero is not served under 2024 at all (#1570), so there is no row
+      // here to carry a package — asserted as absence, not a null package.
+      expect(byName("Folk Hero"), "Folk Hero 2024").toBeUndefined();
+    });
+
+    it("EDITION_2014 Acolyte and Folk Hero carry their fixed one-option lists; every other background is null", async () => {
+      const response = await supertest
+        .agent(createApp())
+        .set("Cookie", COOKIE)
+        .get("/api/reference?edition=EDITION_2014");
+      const byName = (name: string) =>
+        response.body.backgrounds.find((b: { name: string }) => b.name === name);
+
+      const acolyte = byName("Acolyte");
+      expect(acolyte.startingEquipment).not.toBeNull();
+      expect(acolyte.startingEquipment.gold).toBeNull();
+      expect(acolyte.startingEquipment.groups).toHaveLength(1);
+      expect(acolyte.startingEquipment.groups[0].options).toHaveLength(1);
+      expect(acolyte.startingEquipment.groups[0].options[0].gold).toBe(15);
+
+      // PHB'14 Folk Hero (#1570) — a fixed list like Acolyte's, plus the one
+      // open pick a 2014 background carries: "artisan's tools of your choice".
+      // Unbound, unlike Soldier's/Noble's "same as above" gaming set, and the
+      // assertion on toolCategory is what pins the dropdown's pool to the
+      // seventeen artisan Items rather than every tool in the catalog.
+      const folkHero = byName("Folk Hero");
+      expect(folkHero.startingEquipment).not.toBeNull();
+      expect(folkHero.startingEquipment.gold).toBeNull();
+      expect(folkHero.startingEquipment.groups).toHaveLength(1);
+      const folkHeroOption = folkHero.startingEquipment.groups[0].options[0];
+      expect(folkHero.startingEquipment.groups[0].options).toHaveLength(1);
+      expect(folkHeroOption.items.map((i: { catalogName: string }) => i.catalogName)).toEqual([
+        "Shovel",
+        "Iron Pot",
+        "Common Clothes",
+      ]);
+      expect(folkHeroOption.gold).toBe(10);
+      expect(folkHeroOption.openPicks).toHaveLength(1);
+      expect(folkHeroOption.openPicks[0].filter.toolCategory).toBe("artisan");
+      expect(folkHeroOption.openPicks[0].boundToToolChoice).toBeUndefined();
+
+      for (const name of ["Charlatan", "Criminal", "Noble", "Sage", "Soldier"]) {
+        expect(byName(name).startingEquipment, `${name} 2014`).toBeNull();
+      }
+    });
+
+    // Mutation proof: drop the edition filter (change the query below to
+    // exact-match EDITION_2014 unconditionally, mirroring what a broken
+    // reference.ts would serve) and the 2024 test above goes red — its four
+    // backgrounds would report null instead of their real SRD 5.2 packages.
+    // Confirmed by temporarily hardcoding the `edition` variable passed to
+    // the startingEquipmentPackage.findMany query to "EDITION_2014" in
+    // reference.ts and re-running this file (see this PR's report for the
+    // red output), then reverting.
+  });
+
+  // #1308: CharacterClass has no edition column by design — one row serves
+  // both editions, and subclassGateLevel is an edition-divergent field on it.
+  // `subclasses` is excluded because #1336 makes THAT field edition-filtered
+  // on purpose (the describe block above); `startingEquipment` is excluded
+  // because #1535 makes IT genuinely edition-divergent content too (a real
+  // PHB'24 package, not the pre-#1535 2014 copy) via the same exact
+  // (classId, edition) resolution as subclasses, not a fallback. This latch
+  // guards every OTHER class field against a future "for symmetry" filter,
+  // same shape as this file's itemRarities latch (edition-invariant, not
+  // edition-resolved).
+  it("classes (apart from subclassGateLevel/subclasses/startingEquipment) and races are identical between editions (#1308/#1535)", async () => {
+    const app = createApp();
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+
+    const stripEditionDivergentFields = (c: Record<string, unknown>) => {
+      const rest = { ...c };
+      delete rest.subclassGateLevel;
+      delete rest.subclasses;
+      delete rest.startingEquipment;
+      return rest;
+    };
+    expect(res2014.body.classes.map(stripEditionDivergentFields)).toEqual(
+      res2024.body.classes.map(stripEditionDivergentFields),
+    );
+    expect(res2014.body.races).toEqual(res2024.body.races);
+  });
+
+  // #1559: proves #1336's edition-scoping and #1559's Subclass tag compose —
+  // the REAL seeded Path of the Totem Warrior row (never the Zzz fixtures
+  // above, which stand in for a forked row no real subclass has yet), tagged
+  // EDITION_2014 because SRD 5.2 replaces it with Path of the Wild Heart
+  // rather than retabbing it. A 2024 Barbarian must no longer be offered a
+  // subclass with zero features in its own edition.
+  it("no longer offers the real Path of the Totem Warrior to a 2024 Barbarian, but still offers it to a 2014 one (#1559)", async () => {
+    const app = createApp();
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const barbarianOf = (body: any) => body.classes.find((c: { name: string }) => c.name === "Barbarian");
+
+    const barbarian2014 = barbarianOf(res2014.body);
+    const barbarian2024 = barbarianOf(res2024.body);
+    expect(barbarian2014).toBeDefined();
+    expect(barbarian2024).toBeDefined();
+
+    const totemWarrior2014 = barbarian2014.subclasses.find((s: { name: string }) => s.name === "Totem Warrior");
+    const totemWarrior2024 = barbarian2024.subclasses.find((s: { name: string }) => s.name === "Totem Warrior");
+    expect(totemWarrior2014).toBeDefined();
+    expect(totemWarrior2024).toBeUndefined();
+
+    // Berserker is edition: null (shared) — still offered to both, so this
+    // isn't "2024 Barbarian sees no subclasses", only Totem Warrior's absence.
+    expect(barbarian2024.subclasses.map((s: { name: string }) => s.name)).toContain("Berserker");
   });
 });

@@ -3,7 +3,6 @@ import { Router } from "express";
 import {
   ALIGNMENTS,
   ITEM_RARITIES,
-  MULTICLASS_PREREQUISITES,
   cantripsKnownAtLevel,
   conditionRulesText,
   maxSpellLevelForClass,
@@ -11,8 +10,12 @@ import {
   preparedSpellCountAt,
   primaryAbilities,
   toolsByCategory,
+  type MulticlassPrerequisiteOption,
 } from "@/lib/srd/srd.js";
-import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
+import {
+  mapStartingEquipmentPackage,
+  EQUIPMENT_PACKAGE_INCLUDE,
+} from "@/lib/inventory/starting-equipment-package.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
@@ -32,14 +35,52 @@ referenceRouter.get("/reference", async (req, res) => {
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
   const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
+  // Narrowed to at-most-two-per-key at the DB (withEditionOrShared), then
+  // resolveEditionCatalog picks the one row per business key — same D3 shape
+  // as originFeatRows/universalActionRows below. `edition` is present on the
+  // full row (no `select` strips it) purely to drive that resolution; the
+  // projections below never forward it to the wire.
   const rawClasses = await prisma.characterClass.findMany({
     orderBy: { name: "asc" },
-    include: { subclasses: { orderBy: { name: "asc" } } },
+    include: { subclasses: { where: withEditionOrShared({}, edition), orderBy: { name: "asc" } } },
   });
-  const backgrounds = await prisma.background.findMany({
+  // One findMany for every class's package rather than one query per class
+  // (avoids an N+1 over the `classes` map below). `edition` is non-nullable on
+  // StartingEquipmentPackage — an exact-match filter, not resolveEditionCatalog
+  // (there is no shared/NULL row to fall back to, unlike Feat/Subclass/Background).
+  const startingEquipmentPackages = await prisma.startingEquipmentPackage.findMany({
+    where: { classId: { in: rawClasses.map((c) => c.id) }, edition },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  // classId is non-null for every row here (filtered by `classId: { in }`
+  // above) — the `!` narrows StartingEquipmentPackage.classId's schema type
+  // (nullable since #1565's background reuse), never a runtime assumption.
+  const startingEquipmentByClassId = new Map(
+    startingEquipmentPackages.map((p) => [p.classId!, mapStartingEquipmentPackage(p)]),
+  );
+
+  const rawBackgrounds = await prisma.background.findMany({
+    where: withEditionOrShared({}, edition),
     orderBy: { name: "asc" },
     include: { originFeat: { select: { id: true, name: true, description: true, category: true } } },
   });
+  // keyOf is `name` (Background's business key, D2) — same as originFeatByName below.
+  const backgrounds = resolveEditionCatalog(rawBackgrounds, edition, (b) => b.name);
+
+  // One findMany for every background's package (#1565), same N+1-avoidance
+  // reasoning as startingEquipmentPackages above. `edition` is non-nullable on
+  // StartingEquipmentPackage — an exact-match filter, not resolveEditionCatalog
+  // (no shared/NULL row to fall back to). Most backgrounds resolve to `null`
+  // here: 2014 Charlatan/Criminal/Noble/Sage/Soldier get no package (SRD 5.1
+  // ships only Acolyte, and PHB'14 equipment for the rest is unscoped) —
+  // `null` is the correct, intentional answer for those rows, not a gap.
+  const backgroundEquipmentPackages = await prisma.startingEquipmentPackage.findMany({
+    where: { backgroundId: { in: backgrounds.map((b) => b.id) }, edition },
+    include: EQUIPMENT_PACKAGE_INCLUDE,
+  });
+  const startingEquipmentByBackgroundId = new Map(
+    backgroundEquipmentPackages.map((p) => [p.backgroundId!, mapStartingEquipmentPackage(p)]),
+  );
 
   // Resolved per-edition BY NAME, not by following the FK: Background.originFeatId
   // is whatever seed-time resolveOriginFeatId baked on (EDITION_2024), and a
@@ -51,11 +92,19 @@ referenceRouter.get("/reference", async (req, res) => {
   // a 2014 Criminal saw 2024 Alert text). The FK survives only as a name source
   // until #1348 replaces it with originFeatName.
   //
-  // Scope latch (#1325 vs #1336): this endpoint resolves edition-dependent RULE
-  // VALUES and this one feat text. WHICH catalog ROWS it returns (classes,
-  // subclasses, backgrounds, spells) is still edition-unfiltered and is #1336's
-  // job — no forked class/subclass/background rows are seeded today, so the lists
-  // are identical for both editions and nothing is silently wrong yet.
+  // Scope latch (#1336): backgrounds and each class's subclasses (below) are now
+  // resolved per the requesting edition, same mechanism as originFeatRows and
+  // universalActionRows. `startingEquipment` (above) is ALSO resolved per
+  // requesting edition — by an exact (classId, edition) match rather than
+  // resolveEditionCatalog's fallback, since StartingEquipmentPackage.edition is
+  // non-nullable (#1534) — and, since #1535, that resolution reaches genuinely
+  // different SRD 5.2 content, not a 2014 copy: a 2024 character gets the real
+  // PHB'24 package. Still deliberately unfiltered by this endpoint: `races`
+  // (species divergence is real — ability increases, roster membership — but
+  // not representable by an edition column alone, #1518); `classes` themselves
+  // (one CharacterClass row serves both editions by design, subclassGateLevel
+  // is the only field that forks, #1308). The spell catalog (`GET /api/spells`)
+  // is a separate endpoint with its own edition gap, #1517.
   const originFeatNames = [
     ...new Set(backgrounds.map((b) => b.originFeat?.name).filter((n): n is string => n != null)),
   ];
@@ -94,10 +143,18 @@ referenceRouter.get("/reference", async (req, res) => {
     toolProficiencies: c.toolProficiencies,
     toolChoices: c.toolChoices,
     toolChoiceCount: c.toolChoiceCount,
-    subclasses: c.subclasses.map((s) => ({ id: s.id, name: s.name, description: s.description })),
-    startingEquipment: STARTING_EQUIPMENT[c.name] ?? null,
-    // #1161: PHB'24 primary ability/abilities; [] for a homebrew class.
-    primaryAbility: primaryAbilities(c.name),
+    // keyOf is `name` alone, not `${classId}::${name}` (D2): classId is
+    // constant within one class's own subclasses array, so the compound key
+    // resolveEditionCatalog's docstring prescribes for cross-class groups
+    // would be harmless here but misleading.
+    subclasses: resolveEditionCatalog(c.subclasses, edition, (s) => s.name).map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+    })),
+    startingEquipment: startingEquipmentByClassId.get(c.id) ?? null,
+    // #1161/#1529: PHB'24 primary ability/abilities, off the catalog column; [] for a homebrew class.
+    primaryAbility: primaryAbilities(c.primaryAbilities),
     // #1131: level-1 creation pick counts from the SRD 5.2 tables (null for a
     // non-caster) so the creation picker never re-encodes the rules.
     //
@@ -115,15 +172,17 @@ referenceRouter.get("/reference", async (req, res) => {
             maxSpellLevel: maxSpellLevelForClass(c.name, 1),
           }
         : null,
-    // 5e multiclass ability prerequisite (PHB p. 163): the option thresholds plus
+    // 5e multiclass ability prerequisite (PHB'14 p. 163): the option thresholds plus
     // a rendered description. Lets the add-class picker gate + explain eligibility
     // without duplicating the rules table on the frontend. Null for homebrew classes.
-    multiclassPrerequisite: MULTICLASS_PREREQUISITES[c.name.toLowerCase()]
-      ? {
-          options: MULTICLASS_PREREQUISITES[c.name.toLowerCase()],
-          description: multiclassPrerequisitesMet(c.name, {}).description,
-        }
-      : null,
+    // `multiclassPrerequisites` (#1529): every seeded class has at least one
+    // option group, so an empty array here means a homebrew/unseeded row.
+    multiclassPrerequisite: ((): { options: MulticlassPrerequisiteOption[]; description: string } | null => {
+      const options = c.multiclassPrerequisites as MulticlassPrerequisiteOption[];
+      return options.length > 0
+        ? { options, description: multiclassPrerequisitesMet(options, {}).description }
+        : null;
+    })(),
   }));
 
   const racesWithTools = races.map((r) => ({
@@ -142,6 +201,11 @@ referenceRouter.get("/reference", async (req, res) => {
     abilityChoices: b.abilityChoices,
     // Resolved for the requested edition — see the originFeatByName comment above.
     originFeat: b.originFeat ? (originFeatByName.get(b.originFeat.name) ?? null) : null,
+    // #1565: null for a background with no seeded package under this edition
+    // (see startingEquipmentByBackgroundId's comment) — never a placeholder
+    // empty-groups package, so the picker can tell "no equipment choices"
+    // apart from "equipment choices, but this background chose none".
+    startingEquipment: startingEquipmentByBackgroundId.get(b.id) ?? null,
   }));
 
   // Artisan tools for the sheet's Proficiencies-card dropdown (the only category consumed).

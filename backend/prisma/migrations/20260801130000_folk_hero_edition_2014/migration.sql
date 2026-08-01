@@ -1,0 +1,30 @@
+-- #1570: Folk Hero is PHB'14 only — PHB'24's sixteen backgrounds have no Folk
+-- Hero. Its seed row carried edition NULL ("shared"), and resolveEditionRow
+-- serves a NULL row under BOTH editions, so a 2024 character could pick the one
+-- background unable to give them what PHB'24 guarantees every character: with no
+-- abilityChoices and no originFeatName it silently costs them +3 ability points
+-- and an Origin feat, with nothing in the UI to explain the loss.
+--
+-- Retagged IN PLACE rather than left to the seed, which cannot do this:
+-- upsertEditionRow keys on (name, edition), so ("Folk Hero", NULL) and
+-- ("Folk Hero", EDITION_2014) are different rows and the seed would CREATE the
+-- second and leave the first behind. seedBackgrounds is the one catalog seeder
+-- with no staleCatalogRowsWhere sweep, so nothing would ever remove the orphan:
+-- it would keep resolving for 2024 characters — the bug outliving its own fix —
+-- and resolveBackgroundIdsByName would then throw on the duplicate name, which
+-- it now reaches because Folk Hero gains a package in this same change.
+--
+-- Updating the existing row keeps its id, so any CharacterBackground FK pointing
+-- at it stays intact. Delete-and-recreate would not: that FK is onDelete
+-- SetNull, so it would silently un-pick every character holding Folk Hero while
+-- their `name` snapshot kept displaying it (#1559).
+--
+-- Guarded on `edition IS NULL` so re-running after a partial apply is a no-op
+-- rather than clobbering a row someone has since tagged EDITION_2024 by hand.
+--
+-- Hand-written for the reason 20260801120000's header records: Prisma 7 prompts
+-- interactively on `migrate dev --create-only` in this checkout, so every
+-- migration since 20260730120000 has been authored directly. This one carries no
+-- schema change at all — it is data-only, and `prisma migrate diff` would
+-- produce nothing for it.
+UPDATE "Background" SET edition = 'EDITION_2014' WHERE name = 'Folk Hero' AND edition IS NULL;

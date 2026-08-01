@@ -3,7 +3,12 @@
 // Tool proficiency in 5e adds proficiency bonus to ability checks — the
 // governing ability is chosen per check by the DM, not fixed per tool.
 
-export type ToolCategory = "artisan" | "gamingSet" | "musicalInstrument" | "other";
+// Canonical definition lives in shared-types (#1564) — Item.toolCategory and
+// StartingEquipmentOpenPick.toolCategory both key against it, so a starting-
+// equipment open pick can filter "musical instrument" as a column read
+// without this module (or a rules TS import) reaching the equipment resolver.
+import type { ToolCategory } from "@character-sheet/shared-types";
+export type { ToolCategory };
 
 export interface ToolDefinition {
   name: string;
@@ -31,9 +36,13 @@ export const TOOLS: readonly ToolDefinition[] = [
   { name: "Tinker's Tools",          category: "artisan",          cost: { gp: 50 },  weight: 10 },
   { name: "Weaver's Tools",          category: "artisan",          cost: { gp: 1  },  weight: 5  },
   { name: "Woodcarver's Tools",      category: "artisan",          cost: { gp: 1  },  weight: 5  },
-  // Gaming sets
+  // Gaming sets (#1565: Dragonchess/Three-Dragon Ante added alongside Dice/
+  // Playing Card so Soldier's "Gaming Set (same as above)" pick has all four
+  // SRD variants to resolve against, matching the Item catalog rows added there)
   { name: "Dice Set",                category: "gamingSet",        cost: { sp: 1  },  weight: 0  },
+  { name: "Dragonchess Set",         category: "gamingSet",        cost: { gp: 1  },  weight: 0  },
   { name: "Playing Card Set",        category: "gamingSet",        cost: { sp: 5  },  weight: 0  },
+  { name: "Three-Dragon Ante Set",   category: "gamingSet",        cost: { gp: 1  },  weight: 0  },
   // Musical instruments (PHB p. 154)
   { name: "Bagpipes",                category: "musicalInstrument", cost: { gp: 30 }, weight: 6  },
   { name: "Drum",                    category: "musicalInstrument", cost: { gp: 6  }, weight: 3  },

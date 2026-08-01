@@ -55,6 +55,10 @@ export interface CharacterDraft {
   /** #1131: chosen level-1 prepared-spell catalog ids (casters only). */
   spellIds: string[];
   equipmentDraft: EquipmentDraft | null;
+  /** #1565: the background's OWN equipment draft, parallel to equipmentDraft
+   *  above but for the background's package instead of the class's — null
+   *  both before a background with a package is chosen AND for one with none. */
+  backgroundEquipmentDraft: EquipmentDraft | null;
   /** #1176: the creation-ceremony step the player is on, so a reload resumes there. */
   step: CreationStepKey;
   /** #1286: resolved by CreationEntryGate before the identity step is reachable —
@@ -94,6 +98,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   cantripIds: [],
   spellIds: [],
   equipmentDraft: null,
+  backgroundEquipmentDraft: null,
   step: "identity",
   rulesEdition: null,
   campaignId: null,

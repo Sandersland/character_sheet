@@ -26,19 +26,28 @@
  *   the seed array had already drifted out of sync on 6 pre-existing rows before
  *   this file added 4 more, without anything breaking; #1431 closes that drift.)
  *
- * 3. `ACTION_CAST_FN` — cast-core actions that route through `castAbilityInTx`
- *    (pay pool cost → self-apply) instead of the op-list dispatch. Second Wind
- *    (#420) is the first: the fighter spends its Second Wind pool and self-heals
- *    1d10 + level via the shared cast core's self-apply heal path. Action Surge
- *    intentionally stays an `ACTION_EFFECT_FN` counter — its extra-action grant
- *    is a client-side economy effect with no server state to apply.
+ * 3. Row-driven actions (`actionsFromRows` + `castSpecFromRow`, #1528) — a
+ *    `ClassFeature` row whose `activationCost` column is populated becomes an
+ *    `AvailableAction` directly, no `DERIVED_ACTIONS` entry needed; casting one
+ *    with an `effectKind` set routes through `castAbilityInTx` the same way the
+ *    (retired) `ACTION_CAST_FN` table used to — the difference is the die is
+ *    now rolled HERE, server-side, from the row's effect columns
+ *    (`castManeuver`, maneuvers.ts, is the server-roll precedent), not supplied
+ *    by the client. A row with no `effectKind` (Action Surge — a pure counter,
+ *    the extra-action grant is client-side) spends its pool directly instead.
+ *    Today only Fighter's rows populate `activationCost`; every other class
+ *    still goes through `DERIVED_ACTIONS`/`ACTION_EFFECT_FN` until its own
+ *    wave-2 retab (#1134).
  */
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { ActiveBuff } from "@/lib/combat/active-effects.js";
-import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
-import type { EffectSpec } from "@/lib/combat/effects.js";
+import { readAbilityCost, type AbilityCost } from "@/lib/spellcasting/ability-cost.js";
+import { readEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
+import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -65,6 +74,20 @@ interface DerivedActionRecord {
   name: string;
   cost: ActionCost;
   universal?: boolean;
+  /**
+   * Absent means valid in both editions (the default — mirrors
+   * `AuthoredFeature.edition`, #1374/#1499; DERIVED_ACTIONS stays hand-rolled
+   * TS, so it keeps the "optional = both editions" shape `DerivedFeature`
+   * itself moved off of when #1524 switched feature TEXT to seeded rows). A
+   * row whose mechanics genuinely differ between PHB'14 and PHB'24 is tagged
+   * for the edition it describes; `matchesActionGate` filters on it the same
+   * way `featuresFromRows` filters `ClassFeature` rows
+   * (lib/classes/class-feature-rows.ts) — the one place THAT rule lives. A
+   * blanket tagging pass is not wanted: only a row whose 2014 shape doesn't
+   * exist or differs enough to need its own row gets tagged (see the seven
+   * monk rows below); most rows (e.g. Second Wind, Rage) are edition-invariant.
+   */
+  edition?: RulesEdition;
   grantClass?: string;   // lowercase class name
   grantLevel?: number;   // min level for this action
   /**
@@ -153,6 +176,17 @@ export interface AvailableAction {
    *  universalActions for its edition-correct name; it never knows what a key
    *  means. */
   regrants?: string[];
+  /**
+   * Which inline resolution tool the client renders for this action (#1528) —
+   * served only for a row-driven action (`actionsFromRows` below); a
+   * DERIVED_ACTIONS row leaves this undefined, and the frontend's
+   * ACTION_RESOLVERS table (keyed by actionKey, not this) still owns those.
+   * Values mirror the frontend's own ResolutionKind enum
+   * (frontend/src/features/session/actionResolvers.ts) — e.g. "heal-roll",
+   * "simple-confirm" — moved here as the wire-served vocabulary a row can
+   * name, retiring the frontend's per-key mirror one row at a time (#1383).
+   */
+  resolverKind?: string;
 }
 
 /** Resource pool shape — typed subset of what serializeCharacter builds. */
@@ -203,17 +237,27 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Druid
   { key: "wildShape", name: "Wild Shape", cost: "action", grantClass: "druid", grantLevel: 2, resourceKey: "wildShape", resourceAmount: 1 },
 
-  // Fighter
-  { key: "secondWind", name: "Second Wind", cost: "bonusAction", grantClass: "fighter", grantLevel: 1, resourceKey: "secondWind", resourceAmount: 1 },
-  { key: "actionSurge", name: "Action Surge", cost: "special", grantClass: "fighter", grantLevel: 2, resourceKey: "actionSurge", resourceAmount: 1 },
+  // Fighter — Second Wind / Action Surge retired from this table (#1528):
+  // both are now row-driven (actionsFromRows below), read off Fighter's own
+  // ClassFeature rows (activationCost/resolverKind/cost*/effect* columns,
+  // prisma/seed/fighter-features.ts) instead of a DERIVED_ACTIONS entry.
 
   // Monk
   // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no
   // resource cost, gated only on the Martial Arts blanket condition (no armor
-  // or Shield), not on the Attack action. Distinct from Flurry of Blows (#1217,
-  // the two-strike Focus version).
+  // or Shield). SRD 5.2 / PHB'24 p.88 grants this with no Attack-action
+  // prerequisite; SRD 5.1 / PHB'14 p.78 DOES require the Attack action first —
+  // this comment used to assert the 2024 reading as if it were universal
+  // (corrected by #1499). The row stays SHARED across editions regardless:
+  // both editions gate on the identical unarmored/no-shield condition, and the
+  // Attack-action difference is reminder TEXT, not a gate — `reminder` here is
+  // `(level) => string`, not edition-parameterized, so forking the wording is
+  // #1500's work, not this slice's. Distinct from Flurry of Blows (#1217, the
+  // two-strike Focus version, tagged EDITION_2024 below — SRD 5.1's Flurry
+  // costs 1 ki for two strikes into the "ki" pool (monkPoolKey), a different
+  // resource key from this row's "focus").
   { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1 },
+  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
   // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
   // TWO menu entries — a free variant and a 1-Focus variant — rather than the
   // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
@@ -226,15 +270,16 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // willing-creature rider (no server state — this app has no ally/NPC
   // combatant model to move).
   // These four rows' `regrants` (#1431) is data ONLY — deliberately unrendered,
-  // and the curated reminders above/below stay the card subtitle. The rows are
-  // 2024-shaped yet served edition-blind (the debt this comment block records),
-  // and the grant is one of the places the editions genuinely disagree: SRD 5.1
-  // Patient Defense buys DODGE for 1 ki, while SRD 5.2 grants Disengage free
-  // and Disengage + Dodge for 1 Focus. Naming the regrant on the card would
-  // therefore print a wrong answer onto a 2014 monk's screen — it waits on the
-  // edition axis reaching this catalog (#1313). Rogue's Cunning Action and
+  // and the curated reminders above/below stay the card subtitle. All four are
+  // now tagged edition: "EDITION_2024" (#1499): SRD 5.1 Patient Defense buys
+  // DODGE for a flat 1 ki (no free variant), and SRD 5.1 Step of the Wind buys
+  // Disengage-or-Dash for a flat 1 ki the same way — neither 2014 shape is
+  // these two-menu-entries-per-feature rows, so serving them to a 2014 monk
+  // would be wrong, not merely unnamed. #1500 authors the 2014-keyed
+  // equivalents under monkPoolKey's "ki" pool. Naming the regrant on the card
+  // remains future work regardless of edition — Rogue's Cunning Action and
   // Thief's Fast Hands are invariant in both editions and DO render theirs.
-  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action)." },
+  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action).", edition: "EDITION_2024" },
   {
     key: "patientDefenseFocus",
     name: "Patient Defense (1 Focus)",
@@ -248,8 +293,9 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
       level >= 10
         ? "Disengage + Dodge (spend 1 Focus). Heightened Focus (L10): also gain temporary hit points equal to two Martial Arts die rolls."
         : "Disengage + Dodge (spend 1 Focus).",
+    edition: "EDITION_2024",
   },
-  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["dash"], reminder: "Dash (free bonus action)." },
+  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["dash"], reminder: "Dash (free bonus action).", edition: "EDITION_2024" },
   {
     key: "stepOfTheWindFocus",
     name: "Step of the Wind (1 Focus)",
@@ -263,6 +309,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
       level >= 10
         ? "Disengage + Dash, jump distance doubled this turn (spend 1 Focus). Heightened Focus (L10): also bring one willing creature within 5 ft along with you, moving it up to your Speed — it doesn't provoke opportunity attacks."
         : "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
+    edition: "EDITION_2024",
   },
   // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
   // (spend + Con save + fail/success outcome), built as its own dedicated
@@ -272,7 +319,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // reduction (1d10 + Dex + monk level) costs nothing, so — like the Warrior of Shadow
   // reminders below — it carries no resourceKey and the client rolls it directly (see
   // ACTION_EFFECT_FN comment). Deflect Energy (L13) just widens the damage-type clause
-  // in the reminder text; it isn't a separate action key.
+  // in the reminder text; it isn't a separate action key. Tagged EDITION_2024 (#1499):
+  // PHB'14's Deflect Missiles is ranged-weapon-attacks-only, a materially different
+  // feature under a different name, not a text variant of this one — #1500 authors it
+  // as its own row rather than forking this one.
   {
     key: "deflectAttacks",
     name: "Deflect Attacks",
@@ -281,12 +331,24 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantLevel: 3,
     reminder:
       "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+    edition: "EDITION_2024",
   },
   // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a "free"
   // follow-up decision within the same reaction (mirrors Stunning Strike's shape),
   // not its own action-economy slot. Spends the persisted Focus resource, unlike
-  // the free base reduction above.
-  { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1 },
+  // the free base reduction above. Tagged EDITION_2024 alongside deflectAttacks —
+  // PHB'14's Deflect Missiles has no redirect rider at all.
+  { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
+
+  // Every row below (Warrior of Shadow / Warrior of the Elements / Warrior of
+  // the Open Hand / Warrior of Mercy) is subclass-gated via grantSubclassSlugs
+  // and deliberately left UNTAGGED (#1499) even though all four subclasses are
+  // 2024-only content: SUBCLASS_SLUGS (subclass-slug.ts) contains no 2014 monk
+  // subclass, so matchesSubclassGate already excludes every one of these rows
+  // for a 2014 monk (no slug can ever resolve) — an edition tag would add no
+  // observable behaviour. Tagging wholenessOfBody in particular would also
+  // pre-decide a content question that belongs to #1500 (PHB'14 Way of the
+  // Open Hand has its own Wholeness of Body at a different level).
   // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
   // server effect; reminder is the deliverable. Improved Shadow Step (L11)
   // upgrades the SAME bonus action (ignore the dim/dark destination requirement
@@ -443,7 +505,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // The object-use grant is the edition-invariant half and is the `regrants`
   // link; the reminder deliberately does not NAME that action, since SRD 5.1
   // calls it Use an Object and SRD 5.2 Utilize. #1240's edition-blind service
-  // of this catalog is why the name has to come off the wire, not out of here.
+  // of this row is why the name has to come off the wire, not out of here.
   // The prose feature description stays in rogue.ts's THIEF_FEATURES — that is
   // the feature; this is the action.
   {
@@ -478,6 +540,7 @@ export function matchesActionGate(
   cls: string,
   slug: SubclassSlug | undefined,
   level: number,
+  edition: RulesEdition,
 ): boolean {
   // Only class-specific actions ride the character payload; universal rows are
   // served per edition by referenceRouter (#1430). No DERIVED_ACTIONS row sets
@@ -485,6 +548,13 @@ export function matchesActionGate(
   // one out of availableActions[] instead of double-rendering it, which is why
   // it stays even though the field is unset (#1431).
   if (a.universal) return false;
+
+  // Edition gate (#1499) — mirrors featuresFromRows' edition filter
+  // (lib/classes/class-feature-rows.ts, #1524, retired from this file's own
+  // featureAppliesToEdition precedent): absent `edition` means both editions;
+  // a row tagged for the OTHER edition is filtered out here, before the
+  // class/subclass gates below ever see it.
+  if (a.edition !== undefined && a.edition !== edition) return false;
 
   // Class + level gate (single-class grantClass/grantLevel or a multi-class
   // grantClasses list — matched when ANY gate matches; see classGatesOf).
@@ -513,14 +583,18 @@ export function deriveActions(
   pools: ResourcePool[],
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218).
   // Defaults to true (permissive) since only requiresUnarmored actions read it.
+  // `edition` must sit AFTER this defaulted parameter (mirrors subclassGateLevel),
+  // which means the default can no longer be skipped by a caller that also
+  // needs to pass edition — every such call site now passes both explicitly.
   unarmoredUnshielded = true,
+  edition: RulesEdition,
 ): AvailableAction[] {
   const cls = (className ?? "").toLowerCase();
 
   const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
 
   return DERIVED_ACTIONS
-    .filter((a) => matchesActionGate(a, cls, subclassSlug, level))
+    .filter((a) => matchesActionGate(a, cls, subclassSlug, level, edition))
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
@@ -559,18 +633,34 @@ export const REGRANTED_UNIVERSAL_KEYS: readonly string[] = [
  * function shadow-arts.ts's cast guards call, so the wire value and the guard
  * can never independently drift on the gate.
  */
-export function deriveEntryScopedActions(
-  classEntries: (SubclassIdentityInput & { name: string; level: number })[],
+// `getFeatureRows` is optional (#1528 chunk 0) — mirrors registry.ts's
+// GetFeatureRows convention: a caller with FEATURE_ROWS_ENTRY_SELECT loaded
+// passes `featureRowsOf` so a Fighter entry's row-driven actions (Second
+// Wind/Action Surge) surface here too; absent for a caller with no such
+// relation (shadow-arts.ts / warrior-of-elements.ts's `pools: []` callers —
+// harmless, since only monk-gated keys matter to them and no monk row
+// populates `activationCost`).
+export function deriveEntryScopedActions<E extends SubclassIdentityInput & { name: string; level: number }>(
+  classEntries: E[],
   totalLevel: number,
   pools: ResourcePool[],
   unarmoredUnshielded = true,
+  edition: RulesEdition,
+  getFeatureRows?: (entry: E) => ClassFeatureRowsCarrier | undefined,
 ): AvailableAction[] {
+  const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
   const seenKeys = new Set<string>();
   const actions: AvailableAction[] = [];
   for (const entry of classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
     const slug = resolveSubclassSlug(entry.name, entry);
-    for (const action of deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded)) {
+    const rows = getFeatureRows?.(entry);
+    const entryActions = [
+      ...deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded, edition),
+      ...actionsFromRows(rows?.classRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
+      ...actionsFromRows(rows?.subclassRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
+    ];
+    for (const action of entryActions) {
       if (seenKeys.has(action.key)) continue;
       seenKeys.add(action.key);
       actions.push(action);
@@ -586,8 +676,12 @@ export function deriveEntryScopedActions(
  * truth instead of hardcoding the number a second time, which is exactly the
  * kind of drift deriveEntryScopedActions itself exists to prevent (#1315).
  */
-export function actionGrantLevel(key: string): number | undefined {
-  const row = DERIVED_ACTIONS.find((a) => a.key === key);
+export function actionGrantLevel(key: string, edition: RulesEdition): number | undefined {
+  // Filters on edition BEFORE find (#1499) — a no-op today since no key is
+  // duplicated across editions, but written this way anyway: #1500 adds
+  // same-key 2014 monk rows, and a lookup that's only silently correct
+  // because no collision exists yet is exactly what breaks then.
+  const row = DERIVED_ACTIONS.find((a) => a.key === key && (a.edition === undefined || a.edition === edition));
   if (!row) return undefined;
   // Min across gates so a row two classes grant (channelDivinity) reports the
   // earliest level any of them grants it, rather than undefined.
@@ -595,12 +689,18 @@ export function actionGrantLevel(key: string): number | undefined {
   return levels.length > 0 ? Math.min(...levels) : undefined;
 }
 
+// The subset of a DERIVED_ACTIONS row (or a row-driven action, actionFromRow
+// above) resolveEnablement needs — narrowed to exactly these three fields so
+// a row-driven caller can build a plain object literal instead of a
+// structurally-lying cast to the full (key/name/cost-requiring) DerivedActionRecord.
+type EnablementInput = Pick<DerivedActionRecord, "resourceKey" | "resourceAmount" | "requiresUnarmored">;
+
 // One action row's enabled/disabledReason — pulled out of the `.map()` above to
 // keep that callback's complexity low. Resource-pool gate first, then the
 // Martial Arts unarmored/unshielded gate (mutually exclusive today, but a
 // future action could carry both — resource wins the reason if so).
 function resolveEnablement(
-  a: DerivedActionRecord,
+  a: EnablementInput,
   poolMap: Map<string, number>,
   unarmoredUnshielded: boolean,
 ): { enabled: boolean; disabledReason?: string } {
@@ -723,10 +823,12 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // Druid
   wildShape: () => [{ type: "spendResource", key: "wildShape" }],
 
-  // Fighter
-  // secondWind is a cast-core action — see ACTION_CAST_FN below.
-  // actionSurge stays a pure counter: the extra-action grant is client-side.
-  actionSurge: () => [{ type: "spendResource", key: "actionSurge" }],
+  // Fighter — secondWind/actionSurge retired from this table (#1528): both
+  // are row-driven now (routes/character/actions.ts's row-driven dispatch),
+  // which decides the cast-core-vs-spend-only split per row itself (a row
+  // with an `effectKind` routes through castAbilityInTx; one without, like
+  // Action Surge — a pure counter, the extra-action grant is client-side —
+  // spends its pool directly).
 
   // Monk
   // bonusUnarmedStrike is economy-only, like `attack`/`twf` — no server state
@@ -818,9 +920,9 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
 
 // Cast-core actions: the orchestrator routes these through castAbilityInTx (pay
 // pool cost → self-apply heal), not the op-list dispatch. The 5e rule lives here
-// (pool key + base spend + the self-heal effect); the die value is the client roll.
+// (pool key + base spend + the self-heal effect).
 
-/** A cast-core action's cost + effect, resolved from the client roll. */
+/** A cast-core action's cost + effect + resolved self-apply, if any. */
 export interface ActionCastSpec {
   name: string;
   cost: AbilityCost;
@@ -828,20 +930,143 @@ export interface ActionCastSpec {
   apply?: { target: "self"; kind: "heal" | "damage" | "tempHp"; amount: number };
 }
 
-// Second Wind's self-heal effect: 1d10 + fighter level (the client rolls the total).
-const secondWindEffect: EffectSpec = {
-  effectType: "heal",
-  dice: { count: 1, faces: 10 },
-  scaling: { mode: "none" },
-};
+/**
+ * One row's AvailableAction, or null when the row declares no activation
+ * (`activationCost` absent) or the character hasn't reached its grant level.
+ * Data-gated like `poolsFromRows` (class-feature-rows.ts): only a row with
+ * BOTH `activationCost` and `resourceKey` populated contributes — today, only
+ * Fighter's Second Wind/Action Surge rows (#1528). `enabled`/`disabledReason`
+ * reuse `resolveEnablement` so a row's gate can never diverge from a
+ * DERIVED_ACTIONS row's.
+ */
+// The row-driven gate: right edition, grant level reached, and the two
+// fields that make a row an action at all (activationCost + resourceKey —
+// see actionFromRow's own comment). Split out so actionFromRow's own
+// cyclomatic count stays low (the fallow health gate).
+function rowIsAnAvailableAction(row: ClassFeatureRow, level: number, edition: RulesEdition): boolean {
+  return row.edition === edition && row.level <= level && Boolean(row.activationCost) && Boolean(row.resourceKey);
+}
 
-export const ACTION_CAST_FN: Record<string, (ctx: ActionContext) => ActionCastSpec> = {
-  secondWind: (ctx) => ({
-    name: "Second Wind",
-    cost: { kind: "pool", key: "secondWind", base: 1 },
-    effect: secondWindEffect,
-    ...(ctx.roll !== undefined && ctx.roll > 0
-      ? { apply: { target: "self" as const, kind: "heal" as const, amount: ctx.roll } }
-      : {}),
-  }),
-};
+// Assembles the AvailableAction object once enablement is known — pulled out
+// of actionFromRow to keep its own branching budget for the gate check
+// (fallow's cyclomatic/CRAP gate; the four conditional-spread fields below
+// are what pushed this over as one function).
+function buildRowAction(
+  row: ClassFeatureRow,
+  level: number,
+  enabled: boolean,
+  disabledReason: string | undefined,
+): AvailableAction {
+  const reminder = describeRowReminder(row, level);
+  return {
+    key: row.resourceKey as string,
+    name: row.name,
+    cost: row.activationCost as ActionCost,
+    enabled,
+    ...(disabledReason ? { disabledReason } : {}),
+    ...(reminder ? { reminder } : {}),
+    ...(row.resolverKind ? { resolverKind: row.resolverKind } : {}),
+    ...(row.regrants && row.regrants.length > 0 ? { regrants: [...row.regrants] } : {}),
+  };
+}
+
+function actionFromRow(
+  row: ClassFeatureRow,
+  level: number,
+  edition: RulesEdition,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): AvailableAction | null {
+  if (!rowIsAnAvailableAction(row, level, edition)) return null;
+  const cost = readAbilityCost(row);
+  const record: EnablementInput = {
+    resourceKey: row.resourceKey as string,
+    resourceAmount: cost.kind === "pool" ? cost.base : undefined,
+    requiresUnarmored: row.requiresUnarmored ?? false,
+  };
+  const { enabled, disabledReason } = resolveEnablement(record, poolMap, unarmoredUnshielded);
+  return buildRowAction(row, level, enabled, disabledReason);
+}
+
+/**
+ * A dynamic subtitle for a row-driven heal (e.g. "Regain 1d10 + 3 HP") built
+ * from the row's own effect columns rather than a second hand-authored
+ * string — the level-scaled modifier (`effectModifierSource: "classLevel"`)
+ * is resolved here since the row itself only knows the grant level, not the
+ * character's current one. Undefined for a non-heal or dice-less row (Action
+ * Surge).
+ */
+function describeRowReminder(row: ClassFeatureRow, level: number): string | undefined {
+  if (row.effectKind !== "heal" || !row.effectDiceCount || !row.effectDiceFaces) return undefined;
+  const modifier = row.effectModifierSource === "classLevel" ? level : 0;
+  return `Regain ${row.effectDiceCount}d${row.effectDiceFaces}${modifier > 0 ? ` + ${modifier}` : ""} HP`;
+}
+
+/**
+ * Every row-driven action declared across a class/subclass's rows, at one
+ * character level — the row-driven counterpart to `deriveActions`' filter
+ * over `DERIVED_ACTIONS`. Called once per class-rows and once per
+ * subclass-rows by `deriveEntryScopedActions` below (mirrors
+ * `deriveBaseLayer`/`deriveSubclassLayer`'s split in registry.ts).
+ */
+function actionsFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): AvailableAction[] {
+  const actions: AvailableAction[] = [];
+  for (const row of rows) {
+    const action = actionFromRow(row, level, edition, poolMap, unarmoredUnshielded);
+    if (action) actions.push(action);
+  }
+  return actions;
+}
+
+/**
+ * Builds a row-driven cast-core action's spec AND rolls its effect
+ * server-side (#1528) — the row-driven counterpart to the retired
+ * `ACTION_CAST_FN` table. Unlike that table (whose die value was the client
+ * roll), the roll happens HERE: `castManeuver` (maneuvers.ts) is the
+ * server-authoritative-roll precedent this mirrors. `rollDie` is injected
+ * (not imported directly) so this stays a pure function the route's own
+ * `rollDie` (lib/core/dice.ts) is threaded into, same as
+ * computeHeightenedFocusTempHp's pattern one file over.
+ *
+ * The `{ ...row, level: 0 }` adapter is the #1528 EffectRow landmine fix:
+ * `EffectRow`'s `level` decides the SCALING axis (cantrip/upcast), which a
+ * ClassFeature row has no use for — `row.level` here is the CHARACTER level
+ * the feature is GRANTED at, a different number entirely. Passing it through
+ * unadapted would let `resolveEffectScaling` reinterpret Second Wind's grant
+ * level as a spell level. Level 0 with no `cantripScaling`/`upcastDicePerLevel`
+ * (never authored on this row shape — see ClassFeatureRow's own comment)
+ * lands on `{ mode: "none" }`, the only scaling mode any Fighter descriptor
+ * can ever resolve to (pinned by a dedicated test).
+ */
+export function castSpecFromRow(
+  row: ClassFeatureRow,
+  classLevel: number,
+  rollDie: (faces: number) => number,
+): { spec: ActionCastSpec; roll: number } {
+  const cost = readAbilityCost(row);
+  const effect = readEffectSpec({ ...row, level: 0 });
+  // Both level axes get the GRANTING ENTRY's level, not the character total:
+  // `classLevel` because that is what `modifierSource: "classLevel"` means
+  // (Second Wind is `1d10 + your Fighter level`), and `characterLevel` because
+  // the only axis reading it — cantrip scaling — is unreachable from a
+  // ClassFeature row, whose scaling mode is pinned to "none" by the adapter
+  // above and its dedicated test. If a row ever CAN scale by cantrip level,
+  // this call has to start threading the character total separately.
+  const resolved = resolveEffectSpec(effect, 0, { characterLevel: classLevel, classLevel });
+  let roll = 0;
+  if (resolved) {
+    for (let i = 0; i < resolved.count; i++) roll += rollDie(resolved.faces);
+    roll += resolved.modifier;
+  }
+  const apply =
+    effect.effectType === "heal" && roll > 0
+      ? ({ target: "self", kind: "heal", amount: roll } as const)
+      : undefined;
+  return { spec: { name: row.name, cost, effect, apply }, roll };
+}

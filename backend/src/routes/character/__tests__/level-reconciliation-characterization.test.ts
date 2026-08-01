@@ -24,6 +24,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-levelrecon-char";
 let COOKIE: string;
@@ -118,6 +119,15 @@ beforeAll(async () => {
     {},
   );
   bmSubclassId = bm.id;
+  // #1546 Part B-i (Ruling 2): this bespoke Battle Master Subclass row has no
+  // ClassFeature children unless seeded here — the shared helper, not a
+  // per-file copy. This suite exercises maneuverChoiceCount/toolProfChoiceCount,
+  // which Part B-ii moved onto these very rows' derivedStat/derivedStatTiers
+  // columns (registry.ts's deriveRowExtras) — lib/classes/fighter.ts's old
+  // deriveExtras is gone (#1532), so these rows are what makes the assertion
+  // resolve at all now.
+  await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+  await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });
 
 afterAll(async () => {

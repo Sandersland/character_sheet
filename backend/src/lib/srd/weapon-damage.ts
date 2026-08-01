@@ -1,7 +1,7 @@
 import { weaponAbilityMod } from "@/lib/srd/proficiencies.js";
 import { abilityModifier } from "@/lib/srd/math.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
-import type { WeaponGrip } from "@character-sheet/shared-types";
+import type { RulesEdition, WeaponGrip } from "@character-sheet/shared-types";
 
 // Re-exported so importers reaching for it through the `srd.js` barrel keep
 // resolving, while the one declaration is the wire type behind `AttackRow.grip`.
@@ -152,10 +152,19 @@ export function deriveUnarmedDamageDie(advancements: AdvancementEntry[]): number
   return best;
 }
 
-// Monk Martial Arts die by monk class level (SRD 5.2): 1d6 at L1, 1d8/1d10/1d12
-// at L5/L11/L17. Returns 0 below monk level 1 (non-monk or no monk levels).
-export function deriveMartialArtsDie(monkLevel: number): number {
+// Monk Martial Arts die by monk class level. SRD 5.1 / PHB'14 p.78: 1d4 (L1-4),
+// 1d6 (L5-10), 1d8 (L11-16), 1d10 (L17-20). SRD 5.2 / PHB'24 p.88: 1d6 (L1-4),
+// 1d8 (L5-10), 1d10 (L11-16), 1d12 (L17-20). The level bands (L5/L11/L17
+// thresholds) are identical across editions — only the die faces fork (#1499).
+// Returns 0 below monk level 1 (non-monk or no monk levels) in both editions.
+export function deriveMartialArtsDie(monkLevel: number, edition: RulesEdition): number {
   if (monkLevel < 1) return 0;
+  if (edition === "EDITION_2014") {
+    if (monkLevel >= 17) return 10;
+    if (monkLevel >= 11) return 8;
+    if (monkLevel >= 5) return 6;
+    return 4;
+  }
   if (monkLevel >= 17) return 12;
   if (monkLevel >= 11) return 10;
   if (monkLevel >= 5) return 8;
@@ -174,7 +183,8 @@ export function deriveUnarmedStrike(
   effectiveScores: Record<string, number>,
   proficiencyBonus: number,
   unarmedDamageDie: number,
-  monk?: { level: number; isUnarmored: boolean; hasShield: boolean },
+  monk: { level: number; isUnarmored: boolean; hasShield: boolean } | undefined,
+  edition: RulesEdition,
 ): {
   attackBonus: number;
   magical: boolean;
@@ -184,7 +194,7 @@ export function deriveUnarmedStrike(
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
   // Martial Arts only applies unarmored & unshielded; 0 otherwise (fall back to STR).
   const martialArtsDie =
-    monk && monk.isUnarmored && !monk.hasShield ? deriveMartialArtsDie(monk.level) : 0;
+    monk && monk.isUnarmored && !monk.hasShield ? deriveMartialArtsDie(monk.level, edition) : 0;
   const abilityMod = martialArtsDie > 0 ? Math.max(strMod, dexMod) : strMod;
   // Empowered Strikes: monk unarmed strikes count as magical at level 6+.
   const magical = (monk?.level ?? 0) >= 6;

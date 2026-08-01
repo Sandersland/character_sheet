@@ -25,6 +25,34 @@ export interface CreationValidationInput {
   startingEquipment: ClassStartingEquipment | null;
   /** Current equipment draft (null = player hasn't touched it yet). */
   equipmentDraft: EquipmentDraft | null;
+  /** #1565: selected background's OWN starting-equipment definition, if any
+   *  (most backgrounds have none — see BackgroundOption's own comment). */
+  backgroundStartingEquipment?: ClassStartingEquipment | null;
+  /** #1565: current background equipment draft, parallel to equipmentDraft. */
+  backgroundEquipmentDraft?: EquipmentDraft | null;
+}
+
+// One equipment block's missing-label(s), or [] when it's satisfied — shared
+// by the class and background callers below (#1565) so `missingRequirements`
+// itself stays a flat list of checks rather than two near-identical
+// class/background branches inline. An untouched (null) draft is allowed for
+// either — the character simply starts with no inventory/no background gear.
+function equipmentBlockMissing(
+  startingEquipment: ClassStartingEquipment | null | undefined,
+  draft: EquipmentDraft | null | undefined,
+  labelPrefix: string,
+  fallbackLabel: string
+): string[] {
+  if (!startingEquipment || !draft) return [];
+  if (draft.mode === "package") {
+    if (isPackageComplete(startingEquipment, draft.selections)) return [];
+    return [incompletePackageDetail(startingEquipment, draft, labelPrefix) ?? fallbackLabel];
+  }
+  // Gold mode: the dedicated editor surfaces its own range error, so we only
+  // flag it here as a blocking requirement. A background never reaches this
+  // branch in practice — the picker never offers a gold-mode toggle for one
+  // (no background has a roll-for-gold alternative in either edition).
+  return isGoldValid(startingEquipment, draft.gold) ? [] : ["Starting gold amount"];
 }
 
 /**
@@ -40,25 +68,18 @@ export function missingRequirements(input: CreationValidationInput): string[] {
   if (input.className.length === 0) missing.push("Class");
   if (input.backgroundName.length === 0) missing.push("Background");
 
-  // Equipment validation mirrors CharacterCreatePage's intent: if the class
-  // has a package and the player has started filling it in, it must be
-  // complete. An untouched (null) draft is allowed — the character simply
-  // starts with no inventory.
-  if (input.startingEquipment && input.equipmentDraft) {
-    const draft = input.equipmentDraft;
-    if (draft.mode === "package") {
-      if (!isPackageComplete(input.startingEquipment, draft.selections)) {
-        const detail = incompletePackageDetail(input.startingEquipment, draft);
-        missing.push(detail ?? "Starting equipment");
-      }
-    } else {
-      // Gold mode: the dedicated editor surfaces its own range error, so we
-      // only flag it here as a blocking requirement.
-      if (!isGoldValid(input.startingEquipment, draft.gold)) {
-        missing.push("Starting gold amount");
-      }
-    }
-  }
+  // Equipment validation mirrors CharacterCreatePage's intent — see
+  // equipmentBlockMissing's own comment for the shared rule.
+  missing.push(...equipmentBlockMissing(input.startingEquipment, input.equipmentDraft, "Equipment", "Starting equipment"));
+  // #1565: the background's OWN package, same rule, independent block.
+  missing.push(
+    ...equipmentBlockMissing(
+      input.backgroundStartingEquipment,
+      input.backgroundEquipmentDraft,
+      "Background equipment",
+      "Background equipment",
+    ),
+  );
 
   return missing;
 }
@@ -66,28 +87,31 @@ export function missingRequirements(input: CreationValidationInput): string[] {
 /**
  * Produces a precise label for an incomplete equipment *package*, pointing at
  * the first group that still needs attention — either an unpicked option or a
- * nested weapon sub-choice that's still on "— choose —".
+ * nested weapon sub-choice that's still on "— choose —". `labelPrefix`
+ * (#1565) distinguishes the class package ("Equipment: …") from the
+ * background's own ("Background equipment: …") — same function, two callers.
  */
 function incompletePackageDetail(
   startingEquipment: ClassStartingEquipment,
-  draft: Extract<EquipmentDraft, { mode: "package" }>
+  draft: Extract<EquipmentDraft, { mode: "package" }>,
+  labelPrefix: string
 ): string | null {
   const { groups } = startingEquipment;
   for (let i = 0; i < groups.length; i++) {
     const group = groups[i];
     const sel = draft.selections[i];
     if (!sel || sel.optionIndex === -1) {
-      return `Equipment: choose "${group.label}"`;
+      return `${labelPrefix}: choose "${group.label}"`;
     }
     const bundle = group.options[sel.optionIndex];
     if (!bundle) {
-      return `Equipment: choose "${group.label}"`;
+      return `${labelPrefix}: choose "${group.label}"`;
     }
     const openPicks = bundle.openPicks ?? [];
     const provided = sel.openPicks ?? [];
     for (let p = 0; p < openPicks.length; p++) {
       if (!provided[p]) {
-        return `Equipment: pick "${openPicks[p].label}"`;
+        return `${labelPrefix}: pick "${openPicks[p].label}"`;
       }
     }
   }

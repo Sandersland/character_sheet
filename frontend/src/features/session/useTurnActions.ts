@@ -29,7 +29,7 @@ import { interactionBudgetRemaining } from "@/lib/loadoutPicker";
 import { useUniversalActions } from "@/hooks/useUniversalActions";
 import { useManeuverActions } from "@/features/session/useManeuverActions";
 import { useTurnActionMutations } from "@/features/session/useTurnActionMutations";
-import { resolverFor, type ResolutionKind } from "@/features/session/actionResolvers";
+import { resolverFor, type ActionResolver, type ResolutionKind } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
 import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -135,7 +135,7 @@ export function useTurnActions({
   // sheet models.
   const universalActions = useUniversalActions(character.rulesEdition);
   const enrich = (a: AvailableAction) =>
-    classActionOption(a, resolverFor(a.key), character, universalActions);
+    classActionOption(a, resolverFor(a.key, a), character, universalActions);
   const actionSheetModel = {
     attackSummary: mainWeaponSummary(character),
     universalActions,
@@ -171,14 +171,18 @@ export function useTurnActions({
   );
 
   // send() — fires applyActionTransactions via the mutation. The returned
-  // batchId is tagged onto the just-pushed history entry so undo can revert this
-  // server effect (#758).
+  // batchId is tagged onto the just-pushed history entry so undo can revert
+  // this server effect (#758). Returns the first op's ExecuteActionResult
+  // (#1528) so a server-rolled row-driven action (Second Wind) can surface
+  // its roll — undefined on failure or when the server reported nothing.
   async function send(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {
     try {
       const updated = await sendAction(actionKey, opts);
       if (updated.batchId) attachBatchId(updated.batchId);
+      return updated.results?.[0];
     } catch {
       // error already carries the message via useTurnActionMutations.
+      return undefined;
     }
   }
 
@@ -221,10 +225,39 @@ export function useTurnActions({
     else consumeReaction();
   }
 
+  // Surfaces a server-rolled heal-roll result (#1528 — Second Wind, no client
+  // `healRoll` to preview from) as a toast, same spot surfaceReminder below
+  // writes to. There is no dice-animation for a server-decided roll yet —
+  // animating toward a result the server already picked needs its own design
+  // pass (how to reconstruct a single die face from the summed total, and
+  // where in TurnHub's tree to mount it) — the toast is the interim
+  // confirmation so the heal is never silently unconfirmed. Split out of
+  // sendForPlan to keep that function's own branching budget (fallow's
+  // cyclomatic/CRAP gate).
+  function surfaceServerRoll(
+    key: string,
+    resolver: ActionResolver | undefined,
+    roll: number | undefined,
+    cost: "action" | "bonusAction" | "reaction",
+  ) {
+    if (resolver?.kind !== "heal-roll" || roll === undefined) return;
+    const name = availableActions.find((a) => a.key === key)?.name ?? key;
+    const message = `${name}: healed ${roll} HP.`;
+    if (cost === "reaction") setReactionMessage(message);
+    else setEffectMessage(message);
+  }
+
   // Fire applyActionTransactions per the plan's send mode (none/plain/healRoll).
-  function sendForPlan(plan: ActionClickPlan, key: string) {
-    if (plan.send === "plain") void send(key);
-    else if (plan.send === "healRoll" && plan.healRoll) {
+  async function sendForPlan(
+    plan: ActionClickPlan,
+    key: string,
+    resolver: ActionResolver | undefined,
+    cost: "action" | "bonusAction" | "reaction",
+  ) {
+    if (plan.send === "plain") {
+      const result = await send(key);
+      surfaceServerRoll(key, resolver, result?.roll, cost);
+    } else if (plan.send === "healRoll" && plan.healRoll) {
       void send(key, { roll: rollSpec(plan.healRoll).total });
     }
   }
@@ -241,10 +274,13 @@ export function useTurnActions({
   // Action button click handler — plans via planActionClick, then applies effects.
   function handleActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
     closeMenuFor(cost);
-    const resolver = resolverFor(key);
+    // resolverFor(key, action) — the action itself is the #1528 fallback
+    // context for a row-driven key (no ACTION_RESOLVERS entry anymore).
+    const action = availableActions.find((a) => a.key === key);
+    const resolver = resolverFor(key, action);
     const plan = planActionClick(resolver, character);
     if (plan.consumeSlot) consumeSlotFor(cost, resolver?.kind);
-    sendForPlan(plan, key);
+    void sendForPlan(plan, key, resolver, cost);
     if (plan.openResolution) openResolution(key);
     surfaceReminder(key, cost);
   }

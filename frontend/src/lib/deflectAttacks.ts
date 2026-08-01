@@ -18,10 +18,11 @@
  * is edition-invariant (#1441).
  *
  * The L13 Deflect Energy threshold is SRD 5.2 only — PHB'14 has no Deflect
- * Energy at any level. `DERIVED_ACTIONS`/`deriveActions` (backend
- * lib/classes/actions.ts) carry no edition axis, so a 2014 Monk is currently
- * served this 2024-only feature regardless. Tracked on #1435 / #1313;
- * deliberately not forked here — rules-edition forks are backend-owned.
+ * Energy at any level. `DERIVED_ACTIONS`'s `deflectAttacks` row is now tagged
+ * EDITION_2024 (#1499), so a 2014 Monk is no longer served this action at
+ * all — this module is simply unreached for that edition. `hasDeflectEnergy`
+ * itself still takes no edition parameter (isn't forked client-side); rules-
+ * edition forks stay backend-owned. Tracked on #1435 / #1313.
  */
 
 import { abilityModifier, formatModifier } from "@/lib/abilities";

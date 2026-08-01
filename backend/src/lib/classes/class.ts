@@ -22,6 +22,7 @@ import {
   abilityModifier,
   hitDieFace,
   multiclassPrerequisitesMet,
+  type MulticlassPrerequisiteOption,
 } from "@/lib/srd/srd.js";
 
 export class InvalidClassOperationError extends Error {}
@@ -193,7 +194,7 @@ async function resolveMulticlass(
 
   const catalog = await tx.characterClass.findUnique({
     where: { id: op.classId },
-    select: { id: true, name: true, hitDie: true },
+    select: { id: true, name: true, hitDie: true, multiclassPrerequisites: true },
   });
   if (!catalog) {
     throw new InvalidClassOperationError(`Class not found: ${op.classId}`);
@@ -204,9 +205,14 @@ async function resolveMulticlass(
     throw new InvalidClassOperationError(`Character already has levels in ${catalog.name}`);
   }
 
-  // 5e multiclass ability prerequisite (PHB p. 163) — same validator as level-up.
+  // 5e multiclass ability prerequisite (PHB'14 p. 163) — same validator as level-up.
+  // `multiclassPrerequisites` (#1529): the catalog row's own Json column, cast
+  // once like every other opaque-Json Prisma field this codebase reads.
   const abilityScores = character.abilityScores as Record<string, number>;
-  const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
+  const prereq = multiclassPrerequisitesMet(
+    catalog.multiclassPrerequisites as MulticlassPrerequisiteOption[] | null,
+    abilityScores,
+  );
   if (!prereq.met) {
     throw new InvalidClassOperationError(`Cannot multiclass into ${catalog.name}: requires ${prereq.description}`);
   }

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-experience";
 let COOKIE: string;
@@ -99,6 +100,10 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
       {},
     );
     battleMasterSubclassId = bm.id;
+    // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy — see its
+    // own header for why every bespoke Battle Master Subclass row needs this.
+    await prisma.classFeature.deleteMany({ where: { subclassId: battleMasterSubclassId } });
+    await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, battleMasterSubclassId) });
 
     const clericClass = await prisma.characterClass.upsert({
       where: { name: CLERIC_CLASS_NAME },
@@ -401,6 +406,9 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
       {},
     );
     battleMasterSubclassId2 = bm.id;
+    // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy.
+    await prisma.classFeature.deleteMany({ where: { subclassId: battleMasterSubclassId2 } });
+    await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId2, battleMasterSubclassId2) });
   });
 
   afterAll(async () => {
@@ -745,6 +753,18 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
     advancements, fightingStyle: null,
   } as unknown as Prisma.InputJsonValue);
 
+  // #1529: the fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel
+  // through the class FK relation now — every entry below must link classId
+  // to its real seeded row, or the slot cap is 0 (homebrew) regardless of
+  // `name`, which would make every "removed" assertion in this block true
+  // vacuously (the feat was never validly granted in the first place).
+  let classIds: Record<string, string>;
+
+  beforeAll(async () => {
+    const rows = await prisma.characterClass.findMany({ where: { name: { in: ["Fighter", "Paladin", "Wizard"] } }, select: { id: true, name: true } });
+    classIds = Object.fromEntries(rows.map((r) => [r.name, r.id]));
+  });
+
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { name: { startsWith: "FSFeatRecon" } } });
   });
@@ -756,7 +776,7 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
         ...BASE_CHARACTER, ownerId: OWNER_ID, id, name: `FSFeatRecon ${id}`,
         experiencePoints: xp, hitDice: { total: entries.reduce((s, e) => s + e.level, 0), die: "d10", spent: 0 },
         spellcasting: Prisma.JsonNull, resources: resourcesWith(advancements),
-        classEntries: { create: entries },
+        classEntries: { create: entries.map((e) => ({ ...e, classId: classIds[e.name] })) },
       },
     });
   }

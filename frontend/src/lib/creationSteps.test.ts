@@ -74,6 +74,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
+    backgroundEquipmentDraft: null,
     step: "identity",
     rulesEdition: "EDITION_2024",
     campaignId: null,
@@ -93,6 +94,7 @@ const specBackground = {
   toolProficiencies: [],
   abilityChoices: ["dexterity" as const, "constitution" as const, "intelligence" as const],
   originFeat: null,
+  startingEquipment: null,
 };
 
 function sel(overrides: Partial<CreationSelections> = {}): CreationSelections {
@@ -233,6 +235,26 @@ describe("creationStepMissing", () => {
     const untouched = makeDraft({ className: "Rogue" });
     expect(
       creationStepMissing("equipment", untouched, sel({ class: makeClass({ startingEquipment: PACKAGE }) })),
+    ).toEqual([]);
+  });
+
+  // #1565: the background's own package rides the SAME "equipment" step —
+  // its missing-labels must show up here too, not just the class's.
+  it("equipment also gates a started-but-incomplete BACKGROUND package", () => {
+    const started = makeDraft({
+      className: "Rogue",
+      background: "Criminal",
+      backgroundEquipmentDraft: { mode: "package", selections: [{ optionIndex: -1 }] },
+    });
+    const backgroundWithPackage = { ...specBackground, startingEquipment: PACKAGE };
+    expect(
+      creationStepMissing("equipment", started, sel({ class: rogue, background: backgroundWithPackage })),
+    ).toEqual(['Background equipment: choose "Weapon"']);
+
+    // Untouched (null) background draft — nothing gated, same as the class's own.
+    const untouched = makeDraft({ className: "Rogue", background: "Criminal" });
+    expect(
+      creationStepMissing("equipment", untouched, sel({ class: rogue, background: backgroundWithPackage })),
     ).toEqual([]);
   });
 });

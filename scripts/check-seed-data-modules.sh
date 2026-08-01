@@ -7,17 +7,24 @@
 #
 # LOGIC_EXCEPTIONS are genuinely logic, not content: guards.ts (fail-fast
 # uniqueness check), prune.ts (stale-row where-clause builder), rename-spells.ts
-# (in-place rename upsert). validate.ts is NOT listed here on purpose — it's
-# also logic, but it happens to carry none of the three tokens (pure zod
-# validation, no DB access), so it passes the scan as a plain data module
-# would; adding it to the exception list would only hide a real future
-# violation if one were ever introduced there.
+# (in-place rename upsert), seed-class-features.ts (#1523 — the executable
+# counterpart split out of class-features.ts, the same content/logic split
+# rename-spells.ts/spells.ts already establishes), seed-starting-equipment.ts
+# (#1533 — same split, one level up, for STARTING_EQUIPMENT_PACKAGES),
+# seed-subclasses.ts (#1559 — same split again, one level up from
+# subclasses.ts: the upsert loop plus the retag-safe stale-row prune and its
+# CharacterClassEntry guard).
+# validate.ts is NOT listed here on purpose — it's also logic, but it happens
+# to carry none of the three tokens (pure zod validation, no DB access), so it
+# passes the scan as a plain data module would; adding it to the exception
+# list would only hide a real future violation if one were ever introduced
+# there.
 #
 # Anti-vacuity: fail if fewer than 13 non-exception modules were scanned, so
 # deleting a module or mistyping the glob turns this red, not silently green.
 set -eu
 
-LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts"
+LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts prisma/seed/seed-class-features.ts prisma/seed/seed-starting-equipment.ts prisma/seed/seed-subclasses.ts"
 
 is_exception() {
   target="$1"

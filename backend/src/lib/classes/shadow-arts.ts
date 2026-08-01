@@ -216,7 +216,7 @@ export async function applyShadowArtsOperations(
       // would wrongly reject every cast; if that's ever needed, pass the real
       // pools instead of widening this comment.
       const level = levelForExperience(row.experiencePoints);
-      const actions = deriveEntryScopedActions(row.classEntries, level, [], true);
+      const actions = deriveEntryScopedActions(row.classEntries, level, [], true, editionOf(row));
 
       if (op.type === "activateCloakOfShadows") {
         if (!actions.some((a) => a.key === "cloakOfShadows")) {

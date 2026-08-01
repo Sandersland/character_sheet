@@ -1,5 +1,7 @@
 // Clamp-on-read blocks here pair 1:1 with LEVEL_GATED_RECONCILERS (lib/leveling/level-reconciliation.ts).
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import {
   characterAdvancementSlots,
   characterFightingStyleFeatSlots,
@@ -7,6 +9,7 @@ import {
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import type { DerivedFeature } from "@/lib/classes/types.js";
 import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { deriveManeuverEffect } from "@/lib/classes/maneuver-effect.js";
@@ -35,7 +38,21 @@ export function buildResourcesView(
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
 ): { resources: object | undefined; maneuverSaveDC: number | undefined } {
-  const { derived: derivedRes } = deriveEntryScopedResources(row.classEntries, level, abilityScores, proficiencyBonus, editionOf(row));
+  // The ONE production caller that supplies real ClassFeature rows (#1524):
+  // characterInclude loaded entry.class.features (already subclassId:null
+  // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
+  // do the per-edition filter inside deriveResources itself. featureRowsOf
+  // (feature-rows-select.ts, #1528 chunk 0) is the SAME extractor every
+  // narrow-select caller now uses too, so this stays the one place the
+  // "class"/"subclassRef" → carrier mapping is written.
+  const { derived: derivedRes } = deriveEntryScopedResources(
+    row.classEntries,
+    level,
+    abilityScores,
+    proficiencyBonus,
+    editionOf(row),
+    featureRowsOf,
+  );
 
   const resources = derivedRes
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
@@ -45,8 +62,9 @@ export function buildResourcesView(
 }
 
 // #1272/#1374: DerivedFeature.edition is a server-side selector (which of a
-// fork's two rows survived featureAppliesToEdition) — never a client-trusted
-// rule input, so it must not cross the wire. Every other buildResourcesPayload
+// fork's two rows survived featuresFromRows' edition filter,
+// lib/classes/class-feature-rows.ts, #1524) — never a client-trusted rule
+// input, so it must not cross the wire. Every other buildResourcesPayload
 // field is already explicitly projected; `features` was the one passthrough.
 export function toWireFeatures(
   features: DerivedFeature[],
@@ -191,12 +209,16 @@ export function buildAvailableActionsView(
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218) —
   // gates the Monk's Bonus Unarmed Strike (requiresUnarmored in DERIVED_ACTIONS).
   unarmoredUnshielded: boolean,
+  edition: RulesEdition,
 ): AvailableAction[] {
   const pools =
     resources && "pools" in resources
       ? (resources as { pools: { key: string; remaining: number }[] }).pools
       : [];
-  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded);
+  // featureRowsOf (#1528 chunk 0): a Fighter entry's row-driven actions
+  // (Second Wind/Action Surge) surface here through the SAME carrier
+  // buildResourcesView passes for its pools/features.
+  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf);
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

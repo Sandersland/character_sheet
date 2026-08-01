@@ -39,6 +39,8 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { subclassGateLevel } from "./effective-levels.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
+import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { FEATURE_ROWS_ORDER_BY } from "@/lib/classes/feature-rows-select.js";
 
 // A validated step, mapped to the seam that applies it. Each domain re-reads its
 // own state via `tx`, so a later op sees the earlier op's write (e.g. the maneuver
@@ -57,6 +59,13 @@ export interface LevelUpContext {
   chosenSubclassName: string | null;
   /** Display-only (#1177) — surfaced on the plan route's `target.isPrimary`. */
   targetIsPrimary: boolean;
+  // #1546 Part B-i: the not-yet-committed `?subclassId=` pick's own feature
+  // rows (null when no subclassId was submitted) — the "picked" half of the
+  // persisted/picked pair this context also carries on targetEntry (mirrors
+  // persistedGrantSource/pickedGrantSource, level-up.ts's #898 pattern). Fed
+  // to resolveLevelUpPlan by every caller of this context (the commit path
+  // and the GET /plan route) so the re-plan splice carries the matching rows.
+  pickedSubclassFeatureRows: ClassFeatureRow[] | null;
 }
 
 const TARGET_ENTRY_SELECT = {
@@ -66,22 +75,157 @@ const TARGET_ENTRY_SELECT = {
   level: true,
   position: true,
   classId: true,
-  // #1380: the advancing class's catalog hit die, the same shape buildHpOpContext
-  // selects for the commit path.
-  class: { select: { hitDie: true } },
+  class: {
+    select: {
+      // #1380: the advancing class's catalog hit die, the same shape
+      // buildHpOpContext selects for the commit path.
+      hitDie: true,
+      // #1546 Part B-i: the class's OWN feature rows — never a subclass's —
+      // `subclassId: null` is load-bearing, mirroring characterInclude's
+      // identical comment (character-include.ts) on why an unfiltered
+      // `class.features` would return every subclass under this class too.
+      features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+    },
+  },
+  // #1546 Part B-i: the PERSISTED subclass's own feature rows, mirroring
+  // characterInclude's subclassRef.features — already subclass-scoped by the
+  // back-relation, no further filter needed. Absent (relation null) when no
+  // subclass is set yet.
+  subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
-// Fetch the target class's catalog subclassLevel and resolve it through the
-// edition seam (#1308) — the column is 2014-only (subclassGateLevel hardcodes 3
-// under 2024), so subclassStep must never compare against the raw column.
-async function subclassLevelFor(classId: string | null, className: string, edition: RulesEdition): Promise<number> {
+// Fetch the target class's catalog subclassLevel/extraAsiLevels/
+// fightingStyleFeatLevel (#1529) in one read, resolving subclassLevel through
+// the edition seam (#1308) — that column is 2014-only (subclassGateLevel
+// hardcodes 3 under 2024), so subclassStep must never compare against the raw
+// column. extraAsiLevels/fightingStyleFeatLevel carry no edition fork
+// (CLAUDE.md: ASI levels and the FS grant level agree in both editions) and
+// pass through as-is — `[]`/`null` for a homebrew class with no catalog row,
+// same fallback advancementSlotsForLevel/fightingStyleFeatSlots apply.
+async function targetClassCatalogFor(
+  classId: string | null,
+  className: string,
+  edition: RulesEdition,
+): Promise<{ subclassLevel: number; extraAsiLevels: number[]; fightingStyleFeatLevel: number | null }> {
+  const select = { subclassLevel: true, extraAsiLevels: true, fightingStyleFeatLevel: true } as const;
   const row = classId
-    ? await prisma.characterClass.findUnique({ where: { id: classId }, select: { subclassLevel: true } })
+    ? await prisma.characterClass.findUnique({ where: { id: classId }, select })
     : await prisma.characterClass.findFirst({
         where: { name: { equals: className, mode: "insensitive" } },
-        select: { subclassLevel: true },
+        select,
       });
-  return subclassGateLevel(row?.subclassLevel, edition);
+  return {
+    subclassLevel: subclassGateLevel(row?.subclassLevel, edition),
+    extraAsiLevels: row?.extraAsiLevels ?? [],
+    fightingStyleFeatLevel: row?.fightingStyleFeatLevel ?? null,
+  };
+}
+
+type TargetEntryRow = Prisma.CharacterClassEntryGetPayload<{ select: typeof TARGET_ENTRY_SELECT }>;
+
+// Every field the rest of resolveLevelUpContext needs about the advancing
+// class entry, for EITHER target.kind. Split out of resolveLevelUpContext
+// (#1546 Part B-i added the classFeatureRows/subclassFeatureRows pair to
+// both branches, which is what pushed the caller over the cognitive-
+// complexity gate) so the existing/new branch stays a single-purpose helper
+// instead of inflating the caller's own branch count.
+interface ResolvedTargetEntry {
+  targetClassName: string;
+  persistedSubclass: string | null;
+  newLevel: number;
+  classId: string | null;
+  targetIsPrimary: boolean;
+  // The advancing class's own catalog die; null falls back to hitDice.die at the call site.
+  catalogHitDie: string | null;
+  // #1546 Part B-i: the PERSISTED half of the featureRows carrier — the
+  // class's own rows always resolve (every class has a catalog row or the
+  // relation is simply empty); subclassFeatureRows is empty for a brand new
+  // entry (target.kind === "new" never has a persisted subclass) or an
+  // existing entry with no subclass chosen yet. Cast mirrors featureRowsOf's
+  // own (feature-rows-select.ts) — Prisma types resourceTotals/
+  // resourceDieTiers/derivedStatTiers as opaque Prisma.JsonValue.
+  classFeatureRows: ClassFeatureRow[];
+  subclassFeatureRows: ClassFeatureRow[];
+}
+
+function resolveExistingTargetEntry(
+  target: Extract<LevelUpTarget, { kind: "existing" }>,
+  classEntries: TargetEntryRow[],
+  isMulticlass: boolean,
+  hitDiceTotal: number,
+): ResolvedTargetEntry {
+  const entry = classEntries.find((e) => e.id === target.classEntryId);
+  if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
+  return {
+    targetClassName: entry.name,
+    persistedSubclass: entry.subclass,
+    newLevel: isMulticlass ? entry.level + 1 : hitDiceTotal + 1,
+    classId: entry.classId,
+    targetIsPrimary: entry.position === 0,
+    catalogHitDie: entry.class?.hitDie ?? null,
+    classFeatureRows: (entry.class?.features ?? []) as unknown as ClassFeatureRow[],
+    subclassFeatureRows: (entry.subclassRef?.features ?? []) as unknown as ClassFeatureRow[],
+  };
+}
+
+async function resolveNewTargetEntry(target: Extract<LevelUpTarget, { kind: "new" }>): Promise<ResolvedTargetEntry> {
+  const catalog = await prisma.characterClass.findUnique({
+    where: { id: target.classId },
+    select: { name: true, hitDie: true, features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } },
+  });
+  if (!catalog) throw new InvalidLevelUpError(`Class not found: ${target.classId}`);
+  return {
+    targetClassName: catalog.name,
+    persistedSubclass: null,
+    newLevel: 1,
+    classId: target.classId,
+    targetIsPrimary: false, // a new multiclass entry is never the primary
+    catalogHitDie: catalog.hitDie,
+    classFeatureRows: catalog.features as unknown as ClassFeatureRow[],
+    subclassFeatureRows: [], // a brand new entry has no persisted subclass
+  };
+}
+
+// Split into one function per target.kind (resolveExistingTargetEntry/
+// resolveNewTargetEntry above) so this dispatcher stays trivial — each
+// branch's own guard-throw and #1546 Part B-i's featureRows pair no longer
+// inflate ONE function's complexity.
+function resolveTargetEntry(
+  target: LevelUpTarget,
+  classEntries: TargetEntryRow[],
+  isMulticlass: boolean,
+  hitDiceTotal: number,
+): Promise<ResolvedTargetEntry> {
+  return target.kind === "existing"
+    ? Promise.resolve(resolveExistingTargetEntry(target, classEntries, isMulticlass, hitDiceTotal))
+    : resolveNewTargetEntry(target);
+}
+
+// Resolves the not-yet-committed `?subclassId=` pick into its name + own
+// feature rows — the "picked" half of the featureRows carrier pair (#1546
+// Part B-i), split out for the same reason as resolveTargetEntry above.
+async function resolvePickedSubclass(
+  subclassId: string | undefined,
+  edition: RulesEdition,
+): Promise<{ chosenSubclassName: string | null; pickedSubclassFeatureRows: ClassFeatureRow[] | null }> {
+  if (!subclassId) return { chosenSubclassName: null, pickedSubclassFeatureRows: null };
+  // Cross-edition before membership: a wrong-edition row is "not in this
+  // character's catalog at all" (#1414), the ordering applySetSubclass also
+  // carries. Reuses the `edition` const bound at the call site — never
+  // resolve edition twice for one resolution. Membership stays one copy of
+  // the rule (applySetSubclass re-validates it in-tx); here we only resolve
+  // id → name. `features` (#1546 Part B-i): this pick's own rows, so a
+  // re-plan (the subclass hasn't been committed to the character yet) still
+  // resolves its subclass-derived choices — one line added to an existing
+  // lookup, no new query.
+  const sub = await prisma.subclass.findUnique({
+    where: { id: subclassId },
+    select: { name: true, edition: true, features: { orderBy: FEATURE_ROWS_ORDER_BY } },
+  });
+  if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
+  const mismatch = crossEditionRejection(sub, `Subclass "${sub.name}"`, edition);
+  if (mismatch) throw new InvalidLevelUpError(mismatch);
+  return { chosenSubclassName: sub.name, pickedSubclassFeatureRows: sub.features as unknown as ClassFeatureRow[] };
 }
 
 // Reads the character + resolves a level-up target into the validator inputs
@@ -109,59 +253,19 @@ export async function resolveLevelUpContext(
 
   const isMulticlass = character.classEntries.length > 1;
   const hitDice = normalizeHitDice(character.hitDice);
-  let targetClassName: string;
-  let persistedSubclass: string | null;
-  let newLevel: number;
-  let classId: string | null;
-  let targetIsPrimary: boolean;
-  // The advancing class's own catalog die; null falls back to hitDice.die below.
-  let catalogHitDie: string | null;
 
-  if (target.kind === "existing") {
-    const entry = character.classEntries.find((e) => e.id === target.classEntryId);
-    if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
-    targetClassName = entry.name;
-    persistedSubclass = entry.subclass;
-    newLevel = isMulticlass ? entry.level + 1 : hitDice.total + 1;
-    classId = entry.classId;
-    targetIsPrimary = entry.position === 0;
-    catalogHitDie = entry.class?.hitDie ?? null;
-  } else {
-    const catalog = await prisma.characterClass.findUnique({
-      where: { id: target.classId },
-      select: { name: true, hitDie: true },
-    });
-    if (!catalog) throw new InvalidLevelUpError(`Class not found: ${target.classId}`);
-    targetClassName = catalog.name;
-    persistedSubclass = null;
-    newLevel = 1;
-    classId = target.classId;
-    targetIsPrimary = false; // a new multiclass entry is never the primary
-    catalogHitDie = catalog.hitDie;
-  }
+  const {
+    targetClassName, persistedSubclass, newLevel, classId, targetIsPrimary,
+    catalogHitDie, classFeatureRows, subclassFeatureRows,
+  } = await resolveTargetEntry(target, character.classEntries, isMulticlass, hitDice.total);
 
   // #1380: resolved through the same function applyLevelUpOp uses, so the plan's
   // previewed gain and the committed gain can't be resolved off different dice.
   const { die: hitDie } = advancingHitDie(catalogHitDie, hitDice.die);
 
-  const subclassLevel = await subclassLevelFor(classId, targetClassName, edition);
+  const { subclassLevel, extraAsiLevels, fightingStyleFeatLevel } = await targetClassCatalogFor(classId, targetClassName, edition);
 
-  let chosenSubclassName: string | null = null;
-  if (subclassId) {
-    // Cross-edition before membership: a wrong-edition row is "not in this
-    // character's catalog at all" (#1414), the ordering applySetSubclass also
-    // carries. Reuses the `edition` const bound above — never resolve edition
-    // twice for one resolution. Membership stays one copy of the rule
-    // (applySetSubclass re-validates it in-tx); here we only resolve id → name.
-    const sub = await prisma.subclass.findUnique({
-      where: { id: subclassId },
-      select: { name: true, edition: true },
-    });
-    if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
-    const mismatch = crossEditionRejection(sub, `Subclass "${sub.name}"`, edition);
-    if (mismatch) throw new InvalidLevelUpError(mismatch);
-    chosenSubclassName = sub.name;
-  }
+  const { chosenSubclassName, pickedSubclassFeatureRows } = await resolvePickedSubclass(subclassId, edition);
 
   return {
     planCharacter: {
@@ -171,9 +275,20 @@ export async function resolveLevelUpContext(
       spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
       edition,
     },
-    targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel, hitDie },
+    targetEntry: {
+      name: targetClassName,
+      subclass: persistedSubclass,
+      newLevel,
+      subclassLevel,
+      hitDie,
+      extraAsiLevels,
+      fightingStyleFeatLevel,
+      classFeatureRows,
+      subclassFeatureRows,
+    },
     chosenSubclassName,
     targetIsPrimary,
+    pickedSubclassFeatureRows,
   };
 }
 
@@ -421,10 +536,10 @@ export async function applyLevelUpTransaction(
   submission: LevelUpSubmission,
   userId: string,
 ): Promise<void> {
-  const { planCharacter, targetEntry, chosenSubclassName } =
+  const { planCharacter, targetEntry, chosenSubclassName, pickedSubclassFeatureRows } =
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
-  const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
+  const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows);
   await assertPickSpellEligibility(submission, steps, targetEntry.name);
 
   const ops = buildLevelUpOps(steps, submission);

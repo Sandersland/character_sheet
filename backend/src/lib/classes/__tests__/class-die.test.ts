@@ -4,11 +4,13 @@ import { deriveResources, resolveClassDie, type DerivedClassInfo } from "@/lib/c
 import { deriveManeuverEffect } from "@/lib/classes/maneuver-effect.js";
 import { readEffectSpec, resolveEffectSpec, type EffectRow } from "@/lib/combat/effects.js";
 
+import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
+
 const scores = { strength: 16, dexterity: 12 };
 
 // Battle Master DerivedClassInfo at a given fighter level.
 function battleMaster(level: number): DerivedClassInfo {
-  const info = deriveResources("fighter", "battle master", level, scores, 4, "EDITION_2024");
+  const info = deriveResources("fighter", "battle master", level, scores, 4, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
   if (!info) throw new Error("expected battle master resources");
   return info;
 }

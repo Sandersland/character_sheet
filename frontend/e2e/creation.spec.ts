@@ -11,9 +11,39 @@ function continueStep(page: Page) {
   return page.getByRole("button", { name: /Continue/ }).click();
 }
 
-// Walks the guided creation ceremony end-to-end and lands on the new sheet. Uses
-// the starting-gold path for the equipment step — a single deterministic choice
-// that completes the package regardless of catalog contents.
+// Equipment step, default (2024) edition: PHB'24's packages have no
+// roll-for-gold rule at all (#1535), so "Starting gold" isn't offered — pick
+// the lettered option (A), a single deterministic choice with no open picks
+// for either class this spec creates (Fighter, Warlock).
+//
+// Checks EVERY (A) rather than one: since #1565 the step renders a second
+// package for the character's background, both cards carry an (A), and
+// Continue stays disabled until every package has a selection. Iterating the
+// matches keeps this correct for a background with no package (every 2014
+// background but Acolyte and Folk Hero) without the spec having to know which
+// case it is in.
+async function chooseEquipmentOptionA(page: Page) {
+  const options = page.getByRole("radio", { name: /^\(A\)/ });
+  await expect(options.first()).toBeVisible();
+  for (let i = 0; i < (await options.count()); i++) {
+    await options.nth(i).check();
+  }
+  // Then fill every open pick the chosen options revealed, or Continue stays
+  // disabled: the 2024 Soldier background's option (A) carries "Gaming Set
+  // (same as above)", a boundToToolChoice pick over the character's own tool
+  // proficiencies (#1564/#1565). Taking the first real option exercises that
+  // binding rather than routing around it via the flat-gold alternative.
+  const picks = page.locator("select");
+  for (let i = 0; i < (await picks.count()); i++) {
+    const pick = picks.nth(i);
+    const values = await pick
+      .locator("option")
+      .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+    if (values.length > 0) await pick.selectOption(values[0]);
+  }
+}
+
+// Walks the guided creation ceremony end-to-end and lands on the new sheet.
 test("creation: guided ceremony lands on the sheet with the chosen class", async ({ page }) => {
   const name = uniqueName("Forged Hero");
 
@@ -46,10 +76,9 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   // Skills & Tools step — no required picks for this build.
   await continueStep(page);
 
-  // Equipment step — choose the starting-gold option and roll a valid amount. The
-  // gold roll label carries a ×N multiplier, distinguishing it from "Roll 4d6".
-  await page.getByRole("button", { name: /Starting gold/ }).click();
-  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  // Equipment step — the 2024 Fighter package's option (A) (chain mail etc.),
+  // no open picks required.
+  await chooseEquipmentOptionA(page);
   await continueStep(page);
 
   // Review step — create.
@@ -62,6 +91,52 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   await expect(page.getByText("Fighter").and(page.locator(":visible")).first()).toBeVisible();
   // The granted Origin feat rides the Advancements card as a slot-exempt entry.
   await expect(page.getByText("Savage Attacker").first()).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+// #1570: Noble's PHB'24 option (A) carries "Gaming Set (same as above)" — a
+// boundToToolChoice pick over the gaming-set proficiency the BACKGROUND itself
+// grants, not one the player chose. That is precisely the shape that shipped
+// broken in #1565 (the picker filtered on chosen tools only, so the dropdown
+// was empty and Continue stayed disabled forever), and no unit test catches it:
+// the draft is React-controlled, so only the rendered step is wrong.
+//
+// Landing on the sheet IS the assertion — it can only happen if the Equipment
+// step was completable, which requires the bound pick to have offered the
+// granted gaming set.
+test("creation: a Noble's background gaming-set pick is satisfiable from a granted tool", async ({ page }) => {
+  const name = uniqueName("Highborn");
+
+  await login(page);
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: "New Character" }).first().click();
+  await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page);
+
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
+  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Class/).selectOption({ label: "Rogue" });
+  await page.getByLabel("Background").selectOption({ label: "Noble" });
+  await continueStep(page);
+
+  // Noble's PHB'24 spread draws from Str/Int/Cha.
+  await page.getByRole("radio", { name: "+2 to Charisma" }).check();
+  await page.getByRole("radio", { name: "+1 to Intelligence" }).check();
+  await continueStep(page);
+
+  // Skills & Tools step.
+  await continueStep(page);
+
+  // Equipment step — two cards now (Rogue's package and Noble's own), and the
+  // background card's open pick must offer the granted Dice Set.
+  await chooseEquipmentOptionA(page);
+  await continueStep(page);
+
+  await page.getByRole("button", { name: /Create Character/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -112,9 +187,9 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await page.getByRole("button", { name: "Add Hideous Laughter" }).click();
   await continueStep(page);
 
-  // Equipment step — the deterministic starting-gold path (as above).
-  await page.getByRole("button", { name: /Starting gold/ }).click();
-  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  // Equipment step — the 2024 Warlock package's option (A) (no roll-for-gold
+  // rule under PHB'24, #1535; same reasoning as the Fighter test above).
+  await chooseEquipmentOptionA(page);
   await continueStep(page);
 
   // Review step — create.
@@ -176,7 +251,10 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   await page.getByRole("button", { name: "Add Hideous Laughter" }).click();
   await continueStep(page);
 
-  // Equipment step — the deterministic starting-gold path (as above).
+  // Equipment step — unlike the 2024 case above, a 2014 Warlock package still
+  // has a roll-for-gold rule, so the starting-gold path remains reachable
+  // here. The gold roll label carries a ×N multiplier, distinguishing it from
+  // "Roll 4d6".
   await page.getByRole("button", { name: /Starting gold/ }).click();
   await page.getByRole("button", { name: /^Roll.*×/ }).click();
   await continueStep(page);
@@ -186,6 +264,59 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
 
   await expect(page.getByText("The Fiend").first()).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+// #1570: the first UNBOUND tool open pick in the app — every earlier
+// toolCategory pick was bound to a proficiency the character already had, so
+// its dropdown was populated from the character's own tool choices rather than
+// from the Item catalog. Folk Hero's "artisan's tools of your choice" is filled
+// from Item rows carrying toolCategory "artisan", and only one of the seventeen
+// had an Item row before this change: the pick would have rendered as a
+// one-entry dropdown. Choosing Smith's Tools specifically is the assertion —
+// picking whatever happened to be first would pass against that broken catalog.
+//
+// Also the only route by which Folk Hero is reachable at all now: it is tagged
+// EDITION_2014, so it appears for a 2014 campaign's character and nowhere else.
+test("creation: a 2014 Folk Hero picks artisan's tools from the full catalog", async ({ page }) => {
+  const name = uniqueName("Village Champion");
+  const campaignName = uniqueName("Old Ways Homestead");
+
+  await login(page);
+  await createCampaign(page.request, { name: campaignName, rulesEdition: "EDITION_2014" });
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: "New Character" }).first().click();
+  await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page, { campaign: campaignName });
+
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
+  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Class/).selectOption({ label: "Rogue" });
+  await page.getByLabel("Background").selectOption({ label: "Folk Hero" });
+  await continueStep(page);
+
+  // Abilities step — Folk Hero predates the PHB'24 spread, so there are no
+  // +2/+1 radios to assign and the step passes straight through.
+  await continueStep(page);
+
+  // Skills & Tools step.
+  await continueStep(page);
+
+  // Equipment step. The class card goes down the 2014 roll-for-gold path so the
+  // background card's artisan pick is the only dropdown left on the step.
+  await page.getByRole("button", { name: /Starting gold/ }).click();
+  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+
+  const artisanPick = page.getByRole("combobox");
+  await expect(artisanPick).toHaveCount(1);
+  await artisanPick.selectOption({ label: "Smith's Tools" });
+  await continueStep(page);
+
+  await page.getByRole("button", { name: /Create Character/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 
   expect(errors).toEqual([]);
 });

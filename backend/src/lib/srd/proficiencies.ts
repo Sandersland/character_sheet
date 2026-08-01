@@ -15,26 +15,6 @@ export interface ProficiencyGrant {
 }
 
 /**
- * Fixed weapon/armor proficiencies granted by each class at creation (PHB).
- * Keyed by class display name, matching CharacterClassEntry.name from the seed.
- * Unknown class names are treated as granting nothing — no crash, no spurious grants.
- */
-export const CLASS_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
-  Barbarian: { armor: ["light", "medium", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
-  Bard:      { armor: ["light"],                     weapons: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"] },
-  Cleric:    { armor: ["light", "medium", "shield"], weapons: ["Simple Weapons"] },
-  Druid:     { armor: ["light", "medium", "shield"], weapons: ["Clubs", "Daggers", "Darts", "Javelins", "Maces", "Quarterstaffs", "Scimitars", "Sickles", "Slings", "Spears"] },
-  Fighter:   { armor: ["light", "medium", "heavy", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
-  Monk:      { armor: [],                            weapons: ["Simple Weapons", "Shortswords"] },
-  Paladin:   { armor: ["light", "medium", "heavy", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
-  Ranger:    { armor: ["light", "medium", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
-  Rogue:     { armor: ["light"],                     weapons: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"] },
-  Sorcerer:  { armor: [],                            weapons: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"] },
-  Warlock:   { armor: ["light"],                     weapons: ["Simple Weapons"] },
-  Wizard:    { armor: [],                            weapons: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"] },
-};
-
-/**
  * Fixed weapon/armor proficiencies granted by race (PHB).
  * Keyed by race display name, matching raceSelection.name from the seed.
  * Races not listed (Human, Halfling, Gnome, Tiefling, etc.) grant nothing — omitted.

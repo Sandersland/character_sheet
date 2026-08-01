@@ -11,14 +11,21 @@
 //      what's currently seeded.
 import { describe, it, expect } from "vitest";
 
-import { assertSeedContentValid } from "../validate.js";
+import { assertSeedContentValid, assertCatalogNamesResolve } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
-  it("visited at least 2 families and 31 rows (SUBCLASSES + SUBCLASS_GRANTED_SPELLS)", () => {
+  // 5 families today: SUBCLASSES, SUBCLASS_GRANTED_SPELLS, CLASS_FEATURES
+  // (#1523, 522 rows), STARTING_EQUIPMENT_PACKAGES (#1533, 24 rows), and
+  // BACKGROUND_STARTING_EQUIPMENT_PACKAGES (#1565, 5 rows) — >= floors rather
+  // than exact counts so this doesn't need editing every time a family is
+  // added. The floor is bumped 4->5 in the SAME diff that registers the fifth
+  // family — writing toBe(4)/60 here would keep passing if the registration
+  // were silently dropped (#1370's exact failure shape).
+  it("visited at least 5 families and 60 rows", () => {
     const summary = assertSeedContentValid();
-    expect(summary.familiesChecked).toBeGreaterThanOrEqual(2);
-    expect(summary.rowsChecked).toBeGreaterThanOrEqual(31);
+    expect(summary.familiesChecked).toBeGreaterThanOrEqual(5);
+    expect(summary.rowsChecked).toBeGreaterThanOrEqual(60);
   });
 
   it("the real content passes cleanly", () => {
@@ -33,5 +40,102 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
     const bad = brokenFixture.map((row, i) => ({ index: i, result: subclassSeedSchema.safeParse(row) }));
     expect(bad[0].result.success).toBe(true);
     expect(bad[1].result.success).toBe(false);
+  });
+
+  // #1533 [R3]/[R4] mutation proof: a FIXTURE row (never the real
+  // STARTING_EQUIPMENT_PACKAGES) whose catalogName resolves against NEITHER
+  // ITEMS nor PACKS must be named in the thrown error.
+  it("assertCatalogNamesResolve rejects a catalogName that resolves against neither ITEMS nor PACKS", () => {
+    const brokenFixture = [
+      {
+        className: "Fighter",
+        edition: "EDITION_2014" as const,
+        package: {
+          gold: { diceCount: 1, diceFaces: 4, multiplier: 1 },
+          groups: [
+            {
+              label: "test group",
+              options: [{ label: "test option", items: [{ catalogName: "Not A Real Catalog Item" }] }],
+            },
+          ],
+        },
+      },
+    ];
+    expect(() => assertCatalogNamesResolve(brokenFixture)).toThrow(/Not A Real Catalog Item/);
+  });
+
+  it("assertCatalogNamesResolve accepts a Pack-only catalogName (resolveFixedItems checks Pack before Item)", () => {
+    const okFixture = [
+      {
+        className: "Fighter",
+        edition: "EDITION_2014" as const,
+        package: {
+          gold: { diceCount: 1, diceFaces: 4, multiplier: 1 },
+          groups: [
+            {
+              label: "test group",
+              options: [{ label: "test option", items: [{ catalogName: "Dungeoneer's Pack" }] }],
+            },
+          ],
+        },
+      },
+    ];
+    expect(() => assertCatalogNamesResolve(okFixture)).not.toThrow();
+  });
+
+  // #1564: the twelve PHB'24 catalog additions (11 fixed items + 9 new
+  // musical instruments, Lute already existed) must resolve the same way any
+  // other ITEMS row does — a FIXTURE package referencing all of them, never
+  // the real STARTING_EQUIPMENT_PACKAGES (which doesn't cite them until #1535).
+  it("assertCatalogNamesResolve accepts every #1564 catalog addition", () => {
+    const newNames = [
+      "Greatsword", "Flail", "Spear", "Sickle", "Studded Leather Armor", "Chain Shirt",
+      "Quiver", "Robe", "Crystal", "Orb", "Herbalism Kit",
+      "Bagpipes", "Drum", "Dulcimer", "Flute", "Horn", "Lyre", "Pan Flute", "Shawm", "Viol",
+    ];
+    const fixture = [
+      {
+        className: "Fighter",
+        edition: "EDITION_2014" as const,
+        package: {
+          gold: { diceCount: 1, diceFaces: 4, multiplier: 1 },
+          groups: [
+            {
+              label: "test group",
+              options: [{ label: "test option", items: newNames.map((catalogName) => ({ catalogName })) }],
+            },
+          ],
+        },
+      },
+    ];
+    expect(() => assertCatalogNamesResolve(fixture)).not.toThrow();
+  });
+
+  // #1565: the nine background-package catalog additions must resolve the
+  // same way any other ITEMS row does — a FIXTURE package referencing all of
+  // them, never the real BACKGROUND_STARTING_EQUIPMENT_PACKAGES (which cites
+  // them via `backgroundName`, not `className`, but assertCatalogNamesResolve
+  // only reads `.package`, so a class-shaped fixture proves the same thing).
+  it("assertCatalogNamesResolve accepts every #1565 catalog addition", () => {
+    const newNames = [
+      "Traveler's Clothes", "Common Clothes", "Pouch", "Calligrapher's Supplies", "Prayer Book",
+      "Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set",
+    ];
+    const fixture = [
+      {
+        className: "Fighter",
+        edition: "EDITION_2014" as const,
+        package: {
+          gold: { diceCount: 1, diceFaces: 4, multiplier: 1 },
+          groups: [
+            {
+              label: "test group",
+              options: [{ label: "test option", items: newNames.map((catalogName) => ({ catalogName })) }],
+            },
+          ],
+        },
+      },
+    ];
+    expect(() => assertCatalogNamesResolve(fixture)).not.toThrow();
   });
 });

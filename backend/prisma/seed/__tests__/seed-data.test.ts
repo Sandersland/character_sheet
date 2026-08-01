@@ -7,11 +7,9 @@
 // in seed.ts main().
 import { describe, it, expect } from "vitest";
 
-import { barbarian } from "@/lib/classes/barbarian.js";
 import { bard } from "@/lib/classes/bard.js";
 import { cleric } from "@/lib/classes/cleric.js";
 import { druid } from "@/lib/classes/druid.js";
-import { fighter } from "@/lib/classes/fighter.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
@@ -535,7 +533,7 @@ describe("referential integrity", () => {
   // comparison while only the catalog column carried 2014 values).
   it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
-      Barbarian: barbarian, Bard: bard, Cleric: cleric, Druid: druid, Fighter: fighter,
+      Bard: bard, Cleric: cleric, Druid: druid,
       Monk: monk, Paladin: paladin, Ranger: ranger, Rogue: rogue, Sorcerer: sorcerer,
       Warlock: warlock, Wizard: wizard,
     };
@@ -545,6 +543,22 @@ describe("referential integrity", () => {
         .map(([key]) => `${seedClass.name}/${key}`),
     );
     expect(drift, "class-definition grantLevel differs from seed subclassLevel").toEqual([]);
+  });
+
+  // Fighter left `defByName` above when lib/classes/fighter.ts was deleted
+  // (#1532); Barbarian left it the same way when lib/classes/barbarian.ts was
+  // (#1223) — both classes' subclasses (Fighter: Champion/Battle
+  // Master/Eldritch Knight; Barbarian: Totem Warrior/Berserker) are
+  // SUBCLASS_IDENTITY-only now, so there is no `sub.grantLevel` left to
+  // compare against. Assert directly on the seeded CharacterClass.subclassLevel
+  // value instead: SRD 5.2 grants every subclass at level 3, and PHB'14 grants
+  // Martial Archetype (p.72) and Primal Path (p.48) at 3rd level too, so 3 is
+  // correct in BOTH editions — these rows are edition-invariant.
+  it("Fighter's and Barbarian's seeded subclassLevel is 3 in both editions (SRD 5.2 & PHB'14 pp. 72/48)", () => {
+    const fighterClass = CLASSES.find((c) => c.name === "Fighter");
+    const barbarianClass = CLASSES.find((c) => c.name === "Barbarian");
+    expect(fighterClass?.subclassLevel).toBe(3);
+    expect(barbarianClass?.subclassLevel).toBe(3);
   });
 
   // Unlike the grantLevel drift test above (reverted to direct equality by
@@ -569,13 +583,25 @@ describe("referential integrity", () => {
 // to its lib/classes/*.ts SubclassDefinition, replacing the substring match
 // #1339 fixed on one of the seven gate sites. F2 measured the seed catalog and
 // the class definitions as ALREADY a perfect 1:1 bijection (31 rows, 31
-// definition keys), which is what makes a bidirectional, allowlist-EMPTY latch
-// possible at zero data cost — each assertion below is a toEqual([]) diff so a
-// broken row names the offender instead of a boolean pass/fail.
+// definition keys) at the time of filing — each assertion below is a
+// toEqual([]) diff so a broken row names the offender instead of a boolean
+// pass/fail. #1532 deleted lib/classes/fighter.ts and #1223 deleted
+// lib/classes/barbarian.ts, so that bijection is now 31 rows / 26 definition
+// keys: Fighter's three subclasses and Barbarian's two are SUBCLASS_IDENTITY-
+// only (no SubclassDefinition), which is exactly the row-migrated case the
+// fourth test below carves out.
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   const CLASS_DEFS: Record<string, ClassDefinition> = {
-    barbarian, bard, cleric, druid, fighter, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+    bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
   };
+
+  // The named twin of scripts/check-class-ts-migration.sh's NOT_YET_MIGRATED
+  // list, keyed by SUBCLASS_IDENTITY's classKey (not the seeded display
+  // name) — a class that migrates off lib/classes/<class>.ts drops out of
+  // BOTH lists in the same PR, or this test and the guard script silently
+  // drift apart. Deliberate-coupling latch: if you change one, update the
+  // other.
+  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian"];
 
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
     const bad = SUBCLASSES.filter((s) => {
@@ -607,13 +633,17 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
     expect(bad, "SubclassDefinition's slug doesn't resolve back to its own (classKey, nameKey)").toEqual([]);
   });
 
-  it("every SUBCLASS_SLUGS member has a matching SubclassDefinition", () => {
+  it("every SUBCLASS_SLUGS member has a matching SubclassDefinition, or belongs to a row-migrated class", () => {
     const definedSlugs = new Set<SubclassSlug>();
     for (const def of Object.values(CLASS_DEFS)) {
       for (const sub of Object.values(def.subclasses ?? {})) definedSlugs.add(sub.slug);
     }
-    const missing = SUBCLASS_SLUGS.filter((slug) => !definedSlugs.has(slug));
-    expect(missing, "slug declared but no SubclassDefinition carries it").toEqual([]);
+    const missing = SUBCLASS_SLUGS.filter((slug) => {
+      if (definedSlugs.has(slug)) return false;
+      const identity = SUBCLASS_IDENTITY[slug];
+      return !identity || !ROW_MIGRATED_CLASSES.includes(identity.classKey);
+    });
+    expect(missing, "slug declared but no SubclassDefinition carries it, and not a row-migrated class").toEqual([]);
   });
 
   // The declared intentional-gap allowlist — deliberately empty. A future

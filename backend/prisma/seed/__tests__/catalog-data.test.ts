@@ -6,6 +6,8 @@
 // dropdown, and versatile weapons missing their second damage die.
 import { describe, it, expect } from "vitest";
 
+import { toolsByCategory, type ToolCategory } from "@/lib/srd/tools.js";
+
 import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "../catalog-data.js";
 
 // The 12 PHB classes. If any is missing the character-creation dropdown is
@@ -107,6 +109,19 @@ describe("BACKGROUNDS catalog", () => {
       }
     }
   });
+
+  // #1570: PHB'24 has sixteen backgrounds and Folk Hero is not among them, so a
+  // shared (NULL) row would keep offering it to 2024 characters as the one
+  // background that cannot give them the ability spread and Origin feat PHB'24
+  // guarantees — a silent forfeit of +3 points and a feat, with nothing in the
+  // UI to explain it. Its 2014-ness is the reason it has no abilityChoices, so
+  // the tag and the empty spread must move together.
+  it("tags Folk Hero EDITION_2014 rather than leaving it shared", () => {
+    const folkHero = BACKGROUNDS.find((b) => b.name === "Folk Hero");
+    expect(folkHero?.edition).toBe("EDITION_2014");
+    expect(folkHero?.abilityChoices ?? []).toEqual([]);
+    expect(folkHero?.originFeatName).toBeUndefined();
+  });
 });
 
 describe("ITEMS catalog", () => {
@@ -164,6 +179,227 @@ describe("ITEMS catalog", () => {
     for (const item of ITEMS.filter((i) => i.category === "armor")) {
       expect(item.armor, `armor "${item.name}" has no armor detail`).toBeDefined();
       expect(item.armor!.baseArmorClass, `armor "${item.name}" baseArmorClass`).toBeGreaterThan(0);
+    }
+  });
+});
+
+// #1564: the twelve items every PHB'24 class package needs that #1534's ITEMS
+// catalog didn't carry yet — parsed from raw HTML (5e24srd.com, CC-BY-4.0,
+// SRD 5.2) and cross-checked against SRD 5.1 (5thsrd.org); every value is
+// identical in both editions (that identity is WHY one untagged Item row can
+// serve both — see this issue's research comment). "Musical Instrument" is a
+// category, not one item: nine of its ten concrete instruments are new here
+// (Lute already existed); each entry below pins name/category/weight/cost so
+// a future edit can't silently drift from the cited SRD 5.2 tables.
+describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
+  const byName = (name: string) => ITEMS.find((i) => i.name === name);
+
+  it("adds Greatsword: 2d6 slashing, heavy, two-handed, martial melee, 6 lb, 50 gp", () => {
+    const item = byName("Greatsword");
+    expect(item).toBeDefined();
+    expect(item!.category).toBe("weapon");
+    expect(item!.weight).toBe(6);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 50, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 2,
+      damageDiceFaces: 6,
+      damageType: "slashing",
+      heavy: true,
+      twoHanded: true,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Flail: 1d8 bludgeoning, martial melee, no special properties, 2 lb, 10 gp", () => {
+    const item = byName("Flail");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(2);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "bludgeoning",
+      weaponClass: "martial",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Spear: 1d6 piercing, thrown 20/60, versatile 1d8, simple melee, 3 lb, 1 gp", () => {
+    const item = byName("Spear");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(3);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 1, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "piercing",
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+      versatileDiceCount: 1,
+      versatileDiceFaces: 8,
+      weaponClass: "simple",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Sickle: 1d4 slashing, light, simple melee, 2 lb, 1 gp", () => {
+    const item = byName("Sickle");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(2);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 1, pp: 0 });
+    expect(item!.weapon).toEqual({
+      damageDiceCount: 1,
+      damageDiceFaces: 4,
+      damageType: "slashing",
+      light: true,
+      weaponClass: "simple",
+      weaponRange: "melee",
+    });
+  });
+
+  it("adds Studded Leather Armor: light, AC 12 + Dex, 13 lb, 45 gp", () => {
+    const item = byName("Studded Leather Armor");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(13);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 45, pp: 0 });
+    expect(item!.armor).toEqual({
+      armorCategory: "light",
+      baseArmorClass: 12,
+      dexModifierApplies: true,
+    });
+  });
+
+  it("adds Chain Shirt: medium, AC 13 + Dex (max 2), 20 lb, 50 gp", () => {
+    const item = byName("Chain Shirt");
+    expect(item).toBeDefined();
+    expect(item!.weight).toBe(20);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 50, pp: 0 });
+    expect(item!.armor).toEqual({
+      armorCategory: "medium",
+      baseArmorClass: 13,
+      dexModifierApplies: true,
+      dexModifierMax: 2,
+    });
+  });
+
+  it("adds Quiver, Robe, Crystal, Orb, Herbalism Kit as gear with the SRD 5.2 weight/cost", () => {
+    const expectations: [string, number, number][] = [
+      ["Quiver", 1, 1],
+      ["Robe", 4, 1],
+      ["Crystal", 1, 10],
+      ["Orb", 3, 20],
+      ["Herbalism Kit", 3, 5],
+    ];
+    for (const [name, weight, gp] of expectations) {
+      const item = byName(name);
+      expect(item, `"${name}" missing from ITEMS`).toBeDefined();
+      expect(item!.category, `"${name}" category`).toBe("gear");
+      expect(item!.weight, `"${name}" weight`).toBe(weight);
+      expect(item!.cost, `"${name}" cost`).toEqual({ cp: 0, sp: 0, gp, pp: 0 });
+    }
+  });
+
+  it("adds the nine missing musical instruments as gear (Lute already existed)", () => {
+    const expectations: [string, number, number][] = [
+      ["Bagpipes", 6, 30],
+      ["Drum", 3, 6],
+      ["Dulcimer", 10, 25],
+      ["Flute", 1, 2],
+      ["Horn", 2, 3],
+      ["Lyre", 2, 30],
+      ["Pan Flute", 2, 12],
+      ["Shawm", 1, 2],
+      ["Viol", 1, 30],
+    ];
+    for (const [name, weight, gp] of expectations) {
+      const item = byName(name);
+      expect(item, `"${name}" missing from ITEMS`).toBeDefined();
+      expect(item!.category, `"${name}" category`).toBe("gear");
+      expect(item!.weight, `"${name}" weight`).toBe(weight);
+      expect(item!.cost, `"${name}" cost`).toEqual({ cp: 0, sp: 0, gp, pp: 0 });
+    }
+  });
+
+  // Lute is untouched by this issue — pinned so a future edit can't drift it
+  // while adding its nine siblings.
+  it("leaves the existing Lute (35 gp, 2 lb) unchanged", () => {
+    const item = byName("Lute");
+    expect(item!.weight).toBe(2);
+    expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 35, pp: 0 });
+  });
+
+  // No weapon-mastery properties (Graze/Sap/Nick/Vex/Topple, SRD 5.2) exist
+  // anywhere in WeaponDetailInput — this just documents that Greatsword/
+  // Flail/Spear/Sickle above carry nothing beyond the shared 5.1/5.2 stat
+  // line, rather than a reader wondering if mastery was forgotten.
+  it("does not model SRD 5.2 weapon-mastery properties on the new weapons", () => {
+    for (const name of ["Greatsword", "Flail", "Spear", "Sickle"]) {
+      const keys = Object.keys(byName(name)!.weapon ?? {});
+      for (const masteryKey of ["mastery", "graze", "sap", "nick", "vex", "topple"]) {
+        expect(keys.map((k) => k.toLowerCase())).not.toContain(masteryKey);
+      }
+    }
+  });
+
+  // #1564 commit 4: only the small set of Item rows that ARE tools carry
+  // toolCategory — the open-pick validator reads this column so a Bard's
+  // "musical instrument of your choice" or a Monk's tool-bound pick never
+  // reaches into lib/srd/tools.ts. Everything else stays untagged (null).
+  it("tags the ten musical instruments with toolCategory: musicalInstrument", () => {
+    for (const name of ["Bagpipes", "Drum", "Dulcimer", "Flute", "Horn", "Lute", "Lyre", "Pan Flute", "Shawm", "Viol"]) {
+      expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBe("musicalInstrument");
+    }
+  });
+
+  it("tags Herbalism Kit and Thieves' Tools with toolCategory: other", () => {
+    for (const name of ["Herbalism Kit", "Thieves' Tools"]) {
+      expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBe("other");
+    }
+  });
+
+  it("leaves non-tool items untagged (toolCategory undefined)", () => {
+    for (const name of ["Greatsword", "Spellbook", "Backpack"]) {
+      expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBeUndefined();
+    }
+  });
+});
+
+// #1570: an UNBOUND open pick ("artisan's tools of your choice") is offered from
+// the Item rows carrying that toolCategory — TOOLS plays no part in the dropdown,
+// it only validates proficiency choices. The two drifted: TOOLS listed all
+// seventeen artisan tools while ITEMS carried one (Calligrapher's Supplies), so
+// Folk Hero's signature choice would have rendered as a one-entry dropdown that
+// looks like a bug and can't express the background. Same species as the nine
+// instruments (#1564) and four gaming sets (#1565), each added when a pick first
+// needed a pool. Scoped to the three categories a filter can name; "other" tools
+// are only ever referenced by exact catalogName (Thieves' Tools, Forgery Kit),
+// never pooled, so their Item rows stay demand-driven.
+// TOOLS omits the zero coin denominations ITEMS spells out (and ITEMS carries a
+// pp field TOOLS has no concept of), so both sides are normalized to the three
+// denominations a tool's price can actually use before being compared.
+function coinTriple(cost?: { gp?: number; sp?: number; cp?: number }) {
+  return { gp: cost?.gp ?? 0, sp: cost?.sp ?? 0, cp: cost?.cp ?? 0 };
+}
+
+describe("tool Items back every pickable tool category (#1570)", () => {
+  const PICKABLE: ToolCategory[] = ["artisan", "gamingSet", "musicalInstrument"];
+
+  it.each(PICKABLE)("every %s tool in TOOLS has a matching Item row", (category) => {
+    const missing = toolsByCategory(category)
+      .filter((tool) => !ITEMS.some((i) => i.name === tool.name))
+      .map((t) => t.name);
+    expect(missing, `${category} tools with no Item row — an open pick would not offer them`).toEqual([]);
+  });
+
+  it.each(PICKABLE)("every %s Item agrees with TOOLS on cost and weight", (category) => {
+    for (const tool of toolsByCategory(category)) {
+      const item = ITEMS.find((i) => i.name === tool.name);
+      if (!item) continue; // absence is the previous test's assertion, not this one's
+      expect(item.toolCategory, `"${tool.name}" toolCategory`).toBe(category);
+      expect(item.weight ?? 0, `"${tool.name}" weight`).toBe(tool.weight ?? 0);
+      expect(coinTriple(item.cost), `"${tool.name}" cost`).toEqual(coinTriple(tool.cost));
     }
   });
 });

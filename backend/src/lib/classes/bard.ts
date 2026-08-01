@@ -1,8 +1,8 @@
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature, RechargeOn } from "./types.js";
+import type { AuthoredFeature, ClassDefinition, RechargeOn } from "./types.js";
 
-const BARD_FEATURES: DerivedFeature[] = [
+const BARD_FEATURES: AuthoredFeature[] = [
   {
     name: "Spellcasting",
     level: 1,
@@ -68,7 +68,7 @@ const BARD_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const COLLEGE_OF_LORE_FEATURES: DerivedFeature[] = [
+const COLLEGE_OF_LORE_FEATURES: AuthoredFeature[] = [
   {
     name: "Bonus Proficiencies",
     level: 3,
@@ -99,7 +99,7 @@ const COLLEGE_OF_LORE_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const COLLEGE_OF_VALOR_FEATURES: DerivedFeature[] = [
+const COLLEGE_OF_VALOR_FEATURES: AuthoredFeature[] = [
   {
     name: "Bonus Proficiencies",
     level: 3,
@@ -118,7 +118,14 @@ const COLLEGE_OF_VALOR_FEATURES: DerivedFeature[] = [
     name: "Extra Attack",
     level: 6,
     source: "subclass",
+    // PHB-only content (not in SRD 5.1 or SRD 5.2 — both SRDs carry only
+    // College of Lore for Bard, #1530 arbiter note) — no page # verified, so
+    // no SRD/PHB citation is attached here; this row's tier is the value
+    // deriveAttacksPerAction already returned for this subclass before this
+    // row-driven rewrite (zero behaviour change), not new content.
     description: "You can attack twice whenever you take the Attack action.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 6, value: 2 }],
   },
   {
     name: "Battle Magic",

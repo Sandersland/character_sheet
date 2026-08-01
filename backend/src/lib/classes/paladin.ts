@@ -1,8 +1,8 @@
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-import type { ClassDefinition, DerivedFeature, DerivedResource } from "./types.js";
+import type { AuthoredFeature, ClassDefinition, DerivedResource } from "./types.js";
 
-const PALADIN_FEATURES: DerivedFeature[] = [
+const PALADIN_FEATURES: AuthoredFeature[] = [
   {
     name: "Divine Sense",
     level: 1,
@@ -57,6 +57,10 @@ const PALADIN_FEATURES: DerivedFeature[] = [
     level: 5,
     source: "class",
     description: "You can attack twice whenever you take the Attack action on your turn.",
+    // #1530: edition-invariant (SRD 5.1 / SRD 5.2 Paladin, Extra Attack) —
+    // one flat tier, no further scaling at higher levels (unlike Fighter).
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
   },
   {
     name: "Aura of Protection",
@@ -88,7 +92,7 @@ const PALADIN_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const OATH_OF_DEVOTION_FEATURES: DerivedFeature[] = [
+const OATH_OF_DEVOTION_FEATURES: AuthoredFeature[] = [
   {
     name: "Oath Spells",
     level: 3,
@@ -133,7 +137,7 @@ const OATH_OF_DEVOTION_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const OATH_OF_THE_ANCIENTS_FEATURES: DerivedFeature[] = [
+const OATH_OF_THE_ANCIENTS_FEATURES: AuthoredFeature[] = [
   {
     name: "Oath Spells",
     level: 3,
@@ -178,7 +182,7 @@ const OATH_OF_THE_ANCIENTS_FEATURES: DerivedFeature[] = [
   },
 ];
 
-const OATH_OF_VENGEANCE_FEATURES: DerivedFeature[] = [
+const OATH_OF_VENGEANCE_FEATURES: AuthoredFeature[] = [
   {
     name: "Oath Spells",
     level: 3,

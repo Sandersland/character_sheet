@@ -1,3 +1,17 @@
+// Classes whose CLASS_FEATURES rows are literal seed data (#1227,
+// backend/prisma/seed/fighter-features.ts; #1223,
+// backend/prisma/seed/barbarian-features.ts), keyed lowercase to match this
+// file's own registry convention — the sibling of prisma/seed/class-
+// features.ts's LITERAL_ROW_CLASSES (Title Case, "Fighter", "Barbarian"). Kept
+// as a SECOND constant rather than importing the prisma-side one directly:
+// backend/tsconfig.json's `rootDir: "src"` makes any src file importing
+// something under prisma/ a compile error (TS6059, verified empirically) —
+// there is no single set both sides can share. Both must be updated together
+// when a class's rows go literal; class-feature-parity.test.ts and feature-
+// edition.test.ts key off THIS one so there is still only one hand-maintained
+// list per side, never one per test.
+export const LITERAL_ROW_CLASSES = new Set(["fighter", "barbarian"]);
+
 // Every class/subclass pair, shared by class-features-snapshot.test.ts and
 // feature-edition.test.ts (#1374) — a plain (non-.test.ts) module so importing
 // it for the data never re-executes another file's describe/it blocks (a

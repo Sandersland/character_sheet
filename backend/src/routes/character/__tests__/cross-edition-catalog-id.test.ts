@@ -21,6 +21,7 @@ import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
 import { InvalidLevelUpError } from "@/lib/leveling/level-up-submission.js";
+import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 
 const OWNER_ID = "owner-cross-edition-catalog-id";
 let COOKIE: string;
@@ -332,7 +333,9 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
   const CHOICE_SHARED = "XEd Choice Shared";
   const FIXTURE_ID = "xed-resources-battle-master-1";
   const HUNTER_ID = "xed-resources-hunter-1";
+  const BM_SUBCLASS_NAME = "battle master"; // exact lowercase key deriveResources reads
   let classId: string;
+  let bmSubclassId: string;
   let maneuverId2014: string;
   let maneuverIdShared: string;
   let choiceId2014: string;
@@ -348,10 +351,26 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
         skillChoiceCount: 2,
         skillChoices: ["athletics", "intimidation"],
         isSpellcaster: false,
+        subclassLevel: 3,
       },
-      update: {},
+      update: { subclassLevel: 3 },
     });
     classId = cls.id;
+    // #1546 Part B-ii: Battle Master's maneuver/tool choice-count caps (the
+    // "once the choice count is reached" 400s below) are ROW-driven now
+    // (fighter.ts's deriveExtras is gone) — a bespoke Subclass row with no
+    // ClassFeature children would silently lose them, same failure mode
+    // fighterResourceRowsData's own header describes for the base class
+    // (#1546 Part B-i, Ruling 2). Shared helper, not a per-file copy.
+    const bm = await upsertEditionRow(
+      prisma.subclass,
+      { classId, name: BM_SUBCLASS_NAME, edition: null },
+      { classId, name: BM_SUBCLASS_NAME, description: "Maneuvers.", slug: "fighter-battle-master-cross-edition-test" },
+      {},
+    );
+    bmSubclassId = bm.id;
+    await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
+    await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(classId, bmSubclassId) });
 
     const mkGranted = (name: string, source: string, edition: "EDITION_2014" | null) =>
       upsertEditionRow(
@@ -399,7 +418,7 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
         toolProficiencies: [],
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
         resources: Prisma.JsonNull,
-        classEntries: { create: [{ name: "fighter", subclass: "battle master", classId, position: 0 }] },
+        classEntries: { create: [{ name: "fighter", subclass: "battle master", subclassId: bmSubclassId, classId, position: 0 }] },
       },
     });
   }
