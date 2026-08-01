@@ -11,12 +11,36 @@ function continueStep(page: Page) {
   return page.getByRole("button", { name: /Continue/ }).click();
 }
 
-// Equipment step, default (2024) edition: PHB'24's package has no roll-for-gold
-// rule at all (#1535), so "Starting gold" isn't offered — pick the class's
-// lettered option (A) instead, a single deterministic choice with no open
-// picks for either class this spec creates (Fighter, Warlock).
-function chooseEquipmentOptionA(page: Page) {
-  return page.getByRole("radio", { name: /^\(A\)/ }).check();
+// Equipment step, default (2024) edition: PHB'24's packages have no
+// roll-for-gold rule at all (#1535), so "Starting gold" isn't offered — pick
+// the lettered option (A), a single deterministic choice with no open picks
+// for either class this spec creates (Fighter, Warlock).
+//
+// Checks EVERY (A) rather than one: since #1565 the step renders a second
+// package for the character's background, both cards carry an (A), and
+// Continue stays disabled until every package has a selection. Iterating the
+// matches keeps this correct for a background with no package (Charlatan,
+// Folk Hero, Noble — no SRD equipment in either edition) without the spec
+// having to know which case it is in.
+async function chooseEquipmentOptionA(page: Page) {
+  const options = page.getByRole("radio", { name: /^\(A\)/ });
+  await expect(options.first()).toBeVisible();
+  for (let i = 0; i < (await options.count()); i++) {
+    await options.nth(i).check();
+  }
+  // Then fill every open pick the chosen options revealed, or Continue stays
+  // disabled: the 2024 Soldier background's option (A) carries "Gaming Set
+  // (same as above)", a boundToToolChoice pick over the character's own tool
+  // proficiencies (#1564/#1565). Taking the first real option exercises that
+  // binding rather than routing around it via the flat-gold alternative.
+  const picks = page.locator("select");
+  for (let i = 0; i < (await picks.count()); i++) {
+    const pick = picks.nth(i);
+    const values = await pick
+      .locator("option")
+      .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+    if (values.length > 0) await pick.selectOption(values[0]);
+  }
 }
 
 // Walks the guided creation ceremony end-to-end and lands on the new sheet.

@@ -86,6 +86,14 @@ function EquipmentStepBody({ c }: StepBodyProps) {
   // — most backgrounds have none (Charlatan/Folk Hero/Noble, every homebrew
   // name, and a 2014 Criminal/Sage/Soldier), so this is usually absent.
   const backgroundEquipment = c.selections.background?.startingEquipment;
+  // GRANTED tools as well as chosen ones — the same union the server's
+  // creationToolProfs assembles (background + class + race grants, plus the
+  // player's class picks). A boundToToolChoice pick filtered on chosen tools
+  // alone offered NOTHING for a 2024 Soldier, whose Gaming Set arrives as a
+  // background grant rather than a pick: an empty dropdown the step could
+  // never satisfy, so Continue stayed disabled forever (#1565). The picker
+  // must admit exactly what boundToolChoiceError admits, no less.
+  const boundToolCandidates = [...c.toolChoices.grantedToolProfs, ...c.toolChoices.selectedToolChoices];
   return (
     <>
       {!startingEquipment && (
@@ -99,7 +107,7 @@ function EquipmentStepBody({ c }: StepBodyProps) {
           value={c.draft.equipmentDraft}
           catalog={c.catalog}
           onChange={(eq) => c.update({ equipmentDraft: eq })}
-          selectedToolChoices={c.toolChoices.selectedToolChoices}
+          selectedToolChoices={boundToolCandidates}
         />
       )}
       {backgroundEquipment && (
@@ -110,7 +118,7 @@ function EquipmentStepBody({ c }: StepBodyProps) {
           value={c.draft.backgroundEquipmentDraft}
           catalog={c.catalog}
           onChange={(eq) => c.update({ backgroundEquipmentDraft: eq })}
-          selectedToolChoices={c.toolChoices.selectedToolChoices}
+          selectedToolChoices={boundToolCandidates}
         />
       )}
     </>

@@ -32,10 +32,12 @@ interface StartingEquipmentEditorProps {
    *  matching the server's boundToolChoiceError so the picker never offers a
    *  choice the write path would reject (#1336). */
   selectedToolChoices: string[];
-  /** #1565: "class" (default) or "background" — a background never has a
-   *  gold-roll alternative, so its own mode toggle row never renders at all
-   *  (see the toggle's own render-guard below); this only labels the
-   *  package-mode button on the rare path where BOTH modes exist. */
+  /** #1565: "class" (default) or "background". Two jobs — it labels the
+   *  package-mode button on the rare path where both modes exist (a background
+   *  never has a gold-roll alternative, so its own toggle row never renders at
+   *  all), and it namespaces this instance's native radio groups so the two
+   *  editors mounted on the creation step stay independent. See OptionChoice's
+   *  radioGroupName for what went wrong when they did not. */
   kind?: "class" | "background";
 }
 
@@ -152,7 +154,13 @@ function OpenPickList({ bundle, catalog, currentPicks, onPick, selectedToolChoic
 
 interface OptionChoiceProps {
   option: EquipmentBundle;
-  groupIdx: number;
+  /** Native radio-group name — must be unique across every editor instance on
+   *  the page, not just across groups within one. Since #1565 the creation step
+   *  mounts TWO editors (class and background); a bare `group-${idx}` made both
+   *  cards' first groups one native radio group, so choosing a background
+   *  option visually cleared the class option (the draft kept both, since the
+   *  radios are React-controlled, so only the rendering lied). */
+  radioGroupName: string;
   isChosen: boolean;
   catalog: Item[];
   currentPicks: string[] | undefined;
@@ -202,7 +210,7 @@ function ChosenFixedSummary({ isChosen, option }: { isChosen: boolean; option: E
  *  EquipmentGroupCard purely to keep its own cyclomatic complexity low. */
 function OptionChoice({
   option,
-  groupIdx,
+  radioGroupName,
   isChosen,
   catalog,
   currentPicks,
@@ -221,7 +229,7 @@ function OptionChoice({
       <div className="flex items-start gap-2">
         <input
           type="radio"
-          name={`group-${groupIdx}`}
+          name={radioGroupName}
           checked={isChosen}
           onChange={onChoose}
           className="mt-0.5 accent-arcane-600"
@@ -244,6 +252,9 @@ function OptionChoice({
 interface EquipmentGroupCardProps {
   group: EquipmentChoiceGroup;
   groupIdx: number;
+  /** Namespaces this card's radio group per editor instance — see OptionChoice's
+   *  radioGroupName. */
+  radioGroupPrefix: string;
   sel: PackageSelection | undefined;
   catalog: Item[];
   onSetOptionIndex: (groupIdx: number, optionIdx: number) => void;
@@ -257,6 +268,7 @@ interface EquipmentGroupCardProps {
 function EquipmentGroupCard({
   group,
   groupIdx,
+  radioGroupPrefix,
   sel,
   catalog,
   onSetOptionIndex,
@@ -284,7 +296,7 @@ function EquipmentGroupCard({
             <OptionChoice
               key={optionIdx}
               option={option}
-              groupIdx={groupIdx}
+              radioGroupName={`${radioGroupPrefix}-group-${groupIdx}`}
               isChosen={chosenOptionIdx === optionIdx}
               catalog={catalog}
               currentPicks={sel?.openPicks}
@@ -508,6 +520,7 @@ export default function StartingEquipmentEditor({
               key={groupIdx}
               group={group}
               groupIdx={groupIdx}
+              radioGroupPrefix={kind}
               sel={value.selections[groupIdx]}
               catalog={catalog}
               onSetOptionIndex={setOptionIndex}

@@ -95,4 +95,37 @@ describe("StartingEquipmentSection — background reuse (#1565)", () => {
     );
     expect(screen.getByRole("button", { name: "Background equipment package" })).toBeInTheDocument();
   });
+
+  // The creation step mounts both editors at once, and a native radio group is
+  // keyed by `name` across the WHOLE document — so a shared name would make
+  // picking a background option clear the class one on screen while the draft
+  // silently kept both (#1565). Asserting the names are disjoint is what pins
+  // that; asserting on `checked` alone would not, since these radios are
+  // React-controlled and re-render from state either way.
+  it("namespaces each editor's radio group so two mounted editors stay independent", () => {
+    const { container } = render(
+      <>
+        <StartingEquipmentSection
+          startingEquipment={PACKAGE}
+          value={{ mode: "package", selections: emptyPackageState(PACKAGE) }}
+          catalog={[]}
+          onChange={vi.fn()}
+          selectedToolChoices={[]}
+        />
+        <StartingEquipmentSection
+          title="Background Equipment"
+          kind="background"
+          startingEquipment={PACKAGE}
+          value={{ mode: "package", selections: emptyPackageState(PACKAGE) }}
+          catalog={[]}
+          onChange={vi.fn()}
+          selectedToolChoices={[]}
+        />
+      </>,
+    );
+
+    const names = [...container.querySelectorAll("input[type=radio]")].map((r) => r.getAttribute("name"));
+    expect(names).toHaveLength(4);
+    expect(new Set(names)).toEqual(new Set(["class-group-0", "background-group-0"]));
+  });
 });
