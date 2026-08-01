@@ -48,9 +48,14 @@ const CLASSES: Record<string, ClassDefinition> = {
 // #1277's sanctioned join table) — #1546 Part A. An identity-only entry is
 // just `{ slug }`, no `grantLevel`, so isSubclassActive resolves it through
 // subclassActiveAt/subclassGateLevel's undefined-grantLevel fallback, which is
-// already 3 in BOTH editions (effective-levels.ts) — the same value every
-// class not yet migrated off `lib/classes/<class>.ts` still supplies
-// explicitly. This is what lets deriveSubclassLayer resolve a subclass's
+// already 3 in BOTH editions (effective-levels.ts) — CORRECTLY the value for
+// most classes not yet migrated off `lib/classes/<class>.ts` (Bard/Monk/
+// Paladin/Ranger/Rogue, each `grantLevel: 3` in their own module), but NOT
+// for all: Cleric/Sorcerer/Warlock supply `grantLevel: 1` and Druid/Wizard
+// supply `grantLevel: 2` explicitly (PHB'14) — a false "same value" claim
+// here would have shipped in #1234; those five classes' own TS overlay (the
+// second pass below) is what corrects the fallback for them, not this
+// identity-only seed. This is what lets deriveSubclassLayer resolve a subclass's
 // seeded ClassFeature rows (poolsFromRows/featuresFromRows) even when no
 // ClassDefinition registers it in TS at all (Fighter's three since fighter.ts
 // was deleted, #1532; Barbarian's two since barbarian.ts was, #1223) —
