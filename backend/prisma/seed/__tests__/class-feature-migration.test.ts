@@ -169,6 +169,22 @@ function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string 
   return row.className === "Barbarian" && row.subclassSlug === null && row.name === "Rage";
 }
 
+// #1234: Arcane Recovery's resource pool (base Wizard, both editions — 2
+// rows) — the third class to populate a resource descriptor column. No
+// activation/cost/effect columns (Arcane Recovery has no DERIVED_ACTIONS
+// entry — it's spent through the spellcasting op, not the actions endpoint).
+function isPopulatedWizardRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return row.className === "Wizard" && row.subclassSlug === null && row.name === "Arcane Recovery";
+}
+
+// #1234: Illusory Self's resource pool (School of Illusion subclass, both
+// editions — 2 rows) — the one SUBCLASS-scoped Wizard resource row, mirroring
+// Battle Master's Combat Superiority above. Same no-activation reasoning as
+// isPopulatedWizardRow.
+function isPopulatedIllusorySelfRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return row.className === "Wizard" && row.subclassSlug === "wizard-school-of-illusion" && row.name === "Illusory Self";
+}
+
 // #1546 Part B: Battle Master's Combat Superiority is the one SUBCLASS-scoped
 // resource row (its superiority-dice pool) alongside the three base-class
 // ones above.
@@ -211,8 +227,123 @@ function isDerivedStatRow(row: { className: string; subclassSlug: string | null;
   return DERIVED_STAT_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
+// The combined "has any populated resource pool" predicate — split out of the
+// test body below purely to keep its own cyclomatic/CRAP score under the
+// ratchet (#1234 added the two Wizard checks, which pushed the inline OR-chain
+// over budget; splitting is the only lever, same reasoning as
+// class-features.ts's baseFeatureRows/resolveSubclassId comments).
+function isAnyPopulatedResourceRow(key: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return (
+    isPopulatedFighterRow(key) ||
+    isPopulatedBattleMasterPoolRow(key) ||
+    isPopulatedBarbarianRow(key) ||
+    isPopulatedWizardRow(key) ||
+    isPopulatedIllusorySelfRow(key)
+  );
+}
+
+type DescriptorRow = {
+  name: string;
+  resourceKey: string | null;
+  resourceLabel: string | null;
+  resourceRecharge: string | null;
+  resourceTotals: unknown;
+  resourceDieTiers: unknown;
+  activationCost: string | null;
+  resolverKind: string | null;
+  requiresUnarmored: boolean;
+  regrants: string[];
+  costKind: string | null;
+  costPoolKey: string | null;
+  costBase: number | null;
+  costPerStep: number | null;
+  effectKind: string | null;
+  effectDiceCount: number | null;
+  effectDiceFaces: number | null;
+  effectDieSource: string | null;
+  effectModifier: number | null;
+  effectModifierSource: string | null;
+  damageType: string | null;
+  attackType: string | null;
+  saveAbility: string | null;
+  saveEffect: string | null;
+  buffTarget: string | null;
+  buffModifier: number | null;
+  derivedStat: string | null;
+  derivedStatTiers: unknown;
+  saveDcAbilities: string[];
+};
+
+// Every resource/activation/cost/effect column at its NULL/default reset —
+// split out so the test body's own branching stays low (see
+// isAnyPopulatedResourceRow's comment above for why).
+function expectNullResourceColumns(row: DescriptorRow): void {
+  expect(row.resourceKey, row.name).toBeNull();
+  expect(row.resourceLabel, row.name).toBeNull();
+  expect(row.resourceRecharge, row.name).toBeNull();
+  expect(row.resourceTotals, row.name).toBeNull();
+  expect(row.resourceDieTiers, row.name).toBeNull();
+  expect(row.activationCost, row.name).toBeNull();
+  expect(row.resolverKind, row.name).toBeNull();
+  expect(row.requiresUnarmored, row.name).toBe(false);
+  expect(row.regrants, row.name).toEqual([]);
+  expect(row.costKind, row.name).toBeNull();
+  expect(row.costPoolKey, row.name).toBeNull();
+  expect(row.costBase, row.name).toBeNull();
+  expect(row.costPerStep, row.name).toBeNull();
+  expect(row.effectKind, row.name).toBeNull();
+  expect(row.effectDiceCount, row.name).toBeNull();
+  expect(row.effectDiceFaces, row.name).toBeNull();
+  expect(row.effectDieSource, row.name).toBeNull();
+  expect(row.effectModifier, row.name).toBeNull();
+  expect(row.effectModifierSource, row.name).toBeNull();
+  expect(row.damageType, row.name).toBeNull();
+  expect(row.attackType, row.name).toBeNull();
+  expect(row.saveAbility, row.name).toBeNull();
+  expect(row.saveEffect, row.name).toBeNull();
+  expect(row.buffTarget, row.name).toBeNull();
+  expect(row.buffModifier, row.name).toBeNull();
+}
+
+// One row's full set of descriptor-column assertions — extracted so the it()
+// body itself is a plain fetch + count + loop, not the branching (same
+// complexity-budget reasoning as the two functions above).
+function expectRowDescriptors(row: DescriptorRow & { className: string; subclassSlug: string | null }): void {
+  const key = { className: row.className, subclassSlug: row.subclassSlug, name: row.name };
+  if (isAnyPopulatedResourceRow(key)) {
+    // Populated by #1528/#1546/#1234 — asserted precisely in the describe
+    // blocks below. Falls through to the derivedStat/saveDcAbilities checks
+    // rather than an early return: Combat Superiority (#1546) sets a resource
+    // pool AND a derivedStat AND saveDcAbilities all on the SAME row, so
+    // returning here would skip asserting the latter two entirely.
+    expect(row.resourceKey, row.name).not.toBeNull();
+  } else {
+    expectNullResourceColumns(row);
+  }
+
+  // #1530/#1546: Extra Attack's six pairs plus Combat Superiority/Student
+  // of War are the derivedStat exceptions, checked separately since they
+  // don't all touch the resource columns asserted null above.
+  if (isDerivedStatRow(key)) {
+    expect(row.derivedStat, row.name).not.toBeNull();
+    expect(row.derivedStatTiers, row.name).not.toBeNull();
+  } else {
+    expect(row.derivedStat, row.name).toBeNull();
+    expect(row.derivedStatTiers, row.name).toBeNull();
+  }
+
+  // #1546: saveDcAbilities defaults to `[]` (a NOT NULL String[] column,
+  // same "no SQL NULL to distinguish" shape as `regrants`) — non-empty
+  // only on Combat Superiority, both editions.
+  if (isSaveDcRow(key)) {
+    expect(row.saveDcAbilities, row.name).toEqual(["strength", "dexterity"]);
+  } else {
+    expect(row.saveDcAbilities, row.name).toEqual([]);
+  }
+}
+
 describe("ClassFeature migration — every descriptor column is NULL/default, except Fighter's #1528 pilot rows and Barbarian's #1223 Rage rows", () => {
-  it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528) and Rage (#1223)", async () => {
+  it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528), Rage (#1223), and Arcane Recovery/Illusory Self (#1234)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
         resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
@@ -230,62 +361,7 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     expect(rows.length).toBe(CLASS_FEATURES.length);
 
     for (const row of rows) {
-      const key = { className: row.class.name, subclassSlug: row.subclass?.slug ?? null, name: row.name };
-      const populated = isPopulatedFighterRow(key) || isPopulatedBattleMasterPoolRow(key) || isPopulatedBarbarianRow(key);
-      if (populated) {
-        // Populated by #1528/#1546 — asserted precisely in the describe blocks below.
-        // Falls through to the derivedStat/saveDcAbilities checks below rather
-        // than an early continue: Combat Superiority (#1546) sets a resource
-        // pool AND a derivedStat AND saveDcAbilities all on the SAME row, so a
-        // bare continue here would skip asserting the latter two entirely.
-        expect(row.resourceKey, row.name).not.toBeNull();
-      } else {
-        expect(row.resourceKey, row.name).toBeNull();
-        expect(row.resourceLabel, row.name).toBeNull();
-        expect(row.resourceRecharge, row.name).toBeNull();
-        expect(row.resourceTotals, row.name).toBeNull();
-        expect(row.resourceDieTiers, row.name).toBeNull();
-        expect(row.activationCost, row.name).toBeNull();
-        expect(row.resolverKind, row.name).toBeNull();
-        expect(row.requiresUnarmored, row.name).toBe(false);
-        expect(row.regrants, row.name).toEqual([]);
-        expect(row.costKind, row.name).toBeNull();
-        expect(row.costPoolKey, row.name).toBeNull();
-        expect(row.costBase, row.name).toBeNull();
-        expect(row.costPerStep, row.name).toBeNull();
-        expect(row.effectKind, row.name).toBeNull();
-        expect(row.effectDiceCount, row.name).toBeNull();
-        expect(row.effectDiceFaces, row.name).toBeNull();
-        expect(row.effectDieSource, row.name).toBeNull();
-        expect(row.effectModifier, row.name).toBeNull();
-        expect(row.effectModifierSource, row.name).toBeNull();
-        expect(row.damageType, row.name).toBeNull();
-        expect(row.attackType, row.name).toBeNull();
-        expect(row.saveAbility, row.name).toBeNull();
-        expect(row.saveEffect, row.name).toBeNull();
-        expect(row.buffTarget, row.name).toBeNull();
-        expect(row.buffModifier, row.name).toBeNull();
-      }
-
-      // #1530/#1546: Extra Attack's six pairs plus Combat Superiority/Student
-      // of War are the derivedStat exceptions, checked separately since they
-      // don't all touch the resource columns asserted null above.
-      if (isDerivedStatRow(key)) {
-        expect(row.derivedStat, row.name).not.toBeNull();
-        expect(row.derivedStatTiers, row.name).not.toBeNull();
-      } else {
-        expect(row.derivedStat, row.name).toBeNull();
-        expect(row.derivedStatTiers, row.name).toBeNull();
-      }
-
-      // #1546: saveDcAbilities defaults to `[]` (a NOT NULL String[] column,
-      // same "no SQL NULL to distinguish" shape as `regrants`) — non-empty
-      // only on Combat Superiority, both editions.
-      if (isSaveDcRow(key)) {
-        expect(row.saveDcAbilities, row.name).toEqual(["strength", "dexterity"]);
-      } else {
-        expect(row.saveDcAbilities, row.name).toEqual([]);
-      }
+      expectRowDescriptors({ ...row, className: row.class.name, subclassSlug: row.subclass?.slug ?? null });
     }
   });
 
@@ -301,13 +377,15 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // now (#1525's population guards). resourceTotals excludes #1528's six
   // populated Fighter rows (Second Wind ×2/Action Surge ×2/Indomitable ×2)
   // PLUS #1546's Combat Superiority ×2 (its superiority-dice pool) PLUS
-  // #1223's Rage ×2 (Barbarian's base-class pool, both editions);
-  // derivedStatTiers excludes #1530's twelve populated Extra Attack rows PLUS
-  // #1546's Combat Superiority/Student of War ×2 editions each
-  // (DERIVED_STAT_ROW_KEYS ×2 editions each, computed below); resourceDieTiers
-  // excludes only Combat Superiority ×2 (the only row with a die-size tier).
+  // #1223's Rage ×2 (Barbarian's base-class pool, both editions) PLUS
+  // #1234's Arcane Recovery ×2 (Wizard's base-class pool) and Illusory Self
+  // ×2 (School of Illusion's subclass pool), both editions; derivedStatTiers
+  // excludes #1530's twelve populated Extra Attack rows PLUS #1546's Combat
+  // Superiority/Student of War ×2 editions each (DERIVED_STAT_ROW_KEYS ×2
+  // editions each, computed below); resourceDieTiers excludes only Combat
+  // Superiority ×2 (the only row with a die-size tier).
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
-    const populatedResourceTotalsCount = 10;
+    const populatedResourceTotalsCount = 14;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
@@ -437,6 +515,38 @@ describe("ClassFeature migration — Barbarian's #1223 Rage rows are populated e
     ]);
 
     for (const row of rows) {
+      expect(row.activationCost, row.edition).toBeNull();
+      expect(row.costKind, row.edition).toBeNull();
+    }
+  });
+});
+
+// #1234: precise pin for Wizard's two populated rows (Arcane Recovery,
+// Illusory Self) — same reasoning as the Fighter/Barbarian pins above.
+describe("ClassFeature migration — Wizard's #1234 Arcane Recovery / Illusory Self rows are populated exactly as authored", () => {
+  it("Arcane Recovery: flat total 1, longRest, both editions — no activation/cost columns", async () => {
+    const rows = await prisma.classFeature.findMany({
+      where: { name: "Arcane Recovery", class: { name: "Wizard" }, subclassId: null },
+    });
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.resourceKey, row.edition).toBe("arcaneRecovery");
+      expect(row.resourceRecharge, row.edition).toBe("longRest");
+      expect(row.resourceTotals, row.edition).toEqual([{ minLevel: 1, total: 1 }]);
+      expect(row.activationCost, row.edition).toBeNull();
+      expect(row.costKind, row.edition).toBeNull();
+    }
+  });
+
+  it("Illusory Self: flat total 1 from level 10, short-or-long, both editions", async () => {
+    const rows = await prisma.classFeature.findMany({
+      where: { name: "Illusory Self", subclass: { slug: "wizard-school-of-illusion" } },
+    });
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.resourceKey, row.edition).toBe("illusorySelf");
+      expect(row.resourceRecharge, row.edition).toBe("short-or-long");
+      expect(row.resourceTotals, row.edition).toEqual([{ minLevel: 10, total: 1 }]);
       expect(row.activationCost, row.edition).toBeNull();
       expect(row.costKind, row.edition).toBeNull();
     }

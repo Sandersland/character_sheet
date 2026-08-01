@@ -17,38 +17,19 @@
 // NOT_YET_MIGRATED for the same reason.
 import type { ClassDefinition } from "./types.js";
 
+// #1234 commit 3: both resourceFns that used to live here (Arcane Recovery's
+// once-per-day pool, #904; Illusory Self's level-10-gated pool) are deleted —
+// their totals/recharge/gate now live on wizard-features.ts's own rows
+// (resourceKey/resourceLabel/resourceRecharge/resourceTotals), read through
+// poolsFromRows exactly like every other row-driven pool. A resourceFn pool
+// wins over a row pool of the same key (mergePoolSources, registry.ts), so
+// deleting both here in the SAME commit that populates the row columns is
+// required — the row would otherwise stay inert.
 export const wizard: ClassDefinition = {
-  // Arcane Recovery's once-per-day use, tracked as a longRest-recharge pool so a
-  // long rest refreshes it (#904). The slot-level cap is computed at op time.
-  resourceFn: () => [
-    {
-      key: "arcaneRecovery",
-      label: "Arcane Recovery",
-      total: 1,
-      recharge: "longRest",
-      description:
-        "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
-    },
-  ],
   // PHB'14 p.114: Arcane Tradition (Wizard's subclass) is chosen at 2nd level.
   subclasses: {
     "school of evocation": { slug: "wizard-school-of-evocation", grantLevel: 2 },
     "school of abjuration": { slug: "wizard-school-of-abjuration", grantLevel: 2 },
-    "school of illusion": {
-      slug: "wizard-school-of-illusion",
-      grantLevel: 2,
-      resourceFn: (level) => {
-        if (level < 10) return [];
-        return [
-          {
-            key: "illusorySelf",
-            label: "Illusory Self",
-            total: 1,
-            recharge: "short-or-long",
-            description: "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
-          },
-        ];
-      },
-    },
+    "school of illusion": { slug: "wizard-school-of-illusion", grantLevel: 2 },
   },
 };

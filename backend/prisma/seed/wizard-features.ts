@@ -9,9 +9,10 @@
 // 5etools-mirror-3 XPHB data extract and dnd2024.wikidot.com), which agree
 // verbatim. Abjurer and Illusionist aren't in SRD 5.2 at all, so their 2024
 // text is mirror-sourced from those same two independently-agreeing sources
-// instead — see each row's own citation. Commit 3 will move Arcane Recovery's
-// and Illusory Self's resource pools onto their rows and delete
-// lib/classes/wizard.ts's resourceFns. Commit 4 will reduce
+// instead — see each row's own citation. Commit 3 (this one) moves Arcane
+// Recovery's and Illusory Self's resource pools onto their rows (see the
+// RESOURCE POOL block below) and deletes lib/classes/wizard.ts's two
+// resourceFns, now that nothing depends on them. Commit 4 will reduce
 // lib/classes/wizard.ts to its irreducible residue — it is NOT deletable
 // (unlike Fighter's/Barbarian's modules): its `grantLevel: 2` on every
 // subclass is PHB'14's actual Arcane Tradition gate, and
@@ -39,6 +40,24 @@
 // pinned (wizard-2014-snapshot.test.ts) — this commit only ever ADDS an
 // `edition: "EDITION_2024"` tag alongside new 2024 text; it never edits a
 // 2014 row's own name/level/description.
+//
+// RESOURCE POOL (commit 3 of 4, mirrors Barbarian's #1223 two-step): Arcane
+// Recovery's uses-per-rest total/recharge (both editions: flat total 1,
+// longRest) and Illusory Self's (both editions: flat total 1 from level 10,
+// short-or-long) now live on their rows' resourceKey/resourceLabel/
+// resourceRecharge/resourceTotals below, replacing lib/classes/wizard.ts's
+// two resourceFns, which this same commit deletes. #1528's "no-second-string"
+// rule (poolFromRow reads the row's own `description`, never a second
+// hand-written pool string) means the retired resourceFns' synthetic
+// "Regained on a long rest."/"Regain use on a short or long rest." sentences
+// are gone from the wire — an accepted, intended consequence, not a
+// regression to fix. Illusory Self's row `level: 10` IS the gate the retired
+// resourceFn used to express as `if (level < 10) return []` — reproduced
+// exactly via `resourceTotals: [{ minLevel: 10, total: 1 }]`. Neither pool
+// gets a `shortRestRegain` on any tier — Arcane Recovery is long-rest-only in
+// both editions, and Illusory Self's 2024 slot-expend restore is a
+// player-initiated cost, not a rest regain, so it has no descriptor column
+// and stays text-only (see that row's own comment).
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -59,9 +78,9 @@ interface RawWizardFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // Resource-pool descriptor columns, declared now and populated in commit 3
-  // (Arcane Recovery's and Illusory Self's rows only — see that commit's own
-  // comment when it lands).
+  // Resource-pool descriptor columns (#1234 commit 3) — see this file's own
+  // header RESOURCE POOL block for why only Arcane Recovery's and Illusory
+  // Self's rows below ever set these.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
@@ -124,6 +143,14 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     edition: "EDITION_2014",
     description:
       "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
+    // #1234 commit 3: reproduces the retired resourceFn's pool exactly —
+    // flat total 1, longRest recharge (#904). The slot-level cap itself is
+    // computed at op time (resolveArcaneRecoveryContext,
+    // lib/spellcasting/spellcasting.ts), not a tier.
+    resourceKey: "arcaneRecovery",
+    resourceLabel: "Arcane Recovery",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
   },
   {
     subclassSlug: null,
@@ -137,6 +164,10 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     // ACTIONS precedent).
     description:
       "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+    resourceKey: "arcaneRecovery",
+    resourceLabel: "Arcane Recovery",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
   },
   {
     subclassSlug: null,
@@ -508,6 +539,15 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     edition: "EDITION_2014",
     description:
       "When a creature makes an attack roll against you, use your reaction to interpose an illusory duplicate — the attack automatically misses. Once used, you regain this ability on a short or long rest.",
+    // #1234 commit 3: reproduces the retired resourceFn's
+    // `if (level < 10) return []` gate exactly, as row data — `level: 10` on
+    // THIS row is the gate; `resourceTotals`' own `minLevel: 10` restates it
+    // for poolsFromRows, which reads tiers independent of the row's own
+    // `level` filter (both must agree; see class-feature-rows.ts).
+    resourceKey: "illusorySelf",
+    resourceLabel: "Illusory Self",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 10, total: 1 }],
   },
   {
     subclassSlug: ILLUSION_SLUG,
@@ -521,6 +561,10 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     // not a rest regain) — stays text-only, per the file header.
     description:
       "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
+    resourceKey: "illusorySelf",
+    resourceLabel: "Illusory Self",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 10, total: 1 }],
   },
   {
     subclassSlug: ILLUSION_SLUG,

@@ -290,6 +290,22 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+// Applies Arcane Recovery's / Illusory Self's resource-pool descriptor
+// columns (#1234 commit 3) onto the matching row(s) of an already-built
+// ClassFeatureRow[] — `toRows` only carries name/level/description/edition
+// through (it takes AuthoredFeature[], which has no resource columns), so
+// this is a targeted post-map rather than a second row-builder, mirroring
+// wizard-features.ts's own resourceKey/resourceLabel/resourceRecharge/
+// resourceTotals values exactly (both editions: flat total 1; Arcane
+// Recovery longRest, Illusory Self short-or-long from level 10).
+function withPool(rows: ClassFeatureRow[], name: string, recharge: string, minLevel: number): ClassFeatureRow[] {
+  return rows.map((row) =>
+    row.name === name
+      ? { ...row, resourceKey: name === "Arcane Recovery" ? "arcaneRecovery" : "illusorySelf", resourceLabel: name, resourceRecharge: recharge, resourceTotals: [{ minLevel, total: 1 }] }
+      : row,
+  );
+}
+
 // WIZARD's base-class rows (#1234): `lib/classes/wizard.ts`'s feature TEXT
 // (base + all three schools) moved to literal seed data
 // (prisma/seed/wizard-features.ts) — the same rootDir boundary FIGHTER_BASE_
@@ -298,8 +314,10 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
 // `.features` are gone). Hardcoded here, once, mirroring wizard-features.ts's
 // own EDITION_2014/EDITION_2024 text exactly (commit 2's real SRD 5.2 /
 // PHB'24 content — every row below now sets its own `edition`, per that
-// file's tagging rule).
-export const WIZARD_BASE_ROWS: ClassFeatureRow[] = toRows([
+// file's tagging rule) — Arcane Recovery's resource columns (commit 3) are
+// applied by withPool below, once, rather than repeated per edition.
+export const WIZARD_BASE_ROWS: ClassFeatureRow[] = withPool(
+  toRows([
   {
     name: "Spellcasting",
     level: 1,
@@ -395,7 +413,11 @@ export const WIZARD_BASE_ROWS: ClassFeatureRow[] = toRows([
     description:
       "Choose two 3rd-level spells in your spellbook as your signature spells. You always have them prepared, and you can cast each once at 3rd level without expending a spell slot. To cast either at a higher level, you must expend a spell slot; regain both uses after a Short Rest or Long Rest.",
   },
-]);
+  ]),
+  "Arcane Recovery",
+  "longRest",
+  1,
+);
 
 /** WIZARD's per-subclass rows (#1234) — same hardcoding reason as WIZARD_BASE_ROWS above. */
 export const WIZARD_EVOCATION_ROWS: ClassFeatureRow[] = toRows([
@@ -507,7 +529,8 @@ export const WIZARD_ABJURATION_ROWS: ClassFeatureRow[] = toRows([
   { name: "Spell Resistance", level: 14, source: "subclass", edition: "EDITION_2024", description: "You have Advantage on saving throws against spells, and Resistance to the damage they deal." },
 ]);
 
-export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = toRows([
+export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = withPool(
+  toRows([
   { name: "Illusion Savant", level: 2, source: "subclass", edition: "EDITION_2014", description: "The gold and time you must spend to copy an illusion spell into your spellbook is halved." },
   {
     name: "Illusion Savant",
@@ -581,7 +604,11 @@ export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = toRows([
     description:
       "When you cast an Illusion spell with a spell slot, you can make one inanimate, nonmagical object that's part of the illusion real for 1 minute — usable as a Bonus Action while the spell is ongoing. The object can't deal damage or otherwise cause harm.",
   },
-]);
+  ]),
+  "Illusory Self",
+  "short-or-long",
+  10,
+);
 
 // The two lookup maps every LITERAL_ROW_CLASSES member's rows resolve
 // through (#1234): replaces the `isFighter ? … : isBarbarian ? … :

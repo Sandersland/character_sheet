@@ -539,7 +539,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "maneuversKnown": [],
     "pools": [
       {
-        "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+        "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
         "die": undefined,
         "key": "arcaneRecovery",
         "label": "Arcane Recovery",

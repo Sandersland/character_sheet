@@ -135,9 +135,18 @@ beforeAll(async () => {
       // close. This bespoke "Test Wizard" class authors only these two rows
       // (never Ritual Adept/Scholar/Memorize Spell/etc.), so only the
       // corrected Spellcasting/Arcane Recovery TEXT is new snapshot output —
-      // no new feature enters it.
+      // no new feature enters it. Arcane Recovery's resource columns (#1234
+      // commit 3) are also mirrored here — wizard.ts's resourceFn that used
+      // to supply this pool regardless of any DB row is deleted, so this
+      // bespoke class needs its own row descriptor or the pool vanishes from
+      // the snapshot entirely instead of just changing its description.
       { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You know three Wizard cantrips (one more at levels 4 and 10), replacing one on a Long Rest. Your spellbook holds your level 1+ spells: it starts with six 1st-level spells, and you add two spells of your choice whenever you gain a Wizard level after 1st. You regain all expended spell slots on a Long Rest, and you change your list of prepared spells whenever you finish a Long Rest." },
-      { classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024", description: "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest." },
+      {
+        classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024",
+        description: "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+        resourceKey: "arcaneRecovery", resourceLabel: "Arcane Recovery", resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 1, total: 1 }],
+      },
     ],
   });
 });
