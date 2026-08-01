@@ -104,8 +104,17 @@ async function upsertGrantedSpell(
   // itself gains an edition column of its own (not needed today: no name
   // here has ever forked into two rows). findFirst, not findUnique: the
   // compound-key shorthand can't express a null edition (upsertEditionRow).
+  //
+  // `orderBy` is load-bearing DESPITE that one-row-per-name invariant: Postgres
+  // LIMIT 1 without ORDER BY is implementation-defined, so the day a name DOES
+  // fork into two rows — and Archfey/GOO are expected to, once their PHB'24
+  // content is authored — this would silently bind whichever row the planner
+  // returned first. It stays deterministic instead, which turns that future
+  // change into a visibly wrong grant rather than a flaky one. Whoever adds the
+  // second row must replace this with a real edition filter, not re-sort it.
   const subclass = await prisma.subclass.findFirst({
     where: { classId, name: g.subclassName },
+    orderBy: { id: "asc" },
     select: { id: true },
   });
   if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
