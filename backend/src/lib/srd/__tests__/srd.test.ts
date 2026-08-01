@@ -453,11 +453,21 @@ describe("deriveResources — features-only classes", () => {
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
-  it("Warlock has features but no resource pools", () => {
+  // #1233: the base class gained a real pool (Magical Cunning, L2) once its
+  // 2024 content and resource columns were authored — this class is no
+  // longer "features-only" at level 5 EDITION_2024. Below level 2 it still
+  // has none.
+  it("Warlock has features and, from level 2 on, the Magical Cunning pool (#1233)", () => {
     const result = deriveResources("warlock", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("warlock", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
-    expect(result!.resources).toHaveLength(0);
+    expect(result!.resources.map((r) => r.key)).toEqual(["magicalCunning"]);
     expect(result!.features.length).toBeGreaterThan(0);
+  });
+
+  it("Warlock has no resource pools below level 2 EDITION_2024 (Magical Cunning's own grant level)", () => {
+    const result = deriveResources("warlock", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("warlock", undefined), "EDITION_2024");
+    expect(result).not.toBeNull();
+    expect(result!.resources).toHaveLength(0);
   });
 });
 

@@ -393,6 +393,21 @@ const MIN_ROWS_PER_PAIR = 10;
 // choice, #1234 research). Illusory Self's 2024 slot-expend restore is also
 // text-only (a player-initiated cost, not a rest regain — no descriptor
 // column exists for it).
+// "Warlock" removed here (#1233, same diff as the content that makes its
+// rows genuinely diverge: base 5->7 EDITION_2024 rows — Pact Boon drops out,
+// Magical Cunning/Contact Patron/Epic Boon join — and The Fiend's own 5
+// EDITION_2024 rows rework in place, one renamed ("Expanded Spell List" ->
+// "Fiend Spells"); The Archfey and The Great Old One author ZERO EDITION_2024
+// rows at all, following Totem Warrior's own precedent, so total counts land
+// at 20 (2014) vs 12 (2024) — genuinely unequal, unlike the identical-both-
+// editions shape this list exists to flag). This removal is NOT "all of
+// Warlock's 2024 content is real" — two residuals stay undisclosed nowhere
+// else but here: The Archfey/The Great Old One's PHB'24 reworks were never
+// even attempted (non-SRD, no licensed source — #1233 research; a 2024
+// character can still pick either and gets zero subclass features, same gap
+// as Totem Warrior), and the Eldritch Invocation catalog itself (which
+// invocations exist, their prerequisites, Pact Boon folding into it) is
+// text-only — no mechanics behind it yet, tracked as a follow-up.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Bard",
   "Cleric",
@@ -401,7 +416,6 @@ const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Paladin",
   "Ranger",
   "Sorcerer",
-  "Warlock",
 ]);
 
 export interface ClassEditionPopulationSummary {
