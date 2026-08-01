@@ -59,11 +59,10 @@ describe("GET /api/reference", () => {
     expect(criminal.skillProficiencies).toEqual(["sleightOfHand", "stealth"]);
     expect(criminal.originFeat).toMatchObject({ name: "Alert", category: "origin" });
 
-    // Folk Hero has no 2024 spec — spec-less legacy row kept (#1130).
-    const folkHero = response.body.backgrounds.find((b: { name: string }) => b.name === "Folk Hero");
-    expect(folkHero).toBeDefined();
-    expect(folkHero.abilityChoices).toEqual([]);
-    expect(folkHero.originFeat).toBeNull();
+    // Folk Hero is absent from the 2024 list entirely (#1570) — PHB'24 has no
+    // Folk Hero, and offering it here is what silently cost a 2024 character
+    // their ability spread and Origin feat. Its 2014 half is asserted below.
+    expect(response.body.backgrounds.map((b: { name: string }) => b.name)).not.toContain("Folk Hero");
   });
 
   // #1131: each class carries its level-1 creation pick counts (or null for a
@@ -174,9 +173,10 @@ describe("GET /api/reference", () => {
     // otherwise ride along on the wire, widening the contract silently.
     expect(Object.keys(alert2014).sort()).toEqual(["category", "description", "id", "name"]);
 
-    // Folk Hero: no origin feat in either edition (spec-less legacy row, #1130).
+    // Folk Hero: 2014 only (#1570), and no origin feat there — an Origin feat is
+    // a 2024 concept, which is precisely why this row could never serve 2024.
     expect(byName(criminal2014.body, "Folk Hero").originFeat).toBeNull();
-    expect(byName(criminal2024.body, "Folk Hero").originFeat).toBeNull();
+    expect(byName(criminal2024.body, "Folk Hero")).toBeUndefined();
 
     // Soldier: Savage Attacker is edition: null (shared path) — same row both editions.
     expect(byName(criminal2014.body, "Soldier").originFeat.name).toBe("Savage Attacker");
@@ -521,11 +521,10 @@ describe("GET /api/reference", () => {
   // #1565/#1570: background startingEquipment resolves by (backgroundId,
   // edition) exactly like a class's — asserted against real BOOK VALUES, never
   // "differs from 2014" (which would pass on any wrong transcription just as
-  // readily as a correct one). Only Folk Hero gets no package in EITHER
-  // edition (PHB'24 dropped it, and it has no SRD text); 2014
-  // Charlatan/Criminal/Noble/Sage/Soldier get none either (SRD 5.1 ships only
-  // Acolyte) — asserting null for those pairs is the other half of the scope
-  // finding.
+  // readily as a correct one). 2014 Charlatan/Criminal/Noble/Sage/Soldier get
+  // no package (SRD 5.1 ships only Acolyte, and PHB'14 equipment for the rest
+  // is unscoped) — asserting null for those pairs is the other half of the
+  // scope finding.
   describe("background starting-equipment (#1565)", () => {
     it("each EDITION_2024 background carries its own option-A GP and a null package-level gold", async () => {
       const response = await supertest
@@ -553,11 +552,12 @@ describe("GET /api/reference", () => {
         expect(options[1]).toEqual({ label: "(B) 50 GP", gold: 50 });
       }
 
-      // Folk Hero is the one background with no package in either edition.
-      expect(byName("Folk Hero").startingEquipment, "Folk Hero 2024").toBeNull();
+      // Folk Hero is not served under 2024 at all (#1570), so there is no row
+      // here to carry a package — asserted as absence, not a null package.
+      expect(byName("Folk Hero"), "Folk Hero 2024").toBeUndefined();
     });
 
-    it("EDITION_2014 Acolyte carries SRD 5.1's fixed one-option list with 15 GP; every other background is null", async () => {
+    it("EDITION_2014 Acolyte and Folk Hero carry their fixed one-option lists; every other background is null", async () => {
       const response = await supertest
         .agent(createApp())
         .set("Cookie", COOKIE)
@@ -572,7 +572,28 @@ describe("GET /api/reference", () => {
       expect(acolyte.startingEquipment.groups[0].options).toHaveLength(1);
       expect(acolyte.startingEquipment.groups[0].options[0].gold).toBe(15);
 
-      for (const name of ["Charlatan", "Criminal", "Folk Hero", "Noble", "Sage", "Soldier"]) {
+      // PHB'14 Folk Hero (#1570) — a fixed list like Acolyte's, plus the one
+      // open pick a 2014 background carries: "artisan's tools of your choice".
+      // Unbound, unlike Soldier's/Noble's "same as above" gaming set, and the
+      // assertion on toolCategory is what pins the dropdown's pool to the
+      // seventeen artisan Items rather than every tool in the catalog.
+      const folkHero = byName("Folk Hero");
+      expect(folkHero.startingEquipment).not.toBeNull();
+      expect(folkHero.startingEquipment.gold).toBeNull();
+      expect(folkHero.startingEquipment.groups).toHaveLength(1);
+      const folkHeroOption = folkHero.startingEquipment.groups[0].options[0];
+      expect(folkHero.startingEquipment.groups[0].options).toHaveLength(1);
+      expect(folkHeroOption.items.map((i: { catalogName: string }) => i.catalogName)).toEqual([
+        "Shovel",
+        "Iron Pot",
+        "Common Clothes",
+      ]);
+      expect(folkHeroOption.gold).toBe(10);
+      expect(folkHeroOption.openPicks).toHaveLength(1);
+      expect(folkHeroOption.openPicks[0].filter.toolCategory).toBe("artisan");
+      expect(folkHeroOption.openPicks[0].boundToToolChoice).toBeUndefined();
+
+      for (const name of ["Charlatan", "Criminal", "Noble", "Sage", "Soldier"]) {
         expect(byName(name).startingEquipment, `${name} 2014`).toBeNull();
       }
     });

@@ -71,10 +71,9 @@ referenceRouter.get("/reference", async (req, res) => {
   // reasoning as startingEquipmentPackages above. `edition` is non-nullable on
   // StartingEquipmentPackage — an exact-match filter, not resolveEditionCatalog
   // (no shared/NULL row to fall back to). Most backgrounds resolve to `null`
-  // here: Folk Hero gets no package in either edition (PHB'24 dropped it), and
-  // 2014 Charlatan/Criminal/Noble/Sage/Soldier likewise (SRD 5.1 ships only
-  // Acolyte) — `null` is the correct, intentional answer for those rows, not a
-  // gap.
+  // here: 2014 Charlatan/Criminal/Noble/Sage/Soldier get no package (SRD 5.1
+  // ships only Acolyte, and PHB'14 equipment for the rest is unscoped) —
+  // `null` is the correct, intentional answer for those rows, not a gap.
   const backgroundEquipmentPackages = await prisma.startingEquipmentPackage.findMany({
     where: { backgroundId: { in: backgrounds.map((b) => b.id) }, edition },
     include: EQUIPMENT_PACKAGE_INCLUDE,

@@ -6,6 +6,8 @@
 // dropdown, and versatile weapons missing their second damage die.
 import { describe, it, expect } from "vitest";
 
+import { toolsByCategory, type ToolCategory } from "@/lib/srd/tools.js";
+
 import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "../catalog-data.js";
 
 // The 12 PHB classes. If any is missing the character-creation dropdown is
@@ -106,6 +108,19 @@ describe("BACKGROUNDS catalog", () => {
           .toMatch(CAMEL_KEY);
       }
     }
+  });
+
+  // #1570: PHB'24 has sixteen backgrounds and Folk Hero is not among them, so a
+  // shared (NULL) row would keep offering it to 2024 characters as the one
+  // background that cannot give them the ability spread and Origin feat PHB'24
+  // guarantees — a silent forfeit of +3 points and a feat, with nothing in the
+  // UI to explain it. Its 2014-ness is the reason it has no abilityChoices, so
+  // the tag and the empty spread must move together.
+  it("tags Folk Hero EDITION_2014 rather than leaving it shared", () => {
+    const folkHero = BACKGROUNDS.find((b) => b.name === "Folk Hero");
+    expect(folkHero?.edition).toBe("EDITION_2014");
+    expect(folkHero?.abilityChoices ?? []).toEqual([]);
+    expect(folkHero?.originFeatName).toBeUndefined();
   });
 });
 
@@ -347,6 +362,44 @@ describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
   it("leaves non-tool items untagged (toolCategory undefined)", () => {
     for (const name of ["Greatsword", "Spellbook", "Backpack"]) {
       expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBeUndefined();
+    }
+  });
+});
+
+// #1570: an UNBOUND open pick ("artisan's tools of your choice") is offered from
+// the Item rows carrying that toolCategory — TOOLS plays no part in the dropdown,
+// it only validates proficiency choices. The two drifted: TOOLS listed all
+// seventeen artisan tools while ITEMS carried one (Calligrapher's Supplies), so
+// Folk Hero's signature choice would have rendered as a one-entry dropdown that
+// looks like a bug and can't express the background. Same species as the nine
+// instruments (#1564) and four gaming sets (#1565), each added when a pick first
+// needed a pool. Scoped to the three categories a filter can name; "other" tools
+// are only ever referenced by exact catalogName (Thieves' Tools, Forgery Kit),
+// never pooled, so their Item rows stay demand-driven.
+// TOOLS omits the zero coin denominations ITEMS spells out (and ITEMS carries a
+// pp field TOOLS has no concept of), so both sides are normalized to the three
+// denominations a tool's price can actually use before being compared.
+function coinTriple(cost?: { gp?: number; sp?: number; cp?: number }) {
+  return { gp: cost?.gp ?? 0, sp: cost?.sp ?? 0, cp: cost?.cp ?? 0 };
+}
+
+describe("tool Items back every pickable tool category (#1570)", () => {
+  const PICKABLE: ToolCategory[] = ["artisan", "gamingSet", "musicalInstrument"];
+
+  it.each(PICKABLE)("every %s tool in TOOLS has a matching Item row", (category) => {
+    const missing = toolsByCategory(category)
+      .filter((tool) => !ITEMS.some((i) => i.name === tool.name))
+      .map((t) => t.name);
+    expect(missing, `${category} tools with no Item row — an open pick would not offer them`).toEqual([]);
+  });
+
+  it.each(PICKABLE)("every %s Item agrees with TOOLS on cost and weight", (category) => {
+    for (const tool of toolsByCategory(category)) {
+      const item = ITEMS.find((i) => i.name === tool.name);
+      if (!item) continue; // absence is the previous test's assertion, not this one's
+      expect(item.toolCategory, `"${tool.name}" toolCategory`).toBe(category);
+      expect(item.weight ?? 0, `"${tool.name}" weight`).toBe(tool.weight ?? 0);
+      expect(coinTriple(item.cost), `"${tool.name}" cost`).toEqual(coinTriple(tool.cost));
     }
   });
 });

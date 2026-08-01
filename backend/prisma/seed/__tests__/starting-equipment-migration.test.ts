@@ -17,10 +17,10 @@ import { STARTING_EQUIPMENT_PACKAGES, BACKGROUND_STARTING_EQUIPMENT_PACKAGES } f
 import { assertEveryClassEditionHasPackage, seedStartingEquipment } from "../seed-starting-equipment.js";
 
 describe("StartingEquipmentPackage migration — row count (#1533, #1565)", () => {
-  it("the seeded table holds exactly one row per (class + background) package literal (31)", async () => {
+  it("the seeded table holds exactly one row per (class + background) package literal (32)", async () => {
     const actual = await prisma.startingEquipmentPackage.count();
     expect(actual).toBe(STARTING_EQUIPMENT_PACKAGES.length + BACKGROUND_STARTING_EQUIPMENT_PACKAGES.length);
-    expect(actual).toBe(31);
+    expect(actual).toBe(32);
   });
 
   it("every class has both an EDITION_2014 and an EDITION_2024 package with >= 1 group", async () => {
@@ -34,17 +34,17 @@ describe("StartingEquipmentPackage migration — row count (#1533, #1565)", () =
     }
   });
 
-  // #1565/#1570: exactly seven background packages exist (Acolyte both
-  // editions; Charlatan/Criminal/Noble/Sage/Soldier 2024 only) — never the
-  // fourteen a full 7-background x 2-edition grid would suggest (Folk Hero
-  // gets none in either edition, on purpose — see starting-equipment.ts's
-  // background-section header).
-  it("exactly 7 background packages exist, each with >= 1 group", async () => {
+  // #1565/#1570: exactly eight background packages exist (Acolyte both
+  // editions; Charlatan/Criminal/Noble/Sage/Soldier 2024 only; Folk Hero 2014
+  // only) — never the fourteen a full 7-background x 2-edition grid would
+  // suggest, since no background but Acolyte exists in both editions' seeded
+  // content (see starting-equipment.ts's background-section header).
+  it("exactly 8 background packages exist, each with >= 1 group", async () => {
     const packages = await prisma.startingEquipmentPackage.findMany({
       where: { backgroundId: { not: null } },
       select: { name: true, edition: true, _count: { select: { groups: true } } },
     });
-    expect(packages.length).toBe(7);
+    expect(packages.length).toBe(8);
     expect(packages.length).toBe(BACKGROUND_STARTING_EQUIPMENT_PACKAGES.length);
     for (const row of packages) {
       expect(row._count.groups, `${row.name}/${row.edition}`).toBeGreaterThan(0);

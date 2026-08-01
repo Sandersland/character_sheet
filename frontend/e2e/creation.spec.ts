@@ -19,9 +19,9 @@ function continueStep(page: Page) {
 // Checks EVERY (A) rather than one: since #1565 the step renders a second
 // package for the character's background, both cards carry an (A), and
 // Continue stays disabled until every package has a selection. Iterating the
-// matches keeps this correct for a background with no package (Folk Hero has
-// none in either edition — PHB'24 dropped it) without the spec having to know
-// which case it is in.
+// matches keeps this correct for a background with no package (every 2014
+// background but Acolyte and Folk Hero) without the spec having to know which
+// case it is in.
 async function chooseEquipmentOptionA(page: Page) {
   const options = page.getByRole("radio", { name: /^\(A\)/ });
   await expect(options.first()).toBeVisible();
@@ -264,6 +264,59 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
 
   await expect(page.getByText("The Fiend").first()).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+// #1570: the first UNBOUND tool open pick in the app — every earlier
+// toolCategory pick was bound to a proficiency the character already had, so
+// its dropdown was populated from the character's own tool choices rather than
+// from the Item catalog. Folk Hero's "artisan's tools of your choice" is filled
+// from Item rows carrying toolCategory "artisan", and only one of the seventeen
+// had an Item row before this change: the pick would have rendered as a
+// one-entry dropdown. Choosing Smith's Tools specifically is the assertion —
+// picking whatever happened to be first would pass against that broken catalog.
+//
+// Also the only route by which Folk Hero is reachable at all now: it is tagged
+// EDITION_2014, so it appears for a 2014 campaign's character and nowhere else.
+test("creation: a 2014 Folk Hero picks artisan's tools from the full catalog", async ({ page }) => {
+  const name = uniqueName("Village Champion");
+  const campaignName = uniqueName("Old Ways Homestead");
+
+  await login(page);
+  await createCampaign(page.request, { name: campaignName, rulesEdition: "EDITION_2014" });
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: "New Character" }).first().click();
+  await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page, { campaign: campaignName });
+
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
+  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Class/).selectOption({ label: "Rogue" });
+  await page.getByLabel("Background").selectOption({ label: "Folk Hero" });
+  await continueStep(page);
+
+  // Abilities step — Folk Hero predates the PHB'24 spread, so there are no
+  // +2/+1 radios to assign and the step passes straight through.
+  await continueStep(page);
+
+  // Skills & Tools step.
+  await continueStep(page);
+
+  // Equipment step. The class card goes down the 2014 roll-for-gold path so the
+  // background card's artisan pick is the only dropdown left on the step.
+  await page.getByRole("button", { name: /Starting gold/ }).click();
+  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+
+  const artisanPick = page.getByRole("combobox");
+  await expect(artisanPick).toHaveCount(1);
+  await artisanPick.selectOption({ label: "Smith's Tools" });
+  await continueStep(page);
+
+  await page.getByRole("button", { name: /Create Character/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 
   expect(errors).toEqual([]);
 });

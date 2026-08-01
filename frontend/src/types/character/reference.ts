@@ -94,10 +94,9 @@ export interface BackgroundOption {
   /** The Origin feat granted at creation; null for spec-less legacy rows. */
   originFeat: OriginFeatOption | null;
   /** #1565: this background's own starting-equipment definition, null when
-   *  the background has no seeded package under this edition — either
-   *  Folk Hero (PHB'24 dropped it, so it has none in either edition) or any
-   *  2014 background but Acolyte (SRD 5.1 ships only that one). Same shape as
-   *  ClassOption.startingEquipment, reused rather than a second type. */
+   *  the background has no seeded package under this edition — any 2014
+   *  background but Acolyte (SRD 5.1's only one) and Folk Hero (PHB'14, #1570).
+   *  Same shape as ClassOption.startingEquipment, reused rather than a second type. */
   startingEquipment: ClassStartingEquipment | null;
 }
 

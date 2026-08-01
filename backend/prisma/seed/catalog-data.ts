@@ -302,18 +302,21 @@ export const CLASSES = [
   },
 ];
 
-// 2024 backgrounds (SRD 5.2 for the 4 SRD rows; PHB'24 for Charlatan/Noble).
-// abilityChoices = the three abilities the +2/+1 (or 1/1/1) spread draws from;
-// originFeatName is resolved to originFeatId in seed.ts. Folk Hero has no 2024
-// version — kept spec-less (2014 legacy, no ability spread / Origin feat, #1130).
+// 2024 backgrounds (SRD 5.2 for the 4 SRD rows; PHB'24 for Charlatan/Noble),
+// plus PHB'14-only Folk Hero. abilityChoices = the three abilities the +2/+1
+// (or 1/1/1) spread draws from; originFeatName is resolved to originFeatId in
+// seed.ts. Both are 2024-only concepts, so the spec-less row IS the 2014 one.
 export interface BackgroundSeed {
   name: string;
   skillProficiencies: string[];
   toolProficiencies?: string[];
   abilityChoices?: string[];
   originFeatName?: string;
-  // Omitted = shared (NULL column, valid in both editions, #1306). No seeded
-  // background diverges yet — the field exists so a future one can.
+  // Omitted = shared (NULL column, valid in both editions, #1306). Only Folk
+  // Hero sets it, and by ABSENCE from PHB'24 rather than by divergent content
+  // (#1570) — a background whose mechanics differ between editions needs two
+  // rows, and resolveBackgroundIdsByName throws on that until it is taught to
+  // key by (name, edition) rather than name alone.
   edition?: SeedEdition;
 }
 
@@ -334,7 +337,14 @@ export const BACKGROUNDS: BackgroundSeed[] = [
   { name: "Criminal",  skillProficiencies: ["sleightOfHand", "stealth"],
     abilityChoices: ["dexterity", "constitution", "intelligence"],
     originFeatName: "Alert", toolProficiencies: ["Thieves' Tools"] },
-  { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"] },
+  // PHB'14 only — PHB'24's sixteen backgrounds have no Folk Hero (Farmer is its
+  // nearest successor), so this is the one background that genuinely forks by
+  // absence rather than by content (#1570). The tag is what stops it being
+  // offered to 2024 characters it cannot serve: with no abilityChoices and no
+  // originFeatName it would silently cost them +3 ability points and an Origin
+  // feat. Retagged in place by a migration — a delete-and-recreate would strand
+  // every character holding it (CharacterBackground.backgroundId is SetNull).
+  { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"], edition: "EDITION_2014" },
   { name: "Noble",     skillProficiencies: ["history", "persuasion"],
     abilityChoices: ["strength", "intelligence", "charisma"],
     originFeatName: "Skilled", toolProficiencies: ["Dice Set"] },
@@ -830,4 +840,34 @@ export const ITEMS: CatalogItem[] = [
   { name: "Dragonchess Set", category: "gear", weight: 0, cost: coins(1), description: "A gaming set.", toolCategory: "gamingSet" },
   { name: "Playing Card Set", category: "gear", weight: 0, cost: coins(0, 5, 0), description: "A gaming set.", toolCategory: "gamingSet" },
   { name: "Three-Dragon Ante Set", category: "gear", weight: 0, cost: coins(1), description: "A gaming set.", toolCategory: "gamingSet" },
+  // The other sixteen artisan's tools (SRD 5.1 / SRD 5.2 tools tables, which
+  // price them identically — one untagged row serves both editions, as with the
+  // instruments above). TOOLS has carried all seventeen since before this
+  // catalog existed, but only Calligrapher's Supplies had an Item row, and an
+  // open pick is offered from Item rows alone: Folk Hero's "artisan's tools of
+  // your choice" (#1570) would have been a one-entry dropdown. Values mirror
+  // TOOLS exactly and a test pins them equal, so the two registries can no
+  // longer drift apart the way they did here.
+  { name: "Alchemist's Supplies", category: "gear", weight: 8, cost: coins(50), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Brewer's Supplies", category: "gear", weight: 9, cost: coins(20), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Carpenter's Tools", category: "gear", weight: 6, cost: coins(8), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Cartographer's Tools", category: "gear", weight: 6, cost: coins(15), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Cobbler's Tools", category: "gear", weight: 5, cost: coins(5), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Cook's Utensils", category: "gear", weight: 8, cost: coins(1), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Glassblower's Tools", category: "gear", weight: 5, cost: coins(30), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Jeweler's Tools", category: "gear", weight: 2, cost: coins(25), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Leatherworker's Tools", category: "gear", weight: 5, cost: coins(5), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Mason's Tools", category: "gear", weight: 8, cost: coins(10), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Painter's Supplies", category: "gear", weight: 5, cost: coins(10), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Potter's Tools", category: "gear", weight: 3, cost: coins(10), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Smith's Tools", category: "gear", weight: 8, cost: coins(20), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Tinker's Tools", category: "gear", weight: 10, cost: coins(50), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Weaver's Tools", category: "gear", weight: 5, cost: coins(1), description: "Artisan's tools.", toolCategory: "artisan" },
+  { name: "Woodcarver's Tools", category: "gear", weight: 5, cost: coins(1), description: "Artisan's tools.", toolCategory: "artisan" },
+  // SRD 5.1 Adventuring Gear, for Folk Hero's PHB'14 package (#1570). "Iron
+  // Pot" is the SRD's "Pot, iron" — the same book-name-to-catalog-name gap
+  // Costume/Perfume hit. Neither is a tool: no toolCategory, so neither can
+  // ever surface in the artisan pick above.
+  { name: "Shovel", category: "gear", weight: 5, cost: coins(2) },
+  { name: "Iron Pot", category: "gear", weight: 10, cost: coins(2), description: "An iron pot for cooking over a campfire." },
 ];

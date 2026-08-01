@@ -39,7 +39,7 @@ afterAll(async () => {
 describe("StartingEquipmentPackage prune — class/background partitions never cross-delete (#1565)", () => {
   it("an empty-seeded CLASS sweep (classId: {not: null}) deletes every class row but leaves every background row untouched", async () => {
     const backgroundCountBefore = await prisma.startingEquipmentPackage.count({ where: { backgroundId: { not: null } } });
-    expect(backgroundCountBefore).toBe(7);
+    expect(backgroundCountBefore).toBe(8);
 
     // Reproduces the worst case: a `seeded` list that forgot every class
     // entirely (as if STARTING_EQUIPMENT_PACKAGES were empty) — the same
@@ -71,13 +71,13 @@ describe("StartingEquipmentPackage prune — class/background partitions never c
     expect(await prisma.startingEquipmentPackage.count({ where: { classId: { not: null } } })).toBe(classCountBefore);
   });
 
-  it("reseeding after either sweep restores exactly the pre-sweep row count (31)", async () => {
+  it("reseeding after either sweep restores exactly the pre-sweep row count (32)", async () => {
     await prisma.startingEquipmentPackage.deleteMany({
       where: startingEquipmentStaleWhere([], { backgroundId: { not: null } }),
     });
     expect(await prisma.startingEquipmentPackage.count()).toBe(24);
 
     await seedStartingEquipment(prisma);
-    expect(await prisma.startingEquipmentPackage.count()).toBe(31);
+    expect(await prisma.startingEquipmentPackage.count()).toBe(32);
   });
 });

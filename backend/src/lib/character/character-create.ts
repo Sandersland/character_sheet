@@ -725,8 +725,8 @@ async function loadBackgroundEquipmentDef(
 // (#1564) across the chosen options. `classDef` null means no seeded package
 // for this subject — preserves the pre-#1534 "no entry" 400
 // (characters.test.ts:901) for a class, and is the SAME shape #1565 reuses
-// for a background with no package (Folk Hero, a 2014 background other than
-// Acolyte, or homebrew).
+// for a background with no package (a 2014 background other than Acolyte and
+// Folk Hero, or homebrew).
 // `subjectLabel` (e.g. "class: Fighter" / "background: Criminal") is
 // player-facing only — never used to resolve anything.
 async function resolvePackageInventory(
@@ -756,8 +756,8 @@ async function resolvePackageInventory(
 // never has a roll-for-gold dice alternative in either edition (unlike a 2014
 // class), so `mode: "gold"` here is always a 400, never a resolveStartingGold
 // range check. `backgroundId` null (homebrew/unresolved background, or one
-// with no package under this edition — Folk Hero in either, or any 2014
-// background but Acolyte) makes
+// with no package under this edition — any 2014 background but Acolyte and
+// Folk Hero) makes
 // loadBackgroundEquipmentDef's null propagate into resolvePackageInventory's
 // existing "no seeded package" 400 — the same shape a class with no package hits.
 async function resolveBackgroundEquipmentInventory(
