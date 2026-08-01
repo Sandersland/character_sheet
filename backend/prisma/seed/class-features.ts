@@ -10,9 +10,9 @@
 // column below still resolves to DESCRIPTOR_RESET, populated nowhere yet
 // (#1528+).
 //
-// Rows are DERIVED from the nine remaining TS-authored class modules (plus
-// Fighter's, Barbarian's and Rogue's own literal rows, concatenated in
-// below), not hand-transcribed: this guarantees byte-identical
+// Rows are DERIVED from the seven remaining TS-authored class modules (plus
+// Fighter's, Barbarian's, Rogue's, Warlock's and Wizard's own literal rows,
+// concatenated in below), not hand-transcribed: this guarantees byte-identical
 // `description`/`level` text for the derived half (the migration's own
 // acceptance criterion) and means that half's row count is a property of the
 // registry, never a literal to keep in sync by hand.
@@ -117,11 +117,11 @@ interface RawFeatureRow {
 // branches down is the only lever, not adding coverage).
 function baseFeatureRows(className: string, classDef: ClassDefinition): RawFeatureRow[] {
   // `?? []` is Fighter-shaped defensive code that never fires today (Fighter
-  // is absent from CLASS_MODULES, #1227; so are Barbarian, #1223, and Rogue,
-  // #1231) — ClassDefinition.features is optional on the TYPE now that
-  // Fighter has no ClassDefinition module at all (`lib/classes/fighter.ts`
-  // deleted, #1532), so every caller through this shared type must narrow,
-  // even the nine classes that still always set it.
+  // is absent from CLASS_MODULES, #1227; so are Barbarian #1223, Rogue #1231,
+  // Warlock #1233 and Wizard #1234) — ClassDefinition.features is optional on
+  // the TYPE now that Fighter has no ClassDefinition module at all
+  // (`lib/classes/fighter.ts` deleted, #1532), so every caller through this
+  // shared type must narrow, even the seven classes that still always set it.
   return (classDef.features ?? []).map((feature) => ({ className, subclassSlug: null, feature }));
 }
 

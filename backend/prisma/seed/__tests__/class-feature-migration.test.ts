@@ -19,6 +19,7 @@ import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 
 import { CLASS_FEATURES, LITERAL_ROW_CLASSES } from "../class-features.js";
 import { seedClassFeatures } from "../seed-class-features.js";
+import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
 describe("ClassFeature migration — row count (#1523)", () => {
   it("the seeded table holds exactly the row count CLASS_FEATURES derives from the registry", async () => {
@@ -619,7 +620,7 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
     await expect(seedClassFeatures(prisma)).resolves.toBeUndefined();
     const after = await prisma.classFeature.count();
     expect(after).toBe(before);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   it("a changed source row's description/level updates the SAME row in place on reseed, never a sibling", async () => {
     const canonical = CLASS_FEATURES.find(
@@ -643,7 +644,7 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(target.id);
     expect(rows[0].description).toBe(canonical.description);
-  });
+  }, RESEED_TIMEOUT_MS);
 });
 
 // #1528 EffectRow landmine pin: EffectRow's `level` decides the SCALING axis

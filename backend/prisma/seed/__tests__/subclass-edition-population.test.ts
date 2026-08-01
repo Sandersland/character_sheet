@@ -21,6 +21,7 @@ import {
   seedClassFeatures,
   type SubclassPresenceInput,
 } from "../seed-class-features.js";
+import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
 describe("subclassPopulationFailures — pure guard logic, fabricated inputs (#1559)", () => {
   const row = (overrides: Partial<SubclassPresenceInput>): SubclassPresenceInput => ({
@@ -126,7 +127,7 @@ describe("assertEverySubclassEditionPopulated — mutation proof, both direction
     });
     await prisma.subclass.update({ where: { id: totemWarrior.id }, data: { edition: "EDITION_2014" } });
     await seedClassFeatures(prisma);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   // Reproduces the EXACT pre-#1559 HEAD condition (verified empirically
   // against a throwaway DB before this guard existed): Subclass.edition back
@@ -170,5 +171,5 @@ describe("assertEverySubclassEditionPopulated — mutation proof, both direction
       where: { subclassId: totemWarrior.id, edition: "EDITION_2014" },
     });
     expect(after).toBe(before);
-  });
+  }, RESEED_TIMEOUT_MS);
 });

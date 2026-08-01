@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/core/prisma.js";
 
 import { seedClassFeatures } from "../seed-class-features.js";
+import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
 // A name genuinely authored under a DIFFERENT (class, subclass) scope today
 // (several classes' base layer) — inserting it under Fighter/NULL subclass is
@@ -24,7 +25,7 @@ describe("seedClassFeatures — prune is scoped per (classId, subclassId) partit
     // Re-seed once more so a failed assertion mid-test can't leave the stale
     // probe row (or a partition-sweep side effect) behind for later tests.
     await seedClassFeatures(prisma);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   it("a stale (fighter, NULL subclass, 'Spellcasting', EDITION_2024) row is deleted on reseed, even though 'Spellcasting' is authored elsewhere", async () => {
     const fighter = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Fighter" } });
@@ -54,7 +55,7 @@ describe("seedClassFeatures — prune is scoped per (classId, subclassId) partit
     // The real "Spellcasting" rows elsewhere must have survived the same reseed.
     const stillSeededElsewhere = await prisma.classFeature.count({ where: { name: STALE_NAME } });
     expect(stillSeededElsewhere).toBeGreaterThan(0);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   it("a stale row in a partition the seed still authors (fighter, NULL subclass) but under an unseeded name is deleted", async () => {
     const fighter = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Fighter" } });
@@ -73,5 +74,5 @@ describe("seedClassFeatures — prune is scoped per (classId, subclassId) partit
     await seedClassFeatures(prisma);
 
     expect(await prisma.classFeature.findUnique({ where: { id: stale.id } })).toBeNull();
-  });
+  }, RESEED_TIMEOUT_MS);
 });

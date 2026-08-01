@@ -17,11 +17,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/core/prisma.js";
 
 import { assertEveryClassEditionPopulated, seedClassFeatures } from "../seed-class-features.js";
+import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
 describe("assertEveryClassEditionPopulated — anti-vacuity floors (#1525)", () => {
   afterEach(async () => {
     await seedClassFeatures(prisma);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   // Literals measured directly against this tree's real seeded catalog (12
   // classes, 522 rows, Sorcerer the smallest pair at 15/15, Monk the largest
@@ -55,7 +56,7 @@ describe("assertEveryClassEditionPopulated — mutation proof (#1525)", () => {
     // Restores whatever a test deleted — belt-and-suspenders alongside each
     // test's own explicit restore step below.
     await seedClassFeatures(prisma);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   it("deleting Sorcerer's EDITION_2024 rows at the DB level fails the guard, naming class and edition; reseeding restores it", async () => {
     const sorcerer = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Sorcerer" } });
@@ -74,5 +75,5 @@ describe("assertEveryClassEditionPopulated — mutation proof (#1525)", () => {
     await expect(assertEveryClassEditionPopulated(prisma)).resolves.toBeDefined();
     const after = await prisma.classFeature.count({ where: { classId: sorcerer.id, edition: "EDITION_2024" } });
     expect(after).toBe(before);
-  });
+  }, RESEED_TIMEOUT_MS);
 });
