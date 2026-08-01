@@ -104,10 +104,15 @@ interface ClassLayer {
 // A resourceFn pool wins over a row-declared pool of the same key (mirrors
 // mergeLayers' base-wins policy) — no production collision exists today
 // (Fighter's rows declare a resourceKey since #1528, Barbarian's since #1223,
-// and neither class has a resourceFn left to collide with, both modules
-// deleted), but this keeps a class mid-migration (resourceFn for some pools,
-// rows for others) from silently doubling a pool up if a row and a resourceFn
-// ever named the same key during the transition.
+// and Warlock's since #1233; Fighter's and Barbarian's modules are deleted
+// outright, so neither has a resourceFn left to collide with. Warlock's Fiend
+// subclass DOES still have one — its 2024 Dark One's Own Luck pool is a
+// Charisma-modifier formula resourceTotals can't express — but that row
+// deliberately OMITS resourceTotals, so poolFromRow (class-feature-rows.ts)
+// never even produces a same-keyed row pool to collide with; the resourceFn
+// is the pool's ONLY source under 2024), but this keeps a class mid-migration
+// (resourceFn for some pools, rows for others) from silently doubling a pool
+// up if a row and a resourceFn ever named the same key during the transition.
 function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]): DerivedResource[] {
   if (fromRows.length === 0) return fromFn;
   const seenKeys = new Set(fromFn.map((p) => p.key));
@@ -116,13 +121,15 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
 
 // Row-driven pools are DATA-gated, not class-gated: `poolsFromRows` reads
 // whatever `resourceKey` a class's rows actually populate, which today is
-// Fighter (#1528) and Barbarian's Rage (#1223) — every other class's rows
-// carry no resourceKey, so this is a no-op for them until their own wave-2
-// retab (#1134) populates theirs (Rogue's own retab, #1231, populates NONE —
-// Sneak Attack's Nd6 is a computed rule function off the class entry's own
-// level, not a persisted pool, so Rogue stays a no-op here even after its
-// retab). No `=== "fighter"` / `=== "barbarian"` / `=== "rogue"` check
-// anywhere (CLAUDE.md).
+// Fighter (#1528), Barbarian's Rage (#1223), Wizard's Arcane Recovery/Illusory
+// Self (#1234) and Warlock's Magical Cunning/Dark One's Own Luck (2014
+// only)/Hurl Through Hell/Fey Presence/Misty Escape/Dark Delirium/Entropic
+// Ward (#1233) — every other class's rows carry no resourceKey, so this is a
+// no-op for them until their own wave-2 retab (#1134) populates theirs. Rogue
+// is the exception that stays a no-op even AFTER its retab (#1231): Sneak
+// Attack's Nd6 is a computed rule function off the class entry's own level,
+// never a persisted pool. No `=== "fighter"` / `=== "barbarian"` /
+// `=== "rogue"` / `=== "warlock"` / `=== "wizard"` check anywhere (CLAUDE.md).
 function deriveBaseLayer(
   classDef: ClassDefinition | undefined,
   level: number,

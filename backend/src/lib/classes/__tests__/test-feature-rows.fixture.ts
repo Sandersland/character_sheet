@@ -622,12 +622,11 @@ export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = withPool(
 // FIGHTER_BASE_ROWS exists — so falling through to `toRows(subDef?.features
 // ?? [])` would silently go empty for it, same failure mode this map exists
 // to avoid for every literal-row subclass).
-// WARLOCK's base class (#1233 commit 2 of 3): moved off warlock.ts's
-// WARLOCK_FEATURES AuthoredFeature[] array onto literal seed data
-// (prisma/seed/warlock-features.ts) — the same rootDir boundary FIGHTER_
-// BASE_ROWS'/BARBARIAN_BASE_ROWS' comments explain. Mirrors that file's real
-// SRD 5.2 (2024) content exactly; commit 3 will add Magical Cunning's
-// resourceKey here alongside the matching seed-file change.
+// WARLOCK's base class (#1233): moved off warlock.ts's WARLOCK_FEATURES
+// AuthoredFeature[] array onto literal seed data (prisma/seed/
+// warlock-features.ts) — the same rootDir boundary FIGHTER_BASE_ROWS'/
+// BARBARIAN_BASE_ROWS' comments explain. Mirrors that file's real SRD 5.2
+// (2024) content and Magical Cunning's resourceKey/resourceTotals exactly.
 export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Pact Magic",
@@ -663,6 +662,10 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+    resourceKey: "magicalCunning",
+    resourceLabel: "Magical Cunning",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 2, total: 1 }],
   },
   {
     name: "Pact Boon",
@@ -713,12 +716,12 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// THE FIEND (#1233 commit 2 of 3): mirrors warlock-features.ts's real SRD 5.2
-// content exactly. Commit 3 will add Dark One's Own Luck's/Hurl Through
-// Hell's resourceKey columns here alongside the matching seed-file change —
-// Dark One's Own Luck's 2024 row will deliberately OMIT resourceTotals (a
-// Charisma-modifier formula, still resourceFn-derived; see warlock.ts's own
-// header).
+// THE FIEND (#1233): mirrors warlock-features.ts's real SRD 5.2 content and
+// resource-pool columns exactly — Dark One's Own Luck's 2024 row deliberately
+// OMITS resourceTotals (a Charisma-modifier formula, still resourceFn-derived;
+// see warlock.ts's own header), and Hurl Through Hell's resourceTotals/
+// recharge are identical across both editions (only the description and gate
+// level differ).
 export const THE_FIEND_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
@@ -753,6 +756,10 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
     level: 6,
     edition: "EDITION_2014",
     description: "Add a d10 to one ability check or saving throw you make. Once used, regain on a short or long rest.",
+    resourceKey: "darkOnesOwnLuck",
+    resourceLabel: "Dark One's Own Luck",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
   },
   {
     name: "Dark One's Own Luck",
@@ -760,6 +767,9 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+    resourceKey: "darkOnesOwnLuck",
+    resourceLabel: "Dark One's Own Luck",
+    resourceRecharge: "longRest",
   },
   {
     name: "Fiendish Resilience",
@@ -781,6 +791,10 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "When you hit a creature with an attack, banish it through the Lower Planes until the start of your next turn. It takes 10d10 psychic damage from the horrors of its brief journey and then returns. Once used, regain on a long rest.",
+    resourceKey: "hurlThroughHell",
+    resourceLabel: "Hurl Through Hell",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
   {
     name: "Hurl Through Hell",
@@ -788,6 +802,10 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
+    resourceKey: "hurlThroughHell",
+    resourceLabel: "Hurl Through Hell",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
 ];
 
@@ -804,6 +822,18 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
 // UNEDITED. class-feature-parity.test.ts's own LITERAL_ROW_CLASSES exclusion
 // is what already permits this fixture to diverge from the real seed without
 // anything else catching it.
+//
+// Same reasoning extends to the pool columns: these two patrons' resourceFns
+// in lib/classes/warlock.ts are DELETED outright by commit 3 (their real
+// pools are now row-driven, EDITION_2014 only) — but subclass-grant-level.test.ts's
+// "Archfey's feyPresence pool is absent at level 2 and present at level 3"
+// case calls deriveResources with EDITION_2024 explicitly and must also stay
+// green unedited. Fey Presence/Misty Escape/Dark Delirium/Entropic Ward below
+// therefore keep resourceKey on their UNTAGGED (both-editions) rows, exactly
+// reproducing the old resourceFns' edition-blind behavior (present once the
+// gate level is reached, in EITHER edition) via poolsFromRows instead — the
+// real seed's EDITION_2024 partition for these two patrons has none of these
+// keys at all (see warlock-2024-srd.test.ts's own assertion of that).
 export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Expanded Spell List",
@@ -820,6 +850,10 @@ export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_20
     edition,
     description:
       "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
+    resourceKey: "feyPresence",
+    resourceLabel: "Fey Presence",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
   },
   {
     name: "Misty Escape",
@@ -827,6 +861,10 @@ export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_20
     edition,
     description:
       "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
+    resourceKey: "mistyEscape",
+    resourceLabel: "Misty Escape",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
   },
   {
     name: "Beguiling Defenses",
@@ -841,6 +879,10 @@ export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_20
     edition,
     description:
       "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
+    resourceKey: "darkDelirium",
+    resourceLabel: "Dark Delirium",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
 ]);
 
@@ -867,6 +909,10 @@ export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDIT
     edition,
     description:
       "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
+    resourceKey: "entropicWard",
+    resourceLabel: "Entropic Ward",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
   },
   {
     name: "Thought Shield",

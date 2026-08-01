@@ -2,17 +2,18 @@
 // Commit 1 of 3 (mirrors Fighter's pilot, #1227/#1528/#1532, and Barbarian's
 // #1223) moved these rows off lib/classes/warlock.ts's AuthoredFeature[]
 // arrays into literal seed data, byte-identical to the old TS-derived text
-// (pinned by warlock-2014-snapshot.test.ts). Commit 2 (this one) authors
-// Warlock's REAL SRD 5.2 (2024) content for the base class and The Fiend,
-// transcribed directly from the official SRD 5.2 CC-BY PDF (never a wiki —
-// three secondary transcriptions of the invocation-count table disagree with
-// each other and with the PDF) — and tags The Archfey/The Great Old One
+// (pinned by warlock-2014-snapshot.test.ts). Commit 2 authored Warlock's REAL
+// SRD 5.2 (2024) content for the base class and The Fiend, transcribed
+// directly from the official SRD 5.2 CC-BY PDF (never a wiki — three
+// secondary transcriptions of the invocation-count table disagree with each
+// other and with the PDF) — and tagged The Archfey/The Great Old One
 // EDITION_2014-only, since their PHB'24 reworks are non-SRD and unverifiable
 // (prisma/seed/subclasses.ts tags both Subclass rows the same way, same
-// commit — see #1559's hard-fail this is also forced by). Commit 3 will move
-// every movable resource pool onto its row and shrink lib/classes/warlock.ts
-// to its irreducible residue — see that file's own header for why it
-// survives (it is NOT deletable, unlike fighter.ts/barbarian.ts).
+// commit — see #1559's hard-fail this is also forced by). Commit 3 (this one)
+// moves every movable resource pool onto its row (see the RESOURCE POOL block
+// below) and shrinks lib/classes/warlock.ts to its irreducible residue — see
+// that file's own header for why it survives (it is NOT deletable, unlike
+// fighter.ts/barbarian.ts).
 // class-features.ts concatenates WARLOCK_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a
@@ -38,6 +39,31 @@
 // this commit only ever ADDS an `edition: "EDITION_2024"` tag alongside new
 // 2024 text (or retags a whole subclass EDITION_2014, Archfey/GOO); it never
 // edits a 2014 row's own name/level/description.
+//
+// RESOURCE POOL (commit 3 of 3, mirrors Fighter's #1227 -> #1528 and
+// Barbarian's #1223 two-step): every Warlock pool that is a flat, level-tiered
+// total moves onto its row's resourceKey/resourceLabel/resourceRecharge/
+// resourceTotals below, replacing the `if (level >= N)` gate in
+// lib/classes/warlock.ts's resourceFns (that file's own commit-3 edit deletes
+// the Archfey/GOO resourceFns outright and shrinks the Fiend's to a single
+// pool). #1528's "no-second-string" rule (poolFromRow reads the row's own
+// `description`, never a second hand-written pool string) means each moved
+// pool's description is now that row's feature text above — see this file's
+// own PR for the list of dropped "Regain use on a …" sentences that lived
+// only in the retired resourceFn strings, never in the byte-identical-pinned
+// 2014 row text, so dropping them is this commit's accepted, intended
+// consequence, not a regression to fix. ONE pool could not move: The Fiend's
+// 2024 Dark One's Own Luck sets its uses to the Charisma modifier (minimum
+// once) — a formula, not a tier table — so its 2024 row below sets
+// resourceKey/resourceLabel/resourceRecharge and deliberately OMITS
+// resourceTotals (ClassFeature.resourceKey's own schema.prisma comment
+// sanctions exactly this "declares the pool, defers the total" shape); the
+// total itself stays in warlock.ts's small EDITION_2024-gated resourceFn
+// residue. Its 2014 row's pool (flat 1) moves onto the row normally. Per the
+// owner's decision (#1233), NO `contactPatron` pool is authored — out of the
+// issue's named pool set, and Mystic Arcanum's uses are already tracked
+// separately as `arcanumUsed` (not by this ClassFeature machinery at all) —
+// "every long-rest feature gets a pool" is not this codebase's rule.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -58,6 +84,16 @@ interface RawWarlockFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
+  // Resource-pool descriptor columns (#1233 commit 3) — see this file's own
+  // header for why only Magical Cunning's, Dark One's Own Luck's, Hurl
+  // Through Hell's, Fey Presence's, Misty Escape's, Dark Delirium's and
+  // Entropic Ward's rows ever set these. Dark One's Own Luck's 2024 row sets
+  // resourceKey/resourceLabel/resourceRecharge only — its total is a
+  // Charisma-modifier formula, still resourceFn-derived.
+  resourceKey?: string;
+  resourceLabel?: string;
+  resourceRecharge?: string;
+  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
 }
 
 function expand(raw: RawWarlockFeature): ClassFeatureSeedRow[] {
@@ -67,6 +103,10 @@ function expand(raw: RawWarlockFeature): ClassFeatureSeedRow[] {
     name: raw.name,
     level: raw.level,
     description: raw.description,
+    resourceKey: raw.resourceKey,
+    resourceLabel: raw.resourceLabel,
+    resourceRecharge: raw.resourceRecharge,
+    resourceTotals: raw.resourceTotals,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -129,6 +169,10 @@ const WARLOCK_BASE_RAW: RawWarlockFeature[] = [
     // SRD 5.2 p.71. NEW in 2024 — no 2014 counterpart.
     description:
       "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+    resourceKey: "magicalCunning",
+    resourceLabel: "Magical Cunning",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 2, total: 1 }],
   },
   {
     subclassSlug: null,
@@ -264,6 +308,10 @@ const FIEND_RAW: RawWarlockFeature[] = [
     level: 6,
     edition: "EDITION_2014",
     description: "Add a d10 to one ability check or saving throw you make. Once used, regain on a short or long rest.",
+    resourceKey: "darkOnesOwnLuck",
+    resourceLabel: "Dark One's Own Luck",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
   },
   {
     name: "Dark One's Own Luck",
@@ -272,11 +320,15 @@ const FIEND_RAW: RawWarlockFeature[] = [
     edition: "EDITION_2024",
     // SRD 5.2 p.76: uses become the Charisma modifier (minimum of once) and
     // recharge narrows to a Long Rest only (2014 is short-or-long). The pool
-    // itself (uses-per-rest total) is a formula, not a tier table — commit 3
-    // moves it onto lib/classes/warlock.ts's small EDITION_2024-gated
-    // resourceFn residue, never onto this row's resourceTotals.
+    // itself (uses-per-rest total) is a formula, not a tier table — moved
+    // onto lib/classes/warlock.ts's small EDITION_2024-gated resourceFn
+    // residue instead, never onto this row's resourceTotals (deliberately
+    // omitted below — see this file's own header).
     description:
       "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+    resourceKey: "darkOnesOwnLuck",
+    resourceLabel: "Dark One's Own Luck",
+    resourceRecharge: "longRest",
   },
   {
     name: "Fiendish Resilience",
@@ -303,6 +355,10 @@ const FIEND_RAW: RawWarlockFeature[] = [
     edition: "EDITION_2014",
     description:
       "When you hit a creature with an attack, banish it through the Lower Planes until the start of your next turn. It takes 10d10 psychic damage from the horrors of its brief journey and then returns. Once used, regain on a long rest.",
+    resourceKey: "hurlThroughHell",
+    resourceLabel: "Hurl Through Hell",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
   {
     name: "Hurl Through Hell",
@@ -317,6 +373,10 @@ const FIEND_RAW: RawWarlockFeature[] = [
     // restorable early by expending a Pact Magic spell slot.
     description:
       "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
+    resourceKey: "hurlThroughHell",
+    resourceLabel: "Hurl Through Hell",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
 ];
 
@@ -355,6 +415,10 @@ const ARCHFEY_RAW: RawWarlockFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
+    resourceKey: "feyPresence",
+    resourceLabel: "Fey Presence",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
   },
   {
     name: "Misty Escape",
@@ -363,6 +427,10 @@ const ARCHFEY_RAW: RawWarlockFeature[] = [
     edition: "EDITION_2014",
     description:
       "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
+    resourceKey: "mistyEscape",
+    resourceLabel: "Misty Escape",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
   },
   {
     name: "Beguiling Defenses",
@@ -379,6 +447,10 @@ const ARCHFEY_RAW: RawWarlockFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
+    resourceKey: "darkDelirium",
+    resourceLabel: "Dark Delirium",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
 ];
 
@@ -410,6 +482,10 @@ const GREAT_OLD_ONE_RAW: RawWarlockFeature[] = [
     edition: "EDITION_2014",
     description:
       "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
+    resourceKey: "entropicWard",
+    resourceLabel: "Entropic Ward",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
   },
   {
     name: "Thought Shield",
