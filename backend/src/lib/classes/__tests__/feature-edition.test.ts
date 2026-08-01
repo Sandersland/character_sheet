@@ -166,6 +166,27 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 // 10->14) share their name across editions same as everything else here —
 // taggedNamesFor keys on name alone, not level, so a level-shifted pair
 // counts as "tagged" exactly like a same-level rewrite.
+// Rogue's 53 new triples (#1231), derived from the test's own failure diff
+// (not hand-guessed): 10 base-class names genuinely forked (Cunning Action,
+// Elusive, Evasion, Expertise, Reliable Talent, Slippery Mind, Sneak Attack,
+// Stroke of Luck, Thieves' Cant, Uncanny Dodge) show up under EVERY subclass
+// context Rogue has (undefined/arcane trickster/assassin/thief) — 10 x 4 =
+// 40 — plus Arcane Trickster's own 5 (Arcane Trickster Spellcasting, Mage
+// Hand Legerdemain, Magical Ambush, Spell Thief, Versatile Trickster),
+// Assassin's own 3 (Assassinate, Death Strike, Infiltration Expertise), and
+// Thief's own 5 (Fast Hands, Second-Story Work, Supreme Sneak, Thief's
+// Reflexes, Use Magic Device) = 53. Reliable Talent's level-shift (11->7)
+// counts as "tagged" the same way Barbarian's Berserker level-shifts do —
+// taggedNamesFor keys on name alone. Weapon Mastery/Steady Aim/Cunning
+// Strike/Improved Cunning Strike/Devious Strikes/Epic Boon (base) and
+// Assassin's Tools/Envenom Weapons (Assassin) are NOT here: each has exactly
+// one description under its name (2024-only, no 2014 row to diverge from).
+// Assassin's own Bonus Proficiencies/Impostor are the same "one description,
+// no 2014 counterpart to fork against" shape, just on the 2014 side.
+// Infiltration Expertise IS tagged (both editions have a row under that
+// name) even though it's a same-name FORK rather than a rewrite — taggedNamesFor
+// cannot distinguish the two shapes, and doesn't need to: either way the name
+// legitimately carries two different descriptions.
 const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["cleric", "life domain", "Domain Spells"],
   ["cleric", "trickery domain", "Domain Spells"],
@@ -233,6 +254,59 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["fighter", "eldritch knight", "Action Surge"],
   ["fighter", "eldritch knight", "Extra Attack"],
   ["fighter", "eldritch knight", "Indomitable"],
+  ["rogue", "undefined", "Cunning Action"],
+  ["rogue", "undefined", "Elusive"],
+  ["rogue", "undefined", "Evasion"],
+  ["rogue", "undefined", "Expertise"],
+  ["rogue", "undefined", "Reliable Talent"],
+  ["rogue", "undefined", "Slippery Mind"],
+  ["rogue", "undefined", "Sneak Attack"],
+  ["rogue", "undefined", "Stroke of Luck"],
+  ["rogue", "undefined", "Thieves' Cant"],
+  ["rogue", "undefined", "Uncanny Dodge"],
+  ["rogue", "arcane trickster", "Cunning Action"],
+  ["rogue", "arcane trickster", "Elusive"],
+  ["rogue", "arcane trickster", "Evasion"],
+  ["rogue", "arcane trickster", "Expertise"],
+  ["rogue", "arcane trickster", "Reliable Talent"],
+  ["rogue", "arcane trickster", "Slippery Mind"],
+  ["rogue", "arcane trickster", "Sneak Attack"],
+  ["rogue", "arcane trickster", "Stroke of Luck"],
+  ["rogue", "arcane trickster", "Thieves' Cant"],
+  ["rogue", "arcane trickster", "Uncanny Dodge"],
+  ["rogue", "arcane trickster", "Arcane Trickster Spellcasting"],
+  ["rogue", "arcane trickster", "Mage Hand Legerdemain"],
+  ["rogue", "arcane trickster", "Magical Ambush"],
+  ["rogue", "arcane trickster", "Spell Thief"],
+  ["rogue", "arcane trickster", "Versatile Trickster"],
+  ["rogue", "assassin", "Cunning Action"],
+  ["rogue", "assassin", "Elusive"],
+  ["rogue", "assassin", "Evasion"],
+  ["rogue", "assassin", "Expertise"],
+  ["rogue", "assassin", "Reliable Talent"],
+  ["rogue", "assassin", "Slippery Mind"],
+  ["rogue", "assassin", "Sneak Attack"],
+  ["rogue", "assassin", "Stroke of Luck"],
+  ["rogue", "assassin", "Thieves' Cant"],
+  ["rogue", "assassin", "Uncanny Dodge"],
+  ["rogue", "assassin", "Assassinate"],
+  ["rogue", "assassin", "Death Strike"],
+  ["rogue", "assassin", "Infiltration Expertise"],
+  ["rogue", "thief", "Cunning Action"],
+  ["rogue", "thief", "Elusive"],
+  ["rogue", "thief", "Evasion"],
+  ["rogue", "thief", "Expertise"],
+  ["rogue", "thief", "Reliable Talent"],
+  ["rogue", "thief", "Slippery Mind"],
+  ["rogue", "thief", "Sneak Attack"],
+  ["rogue", "thief", "Stroke of Luck"],
+  ["rogue", "thief", "Thieves' Cant"],
+  ["rogue", "thief", "Uncanny Dodge"],
+  ["rogue", "thief", "Fast Hands"],
+  ["rogue", "thief", "Second-Story Work"],
+  ["rogue", "thief", "Supreme Sneak"],
+  ["rogue", "thief", "Thief's Reflexes"],
+  ["rogue", "thief", "Use Magic Device"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

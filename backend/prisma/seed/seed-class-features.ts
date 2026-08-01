@@ -363,6 +363,20 @@ const MIN_ROWS_PER_PAIR = 10;
 // Strike/Improved Brutal Strike effect menu, Frenzy's bonus dice,
 // Intimidating Presence's announced save DC, Epic Boon's feat grant — #1223
 // research finding 6).
+//
+// "Rogue" removed here (#1231, same diff as the content that makes its rows
+// genuinely diverge: base 11->16 EDITION_2024 rows — Blindsense drops out,
+// six new 2024-only features join (Weapon Mastery, Steady Aim, Cunning
+// Strike, Improved Cunning Strike, Devious Strikes, Epic Boon), while Arcane
+// Trickster/Assassin/Thief each keep 5/5 (Assassin's own count is unchanged
+// despite Bonus Proficiencies -> Assassin's Tools being a rename and
+// Impostor's mechanics folding into Infiltration Expertise's fork) — so the
+// two editions land at 26 (2014) vs 31 (2024) total rows, genuinely
+// unequal. This removal is NOT "all of Rogue's 2024 content is real" — the
+// Cunning Strike effect catalog (dice-spend + enemy-targeted save effects)
+// is TEXT ONLY with no mechanics behind it yet, same disclosed gap as
+// Barbarian's Brutal Strike menu (#1231 research, mirrors #1223's own
+// finding 6).
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Bard",
   "Cleric",
@@ -370,7 +384,6 @@ const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Monk",
   "Paladin",
   "Ranger",
-  "Rogue",
   "Sorcerer",
   "Warlock",
   "Wizard",

@@ -11532,123 +11532,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / (no subclass) 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]
@@ -11657,123 +11617,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / arcane trickster 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]
@@ -11782,123 +11702,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / assassin 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]
@@ -11907,123 +11787,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / thief 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]

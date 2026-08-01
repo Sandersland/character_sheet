@@ -15,19 +15,19 @@ import { druid } from "./druid.js";
 import { monk } from "./monk.js";
 import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
-import { rogue } from "./rogue.js";
 import { sorcerer } from "./sorcerer.js";
 import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
 
-// Fighter and Barbarian are deliberately absent (#1532 / #1223 —
-// lib/classes/fighter.ts and lib/classes/barbarian.ts are both deleted).
-// Their subclasses (Fighter: Champion/Battle Master/Eldritch Knight;
-// Barbarian: Totem Warrior/Berserker) resolve entirely through the
-// SUBCLASS_IDENTITY seeding pass below; deriveBaseLayer's optional-chaining
-// on `classDef` already tolerates a missing key.
+// Fighter, Barbarian and Rogue are deliberately absent (#1532 / #1223 /
+// #1231 — lib/classes/fighter.ts, lib/classes/barbarian.ts and
+// lib/classes/rogue.ts are all deleted). Their subclasses (Fighter:
+// Champion/Battle Master/Eldritch Knight; Barbarian: Totem Warrior/
+// Berserker; Rogue: Arcane Trickster/Assassin/Thief) resolve entirely
+// through the SUBCLASS_IDENTITY seeding pass below; deriveBaseLayer's
+// optional-chaining on `classDef` already tolerates a missing key.
 const CLASSES: Record<string, ClassDefinition> = {
   bard,
   cleric,
@@ -35,7 +35,6 @@ const CLASSES: Record<string, ClassDefinition> = {
   monk,
   paladin,
   ranger,
-  rogue,
   sorcerer,
   warlock,
   wizard,
@@ -62,16 +61,17 @@ const CLASSES: Record<string, ClassDefinition> = {
 // THEN overlaid by the CLASSES-derived definitions, in a second pass — order
 // matters: a class still on the TS migration path (a non-3 grantLevel,
 // resourceFn, deriveExtras, or the `choices` catalog) must win over its own
-// identity-only stub, or those fields would silently vanish for the ten
+// identity-only stub, or those fields would silently vanish for the nine
 // classes not yet fully row-driven. `SUBCLASS_IDENTITY` is 31 entries against
-// 26 TS registrations now that Fighter's three (Champion/Battle
-// Master/Eldritch Knight) and Barbarian's two (Totem Warrior/Berserker) have
-// none — so the overlay is behaviour-preserving by construction only for
-// those 26: every key the first loop seeds for a still-TS-registered class is
-// immediately replaced by the second loop's richer definition; Fighter's
-// three and Barbarian's two keep their identity-only seed as their final
-// definition, which is correct — there is no richer TS definition left to
-// overlay it with.
+// 23 TS registrations now that Fighter's three (Champion/Battle
+// Master/Eldritch Knight), Barbarian's two (Totem Warrior/Berserker) and
+// Rogue's three (Arcane Trickster/Assassin/Thief) have none — so the overlay
+// is behaviour-preserving by construction only for those 23: every key the
+// first loop seeds for a still-TS-registered class is immediately replaced by
+// the second loop's richer definition; Fighter's three, Barbarian's two and
+// Rogue's three keep their identity-only seed as their final definition,
+// which is correct — there is no richer TS definition left to overlay it
+// with.
 const SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const [slug, { nameKey }] of Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]) {
   SUBCLASSES[nameKey] = { slug };
@@ -113,8 +113,11 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
 // whatever `resourceKey` a class's rows actually populate, which today is
 // Fighter (#1528) and Barbarian's Rage (#1223) — every other class's rows
 // carry no resourceKey, so this is a no-op for them until their own wave-2
-// retab (#1134) populates theirs. No `=== "fighter"` / `=== "barbarian"`
-// check anywhere (CLAUDE.md).
+// retab (#1134) populates theirs (Rogue's own retab, #1231, populates NONE —
+// Sneak Attack's Nd6 is a computed rule function off the class entry's own
+// level, not a persisted pool, so Rogue stays a no-op here even after its
+// retab). No `=== "fighter"` / `=== "barbarian"` / `=== "rogue"` check
+// anywhere (CLAUDE.md).
 function deriveBaseLayer(
   classDef: ClassDefinition | undefined,
   level: number,

@@ -13,7 +13,6 @@ import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
-import { rogue } from "@/lib/classes/rogue.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
 import { warlock } from "@/lib/classes/warlock.js";
@@ -534,7 +533,7 @@ describe("referential integrity", () => {
   it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
       Bard: bard, Cleric: cleric, Druid: druid,
-      Monk: monk, Paladin: paladin, Ranger: ranger, Rogue: rogue, Sorcerer: sorcerer,
+      Monk: monk, Paladin: paladin, Ranger: ranger, Sorcerer: sorcerer,
       Warlock: warlock, Wizard: wizard,
     };
     const drift = CLASSES.flatMap((seedClass) =>
@@ -547,18 +546,24 @@ describe("referential integrity", () => {
 
   // Fighter left `defByName` above when lib/classes/fighter.ts was deleted
   // (#1532); Barbarian left it the same way when lib/classes/barbarian.ts was
-  // (#1223) — both classes' subclasses (Fighter: Champion/Battle
-  // Master/Eldritch Knight; Barbarian: Totem Warrior/Berserker) are
-  // SUBCLASS_IDENTITY-only now, so there is no `sub.grantLevel` left to
-  // compare against. Assert directly on the seeded CharacterClass.subclassLevel
-  // value instead: SRD 5.2 grants every subclass at level 3, and PHB'14 grants
-  // Martial Archetype (p.72) and Primal Path (p.48) at 3rd level too, so 3 is
-  // correct in BOTH editions — these rows are edition-invariant.
-  it("Fighter's and Barbarian's seeded subclassLevel is 3 in both editions (SRD 5.2 & PHB'14 pp. 72/48)", () => {
+  // (#1223); Rogue left it the same way when lib/classes/rogue.ts was (#1231)
+  // — all three classes' subclasses (Fighter: Champion/Battle Master/
+  // Eldritch Knight; Barbarian: Totem Warrior/Berserker; Rogue: Arcane
+  // Trickster/Assassin/Thief) are SUBCLASS_IDENTITY-only now, so there is no
+  // `sub.grantLevel` left to compare against. Assert directly on the seeded
+  // CharacterClass.subclassLevel value instead: SRD 5.2 grants every
+  // subclass at level 3, and PHB'14 grants Martial Archetype (p.72) and
+  // Primal Path (p.48) at 3rd level too (Roguish Archetype is also 3rd level
+  // in PHB'14, unchanged by this migration and already the pre-existing
+  // seeded value — page not re-verified for this issue), so 3 is correct in
+  // BOTH editions — these rows are edition-invariant.
+  it("Fighter's, Barbarian's and Rogue's seeded subclassLevel is 3 in both editions (SRD 5.2; PHB'14 pp. 72/48 verified, Rogue's own page not re-verified)", () => {
     const fighterClass = CLASSES.find((c) => c.name === "Fighter");
     const barbarianClass = CLASSES.find((c) => c.name === "Barbarian");
+    const rogueClass = CLASSES.find((c) => c.name === "Rogue");
     expect(fighterClass?.subclassLevel).toBe(3);
     expect(barbarianClass?.subclassLevel).toBe(3);
+    expect(rogueClass?.subclassLevel).toBe(3);
   });
 
   // Unlike the grantLevel drift test above (reverted to direct equality by
@@ -585,14 +590,15 @@ describe("referential integrity", () => {
 // the class definitions as ALREADY a perfect 1:1 bijection (31 rows, 31
 // definition keys) at the time of filing — each assertion below is a
 // toEqual([]) diff so a broken row names the offender instead of a boolean
-// pass/fail. #1532 deleted lib/classes/fighter.ts and #1223 deleted
-// lib/classes/barbarian.ts, so that bijection is now 31 rows / 26 definition
-// keys: Fighter's three subclasses and Barbarian's two are SUBCLASS_IDENTITY-
-// only (no SubclassDefinition), which is exactly the row-migrated case the
-// fourth test below carves out.
+// pass/fail. #1532 deleted lib/classes/fighter.ts, #1223 deleted
+// lib/classes/barbarian.ts, and #1231 deleted lib/classes/rogue.ts, so that
+// bijection is now 31 rows / 23 definition keys: Fighter's three subclasses,
+// Barbarian's two, and Rogue's three are SUBCLASS_IDENTITY-only (no
+// SubclassDefinition), which is exactly the row-migrated case the fourth
+// test below carves out.
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   const CLASS_DEFS: Record<string, ClassDefinition> = {
-    bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+    bard, cleric, druid, monk, paladin, ranger, sorcerer, warlock, wizard,
   };
 
   // The named twin of scripts/check-class-ts-migration.sh's NOT_YET_MIGRATED
@@ -601,7 +607,7 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   // BOTH lists in the same PR, or this test and the guard script silently
   // drift apart. Deliberate-coupling latch: if you change one, update the
   // other.
-  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian"];
+  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue"];
 
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
     const bad = SUBCLASSES.filter((s) => {
