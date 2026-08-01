@@ -53,15 +53,20 @@ describe("ClassFeature migration — row count (#1523)", () => {
   });
 });
 
-// The 10 already-forked rows (Cleric "Domain Spells", Warlock "Expanded Spell
-// List") are the ONLY names whose EDITION_2014/EDITION_2024 pair is SUPPOSED
-// to differ — asserted separately (and by name) in the "already-forked pairs"
-// describe block below. Excluding those two names here, by construction every
+// The 2 already-forked names among the DERIVED (non-LITERAL_ROW_CLASSES) half
+// are Cleric's "Domain Spells" — the ONLY name whose EDITION_2014/EDITION_2024
+// pair is SUPPOSED to differ there — asserted separately (and by name) in the
+// "already-forked pairs" describe block below. "Expanded Spell List" is
+// deliberately ABSENT here: Warlock is a LITERAL_ROW_CLASSES member (#1233)
+// now, so its rows never reach this test's loop at all (excluded by the
+// `LITERAL_ROW_CLASSES.has(row.className)` `continue` below, which runs
+// FIRST) — leaving it listed would be an unreachable, misleading entry, not a
+// second guard. Excluding "Domain Spells" here, by construction every
 // remaining (className, subclassSlug, name, level) group of exactly 2 rows in
 // CLASS_FEATURES must be an untagged feature's 2014/2024 expansion, so its two
 // descriptions must be equal — this needs no separate access to the raw,
 // pre-expansion feature list (which class-features.ts keeps internal).
-const KNOWN_FORKED_NAMES = new Set(["Domain Spells", "Expanded Spell List"]);
+const KNOWN_FORKED_NAMES = new Set(["Domain Spells"]);
 
 // This suite reads in-memory CLASS_FEATURES, not the DB — both editions of an
 // untagged row come from the SAME expandFeatureRow spread (class-features.ts),

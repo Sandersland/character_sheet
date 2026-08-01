@@ -1,6 +1,6 @@
 // Test-only helper (#1524): builds the `ClassFeatureRowsCarrier` deriveResources'
 // `featureRows` parameter expects, directly from the TS class/subclass
-// definitions — the NINE remaining lib/classes/<class>.ts modules stay the
+// definitions — the remaining lib/classes/<class>.ts modules stay the
 // seed's AUTHORING input even though production now reads seeded rows instead
 // (#1524's Fact 1). Lets every unit test that asserts on `.features` keep
 // calling deriveResources with a bare class/subclass name (no DB round-trip)
@@ -9,39 +9,41 @@
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
 //
-// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), ROGUE (#1231) and WIZARD
-// (#1234): `lib/classes/fighter.ts`, `lib/classes/barbarian.ts` and
-// `lib/classes/rogue.ts` are all deleted outright, and `lib/classes/wizard.ts`'s
-// feature TEXT (all four schools) moved out while the module itself survives for
-// its subclass `grantLevel` (#1576). Every one of their rows is literal seed
-// data (prisma/seed/fighter-features.ts, barbarian-features.ts,
-// rogue-features.ts, wizard-features.ts), which this src-side fixture can't
-// import (backend/tsconfig.json's `rootDir: "src"` makes a src file importing
-// anything under prisma/ a compile error, TS6059). `testFeatureRowsFor(
-// "fighter"/"barbarian"/"wizard", ...)`'s rows are therefore the hardcoded
-// mirrors below (LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS, mirroring each seed
-// file's RESOURCE columns) — class-features-snapshot.test.ts records
-// `withoutFeatures(deriveResources(...))`, stripping `.features` before
+// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), ROGUE (#1231), WARLOCK
+// (#1233) and WIZARD (#1234) all author their ClassFeature rows as literal seed
+// data (prisma/seed/<class>-features.ts), which this src-side fixture can't
+// import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
+// anything under prisma/ a compile error (TS6059). Their rows therefore come
+// from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps below,
+// mirroring each seed file's RESOURCE columns. class-features-snapshot.test.ts
+// records `withoutFeatures(deriveResources(...))`, stripping `.features` before
 // snapshotting, so the row TEXT matters only for readability here, never for a
-// passing assertion. class-feature-parity.test.ts is the suite that DOES assert
-// on `.features` content, and it skips all four classes entirely for the same
-// underlying reason (its own file's LITERAL_ROW_CLASSES check).
+// passing assertion; class-feature-parity.test.ts is the suite that DOES assert
+// on `.features` content, and it skips all five classes for the same underlying
+// reason (its own file's LITERAL_ROW_CLASSES check).
 //
-// Barbarian's two subclasses (Totem Warrior, Berserker) need no hardcoded
-// subclassRows stand-in: neither declares a resourceKey/derivedStat in
-// barbarian-features.ts, so falling through to `toRows(subDef?.features ?? [])`
-// -> `toRows([])` -> `[]` (TEST_SUBCLASSES has no entry for either, same as
-// Champion/Eldritch Knight) loses nothing a `.resources`-observing test could
-// see.
+// Two different end states sit behind that one list. `lib/classes/fighter.ts`,
+// `barbarian.ts` and `rogue.ts` are deleted outright. `warlock.ts` and
+// `wizard.ts` survive — each carries a subclass `grantLevel` (1 for Warlock's
+// patrons, 2 for Wizard's schools) that no seeded row can express while
+// subclassGateLevel's undefined fallback is 3, so deleting either would
+// silently move that class's 2014 subclass gate (#1576). Neither still exports
+// a `features` array, which is what matters here.
 //
-// ROGUE NEEDS NO MIRROR AT ALL, unlike the other three: its rows declare no
+// Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
+// stand-in: neither declares a resourceKey/derivedStat in barbarian-features.ts,
+// so falling through to `toRows(subDef?.features ?? [])` -> `[]`
+// (TEST_SUBCLASSES has no entry for either, same as Champion/Eldritch Knight)
+// loses nothing a `.resources`-observing test could see.
+//
+// ROGUE NEEDS NO MIRROR AT ALL, unlike the other four: its rows declare no
 // resourceKey/derivedStat/saveDcAbilities anywhere (Sneak Attack's Nd6 is a
 // computed rule function, never a persisted pool — see sneakAttackSpec), so
-// falling out of LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS entirely — the same
-// `toRows(undefined?.features ?? [])` -> `[]` fallthrough — loses nothing a
-// `.resources`-observing test could see. rogue-thief.test.ts (which used to call
-// `testFeatureRowsFor("rogue", "thief")`) is rewritten onto `loadDbFeatureRows`
-// instead, same shape as fighter-unregistered.test.ts.
+// falling out of both maps entirely — the same `toRows(undefined?.features ??
+// [])` -> `[]` fallthrough — loses nothing a `.resources`-observing test could
+// see. rogue-thief.test.ts (which used to call `testFeatureRowsFor("rogue",
+// "thief")`) is rewritten onto `loadDbFeatureRows` instead, same shape as
+// fighter-unregistered.test.ts.
 import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { cleric } from "@/lib/classes/cleric.js";
@@ -51,11 +53,10 @@ import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
-import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
 
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  bard, cleric, druid, monk, paladin, ranger, sorcerer, warlock, wizard,
+  bard, cleric, druid, monk, paladin, ranger, sorcerer, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
@@ -621,9 +622,185 @@ export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = withPool(
 // FIGHTER_BASE_ROWS exists — so falling through to `toRows(subDef?.features
 // ?? [])` would silently go empty for it, same failure mode this map exists
 // to avoid for every literal-row subclass).
+// WARLOCK's base class (#1233 commit 1): moved off warlock.ts's
+// WARLOCK_FEATURES AuthoredFeature[] array onto literal seed data
+// (prisma/seed/warlock-features.ts) — the same rootDir boundary FIGHTER_
+// BASE_ROWS'/BARBARIAN_BASE_ROWS' comments explain. At this commit every row
+// is still untagged (identical text both editions, mirroring
+// warlock-features.ts's own commit-1 shape) — commit 2 will make these
+// diverge for real.
+export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Pact Magic",
+    level: 1,
+    edition,
+    description:
+      "You cast spells using Charisma. Unique short-rest progression: all spell slots are the same (high) level and you regain all slots on a short or long rest. Slots scale: 1st at L1; 2nd at L3; 3rd at L5; 4th at L7; 5th at L9.",
+  },
+  {
+    name: "Eldritch Invocations",
+    level: 2,
+    edition,
+    description:
+      "Learn 2 eldritch invocations — magical studies that grant you permanent abilities or modify your spells (e.g., Agonizing Blast, Armor of Shadows, Devil's Sight). More invocations at levels 5, 7, 9, 12, 15, 18 (max 8 known).",
+  },
+  {
+    name: "Pact Boon",
+    level: 3,
+    edition,
+    description:
+      "Your patron grants a boon: Pact of the Chain (familiar with special forms), Pact of the Blade (summon a pact weapon), or Pact of the Tome (Book of Shadows with extra cantrips and rituals).",
+  },
+  {
+    name: "Mystic Arcanum",
+    level: 11,
+    edition,
+    description:
+      "Choose one 6th-level spell from the warlock list as a Mystic Arcanum. You can cast it once without expending a spell slot per long rest. Gain a 7th-level arcanum at L13, 8th at L15, 9th at L17.",
+  },
+  {
+    name: "Eldritch Master",
+    level: 20,
+    edition,
+    description:
+      "Spend 1 minute entreating your patron to regain all expended Pact Magic spell slots. Once used, you must finish a long rest before you can do so again.",
+  },
+]);
+
+// WARLOCK's three patrons (#1233 commit 1): same rootDir-boundary reason as
+// WARLOCK_BASE_ROWS above. Expanded Spell List is already forked (#1374 —
+// same PHB'14-spell-level-vs-2024-character-level split every patron shares);
+// the rest stay untagged at this commit.
+export const THE_FIEND_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Expanded Spell List",
+    level: 1,
+    edition,
+    description:
+      edition === "EDITION_2014"
+        ? "Add fiend spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Burning Hands, Command (1st); Blindness/Deafness, Scorching Ray (2nd); Fireball, Stinking Cloud (3rd); Fire Shield, Wall of Fire (4th); Flame Strike, Hallow (5th)."
+        : "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+  },
+  {
+    name: "Dark One's Blessing",
+    level: 1,
+    edition,
+    description:
+      "When you reduce a hostile creature to 0 HP, gain temporary HP equal to your Charisma modifier + your warlock level (minimum 1).",
+  },
+  {
+    name: "Dark One's Own Luck",
+    level: 6,
+    edition,
+    description: "Add a d10 to one ability check or saving throw you make. Once used, regain on a short or long rest.",
+  },
+  {
+    name: "Fiendish Resilience",
+    level: 10,
+    edition,
+    description:
+      "After a short or long rest, choose one damage type. You gain resistance to that type until you choose a different one.",
+  },
+  {
+    name: "Hurl Through Hell",
+    level: 14,
+    edition,
+    description:
+      "When you hit a creature with an attack, banish it through the Lower Planes until the start of your next turn. It takes 10d10 psychic damage from the horrors of its brief journey and then returns. Once used, regain on a long rest.",
+  },
+]);
+
+export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Expanded Spell List",
+    level: 1,
+    edition,
+    description:
+      edition === "EDITION_2014"
+        ? "Add archfey spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Faerie Fire, Sleep (1st); Calm Emotions, Phantasmal Force (2nd); Blink, Plant Growth (3rd); Dominate Beast, Greater Invisibility (4th); Dominate Person, Seeming (5th)."
+        : "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+  },
+  {
+    name: "Fey Presence",
+    level: 1,
+    edition,
+    description:
+      "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
+  },
+  {
+    name: "Misty Escape",
+    level: 6,
+    edition,
+    description:
+      "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
+  },
+  {
+    name: "Beguiling Defenses",
+    level: 10,
+    edition,
+    description:
+      "You are immune to being charmed. When another creature attempts to charm you, you can use your reaction to have it make a Wisdom saving throw (spell save DC) or be charmed by you for 1 minute or until it takes damage.",
+  },
+  {
+    name: "Dark Delirium",
+    level: 14,
+    edition,
+    description:
+      "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
+  },
+]);
+
+export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Expanded Spell List",
+    level: 1,
+    edition,
+    description:
+      edition === "EDITION_2014"
+        ? "Add Great Old One spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Dissonant Whispers, Hideous Laughter (1st); Detect Thoughts, Phantasmal Force (2nd); Clairvoyance, Sending (3rd); Dominate Beast, Black Tentacles (4th); Dominate Person, Telekinesis (5th)."
+        : "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+  },
+  {
+    name: "Awakened Mind",
+    level: 1,
+    edition,
+    description:
+      "Communicate telepathically with any creature you can see within 30 ft. The creature understands you even if it shares no language with you, though it cannot telepathically respond.",
+  },
+  {
+    name: "Entropic Ward",
+    level: 6,
+    edition,
+    description:
+      "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
+  },
+  {
+    name: "Thought Shield",
+    level: 10,
+    edition,
+    description:
+      "Your thoughts can't be read by telepathy or other means unless you allow it. Resistance to psychic damage. When a creature deals psychic damage to you, it takes the same amount.",
+  },
+  {
+    name: "Create Thrall",
+    level: 14,
+    edition,
+    description:
+      "Touch an incapacitated humanoid to charm it indefinitely (no save). While charmed, it obeys your commands and you share telepathic communication with it. Each time the thrall takes damage, it makes a Charisma save to break free (DC = your spell save DC).",
+  },
+]);
+
+// Per-class/per-subclass literal-row overrides (#1233): replaces the former
+// isFighter/isBarbarian/isBattleMaster boolean chain with two lookup maps, one
+// keyed by class name and one by subclass name — a fourth `isWarlock` boolean
+// (plus a fifth/sixth/seventh for each patron) would have made
+// testFeatureRowsFor's own branching harder to read with every future
+// LITERAL_ROW_CLASSES addition than a table lookup is. Both maps are keyed
+// lowercase, matching this file's own registry convention.
 const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
+  warlock: WARLOCK_BASE_ROWS,
   wizard: WIZARD_BASE_ROWS,
 };
 
@@ -632,6 +809,9 @@ const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "school of evocation": WIZARD_EVOCATION_ROWS,
   "school of abjuration": WIZARD_ABJURATION_ROWS,
   "school of illusion": WIZARD_ILLUSION_ROWS,
+  "the fiend": THE_FIEND_ROWS,
+  "the archfey": THE_ARCHFEY_ROWS,
+  "the great old one": THE_GREAT_OLD_ONE_ROWS,
 };
 
 /** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */
