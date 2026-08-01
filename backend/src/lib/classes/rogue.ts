@@ -1,48 +1,12 @@
-import { readEffectSpec, resolveEffectSpec, type ClassDieResolver, type EffectRow } from "@/lib/combat/effects.js";
 import type { AuthoredFeature, ClassDefinition } from "./types.js";
 
-// Sneak Attack is a C5 referenced-class-die consumer: a fixed d6 whose COUNT is
-// rogue-level-derived. The die is resolved through the same effects.ts machinery
-// (effectDieSource + ClassDieResolver + readEffectSpec) the Battle Master uses,
-// but the rogue die never grows, so it needs no resolveClassDie pool.
-export const SNEAK_ATTACK_DIE_SOURCE = "sneakAttackDice";
-
-// 1d6 at L1, +1d6 every odd level, capped at 10d6 from L19. 0 below L1.
-export function sneakAttackDiceCount(rogueLevel: number): number {
-  if (rogueLevel < 1) return 0;
-  return Math.min(10, Math.ceil(rogueLevel / 2));
-}
-
-// The referenced-class-die resolver for the C5 machinery: the rogue die is a
-// flat d6 (never scales with level, unlike the superiority die).
-export const resolveSneakAttackDie: ClassDieResolver = (source) =>
-  source === SNEAK_ATTACK_DIE_SOURCE ? 6 : null;
-
-function sneakAttackEffectRow(rogueLevel: number): EffectRow {
-  return {
-    level: 1,
-    effectKind: "damage",
-    effectDiceCount: sneakAttackDiceCount(rogueLevel),
-    effectDieSource: SNEAK_ATTACK_DIE_SOURCE,
-  };
-}
-
-// The resolved Nd6 dice for a rogue's Sneak Attack, or null below L1. Routes
-// through readEffectSpec/resolveEffectSpec so the die-source resolution matches
-// every other referenced-class-die effect.
-export function sneakAttackSpec(rogueLevel: number): { count: number; faces: number; modifier: number } | null {
-  if (sneakAttackDiceCount(rogueLevel) <= 0) return null;
-  const spec = readEffectSpec(sneakAttackEffectRow(rogueLevel), resolveSneakAttackDie);
-  // characterLevel receives rogueLevel: die faces (d6) never scale with level —
-  // only the count does, already baked into effectDiceCount above.
-  return resolveEffectSpec(spec, 0, { characterLevel: rogueLevel });
-}
-
-// Once-per-turn + eligibility guard. Eligibility (advantage OR an ally adjacent
-// to the target) is a manual assertion — never auto-detected from board state.
-export function canApplySneakAttack(input: { eligible: boolean; usedThisTurn: boolean }): boolean {
-  return input.eligible && !input.usedThisTurn;
-}
+// This module's five Sneak Attack rule exports (SNEAK_ATTACK_DIE_SOURCE,
+// sneakAttackDiceCount, resolveSneakAttackDie, sneakAttackSpec,
+// canApplySneakAttack) relocated to lib/classes/sneak-attack.ts in #1231
+// commit 3 of 4 (behaviour-neutral) — this file now holds only the
+// ClassDefinition's feature TEXT (the seed's authoring source, #1231 commits
+// 1-2; see rogue-features.ts), which stops being read anywhere once #1231
+// commit 4 deletes this file outright.
 
 const ROGUE_FEATURES: AuthoredFeature[] = [
   {

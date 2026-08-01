@@ -5,8 +5,9 @@ import {
   resolveSneakAttackDie,
   sneakAttackDiceCount,
   sneakAttackSpec,
+  sneakAttackSpecForEntries,
   SNEAK_ATTACK_DIE_SOURCE,
-} from "@/lib/classes/rogue.js";
+} from "@/lib/classes/sneak-attack.js";
 
 describe("sneakAttackDiceCount", () => {
   it("is 1d6 at level 1 and adds a die every odd level", () => {
@@ -52,6 +53,24 @@ describe("sneakAttackSpec", () => {
 
   it("is null below level 1 (no dice to roll)", () => {
     expect(sneakAttackSpec(0)).toBeNull();
+  });
+});
+
+describe("sneakAttackSpecForEntries (#1231 commit 3: the shared class-entries lookup character-serialize.ts and this file's own rollSneakAttack both go through)", () => {
+  it("finds the rogue entry among a multiclass list and scales off ITS level, not the total", () => {
+    // 9 wizard + 5 rogue: total level 14 would resolve to 7d6 (Math.ceil(14/2))
+    // if the lookup ever used total level by mistake; the rogue entry's own
+    // level (5) resolves to 3d6 instead — this is the case that would go red
+    // under that mistake.
+    expect(sneakAttackSpecForEntries([{ name: "Wizard", level: 9 }, { name: "Rogue", level: 5 }])).toEqual({
+      count: 3,
+      faces: 6,
+      modifier: 0,
+    });
+  });
+
+  it("is null for a class-entries list with no rogue entry at all", () => {
+    expect(sneakAttackSpecForEntries([{ name: "Wizard", level: 9 }])).toBeNull();
   });
 });
 
