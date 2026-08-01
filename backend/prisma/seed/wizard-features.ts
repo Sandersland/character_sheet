@@ -1,23 +1,26 @@
 // --- Wizard ClassFeature rows, authored as LITERAL data (#1234) ------------
-// Commit 1 of 4 (mirrors Barbarian's #1223, itself modelled on Fighter's
-// pilot, #1227/#1528/#1532) moved these rows off lib/classes/wizard.ts's
-// AuthoredFeature[] arrays into literal seed data, byte-identical to the old
-// TS-derived text (pinned by wizard-2014-snapshot.test.ts). Commit 2 (this
-// one) authors Wizard's REAL SRD 5.2 (2024) content — the base class and
-// Evoker are transcribed from the SRD 5.2 / SRD 5.2.1 CC-BY document
-// (dndbeyond.com/srd), cross-checked against two independent mirrors (a
-// 5etools-mirror-3 XPHB data extract and dnd2024.wikidot.com), which agree
-// verbatim. Abjurer and Illusionist aren't in SRD 5.2 at all, so their 2024
-// text is mirror-sourced from those same two independently-agreeing sources
-// instead — see each row's own citation. Commit 3 (this one) moves Arcane
-// Recovery's and Illusory Self's resource pools onto their rows (see the
-// RESOURCE POOL block below) and deletes lib/classes/wizard.ts's two
-// resourceFns, now that nothing depends on them. Commit 4 will reduce
-// lib/classes/wizard.ts to its irreducible residue — it is NOT deletable
-// (unlike Fighter's/Barbarian's modules): its `grantLevel: 2` on every
-// subclass is PHB'14's actual Arcane Tradition gate, and
-// `subclassGateLevel`'s undefined-grantLevel fallback is 3 — see wizard.ts's
-// own header and #1576 for the tracked follow-up.
+// Mirrors Barbarian's #1223, itself modelled on Fighter's pilot
+// (#1227/#1528/#1532), across four commits:
+//
+// 1. Moved these rows off lib/classes/wizard.ts's AuthoredFeature[] arrays
+//    into literal seed data, byte-identical to the old TS-derived text
+//    (pinned by wizard-2014-snapshot.test.ts).
+// 2. Authored Wizard's REAL SRD 5.2 (2024) content. The base class and Evoker
+//    are transcribed from the SRD 5.2 / SRD 5.2.1 CC-BY document
+//    (dndbeyond.com/srd), cross-checked against two independent mirrors (a
+//    5etools-mirror-3 XPHB data extract and dnd2024.wikidot.com) which agree
+//    verbatim. Abjurer and Illusionist aren't in SRD 5.2 at all, so their
+//    2024 text is mirror-sourced from those same two independently-agreeing
+//    sources — see each row's own citation.
+// 3. Moved Arcane Recovery's and Illusory Self's resource pools onto their
+//    rows (see the RESOURCE POOL block below) and deleted
+//    lib/classes/wizard.ts's two resourceFns, nothing depending on them.
+// 4. Reduced lib/classes/wizard.ts to its irreducible residue. It is NOT
+//    deletable, unlike Fighter's and Barbarian's modules: its `grantLevel: 2`
+//    on every subclass is PHB'14's actual Arcane Tradition gate, and
+//    `subclassGateLevel`'s undefined-grantLevel fallback is 3, so deleting it
+//    would silently move every 2014 Wizard's subclass gate — see wizard.ts's
+//    own header and #1576 for the tracked follow-up.
 // class-features.ts concatenates WIZARD_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a
