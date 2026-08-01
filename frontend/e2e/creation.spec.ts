@@ -19,9 +19,9 @@ function continueStep(page: Page) {
 // Checks EVERY (A) rather than one: since #1565 the step renders a second
 // package for the character's background, both cards carry an (A), and
 // Continue stays disabled until every package has a selection. Iterating the
-// matches keeps this correct for a background with no package (Charlatan,
-// Folk Hero, Noble — no SRD equipment in either edition) without the spec
-// having to know which case it is in.
+// matches keeps this correct for a background with no package (Folk Hero has
+// none in either edition — PHB'24 dropped it) without the spec having to know
+// which case it is in.
 async function chooseEquipmentOptionA(page: Page) {
   const options = page.getByRole("radio", { name: /^\(A\)/ });
   await expect(options.first()).toBeVisible();
