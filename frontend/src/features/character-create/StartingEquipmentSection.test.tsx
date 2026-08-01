@@ -18,6 +18,16 @@ const PACKAGE: ClassStartingEquipment = {
   gold: null,
 };
 
+// A package with BOTH modes (gold: not null) — the realistic shape for a
+// 2014 class, used only to prove the toggle's kind-label still threads
+// through Section -> Editor when the toggle actually renders (#1565 reviewer
+// fix: PACKAGE above's gold:null, the realistic BACKGROUND shape, hides the
+// toggle row entirely, so it can't exercise the label).
+const PACKAGE_WITH_GOLD_ALT: ClassStartingEquipment = {
+  ...PACKAGE,
+  gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
+};
+
 // #1565: this section is reused for BOTH the class's package (default title/
 // kind) and the background's own package (title="Background Equipment",
 // kind="background") — the acceptance criterion is that the picker renders a
@@ -39,7 +49,7 @@ describe("StartingEquipmentSection — background reuse (#1565)", () => {
     expect(screen.queryByRole("heading", { name: "Background Equipment" })).not.toBeInTheDocument();
   });
 
-  it("defaults to the \"Starting Equipment\" title and class kind", () => {
+  it("defaults to the \"Starting Equipment\" title and class kind (no toggle row — this package has no gold alternative)", () => {
     render(
       <StartingEquipmentSection
         startingEquipment={PACKAGE}
@@ -50,10 +60,11 @@ describe("StartingEquipmentSection — background reuse (#1565)", () => {
       />,
     );
     expect(screen.getByRole("heading", { name: "Starting Equipment" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Class equipment package" })).toBeInTheDocument();
+    // #1565 reviewer fix: a one-mode package renders no toggle row at all.
+    expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
   });
 
-  it("renders a distinct \"Background Equipment\" card, with the background-labeled toggle, when passed title/kind", () => {
+  it("renders a distinct \"Background Equipment\" card when passed title/kind", () => {
     render(
       <StartingEquipmentSection
         title="Background Equipment"
@@ -67,6 +78,21 @@ describe("StartingEquipmentSection — background reuse (#1565)", () => {
     );
     expect(screen.getByRole("heading", { name: "Background Equipment" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Starting Equipment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Background equipment package" })).not.toBeInTheDocument();
+  });
+
+  it("threads the background-labeled toggle through Section -> Editor on the rare package that DOES have a gold alternative", () => {
+    render(
+      <StartingEquipmentSection
+        title="Background Equipment"
+        kind="background"
+        startingEquipment={PACKAGE_WITH_GOLD_ALT}
+        value={{ mode: "package", selections: emptyPackageState(PACKAGE_WITH_GOLD_ALT) }}
+        catalog={[]}
+        onChange={vi.fn()}
+        selectedToolChoices={[]}
+      />,
+    );
     expect(screen.getByRole("button", { name: "Background equipment package" })).toBeInTheDocument();
   });
 });

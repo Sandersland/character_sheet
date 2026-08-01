@@ -173,20 +173,44 @@ async function resolveClassIdsByName(prisma: PrismaClient, classNames: string[])
   return new Map(rows.map((c) => [c.name, c.id]));
 }
 
-// #1565's twin of resolveClassIdsByName above. Backgrounds have no unique-by-
-// name guarantee across editions in general (Background.@@unique is
-// [name, edition]) — harmless here because every seeded
-// BACKGROUND_STARTING_EQUIPMENT_PACKAGES name (Acolyte) resolves to a single
-// shared (edition: null) row today, same as every other seeded background.
-async function resolveBackgroundIdsByName(
+// #1565's twin of resolveClassIdsByName above — NOT interchangeable the way
+// the naming suggests: CharacterClass.name is genuinely unique, but
+// Background is @@unique([name, edition]), so one name can legitimately own
+// up to three rows (NULL/2014/2024, #1306). Guarantees the returned Map has
+// at most one id per name — throws, naming the background and every edition
+// found, rather than letting a name that resolves to more than one row
+// silently pick whichever `findMany` happened to return last (a real hazard
+// the moment Charlatan/Folk Hero/Noble get tagged EDITION_2014, or any
+// background forks per #1348 generally: a fork sharing a name with an
+// existing packaged background would silently misfile that package onto the
+// wrong row with no error anywhere). Every background this module actually
+// resolves today has exactly one row per name, so this throws on nobody yet.
+export async function resolveBackgroundIdsByName(
   prisma: PrismaClient,
   backgroundNames: string[],
 ): Promise<Map<string, string>> {
   const rows = await prisma.background.findMany({
     where: { name: { in: backgroundNames } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, edition: true },
   });
-  return new Map(rows.map((b) => [b.name, b.id]));
+
+  const rowsByName = new Map<string, typeof rows>();
+  for (const row of rows) {
+    rowsByName.set(row.name, [...(rowsByName.get(row.name) ?? []), row]);
+  }
+
+  const ambiguous = [...rowsByName.entries()].filter(([, group]) => group.length > 1);
+  if (ambiguous.length > 0) {
+    const detail = ambiguous
+      .map(([name, group]) => `"${name}" (${group.map((r) => r.edition ?? "shared").join(", ")})`)
+      .join("; ");
+    throw new Error(
+      `seedStartingEquipment: ambiguous background name(s) resolve to more than one Background row — ${detail}. ` +
+        "A BACKGROUND_STARTING_EQUIPMENT_PACKAGES entry cannot be written against a forked background by name alone.",
+    );
+  }
+
+  return new Map([...rowsByName.entries()].map(([name, group]) => [name, group[0].id]));
 }
 
 async function writeAllPackages(prisma: PrismaClient, classIdByName: Map<string, string>): Promise<void> {

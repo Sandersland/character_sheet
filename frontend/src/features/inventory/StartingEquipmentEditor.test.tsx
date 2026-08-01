@@ -173,6 +173,10 @@ describe("StartingEquipmentEditor — null gold (#1564)", () => {
     );
 
     expect(screen.queryByText(/Starting gold/)).not.toBeInTheDocument();
+    // #1565 reviewer fix: with no gold alternative, package is the ONLY mode
+    // — a one-option toggle is meaningless, so the whole toggle row (package
+    // button included) is hidden, not just the gold button.
+    expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
   });
 
   it("isGoldValid/draftToInput reject a gold draft when the class has no gold dice at all", () => {
@@ -332,12 +336,21 @@ describe("StartingEquipmentEditor — background reuse (#1565)", () => {
     gold: null,
   };
 
-  it("kind=\"class\" (the default) labels the package toggle \"Class equipment package\"", () => {
+  // The toggle row (package/gold buttons) needs a SECOND mode to be
+  // meaningful (#1565 reviewer fix, below) — real background packages never
+  // have one (gold: null always), so the label tests below use a synthetic
+  // package WITH a gold alternative purely to exercise that row at all.
+  const packageWithGoldAlt: ClassStartingEquipment = {
+    groups: [{ label: "Weapon", options: [{ label: "Dagger", items: [{ catalogName: "Dagger" }] }] }],
+    gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
+  };
+
+  it("kind=\"class\" (the default) labels the package toggle \"Class equipment package\" when both modes exist", () => {
     render(
       <StartingEquipmentEditor
-        startingEquipment={acolyte2024Shaped}
+        startingEquipment={packageWithGoldAlt}
         catalog={catalog}
-        value={packageDraft(acolyte2024Shaped)}
+        value={packageDraft(packageWithGoldAlt)}
         onChange={vi.fn()}
         selectedToolChoices={[]}
       />,
@@ -345,7 +358,26 @@ describe("StartingEquipmentEditor — background reuse (#1565)", () => {
     expect(screen.getByRole("button", { name: "Class equipment package" })).toBeInTheDocument();
   });
 
-  it("kind=\"background\" labels the package toggle \"Background equipment package\"", () => {
+  it("kind=\"background\" labels the package toggle \"Background equipment package\" when both modes exist", () => {
+    render(
+      <StartingEquipmentEditor
+        startingEquipment={packageWithGoldAlt}
+        catalog={catalog}
+        value={packageDraft(packageWithGoldAlt)}
+        onChange={vi.fn()}
+        selectedToolChoices={[]}
+        kind="background"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Background equipment package" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
+  });
+
+  // #1565 reviewer fix: every real background package (and every 2024 class
+  // package) has gold: null, so there is only ONE mode — the toggle row
+  // itself (not just the gold button) must not render at all in that case,
+  // for either `kind`.
+  it("hides the toggle row entirely for a background package with no gold alternative (the real shape)", () => {
     render(
       <StartingEquipmentEditor
         startingEquipment={acolyte2024Shaped}
@@ -356,8 +388,9 @@ describe("StartingEquipmentEditor — background reuse (#1565)", () => {
         kind="background"
       />,
     );
-    expect(screen.getByRole("button", { name: "Background equipment package" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Background equipment package" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Starting gold/)).not.toBeInTheDocument();
   });
 
   it("a 2024-shaped (multi-option) background package renders a real choice — two radio options", () => {

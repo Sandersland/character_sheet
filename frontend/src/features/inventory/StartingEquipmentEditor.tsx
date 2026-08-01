@@ -32,9 +32,10 @@ interface StartingEquipmentEditorProps {
    *  matching the server's boundToolChoiceError so the picker never offers a
    *  choice the write path would reject (#1336). */
   selectedToolChoices: string[];
-  /** #1565: "class" (default) or "background" — the only visible difference
-   *  when this editor is reused for a background's package instead of a
-   *  class's is the package-mode toggle button's label. */
+  /** #1565: "class" (default) or "background" — a background never has a
+   *  gold-roll alternative, so its own mode toggle row never renders at all
+   *  (see the toggle's own render-guard below); this only labels the
+   *  package-mode button on the rare path where BOTH modes exist. */
   kind?: "class" | "background";
 }
 
@@ -482,14 +483,22 @@ export default function StartingEquipmentEditor({
 
   return (
     <div className="flex flex-col gap-5">
-      <ModeToggle
-        isPackage={isPackage}
-        isGold={isGold}
-        gold={gold}
-        onSelectPackage={() => onChange(draftForMode(startingEquipment!, "package"))}
-        onSelectGold={() => onChange(draftForMode(startingEquipment!, "gold"))}
-        packageModeLabel={packageModeLabel}
-      />
+      {/* #1565 reviewer fix: package is always available, so the toggle row
+          itself is only meaningful when a SECOND mode (gold) also exists — a
+          2014 class package. A 2024 class package and every background
+          package (gold: null) have exactly one mode, and a one-option toggle
+          group is not a real choice, so the whole row is hidden rather than
+          rendering a single, unclickable-feeling button. */}
+      {gold && (
+        <ModeToggle
+          isPackage={isPackage}
+          isGold={isGold}
+          gold={gold}
+          onSelectPackage={() => onChange(draftForMode(startingEquipment!, "package"))}
+          onSelectGold={() => onChange(draftForMode(startingEquipment!, "gold"))}
+          packageModeLabel={packageModeLabel}
+        />
+      )}
 
       {isPackage && value.mode === "package" && (
         <div className="flex flex-col gap-5">
