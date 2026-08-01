@@ -20,7 +20,10 @@ export interface SubclassSeed {
   // the Totem Warrior (Barbarian) is the first row to set this —
   // EDITION_2014 only, since SRD 5.2 replaces it with Path of the Wild Heart
   // rather than retabbing it (#1559) — so a 2024 character is no longer
-  // offered a subclass with zero features in its edition.
+  // offered a subclass with zero features in its edition. The Archfey and The
+  // Great Old One (Warlock, #1233) are the same shape: their PHB'24 reworks
+  // are non-SRD and unverifiable, so no 2024 rows are authored and both are
+  // tagged EDITION_2014 here in the same commit.
   edition?: SeedEdition;
 }
 
@@ -260,6 +263,7 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "Your patron is a lord or lady of the Feywild. Fey Presence (charm or frighten nearby creatures as an action) and Misty Escape (teleport and turn invisible as a reaction when hit) define your early power. At higher levels you become immune to charm, can beguile minds, and can blur the line between dream and reality.",
     slug: "warlock-the-archfey",
+    edition: "EDITION_2014",
   },
   {
     className: "Warlock",
@@ -267,5 +271,6 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "Your patron is an entity of unfathomable cosmic power. Awakened Mind lets you telepathically communicate with any creature you can see. You gain spells such as Dissonant Whispers and Detect Thoughts, and eventually can project your awareness across planes, speak into the minds of others, and create a lair in the Far Realm.",
     slug: "warlock-the-great-old-one",
+    edition: "EDITION_2014",
   },
 ];

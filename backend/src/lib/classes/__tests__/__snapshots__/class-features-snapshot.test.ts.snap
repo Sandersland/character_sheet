@@ -11532,123 +11532,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / (no subclass) 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]
@@ -11657,123 +11617,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / arcane trickster 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]
@@ -11782,123 +11702,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / assassin 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]
@@ -11907,123 +11787,83 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > rogue / thief 1`] = `
 [
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 1,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 2,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 3,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 4,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 5,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 6,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 7,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 8,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 9,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 10,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 11,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 12,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 13,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 14,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 15,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 16,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 17,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 18,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 19,
   },
   {
-    "info": {
-      "resources": [],
-    },
+    "info": null,
     "level": 20,
   },
 ]
@@ -12996,115 +12836,267 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 3,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 4,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 5,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 6,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 7,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 8,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 9,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 10,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 11,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 12,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 13,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 14,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 15,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 16,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 17,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 18,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 19,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 20,
   },
@@ -13121,7 +13113,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
@@ -13129,7 +13129,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
@@ -13143,7 +13150,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
@@ -13157,7 +13171,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
@@ -13171,14 +13192,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13192,14 +13220,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13213,14 +13248,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13234,14 +13276,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13255,14 +13304,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13276,14 +13332,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13297,14 +13360,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13318,14 +13388,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
@@ -13339,21 +13416,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Action: plunge a creature into an illusory dreamscape (Wisdom save). Charmed or frightened and incapacitated. Regain use on a short or long rest.",
+          "description": "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
           "key": "darkDelirium",
           "label": "Dark Delirium",
           "recharge": "short-or-long",
@@ -13367,21 +13451,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Action: plunge a creature into an illusory dreamscape (Wisdom save). Charmed or frightened and incapacitated. Regain use on a short or long rest.",
+          "description": "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
           "key": "darkDelirium",
           "label": "Dark Delirium",
           "recharge": "short-or-long",
@@ -13395,21 +13486,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Action: plunge a creature into an illusory dreamscape (Wisdom save). Charmed or frightened and incapacitated. Regain use on a short or long rest.",
+          "description": "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
           "key": "darkDelirium",
           "label": "Dark Delirium",
           "recharge": "short-or-long",
@@ -13423,21 +13521,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Action: plunge a creature into an illusory dreamscape (Wisdom save). Charmed or frightened and incapacitated. Regain use on a short or long rest.",
+          "description": "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
           "key": "darkDelirium",
           "label": "Dark Delirium",
           "recharge": "short-or-long",
@@ -13451,21 +13556,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Action: plunge a creature into an illusory dreamscape (Wisdom save). Charmed or frightened and incapacitated. Regain use on a short or long rest.",
+          "description": "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
           "key": "darkDelirium",
           "label": "Dark Delirium",
           "recharge": "short-or-long",
@@ -13479,21 +13591,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Action: plunge a creature into an illusory dreamscape (Wisdom save). Charmed or frightened and incapacitated. Regain use on a short or long rest.",
+          "description": "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
           "key": "darkDelirium",
           "label": "Dark Delirium",
           "recharge": "short-or-long",
@@ -13507,21 +13626,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: charm or frighten creatures in a 10-ft cube (Wisdom save). Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
           "key": "feyPresence",
           "label": "Fey Presence",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Reaction when damaged: turn invisible and teleport up to 60 ft. Lasts until start of next turn. Regain use on a short or long rest.",
+          "description": "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
           "key": "mistyEscape",
           "label": "Misty Escape",
           "recharge": "short-or-long",
           "total": 1,
         },
         {
-          "description": "Action: plunge a creature into an illusory dreamscape (Wisdom save). Charmed or frightened and incapacitated. Regain use on a short or long rest.",
+          "description": "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
           "key": "darkDelirium",
           "label": "Dark Delirium",
           "recharge": "short-or-long",
@@ -13544,25 +13670,57 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 3,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 4,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 5,
   },
@@ -13570,11 +13728,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13584,11 +13749,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13598,11 +13770,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13612,11 +13791,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13626,11 +13812,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13640,11 +13833,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13654,11 +13854,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13668,11 +13875,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
           "key": "darkOnesOwnLuck",
           "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13682,14 +13896,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
-          "key": "darkOnesOwnLuck",
-          "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "When you hit a creature, banish it through the Lower Planes until the start of your next turn (10d10 psychic damage). Regain use on a long rest.",
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+          "key": "darkOnesOwnLuck",
+          "label": "Dark One's Own Luck",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
           "key": "hurlThroughHell",
           "label": "Hurl Through Hell",
           "recharge": "longRest",
@@ -13703,14 +13924,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
-          "key": "darkOnesOwnLuck",
-          "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "When you hit a creature, banish it through the Lower Planes until the start of your next turn (10d10 psychic damage). Regain use on a long rest.",
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+          "key": "darkOnesOwnLuck",
+          "label": "Dark One's Own Luck",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
           "key": "hurlThroughHell",
           "label": "Hurl Through Hell",
           "recharge": "longRest",
@@ -13724,14 +13952,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
-          "key": "darkOnesOwnLuck",
-          "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "When you hit a creature, banish it through the Lower Planes until the start of your next turn (10d10 psychic damage). Regain use on a long rest.",
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+          "key": "darkOnesOwnLuck",
+          "label": "Dark One's Own Luck",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
           "key": "hurlThroughHell",
           "label": "Hurl Through Hell",
           "recharge": "longRest",
@@ -13745,14 +13980,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
-          "key": "darkOnesOwnLuck",
-          "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "When you hit a creature, banish it through the Lower Planes until the start of your next turn (10d10 psychic damage). Regain use on a long rest.",
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+          "key": "darkOnesOwnLuck",
+          "label": "Dark One's Own Luck",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
           "key": "hurlThroughHell",
           "label": "Hurl Through Hell",
           "recharge": "longRest",
@@ -13766,14 +14008,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
-          "key": "darkOnesOwnLuck",
-          "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "When you hit a creature, banish it through the Lower Planes until the start of your next turn (10d10 psychic damage). Regain use on a long rest.",
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+          "key": "darkOnesOwnLuck",
+          "label": "Dark One's Own Luck",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
           "key": "hurlThroughHell",
           "label": "Hurl Through Hell",
           "recharge": "longRest",
@@ -13787,14 +14036,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
-          "key": "darkOnesOwnLuck",
-          "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "When you hit a creature, banish it through the Lower Planes until the start of your next turn (10d10 psychic damage). Regain use on a long rest.",
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+          "key": "darkOnesOwnLuck",
+          "label": "Dark One's Own Luck",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
           "key": "hurlThroughHell",
           "label": "Hurl Through Hell",
           "recharge": "longRest",
@@ -13808,14 +14064,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Add 1d10 to one ability check or saving throw. Regain use on a short or long rest.",
-          "key": "darkOnesOwnLuck",
-          "label": "Dark One's Own Luck",
-          "recharge": "short-or-long",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "When you hit a creature, banish it through the Lower Planes until the start of your next turn (10d10 psychic damage). Regain use on a long rest.",
+          "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
+          "key": "darkOnesOwnLuck",
+          "label": "Dark One's Own Luck",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
           "key": "hurlThroughHell",
           "label": "Hurl Through Hell",
           "recharge": "longRest",
@@ -13838,25 +14101,57 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 2,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 3,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 4,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
     },
     "level": 5,
   },
@@ -13864,7 +14159,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13878,7 +14180,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13892,7 +14201,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13906,7 +14222,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13920,7 +14243,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13934,7 +14264,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13948,7 +14285,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13962,7 +14306,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13976,7 +14327,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -13990,7 +14348,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -14004,7 +14369,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -14018,7 +14390,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -14032,7 +14411,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -14046,7 +14432,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -14060,7 +14453,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Reaction: impose disadvantage on one attack against you. If it misses, you have advantage on your next attack against it. Regain use on a short or long rest.",
+          "description": "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+          "key": "magicalCunning",
+          "label": "Magical Cunning",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
           "key": "entropicWard",
           "label": "Entropic Ward",
           "recharge": "short-or-long",
@@ -14079,7 +14479,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14093,7 +14493,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14107,7 +14507,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14121,7 +14521,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14135,7 +14535,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14149,7 +14549,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14163,7 +14563,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14177,7 +14577,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14191,7 +14591,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14205,7 +14605,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14219,7 +14619,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14233,7 +14633,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14247,7 +14647,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14261,7 +14661,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14275,7 +14675,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14289,7 +14689,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14303,7 +14703,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14317,7 +14717,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14331,7 +14731,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14345,7 +14745,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14364,7 +14764,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14378,7 +14778,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14392,7 +14792,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14406,7 +14806,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14420,7 +14820,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14434,7 +14834,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14448,7 +14848,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14462,7 +14862,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14476,7 +14876,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14490,7 +14890,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14504,7 +14904,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14518,7 +14918,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14532,7 +14932,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14546,7 +14946,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14560,7 +14960,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14574,7 +14974,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14588,7 +14988,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14602,7 +15002,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14616,7 +15016,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14630,7 +15030,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14649,7 +15049,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14663,7 +15063,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14677,7 +15077,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14691,7 +15091,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14705,7 +15105,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14719,7 +15119,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14733,7 +15133,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14747,7 +15147,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14761,7 +15161,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14775,7 +15175,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14789,7 +15189,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14803,7 +15203,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14817,7 +15217,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14831,7 +15231,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14845,7 +15245,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14859,7 +15259,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14873,7 +15273,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14887,7 +15287,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14901,7 +15301,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14915,7 +15315,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14934,7 +15334,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14948,7 +15348,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14962,7 +15362,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14976,7 +15376,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -14990,7 +15390,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -15004,7 +15404,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -15018,7 +15418,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -15032,7 +15432,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -15046,7 +15446,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
@@ -15060,14 +15460,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15081,14 +15481,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15102,14 +15502,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15123,14 +15523,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15144,14 +15544,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15165,14 +15565,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15186,14 +15586,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15207,14 +15607,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15228,14 +15628,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15249,14 +15649,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",
@@ -15270,14 +15670,14 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Once per day when finishing a short rest, recover expended spell slots totalling up to half your wizard level (rounded up), none above 5th level. Regained on a long rest.",
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
           "key": "arcaneRecovery",
           "label": "Arcane Recovery",
           "recharge": "longRest",
           "total": 1,
         },
         {
-          "description": "Reaction: an illusory duplicate causes an attack against you to automatically miss. Regain use on a short or long rest.",
+          "description": "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
           "key": "illusorySelf",
           "label": "Illusory Self",
           "recharge": "short-or-long",

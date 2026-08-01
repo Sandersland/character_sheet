@@ -166,12 +166,65 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 // 10->14) share their name across editions same as everything else here —
 // taggedNamesFor keys on name alone, not level, so a level-shifted pair
 // counts as "tagged" exactly like a same-level rewrite.
+// Rogue's 53 new triples (#1231), derived from the test's own failure diff
+// (not hand-guessed): 10 base-class names genuinely forked (Cunning Action,
+// Elusive, Evasion, Expertise, Reliable Talent, Slippery Mind, Sneak Attack,
+// Stroke of Luck, Thieves' Cant, Uncanny Dodge) show up under EVERY subclass
+// context Rogue has (undefined/arcane trickster/assassin/thief) — 10 x 4 =
+// 40 — plus Arcane Trickster's own 5 (Arcane Trickster Spellcasting, Mage
+// Hand Legerdemain, Magical Ambush, Spell Thief, Versatile Trickster),
+// Assassin's own 3 (Assassinate, Death Strike, Infiltration Expertise), and
+// Thief's own 5 (Fast Hands, Second-Story Work, Supreme Sneak, Thief's
+// Reflexes, Use Magic Device) = 53. Reliable Talent's level-shift (11->7)
+// counts as "tagged" the same way Barbarian's Berserker level-shifts do —
+// taggedNamesFor keys on name alone. Weapon Mastery/Steady Aim/Cunning
+// Strike/Improved Cunning Strike/Devious Strikes/Epic Boon (base) and
+// Assassin's Tools/Envenom Weapons (Assassin) are NOT here: each has exactly
+// one description under its name (2024-only, no 2014 row to diverge from).
+// Assassin's own Bonus Proficiencies/Impostor are the same "one description,
+// no 2014 counterpart to fork against" shape, just on the 2014 side.
+// Infiltration Expertise IS tagged (both editions have a row under that
+// name) even though it's a same-name FORK rather than a rewrite — taggedNamesFor
+// cannot distinguish the two shapes, and doesn't need to: either way the name
+// legitimately carries two different descriptions.
+// Warlock's 20 new triples (#1233): the 4 base-class names that genuinely
+// fork (Pact Magic, Eldritch Invocations, Mystic Arcanum, Eldritch Master)
+// show up under EVERY subclass context Warlock has (undefined/the fiend/the
+// archfey/the great old one — collectTaggedFeatureKeys combines classRows,
+// always ALL of them, with each context's own subclassRows) — 4 contexts x 4
+// base names = 16, plus The Fiend's own 4 forked subclass names (Dark One's
+// Blessing, Dark One's Own Luck, Fiendish Resilience, Hurl Through Hell) = 20.
+// The three "Expanded Spell List" triples that used to be here are GONE, not
+// merely renamed: The Fiend's row renames to "Fiend Spells" (a 2024-only
+// name, so never tagged — one description, not two); The Archfey's/The Great
+// Old One's rows are now EDITION_2014-only (zero 2024 rows authored at all,
+// owner decision #1233), so each has exactly one description under its name
+// too. Pact Boon (2014-only)/Magical Cunning/Contact Patron/Epic Boon
+// (2024-only) are the same "one description under this name" shape, so none
+// of those are tagged either.
 const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["cleric", "life domain", "Domain Spells"],
   ["cleric", "trickery domain", "Domain Spells"],
-  ["warlock", "the fiend", "Expanded Spell List"],
-  ["warlock", "the archfey", "Expanded Spell List"],
-  ["warlock", "the great old one", "Expanded Spell List"],
+  ["warlock", "undefined", "Pact Magic"],
+  ["warlock", "undefined", "Eldritch Invocations"],
+  ["warlock", "undefined", "Mystic Arcanum"],
+  ["warlock", "undefined", "Eldritch Master"],
+  ["warlock", "the fiend", "Pact Magic"],
+  ["warlock", "the fiend", "Eldritch Invocations"],
+  ["warlock", "the fiend", "Mystic Arcanum"],
+  ["warlock", "the fiend", "Eldritch Master"],
+  ["warlock", "the fiend", "Dark One's Blessing"],
+  ["warlock", "the fiend", "Dark One's Own Luck"],
+  ["warlock", "the fiend", "Fiendish Resilience"],
+  ["warlock", "the fiend", "Hurl Through Hell"],
+  ["warlock", "the archfey", "Pact Magic"],
+  ["warlock", "the archfey", "Eldritch Invocations"],
+  ["warlock", "the archfey", "Mystic Arcanum"],
+  ["warlock", "the archfey", "Eldritch Master"],
+  ["warlock", "the great old one", "Pact Magic"],
+  ["warlock", "the great old one", "Eldritch Invocations"],
+  ["warlock", "the great old one", "Mystic Arcanum"],
+  ["warlock", "the great old one", "Eldritch Master"],
   ["barbarian", "undefined", "Rage"],
   ["barbarian", "undefined", "Unarmored Defense"],
   ["barbarian", "undefined", "Danger Sense"],
@@ -233,6 +286,103 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["fighter", "eldritch knight", "Action Surge"],
   ["fighter", "eldritch knight", "Extra Attack"],
   ["fighter", "eldritch knight", "Indomitable"],
+  ["rogue", "undefined", "Cunning Action"],
+  ["rogue", "undefined", "Elusive"],
+  ["rogue", "undefined", "Evasion"],
+  ["rogue", "undefined", "Expertise"],
+  ["rogue", "undefined", "Reliable Talent"],
+  ["rogue", "undefined", "Slippery Mind"],
+  ["rogue", "undefined", "Sneak Attack"],
+  ["rogue", "undefined", "Stroke of Luck"],
+  ["rogue", "undefined", "Thieves' Cant"],
+  ["rogue", "undefined", "Uncanny Dodge"],
+  ["rogue", "arcane trickster", "Cunning Action"],
+  ["rogue", "arcane trickster", "Elusive"],
+  ["rogue", "arcane trickster", "Evasion"],
+  ["rogue", "arcane trickster", "Expertise"],
+  ["rogue", "arcane trickster", "Reliable Talent"],
+  ["rogue", "arcane trickster", "Slippery Mind"],
+  ["rogue", "arcane trickster", "Sneak Attack"],
+  ["rogue", "arcane trickster", "Stroke of Luck"],
+  ["rogue", "arcane trickster", "Thieves' Cant"],
+  ["rogue", "arcane trickster", "Uncanny Dodge"],
+  ["rogue", "arcane trickster", "Arcane Trickster Spellcasting"],
+  ["rogue", "arcane trickster", "Mage Hand Legerdemain"],
+  ["rogue", "arcane trickster", "Magical Ambush"],
+  ["rogue", "arcane trickster", "Spell Thief"],
+  ["rogue", "arcane trickster", "Versatile Trickster"],
+  ["rogue", "assassin", "Cunning Action"],
+  ["rogue", "assassin", "Elusive"],
+  ["rogue", "assassin", "Evasion"],
+  ["rogue", "assassin", "Expertise"],
+  ["rogue", "assassin", "Reliable Talent"],
+  ["rogue", "assassin", "Slippery Mind"],
+  ["rogue", "assassin", "Sneak Attack"],
+  ["rogue", "assassin", "Stroke of Luck"],
+  ["rogue", "assassin", "Thieves' Cant"],
+  ["rogue", "assassin", "Uncanny Dodge"],
+  ["rogue", "assassin", "Assassinate"],
+  ["rogue", "assassin", "Death Strike"],
+  ["rogue", "assassin", "Infiltration Expertise"],
+  ["rogue", "thief", "Cunning Action"],
+  ["rogue", "thief", "Elusive"],
+  ["rogue", "thief", "Evasion"],
+  ["rogue", "thief", "Expertise"],
+  ["rogue", "thief", "Reliable Talent"],
+  ["rogue", "thief", "Slippery Mind"],
+  ["rogue", "thief", "Sneak Attack"],
+  ["rogue", "thief", "Stroke of Luck"],
+  ["rogue", "thief", "Thieves' Cant"],
+  ["rogue", "thief", "Uncanny Dodge"],
+  ["rogue", "thief", "Fast Hands"],
+  ["rogue", "thief", "Second-Story Work"],
+  ["rogue", "thief", "Supreme Sneak"],
+  ["rogue", "thief", "Thief's Reflexes"],
+  ["rogue", "thief", "Use Magic Device"],
+  // Wizard's 28 new triples (#1234): the 4 base names that genuinely fork
+  // (Spellcasting, Arcane Recovery, Spell Mastery, Signature Spells) show up
+  // under EVERY subclass context Wizard has (undefined/school of evocation/
+  // school of abjuration/school of illusion), same reason Fighter's 5 base
+  // names show up under all 4 of ITS contexts (collectTaggedFeatureKeys
+  // combines classRows with EVERY subclass's own rows) — 4 x 4 = 16, plus
+  // Evocation's own 5 (Evocation Savant, Sculpt Spells, Potent Cantrip,
+  // Empowered Evocation, Overchannel — ALL five share a name across editions,
+  // only level/wording shift), Abjuration's own 4 (Abjuration Savant, Arcane
+  // Ward, Projected Ward, Spell Resistance — Improved Abjuration/Spell
+  // Breaker share no name, so neither counts), and Illusion's own 3 (Illusion
+  // Savant, Illusory Self, Illusory Reality — Improved Minor Illusion/
+  // Improved Illusions and Malleable Illusions/Phantasmal Creatures each
+  // share no name, so none of those four count) = 16 + 5 + 4 + 3 = 28.
+  // Ritual Adept/Scholar/Memorize Spell/Epic Boon are NOT tagged (2024-only,
+  // no 2014 twin to diverge from).
+  ["wizard", "undefined", "Spellcasting"],
+  ["wizard", "undefined", "Arcane Recovery"],
+  ["wizard", "undefined", "Spell Mastery"],
+  ["wizard", "undefined", "Signature Spells"],
+  ["wizard", "school of evocation", "Spellcasting"],
+  ["wizard", "school of evocation", "Arcane Recovery"],
+  ["wizard", "school of evocation", "Spell Mastery"],
+  ["wizard", "school of evocation", "Signature Spells"],
+  ["wizard", "school of evocation", "Evocation Savant"],
+  ["wizard", "school of evocation", "Sculpt Spells"],
+  ["wizard", "school of evocation", "Potent Cantrip"],
+  ["wizard", "school of evocation", "Empowered Evocation"],
+  ["wizard", "school of evocation", "Overchannel"],
+  ["wizard", "school of abjuration", "Spellcasting"],
+  ["wizard", "school of abjuration", "Arcane Recovery"],
+  ["wizard", "school of abjuration", "Spell Mastery"],
+  ["wizard", "school of abjuration", "Signature Spells"],
+  ["wizard", "school of abjuration", "Abjuration Savant"],
+  ["wizard", "school of abjuration", "Arcane Ward"],
+  ["wizard", "school of abjuration", "Projected Ward"],
+  ["wizard", "school of abjuration", "Spell Resistance"],
+  ["wizard", "school of illusion", "Spellcasting"],
+  ["wizard", "school of illusion", "Arcane Recovery"],
+  ["wizard", "school of illusion", "Spell Mastery"],
+  ["wizard", "school of illusion", "Signature Spells"],
+  ["wizard", "school of illusion", "Illusion Savant"],
+  ["wizard", "school of illusion", "Illusory Self"],
+  ["wizard", "school of illusion", "Illusory Reality"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

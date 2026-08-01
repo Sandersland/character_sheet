@@ -128,8 +128,25 @@ beforeAll(async () => {
       // higher-level Battle Master feature enters the snapshot — only the
       // corrected Combat Superiority/Student of War text is new output.
       ...battleMasterResourceRowsData(fighterClassId, battleMasterSubclassId),
-      { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You copy spells into your spellbook and prepare a number equal to your Intelligence modifier + your wizard level (minimum 1) after each long rest." },
-      { classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024", description: "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots)." },
+      // #1234: hand-copied verbatim from the real seeded EDITION_2024 rows
+      // (wizard-features.ts) — the earlier version of this fixture was
+      // tagged EDITION_2024 but carried the 2014 TEXT, the exact stale-copy
+      // shape this issue's own guard (EDITIONS_STILL_IDENTICAL) exists to
+      // close. This bespoke "Test Wizard" class authors only these two rows
+      // (never Ritual Adept/Scholar/Memorize Spell/etc.), so only the
+      // corrected Spellcasting/Arcane Recovery TEXT is new snapshot output —
+      // no new feature enters it. Arcane Recovery's resource columns (#1234
+      // commit 3) are also mirrored here — wizard.ts's resourceFn that used
+      // to supply this pool regardless of any DB row is deleted, so this
+      // bespoke class needs its own row descriptor or the pool vanishes from
+      // the snapshot entirely instead of just changing its description.
+      { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You know three Wizard cantrips (one more at levels 4 and 10), replacing one on a Long Rest. Your spellbook holds your level 1+ spells: it starts with six 1st-level spells, and you add two spells of your choice whenever you gain a Wizard level after 1st. You regain all expended spell slots on a Long Rest, and you change your list of prepared spells whenever you finish a Long Rest." },
+      {
+        classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024",
+        description: "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+        resourceKey: "arcaneRecovery", resourceLabel: "Arcane Recovery", resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 1, total: 1 }],
+      },
     ],
   });
 });

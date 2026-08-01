@@ -305,6 +305,26 @@ describe("rest/level-up branch pins (#684)", () => {
       update: {},
     });
     wizClassId = wiz.id;
+    // #1234 commit 3: Arcane Recovery's pool moved off wizard.ts's resourceFn
+    // onto its ClassFeature row (wizard-features.ts) — this bespoke test
+    // class needs its own row now, or the longRest-reset test below finds no
+    // arcaneRecovery pool at all (poolsFromRows reads a real relation, not
+    // the old name-keyed TS registry).
+    await prisma.classFeature.deleteMany({ where: { classId: wiz.id, name: "Arcane Recovery" } });
+    await prisma.classFeature.createMany({
+      data: (["EDITION_2014", "EDITION_2024"] as const).map((edition) => ({
+        classId: wiz.id,
+        subclassId: null,
+        name: "Arcane Recovery",
+        level: 1,
+        edition,
+        description: "Arcane Recovery test fixture row.",
+        resourceKey: "arcaneRecovery",
+        resourceLabel: "Arcane Recovery",
+        resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 1, total: 1 }],
+      })),
+    });
     const warlock = await prisma.characterClass.upsert({
       where: { name: WARLOCK_CLASS },
       create: { name: WARLOCK_CLASS, hitDie: "d8", savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2, skillChoices: ["arcana"], isSpellcaster: true, subclassLevel: 1 },
@@ -395,7 +415,9 @@ describe("rest/level-up branch pins (#684)", () => {
 
   it("longRest with used slots + arcanum + concentration: all restored, concentration dropped", async () => {
     await createPlain("hp684-lr", {
-      classEntries: { create: [{ name: "Wizard", position: 0, level: 5 }] },
+      // #1234 commit 3: classId now required — see this describe's beforeAll
+      // for why (poolsFromRows needs the real relation, not a bare name match).
+      classEntries: { create: [{ name: "Wizard", classId: wizClassId, position: 0, level: 5 }] },
       spellcasting: {
         slotsUsed: { "1": 2, "2": 1 },
         arcanumUsed: { "6": 1 },

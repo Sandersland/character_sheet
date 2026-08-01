@@ -21,6 +21,7 @@ import {
   seedClassFeatures,
   type SubclassPresenceInput,
 } from "../seed-class-features.js";
+import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
 describe("subclassPopulationFailures — pure guard logic, fabricated inputs (#1559)", () => {
   const row = (overrides: Partial<SubclassPresenceInput>): SubclassPresenceInput => ({
@@ -91,6 +92,19 @@ describe("assertEverySubclassEditionPopulated — real seeded catalog (#1559)", 
     await expect(assertEverySubclassEditionPopulated(prisma)).resolves.toBeDefined();
   });
 
+  // Same Totem-Warrior-shaped disclosure as above, extended (#1233): The
+  // Archfey and The Great Old One's PHB'24 reworks are non-SRD and
+  // unverifiable, so the same "tag EDITION_2014, author zero EDITION_2024
+  // rows" fix applies to both — without it, the seed would offer either
+  // patron to a 2024 character with zero ClassFeature rows to serve, hard-
+  // failing this exact guard.
+  it("Warlock's The Archfey and The Great Old One are tagged EDITION_2014 for the same reason as Totem Warrior", async () => {
+    const archfey = await prisma.subclass.findFirstOrThrow({ where: { slug: "warlock-the-archfey" } });
+    const greatOldOne = await prisma.subclass.findFirstOrThrow({ where: { slug: "warlock-the-great-old-one" } });
+    expect(archfey.edition).toBe("EDITION_2014");
+    expect(greatOldOne.edition).toBe("EDITION_2014");
+  });
+
   it("reports non-vacuous summary counts against the real catalog", async () => {
     const summary = await assertEverySubclassEditionPopulated(prisma);
     // 31 seeded subclasses today; every one of them is checked in at least
@@ -113,7 +127,7 @@ describe("assertEverySubclassEditionPopulated — mutation proof, both direction
     });
     await prisma.subclass.update({ where: { id: totemWarrior.id }, data: { edition: "EDITION_2014" } });
     await seedClassFeatures(prisma);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   // Reproduces the EXACT pre-#1559 HEAD condition (verified empirically
   // against a throwaway DB before this guard existed): Subclass.edition back
@@ -157,5 +171,5 @@ describe("assertEverySubclassEditionPopulated — mutation proof, both direction
       where: { subclassId: totemWarrior.id, edition: "EDITION_2014" },
     });
     expect(after).toBe(before);
-  });
+  }, RESEED_TIMEOUT_MS);
 });

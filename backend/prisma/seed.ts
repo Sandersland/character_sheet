@@ -91,11 +91,30 @@ async function upsertGrantedSpell(
 ) {
   const classId = classIds.get(g.className);
   if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
-  // Every seeded subclass is edition: null (shared) today (#1306) — no granted
-  // spell yet targets an edition-forked subclass. findFirst, not findUnique:
-  // the compound-key shorthand can't express a null edition (upsertEditionRow).
+  // SubclassGrantedSpellSeed carries no `edition` of its own (unlike
+  // SubclassSeed) — it was authored back when every seeded subclass was
+  // edition: null (shared, #1306). #1233 is the first row to break that:
+  // The Archfey/The Great Old One are now tagged EDITION_2014 (their PHB'24
+  // reworks are non-SRD, so they're offered to 2014 characters only), and
+  // this lookup's old hardcoded `edition: null` filter would no longer find
+  // them. Resolving by (classId, name) ALONE — not `resolveEditionRow`, which
+  // needs a character's edition to pick between candidates — is correct as
+  // long as at most one Subclass row exists per name, which the schema's
+  // `@@unique([classId, name, edition])` only guarantees once this data model
+  // itself gains an edition column of its own (not needed today: no name
+  // here has ever forked into two rows). findFirst, not findUnique: the
+  // compound-key shorthand can't express a null edition (upsertEditionRow).
+  //
+  // `orderBy` is load-bearing DESPITE that one-row-per-name invariant: Postgres
+  // LIMIT 1 without ORDER BY is implementation-defined, so the day a name DOES
+  // fork into two rows — and Archfey/GOO are expected to, once their PHB'24
+  // content is authored — this would silently bind whichever row the planner
+  // returned first. It stays deterministic instead, which turns that future
+  // change into a visibly wrong grant rather than a flaky one. Whoever adds the
+  // second row must replace this with a real edition filter, not re-sort it.
   const subclass = await prisma.subclass.findFirst({
-    where: { classId, name: g.subclassName, edition: null },
+    where: { classId, name: g.subclassName },
+    orderBy: { id: "asc" },
     select: { id: true },
   });
   if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);

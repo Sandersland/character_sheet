@@ -428,16 +428,17 @@ describe("deriveResources — Cleric Channel Divinity", () => {
   });
 });
 
-// ── Features-only classes (Rogue, Ranger, Wizard, Warlock) ──────────────────
+// ── Features-only classes (Ranger, Wizard, Warlock) ─────────────────────────
+// Rogue's own case moved out of this synchronous, TS-fixture-driven suite in
+// #1231 commit 4: `lib/classes/rogue.ts` is deleted, so `testFeatureRowsFor(
+// "rogue", ...)` now yields an EMPTY carrier (Rogue is no longer in
+// TEST_CLASSES) and `deriveResources` correctly returns null for it here —
+// the same absent-class shape Fighter's and Barbarian's own deletions never
+// exercised in this file (neither was ever listed above). Rogue's real
+// "features but no resource pools" behaviour is covered DB-backed instead,
+// by rogue-unregistered.test.ts's own resource-pool-emptiness check.
 
 describe("deriveResources — features-only classes", () => {
-  it("Rogue has features but no resource pools", () => {
-    const result = deriveResources("rogue", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("rogue", undefined), "EDITION_2024");
-    expect(result).not.toBeNull();
-    expect(result!.resources).toHaveLength(0);
-    expect(result!.features.length).toBeGreaterThan(0);
-  });
-
   it("Ranger has features but no resource pools", () => {
     const result = deriveResources("ranger", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("ranger", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
@@ -452,11 +453,21 @@ describe("deriveResources — features-only classes", () => {
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
-  it("Warlock has features but no resource pools", () => {
+  // #1233: the base class gained a real pool (Magical Cunning, L2) once its
+  // 2024 content and resource columns were authored — this class is no
+  // longer "features-only" at level 5 EDITION_2024. Below level 2 it still
+  // has none.
+  it("Warlock has features and, from level 2 on, the Magical Cunning pool (#1233)", () => {
     const result = deriveResources("warlock", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("warlock", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
-    expect(result!.resources).toHaveLength(0);
+    expect(result!.resources.map((r) => r.key)).toEqual(["magicalCunning"]);
     expect(result!.features.length).toBeGreaterThan(0);
+  });
+
+  it("Warlock has no resource pools below level 2 EDITION_2024 (Magical Cunning's own grant level)", () => {
+    const result = deriveResources("warlock", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("warlock", undefined), "EDITION_2024");
+    expect(result).not.toBeNull();
+    expect(result!.resources).toHaveLength(0);
   });
 });
 

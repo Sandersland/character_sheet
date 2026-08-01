@@ -9,7 +9,7 @@ import {
 } from "@/lib/srd/srd.js";
 import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
 import { currencyOrEmpty } from "@/lib/inventory/inventory-currency.js";
-import { sneakAttackSpec } from "@/lib/classes/rogue.js";
+import { sneakAttackSpecForEntries } from "@/lib/classes/sneak-attack.js";
 import { monkSaveDC } from "@/lib/classes/monk.js";
 import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
@@ -55,9 +55,11 @@ export { buildRollModifiers };
 // null ones.
 
 // Sneak Attack: the Nd6 dice spec, undefined for a non-rogue. Scales with
-// rogue class levels, matching applySneakAttackOperations.
+// rogue class levels, matching applySneakAttackOperations — both now go
+// through sneak-attack.ts's sneakAttackSpecForEntries (#1231 commit 3), which
+// is the one place the "which class entry is the rogue" lookup lives.
 function sneakAttackRider(classEntries: { name: string; level: number }[]): DiceRider | undefined {
-  const spec = sneakAttackSpec(classEntries.find((c) => c.name.toLowerCase() === "rogue")?.level ?? 0);
+  const spec = sneakAttackSpecForEntries(classEntries);
   return spec ? { dice: { count: spec.count, faces: spec.faces } } : undefined;
 }
 
