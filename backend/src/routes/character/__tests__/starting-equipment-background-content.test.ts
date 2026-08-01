@@ -184,26 +184,32 @@ describe("real Acolyte background package resolves per-edition, never one servin
 });
 
 describe("a background with no package still creates successfully (#1565)", () => {
-  // Folk Hero, not Charlatan: since #1570 Charlatan carries a PHB'24 package,
-  // so it would exercise the HAS-a-package path and pass for the wrong reason.
-  // Folk Hero is the only background with no package in either edition —
-  // PHB'24 dropped it and it has no SRD text.
-  it("Folk Hero (no package in either edition) creates fine with no backgroundStartingEquipment sent", async () => {
+  // 2014 Charlatan. This fixture has now moved twice for the same reason: it
+  // must be a background that RESOLVES under the character's edition and simply
+  // has no package, or it silently exercises the unknown-name path instead.
+  // Charlatan was wrong once #1570 gave it a 2024 package; Folk Hero was wrong
+  // once #1570 tagged it EDITION_2014 (a 2024 character's "Folk Hero" stops
+  // resolving and becomes homebrew). SRD 5.1 ships only Acolyte, so every 2014
+  // background but that one is a valid choice here.
+  it("2014 Charlatan (resolves, but SRD 5.1 gives it no package) creates fine with no backgroundStartingEquipment sent", async () => {
     const response = await supertest
       .agent(createApp())
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
         baseBody({
-          name: "Folk Hero No Equipment",
-          background: "Folk Hero",
+          name: "Charlatan No Equipment",
+          background: "Charlatan",
           classes: [{ name: "Rogue" }],
-          rulesEdition: "EDITION_2024",
+          rulesEdition: "EDITION_2014",
         }),
       );
     expect(response.status).toBe(201);
     createdCharacterIds.push(response.body.id);
     expect(response.body.inventory).toEqual([]);
+    // Distinguishes this from the homebrew path below: the name really did
+    // resolve to a catalog row, so "no package" is the branch under test.
+    expect(response.body.background).toBe("Charlatan");
   });
 
   it("sending backgroundStartingEquipment for a background with no package 400s", async () => {
@@ -213,10 +219,10 @@ describe("a background with no package still creates successfully (#1565)", () =
       .post("/api/characters")
       .send(
         baseBody({
-          name: "Folk Hero Rejected",
-          background: "Folk Hero",
+          name: "Charlatan Rejected",
+          background: "Charlatan",
           classes: [{ name: "Rogue" }],
-          rulesEdition: "EDITION_2024",
+          rulesEdition: "EDITION_2014",
           backgroundStartingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] },
         }),
       );
@@ -240,6 +246,88 @@ describe("a background with no package still creates successfully (#1565)", () =
     expect(response.status).toBe(201);
     createdCharacterIds.push(response.body.id);
     expect(response.body.inventory).toEqual([]);
+  });
+});
+
+// #1570: the first 2014 background package with an open pick, and the first
+// UNBOUND tool pick anywhere — Soldier's and Noble's gaming sets are bound to a
+// proficiency the background grants, but PHB'14 Folk Hero grants no tool
+// proficiency at all, so a bound pick here would have nothing to offer. No class
+// equipment is sent, so the inventory and GP below are the background's alone.
+describe("PHB'14 Folk Hero background package (#1570)", () => {
+  it("a 2014 Folk Hero gets the fixed list, 10 GP, and whichever artisan's tools they picked", async () => {
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .post("/api/characters")
+      .send(
+        baseBody({
+          name: "2014 Folk Hero",
+          background: "Folk Hero",
+          classes: [{ name: "Rogue" }],
+          rulesEdition: "EDITION_2014",
+          backgroundStartingEquipment: {
+            mode: "package",
+            selections: [{ optionIndex: 0, openPicks: ["Smith's Tools"] }],
+          },
+        }),
+      );
+
+    expect(response.status).toBe(201);
+    createdCharacterIds.push(response.body.id);
+
+    const inventory: { name: string; quantity: number }[] = response.body.inventory;
+    expect(inventory.find((i) => i.name === "Shovel")).toBeDefined();
+    expect(inventory.find((i) => i.name === "Iron Pot")).toBeDefined();
+    expect(inventory.find((i) => i.name === "Common Clothes")).toBeDefined();
+    expect(inventory.find((i) => i.name === "Smith's Tools")).toBeDefined();
+    expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 });
+  });
+
+  it("rejects an open pick that isn't an artisan's tool, even though it is a real tool", async () => {
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .post("/api/characters")
+      .send(
+        baseBody({
+          name: "Folk Hero Bad Pick",
+          background: "Folk Hero",
+          classes: [{ name: "Rogue" }],
+          rulesEdition: "EDITION_2014",
+          // A musical instrument: in the catalog, carries a toolCategory, and
+          // would pass a filter that merely checked "is a tool".
+          backgroundStartingEquipment: {
+            mode: "package",
+            selections: [{ optionIndex: 0, openPicks: ["Lute"] }],
+          },
+        }),
+      );
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/toolCategory must be "artisan"/);
+  });
+
+  it("is not offered to a 2024 character at all — the name falls through to homebrew", async () => {
+    const response = await supertest
+      .agent(createApp())
+      .set("Cookie", COOKIE)
+      .post("/api/characters")
+      .send(
+        baseBody({
+          name: "2024 Folk Hero Attempt",
+          background: "Folk Hero",
+          classes: [{ name: "Rogue" }],
+          rulesEdition: "EDITION_2024",
+          backgroundStartingEquipment: {
+            mode: "package",
+            selections: [{ optionIndex: 0, openPicks: ["Smith's Tools"] }],
+          },
+        }),
+      );
+    // The 2014 package must not leak across the edition boundary: creation is
+    // refused rather than quietly handing a 2024 character PHB'14 gear.
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/No starting equipment package defined for background/);
   });
 });
 

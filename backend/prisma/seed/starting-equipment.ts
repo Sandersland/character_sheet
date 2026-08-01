@@ -1020,14 +1020,14 @@ export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = [
 // Citations name the edition but no page — an invented page number to satisfy
 // the citation rule is a worse bug than an unpaged one.
 //
-// Folk Hero is the genuine hole: PHB'24 dropped it, so it has no 2024 package
-// and cannot get one. It is not deleted or retagged here — its seed row is
-// edition NULL (shared), so it is still offered to 2024 characters it cannot
-// serve, and fixing that means creating an EDITION_2014 row whose id differs
-// from the NULL one every existing character points at (#1559's landmine via
-// CharacterBackground's onDelete: SetNull). That needs its own guard, #1570.
+// Folk Hero is PHB'14 only — PHB'24 dropped it, so it has no 2024 package and
+// cannot get one. Its Background row is tagged EDITION_2014 (#1570) rather than
+// left shared, which is what keeps it off 2024 characters entirely; the retag
+// is applied in place by a migration, never delete-and-recreate, because a new
+// row id would strand every character pointing at the old one (#1559's landmine
+// via CharacterBackground's onDelete: SetNull).
 //
-// So this seed covers SEVEN (backgroundName, edition) pairs, not the fourteen
+// So this seed covers EIGHT (backgroundName, edition) pairs, not the fourteen
 // a full 7×2 grid would suggest, and the seeder's presence guard is scoped to
 // exactly these pairs (assertEveryBackgroundEditionHasPackage does not exist,
 // on purpose — see seed-starting-equipment.ts's comment on why one was NOT
@@ -1242,14 +1242,48 @@ const ACOLYTE_2014: ClassStartingEquipment = {
   ],
 };
 
-const BACKGROUND_PACKAGES_2014: Record<string, ClassStartingEquipment> = {
-  Acolyte: ACOLYTE_2014,
+// PHB'14 Folk Hero. Not SRD (SRD 5.1 carries Acolyte alone), so it is cited by
+// edition without a page, exactly like Charlatan/Noble above. Same fixed-list
+// shape as ACOLYTE_2014 — 2014 backgrounds grant, they don't offer A-or-B — and
+// the "belt pouch containing 10 gp" is modelled as the option's `gold`, not a
+// Pouch item, following that row's precedent.
+//
+// The artisan's tools pick is UNBOUND, unlike Soldier's and Noble's gaming sets:
+// the book says "one of your choice", not "same as above", and this background
+// grants no tool proficiency for a bound pick to resolve against — a bound pick
+// here would offer an empty dropdown and disable Continue forever, the exact
+// #1565 failure. It is offered from Item rows carrying toolCategory "artisan",
+// all seventeen of which now exist (see ITEMS' own note).
+const FOLK_HERO_2014: ClassStartingEquipment = {
+  gold: null,
+  groups: [
+    {
+      label: "A set of artisan's tools (one of your choice), a shovel, an iron pot, a set of common clothes, and a pouch containing 10 GP",
+      options: [
+        {
+          label: "Artisan's Tools (your choice), a Shovel, an Iron Pot, Common Clothes, and 10 GP",
+          items: [
+            { catalogName: "Shovel" },
+            { catalogName: "Iron Pot" },
+            { catalogName: "Common Clothes" },
+          ],
+          openPicks: [{ label: "artisan's tools of your choice", filter: { toolCategory: "artisan" } }],
+          gold: 10,
+        },
+      ],
+    },
+  ],
 };
 
-// Flattened the same way STARTING_EQUIPMENT_PACKAGES is above — seven rows,
+const BACKGROUND_PACKAGES_2014: Record<string, ClassStartingEquipment> = {
+  Acolyte: ACOLYTE_2014,
+  "Folk Hero": FOLK_HERO_2014,
+};
+
+// Flattened the same way STARTING_EQUIPMENT_PACKAGES is above — eight rows,
 // not the fourteen a full cross product would produce (see this section's
-// header on why Folk Hero and the 2014 halves of Charlatan/Criminal/Noble/
-// Sage/Soldier are deliberately absent, not forgotten).
+// header on why the 2014 halves of Charlatan/Criminal/Noble/Sage/Soldier and
+// the 2024 half of Folk Hero are deliberately absent, not forgotten).
 export const BACKGROUND_STARTING_EQUIPMENT_PACKAGES: BackgroundStartingEquipmentSeed[] = [
   ...Object.entries(BACKGROUND_PACKAGES_2014).map(([backgroundName, pkg]) => ({
     backgroundName,

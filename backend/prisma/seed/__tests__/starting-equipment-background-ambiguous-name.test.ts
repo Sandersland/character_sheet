@@ -3,10 +3,11 @@
 // resolveBackgroundIdsByName's `findMany` keyed a Map by NAME alone — when
 // two rows shared a name, the later one silently won and the earlier row's
 // package (if any) would misfile onto the wrong background with no error.
-// This is dormant today (every seeded background name resolves to exactly
-// one row), but the open owner decision this issue names — forking
-// Charlatan/Folk Hero/Noble to EDITION_2014, or #1348 generally — would hit
-// it silently the moment any forked background also carries a package.
+// This is dormant today (every seeded background name resolves to exactly one
+// row — Folk Hero's EDITION_2014 tag was applied by retagging its existing row
+// in place, #1570, precisely so it stayed one), but a background that FORKS
+// into two edition-tagged rows per #1348 would hit it silently the moment the
+// forked name also carries a package.
 //
 // A transient fixture Background (never a real seeded name), cleaned up in
 // afterEach regardless of pass/fail — same isolation shape

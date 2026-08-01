@@ -69,8 +69,8 @@ export const createCharacterSchema = z
     // package-only one; materializeStartingEquipment 400s a "gold" mode here
     // exactly as resolveStartingGold already does for a null-dice CLASS
     // package. Omitted (not required) for a homebrew/unresolved background or
-    // one with no package under this edition (Folk Hero in either, or any 2014
-    // background but Acolyte).
+    // one with no package under this edition (any 2014 background but Acolyte
+    // and Folk Hero).
     backgroundStartingEquipment: startingEquipmentSchema.optional(),
     // #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids).
     // Optional for back-compat; strictly count/list/level-validated when present.

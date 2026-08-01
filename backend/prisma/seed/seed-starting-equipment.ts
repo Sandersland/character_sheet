@@ -10,13 +10,13 @@
 //
 // No assertEveryBackgroundEditionHasPackage guard exists here, unlike
 // assertEveryClassEditionHasPackage below (deliberate, not an oversight):
-// BACKGROUND_STARTING_EQUIPMENT_PACKAGES covers exactly seven (backgroundName,
-// edition) pairs by design — Folk Hero has no package in either edition
-// (PHB'24 dropped it), and 2014 Charlatan/Criminal/Noble/Sage/Soldier have
-// none either (SRD 5.1 ships only Acolyte) — so a guard requiring every seeded
-// Background to have a package in both editions would fail on content left
-// unfinished ON PURPOSE (see starting-equipment.ts's background-section
-// header). Content correctness for the seven pairs that DO exist is
+// BACKGROUND_STARTING_EQUIPMENT_PACKAGES covers exactly eight (backgroundName,
+// edition) pairs by design — Folk Hero exists only in 2014 and the other six
+// only in 2024 for equipment purposes (SRD 5.1 ships Acolyte alone) — so a
+// guard requiring every seeded Background to have a package in both editions
+// would fail both on content left unfinished ON PURPOSE and on a background
+// that legitimately exists in one edition only (see starting-equipment.ts's
+// background-section header). Content correctness for the eight pairs that exist is
 // starting-equipment.test.ts's job, same division of labour as the class
 // guard's own docstring describes.
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
@@ -180,11 +180,12 @@ async function resolveClassIdsByName(prisma: PrismaClient, classNames: string[])
 // at most one id per name — throws, naming the background and every edition
 // found, rather than letting a name that resolves to more than one row
 // silently pick whichever `findMany` happened to return last (a real hazard
-// the moment Charlatan/Folk Hero/Noble get tagged EDITION_2014, or any
-// background forks per #1348 generally: a fork sharing a name with an
-// existing packaged background would silently misfile that package onto the
-// wrong row with no error anywhere). Every background this module actually
-// resolves today has exactly one row per name, so this throws on nobody yet.
+// the moment any background forks into two edition-tagged rows, per #1348: a
+// fork sharing a name with an existing packaged background would silently
+// misfile that package onto the wrong row with no error anywhere). Folk Hero
+// is now edition-tagged (#1570) AND packaged, so it reaches this guard — but by
+// retag-in-place, so it still owns exactly one row. Every background this module
+// resolves today does, so this throws on nobody yet.
 export async function resolveBackgroundIdsByName(
   prisma: PrismaClient,
   backgroundNames: string[],
