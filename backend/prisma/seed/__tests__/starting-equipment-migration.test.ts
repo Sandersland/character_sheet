@@ -17,10 +17,10 @@ import { STARTING_EQUIPMENT_PACKAGES, BACKGROUND_STARTING_EQUIPMENT_PACKAGES } f
 import { assertEveryClassEditionHasPackage, seedStartingEquipment } from "../seed-starting-equipment.js";
 
 describe("StartingEquipmentPackage migration — row count (#1533, #1565)", () => {
-  it("the seeded table holds exactly one row per (class + background) package literal (29)", async () => {
+  it("the seeded table holds exactly one row per (class + background) package literal (31)", async () => {
     const actual = await prisma.startingEquipmentPackage.count();
     expect(actual).toBe(STARTING_EQUIPMENT_PACKAGES.length + BACKGROUND_STARTING_EQUIPMENT_PACKAGES.length);
-    expect(actual).toBe(29);
+    expect(actual).toBe(31);
   });
 
   it("every class has both an EDITION_2014 and an EDITION_2024 package with >= 1 group", async () => {
@@ -34,20 +34,88 @@ describe("StartingEquipmentPackage migration — row count (#1533, #1565)", () =
     }
   });
 
-  // #1565: exactly five background packages exist (Acolyte both editions;
-  // Criminal/Sage/Soldier 2024 only) — never the fourteen a full 7-background
-  // x 2-edition grid would suggest (Charlatan/Folk Hero/Noble get none, on
-  // purpose — see starting-equipment.ts's background-section header).
-  it("exactly 5 background packages exist, each with >= 1 group", async () => {
+  // #1565/#1570: exactly seven background packages exist (Acolyte both
+  // editions; Charlatan/Criminal/Noble/Sage/Soldier 2024 only) — never the
+  // fourteen a full 7-background x 2-edition grid would suggest (Folk Hero
+  // gets none in either edition, on purpose — see starting-equipment.ts's
+  // background-section header).
+  it("exactly 7 background packages exist, each with >= 1 group", async () => {
     const packages = await prisma.startingEquipmentPackage.findMany({
       where: { backgroundId: { not: null } },
       select: { name: true, edition: true, _count: { select: { groups: true } } },
     });
-    expect(packages.length).toBe(5);
+    expect(packages.length).toBe(7);
     expect(packages.length).toBe(BACKGROUND_STARTING_EQUIPMENT_PACKAGES.length);
     for (const row of packages) {
       expect(row._count.groups, `${row.name}/${row.edition}`).toBeGreaterThan(0);
     }
+  });
+});
+
+// #1570: Charlatan and Noble are PHB'24 backgrounds — NOT SRD, but the repo
+// already transcribes their 2024 mechanics (abilityChoices + originFeatName in
+// BACKGROUNDS are 2024-only concepts), so the equipment finishes a row that was
+// already half-authored from the same source. Values verified against the
+// PHB'24 stat blocks themselves, not a reference site.
+describe("Charlatan/Noble 2024 background packages (#1570)", () => {
+  async function optionsFor(backgroundName: string) {
+    const pkg = await prisma.startingEquipmentPackage.findFirst({
+      where: { background: { name: backgroundName }, edition: "EDITION_2024" },
+      include: {
+        groups: {
+          orderBy: { position: "asc" },
+          include: {
+            options: {
+              orderBy: { position: "asc" },
+              include: {
+                items: { orderBy: { position: "asc" } },
+                openPicks: { orderBy: { position: "asc" } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return pkg;
+  }
+
+  it("Charlatan: (A) Forgery Kit, Costume, Fine Clothes, 15 GP; or (B) 50 GP", async () => {
+    const pkg = await optionsFor("Charlatan");
+    expect(pkg).not.toBeNull();
+    // No roll-for-gold alternative — same as every other background package.
+    expect(pkg!.goldDiceCount).toBeNull();
+    expect(pkg!.groups).toHaveLength(1);
+
+    const [a, b] = pkg!.groups[0].options;
+    expect(a.items.map((i) => i.catalogName)).toEqual(["Forgery Kit", "Costume Clothes", "Fine Clothes"]);
+    expect(a.gold).toBe(15);
+    expect(a.openPicks).toHaveLength(0);
+    expect(b.items).toHaveLength(0);
+    expect(b.gold).toBe(50);
+  });
+
+  it("Noble: (A) Gaming Set (same as above), Fine Clothes, Perfume, 29 GP; or (B) 50 GP", async () => {
+    const pkg = await optionsFor("Noble");
+    expect(pkg).not.toBeNull();
+    expect(pkg!.goldDiceCount).toBeNull();
+
+    const [a, b] = pkg!.groups[0].options;
+    expect(a.items.map((i) => i.catalogName)).toEqual(["Fine Clothes", "Perfume Vial"]);
+    expect(a.gold).toBe(29);
+    // "same as above" binds to the gaming-set proficiency the background itself
+    // grants — the identical mechanism Soldier's package uses (#1564/#1565).
+    expect(a.openPicks).toHaveLength(1);
+    expect(a.openPicks[0].toolCategory).toBe("gamingSet");
+    expect(a.openPicks[0].boundToToolChoice).toBe(true);
+    expect(b.gold).toBe(50);
+  });
+
+  // SRD 5.2 lists Forgery Kit (15 GP, 5 lb) in its tools table, so the Item row
+  // is citable even though the background that needs it is not.
+  it("seeds the Forgery Kit item the Charlatan package references", async () => {
+    const item = await prisma.item.findFirst({ where: { name: "Forgery Kit" } });
+    expect(item).not.toBeNull();
+    expect(item!.toolCategory).toBe("other");
   });
 });
 
