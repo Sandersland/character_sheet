@@ -187,12 +187,44 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 // name) even though it's a same-name FORK rather than a rewrite — taggedNamesFor
 // cannot distinguish the two shapes, and doesn't need to: either way the name
 // legitimately carries two different descriptions.
+// Warlock's 20 new triples (#1233): the 4 base-class names that genuinely
+// fork (Pact Magic, Eldritch Invocations, Mystic Arcanum, Eldritch Master)
+// show up under EVERY subclass context Warlock has (undefined/the fiend/the
+// archfey/the great old one — collectTaggedFeatureKeys combines classRows,
+// always ALL of them, with each context's own subclassRows) — 4 contexts x 4
+// base names = 16, plus The Fiend's own 4 forked subclass names (Dark One's
+// Blessing, Dark One's Own Luck, Fiendish Resilience, Hurl Through Hell) = 20.
+// The three "Expanded Spell List" triples that used to be here are GONE, not
+// merely renamed: The Fiend's row renames to "Fiend Spells" (a 2024-only
+// name, so never tagged — one description, not two); The Archfey's/The Great
+// Old One's rows are now EDITION_2014-only (zero 2024 rows authored at all,
+// owner decision #1233), so each has exactly one description under its name
+// too. Pact Boon (2014-only)/Magical Cunning/Contact Patron/Epic Boon
+// (2024-only) are the same "one description under this name" shape, so none
+// of those are tagged either.
 const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["cleric", "life domain", "Domain Spells"],
   ["cleric", "trickery domain", "Domain Spells"],
-  ["warlock", "the fiend", "Expanded Spell List"],
-  ["warlock", "the archfey", "Expanded Spell List"],
-  ["warlock", "the great old one", "Expanded Spell List"],
+  ["warlock", "undefined", "Pact Magic"],
+  ["warlock", "undefined", "Eldritch Invocations"],
+  ["warlock", "undefined", "Mystic Arcanum"],
+  ["warlock", "undefined", "Eldritch Master"],
+  ["warlock", "the fiend", "Pact Magic"],
+  ["warlock", "the fiend", "Eldritch Invocations"],
+  ["warlock", "the fiend", "Mystic Arcanum"],
+  ["warlock", "the fiend", "Eldritch Master"],
+  ["warlock", "the fiend", "Dark One's Blessing"],
+  ["warlock", "the fiend", "Dark One's Own Luck"],
+  ["warlock", "the fiend", "Fiendish Resilience"],
+  ["warlock", "the fiend", "Hurl Through Hell"],
+  ["warlock", "the archfey", "Pact Magic"],
+  ["warlock", "the archfey", "Eldritch Invocations"],
+  ["warlock", "the archfey", "Mystic Arcanum"],
+  ["warlock", "the archfey", "Eldritch Master"],
+  ["warlock", "the great old one", "Pact Magic"],
+  ["warlock", "the great old one", "Eldritch Invocations"],
+  ["warlock", "the great old one", "Mystic Arcanum"],
+  ["warlock", "the great old one", "Eldritch Master"],
   ["barbarian", "undefined", "Rage"],
   ["barbarian", "undefined", "Unarmored Defense"],
   ["barbarian", "undefined", "Danger Sense"],

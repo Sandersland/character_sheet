@@ -622,94 +622,188 @@ export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = withPool(
 // FIGHTER_BASE_ROWS exists — so falling through to `toRows(subDef?.features
 // ?? [])` would silently go empty for it, same failure mode this map exists
 // to avoid for every literal-row subclass).
-// WARLOCK's base class (#1233 commit 1): moved off warlock.ts's
+// WARLOCK's base class (#1233 commit 2 of 3): moved off warlock.ts's
 // WARLOCK_FEATURES AuthoredFeature[] array onto literal seed data
 // (prisma/seed/warlock-features.ts) — the same rootDir boundary FIGHTER_
-// BASE_ROWS'/BARBARIAN_BASE_ROWS' comments explain. At this commit every row
-// is still untagged (identical text both editions, mirroring
-// warlock-features.ts's own commit-1 shape) — commit 2 will make these
-// diverge for real.
-export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+// BASE_ROWS'/BARBARIAN_BASE_ROWS' comments explain. Mirrors that file's real
+// SRD 5.2 (2024) content exactly; commit 3 will add Magical Cunning's
+// resourceKey here alongside the matching seed-file change.
+export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Pact Magic",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
       "You cast spells using Charisma. Unique short-rest progression: all spell slots are the same (high) level and you regain all slots on a short or long rest. Slots scale: 1st at L1; 2nd at L3; 3rd at L5; 4th at L7; 5th at L9.",
   },
   {
+    name: "Pact Magic",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You form a pact with a mysterious patron to cast spells, using Charisma. You know two Warlock cantrips (more at levels 4 and 10) and prepare a growing list of Warlock spells, each no higher a level than the Slot Level shown for your level. All your Pact Magic spell slots are the same (high) level, and you regain every expended slot when you finish a Short or Long Rest. An Arcane Focus serves as your Spellcasting Focus.",
+  },
+  {
     name: "Eldritch Invocations",
     level: 2,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Learn 2 eldritch invocations — magical studies that grant you permanent abilities or modify your spells (e.g., Agonizing Blast, Armor of Shadows, Devil's Sight). More invocations at levels 5, 7, 9, 12, 15, 18 (max 8 known).",
   },
   {
+    name: "Eldritch Invocations",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You gain one Eldritch Invocation of your choice — a permanent magical ability or lesson unlocked by forbidden knowledge, such as Pact of the Tome — meeting any stated prerequisite. You gain additional invocations as you gain levels: 1 at level 1, 3 at level 2, 5 at level 5, 6 at level 7, 7 at level 9, 8 at level 12, 9 at level 15, and 10 at level 18. Whenever you gain a Warlock level, you can replace one invocation you know with a different one you qualify for, unless it's a prerequisite for another invocation you have.",
+  },
+  {
+    name: "Magical Cunning",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
+  },
+  {
     name: "Pact Boon",
     level: 3,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Your patron grants a boon: Pact of the Chain (familiar with special forms), Pact of the Blade (summon a pact weapon), or Pact of the Tome (Book of Shadows with extra cantrips and rituals).",
   },
   {
+    name: "Contact Patron",
+    level: 9,
+    edition: "EDITION_2024",
+    description:
+      "You always have the Contact Other Plane spell prepared, and you can cast it without expending a spell slot to contact your patron directly — you automatically succeed on the spell's saving throw. Once you cast it this way, you can't do so again until you finish a Long Rest.",
+  },
+  {
     name: "Mystic Arcanum",
     level: 11,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Choose one 6th-level spell from the warlock list as a Mystic Arcanum. You can cast it once without expending a spell slot per long rest. Gain a 7th-level arcanum at L13, 8th at L15, 9th at L17.",
   },
   {
+    name: "Mystic Arcanum",
+    level: 11,
+    edition: "EDITION_2024",
+    description:
+      "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum; you can cast it once without expending a spell slot, and must finish a Long Rest before doing so again. You gain another arcanum spell the same way at level 13 (a 7th-level spell), level 15 (8th-level), and level 17 (9th-level). You regain all uses of your Mystic Arcanum when you finish a Long Rest.",
+  },
+  {
+    name: "Epic Boon",
+    level: 19,
+    edition: "EDITION_2024",
+    description: "You gain an Epic Boon feat of your choice (Boon of Fate recommended). You can take this feat only once.",
+  },
+  {
     name: "Eldritch Master",
     level: 20,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Spend 1 minute entreating your patron to regain all expended Pact Magic spell slots. Once used, you must finish a long rest before you can do so again.",
   },
-]);
+  {
+    name: "Eldritch Master",
+    level: 20,
+    edition: "EDITION_2024",
+    description: "When you use your Magical Cunning feature, you regain all your expended Pact Magic spell slots.",
+  },
+];
 
-// WARLOCK's three patrons (#1233 commit 1): same rootDir-boundary reason as
-// WARLOCK_BASE_ROWS above. Expanded Spell List is already forked (#1374 —
-// same PHB'14-spell-level-vs-2024-character-level split every patron shares);
-// the rest stay untagged at this commit.
-export const THE_FIEND_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+// THE FIEND (#1233 commit 2 of 3): mirrors warlock-features.ts's real SRD 5.2
+// content exactly. Commit 3 will add Dark One's Own Luck's/Hurl Through
+// Hell's resourceKey columns here alongside the matching seed-file change —
+// Dark One's Own Luck's 2024 row will deliberately OMIT resourceTotals (a
+// Charisma-modifier formula, still resourceFn-derived; see warlock.ts's own
+// header).
+export const THE_FIEND_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
-      edition === "EDITION_2014"
-        ? "Add fiend spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Burning Hands, Command (1st); Blindness/Deafness, Scorching Ray (2nd); Fireball, Stinking Cloud (3rd); Fire Shield, Wall of Fire (4th); Flame Strike, Hallow (5th)."
-        : "Add fiend spells to your warlock list: Burning Hands, Command (L3); Blindness/Deafness, Scorching Ray (L3); Fireball, Stinking Cloud (L5); Fire Shield, Wall of Fire (L7); Flame Strike, Hallow (L9).",
+      "Add fiend spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Burning Hands, Command (1st); Blindness/Deafness, Scorching Ray (2nd); Fireball, Stinking Cloud (3rd); Fire Shield, Wall of Fire (4th); Flame Strike, Hallow (5th).",
+  },
+  {
+    name: "Fiend Spells",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "The magic of your patron ensures you always have certain spells prepared, which don't count against the number of spells you can prepare with Pact Magic: Burning Hands, Command, Scorching Ray, Suggestion (level 3); Fireball, Stinking Cloud (level 5); Fire Shield, Wall of Fire (level 7); Geas, Insect Plague (level 9).",
   },
   {
     name: "Dark One's Blessing",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
       "When you reduce a hostile creature to 0 HP, gain temporary HP equal to your Charisma modifier + your warlock level (minimum 1).",
   },
   {
+    name: "Dark One's Blessing",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "When you reduce an enemy to 0 Hit Points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum 1). You also gain this benefit when someone else reduces an enemy within 10 feet of you to 0 Hit Points.",
+  },
+  {
     name: "Dark One's Own Luck",
     level: 6,
-    edition,
+    edition: "EDITION_2014",
     description: "Add a d10 to one ability check or saving throw you make. Once used, regain on a short or long rest.",
+  },
+  {
+    name: "Dark One's Own Luck",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
   },
   {
     name: "Fiendish Resilience",
     level: 10,
-    edition,
+    edition: "EDITION_2014",
     description:
       "After a short or long rest, choose one damage type. You gain resistance to that type until you choose a different one.",
   },
   {
+    name: "Fiendish Resilience",
+    level: 10,
+    edition: "EDITION_2024",
+    description:
+      "Choose one damage type, other than Force, whenever you finish a Short or Long Rest. You have resistance to that damage type until you choose a different one.",
+  },
+  {
     name: "Hurl Through Hell",
     level: 14,
-    edition,
+    edition: "EDITION_2014",
     description:
       "When you hit a creature with an attack, banish it through the Lower Planes until the start of your next turn. It takes 10d10 psychic damage from the horrors of its brief journey and then returns. Once used, regain on a long rest.",
   },
-]);
+  {
+    name: "Hurl Through Hell",
+    level: 14,
+    edition: "EDITION_2024",
+    description:
+      "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
+  },
+];
 
+// THE ARCHFEY / THE GREAT OLD ONE test rows are DELIBERATELY frozen at their
+// pre-#1233 shape (an untagged-both-editions body plus a 2024-tagged
+// Expanded Spell List) rather than updated to mirror warlock-features.ts's
+// real post-#1233 content, which tags every one of their rows EDITION_2014
+// and authors zero EDITION_2024 rows. subclass-grant-level.test.ts's MOVED
+// array asserts "warlock/the archfey" and "warlock/the great old one"
+// contribute subclass features at level 3 under EDITION_2024 by DEFAULT
+// (testing the GRANT-LEVEL gate, not subclass content) — retagging these two
+// fixtures to match the real seed would starve that gate check of any
+// EDITION_2024 row to find, failing a test the #1233 plan requires stay green
+// UNEDITED. class-feature-parity.test.ts's own LITERAL_ROW_CLASSES exclusion
+// is what already permits this fixture to diverge from the real seed without
+// anything else catching it.
 export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Expanded Spell List",

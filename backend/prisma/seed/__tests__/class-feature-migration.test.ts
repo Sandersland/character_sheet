@@ -115,7 +115,7 @@ describe("ClassFeature migration — expandFeatureRow's untagged branch keeps bo
   });
 });
 
-describe("ClassFeature migration — the 5 already-forked pairs were not duplicated (#1523)", () => {
+describe("ClassFeature migration — the 2 already-forked pairs were not duplicated (#1523)", () => {
   it("Cleric Domain Spells: exactly one row per (subclass, edition), descriptions differ between editions", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { name: "Domain Spells", class: { name: "Cleric" } },
@@ -134,21 +134,25 @@ describe("ClassFeature migration — the 5 already-forked pairs were not duplica
     }
   });
 
-  it("Warlock Expanded Spell List: exactly one row per (subclass, edition), descriptions differ between editions", async () => {
+  // #1233: Warlock's "Expanded Spell List" is NO LONGER a forked pair — The
+  // Fiend's 2024 row renamed to "Fiend Spells" (a different name, so
+  // pruneStalePartitions retired the old 2024 "Expanded Spell List" DB row
+  // outright) and The Archfey/The Great Old One are now EDITION_2014-only
+  // (owner decision: their PHB'24 reworks are non-SRD, so zero 2024 rows are
+  // authored). Every "Expanded Spell List" row left is a single EDITION_2014
+  // row per patron — asserted here as exactly that, not a fork.
+  it("Warlock Expanded Spell List: exactly one EDITION_2014 row per patron, no EDITION_2024 row anywhere", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { name: "Expanded Spell List", class: { name: "Warlock" } },
       select: { level: true, edition: true, description: true, subclass: { select: { name: true } } },
     });
-    expect(rows).toHaveLength(6); // The Fiend + The Archfey + The Great Old One, x2 editions each
+    expect(rows).toHaveLength(3); // The Fiend + The Archfey + The Great Old One, EDITION_2014 only
 
     for (const subclassName of ["The Fiend", "The Archfey", "The Great Old One"]) {
       const pair = rows.filter((r) => r.subclass?.name === subclassName);
-      expect(pair).toHaveLength(2);
-      expect(pair.every((r) => r.level === 1)).toBe(true);
-      const [r2014, r2024] = [pair.find((r) => r.edition === "EDITION_2014"), pair.find((r) => r.edition === "EDITION_2024")];
-      expect(r2014).toBeDefined();
-      expect(r2024).toBeDefined();
-      expect(r2014!.description).not.toBe(r2024!.description);
+      expect(pair).toHaveLength(1);
+      expect(pair[0].level).toBe(1);
+      expect(pair[0].edition).toBe("EDITION_2014");
     }
   });
 });
