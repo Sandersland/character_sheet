@@ -1011,11 +1011,14 @@ export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = [
 // Built EXACTLY what the SRD supports, which is squeezed from both ends:
 // SRD 5.1 (5thsrd.org) contains ONE background — Acolyte — and SRD 5.2
 // (5e24srd.com) contains FOUR — Acolyte, Criminal, Sage, Soldier. Charlatan,
-// Folk Hero and Noble are PHB'14-only content with no SRD text in either
-// edition to cite (CLAUDE.md: an unattributed rules citation is a bug) and
-// deliberately get no package here — they are not deleted or retagged (that
-// decision belongs to a follow-up issue; deleting a Background row would
-// strand any character holding it, #1559's landmine). So this seed covers
+// Folk Hero and Noble have no SRD text in either edition to cite (CLAUDE.md:
+// an unattributed rules citation is a bug) and deliberately get no package
+// here — they are not deleted or retagged (that decision belongs to #1570;
+// deleting a Background row would strand any character holding it, #1559's
+// landmine). Non-SRD is NOT the same as non-existent: Charlatan and Noble are
+// PHB'24 backgrounds whose 2024 mechanics this repo already transcribes (see
+// BACKGROUNDS' abilityChoices/originFeatName — both are 2024-only concepts),
+// and only Folk Hero is genuinely absent from PHB'24. So this seed covers
 // five (backgroundName, edition) pairs, not the fourteen a full 7×2 grid
 // would suggest, and the seeder's presence guard is scoped to exactly these
 // pairs (assertEveryBackgroundEditionHasPackage does not exist, on purpose —
