@@ -84,9 +84,12 @@ function weaponRow(item: EquippedWeapon): AttackRow {
  * paper-doll slot, falling back to the second equipped weapon.
  *
  * Row presence is not action availability: a row is emitted whenever two weapons
- * are equipped, exactly as before. Whether the swing may be taken this turn (the
- * light-weapon rule, the Two-Weapon Fighting style's waiver of it) belongs to the
- * gated action row (#1435) — no `light` logic here.
+ * are equipped, exactly as before. Whether the swing may be taken this turn is the
+ * two-Light-weapons rule, identical in SRD 5.1 / PHB'14 p. 72 and SRD 5.2, and the
+ * Two-Weapon Fighting style does NOT waive it (#1496) — it grants damage only, which
+ * is exactly what `deriveOffHandDamage` below applies. The feature that would lift
+ * the requirement is the Dual Wielder feat, unseeded here. Eligibility still belongs
+ * to the gated action row (#1435) — no `light` logic here.
  *
  * `damageSpec.modifier` and `damageComponents` both come from the one
  * `deriveOffHandDamage` result, which is what keeps
