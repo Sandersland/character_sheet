@@ -20,8 +20,8 @@
  * style never waives it (#1496). SRD 5.1 / PHB'14 p. 72 grants the style only "add
  * your ability modifier to the damage of the second attack"; SRD 5.2 / PHB'24 says
  * the opposite of a waiver outright — the benefit applies only "while wielding a
- * weapon that has the Light property in each hand". Because the editions agree there
- * is one rule and no `edition` parameter. The feature that WOULD lift the
+ * weapon that has the Light property in each hand". The editions agree, so there is
+ * one rule and no `edition` parameter. The feature that WOULD lift the
  * requirement is the **Dual Wielder** feat, which is not seeded in this app, so do
  * not reintroduce a style short-circuit here: the style's entire effect is the
  * ability modifier on off-hand DAMAGE, resolved by `deriveOffHandDamage`, and it
