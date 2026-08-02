@@ -223,9 +223,19 @@ function isPopulatedWarlockRow(row: { className: string; subclassSlug: string | 
   return POPULATED_WARLOCK_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
+// What the descriptor predicates below key on. `edition` is part of the key
+// because a class can populate a descriptor column on ONE edition's row and
+// not the other's, under the same (class, subclass, name): Ranger's Favored
+// Enemy exists in both editions and carries a pool only in 2024 (#1230), and
+// Warlock's Dark One's Own Luck already omits resourceTotals on its 2024 row
+// alone. A 3-tuple key cannot express either, and would assert the wrong thing
+// on the row it can't distinguish. Predicates that are edition-invariant
+// simply ignore the field.
+type RowKey = { className: string; subclassSlug: string | null; name: string; edition: string };
+
 // #1546 Part B: the ability list Combat Superiority's maneuverSaveDC is
 // computed from — the one row that sets it, both editions.
-function isSaveDcRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+function isSaveDcRow(row: RowKey): boolean {
   return isPopulatedBattleMasterPoolRow(row);
 }
 
@@ -241,7 +251,7 @@ function isSaveDcRow(row: { className: string; subclassSlug: string | null; name
 // were merged into this one at integration, because two aggregators each
 // naming a DIFFERENT subset is precisely how a row silently escapes the
 // descriptor sweep. Every new populated-row predicate goes here, once.
-function isPopulatedRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+function isPopulatedRow(row: RowKey): boolean {
   return (
     isPopulatedFighterRow(row) ||
     isPopulatedBattleMasterPoolRow(row) ||
@@ -277,7 +287,7 @@ const DERIVED_STAT_ROW_KEYS = new Set([
   "Fighter::fighter-battle-master::Student of War",
 ]);
 
-function isDerivedStatRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+function isDerivedStatRow(row: RowKey): boolean {
   return DERIVED_STAT_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
@@ -347,8 +357,13 @@ function expectNullResourceColumns(row: DescriptorRow): void {
 // One row's full set of descriptor-column assertions — extracted so the it()
 // body itself is a plain fetch + count + loop, not the branching (same
 // complexity-budget reasoning as the two functions above).
-function expectRowDescriptors(row: DescriptorRow & { className: string; subclassSlug: string | null }): void {
-  const key = { className: row.className, subclassSlug: row.subclassSlug, name: row.name };
+function expectRowDescriptors(row: DescriptorRow & RowKey): void {
+  const key = {
+    className: row.className,
+    subclassSlug: row.subclassSlug,
+    name: row.name,
+    edition: row.edition,
+  };
   if (isPopulatedRow(key)) {
     // Populated by #1528/#1546/#1234 — asserted precisely in the describe
     // blocks below. Falls through to the derivedStat/saveDcAbilities checks
@@ -384,7 +399,7 @@ function expectRowDescriptors(row: DescriptorRow & { className: string; subclass
 describe("ClassFeature migration — every descriptor column is NULL/default, except Fighter's #1528 pilot rows and Barbarian's #1223 Rage rows", () => {
   it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528), Rage (#1223), and Arcane Recovery/Illusory Self (#1234)", async () => {
     const rows = await prisma.classFeature.findMany({
-      select: { name: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
+      select: { name: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
         resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
         activationCost: true, resolverKind: true, requiresUnarmored: true, regrants: true,
         costKind: true, costPoolKey: true, costBase: true, costPerStep: true,

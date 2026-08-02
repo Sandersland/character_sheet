@@ -316,9 +316,11 @@ const EDITIONS: readonly SeedEdition[] = ["EDITION_2014", "EDITION_2024"];
 // Below this, a (class, edition) pair reads as a half-written partition, not
 // real content — e.g. a migration that landed a class's base-layer rows but
 // not a subclass's, or a retab commit that stopped partway through. Today's
-// smallest FULLY authored pair is Sorcerer's 15 (both editions, no
-// subclasses) — ten leaves five rows of slack, tight enough that a bare
-// `>= 1` (which a half-write sails straight past) can't hide behind it.
+// smallest FULLY authored pair is Warlock's EDITION_2024 at 12 (#1233 — a
+// retab shrinks the 2024 half when PHB'24 drops features, so this tracks the
+// most-retabbed class rather than the smallest one) — ten leaves two rows of
+// slack, tight enough that a bare `>= 1` (which a half-write sails straight
+// past) can't hide behind it.
 const MIN_ROWS_PER_PAIR = 10;
 
 // Every class whose EDITION_2024 rows are STILL an unverified verbatim copy
