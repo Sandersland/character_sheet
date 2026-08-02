@@ -31,7 +31,23 @@ import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-r
 // (poolsFromRows, actionsFromRows) would nondeterministically swap position
 // on every read. `level` then `name` gives a stable, content-derived order
 // with no dependency on insertion order.
-export const FEATURE_ROWS_ORDER_BY = [{ level: "asc" }, { name: "asc" }] satisfies Prisma.ClassFeatureOrderByWithRelationInput[];
+//
+// `edition` sorts LAST and only breaks ties `(level, name)` leaves — the query
+// deliberately loads BOTH editions, and a class's two edition rows for one
+// feature share a level and a name (Fighter has five such pairs: Fighting
+// Style L1, Second Wind L1, Action Surge L2, Extra Attack L5, Indomitable L9).
+// Those ties are unobservable downstream TODAY because every consumer
+// edition-filters before reading position, so exactly one of each pair
+// survives; the key exists so totality stops depending on that invariant
+// holding forever, and sorting it last is what keeps each edition's surviving
+// subsequence byte-identical to before (#1545, #1528). Total, not merely
+// "more total": `@@unique([classId, subclassId, name, edition])` makes
+// `(level, name, edition)` unique within either relation.
+//
+// Gotcha: `edition` is a Postgres enum, so `asc` sorts by DECLARATION order in
+// schema.prisma — EDITION_2014 then EDITION_2024 — not lexicographically. They
+// coincide today; an edition declared out of alphabetical order would not.
+export const FEATURE_ROWS_ORDER_BY = [{ level: "asc" }, { name: "asc" }, { edition: "asc" }] satisfies Prisma.ClassFeatureOrderByWithRelationInput[];
 
 export const FEATURE_ROWS_ENTRY_SELECT = {
   // subclassLevel rides along because this select already reaches the class
