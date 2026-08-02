@@ -36,53 +36,53 @@ import { cleric } from "../../src/lib/classes/cleric.js";
 import { druid } from "../../src/lib/classes/druid.js";
 import { monk } from "../../src/lib/classes/monk.js";
 import { paladin } from "../../src/lib/classes/paladin.js";
-import { sorcerer } from "../../src/lib/classes/sorcerer.js";
 import { BARBARIAN_FEATURES } from "./barbarian-features.js";
 import { FIGHTER_FEATURES } from "./fighter-features.js";
 import { RANGER_FEATURES } from "./ranger-features.js";
 import { ROGUE_FEATURES } from "./rogue-features.js";
+import { SORCERER_FEATURES } from "./sorcerer-features.js";
 import { WARLOCK_FEATURES } from "./warlock-features.js";
 import { WIZARD_FEATURES } from "./wizard-features.js";
 
 // className must match a CharacterClass.name seed row (catalog-data.ts) —
 // title case, not the lowercase registry.ts dispatch key. Fighter, Barbarian,
-// Ranger, Rogue, Warlock and Wizard are deliberately ABSENT (#1227, #1223,
-// #1230, #1231, #1233, #1234): their rows are literal data
+// Ranger, Rogue, Sorcerer, Warlock and Wizard are deliberately ABSENT (#1227,
+// #1223, #1230, #1231, #1232, #1233, #1234): their rows are literal data
 // (fighter-features.ts, barbarian-features.ts, ranger-features.ts,
-// rogue-features.ts, warlock-features.ts, wizard-features.ts), not derived
-// from a ClassDefinition.features array — see LITERAL_ROW_CLASSES below.
+// rogue-features.ts, sorcerer-features.ts, warlock-features.ts,
+// wizard-features.ts), not derived from a ClassDefinition.features array —
+// see LITERAL_ROW_CLASSES below.
 //
 // Absence here does NOT imply the class module is gone; there are three
 // distinct end states. `lib/classes/fighter.ts` (#1532), `lib/classes/
 // barbarian.ts` (#1223) and `lib/classes/rogue.ts` (#1231) are deleted
-// outright — nothing was left in them. Warlock and Wizard stay registered in
-// registry.ts's CLASSES because each carries a subclass `grantLevel` no
-// seeded row can express today — 1 for Warlock's patrons (PHB'14 p.105), 2
-// for Wizard's schools (PHB'14 p.114) — while subclassGateLevel's
-// undefined-grantLevel fallback is 3, so deleting either would silently move
-// that class's 2014 subclass gate (see each file's own header and #1576).
-// Ranger (#1230) is the THIRD state: its module also stays registered, but
-// for TWO DIFFERENT reasons — its `grantLevel: 3` already equals the
-// fallback, so unlike Warlock/Wizard that isn't one of them. See ranger.ts's
-// own header for the two that are (Hunter's `choices` catalog, #899, owned
-// by #1353; and its EDITION_2024 Wisdom-modifier `resourceFn`, #1230 commit
-// 3). All three are absent from CLASS_MODULES here only because their
-// FEATURE TEXT has moved to seed data. `features` stays optional on
-// ClassDefinition/SubclassDefinition for the six classes still on the
-// TS-authoring path, not because these six ever needed it to be.
+// outright — nothing was left in them. Warlock, Wizard and Sorcerer are the
+// SECOND state: each carries a subclass `grantLevel` no seeded row can express
+// today — 1 for Warlock's patrons (PHB'14 p.105) and Sorcerer's origins
+// (PHB'14 p.99, #1232), 2 for Wizard's schools (PHB'14 p.114) — while
+// subclassGateLevel's undefined-grantLevel fallback is 3, so deleting any of
+// them would silently move that class's 2014 subclass gate (see each file's own
+// header and #1576). Ranger (#1230) is the THIRD state: its module also stays
+// registered, but for reasons that have nothing to do with the gate — its
+// `grantLevel: 3` already equals the fallback. See ranger.ts's own header for
+// the two that do apply (Hunter's `choices` catalog, #899, owned by #1353; and
+// its EDITION_2024 Wisdom-modifier `resourceFn`, #1230 commit 3). All seven are
+// absent from CLASS_MODULES here only because their FEATURE TEXT has moved to
+// seed data. `features` stays optional on
+// ClassDefinition/SubclassDefinition for the five classes still on the
+// TS-authoring path, not because these seven ever needed it to be.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
   Bard: bard,
   Cleric: cleric,
   Druid: druid,
   Monk: monk,
   Paladin: paladin,
-  Sorcerer: sorcerer,
 };
 
 // Classes whose CLASS_FEATURES rows are authored as LITERAL seed data
 // (fighter-features.ts, barbarian-features.ts, rogue-features.ts,
-// warlock-features.ts, wizard-features.ts) rather than derived from a
-// lib/classes/<class>.ts module's AuthoredFeature[] arrays via
+// warlock-features.ts, wizard-features.ts, sorcerer-features.ts) rather than
+// derived from a lib/classes/<class>.ts module's AuthoredFeature[] arrays via
 // collectRawFeatures/expandFeatureRow below. Exported so every test that needs
 // to skip/scope around these classes (class-feature-migration.test.ts's
 // derived-half scoping; the lowercase sibling set in
@@ -97,6 +97,7 @@ export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set([
   "Rogue",
   "Warlock",
   "Wizard",
+  "Sorcerer",
 ]);
 
 // One entry per DerivedFeature exactly as authored in lib/classes/<class>.ts —
@@ -242,12 +243,13 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
 }
 
 // The full seed family: every derived-class row (re-derived from the
-// six-class registry by class-feature-migration.test.ts, never hardcoded
-// there either) PLUS Fighter's, Barbarian's, Ranger's, Rogue's, Warlock's and
-// Wizard's literal rows (fighter-features.ts #1227, barbarian-features.ts
-// #1223, ranger-features.ts #1230, rogue-features.ts #1231,
-// warlock-features.ts #1233, wizard-features.ts #1234) — concatenated, not
-// merged through expandFeatureRow, since those six arrays are already in
+// five-class registry by class-feature-migration.test.ts, never hardcoded
+// there either) PLUS Fighter's, Barbarian's, Ranger's, Rogue's, Sorcerer's,
+// Warlock's and Wizard's literal rows (fighter-features.ts #1227,
+// barbarian-features.ts #1223, ranger-features.ts #1230, rogue-features.ts
+// #1231, sorcerer-features.ts #1232, warlock-features.ts #1233,
+// wizard-features.ts #1234) — concatenated, not
+// merged through expandFeatureRow, since those seven arrays are already in
 // final ClassFeatureSeedRow[] shape.
 export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
   ...collectRawFeatures().flatMap(expandFeatureRow),
@@ -257,6 +259,7 @@ export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
   ...ROGUE_FEATURES,
   ...WARLOCK_FEATURES,
   ...WIZARD_FEATURES,
+  ...SORCERER_FEATURES,
 ];
 
 // Shared ascending-by-minLevel invariant (#1522 decision: tier arrays are
