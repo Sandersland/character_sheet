@@ -226,8 +226,10 @@ describe("deriveResources — Bard Bardic Inspiration", () => {
 
   // #1224: the pool is verified edition-invariant against both SRDs — pins
   // that nobody later adds an `edition` parameter to special-case one of them.
+  // Exact arity, not an upper bound: dropping `abilityScores` would break the
+  // Cha-modifier total that is the whole reason this module still exists.
   it("resourceFn declares no edition parameter (edition-invariant pool)", () => {
-    expect(bard.resourceFn!.length).toBeLessThanOrEqual(2);
+    expect(bard.resourceFn!.length).toBe(2);
   });
 });
 

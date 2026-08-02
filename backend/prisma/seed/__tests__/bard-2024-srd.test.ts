@@ -101,7 +101,10 @@ describe("Countercharm (#1224): level-shift 6 -> 7 + full rewrite to a Reaction 
     expect(r.description).toContain("30 feet");
     expect(r.description).not.toContain("As an action");
     expect(r.description).not.toContain("performance");
-    expect(r.description).not.toContain("advantage on saving throws");
+    // "advantage on saves" and not "…on saving throws": the 2014 row's own
+    // wording is what a stale copy would carry, so only that exact phrase can
+    // fail here.
+    expect(r.description).not.toContain("advantage on saves");
   });
 
   it("2014 stays level 6 and still contains 'As an action'", () => {
