@@ -410,13 +410,32 @@ const MIN_ROWS_PER_PAIR = 10;
 // as Totem Warrior), and the Eldritch Invocation catalog itself (which
 // invocations exist, their prerequisites, Pact Boon folding into it) is
 // text-only — no mechanics behind it yet, tracked as a follow-up.
+//
+// "Ranger" removed here (#1230, same diff as the content that makes its rows
+// genuinely diverge: base 11->15 EDITION_2024 rows — Natural Explorer/
+// Primeval Awareness/Land's Stride/Hide in Plain Sight/Vanish drop out, nine
+// new 2024-only features join, four rework in place (Spellcasting level-
+// shifts 2->1, Favored Enemy/Feral Senses/Foe Slayer all full rewrites);
+// Hunter goes 4->5 (Giant Killer/Steel Will/Multiattack drop out, Hunter's
+// Lore joins, Superior Hunter's Prey fills Multiattack's old L11 slot); Beast
+// Master stays 4->4 but Ranger's Companion RENAMES to Primal Companion — so
+// the two editions land at 19 (2014) vs 24 (2024) total rows, genuinely
+// unequal). This removal is NOT "all of Ranger's 2024 content is real" —
+// several residuals stay undisclosed nowhere else but here: Roving's Climb/
+// Swim-Speed and +10-ft grants, Deft Explorer's/L9 Expertise's Expertise
+// grants, and Hunter's Prey/Defensive Tactics' 2024 rest-swap are all TEXT
+// ONLY (#1230 research C6/C7, #1353); Favored Enemy's always-prepared
+// Hunter's Mark has no force-prepare mechanism at all (no ClassGrantedSpell
+// model exists — #1234's Wizard disclosure, same gap); and Beast Master's
+// three companion stat blocks are deliberately never transcribed (mirror-
+// sourced content, owner decision, PR body has the two-independent-mirror
+// discipline this content was held to).
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Bard",
   "Cleric",
   "Druid",
   "Monk",
   "Paladin",
-  "Ranger",
   "Sorcerer",
 ]);
 

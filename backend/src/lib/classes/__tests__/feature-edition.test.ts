@@ -383,6 +383,45 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["wizard", "school of illusion", "Illusion Savant"],
   ["wizard", "school of illusion", "Illusory Self"],
   ["wizard", "school of illusion", "Illusory Reality"],
+  // Ranger's 21 new triples (#1230): the 5 base names that genuinely fork
+  // (Favored Enemy, Spellcasting, Fighting Style, Feral Senses, Foe Slayer)
+  // show up under EVERY subclass context Ranger has (undefined/hunter/beast
+  // master — collectTaggedFeatureKeys combines classRows, always ALL of
+  // them, with each context's own subclassRows) — 3 contexts x 5 base names
+  // = 15, plus Hunter's own 3 forked subclass names (Hunter's Prey,
+  // Defensive Tactics, Superior Hunter's Defense) and Beast Master's own 3
+  // (Exceptional Training, Bestial Fury, Share Spells) = 21. Extra Attack is
+  // NOT here (one untagged row, edition-invariant). Neither are 2024-only
+  // names (Weapon Mastery, Deft Explorer, Roving, Expertise, Tireless,
+  // Relentless Hunter, Nature's Veil, Precise Hunter, Epic Boon, Hunter's
+  // Lore, Superior Hunter's Prey, Primal Companion), nor 2014-only names
+  // (Natural Explorer, Primeval Awareness, Land's Stride, Hide in Plain
+  // Sight, Vanish, Giant Killer/Steel Will/Multiattack's parent rows,
+  // Ranger's Companion) — each has exactly one description under its name,
+  // not two. Ranger's Companion / Primal Companion is a RENAME (a different
+  // name each edition), not a fork, same shape as Warlock's "Expanded Spell
+  // List" -> "Fiend Spells".
+  ["ranger", "undefined", "Favored Enemy"],
+  ["ranger", "undefined", "Spellcasting"],
+  ["ranger", "undefined", "Fighting Style"],
+  ["ranger", "undefined", "Feral Senses"],
+  ["ranger", "undefined", "Foe Slayer"],
+  ["ranger", "hunter", "Favored Enemy"],
+  ["ranger", "hunter", "Spellcasting"],
+  ["ranger", "hunter", "Fighting Style"],
+  ["ranger", "hunter", "Feral Senses"],
+  ["ranger", "hunter", "Foe Slayer"],
+  ["ranger", "hunter", "Hunter's Prey"],
+  ["ranger", "hunter", "Defensive Tactics"],
+  ["ranger", "hunter", "Superior Hunter's Defense"],
+  ["ranger", "beast master", "Favored Enemy"],
+  ["ranger", "beast master", "Spellcasting"],
+  ["ranger", "beast master", "Fighting Style"],
+  ["ranger", "beast master", "Feral Senses"],
+  ["ranger", "beast master", "Foe Slayer"],
+  ["ranger", "beast master", "Exceptional Training"],
+  ["ranger", "beast master", "Bestial Fury"],
+  ["ranger", "beast master", "Share Spells"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry
