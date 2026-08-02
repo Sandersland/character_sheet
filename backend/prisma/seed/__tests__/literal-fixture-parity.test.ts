@@ -127,16 +127,17 @@ describe("literal-row fixture parity (#1593)", () => {
   // resourceKey/derivedStat and no surviving test asserts a null-vs-object
   // distinction against it (see the fixture's own header).
   //
-  // Measured against this tree at #1226 commit 1 (Druid's 17 rows, still
-  // untagged, added to wave B's 203): 8 classes and 13 subclasses. The floors
-  // sit just under the real measured count, not an order of magnitude under —
-  // a loose floor passes a bad merge that drops most of the fixture, which
-  // would defeat every assertion below while staying green. Tune these UPWARD
-  // as classes go literal; only ever tune one DOWNWARD with the reason
-  // recorded here (the class-feature-population.test.ts idiom).
+  // Measured against this tree at #1226 commit 2 (Druid's real SRD 5.2
+  // content — 17 EDITION_2014 + 21 EDITION_2024 rows across base + both
+  // circles): 241 rows, 8 classes, 13 subclasses. The floors sit just under
+  // the real measured count, not an order of magnitude under — a loose floor
+  // passes a bad merge that drops most of the fixture, which would defeat
+  // every assertion below while staying green. Tune these UPWARD as classes go
+  // literal; only ever tune one DOWNWARD with the reason recorded here (the
+  // class-feature-population.test.ts idiom).
   it("the fixture actually mirrors something — non-vacuity floor", () => {
     const rows = collectFixtureRows();
-    expect(rows.length).toBeGreaterThanOrEqual(235);
+    expect(rows.length).toBeGreaterThanOrEqual(238);
     expect(Object.keys(LITERAL_CLASS_ROWS).length).toBeGreaterThanOrEqual(8);
     expect(Object.keys(LITERAL_SUBCLASS_ROWS).length).toBeGreaterThanOrEqual(13);
     expect(SEED_BY_KEY.size).toBe(CLASS_FEATURES.length);

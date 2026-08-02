@@ -1,4 +1,14 @@
-// Circle of the Moon derives Circle Forms CR caps; base/Land keep the base table (#906).
+// Circle of the Moon derives Circle Forms CR caps; base/Land keep the base
+// table (#906) — EDITION_2014 only. #1226 commit 3: the EDITION_2024 pool
+// moved wholesale onto druid-features.ts's Wild Shape row (wildShapeCrCap and
+// wildShapeSpeedNote are now 2014-only, gated by `edition === "EDITION_2024"
+// -> []` at the top of lib/classes/druid.ts's resourceFn) — SRD 5.2 states a
+// flat, subclass-invariant CR table in prose instead of a computed value, so
+// under 2024 every subclass context reads the SAME Wild Shape description;
+// Circle of the Moon's own level/3 CR bump is a FEATURE-list fact (its Circle
+// Forms row) now, never baked into the pool description. This file used to
+// assert 2014's computed values under a hardcoded "EDITION_2024" call — that
+// was the stale-copy bug #1226 exists to fix.
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -15,14 +25,28 @@ const ABILITIES = {
   charisma: 10,
 };
 
-function wildShapeDescription(subclass: string | undefined, level: number): string | undefined {
-  const info = deriveResources("druid", subclass, level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("druid", subclass), "EDITION_2024");
+function wildShapeDescription(
+  subclass: string | undefined,
+  level: number,
+  edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2014",
+): string | undefined {
+  const info = deriveResources("druid", subclass, level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("druid", subclass), edition);
   return info?.resources.find((r) => r.key === "wildShape")?.description;
 }
 
-describe("druid Wild Shape CR cap derivation (#906)", () => {
-  it("Circle of the Moon caps CR at 1 from level 3 (subclass grants at 3, #1128)", () => {
-    expect(wildShapeDescription("circle of the moon", 2)).toContain("max CR 1/4 (no flying or swimming speed)");
+describe("druid Wild Shape CR cap derivation, EDITION_2014 (#906) — 2014-only, unaffected by #1226", () => {
+  // PHB'14 p.66: Circle of the Moon grants at level 2 (druid.ts's own
+  // `grantLevel: 2`) — subclassGateLevel resolves the 2014 gate straight off
+  // that value when no CharacterClass.subclassLevel relation is supplied
+  // (testFeatureRowsFor carries none), unlike EDITION_2024's hardcoded gate
+  // of 3 regardless of `grantLevel` (effective-levels.ts). Circle Forms
+  // itself caps CR at 1 from L2-L5 (its "starting at level 6" step hasn't
+  // hit yet), so this is a flat "1", not the base table's "1/4" — the prior
+  // version of this test called deriveResources with a hardcoded
+  // "EDITION_2024" (which always gates at 3, masking this) while asserting
+  // this exact SRD 5.1 text; that's the bug #1226 was retargeting to fix.
+  it("Circle of the Moon caps CR at 1 starting at its own level-2 grant", () => {
+    expect(wildShapeDescription("circle of the moon", 2)).toContain("max CR 1 (no flying or swimming speed)");
     expect(wildShapeDescription("circle of the moon", 3)).toContain("max CR 1 (no flying or swimming speed)");
     expect(wildShapeDescription("circle of the moon", 4)).toContain("max CR 1 (no flying speed)");
     expect(wildShapeDescription("circle of the moon", 5)).toContain("max CR 1 (no flying speed)");
@@ -50,5 +74,30 @@ describe("druid Wild Shape CR cap derivation (#906)", () => {
   it("no Wild Shape pool below level 2, even for the Moon", () => {
     expect(wildShapeDescription("circle of the moon", 1)).toBeUndefined();
     expect(wildShapeDescription(undefined, 1)).toBeUndefined();
+  });
+});
+
+describe("druid Wild Shape pool, EDITION_2024 (#1226): flat, subclass-invariant description — no computed CR cap", () => {
+  it("the SAME description is served regardless of subclass — the CR cap is no longer subclass-derived", () => {
+    const base = wildShapeDescription(undefined, 10, "EDITION_2024");
+    const land = wildShapeDescription("circle of the land", 10, "EDITION_2024");
+    const moon = wildShapeDescription("circle of the moon", 10, "EDITION_2024");
+    expect(base).toBeDefined();
+    expect(land).toBe(base);
+    expect(moon).toBe(base);
+  });
+
+  it("states the static three-tier CR table and the Fly-only speed gate in prose", () => {
+    const description = wildShapeDescription(undefined, 10, "EDITION_2024");
+    expect(description).toContain("1/4 or lower at level 2");
+    expect(description).toContain("1/2 or lower at level 4");
+    expect(description).toContain("1 or lower starting at level 8");
+    expect(description).toContain("Fly Speed");
+    expect(description).not.toContain("max CR");
+  });
+
+  it("no Wild Shape pool below level 2, even for the Moon", () => {
+    expect(wildShapeDescription("circle of the moon", 1, "EDITION_2024")).toBeUndefined();
+    expect(wildShapeDescription(undefined, 1, "EDITION_2024")).toBeUndefined();
   });
 });

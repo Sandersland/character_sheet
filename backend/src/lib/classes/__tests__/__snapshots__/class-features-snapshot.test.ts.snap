@@ -2730,10 +2730,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -2744,10 +2745,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -2758,10 +2760,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -2772,10 +2775,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -2786,11 +2790,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2800,11 +2805,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2814,11 +2820,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2828,11 +2835,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2842,11 +2850,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2856,11 +2865,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2870,11 +2880,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2884,11 +2895,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2898,11 +2910,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2912,11 +2925,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2926,11 +2940,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -2940,11 +2955,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -2954,11 +2970,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -2968,11 +2985,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -2982,11 +3000,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 10 hour(s). Regain all uses on a short or long rest. Unlimited uses (Archdruid).",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 99,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -3007,10 +3026,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3021,10 +3041,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3035,10 +3056,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3049,10 +3071,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3063,11 +3086,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3077,11 +3101,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3091,11 +3116,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3105,11 +3131,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3119,11 +3146,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3133,11 +3161,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3147,11 +3176,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3161,11 +3191,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3175,11 +3206,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3189,11 +3221,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3203,11 +3236,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3217,11 +3251,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -3231,11 +3266,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -3245,11 +3281,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -3259,11 +3296,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1). Lasts up to 10 hour(s). Regain all uses on a short or long rest. Unlimited uses (Archdruid).",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 99,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
         },
       ],
     },
@@ -3284,10 +3322,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1/4 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3298,10 +3337,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1 (no flying or swimming speed)). Lasts up to 1 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3312,10 +3352,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3326,10 +3367,11 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 1 (no flying speed)). Lasts up to 2 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
+          "recharge": "longRest",
+          "shortRestRegain": 1,
           "total": 2,
         },
       ],
@@ -3340,11 +3382,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3354,11 +3397,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 2 (no flying speed)). Lasts up to 3 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3368,11 +3412,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 2). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3382,11 +3427,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 3). Lasts up to 4 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -3396,11 +3442,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 3). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3410,11 +3464,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 3). Lasts up to 5 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3424,11 +3486,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 4). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3438,11 +3508,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 4). Lasts up to 6 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3452,11 +3530,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 4). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3466,11 +3552,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 5). Lasts up to 7 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3480,11 +3574,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 5). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3494,11 +3596,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 5). Lasts up to 8 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3508,11 +3618,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 6). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3522,11 +3640,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 6). Lasts up to 9 hour(s). Regain all uses on a short or long rest.",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 2,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -3536,11 +3662,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Transform into a beast (max CR 6). Lasts up to 10 hour(s). Regain all uses on a short or long rest. Unlimited uses (Archdruid).",
+          "description": "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
           "key": "wildShape",
           "label": "Wild Shape",
-          "recharge": "short-or-long",
-          "total": 99,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 4,
+        },
+        {
+          "description": "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          "key": "moonlightStep",
+          "label": "Moonlight Step",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },

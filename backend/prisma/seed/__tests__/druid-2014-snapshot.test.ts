@@ -173,8 +173,8 @@ describe("Druid EDITION_2014 rows are byte-identical to the pre-#1226 tree (2014
   });
 });
 
-describe("commit 1 negative: druid.ts no longer authors feature TEXT, and no pool has moved onto a row yet", () => {
-  it("lib/classes/druid.ts's ClassDefinition carries no `features` array (moved to literal seed data)", () => {
+describe("druid.ts no longer authors feature TEXT — moved to literal seed data (commit 1), unaffected by commits 2-3", () => {
+  it("lib/classes/druid.ts's ClassDefinition carries no `features` array", () => {
     expect(druid.features).toBeUndefined();
   });
 
@@ -184,9 +184,16 @@ describe("commit 1 negative: druid.ts no longer authors feature TEXT, and no poo
     }
   });
 
-  it("no DRUID_FEATURES row carries a resourceKey yet — the pool split is commit 3's job, not commit 1's", () => {
+  // Commit 3 moves Wild Shape's (and Moonlight Step's) pool onto the row —
+  // see druid-wildshape-pool.test.ts for that split's own coverage. The
+  // invariant this suite protects is narrower: no EDITION_2014 row EVER
+  // carries a resourceKey (the 2014 pool stays in druid.ts's resourceFn,
+  // untouched by #1226).
+  it("no EDITION_2014 row carries a resourceKey — the 2014 pool stays in druid.ts's resourceFn", () => {
     for (const row of DRUID_FEATURES) {
-      expect(row.resourceKey, `${row.name} (${row.edition})`).toBeUndefined();
+      if (row.edition === "EDITION_2014") {
+        expect(row.resourceKey, `${row.name} (${row.edition})`).toBeUndefined();
+      }
     }
   });
 });
