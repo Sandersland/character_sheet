@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -24,7 +24,6 @@ let cookieOwner: string;
 let cookiePlayer: string;
 let cookieOutsider: string;
 
-const app = createApp();
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
 const BASE_CHAR = {

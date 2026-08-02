@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 
@@ -42,7 +42,7 @@ describe("GET /api/items", () => {
       },
     });
 
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/items");
+    const response = await supertest.agent(app).set("Cookie", COOKIE).get("/api/items");
 
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body)).toBe(true);

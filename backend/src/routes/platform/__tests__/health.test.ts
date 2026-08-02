@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 
 describe("GET /api/health", () => {
   it("returns ok status (public, no session)", async () => {
-    const response = await supertest(createApp()).get("/api/health");
+    const response = await supertest(app).get("/api/health");
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: "ok" });
@@ -27,12 +27,12 @@ describe("unknown /api paths", () => {
   });
 
   it("401s before the 404 handler when unauthenticated (no path enumeration)", async () => {
-    const response = await supertest(createApp()).get("/api/does-not-exist");
+    const response = await supertest(app).get("/api/does-not-exist");
     expect(response.status).toBe(401);
   });
 
   it("404s as JSON for an authenticated caller, not Express's default HTML", async () => {
-    const response = await supertest(createApp())
+    const response = await supertest(app)
       .get("/api/does-not-exist")
       .set("Cookie", cookie);
 

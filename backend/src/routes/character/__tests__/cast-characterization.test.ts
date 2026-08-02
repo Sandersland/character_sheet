@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -94,7 +94,7 @@ describe("cast characterization — Wizard", () => {
   });
 
   it("cantrip with a roll: summary + data.slotLevel null", async () => {
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(url).send({ operations: [{ type: "castSpell", entryId: "cantrip-1", roll: 7 }] });
     expect(res.status).toBe(200);
 
@@ -104,7 +104,7 @@ describe("cast characterization — Wizard", () => {
   });
 
   it("leveled spell at its own level: label + data.slotLevel", async () => {
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(url).send({ operations: [{ type: "castSpell", entryId: "missile-1", slotLevel: 1, roll: 14 }] });
     expect(res.status).toBe(200);
 
@@ -114,7 +114,7 @@ describe("cast characterization — Wizard", () => {
   });
 
   it("upcast leveled spell: upcast label + data.slotLevel", async () => {
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(url).send({ operations: [{ type: "castSpell", entryId: "missile-1", slotLevel: 3, roll: 20 }] });
     expect(res.status).toBe(200);
 
@@ -124,7 +124,7 @@ describe("cast characterization — Wizard", () => {
   });
 
   it("utility / roll 0: no colon clause", async () => {
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(url).send({ operations: [{ type: "castSpell", entryId: "conc-1", slotLevel: 1, roll: 0 }] });
     expect(res.status).toBe(200);
 
@@ -134,7 +134,6 @@ describe("cast characterization — Wizard", () => {
   });
 
   it("concentration displace: separate drop event + before/after snapshots", async () => {
-    const app = createApp();
     await supertest.agent(app).set("Cookie", COOKIE)
       .post(url).send({ operations: [{ type: "castSpell", entryId: "conc-1", slotLevel: 1, roll: 0 }] });
     await supertest.agent(app).set("Cookie", COOKIE)
@@ -159,7 +158,7 @@ describe("cast characterization — Wizard", () => {
   });
 
   it("self-apply: HP delta + slot spend in one batch", async () => {
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(url).send({
         operations: [{
           type: "castSpell", entryId: "missile-1", slotLevel: 1, roll: 4,
@@ -222,7 +221,7 @@ describe("cast characterization — Warlock Mystic Arcanum", () => {
   });
 
   it("arcanum cast: 'L6 Mystic Arcanum' label", async () => {
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${WARLOCK_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", entryId: "arcanum-6", slotLevel: 6, roll: 0 }] });
     expect(res.status).toBe(200);

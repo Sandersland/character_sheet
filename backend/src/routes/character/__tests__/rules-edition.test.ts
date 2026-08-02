@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -11,7 +11,6 @@ import { authCookie } from "@/test-support/auth.js";
 // sheet at rules for which no content exists (audit on #1281).
 const OWNER_ID = "owner-rules-edition";
 let COOKIE: string;
-const app = createApp();
 
 const BASE = {
   alignment: "True Neutral",

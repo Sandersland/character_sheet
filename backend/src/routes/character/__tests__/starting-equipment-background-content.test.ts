@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-starting-equipment-background-content";
@@ -44,7 +44,7 @@ function baseBody(overrides: Record<string, unknown>) {
 describe("real background starting-equipment gold ADDS to the class package's gold (#1565)", () => {
   it("a 2024 Criminal Fighter picking option A on both gets 4 + 16 = 20 GP, and both item sets land", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -82,7 +82,7 @@ describe("real background starting-equipment gold ADDS to the class package's go
 
   it("choosing option B (flat GP) on both sums 155 (Fighter) + 50 (Criminal) = 205 GP with no items", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -106,7 +106,7 @@ describe("real background starting-equipment gold ADDS to the class package's go
 describe("real Acolyte background package resolves per-edition, never one serving both (#1565)", () => {
   it("a 2014 Acolyte gets SRD 5.1's fixed list and 15 GP", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -144,7 +144,7 @@ describe("real Acolyte background package resolves per-edition, never one servin
 
   it("a 2024 Acolyte of the SAME background gets SRD 5.2's option-A items and 8 GP — unaffected by #1565's 2014 row", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -193,7 +193,7 @@ describe("a background with no package still creates successfully (#1565)", () =
   // background but that one is a valid choice here.
   it("2014 Charlatan (resolves, but SRD 5.1 gives it no package) creates fine with no backgroundStartingEquipment sent", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -214,7 +214,7 @@ describe("a background with no package still creates successfully (#1565)", () =
 
   it("sending backgroundStartingEquipment for a background with no package 400s", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -232,7 +232,7 @@ describe("a background with no package still creates successfully (#1565)", () =
 
   it("a homebrew background name creates fine with no backgroundStartingEquipment sent", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -257,7 +257,7 @@ describe("a background with no package still creates successfully (#1565)", () =
 describe("PHB'14 Folk Hero background package (#1570)", () => {
   it("a 2014 Folk Hero gets the fixed list, 10 GP, and whichever artisan's tools they picked", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -286,7 +286,7 @@ describe("PHB'14 Folk Hero background package (#1570)", () => {
 
   it("rejects an open pick that isn't an artisan's tool, even though it is a real tool", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -309,7 +309,7 @@ describe("PHB'14 Folk Hero background package (#1570)", () => {
 
   it("is not offered to a 2024 character at all — the name falls through to homebrew", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -334,7 +334,7 @@ describe("PHB'14 Folk Hero background package (#1570)", () => {
 describe("backgroundStartingEquipment rejects mode:\"gold\" (#1565)", () => {
   it("a background never has a roll-for-gold alternative, in either edition", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(

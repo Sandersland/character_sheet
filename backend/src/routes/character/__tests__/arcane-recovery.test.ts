@@ -8,7 +8,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -16,7 +16,6 @@ import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-arcane-recovery";
 let COOKIE: string;
-const app = createApp();
 
 const XP_LVL_8 = 34000; // level 8 → L1:4, L2:3, L3:3, L4:2 slots; cap = 4 slot-levels
 

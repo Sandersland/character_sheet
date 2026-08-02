@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -44,8 +44,6 @@ const FIXTURE_LOW_CON = {
   name: "Low-Con HP Fixture",
   abilityScores: { ...FIXTURE.abilityScores, constitution: 6 }, // -2 conMod
 };
-
-const app = createApp();
 
 async function post(characterId: string, body: object) {
   return supertest(app)

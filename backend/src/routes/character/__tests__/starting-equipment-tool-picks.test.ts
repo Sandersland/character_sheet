@@ -13,7 +13,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 
@@ -141,7 +141,7 @@ describe("open picks widen past weapons (#1564)", () => {
 
   it("(a) toolCategory pick accepts a Flute and rejects a Longsword", async () => {
     const ok = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody(["Flute"]), startingEquipment: selections("Dagger", "Flute", "Flute") });
@@ -149,7 +149,7 @@ describe("open picks widen past weapons (#1564)", () => {
     createdCharacterIds.push(ok.body.id);
 
     const rejected = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody(["Flute"]), startingEquipment: selections("Dagger", "Longsword", "Flute") });
@@ -159,7 +159,7 @@ describe("open picks widen past weapons (#1564)", () => {
 
   it("(b) boundToToolChoice pick accepts the character's chosen tool proficiency and rejects one they didn't choose", async () => {
     const ok = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody(["Flute"]), startingEquipment: selections("Dagger", "Flute", "Flute") });
@@ -168,7 +168,7 @@ describe("open picks widen past weapons (#1564)", () => {
 
     // Chose Flute proficiency, but tries to take the Drum for the bound pick.
     const rejected = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody(["Flute"]), startingEquipment: selections("Dagger", "Flute", "Drum") });
@@ -178,7 +178,7 @@ describe("open picks widen past weapons (#1564)", () => {
 
   it("(c) an existing weapon-filtered pick still rejects a non-weapon", async () => {
     const rejected = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody(["Flute"]), startingEquipment: selections("Flute", "Flute", "Flute") });

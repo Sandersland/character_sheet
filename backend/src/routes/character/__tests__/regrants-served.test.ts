@@ -15,7 +15,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -25,7 +25,6 @@ const EDITIONS = ["EDITION_2014", "EDITION_2024"] as const;
 const XP_BY_LEVEL: Record<number, number> = { 2: 300, 3: 900 };
 
 let COOKIE: string;
-const app = createApp();
 const createdIds: string[] = [];
 
 const BASE = {

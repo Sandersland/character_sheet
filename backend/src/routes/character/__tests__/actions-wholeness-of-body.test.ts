@@ -12,12 +12,10 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
-
-const app = () => createApp();
 
 const OWNER_ID = "owner-actions-wholeness-of-body";
 let COOKIE: string;
@@ -70,14 +68,14 @@ async function createMonk() {
 }
 
 async function activity(): Promise<ActivityEvent[]> {
-  const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}/activity`);
+  const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}/activity`);
   expect(res.status).toBe(200);
   return res.body as ActivityEvent[];
 }
 
 function executeAction(actionKey: string, roll?: number) {
   return supertest
-    .agent(app())
+    .agent(app)
     .set("Cookie", COOKIE)
     .post(`/api/characters/${MONK_ID}/actions/transactions`)
     .send({ operations: [{ type: "executeAction", actionKey, ...(roll !== undefined ? { roll } : {}) }] });

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -9,8 +9,6 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 // DM authoring of passiveBonus capabilities + attunement prerequisite persists
 // and round-trips through the campaign-item route (#546).
 const OWNER = "owner-campaign-item-caps-route";
-
-const app = createApp();
 
 describe("campaign item capabilities route (#546)", () => {
   let cookie: string;

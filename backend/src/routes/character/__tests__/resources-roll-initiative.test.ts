@@ -8,7 +8,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -47,7 +47,7 @@ interface Pool { key: string; used: number; remaining: number; total: number }
 interface OpResult { eventType: string; summary: string; eventData: { regenerated: unknown[] } }
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 const resourcesUrl = `/api/characters/${FIXTURE_ID}/resources/transactions`;
 const hpUrl = `/api/characters/${FIXTURE_ID}/hp`;

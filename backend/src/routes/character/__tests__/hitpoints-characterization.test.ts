@@ -19,7 +19,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -29,7 +29,6 @@ import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-ro
 
 const OWNER_ID = "owner-hp-char";
 let COOKIE: string;
-const app = createApp();
 
 const BASE_ABILITY = { strength: 10, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 };
 const BASE = {

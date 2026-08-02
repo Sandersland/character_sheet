@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { syncEntryRefs, visibleEntries } from "@/routes/session/journal.js";
@@ -46,8 +46,6 @@ const FIXTURE = {
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 25, pp: 0 },
 };
-
-const app = createApp();
 
 function journalUrl(suffix = "") {
   return `/api/characters/${FIXTURE_ID}/journal${suffix}`;

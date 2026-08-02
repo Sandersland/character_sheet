@@ -25,13 +25,11 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
-
-const app = () => createApp();
 
 const OWNER_ID = "owner-actions-cast";
 let COOKIE: string;
@@ -76,7 +74,7 @@ interface ActivityEvent {
 }
 
 async function activity(): Promise<ActivityEvent[]> {
-  const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${FIGHTER_ID}/activity`);
+  const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIGHTER_ID}/activity`);
   expect(res.status).toBe(200);
   return res.body as ActivityEvent[];
 }
@@ -93,7 +91,7 @@ async function latestBatchId(): Promise<string> {
 // this suite's scope.
 function execute(actionKey: string) {
   return supertest
-    .agent(app())
+    .agent(app)
     .set("Cookie", COOKIE)
     .post(`/api/characters/${FIGHTER_ID}/actions/transactions`)
     .send({ operations: [{ type: "executeAction", actionKey }] });
@@ -176,7 +174,7 @@ describe("POST /:id/actions/transactions — Second Wind, row-driven (#420, #152
     const roll = cast.body.results[0].roll as number;
     const batchId = await latestBatchId();
     const revert = await supertest
-      .agent(app())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post(`/api/characters/${FIGHTER_ID}/events/${batchId}/revert`);
     expect(revert.status).toBe(200);
@@ -291,7 +289,7 @@ describe("POST /:id/actions/transactions — Second Wind on a MULTICLASS Fighter
 
   it("heals 1d10 + FIGHTER level, not 1d10 + total character level", async () => {
     const res = await supertest
-      .agent(app())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post(`/api/characters/${MC_ID}/actions/transactions`)
       .send({ operations: [{ type: "executeAction", actionKey: "secondWind" }] });

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -12,8 +12,6 @@ const PLAYER = "owner-entities-player"; // a member (PLAYER role)
 const OUTSIDER = "owner-entities-outsider"; // not a member
 const CHAR_OWNER = "test-entities-char-owner";
 const CHAR_PLAYER = "test-entities-char-player";
-
-const app = createApp();
 
 async function makeCharacter(id: string, ownerId: string) {
   await prisma.character.deleteMany({ where: { id } });

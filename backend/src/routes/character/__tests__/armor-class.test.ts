@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -37,9 +37,9 @@ const FIXTURE = {
 };
 
 const url = `/api/characters/${FIXTURE_ID}/inventory/transactions`;
-const get = () => supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
+const get = () => supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
 const acquire = (custom: unknown, equipped = true) =>
-  supertest.agent(createApp()).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "acquire", custom, equipped }] });
+  supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "acquire", custom, equipped }] });
 
 const leather = { name: "Test Leather", category: "armor", armor: { armorCategory: "light", baseArmorClass: 11 } };
 const halfPlate = { name: "Test Half Plate", category: "armor", armor: { armorCategory: "medium", baseArmorClass: 15, dexModifierMax: 2 } };
@@ -87,7 +87,7 @@ describe("derived armorClass", () => {
     const acq = await acquire(leather);
     expect(acq.body.armorClass).toBe(14);
     const inventoryItemId = acq.body.inventory[0].id;
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+    const res = await supertest.agent(app).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "setEquipped", inventoryItemId, equipped: false }] });
     expect(res.body.armorClass).toBe(13);
   });
@@ -103,7 +103,7 @@ describe("derived armorClass", () => {
     expect(res.body.armorClass).toBe(17); // 15 + min(5, 2), unchanged by higher Dex
     // And unarmored re-derives to reflect the new Dex.
     const bodyId = res.body.inventory[0].id;
-    const unequipped = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+    const unequipped = await supertest.agent(app).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "setEquipped", inventoryItemId: bodyId, equipped: false }] });
     expect(unequipped.body.armorClass).toBe(15); // 10 + 5
   });
@@ -116,9 +116,9 @@ describe("derived armorClass", () => {
     expect(second.body.armorClass).toBe(14);
     const leatherId = second.body.inventory.find((i: { name: string; id: string }) => i.name === "Test Leather")!.id;
     const chainId = second.body.inventory.find((i: { name: string; id: string }) => i.name === "Test Chain Mail")!.id;
-    await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+    await supertest.agent(app).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "setEquipped", inventoryItemId: leatherId, equipped: false }] });
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+    const res = await supertest.agent(app).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "equip", inventoryItemId: chainId, slot: "BODY" }] });
     expect(res.body.armorClass).toBe(16);
   });

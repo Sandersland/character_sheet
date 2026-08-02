@@ -10,7 +10,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-feats-edition-1306";
@@ -22,13 +22,13 @@ beforeAll(async () => {
 
 describe("GET /api/feats — edition resolution (#1306)", () => {
   it("without ?edition=, 400s rather than serving a flat cross-edition catalog", async () => {
-    const res = await supertest(createApp()).get("/api/feats").set("Cookie", COOKIE);
+    const res = await supertest(app).get("/api/feats").set("Cookie", COOKIE);
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("Missing required query parameter: edition");
   });
 
   it("?edition=EDITION_2014 resolves to exactly one Alert row: the flat +5 variant", async () => {
-    const res = await supertest(createApp()).get("/api/feats?edition=EDITION_2014").set("Cookie", COOKIE);
+    const res = await supertest(app).get("/api/feats?edition=EDITION_2014").set("Cookie", COOKIE);
     expect(res.status).toBe(200);
 
     const alerts = res.body.filter((f: { name: string }) => f.name === "Alert");
@@ -37,7 +37,7 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
   });
 
   it("?edition=EDITION_2024 resolves to exactly one Alert row: the +PB variant", async () => {
-    const res = await supertest(createApp()).get("/api/feats?edition=EDITION_2024").set("Cookie", COOKIE);
+    const res = await supertest(app).get("/api/feats?edition=EDITION_2024").set("Cookie", COOKIE);
     expect(res.status).toBe(200);
 
     const alerts = res.body.filter((f: { name: string }) => f.name === "Alert");
@@ -46,8 +46,8 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
   });
 
   it("either edition resolves Grappler to the same single shared row", async () => {
-    const res2014 = await supertest(createApp()).get("/api/feats?edition=EDITION_2014").set("Cookie", COOKIE);
-    const res2024 = await supertest(createApp()).get("/api/feats?edition=EDITION_2024").set("Cookie", COOKIE);
+    const res2014 = await supertest(app).get("/api/feats?edition=EDITION_2014").set("Cookie", COOKIE);
+    const res2024 = await supertest(app).get("/api/feats?edition=EDITION_2024").set("Cookie", COOKIE);
 
     const grappler2014 = res2014.body.find((f: { name: string }) => f.name === "Grappler");
     const grappler2024 = res2024.body.find((f: { name: string }) => f.name === "Grappler");
@@ -55,7 +55,7 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
   });
 
   it("an unrecognized ?edition= value 400s with a message distinct from the missing-param one", async () => {
-    const res = await supertest(createApp()).get("/api/feats?edition=bogus").set("Cookie", COOKIE);
+    const res = await supertest(app).get("/api/feats?edition=bogus").set("Cookie", COOKIE);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/^Unknown edition: /);
   });
@@ -71,7 +71,7 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
  */
 describe("GET /api/feats?asiLevel= — server-side ASI eligibility (#1438)", () => {
   async function get(query: string): Promise<{ name: string; category: string }[]> {
-    const res = await supertest(createApp()).get(`/api/feats?${query}`).set("Cookie", COOKIE);
+    const res = await supertest(app).get(`/api/feats?${query}`).set("Cookie", COOKIE);
     expect(res.status).toBe(200);
     return res.body;
   }
@@ -127,7 +127,7 @@ describe("GET /api/feats?asiLevel= — server-side ASI eligibility (#1438)", () 
   });
 
   it("400s on a non-numeric ?asiLevel=", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest(app)
       .get("/api/feats?edition=EDITION_2024&asiLevel=abc")
       .set("Cookie", COOKIE);
     expect(res.status).toBe(400);
@@ -136,7 +136,7 @@ describe("GET /api/feats?asiLevel= — server-side ASI eligibility (#1438)", () 
 
   it("400s on an out-of-range ?asiLevel= rather than clamping it", async () => {
     for (const bad of ["0", "21", "-3", "4.5"]) {
-      const res = await supertest(createApp())
+      const res = await supertest(app)
         .get(`/api/feats?edition=EDITION_2024&asiLevel=${bad}`)
         .set("Cookie", COOKIE);
       expect(res.status, `asiLevel=${bad}`).toBe(400);
