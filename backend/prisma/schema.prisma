@@ -1520,15 +1520,106 @@ model Item {
   // reach into lib/srd/tools.ts from the equipment resolver.
   toolCategory ToolCategory?
 
+  // Promoted from CampaignItem (#1645, epic #1644). These are precisely what
+  // the seeded catalog could not express: with no rarity, no attunement and no
+  // capability rows, an Item could not BE a magic item. #1646 merges
+  // CampaignItem into this table; seeding actual SRD magic items is separate
+  // content work.
+  rarity                ItemRarity?
+  requiresAttunement    Boolean               @default(false)
+  // null kind = attunable by anyone — distinct from requiresAttunement false.
+  attunementPrereqKind  AttunementPrereqKind?
+  attunementPrereqValue String?
+  isUnique              Boolean               @default(false)
+  // DM-private prep notes; never serialized into a player-facing response.
+  // Meaningful only on CAMPAIGN rows — #1646 keys the scrub off scope.
+  dmNotes               String?
+  // Carried over because the campaign-item wire exposes both (serializeCampaignItem);
+  // promoting them here keeps #1646 a pure data move rather than a wire change.
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
   weaponDetail     ItemWeaponDetail?
   armorDetail      ItemArmorDetail?
   consumableDetail ItemConsumableDetail?
+  capabilities     ItemCapability[]
 
   inventoryItems InventoryItem[]
   packContents   PackContent[]
 
   @@unique([scopeKey, name])
   @@index([campaignId])
+}
+
+// Typed 1:N capability side-table, re-parented from CampaignItemCapability
+// (#1645). The column set is identical ON PURPOSE — #1646 copies rows across
+// with a straight INSERT … SELECT, and any divergence silently drops data, so
+// item-capability-parity.integration.test.ts compares the two directly. Do not
+// reorder, rename or "tidy" these; fix them in CampaignItemCapability first.
+model ItemCapability {
+  id     String @id @default(uuid())
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  kind        CapabilityKind
+  description String?
+
+  // passiveBonus payload
+  target    CapabilityTarget?
+  op        CapabilityOp?
+  value     Int?
+  // Specific skill/ability/save key when target is skill|abilityScore|save.
+  targetKey String?
+  condition String?
+
+  // Dice-valued bonus (round-trips now; consumed in the damage roll at #526C).
+  valueDiceCount  Int?
+  valueDiceFaces  Int?
+  valueDamageType String?
+
+  // castSpell payload (#528): the item grants a spell cast from the item itself.
+  spellId           String? // catalog Spell.id provenance
+  spellName         String? // snapshot for display without a catalog join
+  spellLevel        Int?
+  castLevel         Int? // slot level the item casts the spell at
+  castResource      CapabilityCastResource?
+  castUses          Int? // uses per recharge period (null = 1)
+  castConcentration Boolean?
+  dcMode            CapabilityCastStatMode?
+  dcValue           Int?
+  attackMode        CapabilityCastStatMode?
+  attackValue       Int?
+
+  // activatedEffect payload (#543). The inline while-active self-buff reuses the
+  // target/op/value columns above; these add the activation + recharge model.
+  activation      ActivationType?
+  activatedDuration ActivatedDuration?
+  resourceKind    ItemResourceKind?
+  resourcePeriod  ItemResourcePeriod?
+  resourceCharges Int?
+  // Free-text wall-clock duration ("10 minutes") surfaced as reminder text.
+  durationText    String?
+
+  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
+  grantType       String?
+  grantOn         String?
+  grantValueKind  String?
+  grantValue      String?
+  cantBeSurprised Boolean @default(false)
+
+  // charges payload (#555): the item's shared charge pool — at most ONE charges
+  // row per item (authoring-enforced). All-null recharge dice = full refill on
+  // the trigger; dawn/dusk approximate to a long rest (see ItemResourcePeriod).
+  maxCharges        Int?
+  rechargeDiceCount Int?
+  rechargeDiceFaces Int?
+  rechargeBonus     Int?
+  rechargeTrigger   ItemResourcePeriod?
+  // Cost (in pool charges) paid by a castSpell/activatedEffect capability whose
+  // resource is `charges` (null = 1). Lives on the SPENDING capability's row.
+  chargeCost        Int?
+
+  @@index([itemId])
 }
 
 // Optional 1:1 with Item, present only when category = weapon. The FK lives
