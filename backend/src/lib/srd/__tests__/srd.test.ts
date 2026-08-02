@@ -414,33 +414,58 @@ describe("deriveResources — Warrior of Shadow", () => {
 describe("deriveResources — Paladin base pools", () => {
   const CHA_16 = { ...ABILITY_SCORES, charisma: 16 }; // +3 modifier
 
-  it("layOnHands total = 5 × level", () => {
-    for (const level of [1, 5, 10, 20]) {
-      const result = deriveResources("paladin", undefined, level, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
-      expect(result!.resources.find((r) => r.key === "layOnHands")!.total).toBe(level * 5);
+  it("layOnHands total = 5 × level, both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      for (const level of [1, 5, 10, 20]) {
+        const result = deriveResources("paladin", undefined, level, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), edition);
+        expect(result!.resources.find((r) => r.key === "layOnHands")!.total).toBe(level * 5);
+      }
     }
   });
 
-  it("divineSense total = 1 + Cha modifier", () => {
-    const result = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024"); // +3 Cha
-    expect(result!.resources.find((r) => r.key === "divineSense")!.total).toBe(4); // 1+3
+  // #1229: 2024 removed Divine Sense as its own resource pool (its job moves
+  // to the "Channel Divinity: Divine Sense" catalog option, spending the
+  // channelDivinity pool instead) — a 2014 Paladin still has it.
+  it("divineSense total = 1 + Cha modifier, EDITION_2014 only", () => {
+    const result2014 = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2014"); // +3 Cha
+    expect(result2014!.resources.find((r) => r.key === "divineSense")!.total).toBe(4); // 1+3
   });
 
-  it("no channelDivinity before level 3", () => {
-    const result = deriveResources("paladin", undefined, 2, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
-    expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeUndefined();
+  it("divineSense is absent for EDITION_2024", () => {
+    const result2024 = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(result2024!.resources.find((r) => r.key === "divineSense")).toBeUndefined();
   });
 
-  it("channelDivinity appears at level 3", () => {
-    const result = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
-    expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeDefined();
+  it("no channelDivinity before level 3, both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      const result = deriveResources("paladin", undefined, 2, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), edition);
+      expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeUndefined();
+    }
   });
 
-  it("oaths share base channelDivinity pool — exactly one channelDivinity pool", () => {
-    for (const oath of ["oath of devotion", "oath of the ancients", "oath of vengeance"]) {
-      const result = deriveResources("paladin", oath, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", oath), "EDITION_2024");
-      const cdPools = result!.resources.filter((r) => r.key === "channelDivinity");
-      expect(cdPools.length).toBe(1);
+  it("channelDivinity appears at level 3: total 1 (EDITION_2014) vs total 2 (EDITION_2024, SRD 5.2)", () => {
+    const result2014 = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2014");
+    expect(result2014!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(1);
+
+    const result2024 = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(result2024!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(2);
+  });
+
+  it("channelDivinity's 2024 total rises to 3 at level 11, not before", () => {
+    const at10 = deriveResources("paladin", undefined, 10, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(at10!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(2);
+
+    const at11 = deriveResources("paladin", undefined, 11, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(at11!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(3);
+  });
+
+  it("oaths share base channelDivinity pool — exactly one channelDivinity pool, both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      for (const oath of ["oath of devotion", "oath of the ancients", "oath of vengeance"]) {
+        const result = deriveResources("paladin", oath, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", oath), edition);
+        const cdPools = result!.resources.filter((r) => r.key === "channelDivinity");
+        expect(cdPools.length).toBe(1);
+      }
     }
   });
 });

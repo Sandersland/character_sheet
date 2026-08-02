@@ -581,6 +581,62 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["druid", "circle of the moon", "Beast Spells"],
   ["druid", "circle of the moon", "Archdruid"],
   ["druid", "circle of the moon", "Circle Forms"],
+  // Paladin's 32 new triples (#1229): the 6 base names that genuinely fork
+  // (Lay on Hands, Fighting Style, Spellcasting, Channel Divinity, Aura of
+  // Protection, Aura of Courage — Extra Attack is absent because its two rows
+  // carry IDENTICAL text, NOT because it is one shared row: Paladin follows
+  // cleric-features.ts's EDITION RULE and tags both rows explicitly, unlike
+  // Barbarian's/Ranger's one-untagged-row shape. collectTaggedFeatureKeys
+  // surfaces only names whose 2014/2024 descriptions DIFFER) show up under
+  // EVERY subclass
+  // context Paladin has (undefined/oath of devotion/oath of the ancients/oath
+  // of vengeance — collectTaggedFeatureKeys combines classRows, always ALL of
+  // them, with each context's own subclassRows) — 4 contexts x 6 base names =
+  // 24, plus Oath of Devotion's own 2 (Aura of Devotion, Holy Nimbus — Oath
+  // Spells/Sacred Weapon/Turn the Unholy/Purity of Spirit each RENAME to a
+  // different 2024 name, so none of those four is a same-name fork), Oath of
+  // the Ancients' own 3 (Aura of Warding, Undying Sentinel, Elder Champion —
+  // Oath Spells/Nature's Wrath/Turn the Faithless are the same renamed shape),
+  // and Oath of Vengeance's own 3 (Relentless Avenger, Soul of Vengeance,
+  // Avenging Angel — Oath Spells/Vow of Enmity/Abjure Enemy are the same
+  // renamed shape) = 24 + 2 + 3 + 3 = 32. Divine Sense/Divine Health/Divine
+  // Smite/Improved Divine Smite/Cleansing Touch (base) and every oath's own
+  // "Channel Divinity: X" 2014-only name are NOT here (no 2024 row at all,
+  // one description under the name, not two); Faithful Steed/Abjure Foes/Aura
+  // Expansion/Epic Boon (base) and "Channel Divinity: Divine Sense" are the
+  // same "2024-only, no 2014 twin" shape.
+  ["paladin", "undefined", "Lay on Hands"],
+  ["paladin", "undefined", "Fighting Style"],
+  ["paladin", "undefined", "Spellcasting"],
+  ["paladin", "undefined", "Channel Divinity"],
+  ["paladin", "undefined", "Aura of Protection"],
+  ["paladin", "undefined", "Aura of Courage"],
+  ["paladin", "oath of devotion", "Lay on Hands"],
+  ["paladin", "oath of devotion", "Fighting Style"],
+  ["paladin", "oath of devotion", "Spellcasting"],
+  ["paladin", "oath of devotion", "Channel Divinity"],
+  ["paladin", "oath of devotion", "Aura of Protection"],
+  ["paladin", "oath of devotion", "Aura of Courage"],
+  ["paladin", "oath of devotion", "Aura of Devotion"],
+  ["paladin", "oath of devotion", "Holy Nimbus"],
+  ["paladin", "oath of the ancients", "Lay on Hands"],
+  ["paladin", "oath of the ancients", "Fighting Style"],
+  ["paladin", "oath of the ancients", "Spellcasting"],
+  ["paladin", "oath of the ancients", "Channel Divinity"],
+  ["paladin", "oath of the ancients", "Aura of Protection"],
+  ["paladin", "oath of the ancients", "Aura of Courage"],
+  ["paladin", "oath of the ancients", "Aura of Warding"],
+  ["paladin", "oath of the ancients", "Undying Sentinel"],
+  ["paladin", "oath of the ancients", "Elder Champion"],
+  ["paladin", "oath of vengeance", "Lay on Hands"],
+  ["paladin", "oath of vengeance", "Fighting Style"],
+  ["paladin", "oath of vengeance", "Spellcasting"],
+  ["paladin", "oath of vengeance", "Channel Divinity"],
+  ["paladin", "oath of vengeance", "Aura of Protection"],
+  ["paladin", "oath of vengeance", "Aura of Courage"],
+  ["paladin", "oath of vengeance", "Relentless Avenger"],
+  ["paladin", "oath of vengeance", "Soul of Vengeance"],
+  ["paladin", "oath of vengeance", "Avenging Angel"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

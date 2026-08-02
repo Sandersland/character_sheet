@@ -8823,14 +8823,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -8844,14 +8837,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -8865,25 +8851,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 15,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -8893,25 +8873,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 20,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -8921,25 +8895,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 25,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -8949,25 +8917,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 30,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -8977,25 +8939,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 35,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9005,25 +8961,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 40,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9033,25 +8983,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 45,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9061,25 +9005,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 50,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9089,25 +9027,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 55,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9117,25 +9049,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 60,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9145,25 +9071,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 65,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9173,25 +9093,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 70,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9201,25 +9115,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 75,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9229,25 +9137,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 80,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9257,25 +9159,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 85,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9285,25 +9181,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 90,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9313,25 +9203,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 95,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9341,25 +9225,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 100,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9374,14 +9252,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -9395,14 +9266,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -9416,25 +9280,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 15,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9444,25 +9302,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 20,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9472,25 +9324,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 25,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9500,25 +9346,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 30,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9528,25 +9368,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 35,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9556,25 +9390,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 40,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9584,25 +9412,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 45,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9612,25 +9434,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 50,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9640,25 +9456,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 55,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9668,25 +9478,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 60,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9696,25 +9500,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 65,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9724,25 +9522,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 70,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9752,25 +9544,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 75,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9780,25 +9566,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 80,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9808,25 +9588,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 85,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9836,25 +9610,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 90,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9864,25 +9632,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 95,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9892,25 +9654,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 100,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -9925,14 +9681,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -9946,14 +9695,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -9967,25 +9709,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 15,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -9995,25 +9731,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 20,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10023,25 +9753,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 25,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10051,25 +9775,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 30,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10079,25 +9797,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 35,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10107,25 +9819,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 40,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10135,25 +9841,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 45,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10163,25 +9863,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 50,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10191,25 +9885,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 55,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10219,25 +9907,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 60,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10247,25 +9929,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 65,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10275,25 +9951,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 70,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10303,25 +9973,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 75,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10331,25 +9995,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 80,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10359,25 +10017,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 85,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10387,25 +10039,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 90,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10415,25 +10061,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 95,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10443,25 +10083,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 100,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10476,14 +10110,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -10497,14 +10124,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -10518,25 +10138,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 15,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10546,25 +10160,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 20,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10574,25 +10182,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 25,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10602,25 +10204,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 30,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10630,25 +10226,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 35,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10658,25 +10248,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 40,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10686,25 +10270,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 45,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10714,25 +10292,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 50,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 2,
         },
       ],
     },
@@ -10742,25 +10314,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 55,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10770,25 +10336,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 60,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10798,25 +10358,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 65,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10826,25 +10380,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 70,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10854,25 +10402,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 75,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10882,25 +10424,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 80,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10910,25 +10446,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 85,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10938,25 +10468,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 90,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10966,25 +10490,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 95,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },
@@ -10994,25 +10512,19 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Action: sense celestials, fiends, and undead within 60 ft until end of next turn. Regain all uses on a long rest.",
-          "key": "divineSense",
-          "label": "Divine Sense",
-          "recharge": "longRest",
-          "total": 3,
-        },
-        {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to cure a disease or neutralize a poison. Replenishes on a long rest.",
+          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
           "total": 100,
         },
         {
-          "description": "Channel divine energy for oath-specific effects. Regain use on a short or long rest.",
+          "description": "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
           "key": "channelDivinity",
           "label": "Channel Divinity",
-          "recharge": "short-or-long",
-          "total": 1,
+          "recharge": "longRest",
+          "shortRestRegain": 1,
+          "total": 3,
         },
       ],
     },

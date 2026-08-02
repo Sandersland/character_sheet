@@ -290,6 +290,28 @@ async function seedChannelDivinities(prisma: PrismaClient) {
     };
     await upsertEditionRow(prisma.grantedAbility, { name: cd.name, edition }, data, data);
   }
+  // #1229: NEW prune — this seeder had none before (unlike seedShadowArts'/
+  // seedFeats' own stale-row drops). Retagging "Channel Divinity: Turn the
+  // Unholy"/"Turn the Faithless"/"Abjure Enemy" from `edition: null` to
+  // `EDITION_2014` (see channel-divinity.ts's own per-row comments) CREATES a
+  // new EDITION_2014 row via upsertEditionRow's findFirst-by-(name,edition)
+  // and ORPHANS the pre-existing NULL-edition row — without this prune, that
+  // orphan is never deleted, and withEditionOrShared's null-is-shared
+  // fallback keeps serving it to a 2024 Paladin forever on any database that
+  // was seeded before this change. Same edition-partitioned shape as
+  // seedShadowArts' own prune (#1306): each row's OWN edition goes into the
+  // seeded list, not a flat null, so a genuinely-forked name (Nature's
+  // Wrath) doesn't get its OTHER edition's row swept by the same call.
+  const staleWhere = staleCatalogRowsWhere(
+    "name",
+    CHANNEL_DIVINITIES.map((cd) => ({ identity: cd.name, edition: cd.edition ?? null })),
+    { source: "channelDivinity" },
+  );
+  const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedChannelDivinities: dropping stale catalog rows: ${stale.map((c) => `${c.name} (${c.edition ?? "shared"})`).join(", ")}`);
+  }
+  await prisma.grantedAbility.deleteMany({ where: staleWhere });
 }
 
 // Seed feat catalog — upsert by (name, edition), then drop stale rows. Taken
