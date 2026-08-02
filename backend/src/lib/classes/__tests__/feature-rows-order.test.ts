@@ -19,12 +19,16 @@
  * expected sequences here move with it.
  */
 
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { characterInclude } from "@/lib/character/character-include.js";
 
-import { FEATURE_ROWS_ENTRY_SELECT } from "../feature-rows-select.js";
+import { FEATURE_ROWS_ENTRY_SELECT, FEATURE_ROWS_ORDER_BY } from "../feature-rows-select.js";
 
 const CLASS_NAME = "Order Probe Class";
 const SUBCLASS_NAME = "Order Probe Subclass";
@@ -162,5 +166,56 @@ describe("FEATURE_ROWS_ORDER_BY is a total order over the raw, pre-filter result
     );
 
     expect(violations, "FEATURE_ROWS_ORDER_BY left two rows unordered").toEqual([]);
+  });
+});
+
+describe("every feature-relation read carries FEATURE_ROWS_ORDER_BY (#1545)", () => {
+  it("the shared fragment and characterInclude reference the same array object", () => {
+    // `toBe`, not `toEqual`: a hand-written structural copy is exactly the
+    // drift this guards, and a copy would silently pass a deep-equality check
+    // while diverging on the next key added.
+    expect(FEATURE_ROWS_ENTRY_SELECT.class.select.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
+    expect(FEATURE_ROWS_ENTRY_SELECT.subclassRef.select.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
+    expect(characterInclude.classEntries.include.class.select.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
+    expect(characterInclude.classEntries.include.subclassRef.include.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
+  });
+
+  it("no source line selects the features relation without it", () => {
+    // Reference identity above can only reach the two EXPORTED fragments. Three
+    // call sites hand-roll an inline, non-exported select that no import-based
+    // test can see (hp-context.ts, spellcasting.ts, and level-up-transaction.ts
+    // twice) — a source sweep is the only check that covers them. #1528 shipped
+    // red-7-of-8 flake precisely because one such site was missed.
+    //
+    // Scoped to the RELATION select deliberately. loadDbFeatureRows reads the
+    // same rows through a top-level `classFeature.findMany` with no orderBy and
+    // is the one unordered feature read left in the repo; adding one there is
+    // NOT a no-op, because its callers compare derived resource arrays with
+    // toEqual and a reorder can flip them. Left alone rather than silently
+    // swept in (#1545).
+    const root = path.resolve(import.meta.dirname, "../../..");
+
+    function walk(dir: string): string[] {
+      return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return entry.name === "generated" ? [] : walk(full);
+        return entry.name.endsWith(".ts") ? [full] : [];
+      });
+    }
+
+    const offenders = walk(root).flatMap((file) =>
+      readFileSync(file, "utf8")
+        .split("\n")
+        .flatMap((line, index) =>
+          /\bfeatures:\s*\{/.test(line) && !line.includes("orderBy: FEATURE_ROWS_ORDER_BY")
+            ? [`${path.relative(root, file)}:${index + 1}`]
+            : [],
+        ),
+    );
+
+    expect(
+      offenders,
+      "spread FEATURE_ROWS_ENTRY_SELECT, or add `orderBy: FEATURE_ROWS_ORDER_BY` — see #1545",
+    ).toEqual([]);
   });
 });
