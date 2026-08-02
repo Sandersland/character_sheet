@@ -16,6 +16,18 @@ export interface StaleSubclassRow {
   edition: SeedEdition | null;
 }
 
+// How a Subclass row's edition reads in this file's four operator-facing
+// messages — NULL is "shared" (offered to both editions), not "none". Extracted
+// because every `?? ` is its own branch under fallow's cyclomatic count, and
+// prisma/seed/** carries no coverage instrumentation (vitest.config.ts scopes
+// coverage.include to src/**), so a function here floors at the UNCOVERED CRAP
+// formula CC^2+CC no matter how well tested it actually is. Splitting the
+// branch out is the only lever that moves it — the same reasoning
+// countReferencingBySubclassId and staleRowFailureMessages below already carry.
+function editionLabel(edition: SeedEdition | null): string {
+  return edition ?? "shared";
+}
+
 // Groups CharacterClassEntry's (subclassId) row counts into "how many
 // referencing rows per stale subclass id" — split out purely to keep each
 // function's own cyclomatic/cognitive complexity low. prisma/seed/** carries
@@ -38,7 +50,7 @@ function countReferencingBySubclassId(
 function staleRowFailureMessages(stale: readonly StaleSubclassRow[], countBySubclassId: Map<string, number>): string[] {
   return stale
     .filter((s) => countBySubclassId.has(s.id))
-    .map((s) => `  ${s.slug} (${s.edition ?? "shared"}): ${countBySubclassId.get(s.id)} referencing CharacterClassEntry row(s)`);
+    .map((s) => `  ${s.slug} (${editionLabel(s.edition)}): ${countBySubclassId.get(s.id)} referencing CharacterClassEntry row(s)`);
 }
 
 // The failure throw, isolated so assertNoCharactersReferenceStaleSubclasses'
@@ -128,8 +140,8 @@ async function remapCharactersOffStaleSubclasses(
       // debugging a cross-edition sheet later will want.
       console.log(
         `seedSubclasses: remapped ${count} CharacterClassEntry row(s) for ${row.slug} ` +
-          `from the stale (${row.edition ?? "shared"}) row onto the retained ` +
-          `(${retained[0].edition ?? "shared"}) row before pruning (#1559)`,
+          `from the stale (${editionLabel(row.edition)}) row onto the retained ` +
+          `(${editionLabel(retained[0].edition)}) row before pruning (#1559)`,
       );
     }
   }
@@ -173,7 +185,7 @@ export async function pruneStaleSubclasses(
   await assertNoCharactersReferenceStaleSubclasses(prisma, staleRows);
 
   if (stale.length) {
-    console.log(`seedSubclasses: dropping stale catalog rows: ${stale.map((s) => `${s.slug} (${s.edition ?? "shared"})`).join(", ")}`);
+    console.log(`seedSubclasses: dropping stale catalog rows: ${stale.map((s) => `${s.slug} (${editionLabel(s.edition)})`).join(", ")}`);
   }
   await prisma.subclass.deleteMany({ where: staleWhere });
 }
