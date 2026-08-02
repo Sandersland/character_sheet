@@ -127,7 +127,10 @@ describe("deriveResources — Druid Wild Shape, EDITION_2014", () => {
     expect(wsPools.length).toBe(1); // exactly one — no duplicate from subclass
   });
 
-  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) at its level-3 grant (#1128)", () => {
+  // Level 3 is above the gate, not at it: EDITION_2014's Circle of the Moon
+  // grants at 2 (druid.ts's grantLevel, PHB'14 p.66). druid-wildshape-cr.test.ts
+  // owns the level-2 boundary itself.
+  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) above its level-2 grant (#1128)", () => {
     const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const featureNames = result!.features.map((f) => f.name);
     expect(featureNames).toContain("Combat Wild Shape");
