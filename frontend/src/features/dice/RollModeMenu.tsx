@@ -37,7 +37,7 @@ export default function RollModeMenu({ anchor, label, onPick, onClose }: RollMod
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] bg-ink-900/20"
+      className="fixed inset-0 z-[60] bg-backdrop/50"
       onPointerDown={onClose}
       role="presentation"
     >
