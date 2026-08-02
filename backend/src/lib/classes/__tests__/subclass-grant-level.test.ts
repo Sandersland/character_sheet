@@ -20,18 +20,21 @@ function subclassFeatures(className: string, subclass: string, level: number, ed
   return (info?.features ?? []).filter((f) => f.source === "subclass");
 }
 
-// The full twelve non-3 `grantLevel` subclasses (#1546 Part A's verified
-// list) whose 2014 gate moved to 3 under 2024 — every one of them, not just a
-// representative sample, since Part A's registration change touches every
+// Ten of the twelve non-3 `grantLevel` subclasses (#1546 Part A's verified
+// list) whose 2014 gate moved to 3 under 2024 — everything else the list names,
+// not a representative sample, since Part A's registration change touches every
 // class's subclass lookup and this is the surface it must leave unchanged.
+// The Archfey and The Great Old One are the two exclusions (#1595): #1233
+// authored them zero EDITION_2024 rows (no licensed source could verify their
+// PHB'24 reworks), so there is no 2024 gate for them to have moved to and
+// assertEverySubclassEditionPopulated stops a 2024 character picking either.
+// Their 2014 gate of 1 is asserted by GATE_1 below.
 const MOVED: Array<[string, string]> = [
   ["cleric", "life domain"],
   ["cleric", "trickery domain"],
   ["sorcerer", "draconic bloodline"],
   ["sorcerer", "wild magic"],
-  ["warlock", "the archfey"],
   ["warlock", "the fiend"],
-  ["warlock", "the great old one"],
   ["wizard", "school of evocation"],
   ["wizard", "school of abjuration"],
   ["wizard", "school of illusion"],
@@ -48,22 +51,37 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
     expect(subclassFeatures(className, subclass, 3).length).toBeGreaterThan(0);
   });
 
-  it("Archfey's feyPresence pool is absent at level 2 and present at level 3", () => {
-    const at = (level: number) =>
-      deriveResources("warlock", "the archfey", level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("warlock", "the archfey"), "EDITION_2024")
-        ?.resources.some((r) => r.key === "feyPresence") ?? false;
-    expect(at(2)).toBe(false);
-    expect(at(3)).toBe(true);
+  // The only place in the repo asserting the gate suppresses `.resources` pools
+  // and not just `.features`. Wild Magic carries it since #1595 retired the
+  // Archfey pool case (that patron has no EDITION_2024 rows to gate at all);
+  // it is the same "gate moved" shape — Wild Magic opens at level 1 under 2014
+  // (PHB'14 p. 99) and at 3 under 2024, where the `Tides of Chaos` row itself
+  // sits (PHB'24 p. 149). Written as an edition CONTRAST on one pool key rather
+  // than the 2024 half alone: no real PHB'24 subclass row exists below level 3,
+  // so the 2024 half cannot on its own separate the subclass gate from the
+  // row's own level gate, and asserting it that way would read as a stronger
+  // claim than the data supports.
+  it("Wild Magic's tidesOfChaos pool tracks the subclass gate, which differs by edition", () => {
+    const at = (level: number, edition: RulesEdition) =>
+      deriveResources("sorcerer", "wild magic", level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("sorcerer", "wild magic"), edition)
+        ?.resources.some((r) => r.key === "tidesOfChaos") ?? false;
+    expect(at(1, "EDITION_2014")).toBe(true);
+    expect(at(2, "EDITION_2014")).toBe(true);
+    expect(at(1, "EDITION_2024")).toBe(false);
+    expect(at(2, "EDITION_2024")).toBe(false);
+    expect(at(3, "EDITION_2024")).toBe(true);
   });
 
   // The lowest domain/patron spell tier now grants at level 3, so no cleric or
   // warlock subclass feature description may still label it "(L1)" (#1128).
+  // Intrinsically a 2024-only rule, so The Archfey/The Great Old One are out
+  // (#1595): with zero EDITION_2024 rows the filter inspects nothing and the
+  // case passes vacuously, while their 2014 text legitimately writes SPELL
+  // levels as "(1st)"/"(2nd)".
   const L1_LABEL_SUBCLASSES: Array<[string, string]> = [
     ["cleric", "life domain"],
     ["cleric", "trickery domain"],
     ["warlock", "the fiend"],
-    ["warlock", "the archfey"],
-    ["warlock", "the great old one"],
   ];
   it.each(L1_LABEL_SUBCLASSES)("%s / %s has no feature description labelling a tier (L1)", (className, subclass) => {
     const info = deriveResources(className, subclass, 20, ABILITIES, proficiencyBonusForLevel(20), testFeatureRowsFor(className, subclass), "EDITION_2024");
