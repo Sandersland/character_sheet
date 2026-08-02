@@ -457,8 +457,8 @@ function expectRowDescriptors(row: DescriptorRow & RowKey): void {
   }
 }
 
-describe("ClassFeature migration — every descriptor column is NULL/default, except Fighter's #1528 pilot rows and Barbarian's #1223 Rage rows", () => {
-  it("no row has a populated descriptor column, except Second Wind/Action Surge/Indomitable (#1528), Rage (#1223), and Arcane Recovery/Illusory Self (#1234)", async () => {
+describe("ClassFeature migration — every descriptor column is NULL/default, except the rows isPopulatedRow names", () => {
+  it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232) and Cleric's (#1225)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
         resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
