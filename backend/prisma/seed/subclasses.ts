@@ -142,15 +142,22 @@ export const SUBCLASSES: SubclassSeed[] = [
   {
     className: "Bard",
     name: "College of Lore",
+    // #1224: reworded edition-neutral — 2014 grants "bonus spells from any
+    // class"; 2024's Magical Discoveries scopes that to Cleric/Druid/Wizard.
+    // Subclass.description is un-editioned (Subclass rows are edition-shared),
+    // so this row can only state what's true under both, not fork.
     description:
-      "Devoted to knowledge and cunning. You gain proficiency in three additional skills, Cutting Words to impose penalties on enemy rolls, and bonus spells from any class at level 6.",
+      "Devoted to knowledge and cunning. You gain proficiency in three additional skills, Cutting Words to impose penalties on enemy rolls, and bonus spells at level 6.",
     slug: "bard-college-of-lore",
   },
   {
     className: "Bard",
     name: "College of Valor",
+    // #1224: reworded edition-neutral — 2024's Martial Training adds Martial
+    // weapon proficiency (2014's Bonus Proficiencies grants only medium armor
+    // + shields), so "armor and weapon proficiencies" is true under both.
     description:
-      "A bard who fights as well as they inspire. You gain medium armor and shield proficiency, Combat Inspiration (allies add your Bardic Inspiration die to damage rolls), and Extra Attack at level 6.",
+      "A bard who fights as well as they inspire. You gain armor and weapon proficiencies, Combat Inspiration (allies add your Bardic Inspiration die to damage rolls), and Extra Attack at level 6.",
     slug: "bard-college-of-valor",
   },
   // ── Druid ─────────────────────────────────────────────────────────────────

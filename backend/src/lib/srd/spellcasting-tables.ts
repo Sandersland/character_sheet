@@ -566,9 +566,9 @@ export interface MagicalSecretsLists {
  * `Spell.classes` in schema.prisma.
  *
  * `subclass` is currently unused but is the deliberate seam for PHB'24 College of
- * Lore *Magical Discoveries* (level 6, Cleric/Druid/Wizard cantrip) and PHB'14
- * *Additional Magical Secrets* (6th level, any class) — both are content debt for
- * #1281, not implemented here.
+ * Lore *Magical Discoveries* (level 6, a Cleric/Druid/Wizard cantrip OR a spell
+ * you have slots for) and PHB'14 *Additional Magical Secrets* (6th level, any
+ * class) — both are content debt for #1281, not implemented here.
  */
 export function magicalSecretsSpellLists(
   className: string,
