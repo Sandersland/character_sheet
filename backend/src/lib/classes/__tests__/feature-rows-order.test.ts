@@ -188,12 +188,12 @@ describe("every feature-relation read carries FEATURE_ROWS_ORDER_BY (#1545)", ()
   });
 
   it("no source line selects the features relation without it", () => {
-    // Reference identity above can only reach the EXPORTED fragments. Four
+    // Reference identity above can only reach the EXPORTED fragments. Five
     // call sites hand-roll an inline, non-exported select that no import-based
-    // test can see (hp-context.ts, spellcasting.ts, and level-up-transaction.ts
-    // twice) — they now name the relation-level fragments, but only a source
-    // sweep can prove a NEW one does too. #1528 shipped red-7-of-8 flake
-    // precisely because one such site was missed.
+    // test can see: buildHpOpContext, SPELLCASTING_SELECT, TARGET_ENTRY_SELECT,
+    // resolveNewTargetEntry and resolvePickedSubclass. They now name the
+    // relation-level fragments, but only a source sweep can prove a NEW one
+    // does too. #1528 shipped red-7-of-8 flake because one such site was missed.
     //
     // Scoped to the RELATION select deliberately. loadDbFeatureRows reads the
     // same rows through a top-level `classFeature.findMany` with no orderBy and
