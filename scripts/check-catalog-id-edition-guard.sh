@@ -28,7 +28,7 @@ backend/src/lib/character/character-create.ts:170:guarded by crossEditionRejecti
 backend/src/lib/classes/resources.ts:339:guarded by crossEditionRejection (GrantedAbility maneuver, #1345 Chunk 4)
 backend/src/lib/classes/resources.ts:477:guarded by crossEditionRejection (GrantedAbility subclass-choice, #1345 Chunk 4)
 backend/src/lib/classes/shadow-arts.ts:95:guarded by crossEditionRejection (GrantedAbility, #1345 Chunk 5)
-backend/src/lib/classes/channel-divinity.ts:194:guarded by crossEditionRejection (GrantedAbility, #1345 Chunk 5)
+backend/src/lib/classes/channel-divinity.ts:227:guarded by crossEditionRejection (GrantedAbility, #1345 Chunk 5) — line moved by #1229's Divine Sense/Abjure Foes gates and reminder arms
 backend/src/lib/classes/maneuvers.ts:111:persisted id, deliberately unguarded — see the why-comment at loadManeuver (#1345 R2)
 backend/src/lib/leveling/level-up-transaction.ts:221:guarded by crossEditionRejection (Subclass, #1414)
 backend/src/routes/character/level-up.ts:62:reachable only after resolveLevelUpContext admitted the id — see the why-comment at pickedGrantSource (#1414)"

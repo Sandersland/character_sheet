@@ -19,8 +19,8 @@
 //
 // FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
 // (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233), WIZARD (#1234),
-// BARD (#1224) and DRUID (#1226) all author their ClassFeature rows as
-// literal seed data
+// BARD (#1224), DRUID (#1226) and PALADIN (#1229) all author their
+// ClassFeature rows as literal seed data
 // (prisma/seed/<class>-features.ts), which this src-side fixture can't
 // import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
 // anything under prisma/ a compile error (TS6059). Every one but Bard's rows
@@ -2097,6 +2097,218 @@ export const CIRCLE_OF_THE_MOON_ROWS: ClassFeatureRow[] = [
 // and #1232's corrected Draconic descriptions shipped here stale through a
 // fully green suite. That guard lives prisma-side because only that direction
 // can import both halves (`rootDir: "src"`, TS6059).
+// DELIBERATELY absent from LITERAL_SUBCLASS_ROWS below: none declares a
+// resourceKey/derivedStat, and unlike Cleric's two domains (the
+// counterexample this file's own header names), no surviving test observes a
+// null-vs-object distinction against a Paladin oath's subclassRows — Paladin's
+// base layer alone (divineSense/layOnHands/channelDivinity, always active from
+// L1/L1/L3) already guarantees deriveResources returns a non-null object
+// regardless of whether the active oath contributes any rows of its own, so
+// srd.test.ts's Channel-Divinity-pool-merge suite and the entry-scoped
+// resources/actions suites all pass with an empty subclassRows fallback
+// (`toRows(subDef?.features ?? [])` -> `[]`, since paladin.ts's three
+// SubclassDefinition entries carry no `features` array) — checked directly,
+// not assumed.
+export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Divine Sense",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
+  },
+  {
+    name: "Lay on Hands",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "Touch to restore HP from a pool of 5 × your paladin level. Alternatively, spend 5 HP from the pool to cure one disease or neutralize one poison. The pool replenishes on a long rest.",
+  },
+  {
+    name: "Lay on Hands",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
+  },
+  {
+    name: "Fighting Style",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "Choose a fighting style specialty: Defense (+1 AC in armor), Dueling (+2 melee damage with one weapon), Great Weapon Fighting (reroll 1s and 2s on damage), or Protection (impose disadvantage on attacks against adjacent allies).",
+  },
+  {
+    name: "Fighting Style",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You gain a Fighting Style feat of your choice. Blessed Warrior is available only to you: learn two Cleric cantrips of your choice, treated as Paladin spells for you, using Charisma as your spellcasting ability for them; you can replace one of them whenever you gain a Paladin level.",
+  },
+  {
+    name: "Spellcasting",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "You cast spells using Charisma starting at level 2. Half-caster progression (you gain spell slots more slowly than full casters). You prepare a number of paladin spells equal to your Charisma modifier + half your paladin level (rounded down).",
+  },
+  {
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You cast spells using Charisma as your spellcasting ability. You are a Half-Caster: consult the Paladin Features table for your spell slots, which you gain starting at 1st level. You prepare a growing list of Paladin spells (2 at level 1, rising to 15 by level 20, per the Paladin Features table), regain all expended spell slots on a Long Rest, and can change your prepared list whenever you finish one. A Holy Symbol serves as your Spellcasting Focus.",
+  },
+  {
+    name: "Divine Smite",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "When you hit with a melee weapon attack, expend one spell slot to deal +2d8 radiant damage (+1d8 per slot level above 1st, max +5d8). Undead and fiends take an additional 1d8 radiant damage.",
+  },
+  {
+    name: "Paladin's Smite",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You always have the Divine Smite spell prepared. In addition, you can cast it without expending a spell slot, but you must finish a Long Rest before you can cast it in this way again.",
+  },
+  {
+    name: "Divine Health",
+    level: 3,
+    edition: "EDITION_2014",
+    description: "The divine magic flowing through you makes you immune to disease.",
+  },
+  {
+    name: "Channel Divinity",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "You can channel divine energy through your sacred oath to fuel magical effects. You have 1 use, regained on a short or long rest. The specific options depend on your oath (see subclass features).",
+    resourceKey: "channelDivinity",
+    resourceLabel: "Channel Divinity",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 3, total: 1 }],
+  },
+  {
+    name: "Channel Divinity",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
+    resourceKey: "channelDivinity",
+    resourceLabel: "Channel Divinity",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 3, total: 2, shortRestRegain: 1 },
+      { minLevel: 11, total: 3, shortRestRegain: 1 },
+    ],
+  },
+  {
+    name: "Channel Divinity: Divine Sense",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, expend a use of your Channel Divinity to open your awareness to the presence of celestials, fiends, and undead within 60 feet of yourself that aren't behind total cover. For 10 minutes or until you have the Incapacitated condition, you know the location of any creature of those types in that radius and, for any creature you can see, whether it is one of those creature types. You also learn the creature type of any place or object in the area consecrated or desecrated as with the Hallow spell.",
+  },
+  {
+    name: "Extra Attack",
+    level: 5,
+    edition: "EDITION_2014",
+    description: "You can attack twice whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
+  },
+  {
+    name: "Extra Attack",
+    level: 5,
+    edition: "EDITION_2024",
+    description: "You can attack twice whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
+  },
+  {
+    name: "Faithful Steed",
+    level: 5,
+    edition: "EDITION_2024",
+    description:
+      "You always have the Find Steed spell prepared, and you can cast it once without a spell slot, doing so again only after you finish a Long Rest.",
+  },
+  {
+    name: "Aura of Protection",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "Friendly creatures within 10 ft add your Charisma modifier (minimum +1) to saving throws while you are conscious. Aura extends to 30 ft at level 18.",
+  },
+  {
+    name: "Aura of Protection",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "You and friendly creatures within your 10-foot Emanation add your Charisma modifier (minimum +1) to saving throws, an effect that is inactive while you have the Incapacitated condition. If another Paladin is within the Emanation, a creature can benefit from only one Aura of Protection at a time; that creature chooses which aura applies.",
+  },
+  {
+    name: "Abjure Foes",
+    level: 9,
+    edition: "EDITION_2024",
+    description:
+      "As a Magic action, expend a use of your Channel Divinity to overwhelm creatures with divine awe. Choose a number of creatures you can see within 60 feet of yourself, up to your Charisma modifier (minimum of one creature). Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened, a target can do only one of the following on its turn: move, take an action, or take a bonus action.",
+  },
+  {
+    name: "Aura of Courage",
+    level: 10,
+    edition: "EDITION_2014",
+    description: "Friendly creatures within 10 ft can't be frightened while you are conscious. Aura extends to 30 ft at level 18.",
+  },
+  {
+    name: "Aura of Courage",
+    level: 10,
+    edition: "EDITION_2024",
+    description: "You and friendly creatures within your Aura of Protection have Immunity to the Frightened condition while you don't have the Incapacitated condition.",
+  },
+  {
+    name: "Improved Divine Smite",
+    level: 11,
+    edition: "EDITION_2014",
+    description:
+      "Whenever you hit with a melee weapon, you deal an extra 1d8 radiant damage in addition to any other Divine Smite dice.",
+  },
+  {
+    name: "Radiant Strikes",
+    level: 11,
+    edition: "EDITION_2024",
+    description:
+      "Your strikes now carry supernatural power. When you hit a creature with an attack using a Melee weapon or an Unarmed Strike, the target takes an extra 1d8 Radiant damage.",
+  },
+  {
+    name: "Cleansing Touch",
+    level: 14,
+    edition: "EDITION_2014",
+    description:
+      "As an action, end one spell on yourself or one willing creature within reach. Uses = Charisma modifier per long rest (minimum 1).",
+  },
+  {
+    name: "Restoring Touch",
+    level: 14,
+    edition: "EDITION_2024",
+    description:
+      "You can use your Lay on Hands to remove the Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned condition from a creature: for each condition removed, use 5 Hit Points from your Lay on Hands pool, in addition to any Hit Points used to restore Hit Points.",
+  },
+  {
+    name: "Aura Expansion",
+    level: 18,
+    edition: "EDITION_2024",
+    description: "Your Aura of Protection is now a 30-foot Emanation.",
+  },
+  {
+    name: "Epic Boon",
+    level: 19,
+    edition: "EDITION_2024",
+    description: "You gain an Epic Boon feat of your choice (Boon of Fate recommended). You can take this feat only once.",
+  },
+];
+
 export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
@@ -2106,6 +2318,7 @@ export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   sorcerer: SORCERER_BASE_ROWS,
   cleric: CLERIC_BASE_ROWS,
   druid: DRUID_BASE_ROWS,
+  paladin: PALADIN_BASE_ROWS,
 };
 
 export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {

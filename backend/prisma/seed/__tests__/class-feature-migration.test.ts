@@ -295,6 +295,17 @@ function isPopulatedDruidRow(row: RowKey): boolean {
   return POPULATED_DRUID_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
+// #1229: Paladin's Channel Divinity pool carrier rows — base class,
+// subclassSlug null, BOTH editions ride the SAME name ("Channel Divinity"),
+// unlike Cleric (forced onto "Turn Undead" for 2014 since Cleric's 2014
+// Channel Divinity has no feature of its own by that name) — Paladin already
+// had a base-class row literally named "Channel Divinity" in both editions
+// pre-migration, so each edition's pool rides its own same-named row. See
+// paladin-features.ts's own RESOURCE POOL header block.
+function isPopulatedPaladinRow(row: RowKey): boolean {
+  return row.className === "Paladin" && row.subclassSlug === null && row.name === "Channel Divinity";
+}
+
 // What the descriptor predicates below key on. `edition` is part of the key
 // because a class can populate a descriptor column on ONE edition's row and
 // not the other's, under the same (class, subclass, name): Ranger's Favored
@@ -316,7 +327,12 @@ function isSaveDcRow(row: RowKey): boolean {
 // pushed those checks' own cyclomatic/CRAP scores over the ratchet as wave 2
 // added classes (prisma/seed/** carries no coverage instrumentation, so CRAP
 // floors at CC^2+CC regardless of real coverage — see baseFeatureRows'
-// comment, class-features.ts, for the same reasoning).
+// comment, class-features.ts, for the same reasoning). #1229's own
+// isPopulatedPaladinRow pushed a plain `||` chain's cyclomatic score past the
+// fallow ratchet (10 branches, one function) — restructured as a predicate
+// LIST + `.some()` so this aggregator's own complexity stays flat (1) as more
+// classes join, rather than growing with every addition; the per-class
+// predicates below are unchanged, still one function each.
 //
 // #1233 and #1234 each introduced their own copy of this aggregator while
 // developing in parallel (isPopulatedRow / isAnyPopulatedResourceRow); they
@@ -325,8 +341,9 @@ function isSaveDcRow(row: RowKey): boolean {
 // descriptor sweep. Every new populated-row predicate goes here, once —
 // wave b's isPopulatedRangerRow (#1230) and isPopulatedSorcererRow (#1232)
 // included, both added to this SAME aggregator rather than sibling ones.
-// Wave 2's isPopulatedDruidRow (#1226) follows the same rule — Paladin's
-// agent is adding its own predicate to this SAME aggregator in parallel.
+// Wave C's isPopulatedDruidRow (#1226) and isPopulatedPaladinRow (#1229)
+// follow the same rule — both were authored in parallel and both landed here,
+// not in sibling aggregators.
 //
 // An array + `.some()` rather than an `||` chain (#1226): each `||` is its
 // own branch under the cyclomatic-complexity count, and prisma/seed/** carries
@@ -346,6 +363,7 @@ const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedSorcererRow,
   isPopulatedClericRow,
   isPopulatedDruidRow,
+  isPopulatedPaladinRow,
 ];
 
 function isPopulatedRow(row: RowKey): boolean {
@@ -487,7 +505,7 @@ function expectRowDescriptors(row: DescriptorRow & RowKey): void {
 }
 
 describe("ClassFeature migration — every descriptor column is NULL/default, except the rows isPopulatedRow names", () => {
-  it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232) and Cleric's (#1225)", async () => {
+  it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232), Cleric's (#1225) and Paladin's (#1229)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
         resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
@@ -538,17 +556,20 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // excludes only Combat Superiority x2 (the only row with a die-size tier).
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
     // This total is SUMMED across wave-b branches, never taken from one of
-    // them: #1230 raised 22 -> 23, #1232 -> 28 and #1225 -> 24, each
-    // independently and each correct for its own branch alone. The merged
-    // value is 22 + 1 + 6 + 2, then #1226 adds Druid's own +1 (Wild Shape's
-    // EDITION_2024 row only — Moonlight Step declares resourceKey but
-    // deliberately omits resourceTotals, so it does NOT count here). Picking
-    // any one branch's number would silently exempt the other classes' rows
-    // from the sweep — the wave-A near-miss this file's aggregator comment
-    // already records, in its other half.
+    // them: #1230 raised 22 -> 23, #1232 -> 28, #1225 -> 24, then wave C's
+    // #1226 -> 32 and #1229 -> 33, each independently and each correct for its
+    // own branch ALONE. The merged value is none of those: it is the SUM of
+    // the components, 22 + 1 + 6 + 2 + 1 + 2 = 34. Picking any one branch's
+    // number would silently exempt the other classes' rows from the sweep —
+    // the wave-A near-miss this file's aggregator comment already records, in
+    // its other half. Druid contributes +1, not +2: Moonlight Step declares
+    // resourceKey but deliberately omits resourceTotals, so it is "populated"
+    // for the aggregator above and NOT counted here.
     // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock
-    // + 1 Ranger + 6 Sorcerer + 2 Cleric + 1 Druid.
-    const populatedResourceTotalsCount = 32;
+    // + 1 Ranger + 6 Sorcerer + 2 Cleric + 1 Druid + 2 Paladin (#1229's own
+    // Channel Divinity carrier rows, one per edition — see
+    // isPopulatedPaladinRow).
+    const populatedResourceTotalsCount = 34;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {

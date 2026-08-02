@@ -105,9 +105,10 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
     });
 
     // #1225: Cleric's 2024 pool is the real SRD 5.2 progression (2 at L2, not
-    // the pre-retab edition-blind 1) — Paladin's own pool stays a flat 1 from
-    // L3 on (paladin.ts, not yet retabbed).
-    it("has exactly one channelDivinity pool with total 2 (max(cleric@2→2, paladin@3→1))", async () => {
+    // the pre-retab edition-blind 1). #1229: Paladin's own pool is now ALSO
+    // its real SRD 5.2 progression (2 at L3, not the pre-retab flat 1) — the
+    // two now tie at 2, so the merged max is unchanged.
+    it("has exactly one channelDivinity pool with total 2 (max(cleric@2→2, paladin@3→2))", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
@@ -145,9 +146,11 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       await prisma.character.deleteMany({ where: { id: CHAR_ID } });
     });
 
-    // #1225: Cleric's 2024 pool is 3 at L6 (not the pre-retab 2), so the
-    // merged max/sum both shift up by one.
-    it("has exactly one channelDivinity pool with total 3 — the max (cleric@6→3), NOT the sum 4", async () => {
+    // #1225: Cleric's 2024 pool is 3 at L6 (not the pre-retab 2). #1229:
+    // Paladin's own pool at L4 is now 2 (not the pre-retab flat 1), so the
+    // sum this guards against is 5 (3+2), not the old 4 (3+1) — the max (3)
+    // is unaffected either way.
+    it("has exactly one channelDivinity pool with total 3 — the max (cleric@6→3), NOT the sum 5", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
@@ -170,8 +173,8 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
 
     // #1225: cleric@6's pool is 3 (not the pre-retab 2), and cleric@2's is 2
     // (not 1) — the level-down still crosses a real total change (3 -> 2,
-    // since paladin@4's flat 1 no longer wins the max), so the clamp itself
-    // stays a meaningful assertion, just at new numbers.
+    // since paladin@4's own 2, #1229, still doesn't beat cleric@2's 2), so
+    // the clamp itself stays a meaningful assertion, just at new numbers.
     it("persisted used clamps to the current total after a level-down (cleric 6→2, no reconciler needed)", async () => {
       // Spend all uses at the current (total 3) state.
       await prisma.character.update({
