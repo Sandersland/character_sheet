@@ -461,6 +461,18 @@ describe("twfHint", () => {
     const c = makeCharacter({ inventory: [weaponItem()] } as Partial<Character>);
     expect(twfHint(c)).toBe("Off-hand attack needs two light weapons equipped.");
   });
+
+  // The user-visible consequence of #1496: a non-light pair plus the style used to
+  // suppress the hint entirely (TWF read as live); now the requirement is stated.
+  it("still hints for a non-light pair held by a character with the Two-Weapon Fighting style", () => {
+    const c = makeCharacter({
+      inventory: [weaponItem({ id: "a" }), weaponItem({ id: "b" })],
+      advancements: [
+        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
+      ],
+    } as unknown as Partial<Character>);
+    expect(twfHint(c)).toBe("Off-hand attack needs two light weapons equipped.");
+  });
 });
 
 describe("partitionClassActions", () => {

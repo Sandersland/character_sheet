@@ -19,13 +19,16 @@ import type { Character, InventoryItem } from "@/types/character";
 // Cast to avoid satisfying the full ~50-field Character interface.
 
 function makeCharacter(
-  overrides: Partial<Pick<Character, "attacksPerAction" | "inventory" | "offHandLocked">> = {},
+  overrides: Partial<
+    Pick<Character, "attacksPerAction" | "inventory" | "offHandLocked" | "rulesEdition">
+  > = {},
 ): Character {
   return {
     attacksPerAction: 1,
     inventory: [],
     advancements: [],
     offHandLocked: false,
+    rulesEdition: "EDITION_2024",
     ...overrides,
   } as unknown as Character;
 }
@@ -153,7 +156,10 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(true); // derived → updates without startTurn
   });
 
-  it("twfAvailable is true for a non-light pair WITH the Two-Weapon Fighting feat (#1137)", () => {
+  // The offhandAbilityDamage fixture is the mutation latch: it is the only place the
+  // Two-Weapon Fighting style still reaches twfAvailable through real code, so
+  // restoring the deleted short-circuit turns this test red. Keep it.
+  it("twfAvailable is false for a non-light pair even WITH the Two-Weapon Fighting style — the style adds off-hand damage, it does not waive the Light requirement (#1496; SRD 5.1 / PHB'14 p. 72, SRD 5.2)", () => {
     const heavyPair = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
     const withStyle = {
       ...heavyPair,
@@ -166,8 +172,32 @@ describe("combat lifecycle", () => {
     act(() => { result.current.startCombat(); });
     act(() => { result.current.startTurn(); });
 
-    expect(result.current.twfAvailable).toBe(true);
+    expect(result.current.twfAvailable).toBe(false);
   });
+
+  // Both editions agree, so canTwoWeaponFight takes no `edition` — this goes red the
+  // day someone forks the rule by edition (#1496).
+  it.each(["EDITION_2014", "EDITION_2024"] as const)(
+    "twfAvailable is false for a non-light pair with the style under %s",
+    (rulesEdition) => {
+      const heavyPair = makeCharacter({
+        inventory: [heavyWeapon("h1"), heavyWeapon("h2")],
+        rulesEdition,
+      });
+      const withStyle = {
+        ...heavyPair,
+        advancements: [
+          { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
+        ],
+      } as unknown as Character;
+      const { result } = renderHook(() => useTurnState(withStyle, SESSION_ID));
+
+      act(() => { result.current.startCombat(); });
+      act(() => { result.current.startTurn(); });
+
+      expect(result.current.twfAvailable).toBe(false);
+    },
+  );
 
   it("twfAvailable is false for a non-light pair WITHOUT the style", () => {
     const character = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
