@@ -156,6 +156,53 @@ async function remapCharactersOffStaleSubclasses(
   }
 }
 
+// Detector for #1598: a live character whose held subclass row's `edition`
+// no longer matches its OWN (Character.rulesEdition) — the state
+// remapCharactersOffStaleSubclasses deliberately PRESERVES rather than nulls
+// (a pre-retag pick under a since-retagged, now edition-tagged row). Unlike
+// assertNoCharactersReferenceStaleSubclasses above, this is not a reason to
+// fail the seed/deploy: buildClassesView (#1598 chunk 1) marks the entry at
+// read time (subclassUnavailable) and the sheet explains it, so there is
+// nothing here to repair automatically — only something to report, so a
+// future retab (wave C, #1336) surfaces its blast radius instead of shipping
+// silent dead-end sheets. Runs AFTER the remap/prune above, so a row THAT
+// retag stranded is already counted correctly against the NEW catalog state.
+//
+// Prisma has no field-to-field comparison in a `where` (see
+// withEditionOrShared's own comment on the same limitation), so this compares
+// Character.rulesEdition against the joined Subclass.edition in memory —
+// one query, not a per-character round trip, and both tables are seed/dev-
+// scale today.
+export async function reportStrandedSubclassCharacters(prisma: PrismaClient): Promise<void> {
+  const entries = await prisma.characterClassEntry.findMany({
+    where: { subclassId: { not: null } },
+    select: {
+      subclass: true,
+      character: { select: { id: true, name: true, rulesEdition: true } },
+      subclassRef: { select: { name: true, edition: true } },
+    },
+  });
+  const stranded = entries.filter(
+    (e) => e.subclassRef?.edition != null && e.subclassRef.edition !== e.character.rulesEdition,
+  );
+  if (stranded.length === 0) return;
+
+  // Loud, not silent — same tone as the remap log above: an operator watching
+  // a deploy's seed output should see exactly which characters this touches.
+  console.log(
+    [
+      `seedSubclasses: ${stranded.length} character(s) hold a subclass row edition-tagged for a ` +
+        "DIFFERENT edition than their own (#1598) — buildClassesView marks these " +
+        "(subclassUnavailable) rather than silently rendering zero subclass features:",
+      ...stranded.map((e) => {
+        const name = e.subclass ?? e.subclassRef!.name; // subclass: drifting display name (schema.prisma) — prefer it, catalog name is the fallback
+        return `  ${e.character.name} (${e.character.id}, ${editionLabel(e.character.rulesEdition as SeedEdition)}): ` +
+          `${name} (${editionLabel(e.subclassRef!.edition as SeedEdition | null)})`;
+      }),
+    ].join("\n"),
+  );
+}
+
 // Prune the row a subclass's edition tag CHANGE strands (Totem Warrior null
 // -> EDITION_2014, #1559): see assertNoCharactersReferenceStaleSubclasses's
 // own comment for why upsertEditionRow's create-not-update-in-place behavior
@@ -222,4 +269,5 @@ export async function seedSubclasses(prisma: PrismaClient, classIds: Map<string,
     prisma,
     SUBCLASSES.map((s) => ({ slug: s.slug, edition: s.edition ?? null })),
   );
+  await reportStrandedSubclassCharacters(prisma);
 }
