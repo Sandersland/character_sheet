@@ -7,7 +7,7 @@
  * ONE pool, not two.
  */
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "@/app.js";
@@ -22,7 +22,6 @@ const OWNER_ID = "owner-cd-cast";
 let COOKIE: string;
 
 const FIXTURE_ID = "test-cd-cast-1";
-const CLASS_NAME = "CD Test Class";
 
 // XP thresholds → level: L2=300, L3=900, L6=14000, L10=64000.
 const XP_L2 = 300;
@@ -68,7 +67,6 @@ async function activity(): Promise<ActivityEvent[]> {
   return res.body as ActivityEvent[];
 }
 
-let classId: string;
 const optionId: Record<string, string> = {};
 
 // `edition: null` is load-bearing, not defensive: the #1412 test below forks
@@ -79,12 +77,33 @@ async function loadOption(name: string) {
   optionId[name] = (await prisma.grantedAbility.findFirst({ where: { name, edition: null } }))!.id;
 }
 
+// #1225: classEntries.classId used to point at one shared test-only
+// CharacterClass row regardless of the entry's own `name` — harmless while
+// Cleric's Channel Divinity pool lived in lib/classes/cleric.ts's resourceFn
+// (unaffected by the `class.features` relation), but NOT once Cleric's pool
+// moved onto its ClassFeature rows: featureRowsOf reads `entry.class?.features`
+// through classId, so a fake class with zero attached ClassFeature rows
+// silently starved the Cleric side of its pool (a real cast 400'd). Resolves
+// the REAL seeded CharacterClass per entry name instead — this suite only
+// ever uses "cleric"/"paladin", both real seeded classes, so no synthetic
+// scaffold class is needed anymore.
+const classIdByName: Record<string, string> = {};
+async function resolveClassId(name: string): Promise<string> {
+  const cached = classIdByName[name];
+  if (cached) return cached;
+  const titleCase = name.charAt(0).toUpperCase() + name.slice(1);
+  const cls = await prisma.characterClass.findUniqueOrThrow({ where: { name: titleCase } });
+  classIdByName[name] = cls.id;
+  return cls.id;
+}
+
 async function createCharacter(
   experiencePoints: number,
   className: string,
   subclass: string | null,
   rulesEdition?: "EDITION_2014" | "EDITION_2024",
 ) {
+  const classId = await resolveClassId(className);
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
@@ -97,22 +116,24 @@ async function createCharacter(
   });
 }
 
-// Multiclass fixture (#1340): both entries reference the same test-only
-// CharacterClass row (classId), one per granting class, same shape as the
-// single-class helper above but with two classEntries.
+// Multiclass fixture (#1340): each entry resolves its OWN real classId (see
+// resolveClassId's comment above) so both classes' row-driven pools/features
+// load correctly, one per granting class, same shape as the single-class
+// helper above but with two classEntries.
 async function createMulticlass(
   experiencePoints: number,
   entries: { name: string; subclass: string | null; level: number }[],
 ) {
+  const resolvedEntries = await Promise.all(
+    entries.map(async (e, i) => ({ name: e.name, subclass: e.subclass, classId: await resolveClassId(e.name), position: i, level: e.level })),
+  );
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
       experiencePoints,
       ownerId: OWNER_ID,
       resources: Prisma.JsonNull,
-      classEntries: {
-        create: entries.map((e, i) => ({ name: e.name, subclass: e.subclass, classId, position: i, level: e.level })),
-      },
+      classEntries: { create: resolvedEntries },
     },
   });
 }
@@ -123,12 +144,6 @@ function cdUsed(body: { resources: { pools: { key: string; used: number }[] } })
 
 describe("Channel Divinity cast endpoint", () => {
   beforeAll(async () => {
-    const cls = await prisma.characterClass.upsert({
-      where: { name: CLASS_NAME },
-      create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2, skillChoices: ["insight", "religion"], isSpellcaster: true },
-      update: {},
-    });
-    classId = cls.id;
     await Promise.all([
       "Channel Divinity: Turn Undead",
       "Channel Divinity: Preserve Life",
@@ -138,10 +153,6 @@ describe("Channel Divinity cast endpoint", () => {
       "Channel Divinity: Vow of Enmity",
       "Channel Divinity: Abjure Enemy",
     ].map(loadOption));
-  });
-
-  afterAll(async () => {
-    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
   });
 
   beforeEach(async () => {
@@ -199,10 +210,12 @@ describe("Channel Divinity cast endpoint", () => {
       {
         category: "resources",
         type: "spendResource",
-        summary: "Spent 1 Channel Divinity — 0/1 remaining",
+        // #1225: a level-2 2024 Cleric's pool is 2, not 1 (SRD 5.2's own
+        // progression) — one spend leaves 1/2, not 0/1.
+        summary: "Spent 1 Channel Divinity — 1/2 remaining",
         before: noResourcesUsed,
         after: { resources: { ...noResourcesUsed.resources, used: { channelDivinity: 1 } } },
-        data: { key: "channelDivinity", amount: 1, remaining: 0, roll: null },
+        data: { key: "channelDivinity", amount: 1, remaining: 1, roll: null },
       },
     ]);
   });
@@ -310,7 +323,10 @@ describe("Channel Divinity cast endpoint", () => {
     const initialPool = (initial.body.resources.pools as { key: string; total: number }[]).find(
       (p) => p.key === "channelDivinity",
     );
-    expect(initialPool?.total).toBe(2); // max(cleric@6→2, paladin@4→1)
+    // #1225: Cleric's 2024 pool is the real SRD 5.2 progression (3 at L6,
+    // not the pre-retab edition-blind 2) — Paladin's own pool stays a flat 1
+    // from L3 on (paladin.ts, not yet retabbed).
+    expect(initialPool?.total).toBe(3); // max(cleric@6→3, paladin@4→1)
 
     const turnUndead = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
     expect(turnUndead.status).toBe(200);
@@ -321,8 +337,12 @@ describe("Channel Divinity cast endpoint", () => {
     expect(cdUsed(sacredWeapon.body)).toBe(2); // same pool — both classes' options spent from it
 
     const third = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
-    expect(third.status).toBe(400);
-    expect(third.body.error).toMatch(/only 0 remaining/);
+    expect(third.status).toBe(200);
+    expect(cdUsed(third.body)).toBe(3);
+
+    const fourth = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
+    expect(fourth.status).toBe(400);
+    expect(fourth.body.error).toMatch(/only 0 remaining/);
   });
 
   // ── GET picker ──────────────────────────────────────────────────────────────

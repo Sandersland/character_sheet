@@ -105,6 +105,9 @@ describe("isSubclassActive agrees with subclassGateLevel per edition (#1291)", (
     await prisma.character.update({ where: { id }, data: { experiencePoints: XP_LVL_3 } });
     const atL3 = await get(id);
     expect(atL3.body.classes[0].subclass).toBe("Life Domain");
-    expect((atL3.body.resources.features as { name: string }[]).map((f) => f.name)).toContain("Domain Spells");
+    // #1225: the 2024 row's real SRD 5.2 name is "Life Domain Spells", not
+    // "Domain Spells" (that name/text was a fabricated placeholder retired
+    // this issue — see cleric-features.ts's own header).
+    expect((atL3.body.resources.features as { name: string }[]).map((f) => f.name)).toContain("Life Domain Spells");
   });
 });

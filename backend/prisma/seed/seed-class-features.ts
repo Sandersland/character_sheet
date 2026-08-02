@@ -448,9 +448,29 @@ const MIN_ROWS_PER_PAIR = 10;
 // EITHER edition (#1232 follow-up 1), and Font of Magic's 2024 Min. Sorcerer
 // Level gating is text-only — sorceryPointCostForSlot enforces cost and cap
 // but not minimum level (#1232 follow-up 2).
+//
+// "Cleric" removed here (#1225, same diff as the content that makes its rows
+// genuinely diverge: base 5->11 EDITION_2024 rows — Destroy Undead and Divine
+// Intervention Improvement each get a new-named 2024 successor instead of an
+// in-place edit — while Life Domain stays 7/5 and Trickery Domain 6/5, for
+// 18 (2014) vs 21 (2024) total rows, genuinely unequal). This removal is NOT
+// "all of Cleric's 2024 content is real" — several residuals stay undisclosed
+// nowhere else but here: Divine Order's Protector/Thaumaturge choice, Blessed
+// Strikes'/Improved Blessed Strikes' Divine Strike/Potent Spellcasting
+// choice, Divine Spark's heal-or-damage Channel Divinity option, Epic Boon's
+// feat grant, and Divine Intervention's cast-without-a-slot behavior are all
+// TEXT ONLY (#1225 research, same disclosed shape as every prior retab
+// wave). Life/Trickery Domain Spells are ALSO text only and can't become
+// SubclassGrantedSpell rows — that model has no `edition` column and
+// Subclass rows are edition-shared, the schema gap Wizard's #1234 disclosed
+// first, not a scope choice made here. Trickery Domain's own 2024 text is
+// mirror-sourced (owner decision) rather than transcribed from SRD 5.2 —
+// Trickery isn't in the SRD — see cleric-features.ts's own header for the
+// two independent, non-scraper sources used and the one number
+// (Invoke Duplicity's move-range cap) neither confirmed and is therefore
+// omitted rather than carried over from 2014.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Bard",
-  "Cleric",
   "Druid",
   "Monk",
   "Paladin",

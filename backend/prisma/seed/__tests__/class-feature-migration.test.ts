@@ -54,20 +54,17 @@ describe("ClassFeature migration — row count (#1523)", () => {
   });
 });
 
-// The 2 already-forked names among the DERIVED (non-LITERAL_ROW_CLASSES) half
-// are Cleric's "Domain Spells" — the ONLY name whose EDITION_2014/EDITION_2024
-// pair is SUPPOSED to differ there — asserted separately (and by name) in the
-// "already-forked pairs" describe block below. "Expanded Spell List" is
-// deliberately ABSENT here: Warlock is a LITERAL_ROW_CLASSES member (#1233)
-// now, so its rows never reach this test's loop at all (excluded by the
-// `LITERAL_ROW_CLASSES.has(row.className)` `continue` below, which runs
-// FIRST) — leaving it listed would be an unreachable, misleading entry, not a
-// second guard. Excluding "Domain Spells" here, by construction every
-// remaining (className, subclassSlug, name, level) group of exactly 2 rows in
-// CLASS_FEATURES must be an untagged feature's 2014/2024 expansion, so its two
-// descriptions must be equal — this needs no separate access to the raw,
-// pre-expansion feature list (which class-features.ts keeps internal).
-const KNOWN_FORKED_NAMES = new Set(["Domain Spells"]);
+// The derived half now has ZERO pre-forked names: Cleric's "Domain Spells"
+// (#1225) was the last one, following Warlock's "Expanded Spell List"
+// (#1233) off this path onto its own literal seed data
+// (cleric-features.ts/warlock-features.ts) — both classes are now
+// LITERAL_ROW_CLASSES members, so their rows never reach this test's loop at
+// all (excluded by the `LITERAL_ROW_CLASSES.has(row.className)` `continue`
+// below). By construction every remaining (className, subclassSlug, name,
+// level) group of exactly 2 rows in CLASS_FEATURES must be an untagged
+// feature's 2014/2024 expansion, so its two descriptions must be equal — this
+// needs no separate access to the raw, pre-expansion feature list (which
+// class-features.ts keeps internal).
 
 // This suite reads in-memory CLASS_FEATURES, not the DB — both editions of an
 // untagged row come from the SAME expandFeatureRow spread (class-features.ts),
@@ -87,18 +84,16 @@ const KNOWN_FORKED_NAMES = new Set(["Domain Spells"]);
 // (Fighter's, fighter-features.ts) never pass through expandFeatureRow at
 // all — they arrive in CLASS_FEATURES already split one-row-per-edition, by
 // hand, and several same-name/same-level pairs (Second Wind, Action Surge,
-// Indomitable, Improved Critical, ...) are DELIBERATELY divergent text
-// without being in KNOWN_FORKED_NAMES (which is keyed on name alone and
-// would otherwise have to list all seven, defeating its own point — this
-// suite guards expandFeatureRow, not Fighter's authored content). Excluding
-// LITERAL_ROW_CLASSES rows here is the correct fix, not widening the
-// allow-list.
+// Indomitable, Improved Critical, ...) are DELIBERATELY divergent text — this
+// suite guards expandFeatureRow, not each LITERAL class's authored content.
+// Excluding LITERAL_ROW_CLASSES rows here is the correct fix, not a second
+// name-keyed allow-list (KNOWN_FORKED_NAMES, deleted #1225 — Cleric's
+// "Domain Spells" was its last member).
 describe("ClassFeature migration — expandFeatureRow's untagged branch keeps both editions byte-identical (#1523)", () => {
   it("every untagged feature's EDITION_2014/EDITION_2024 pair has equal level and description", async () => {
     const byKey = new Map<string, typeof CLASS_FEATURES>();
     for (const row of CLASS_FEATURES) {
       if (LITERAL_ROW_CLASSES.has(row.className)) continue;
-      if (KNOWN_FORKED_NAMES.has(row.name)) continue;
       const key = `${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.level}`;
       const group = byKey.get(key) ?? [];
       group.push(row);
@@ -116,22 +111,27 @@ describe("ClassFeature migration — expandFeatureRow's untagged branch keeps bo
   });
 });
 
-describe("ClassFeature migration — the 2 already-forked pairs were not duplicated (#1523)", () => {
-  it("Cleric Domain Spells: exactly one row per (subclass, edition), descriptions differ between editions", async () => {
+describe("ClassFeature migration — the already-forked pairs were not duplicated (#1523)", () => {
+  // #1225: Cleric's "Domain Spells" is NO LONGER a forked pair either — both
+  // domains' 2024 rows renamed ("Life Domain Spells" / "Trickery Domain
+  // Spells", different names from the 2014-only "Domain Spells"), so
+  // pruneStalePartitions retired the old (FABRICATED — a PHB'14 list with its
+  // first tier relabelled, never real SRD 5.2/PHB'24 content) 2024 "Domain
+  // Spells" rows outright. Every "Domain Spells" row left is a single
+  // EDITION_2014 row per domain — asserted here as exactly that, not a fork,
+  // the same replacement Warlock's "Expanded Spell List" test below models.
+  it("Cleric Domain Spells: exactly one EDITION_2014 row per domain, no EDITION_2024 row anywhere", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { name: "Domain Spells", class: { name: "Cleric" } },
       select: { level: true, edition: true, description: true, subclass: { select: { name: true } } },
     });
-    expect(rows).toHaveLength(4); // Life Domain + Trickery Domain, x2 editions each
+    expect(rows).toHaveLength(2); // Life Domain + Trickery Domain, EDITION_2014 only
 
     for (const subclassName of ["Life Domain", "Trickery Domain"]) {
       const pair = rows.filter((r) => r.subclass?.name === subclassName);
-      expect(pair).toHaveLength(1 * 2);
-      expect(pair.every((r) => r.level === 1)).toBe(true);
-      const [r2014, r2024] = [pair.find((r) => r.edition === "EDITION_2014"), pair.find((r) => r.edition === "EDITION_2024")];
-      expect(r2014).toBeDefined();
-      expect(r2024).toBeDefined();
-      expect(r2014!.description).not.toBe(r2024!.description);
+      expect(pair).toHaveLength(1);
+      expect(pair[0].level).toBe(1);
+      expect(pair[0].edition).toBe("EDITION_2014");
     }
   });
 
@@ -263,6 +263,22 @@ function isPopulatedSorcererRow(row: RowKey): boolean {
   return POPULATED_SORCERER_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
+// #1225: Cleric's Channel Divinity pool carrier rows — base class,
+// subclassSlug null, ONE per edition (the 2014 pool rides the existing
+// "Channel Divinity: Turn Undead" row; the 2024 pool rides the new "Channel
+// Divinity" row) — see cleric-features.ts's own RESOURCE POOL header block.
+// `edition` is part of the key: the 2024 "Channel Divinity: Turn Undead" row
+// carries no pool at all (only its 2014 twin does, same name, different
+// edition), so a name-only match would wrongly flag it populated too.
+function isPopulatedClericRow(row: RowKey): boolean {
+  return (
+    row.className === "Cleric" &&
+    row.subclassSlug === null &&
+    ((row.edition === "EDITION_2014" && row.name === "Channel Divinity: Turn Undead") ||
+      (row.edition === "EDITION_2024" && row.name === "Channel Divinity"))
+  );
+}
+
 // What the descriptor predicates below key on. `edition` is part of the key
 // because a class can populate a descriptor column on ONE edition's row and
 // not the other's, under the same (class, subclass, name): Ranger's Favored
@@ -302,7 +318,8 @@ function isPopulatedRow(row: RowKey): boolean {
     isPopulatedWizardRow(row) ||
     isPopulatedIllusorySelfRow(row) ||
     isPopulatedRangerRow(row) ||
-    isPopulatedSorcererRow(row)
+    isPopulatedSorcererRow(row) ||
+    isPopulatedClericRow(row)
   );
 }
 
@@ -481,26 +498,25 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // resourceTotals (Magical Cunning x1, Dark One's Own Luck 2014-only x1 — its
   // 2024 row deliberately OMITS resourceTotals, a Charisma-modifier formula —
   // Hurl Through Hell x2, Fey Presence x1, Misty Escape x1, Dark Delirium x1,
-  // Entropic Ward x1) PLUS #1230's ONE Ranger row: Favored Enemy's 2024 row
-  // only (its 2014 row carries no resourceKey at all; Tireless's/Nature's
-  // Veil's 2024 rows set resourceKey but deliberately OMIT resourceTotals, a
-  // Wisdom-modifier formula, same shape as Dark One's Own Luck's 2024 row)
-  // PLUS #1232's six Sorcerer rows (Innate Sorcery x1, Sorcerous Restoration
-  // x1, Tides of Chaos x2 — one per edition, both real rows sharing a name —
-  // Dragon Wings x1, Tamed Surge x1);
+  // Entropic Ward x1) PLUS #1230's ONE Ranger row (Favored Enemy's 2024 row
+  // only), #1232's six Sorcerer rows (Innate Sorcery x1, Sorcerous Restoration
+  // x1, Tides of Chaos x2 — one per edition — Dragon Wings x1, Tamed Surge x1)
+  // and #1225's two Cleric Channel Divinity carrier rows (Turn Undead
+  // 2014-only x1, Channel Divinity 2024-only x1);
   // derivedStatTiers excludes #1530's twelve populated Extra
   // Attack rows PLUS #1546's Combat Superiority/Student of War x2 editions each
   // (DERIVED_STAT_ROW_KEYS x2 editions each, computed below); resourceDieTiers
   // excludes only Combat Superiority x2 (the only row with a die-size tier).
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
     // This total is SUMMED across wave-b branches, never taken from one of
-    // them: #1230 raised 22 -> 23 and #1232 raised 22 -> 28 independently, so
-    // the merged value is 22 + 1 + 6. Picking either branch's number here
-    // would silently exempt the other class's rows from the sweep — the wave-A
-    // near-miss this file's aggregator comment already records, in its other
-    // half.
-    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock + 1 Ranger + 6 Sorcerer.
-    const populatedResourceTotalsCount = 29;
+    // them: #1230 raised 22 -> 23, #1232 -> 28 and #1225 -> 24, each
+    // independently and each correct for its own branch alone. The merged
+    // value is 22 + 1 + 6 + 2. Picking any one branch's number would silently
+    // exempt the other classes' rows from the sweep — the wave-A near-miss
+    // this file's aggregator comment already records, in its other half.
+    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock
+    // + 1 Ranger + 6 Sorcerer + 2 Cleric.
+    const populatedResourceTotalsCount = 31;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
