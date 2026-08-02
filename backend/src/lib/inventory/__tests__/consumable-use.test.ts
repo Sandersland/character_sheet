@@ -240,6 +240,7 @@ describe("use consumable", () => {
       data: {
         name: catalogPotionName,
         category: "consumable",
+        scopeKey: "global",
         consumableDetail: { create: { effectDiceCount: 1, effectDiceFaces: 6, effectDescription: "Deals lightning damage", maxUses: 5 } },
       },
     });

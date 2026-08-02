@@ -166,6 +166,10 @@ model Campaign {
   entities   CampaignEntity[]
   // DM-authored campaign items, each auto-linked to an ITEM entity (#380).
   items      CampaignItem[]
+  // CAMPAIGN-scoped Item rows (#1645). Named apart from `items` only because
+  // CampaignItem still holds that name; #1646 merges those rows in here, drops
+  // that model, and this becomes the sole campaign-item relation.
+  scopedItems Item[]
   // Non-destructive "revealed to be" identity links between entities (#387).
   entityMerges CampaignEntityMerge[]
   sessions   Session[]
@@ -1082,6 +1086,15 @@ enum ItemCategory {
   gear
 }
 
+// Who authored an Item row (#1645, epic #1644). GLOBAL rows are seeded catalog
+// content with exactly one writer; CAMPAIGN rows are DM-authored and merged in
+// from CampaignItem by #1646. A USER member is a data change, not a redesign —
+// see Item.scopeKey for why.
+enum ItemScope {
+  GLOBAL
+  CAMPAIGN
+}
+
 // The six 5e magic-item rarity tiers (DMG p. 135). Rules data + gp values live
 // in lib/srd.ts (ITEM_RARITIES); this is only the persisted column domain.
 enum ItemRarity {
@@ -1480,7 +1493,18 @@ model Spell {
 // nullable columns here — see those models' comments for why.
 model Item {
   id          String       @id @default(uuid())
-  name        String       @unique
+  scope       ItemScope    @default(GLOBAL)
+  // Non-null uniqueness discriminator: "global" or "campaign:<campaignId>".
+  // The rule is "a name is unique among GLOBAL rows only", and this is its only
+  // expressible form here — @@unique([campaignId, name]) is SILENTLY wrong
+  // because Postgres treats NULLs as distinct (two catalog rows named
+  // 'Longsword' would both insert), and Prisma 7.8 rejects `nullsNotDistinct`.
+  // Redundant with scope/campaignId by construction; item-scope.integration
+  // .test.ts asserts the agreement. Extends to "user:<id>" unchanged.
+  scopeKey    String
+  campaignId  String?
+  campaign    Campaign?    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name        String
   category    ItemCategory
   weight      Float?
   cost        Json? // {cp,sp,gp,pp} — sell/buy default, player can override
@@ -1502,6 +1526,9 @@ model Item {
 
   inventoryItems InventoryItem[]
   packContents   PackContent[]
+
+  @@unique([scopeKey, name])
+  @@index([campaignId])
 }
 
 // Optional 1:1 with Item, present only when category = weapon. The FK lives

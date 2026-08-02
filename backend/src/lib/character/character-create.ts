@@ -606,7 +606,11 @@ async function validateOpenPick(
   creationToolProfs: CreationToolProf[],
 ): Promise<PhaseResult<{ ref: FixedRef }>> {
   const catalogItem = await prisma.item.findUnique({
-    where: { name: chosenName },
+    // Pinned to the GLOBAL catalog (#1645). Starting equipment resolves seeded
+    // content, so a campaign-scoped row must never satisfy an open pick — once
+    // #1646 merges DM-authored items into this table, an unpinned lookup would
+    // let a homebrew row shadow the catalog name the package meant.
+    where: { scopeKey_name: { scopeKey: "global", name: chosenName } },
     include: { weaponDetail: true },
   });
   const error = openPickFilterError(catalogItem, pick, chosenName, creationToolProfs);
