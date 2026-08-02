@@ -10834,121 +10834,407 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 [
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 1,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 2,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 3,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 4,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 5,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 6,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 7,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 8,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 9,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 10,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 11,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 12,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 13,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 14,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 15,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 16,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 17,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 18,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 19,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 20,
   },
@@ -10959,121 +11245,407 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 [
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 1,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 2,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 3,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 4,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 5,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 6,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 7,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
     },
     "level": 8,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 9,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 10,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 11,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
     },
     "level": 12,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 13,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 14,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 15,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
     },
     "level": 16,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 17,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 18,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 19,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
     },
     "level": 20,
   },
@@ -11084,19 +11656,43 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 [
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 1,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 2,
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11110,7 +11706,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11124,7 +11728,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11138,7 +11750,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11152,7 +11772,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11172,7 +11800,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 3,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11192,7 +11828,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11212,7 +11856,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11232,7 +11891,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11258,7 +11932,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 4,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11284,7 +11973,22 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11310,7 +12014,29 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11336,7 +12062,29 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11368,7 +12116,29 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11400,7 +12170,29 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11432,7 +12224,29 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11464,7 +12278,29 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",
@@ -11496,7 +12332,29 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "naturesVeil",
+          "label": "Nature's Veil",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+      ],
       "subclassChoices": [
         {
           "catalogSource": "huntersPrey",

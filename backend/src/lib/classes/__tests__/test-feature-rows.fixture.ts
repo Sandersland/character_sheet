@@ -735,93 +735,221 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
 // object to `null` at every level — exactly the regression this mirror
 // exists to prevent. Extra Attack's derivedStat/derivedStatTiers ride this
 // array (unlike `toRows`, which drops those two fields) for the same reason
-// FIGHTER_BASE_ROWS hand-builds rather than calling `toRows`. Hunter's/Beast
-// Master's own subclass rows need NO mirror (same reasoning as Rogue's
+// FIGHTER_BASE_ROWS hand-builds rather than calling `toRows`. Hand-built per
+// edition (not a shared flatMap over identical text, unlike this fixture's
+// original commit-1 shape) because the two editions now genuinely diverge —
+// mirrors ranger-features.ts's real content AND resource-pool columns
+// exactly: Favored Enemy's (2024) flat level-tiered resourceTotals, and
+// Tireless's/Nature's Veil's (2024) resourceKey with resourceTotals
+// deliberately OMITTED (both a Wisdom-modifier formula — the REAL total
+// comes from ranger.ts's resourceFn, exercised here via testFeatureRowsFor's
+// TEST_CLASSES import of `ranger`, same as production's deriveBaseLayer).
+// class-features-snapshot.test.ts calls deriveResources with EDITION_2024
+// only, so the 2014 partition below matters for readability/parity with the
+// other LITERAL_CLASS_ROWS fixtures more than for any assertion — but it is
+// kept byte-accurate anyway, same discipline as FIGHTER_BASE_ROWS. Hunter's/
+// Beast Master's own subclass rows need NO mirror (same reasoning as Rogue's
 // module-wide exemption): neither declares a resourceKey/derivedStat
 // anywhere in ranger-features.ts, so the `toRows(subDef?.features ?? [])` ->
 // `[]` fallthrough (TEST_SUBCLASSES has no entry for either) loses nothing a
 // `.resources`-observing test could see — their `choices` catalog (Hunter)
 // keeps contributing `subclassChoices` independent of any row carrier.
-export const RANGER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Favored Enemy",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Choose a type of favored enemy (beasts, fey, humanoids of a specific type, etc.). You have advantage on Survival checks to track them and on Intelligence checks to recall information about them. You learn one language spoken by your favored enemy. Additional enemy at L6 and L14.",
   },
   {
+    name: "Favored Enemy",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "favoredEnemy",
+    resourceLabel: "Favored Enemy (Hunter's Mark)",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 1, total: 2 },
+      { minLevel: 5, total: 3 },
+      { minLevel: 9, total: 4 },
+      { minLevel: 13, total: 5 },
+      { minLevel: 17, total: 6 },
+    ],
+  },
+  {
     name: "Natural Explorer",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Choose a favored terrain type. When traveling in it: ignore difficult terrain, can't be surprised if alert, advantage on Initiative rolls, initiative even if surprised once per turn, move at normal pace while stealthing. Additional terrain at L6 and L10.",
   },
   {
-    name: "Fighting Style",
-    level: 2,
-    edition,
+    name: "Weapon Mastery",
+    level: 1,
+    edition: "EDITION_2024",
     description:
-      "Choose: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage with one weapon), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
+      "You use the mastery properties of two kinds of weapons of your choice with which you have proficiency. Whenever you finish a Long Rest, you can change one or both of those weapon choices.",
   },
   {
     name: "Spellcasting",
     level: 2,
-    edition,
+    edition: "EDITION_2014",
     description:
       "You cast spells using Wisdom. Half-caster progression (first slots at level 2, one level behind full casters). You prepare a number of ranger spells equal to half your ranger level + Wisdom modifier (minimum 1).",
   },
   {
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You cast spells using Wisdom. Half-caster progression, with your first spell slots at level 1. You prepare a number of ranger spells from the Ranger spell list, shown on your class table's Spells Prepared column — 2 at level 1, growing to 15 by level 20 (#1127: the per-level table itself isn't modelled).",
+  },
+  {
+    name: "Fighting Style",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "Choose: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage with one weapon), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
+  },
+  {
+    name: "Fighting Style",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "Choose a Fighting Style feat. Alongside the shared options (Archery, Defense, Dueling, Two-Weapon Fighting, etc.), Rangers can choose Druidic Warrior: learn two Druid cantrips, cast using Wisdom, swapping one for a different Druid cantrip whenever you gain a Ranger level.",
+  },
+  {
     name: "Primeval Awareness",
     level: 3,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Expend one spell slot to focus your awareness for 1 minute per slot level. You sense whether certain types of creatures are within 1 mile (or 6 miles in your favored terrain).",
   },
   {
     name: "Extra Attack",
     level: 5,
-    edition,
+    edition: "EDITION_2014",
     description: "You can attack twice whenever you take the Attack action on your turn.",
     derivedStat: "attacksPerAction",
     derivedStatTiers: [{ minLevel: 5, value: 2 }],
   },
   {
+    name: "Extra Attack",
+    level: 5,
+    edition: "EDITION_2024",
+    description: "You can attack twice whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
+  },
+  {
+    name: "Deft Explorer",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "Choose one skill you're proficient in; you gain Expertise in it (double proficiency bonus on its checks). You also learn two languages of your choice.",
+  },
+  {
     name: "Land's Stride",
     level: 8,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Moving through nonmagical difficult terrain costs no extra movement. You can pass through nonmagical plants without being slowed or taking damage. Advantage on saves against magically created or manipulated plants.",
   },
   {
+    name: "Roving",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "Your Speed increases by 10 feet while you aren't wearing Heavy armor. You also gain a Climb Speed and a Swim Speed, both equal to your Speed.",
+  },
+  {
     name: "Hide in Plain Sight",
     level: 10,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Spend 1 minute camouflaging yourself: gain +10 to Dexterity (Stealth) checks while you remain motionless. The bonus is lost when you move, take an action, or take a reaction.",
   },
   {
+    name: "Expertise",
+    level: 9,
+    edition: "EDITION_2024",
+    description: "Choose two more skills you're proficient in; you gain Expertise in them.",
+  },
+  {
+    name: "Tireless",
+    level: 10,
+    edition: "EDITION_2024",
+    description:
+      "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "tireless",
+    resourceLabel: "Tireless",
+    resourceRecharge: "longRest",
+  },
+  {
     name: "Vanish",
     level: 14,
-    edition,
+    edition: "EDITION_2014",
     description:
       "You can use the Hide action as a bonus action on your turn. Also, you can't be tracked by nonmagical means unless you choose to leave a trail.",
   },
   {
+    name: "Relentless Hunter",
+    level: 13,
+    edition: "EDITION_2024",
+    description: "Taking damage can't break your Concentration on the Hunter's Mark spell.",
+  },
+  {
+    name: "Nature's Veil",
+    level: 14,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "naturesVeil",
+    resourceLabel: "Nature's Veil",
+    resourceRecharge: "longRest",
+  },
+  {
+    name: "Precise Hunter",
+    level: 17,
+    edition: "EDITION_2024",
+    description: "You have advantage on attack rolls against the creature currently marked by your Hunter's Mark spell.",
+  },
+  {
     name: "Feral Senses",
     level: 18,
-    edition,
+    edition: "EDITION_2014",
     description:
       "When not blinded or deafened, you are aware of invisible creatures within 30 ft even if they are hidden. In combat, no disadvantage on attacks against invisible creatures within 30 ft.",
   },
   {
+    name: "Feral Senses",
+    level: 18,
+    edition: "EDITION_2024",
+    description: "You have Blindsight with a range of 30 feet.",
+  },
+  {
+    name: "Epic Boon",
+    level: 19,
+    edition: "EDITION_2024",
+    description: "You gain an Epic Boon feat of your choice (Boon of Dimensional Travel recommended). You can take this feat only once.",
+  },
+  {
     name: "Foe Slayer",
     level: 20,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Once per turn when you hit a favored enemy with a weapon, you may add your Wisdom modifier to the attack roll or the damage roll.",
   },
-]);
+  {
+    name: "Foe Slayer",
+    level: 20,
+    edition: "EDITION_2024",
+    description: "The damage die of your Hunter's Mark spell is a d10 rather than a d6.",
+  },
+];
 
 // THE FIEND (#1233): mirrors warlock-features.ts's real SRD 5.2 content and
 // resource-pool columns exactly — Dark One's Own Luck's 2024 row deliberately

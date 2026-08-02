@@ -223,6 +223,27 @@ function isPopulatedWarlockRow(row: { className: string; subclassSlug: string | 
   return POPULATED_WARLOCK_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
+// #1230: Ranger's three Wisdom-tier-or-formula pools. Keyed on the 4-tuple
+// INCLUDING edition (unlike POPULATED_WARLOCK_ROW_KEYS' 3-tuple) because
+// Favored Enemy is the asymmetric case the RowKey comment below names: its
+// 2014 row carries NO resourceKey at all, only its 2024 row does — a 3-tuple
+// key would incorrectly mark the 2014 row "populated" too and fail its
+// expectNullResourceColumns check. Tireless/Nature's Veil have no 2014
+// counterpart at all, so their 2024-only keys need no such asymmetry
+// handling, but stay 4-tuples for consistency. Tireless/Nature's Veil set
+// resourceKey but deliberately OMIT resourceTotals (a Wisdom-modifier
+// formula, still resourceFn-derived) — still "populated" for this check's
+// purposes, same shape as Warlock's Dark One's Own Luck 2024 row.
+const POPULATED_RANGER_ROW_KEYS = new Set([
+  "Ranger::null::Favored Enemy::EDITION_2024",
+  "Ranger::null::Tireless::EDITION_2024",
+  "Ranger::null::Nature's Veil::EDITION_2024",
+]);
+
+function isPopulatedRangerRow(row: { className: string; subclassSlug: string | null; name: string; edition: string }): boolean {
+  return POPULATED_RANGER_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
+}
+
 // What the descriptor predicates below key on. `edition` is part of the key
 // because a class can populate a descriptor column on ONE edition's row and
 // not the other's, under the same (class, subclass, name): Ranger's Favored
@@ -250,7 +271,8 @@ function isSaveDcRow(row: RowKey): boolean {
 // developing in parallel (isPopulatedRow / isAnyPopulatedResourceRow); they
 // were merged into this one at integration, because two aggregators each
 // naming a DIFFERENT subset is precisely how a row silently escapes the
-// descriptor sweep. Every new populated-row predicate goes here, once.
+// descriptor sweep. Every new populated-row predicate goes here, once —
+// #1230's isPopulatedRangerRow included, per this file's own house rule.
 function isPopulatedRow(row: RowKey): boolean {
   return (
     isPopulatedFighterRow(row) ||
@@ -258,7 +280,8 @@ function isPopulatedRow(row: RowKey): boolean {
     isPopulatedBarbarianRow(row) ||
     isPopulatedWarlockRow(row) ||
     isPopulatedWizardRow(row) ||
-    isPopulatedIllusorySelfRow(row)
+    isPopulatedIllusorySelfRow(row) ||
+    isPopulatedRangerRow(row)
   );
 }
 
@@ -437,13 +460,17 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // resourceTotals (Magical Cunning x1, Dark One's Own Luck 2014-only x1 — its
   // 2024 row deliberately OMITS resourceTotals, a Charisma-modifier formula —
   // Hurl Through Hell x2, Fey Presence x1, Misty Escape x1, Dark Delirium x1,
-  // Entropic Ward x1); derivedStatTiers excludes #1530's twelve populated Extra
+  // Entropic Ward x1) PLUS #1230's ONE Ranger row: Favored Enemy's 2024 row
+  // only (its 2014 row carries no resourceKey at all; Tireless's/Nature's
+  // Veil's 2024 rows set resourceKey but deliberately OMIT resourceTotals, a
+  // Wisdom-modifier formula, same shape as Dark One's Own Luck's 2024 row);
+  // derivedStatTiers excludes #1530's twelve populated Extra
   // Attack rows PLUS #1546's Combat Superiority/Student of War x2 editions each
   // (DERIVED_STAT_ROW_KEYS x2 editions each, computed below); resourceDieTiers
   // excludes only Combat Superiority x2 (the only row with a die-size tier).
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
-    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock.
-    const populatedResourceTotalsCount = 22;
+    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock + 1 Ranger.
+    const populatedResourceTotalsCount = 23;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {

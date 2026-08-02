@@ -123,10 +123,26 @@ const RANGER_BASE_RAW: RawRangerFeature[] = [
     // spells) and can cast it without a spell slot 2 times at L1, rising to
     // 3/4/5/6 at L5/9/13/17 (three independent sources agree; a fourth
     // mirror's "+1d4/+1d6/…" progression is a garbled UA-playtest table,
-    // discarded — #1230 research). The pool itself lives on this row, #1230
-    // commit 3 — see this file's own header.
+    // discarded — #1230 research). #1230 commit 3: the free-cast pool is a
+    // flat level tier (unlike Tireless/Nature's Veil below), so it moves
+    // straight onto this row's own resourceTotals — no resourceFn needed for
+    // this one. Coincidentally, each tier's value equals
+    // proficiencyBonusForLevel(level) at every level (SRD 5.2 numeric
+    // coincidence, not a rule — ranger-favored-enemy-pool.test.ts asserts
+    // this explicitly so a future PB change doesn't silently retabulate this
+    // table instead of being caught).
     description:
       "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "favoredEnemy",
+    resourceLabel: "Favored Enemy (Hunter's Mark)",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 1, total: 2 },
+      { minLevel: 5, total: 3 },
+      { minLevel: 9, total: 4 },
+      { minLevel: 13, total: 5 },
+      { minLevel: 17, total: 6 },
+    ],
   },
   {
     subclassSlug: null,
@@ -283,12 +299,21 @@ const RANGER_BASE_RAW: RawRangerFeature[] = [
     edition: "EDITION_2024",
     // SRD 5.2. NEW in 2024 — no 2014 counterpart. C1: uses = WISDOM MODIFIER
     // (minimum of once), not proficiency bonus — a formula resourceTotals'
-    // tier array can't express. #1230 commit 3 declares this row's
-    // resourceKey/resourceLabel/resourceRecharge (deliberately omitting
-    // resourceTotals) and adds ranger.ts's resourceFn to supply the total —
-    // this commit (2) is text only.
+    // tier array can't express (verified: poolFromRow, class-feature-rows.ts,
+    // returns null for a resourceKey with no matching resourceTotals tier —
+    // never ship that half-state without the resourceFn below also
+    // existing). This row declares resourceKey/resourceLabel/
+    // resourceRecharge and deliberately OMITS resourceTotals; ranger.ts's
+    // EDITION_2024-gated resourceFn supplies the total from the character's
+    // Wisdom modifier, mirroring warlock.ts's Dark One's Own Luck pattern.
+    // #1528 no-second-string rule: the resourceFn's pool description below
+    // MUST agree with this row's own text — both mention "Temporary Hit
+    // Points" and "Wisdom modifier" — asserted by ranger-wisdom-pools.test.ts.
     description:
       "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "tireless",
+    resourceLabel: "Tireless",
+    resourceRecharge: "longRest",
   },
   {
     subclassSlug: null,
@@ -316,11 +341,13 @@ const RANGER_BASE_RAW: RawRangerFeature[] = [
     level: 14,
     edition: "EDITION_2024",
     // SRD 5.2. NEW in 2024 — no 2014 counterpart. C1: uses = WISDOM MODIFIER
-    // (minimum of once) — same formula shape as Tireless above; #1230 commit
-    // 3 adds this row's resourceKey/resourceLabel/resourceRecharge (again
-    // deliberately omitting resourceTotals) — this commit (2) is text only.
+    // (minimum of once) — same formula shape as Tireless above, same
+    // deliberate resourceTotals omission, same resourceFn residue.
     description:
       "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "naturesVeil",
+    resourceLabel: "Nature's Veil",
+    resourceRecharge: "longRest",
   },
   {
     subclassSlug: null,

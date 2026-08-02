@@ -62,13 +62,14 @@ import { WIZARD_FEATURES } from "./wizard-features.js";
 // undefined-grantLevel fallback is 3, so deleting either would silently move
 // that class's 2014 subclass gate (see each file's own header and #1576).
 // Ranger (#1230) is the THIRD state: its module also stays registered, but
-// for a DIFFERENT reason — its `grantLevel: 3` already equals the fallback,
-// so it isn't why the module survives. See ranger.ts's own header for the
-// reason that is (Hunter's `choices` catalog, #899, owned by #1353). All three are absent
-// from CLASS_MODULES here only because their FEATURE TEXT has moved to seed
-// data. `features` stays optional on ClassDefinition/SubclassDefinition for
-// the six classes still on the TS-authoring path, not because these six ever
-// needed it to be.
+// for TWO DIFFERENT reasons — its `grantLevel: 3` already equals the
+// fallback, so unlike Warlock/Wizard that isn't one of them. See ranger.ts's
+// own header for the two that are (Hunter's `choices` catalog, #899, owned
+// by #1353; and its EDITION_2024 Wisdom-modifier `resourceFn`, #1230 commit
+// 3). All three are absent from CLASS_MODULES here only because their
+// FEATURE TEXT has moved to seed data. `features` stays optional on
+// ClassDefinition/SubclassDefinition for the six classes still on the
+// TS-authoring path, not because these six ever needed it to be.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
   Bard: bard,
   Cleric: cleric,
