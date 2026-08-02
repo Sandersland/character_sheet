@@ -1081,45 +1081,37 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// THE ARCHFEY / THE GREAT OLD ONE test rows are DELIBERATELY frozen at their
-// pre-#1233 shape (an untagged-both-editions body plus a 2024-tagged
-// Expanded Spell List) rather than updated to mirror warlock-features.ts's
-// real post-#1233 content, which tags every one of their rows EDITION_2014
-// and authors zero EDITION_2024 rows. subclass-grant-level.test.ts's MOVED
-// array asserts "warlock/the archfey" and "warlock/the great old one"
-// contribute subclass features at level 3 under EDITION_2024 by DEFAULT
-// (testing the GRANT-LEVEL gate, not subclass content) — retagging these two
-// fixtures to match the real seed would starve that gate check of any
-// EDITION_2024 row to find, failing a test the #1233 plan requires stay green
-// UNEDITED. class-feature-parity.test.ts's own LITERAL_ROW_CLASSES exclusion
-// is what already permits this fixture to diverge from the real seed without
-// anything else catching it.
+// THE ARCHFEY / THE GREAT OLD ONE are EDITION_2014 only, mirroring
+// WARLOCK_FEATURES: #1233 tagged every one of their rows 2014 and authored zero
+// 2024 rows, because no licensed source could verify their PHB'24 reworks
+// (owner decision), and assertEverySubclassEditionPopulated (#1559) turns that
+// into a hard product fact — a 2024 character cannot pick either patron.
 //
-// Same reasoning extends to the pool columns: these two patrons' resourceFns
-// in lib/classes/warlock.ts are DELETED outright by commit 3 (their real
-// pools are now row-driven, EDITION_2014 only) — but subclass-grant-level.test.ts's
-// "Archfey's feyPresence pool is absent at level 2 and present at level 3"
-// case calls deriveResources with EDITION_2024 explicitly and must also stay
-// green unedited. Fey Presence/Misty Escape/Dark Delirium/Entropic Ward below
-// therefore keep resourceKey on their UNTAGGED (both-editions) rows, exactly
-// reproducing the old resourceFns' edition-blind behavior (present once the
-// gate level is reached, in EITHER edition) via poolsFromRows instead — the
-// real seed's EDITION_2024 partition for these two patrons has none of these
-// keys at all (see warlock-2024-srd.test.ts's own assertion of that).
-export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+// They were frozen at a fabricated both-editions shape until #1595, purely so
+// subclass-grant-level.test.ts's grant-level cases could derive them at
+// EDITION_2024 and find rows to gate. Those cases are gone (both patrons now
+// prove the 2014 gate through GATE_1, and Sorcerer/Wild Magic carries the pool
+// case), so nothing needs the fabricated rows and they would only teach the
+// suite a state production forbids. Do not re-add a 2024 partition here to make
+// a new test pass — narrow the test's edition instead.
+//
+// Still true and load-bearing for the pool columns below: the real seed's
+// EDITION_2024 partition of WARLOCK_FEATURES has none of these keys at all, so
+// Fey Presence/Misty Escape/Dark Delirium/Entropic Ward are 2014-only pools and
+// poolsFromRows is the only thing that produces them (these patrons' 2014
+// resourceFns in lib/classes/warlock.ts were deleted by #1233).
+export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
-      edition === "EDITION_2014"
-        ? "Add archfey spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Faerie Fire, Sleep (1st); Calm Emotions, Phantasmal Force (2nd); Blink, Plant Growth (3rd); Dominate Beast, Greater Invisibility (4th); Dominate Person, Seeming (5th)."
-        : "Add archfey spells to your warlock list: Faerie Fire, Sleep (L3); Calm Emotions, Phantasmal Force (L3); Blink, Plant Growth (L5); Dominate Beast, Greater Invisibility (L7); Dominate Person, Seeming (L9).",
+      "Add archfey spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Faerie Fire, Sleep (1st); Calm Emotions, Phantasmal Force (2nd); Blink, Plant Growth (3rd); Dominate Beast, Greater Invisibility (4th); Dominate Person, Seeming (5th).",
   },
   {
     name: "Fey Presence",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
       "As an action, project a beguiling or dreadful aura in a 10-ft cube. Each creature there must succeed on a Wisdom save (spell save DC) or be charmed or frightened (your choice) until the end of your next turn. Once used, regain on a short or long rest.",
     resourceKey: "feyPresence",
@@ -1130,7 +1122,7 @@ export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_20
   {
     name: "Misty Escape",
     level: 6,
-    edition,
+    edition: "EDITION_2014",
     description:
       "When you take damage, use your reaction to turn invisible and teleport up to 60 ft to an unoccupied space you can see. Invisibility lasts until the start of your next turn or until you attack or cast a spell. Once used, regain on a short or long rest.",
     resourceKey: "mistyEscape",
@@ -1141,14 +1133,14 @@ export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_20
   {
     name: "Beguiling Defenses",
     level: 10,
-    edition,
+    edition: "EDITION_2014",
     description:
       "You are immune to being charmed. When another creature attempts to charm you, you can use your reaction to have it make a Wisdom saving throw (spell save DC) or be charmed by you for 1 minute or until it takes damage.",
   },
   {
     name: "Dark Delirium",
     level: 14,
-    edition,
+    edition: "EDITION_2014",
     description:
       "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
     resourceKey: "darkDelirium",
@@ -1156,29 +1148,27 @@ export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_20
     resourceRecharge: "short-or-long",
     resourceTotals: [{ minLevel: 14, total: 1 }],
   },
-]);
+];
 
-export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
-      edition === "EDITION_2014"
-        ? "Add Great Old One spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Dissonant Whispers, Hideous Laughter (1st); Detect Thoughts, Phantasmal Force (2nd); Clairvoyance, Sending (3rd); Dominate Beast, Black Tentacles (4th); Dominate Person, Telekinesis (5th)."
-        : "Add Great Old One spells to your warlock list: Dissonant Whispers, Hideous Laughter (L3); Detect Thoughts, Phantasmal Force (L3); Clairvoyance, Sending (L5); Dominate Beast, Black Tentacles (L7); Dominate Person, Telekinesis (L9).",
+      "Add Great Old One spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Dissonant Whispers, Hideous Laughter (1st); Detect Thoughts, Phantasmal Force (2nd); Clairvoyance, Sending (3rd); Dominate Beast, Black Tentacles (4th); Dominate Person, Telekinesis (5th).",
   },
   {
     name: "Awakened Mind",
     level: 1,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Communicate telepathically with any creature you can see within 30 ft. The creature understands you even if it shares no language with you, though it cannot telepathically respond.",
   },
   {
     name: "Entropic Ward",
     level: 6,
-    edition,
+    edition: "EDITION_2014",
     description:
       "When a creature makes an attack roll against you, use your reaction to impose disadvantage. If it misses, you gain advantage on your next attack against it before the end of your next turn. Once used, regain on a short or long rest.",
     resourceKey: "entropicWard",
@@ -1189,18 +1179,18 @@ export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDIT
   {
     name: "Thought Shield",
     level: 10,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Your thoughts can't be read by telepathy or other means unless you allow it. Resistance to psychic damage. When a creature deals psychic damage to you, it takes the same amount.",
   },
   {
     name: "Create Thrall",
     level: 14,
-    edition,
+    edition: "EDITION_2014",
     description:
       "Touch an incapacitated humanoid to charm it indefinitely (no save). While charmed, it obeys your commands and you share telepathic communication with it. Each time the thrall takes damage, it makes a Charisma save to break free (DC = your spell save DC).",
   },
-]);
+];
 
 // SORCERER's base class + subclass rows (#1232): moved off sorcerer.ts's
 // SORCERER_FEATURES/DRACONIC_BLOODLINE_FEATURES/WILD_MAGIC_FEATURES
