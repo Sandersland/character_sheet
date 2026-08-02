@@ -130,7 +130,7 @@ function baseFeatureRows(className: string, classDef: ClassDefinition): RawFeatu
   // Warlock #1233 and Wizard #1234) — ClassDefinition.features is optional on
   // the TYPE now that Fighter has no ClassDefinition module at all
   // (`lib/classes/fighter.ts` deleted, #1532), so every caller through this
-  // shared type must narrow, even the seven classes that still always set it.
+  // shared type must narrow, even the four classes that still always set it.
   return (classDef.features ?? []).map((feature) => ({ className, subclassSlug: null, feature }));
 }
 
@@ -238,7 +238,7 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
     // #1530: the only two descriptor columns an AuthoredFeature may set
     // today. `undefined` passes straight through — writeResolvedRows'
     // authoredDescriptors (seed-class-features.ts) skips undefined keys, so
-    // the six remaining TS-authored classes' rows keep resolving to
+    // the four remaining TS-authored classes' rows keep resolving to
     // DESCRIPTOR_RESET exactly as before this field existed.
     derivedStat: raw.feature.derivedStat,
     derivedStatTiers: raw.feature.derivedStatTiers,
@@ -285,13 +285,15 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 
 // Authored for #1528/#1530 to reuse when they first populate
 // resourceTotals/resourceDieTiers/derivedStatTiers. #1530 has landed:
-// expandFeatureRow above now sets derivedStatTiers on five classes' own rows
-// here (Barbarian/Bard/Monk/Paladin/Ranger's Extra Attack) and
-// fighter-features.ts sets it directly on Fighter's — so derivedStatTiersSchema
-// is load-bearing today. resourceTotals/resourceDieTiers stay unset by any
-// row THIS FILE derives — they're populated only on FIGHTER_FEATURES' literal
-// rows (concatenated in below, not derived here) — until wave 2 (#1134)
-// reaches one of the eleven classes still on this file's TS-authoring path.
+// expandFeatureRow above now sets derivedStatTiers on three classes' own rows
+// here (Bard/Monk/Paladin's Extra Attack — Barbarian's and Ranger's were on
+// this list until #1223 and #1230 made their rows literal, and Druid declares
+// none) and each literal seed file sets it directly on its own — so
+// derivedStatTiersSchema is load-bearing today. resourceTotals/
+// resourceDieTiers stay unset by any row THIS FILE derives — they're populated
+// only on the literal seed files' rows (concatenated in below, not derived
+// here) — until wave 2 (#1134) reaches one of the four classes still on this
+// file's TS-authoring path.
 // Not exported:
 // classFeatureSeedSchema (below) is the surface anything outside this file —
 // including class-feature-tier-schema.test.ts — should validate against,
