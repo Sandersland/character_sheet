@@ -82,6 +82,13 @@ fi
 # top-level, so a nested arrow function, a callback, an object-literal method
 # or a brace inside a string cannot shift the answer. No brace counting, no
 # scope tracking.
+#
+# None of the three declaration rules may `next`: a column-0 declaration whose
+# OWN line carries a lookup (`const row = await prisma.feat.findFirst(…)`) would
+# then set the symbol and skip the emit rule, dropping the occurrence entirely —
+# silent, and below MIN_OCCURRENCES' notice. Falling through keys it on the
+# declaration it just named, which is the right answer anyway. The rules are
+# mutually exclusive at column 0, so the `next`s bought nothing.
 records=$(PATTERN="$PATTERN" awk '
 FNR == 1 { sym = "" }   # or a symbol leaks across a file boundary into a file
                         # whose first match precedes any declaration
@@ -89,19 +96,19 @@ FNR == 1 { sym = "" }   # or a symbol leaks across a file boundary into a file
   s = $0
   sub(/^(export[[:blank:]]+)?(default[[:blank:]]+)?(async[[:blank:]]+)?function[[:blank:]]*\*?[[:blank:]]*/, "", s)
   sub(/[[:blank:]]*[(<].*$/, "", s)
-  sym = s; next
+  sym = s
 }
 /^(export[[:blank:]]+)?(const|let|var)[[:blank:]]+[A-Za-z_$][A-Za-z0-9_$]*[[:blank:]]*[:=]/ {
   s = $0
   sub(/^(export[[:blank:]]+)?(const|let|var)[[:blank:]]+/, "", s)
   sub(/[[:blank:]]*[:=].*$/, "", s)
-  sym = s; next
+  sym = s
 }
 /^(export[[:blank:]]+)?(default[[:blank:]]+)?(abstract[[:blank:]]+)?class[[:blank:]]+[A-Za-z_$][A-Za-z0-9_$]*/ {
   s = $0
   sub(/^(export[[:blank:]]+)?(default[[:blank:]]+)?(abstract[[:blank:]]+)?class[[:blank:]]+/, "", s)
   sub(/[^A-Za-z0-9_$].*$/, "", s)
-  sym = s; next
+  sym = s
 }
 $0 ~ ENVIRON["PATTERN"] { printf "%s\t%s\t%d\n", FILENAME, sym, FNR }
 ' $FILES </dev/null)
@@ -143,10 +150,15 @@ fi
 
 # Every occurrence must be in the allowlist (an un-pinned site is either a new
 # unguarded lookup, or a guarded one that needs a new allowlist entry).
-unallowed=$(printf '%s\n' "$occurrences" | while IFS= read -r occ; do
-  [ -z "$occ" ] && continue
-  if ! printf '%s\n' "$ALLOWLIST" | cut -d: -f1,2 | grep -qxF "$occ"; then
-    echo "$occ"
+#
+# The line is reported OUTSIDE the key, in the same `(line N)` shape the
+# duplicate-key error uses, so it stays a navigation aid and never looks like
+# part of the entry to paste. Pasting it anyway fails loudly rather than
+# silently: `path:symbol (line N)` matches no occurrence, so both halves fire.
+unallowed=$(printf '%s\n' "$records" | while IFS="$(printf '\t')" read -r path sym line; do
+  [ -z "$path" ] && continue
+  if ! printf '%s\n' "$ALLOWLIST" | cut -d: -f1,2 | grep -qxF "$path:$sym"; then
+    echo "$path:$sym (line $line)"
   fi
 done)
 
