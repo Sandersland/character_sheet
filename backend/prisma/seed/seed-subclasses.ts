@@ -130,6 +130,15 @@ async function remapCharactersOffStaleSubclasses(
     });
     if (retained.length !== 1) continue;
 
+    // ONLY the FK. `CharacterClassEntry.subclass` — the display name — is
+    // deliberately left alone: schema.prisma calls it a "Drifting subclass
+    // display name — free to diverge from the catalog row's name", and
+    // buildClassesView emits THAT column (not the joined row's name) as what
+    // the player sees. Writing `retained[0].name` here would silently overwrite
+    // a name the player chose, during a seed run, which is the same class of
+    // user-data mutation #1559's guard exists to prevent. A retag that also
+    // renames therefore leaves the sheet reading the old name — correct, and
+    // the player's to change.
     const { count } = await prisma.characterClassEntry.updateMany({
       where: { subclassId: row.id },
       data: { subclassId: retained[0].id },
@@ -164,7 +173,6 @@ async function remapCharactersOffStaleSubclasses(
 // OWN slug is still seeded, under an edition no longer wanted for it. A slug
 // the seed has stopped emitting altogether is untouched and left for its own
 // deliberate fix (the three orphaned monk-way-of-* rows, #1559 disclosure).
-
 export async function pruneStaleSubclasses(
   prisma: PrismaClient,
   seeded: readonly { slug: string; edition: SeedEdition | null }[],

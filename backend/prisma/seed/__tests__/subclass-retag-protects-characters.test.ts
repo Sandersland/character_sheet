@@ -132,6 +132,38 @@ describe("assertNoCharactersReferenceStaleSubclasses / pruneStaleSubclasses (#15
     expect(await prisma.subclass.findUnique({ where: { id: oldRow.id } })).toBeNull();
   });
 
+  // The remap moves the FK and NOTHING else. `CharacterClassEntry.subclass` is
+  // a deliberately drifting display name (schema.prisma: "free to diverge from
+  // the catalog row's name"), and buildClassesView emits THAT column rather
+  // than the joined row's name — so overwriting it during a seed run would
+  // silently replace a name the player chose, the same class of user-data
+  // mutation this file's guard exists to prevent.
+  //
+  // The case above cannot catch a regression here: both its rows are named
+  // "Fixture Subclass", so an implementation that DID overwrite the column
+  // would still pass it. This one gives the retained row a different name and
+  // the entry a player-customised one, so only leaving the column alone works.
+  it("moves the FK only — a drifting subclass display name survives the remap", async () => {
+    const { oldRow } = await seedRetagFixture();
+    await prisma.characterClassEntry.updateMany({
+      where: { characterId: CHAR_ID },
+      data: { subclass: "My Homebrewed Patron" },
+    });
+    // The retained row is renamed too, so "keep the entry's text" and "copy the
+    // row's name" are now distinguishable outcomes.
+    await prisma.subclass.updateMany({
+      where: { slug: SLUG, edition: "EDITION_2014" },
+      data: { name: "Renamed In The Catalog" },
+    });
+
+    await expect(pruneStaleSubclasses(prisma, [{ slug: SLUG, edition: "EDITION_2014" }])).resolves.toBeUndefined();
+
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    expect(entry.subclass).toBe("My Homebrewed Patron");
+    expect(entry.subclass).not.toBe("Renamed In The Catalog");
+    expect(await prisma.subclass.findUnique({ where: { id: oldRow.id } })).toBeNull();
+  });
+
   // The half that is still refused. Two retained rows under one slug is a
   // genuine choice between them, not a mechanical repoint, so the remap
   // declines and the guard throws exactly as before — automating the safe case
