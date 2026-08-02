@@ -396,27 +396,32 @@ describe("deriveResources — Sorcerer Sorcery Points", () => {
 
 // ── Cleric — Channel Divinity ─────────────────────────────────────────────────
 
+// #1225: these totals are 2024's own SRD 5.2 progression (2/3/4 at L2/6/18),
+// NOT 2014's (1/2/3) — before this issue's retab, a 2024 Cleric's pool still
+// came from lib/classes/cleric.ts's edition-blind resourceFn, so a level-2
+// 2024 Cleric derived only 1 use instead of the real 2. This suite used to
+// pin that bug; it now pins the fix.
 describe("deriveResources — Cleric Channel Divinity", () => {
   it("no channelDivinity at level 1", () => {
     const result = deriveResources("cleric", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeUndefined();
   });
 
-  it("1 use at levels 2–5", () => {
+  it("2 uses at levels 2–5", () => {
     for (const level of [2, 3, 5]) {
       const result = deriveResources("cleric", undefined, level, ABILITY_SCORES, PROF_2, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
-      expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(1);
+      expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(2);
     }
   });
 
-  it("2 uses at level 6", () => {
+  it("3 uses at level 6", () => {
     const result = deriveResources("cleric", undefined, 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
-    expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(2);
+    expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(3);
   });
 
-  it("3 uses at level 18", () => {
+  it("4 uses at level 18", () => {
     const result = deriveResources("cleric", undefined, 18, ABILITY_SCORES, PROF_6, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
-    expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(3);
+    expect(result!.resources.find((r) => r.key === "channelDivinity")!.total).toBe(4);
   });
 
   it("domains share base channelDivinity — no duplicates", () => {

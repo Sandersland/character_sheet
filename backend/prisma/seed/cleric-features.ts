@@ -2,18 +2,20 @@
 // Commit 1 of 3 (mirrors Barbarian's #1223 / Warlock's #1233 / Wizard's #1234)
 // moved these rows off lib/classes/cleric.ts's AuthoredFeature[] arrays into
 // literal seed data, byte-identical to the old TS-derived text (pinned by
-// cleric-2014-snapshot.test.ts). Commit 2 (this one) authors Cleric's REAL
-// SRD 5.2 (2024) content: the base class and Life Domain are transcribed
-// directly from the official SRD 5.2 CC-BY PDF (Cleric pp. 36-40) — never a
-// wiki. Trickery Domain is NOT in SRD 5.2 (owner decision, #1225): its 2024
-// text is mirror-sourced from two independent, non-scraper secondary sources
+// cleric-2014-snapshot.test.ts). Commit 2 authored Cleric's REAL SRD 5.2
+// (2024) content: the base class and Life Domain are transcribed directly
+// from the official SRD 5.2 CC-BY PDF (Cleric pp. 36-40) — never a wiki.
+// Trickery Domain is NOT in SRD 5.2 (owner decision, #1225): its 2024 text is
+// mirror-sourced from two independent, non-scraper secondary sources
 // (aidedd.org's Cleric 2024 reference and dungeonmister.com's Trickery Domain
 // guide) that agree on every mechanic below — see the TRICKERY DOMAIN section
 // further down for the one number (Invoke Duplicity's move-range cap) neither
 // source confirmed and that is therefore omitted rather than carried over
-// from the 2014 text. Commit 3 will move the Channel Divinity resource pool
-// onto its two carrier rows and shrink lib/classes/cleric.ts to its
-// irreducible residue.
+// from the 2014 text. Commit 3 (this one) moves the Channel Divinity resource
+// pool onto its two carrier rows (see the RESOURCE POOL block below) and
+// shrinks lib/classes/cleric.ts to its irreducible residue — see that file's
+// own header for why it survives (it is NOT deletable, unlike
+// fighter.ts/barbarian.ts).
 // class-features.ts concatenates CLERIC_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a
@@ -47,9 +49,51 @@
 // `edition: "EDITION_2024"` tag alongside new 2024 text; it never edits a
 // 2014 row's own name/level/description.
 //
-// NO resourceKey/resourceLabel/resourceRecharge/resourceTotals yet — commit 3
-// moves the Channel Divinity pool onto its two carrier rows (the 2014 "Channel
-// Divinity: Turn Undead" row and the new 2024 "Channel Divinity" row).
+// RESOURCE POOL (commit 3 of 3, mirrors Barbarian's #1223/Warlock's #1233
+// two-step): exactly ONE row per edition may set `resourceKey:
+// "channelDivinity"` — two would both be pushed by poolsFromRows and silently
+// "max"-merged by registry.ts's SHARED_POOL_MERGE instead of erroring.
+// 2014's pool (totals 1/2/3 at L2/6/18, `recharge: "short-or-long"`, no
+// shortRestRegain) rides the existing "Channel Divinity: Turn Undead" row —
+// forced, not a choice: cleric-2014-snapshot.test.ts asserts no EXTRA 2014
+// row exists, so a new 2014 "Channel Divinity" row is not allowed. 2024's
+// pool (totals 2/3/4 at L2/6/18, `recharge: "longRest"`, `shortRestRegain: 1`
+// on every tier) rides the new 2024 "Channel Divinity" row (SRD 5.2's actual
+// feature name). `lib/classes/channel-divinity.ts` and
+// `prisma/seed/channel-divinity.ts` do NOT re-declare this pool — they author
+// GrantedAbility rows with `costPoolKey: "channelDivinity"` (spenders, not
+// declarers), and `lib/classes/resources.ts` has no cleric branch — verified,
+// no edits needed to any of them.
+//
+// DISCLOSED CONSEQUENCE (same as Barbarian's Rage, #1223): poolFromRow
+// (class-feature-rows.ts) reads a row's own `description` as the pool's
+// description — #1528's no-second-string rule — so the 2014 pool loses the
+// interpolated `Turn Undead DC ${turnDC}` sentence that lib/classes/
+// cleric.ts's retired resourceFn used to compute inline. NOT a regression:
+// describeChannelDivinity (lib/classes/channel-divinity.ts) already computes
+// and surfaces that DC per-option, and ChannelDivinitySection.tsx renders it
+// as its own "Wisdom DC N" badge — the DC is still on the wire, just not
+// duplicated into the pool's own description string.
+//
+// saveDcAbilities is DELIBERATELY UNSET on every row below, despite the
+// issue instructing it — two independent blockers, both verified: (1)
+// deriveAnnouncedSaveDC (registry.ts's deriveRowExtras) is only ever called
+// with `subclassRows`, gated on `sub.active` — Turn Undead/Channel Divinity
+// are BASE-CLASS rows (subclassId: null), so a `saveDcAbilities` value here
+// would be read by nothing, ever. (2) The one field it feeds,
+// `ClassExtras.maneuverSaveDC`, is Fighter-named and Fighter-consumed
+// (`maneuvers: { saveDC }`, ManeuversSection.tsx) — since overlayExtrasFields
+// (registry.ts) is defined-wins/later-entry-wins per class entry, a Cleric/
+// Battle-Master multiclass would have Cleric's Wisdom-derived value silently
+// CLOBBER the Fighter's real Str/Dex maneuver DC. A live bug, not
+// hypothetical. The DC formula instead stays in this file's own prose (SRD
+// 5.2's "the DC equals the spell save DC from this class's Spellcasting
+// feature", i.e. 8 + Proficiency Bonus + Wisdom modifier) — see the 2024
+// Turn Undead row's own text above. schema.prisma's `saveDcAbilities` comment
+// is corrected in the SAME commit to record this as an aspiration, not a
+// live path. Follow-up filed: generalise deriveAnnouncedSaveDC to base-class
+// rows and rename ClassExtras.maneuverSaveDC -> announcedSaveDC before any
+// non-Fighter class populates saveDcAbilities.
 //
 // TEXT-ONLY (mechanics not wired up, same disclosed shape as every prior
 // retab wave — see EDITIONS_STILL_IDENTICAL's removal comment in
@@ -80,8 +124,9 @@ interface RawClericFeature {
   level: number;
   description: string;
   edition: SeedEdition;
-  // Resource-pool descriptor columns (#1225 commit 3) — populated on Cleric's
-  // two Channel Divinity carrier rows only once commit 3 lands.
+  // Resource-pool descriptor columns (#1225 commit 3) — see the RESOURCE POOL
+  // header block above. Only Turn Undead's EDITION_2014 row and Channel
+  // Divinity's EDITION_2024 row set these; every other row leaves them unset.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
@@ -155,6 +200,16 @@ const CLERIC_BASE_RAW: RawClericFeature[] = [
     // Rest."
     description:
       "You channel divine energy from the Outer Planes to fuel magical effects — Divine Spark and Turn Undead at 2nd level, more at higher levels. Each time you use it, choose which effect to create. You have 2 uses (3 at level 6, 4 at level 18). You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
+    // The 2024 Channel Divinity pool carrier — see this file's own RESOURCE
+    // POOL header block for why exactly one row per edition may set this key.
+    resourceKey: "channelDivinity",
+    resourceLabel: "Channel Divinity",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 2, total: 2, shortRestRegain: 1 },
+      { minLevel: 6, total: 3, shortRestRegain: 1 },
+      { minLevel: 18, total: 4, shortRestRegain: 1 },
+    ],
   },
   {
     subclassSlug: null,
@@ -172,6 +227,18 @@ const CLERIC_BASE_RAW: RawClericFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, each undead within 30 ft that can see or hear you must make a Wisdom save (DC 8 + proficiency + Wisdom modifier) or be turned for 1 minute. Turned undead flee you.",
+    // The 2014 Channel Divinity pool carrier — forced onto THIS row rather
+    // than a new 2014 "Channel Divinity" row (see this file's own RESOURCE
+    // POOL header block: cleric-2014-snapshot.test.ts asserts no extra 2014
+    // row exists).
+    resourceKey: "channelDivinity",
+    resourceLabel: "Channel Divinity",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [
+      { minLevel: 2, total: 1 },
+      { minLevel: 6, total: 2 },
+      { minLevel: 18, total: 3 },
+    ],
   },
   {
     subclassSlug: null,
