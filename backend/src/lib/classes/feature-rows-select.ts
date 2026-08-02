@@ -34,7 +34,14 @@ import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-r
 export const FEATURE_ROWS_ORDER_BY = [{ level: "asc" }, { name: "asc" }] satisfies Prisma.ClassFeatureOrderByWithRelationInput[];
 
 export const FEATURE_ROWS_ENTRY_SELECT = {
-  class: { select: { features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } } },
+  // subclassLevel rides along because this select already reaches the class
+  // relation: it is the seeded PHB'14 subclass grant level isSubclassActive
+  // needs to stop depending on a lib/classes/<class>.ts module (#1576), and
+  // adding it here means every caller already spreading this fragment gets it
+  // without editing its own select.
+  class: {
+    select: { subclassLevel: true, features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } },
+  },
   subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
@@ -58,5 +65,6 @@ export function featureRowsOf(entry: FeatureRowsEntry): ClassFeatureRowsCarrier 
   return {
     classRows: (entry.class?.features ?? []) as unknown as ClassFeatureRow[],
     subclassRows: (entry.subclassRef?.features ?? []) as unknown as ClassFeatureRow[],
+    subclassLevel: entry.class?.subclassLevel,
   };
 }

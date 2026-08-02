@@ -53,9 +53,14 @@ const CLASSES: Record<string, ClassDefinition> = {
 // Paladin/Ranger/Rogue, each `grantLevel: 3` in their own module), but NOT
 // for all: Cleric/Sorcerer/Warlock supply `grantLevel: 1` and Druid/Wizard
 // supply `grantLevel: 2` explicitly (PHB'14) — a false "same value" claim
-// here would have shipped in #1234; those five classes' own TS overlay (the
-// second pass below) is what corrects the fallback for them, not this
-// identity-only seed. This is what lets deriveSubclassLayer resolve a subclass's
+// here would have shipped in #1234.
+//
+// As of #1576 those five are corrected by the SEEDED CharacterClass
+// .subclassLevel, which reaches isSubclassActive on ClassFeatureRowsCarrier
+// whenever the caller's select carries the class relation. Their TS overlay
+// (the second pass below) is now only the FALLBACK for a narrow-select caller
+// that carries no such relation — which is what makes deleting those five
+// modules safe, and is the whole point of that issue. This is what lets deriveSubclassLayer resolve a subclass's
 // seeded ClassFeature rows (poolsFromRows/featuresFromRows) even when no
 // ClassDefinition registers it in TS at all (Fighter's three since fighter.ts
 // was deleted, #1532; Barbarian's two since barbarian.ts was, #1223) —
@@ -170,13 +175,28 @@ interface SubclassLayer extends ClassLayer {
 // edition-blind (#1285's latch, closed by #1291): a 2014 Cleric at level 1
 // used to show its subclass NAME (buildClassesView) with none of its derived
 // FEATURES (deriveResources) because this function ignored edition entirely.
+// #1576: the SEEDED CharacterClass.subclassLevel wins over the TS module's own
+// grantLevel when the caller carries it, because the module is the half that
+// goes away. Every other consumer of this rule — buildClassesView, character
+// creation, the level-up ceremony — already reads the seeded column, and this
+// function reading a different source is precisely what made deleting a class
+// module a SPLIT BRAIN: the character kept its subclass NAME (seeded column)
+// while losing every subclass FEATURE (module gone, subclassGateLevel's `?? 3`
+// silently moving the gate to 3 for Cleric/Sorcerer/Warlock at 1 and
+// Druid/Wizard at 2).
+//
+// The `?? def.grantLevel` fallback keeps a narrow-select caller (no class
+// relation loaded, so no seededSubclassLevel) behaving exactly as before, which
+// is what lets this land with zero behaviour change while the five modules are
+// still present.
 function isSubclassActive(
   def: SubclassDefinition | undefined,
   level: number,
   edition: RulesEdition,
+  seededSubclassLevel: number | undefined,
 ): def is SubclassDefinition {
   if (!def) return false;
-  return subclassActiveAt(level, def.grantLevel, edition);
+  return subclassActiveAt(level, seededSubclassLevel ?? def.grantLevel, edition);
 }
 
 // Scoped to the subclass only, gated by its grant level.
@@ -189,7 +209,9 @@ function deriveSubclassLayer(
   edition: RulesEdition,
 ): SubclassLayer {
   const def = SUBCLASSES[subclassKey];
-  if (!isSubclassActive(def, level, edition)) return { active: false, def, pools: [], features: [] };
+  if (!isSubclassActive(def, level, edition, featureRows?.subclassLevel)) {
+    return { active: false, def, pools: [], features: [] };
+  }
   // subclassKey is `undefined` here, not this function's own `subclassKey`
   // param (#1499) — ResourceFn's subclassKey exists so the BASE layer can
   // resolve #906's wildShape pool-key collision against the active

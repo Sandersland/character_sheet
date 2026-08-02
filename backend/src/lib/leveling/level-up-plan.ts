@@ -125,9 +125,15 @@ function derivedAt(
   // step below stays null-safe through `now?.[field] ?? 0` /
   // `prev?.[field] ?? 0` regardless (choiceCountStep), so a flip to null here
   // only ever reads as "nothing granted yet", never throws.
+  // subclassLevel (#1576) feeds isSubclassActive so the gate survives its
+  // class module's deletion. Safe to pass the value `target` already carries
+  // even though the caller resolved it through subclassGateLevel first:
+  // re-applying that function is idempotent — 2024 returns 3 for any input,
+  // and 2014 returns `x ?? 3`, which is `x` for an already-resolved x.
   const featureRows: ClassFeatureRowsCarrier = {
     classRows: target.classFeatureRows ?? [],
     subclassRows: target.subclassFeatureRows ?? [],
+    subclassLevel: target.subclassLevel,
   };
   return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), featureRows, edition);
 }
