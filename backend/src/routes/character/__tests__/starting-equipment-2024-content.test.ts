@@ -10,7 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-starting-equipment-2024-content";
@@ -48,7 +48,7 @@ function baseBody(overrides: Record<string, unknown>) {
 describe("real EDITION_2024 Barbarian package vs. real EDITION_2014 (#1535)", () => {
   it("a 2024 Barbarian gets the PHB'24 package: Greataxe, 4 Handaxes, Explorer's Pack, and its option's 15 GP in currency", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -76,7 +76,7 @@ describe("real EDITION_2024 Barbarian package vs. real EDITION_2014 (#1535)", ()
 
   it("a 2014 Barbarian of the SAME class still gets PHB'14's shape (3 groups, 0 gold) — unaffected by #1535", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -116,7 +116,7 @@ describe("real EDITION_2024 Barbarian package vs. real EDITION_2014 (#1535)", ()
 describe("real EDITION_2024 Bard package: the musical-instrument open pick (#1535)", () => {
   it("accepts an instrument (Flute) and rejects a weapon (Dagger) for the same pick", async () => {
     const ok = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -133,7 +133,7 @@ describe("real EDITION_2024 Bard package: the musical-instrument open pick (#153
     expect(names).toContain("Flute");
 
     const rejected = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -153,7 +153,7 @@ describe("real EDITION_2024 Bard package: the musical-instrument open pick (#153
 describe("real EDITION_2024 Monk package: the tool-bound open pick (#1535)", () => {
   it("accepts the tool the character chose at creation and rejects one they didn't", async () => {
     const ok = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
@@ -171,7 +171,7 @@ describe("real EDITION_2024 Monk package: the tool-bound open pick (#1535)", () 
     expect(names).toContain("Flute");
 
     const rejected = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(

@@ -8,7 +8,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { shadowArtEffectSpec, SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -50,7 +50,7 @@ const FIXTURE_BASE = {
 };
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 async function cast(operations: unknown[]) {
   return agent().post(url).send({ operations });

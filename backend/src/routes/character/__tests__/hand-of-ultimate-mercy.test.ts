@@ -9,7 +9,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -40,7 +40,7 @@ function fixtureBase(experiencePoints: number) {
 }
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/hand-of-ultimate-mercy/transactions`;
 

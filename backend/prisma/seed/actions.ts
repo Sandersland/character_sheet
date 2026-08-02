@@ -534,6 +534,9 @@ export const ACTIONS: ActionSeed[] = [
   },
 
   // ── Class: Paladin ──────────────────────────────────────────────────────
+  // divineSense is EDITION_2014-only (#1229) — 2024 folds it into the
+  // Channel Divinity option "Channel Divinity: Divine Sense" instead (see
+  // lib/classes/actions.ts's own comment on its twin row).
   {
     key: "divineSense",
     name: "Divine Sense",
@@ -542,9 +545,14 @@ export const ACTIONS: ActionSeed[] = [
     grantLevel: 1,
     resourceKey: "divineSense",
     resourceAmount: 1,
+    edition: "EDITION_2014",
     description:
       "Sense celestials, fiends, and undead within 60 ft until end of next turn. Uses one Divine Sense charge.",
   },
+  // layOnHands' cost forks to a Bonus Action in 2024 (SRD 5.2), and the 2024
+  // description drops the disease clause entirely, keeping only a reworded
+  // Poisoned-condition removal (mirrors paladin-features.ts's own Lay on
+  // Hands row).
   {
     key: "layOnHands",
     name: "Lay on Hands",
@@ -553,8 +561,21 @@ export const ACTIONS: ActionSeed[] = [
     grantLevel: 1,
     resourceKey: "layOnHands",
     resourceAmount: 5,
+    edition: "EDITION_2014",
     description:
       "Touch a creature to restore HP from your Lay on Hands pool. Alternatively, spend 5 HP to cure one disease or neutralize one poison.",
+  },
+  {
+    key: "layOnHands",
+    name: "Lay on Hands",
+    cost: "bonusAction",
+    grantClass: "paladin",
+    grantLevel: 1,
+    resourceKey: "layOnHands",
+    resourceAmount: 5,
+    edition: "EDITION_2024",
+    description:
+      "Touch a creature to restore HP from your Lay on Hands pool. Alternatively, spend 5 HP to remove the Poisoned condition instead of healing.",
   },
   {
     key: "channelDivinityPaladin",
@@ -580,6 +601,9 @@ export const ACTIONS: ActionSeed[] = [
   },
 
   // ── Class: Sorcerer ─────────────────────────────────────────────────────
+  // SRD 5.2 grants Metamagic at level 2, not PHB'14's level 3 (#1232 commit
+  // 2b) — a same-key edition fork, mirroring the universal rows' own
+  // per-edition split above.
   {
     key: "metamagic",
     name: "Metamagic",
@@ -588,8 +612,21 @@ export const ACTIONS: ActionSeed[] = [
     grantLevel: 3,
     resourceKey: "sorceryPoints",
     resourceAmount: 1,
+    edition: "EDITION_2014",
     description:
       "Apply a Metamagic option to a spell you cast (Subtle, Quickened, Twinned, etc.). Costs vary by option.",
+  },
+  {
+    key: "metamagic",
+    name: "Metamagic",
+    cost: "free",
+    grantClass: "sorcerer",
+    grantLevel: 2,
+    resourceKey: "sorceryPoints",
+    resourceAmount: 1,
+    edition: "EDITION_2024",
+    description:
+      "Apply a Metamagic option to a spell you cast (Careful, Distant, Empowered, Extended, Heightened, Quickened, Seeking, Subtle, Transmuted, Twinned). Costs vary by option.",
   },
 
   // ── Class: Warlock ──────────────────────────────────────────────────────

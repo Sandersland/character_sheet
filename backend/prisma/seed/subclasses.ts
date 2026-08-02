@@ -20,7 +20,10 @@ export interface SubclassSeed {
   // the Totem Warrior (Barbarian) is the first row to set this —
   // EDITION_2014 only, since SRD 5.2 replaces it with Path of the Wild Heart
   // rather than retabbing it (#1559) — so a 2024 character is no longer
-  // offered a subclass with zero features in its edition.
+  // offered a subclass with zero features in its edition. The Archfey and The
+  // Great Old One (Warlock, #1233) are the same shape: their PHB'24 reworks
+  // are non-SRD and unverifiable, so no 2024 rows are authored and both are
+  // tagged EDITION_2014 here in the same commit.
   edition?: SeedEdition;
 }
 
@@ -139,15 +142,22 @@ export const SUBCLASSES: SubclassSeed[] = [
   {
     className: "Bard",
     name: "College of Lore",
+    // #1224: reworded edition-neutral — 2014 grants "bonus spells from any
+    // class"; 2024's Magical Discoveries scopes that to Cleric/Druid/Wizard.
+    // Subclass.description is un-editioned (Subclass rows are edition-shared),
+    // so this row can only state what's true under both, not fork.
     description:
-      "Devoted to knowledge and cunning. You gain proficiency in three additional skills, Cutting Words to impose penalties on enemy rolls, and bonus spells from any class at level 6.",
+      "Devoted to knowledge and cunning. You gain proficiency in three additional skills, Cutting Words to impose penalties on enemy rolls, and bonus spells at level 6.",
     slug: "bard-college-of-lore",
   },
   {
     className: "Bard",
     name: "College of Valor",
+    // #1224: reworded edition-neutral — 2024's Martial Training adds Martial
+    // weapon proficiency (2014's Bonus Proficiencies grants only medium armor
+    // + shields), so "armor and weapon proficiencies" is true under both.
     description:
-      "A bard who fights as well as they inspire. You gain medium armor and shield proficiency, Combat Inspiration (allies add your Bardic Inspiration die to damage rolls), and Extra Attack at level 6.",
+      "A bard who fights as well as they inspire. You gain armor and weapon proficiencies, Combat Inspiration (allies add your Bardic Inspiration die to damage rolls), and Extra Attack at level 6.",
     slug: "bard-college-of-valor",
   },
   // ── Druid ─────────────────────────────────────────────────────────────────
@@ -232,18 +242,24 @@ export const SUBCLASSES: SubclassSeed[] = [
     slug: "ranger-beast-master",
   },
   // ── Sorcerer ─────────────────────────────────────────────────────────────
+  // #1232: both descriptions below are edition-neutral — no armor class
+  // formula, feature name, or other numeric/mechanical detail that differs
+  // between PHB'14 and SRD 5.2/PHB'24 (2014's "13 + Dex modifier" AC, e.g., is
+  // NOT the 2024 value, #1232 §1.5) — a Subclass row is edition-SHARED
+  // (`edition` stays unset on both), served identically to 2014 and 2024
+  // creation dropdowns, so its prose can't privilege either edition's numbers.
   {
     className: "Sorcerer",
     name: "Draconic Bloodline",
     description:
-      "Magic runs in your veins as the blood of a dragon ancestor. You gain natural armor (AC 13 + Dex modifier without armor), resistance to your dragon type's damage, bonus damage on spells of that type, and eventually sprout wings and radiate a draconic presence that can frighten or charm creatures around you.",
+      "Magic runs in your veins as the blood of a dragon ancestor. You gain resilience and resistance tied to your dragon type, bonus damage on spells of that type, and eventually sprout wings and command a measure of true draconic power.",
     slug: "sorcerer-draconic-bloodline",
   },
   {
     className: "Sorcerer",
     name: "Wild Magic",
     description:
-      "Your innate magic stems from an untamed, chaotic source. Every time you cast a 1st level or higher spell there is a chance of a Wild Magic Surge — a random magical effect. Tides of Chaos grants advantage on one attack roll, ability check, or saving throw. Controlled Chaos and Spell Bombardment appear at higher levels.",
+      "Your innate magic stems from an untamed, chaotic source. Casting spells risks triggering a Wild Magic Surge — a random magical effect — and Tides of Chaos lets you court that chaos deliberately for advantage on a roll. Your control over the chaos grows at higher levels.",
     slug: "sorcerer-wild-magic",
   },
   // ── Warlock ───────────────────────────────────────────────────────────────
@@ -260,6 +276,7 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "Your patron is a lord or lady of the Feywild. Fey Presence (charm or frighten nearby creatures as an action) and Misty Escape (teleport and turn invisible as a reaction when hit) define your early power. At higher levels you become immune to charm, can beguile minds, and can blur the line between dream and reality.",
     slug: "warlock-the-archfey",
+    edition: "EDITION_2014",
   },
   {
     className: "Warlock",
@@ -267,5 +284,6 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "Your patron is an entity of unfathomable cosmic power. Awakened Mind lets you telepathically communicate with any creature you can see. You gain spells such as Dissonant Whispers and Detect Thoughts, and eventually can project your awareness across planes, speak into the minds of others, and create a lair in the Far Realm.",
     slug: "warlock-the-great-old-one",
+    edition: "EDITION_2014",
   },
 ];

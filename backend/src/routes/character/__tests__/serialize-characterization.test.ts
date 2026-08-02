@@ -15,7 +15,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -25,7 +25,6 @@ import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-ro
 
 const OWNER_ID = "owner-serialize-char";
 let COOKIE: string;
-const app = createApp();
 
 const FIGHTER_CLASS_NAME = "Test Fighter (Serialize Suite)";
 const BM_SUBCLASS_NAME = "battle master";
@@ -327,8 +326,8 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     expect(b.spellcasting.preparedSpellLimit).toBe(9);
     expect(b.spellcasting.preparedSpellCount).toBe(0);
 
-    // Single class, no subclass.
-    expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5 }]);
+    // Single class, no subclass — gate passed (L5) and unchosen, so needsSubclass (#1598).
+    expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5, needsSubclass: true, subclassUnavailable: false }]);
     expect(b.conditions).toEqual({ active: [], exhaustion: 0 });
   });
 

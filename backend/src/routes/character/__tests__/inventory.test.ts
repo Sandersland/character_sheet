@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -68,7 +68,7 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
   });
 
   it("404s for an unknown character", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const response = await supertest.agent(app).set("Cookie", COOKIE)
       .post("/api/characters/does-not-exist/inventory/transactions")
       .send({ operations: [{ type: "acquire", itemId: "whatever" }] });
 
@@ -76,7 +76,7 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
   });
 
   it("400s on a malformed body", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const response = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({ operations: [{ type: "notARealType" }] });
 
@@ -84,7 +84,7 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
   });
 
   it("acquire from the catalog returns the full character with the new nested-detail row", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const response = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({ operations: [{ type: "acquire", itemId, quantity: 2, equipped: true }] });
 
@@ -100,12 +100,12 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
   });
 
   it("a custom homebrew acquire requires the category's minimal detail fields", async () => {
-    const missingDetail = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const missingDetail = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({ operations: [{ type: "acquire", custom: { name: "Mystery Blade", category: "weapon" } }] });
     expect(missingDetail.status).toBe(400);
 
-    const withDetail = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const withDetail = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({
         operations: [
@@ -125,7 +125,7 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
   });
 
   it("buying debits currency in the same response", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const response = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({ operations: [{ type: "acquire", itemId, currencyDelta: { cp: 0, sp: 0, gp: 2, pp: 0 } }] });
 
@@ -134,19 +134,19 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
   });
 
   it("rejects a buy that exceeds current currency and changes nothing", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const response = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({ operations: [{ type: "acquire", itemId, currencyDelta: { cp: 0, sp: 0, gp: 999, pp: 0 } }] });
 
     expect(response.status).toBe(400);
 
-    const character = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
+    const character = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
     expect(character.body.currency).toEqual({ cp: 0, sp: 0, gp: 5, pp: 0 });
     expect(character.body.inventory).toHaveLength(0);
   });
 
   it("a multi-op batch applies atomically: a later failing op rolls back an earlier valid one", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const response = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({
         operations: [
@@ -157,17 +157,17 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
 
     expect(response.status).toBe(400);
 
-    const character = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
+    const character = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
     expect(character.body.inventory).toHaveLength(0);
   });
 
   it("update renames an item and overrides a weapon field, then sell removes it and credits currency", async () => {
-    const acquireResponse = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const acquireResponse = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({ operations: [{ type: "acquire", itemId, quantity: 1 }] });
     const inventoryItemId = acquireResponse.body.inventory[0].id;
 
-    const updateResponse = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const updateResponse = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({
         operations: [{ type: "update", inventoryItemId, name: "Dagger +1", weapon: { damageModifier: 1 } }],
@@ -178,7 +178,7 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
       weapon: { damageModifier: 1, damageDiceFaces: 4 },
     });
 
-    const sellResponse = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const sellResponse = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
       .send({
         operations: [

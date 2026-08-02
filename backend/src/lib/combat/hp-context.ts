@@ -14,7 +14,7 @@ import {
 // would close an import cycle back through combat/hitpoints.ts.
 import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources-state.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
-import { FEATURE_ROWS_ORDER_BY } from "@/lib/classes/feature-rows-select.js";
+import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "@/lib/classes/feature-rows-select.js";
 import {
   InvalidHitPointOperationError,
   normalizeHitPoints,
@@ -72,9 +72,20 @@ export interface ClassEntryRow {
   // `class` field even though both are optional/nullable (registry.ts's
   // EntryScopedClassEntry comment documents the same collision) — so this
   // select widens its EXISTING `class`/adds its own `subclassRef` rather than
-  // spreading the shared fragment in.
+  // spreading the shared fragment in. Only the OUTER `class` key collides:
+  // the relation arguments themselves are shared (FEATURE_ROWS_CLASS_FEATURES,
+  // FEATURE_ROWS_SUBCLASS_FEATURES), so the filter and order can no longer
+  // drift here even though the entry-level fragment stays out of reach (#1545).
   // `extraAsiLevels` (#1529): characterAdvancementSlots' featSlotCap read below.
-  class: { hitDie: string; extraAsiLevels: number[]; features: ClassFeatureRow[] } | null;
+  // `subclassLevel` (#1576): the seeded PHB'14 subclass grant level, fed into
+  // deriveRestPools' ClassFeatureRowsCarrier so isSubclassActive no longer
+  // depends on a lib/classes/<class>.ts module being present.
+  class: {
+    hitDie: string;
+    extraAsiLevels: number[];
+    subclassLevel: number;
+    features: ClassFeatureRow[];
+  } | null;
   subclassRef: { features: ClassFeatureRow[] } | null;
 }
 
@@ -128,21 +139,23 @@ export async function buildHpOpContext(
           classId: true,
           position: true,
           // `features` (#1528 chunk 0): deriveRestPools' featureRows carrier —
-          // see ClassEntryRow's own comment for why this can't just spread
-          // FEATURE_ROWS_ENTRY_SELECT in. It still has to repeat that
-          // fragment's FEATURE_ROWS_ORDER_BY: Postgres makes no ordering
-          // guarantee absent an explicit orderBy, and this is the one feature
-          // read that cannot share the fragment, so it is where drift hides
-          // (#1545). `extraAsiLevels` (#1529): the featSlotCap read below
+          // see ClassEntryRow's own comment for why this can't spread
+          // FEATURE_ROWS_ENTRY_SELECT, and FEATURE_ROWS_CLASS_FEATURES for why
+          // the relation-level fragment it names instead IS shareable (#1545).
+          // `extraAsiLevels` (#1529): the featSlotCap read below
           // (characterAdvancementSlots).
+          // `subclassLevel` (#1576): deriveRestPools' carrier needs it so a
+          // 2014 Cleric/Sorcerer/Warlock/Druid/Wizard's subclass pools still
+          // gate at their PHB'14 level once the class module is gone.
           class: {
             select: {
               hitDie: true,
               extraAsiLevels: true,
-              features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+              subclassLevel: true,
+              features: FEATURE_ROWS_CLASS_FEATURES,
             },
           },
-          subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
+          subclassRef: { select: { features: FEATURE_ROWS_SUBCLASS_FEATURES } },
         },
       },
     },

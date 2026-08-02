@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -11,7 +11,6 @@ const OWNER_ID = "owner-level-up-plan";
 const OWNER_ID_2 = "owner-level-up-plan-2";
 let COOKIE: string;
 let COOKIE_2: string;
-const app = createApp();
 
 const BASE = {
   alignment: "True Neutral",

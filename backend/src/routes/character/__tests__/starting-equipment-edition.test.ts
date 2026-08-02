@@ -16,7 +16,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 
@@ -124,7 +124,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
 
   it("package mode: a 2014 character gets the 2014 package's item, not the 2024 one", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody("EDITION_2014"), startingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] } });
@@ -138,7 +138,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
 
   it("package mode: a 2024 character gets the 2024 package's item, not the 2014 one", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody("EDITION_2024"), startingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] } });
@@ -152,7 +152,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
 
   it("gold mode: the same gold amount is valid for 2014 but rejected for 2024 (disjoint dice ranges)", async () => {
     const in2014Range = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody("EDITION_2014"), startingEquipment: { mode: "gold", gold: 25 } });
@@ -160,7 +160,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
     createdCharacterIds.push(in2014Range.body.id);
 
     const same2024 = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({ ...baseBody("EDITION_2024"), startingEquipment: { mode: "gold", gold: 25 } });

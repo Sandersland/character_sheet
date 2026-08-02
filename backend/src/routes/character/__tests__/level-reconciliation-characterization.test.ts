@@ -18,7 +18,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -28,7 +28,6 @@ import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-ro
 
 const OWNER_ID = "owner-levelrecon-char";
 let COOKIE: string;
-const app = createApp();
 
 // XP thresholds (levelForExperience): L1=0, L3=900, L6=14000, L7=23000, L17=225000.
 const XP_LVL_1 = 0;

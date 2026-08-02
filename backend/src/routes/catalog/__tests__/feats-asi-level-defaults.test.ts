@@ -13,7 +13,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -55,7 +55,7 @@ afterAll(async () => {
 
 describe("GET /api/feats?asiLevel= — category defaults and row overrides (#1438)", () => {
   async function namesAt(asiLevel: number): Promise<string[]> {
-    const res = await supertest(createApp())
+    const res = await supertest(app)
       .get(`/api/feats?edition=EDITION_2024&asiLevel=${asiLevel}`)
       .set("Cookie", COOKIE);
     expect(res.status).toBe(200);
@@ -81,7 +81,7 @@ describe("GET /api/feats?asiLevel= — category defaults and row overrides (#143
   });
 
   it("serves all three fixtures when ?asiLevel= is absent", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest(app)
       .get("/api/feats?edition=EDITION_2024")
       .set("Cookie", COOKIE);
     expect(res.status).toBe(200);

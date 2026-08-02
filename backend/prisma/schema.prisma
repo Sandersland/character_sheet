@@ -759,7 +759,11 @@ model ClassFeature {
   // Resource block — replaces the pool this feature declares in resourceFn.
   // A row may set resourceKey and leave the totals NULL: a formula-computed
   // pool (Bardic Inspiration = Cha mod, Lay on Hands = level x 5) keeps
-  // resourceFn until #416's C3 evaluator exists.
+  // resourceFn until #416's C3 evaluator exists. `resourceRecharge` is also a
+  // single scalar, not a tier array — Bardic Inspiration's recharge changes
+  // mid-progression (longRest below level 5, short-or-long from level 5), a
+  // second independent reason no row can carry this pool even with a fixed
+  // total (#1224).
   resourceKey      String?
   resourceLabel    String?
   resourceRecharge String?  // RechargeOn
@@ -818,16 +822,27 @@ model ClassFeature {
 
   // A closed-form save DC a subclass announces from the abilities named here
   // (#1546): 8 + proficiency bonus + the higher of these abilities' modifiers
-  // (Battle Master maneuvers, PHB'14 p.73 / PHB'24 p.83). Genuinely generic —
-  // Monk's focus DC, Cleric's turn DC, Barbarian's frighten DC and Rogue's
-  // assassin DC are the same closed form hardcoded into class TS strings
-  // today — not a Fighter special case. Deliberately NOT layered onto
-  // derivedStat/derivedStatTiers: the DC is per-character ability math, not a
-  // level tier, and Combat Superiority's own derivedStat slot is already
-  // claimed by maneuverChoiceCount's tiers on the SAME row — one nullable
-  // String column cannot name both, so this is read directly (a non-empty
-  // list IS the trigger), never matched by a derivedStat name. Empty (the
-  // default) means "no such axis" for every row but Combat Superiority.
+  // (Battle Master maneuvers, PHB'14 p.73 / PHB'24 p.83). Genuinely generic in
+  // FORMULA — Monk's focus DC, Cleric's turn DC, Barbarian's frighten DC and
+  // Rogue's assassin DC are the same closed form hardcoded into class TS
+  // strings today — not a Fighter special case, but NOT YET a live path for
+  // any of them: deriveAnnouncedSaveDC (registry.ts's deriveRowExtras) is
+  // only ever called with subclassRows, gated on the subclass being active —
+  // a BASE-CLASS row (subclassId: null, e.g. Cleric's Turn Undead/Channel
+  // Divinity) populating this column would be read by nothing. Only Combat
+  // Superiority (a SUBCLASS row) is a genuinely live consumer today (#1225
+  // research, cleric-features.ts's own RESOURCE POOL header block) — every
+  // other class's DC stays prose in its row's own `description` until
+  // deriveAnnouncedSaveDC is generalised to base-class rows and
+  // ClassExtras.maneuverSaveDC is renamed to something non-Fighter-specific
+  // (#1589). Deliberately NOT layered
+  // onto derivedStat/derivedStatTiers: the DC is per-character ability math,
+  // not a level tier, and Combat Superiority's own derivedStat slot is
+  // already claimed by maneuverChoiceCount's tiers on the SAME row — one
+  // nullable String column cannot name both, so this is read directly (a
+  // non-empty list IS the trigger), never matched by a derivedStat name.
+  // Empty (the default) means "no such axis" for every row but Combat
+  // Superiority.
   saveDcAbilities String[] @default([])
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot

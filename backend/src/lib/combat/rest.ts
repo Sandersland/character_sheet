@@ -201,7 +201,11 @@ function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
     row.abilityScores as Record<string, number>,
     proficiencyBonusForLevel(level),
     editionOf(row),
-    (entry) => ({ classRows: entry.class?.features ?? [], subclassRows: entry.subclassRef?.features ?? [] }),
+    (entry) => ({
+      classRows: entry.class?.features ?? [],
+      subclassRows: entry.subclassRef?.features ?? [],
+      subclassLevel: entry.class?.subclassLevel,
+    }),
   );
   return derived;
 }

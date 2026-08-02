@@ -92,14 +92,24 @@ describe("deriveActions — class gates", () => {
     expect(keys(at("monk", undefined, 1, []))).toContain("bonusUnarmedStrike");
   });
 
-  it("Paladin L1 gets divineSense/layOnHands; L3 adds channelDivinity", () => {
-    const l1 = keys(at("paladin", undefined, 1, []));
+  it("Paladin L1 gets divineSense/layOnHands (EDITION_2014); L3 adds channelDivinity", () => {
+    const l1 = keys(at("paladin", undefined, 1, [], true, "EDITION_2014"));
     expect(l1).toContain("divineSense");
     expect(l1).toContain("layOnHands");
     expect(l1).not.toContain("channelDivinity");
 
-    const l3 = keys(at("paladin", undefined, 3, []));
+    const l3 = keys(at("paladin", undefined, 3, [], true, "EDITION_2014"));
     expect(l3).toContain("channelDivinity");
+  });
+
+  // #1229: divineSense is EDITION_2014-only — 2024 folds it into the base
+  // Channel Divinity option "Channel Divinity: Divine Sense" instead (cast
+  // through the abilities endpoint, not this actions dispatch). layOnHands
+  // survives in both editions.
+  it("Paladin L1 (EDITION_2024): layOnHands present, divineSense absent", () => {
+    const l1 = keys(at("paladin", undefined, 1, [], true, "EDITION_2024"));
+    expect(l1).toContain("layOnHands");
+    expect(l1).not.toContain("divineSense");
   });
 
   it("Bard L1 gets bardicInspiration; Cleric L2 gets channelDivinity", () => {
@@ -118,6 +128,16 @@ describe("deriveActions — class gates", () => {
     expect(result).not.toContain("rage");
     expect(result).not.toContain("recklessAttack");
     expect(result).not.toContain("flurryOfBlows");
+  });
+
+  // #1232 commit 2b: SRD 5.2 grants Metamagic at Sorcerer level 2, not
+  // PHB'14's level 3 — DERIVED_ACTIONS' metamagic row forks its grantLevel
+  // per edition (matchesActionGate filters on edition before the class/level
+  // gate; ActionSeed.edition's comment sanctions same-key forks).
+  it("Metamagic level fork (#1232): 2024 grants at L2, 2014 still grants at L3", () => {
+    expect(keys(at("sorcerer", undefined, 2, [], true, "EDITION_2024"))).toContain("metamagic");
+    expect(keys(at("sorcerer", undefined, 2, [], true, "EDITION_2014"))).not.toContain("metamagic");
+    expect(keys(at("sorcerer", undefined, 3, [], true, "EDITION_2014"))).toContain("metamagic");
   });
 });
 
@@ -202,7 +222,10 @@ describe("deriveActions — case-insensitivity", () => {
   it("matches class name regardless of case", () => {
     // Fighter (formerly this test's fixture) has no DERIVED_ACTIONS entries
     // left (#1528 — row-driven now); paladin/barbarian cover the same gate.
-    expect(keys(at("Paladin", undefined, 1, []))).toContain("divineSense");
+    // #1229: divineSense is EDITION_2014-only now, so this case-insensitivity
+    // check passes the edition explicitly rather than relying on the
+    // (still-2024) default.
+    expect(keys(at("Paladin", undefined, 1, [], true, "EDITION_2014"))).toContain("divineSense");
     expect(keys(at("PALADIN", undefined, 3, []))).toContain("channelDivinity");
     expect(keys(at("Barbarian", undefined, 1, []))).toContain("rage");
   });

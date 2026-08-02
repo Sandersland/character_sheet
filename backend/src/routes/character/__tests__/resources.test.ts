@@ -1,7 +1,7 @@
 /**
  * Resources route characterization tests (issue #289).
  * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest against
- * createApp(). The fixture is a level-3 Battle Master Fighter (Str 16) so the
+ * the shared `app`. The fixture is a level-3 Battle Master Fighter (Str 16) so the
  * superiority-die pool, maneuver choice count (3), and Student-of-War tool
  * choice count (1) are all deterministic. Locks the CURRENT behavior of
  * applyResourceOperations across all six op branches before any refactor.
@@ -10,7 +10,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
@@ -55,7 +55,7 @@ const url = `/api/characters/${FIXTURE_ID}/resources/transactions`;
 const activityUrl = `/api/characters/${FIXTURE_ID}/activity?category=resources`;
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 
 async function post(operations: unknown[]) {

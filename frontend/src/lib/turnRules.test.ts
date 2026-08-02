@@ -48,31 +48,10 @@ describe("canTwoWeaponFight", () => {
     expect(canTwoWeaponFight([noDetail, noDetail])).toBe(false);
   });
 
-  // The Two-Weapon Fighting feat's offhandAbilityDamage improvement (#1137, was a
-  // style scalar in #732) relaxes the light restriction — passed as a boolean now.
-  it("non-light pair → false without the Two-Weapon Fighting improvement", () => {
+  // The signature is the assertion: there is no style/feat flag to pass, so no
+  // caller can ask this function to skip the Light check (#1496).
+  it("non-light pair → false; the Two-Weapon Fighting style adds damage, it does not waive the Light requirement (SRD 5.1 / PHB'14 p. 72; SRD 5.2)", () => {
     expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)])).toBe(false);
-    // An unrelated feat (no offhand-ability-damage improvement) does not relax it.
-    expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], false)).toBe(false);
-  });
-
-  it("non-light pair → true WITH the Two-Weapon Fighting improvement", () => {
-    expect(
-      canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], true),
-    ).toBe(true);
-    // A mixed pair also qualifies with the improvement.
-    expect(
-      canTwoWeaponFight([makeWeapon(true), makeWeapon(false)], true),
-    ).toBe(true);
-  });
-
-  it("the improvement still requires ≥2 equipped weapons", () => {
-    expect(canTwoWeaponFight([makeWeapon(false)], true)).toBe(false);
-    expect(canTwoWeaponFight([], true)).toBe(false);
-  });
-
-  it("two light weapons stay valid regardless of the improvement", () => {
-    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], false)).toBe(true);
-    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], true)).toBe(true);
+    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(false)])).toBe(false);
   });
 });

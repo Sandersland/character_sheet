@@ -7,10 +7,10 @@
  * ONE pool, not two.
  */
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -22,12 +22,13 @@ const OWNER_ID = "owner-cd-cast";
 let COOKIE: string;
 
 const FIXTURE_ID = "test-cd-cast-1";
-const CLASS_NAME = "CD Test Class";
 
-// XP thresholds → level: L2=300, L3=900, L6=14000, L10=64000.
+// XP thresholds → level: L2=300, L3=900, L6=14000, L8=34000, L9=48000, L10=64000.
 const XP_L2 = 300;
 const XP_L3 = 900;
 const XP_L6 = 14000;
+const XP_L8 = 34000;
+const XP_L9 = 48000;
 const XP_L10 = 64000;
 
 const url = `/api/characters/${FIXTURE_ID}/abilities/channel-divinity/transactions`;
@@ -51,7 +52,7 @@ const FIXTURE_BASE = {
 };
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 async function cast(operations: unknown[]) {
   return agent().post(url).send({ operations });
@@ -68,7 +69,6 @@ async function activity(): Promise<ActivityEvent[]> {
   return res.body as ActivityEvent[];
 }
 
-let classId: string;
 const optionId: Record<string, string> = {};
 
 // `edition: null` is load-bearing, not defensive: the #1412 test below forks
@@ -79,12 +79,41 @@ async function loadOption(name: string) {
   optionId[name] = (await prisma.grantedAbility.findFirst({ where: { name, edition: null } }))!.id;
 }
 
+// #1229: Turn the Unholy/Turn the Faithless/Abjure Enemy retagged
+// EDITION_2014 (no longer shared), and Divine Sense/Abjure Foes are NEW
+// EDITION_2024-only rows — `loadOption`'s `edition: null` filter finds
+// neither, so this edition-aware sibling loads them explicitly instead.
+async function loadEditionOption(name: string, edition: "EDITION_2014" | "EDITION_2024") {
+  optionId[`${name}::${edition}`] = (await prisma.grantedAbility.findFirst({ where: { name, edition } }))!.id;
+}
+
+// #1225: classEntries.classId used to point at one shared test-only
+// CharacterClass row regardless of the entry's own `name` — harmless while
+// Cleric's Channel Divinity pool lived in lib/classes/cleric.ts's resourceFn
+// (unaffected by the `class.features` relation), but NOT once Cleric's pool
+// moved onto its ClassFeature rows: featureRowsOf reads `entry.class?.features`
+// through classId, so a fake class with zero attached ClassFeature rows
+// silently starved the Cleric side of its pool (a real cast 400'd). Resolves
+// the REAL seeded CharacterClass per entry name instead — this suite only
+// ever uses "cleric"/"paladin", both real seeded classes, so no synthetic
+// scaffold class is needed anymore.
+const classIdByName: Record<string, string> = {};
+async function resolveClassId(name: string): Promise<string> {
+  const cached = classIdByName[name];
+  if (cached) return cached;
+  const titleCase = name.charAt(0).toUpperCase() + name.slice(1);
+  const cls = await prisma.characterClass.findUniqueOrThrow({ where: { name: titleCase } });
+  classIdByName[name] = cls.id;
+  return cls.id;
+}
+
 async function createCharacter(
   experiencePoints: number,
   className: string,
   subclass: string | null,
   rulesEdition?: "EDITION_2014" | "EDITION_2024",
 ) {
+  const classId = await resolveClassId(className);
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
@@ -97,22 +126,24 @@ async function createCharacter(
   });
 }
 
-// Multiclass fixture (#1340): both entries reference the same test-only
-// CharacterClass row (classId), one per granting class, same shape as the
-// single-class helper above but with two classEntries.
+// Multiclass fixture (#1340): each entry resolves its OWN real classId (see
+// resolveClassId's comment above) so both classes' row-driven pools/features
+// load correctly, one per granting class, same shape as the single-class
+// helper above but with two classEntries.
 async function createMulticlass(
   experiencePoints: number,
   entries: { name: string; subclass: string | null; level: number }[],
 ) {
+  const resolvedEntries = await Promise.all(
+    entries.map(async (e, i) => ({ name: e.name, subclass: e.subclass, classId: await resolveClassId(e.name), position: i, level: e.level })),
+  );
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
       experiencePoints,
       ownerId: OWNER_ID,
       resources: Prisma.JsonNull,
-      classEntries: {
-        create: entries.map((e, i) => ({ name: e.name, subclass: e.subclass, classId, position: i, level: e.level })),
-      },
+      classEntries: { create: resolvedEntries },
     },
   });
 }
@@ -123,12 +154,6 @@ function cdUsed(body: { resources: { pools: { key: string; used: number }[] } })
 
 describe("Channel Divinity cast endpoint", () => {
   beforeAll(async () => {
-    const cls = await prisma.characterClass.upsert({
-      where: { name: CLASS_NAME },
-      create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2, skillChoices: ["insight", "religion"], isSpellcaster: true },
-      update: {},
-    });
-    classId = cls.id;
     await Promise.all([
       "Channel Divinity: Turn Undead",
       "Channel Divinity: Preserve Life",
@@ -136,12 +161,19 @@ describe("Channel Divinity cast endpoint", () => {
       "Channel Divinity: Sacred Weapon",
       "Channel Divinity: Cloak of Shadows",
       "Channel Divinity: Vow of Enmity",
-      "Channel Divinity: Abjure Enemy",
+      // "Channel Divinity: Abjure Enemy" removed (#1229): no longer a shared
+      // (edition: null) row — it retagged EDITION_2014, so loadOption's
+      // `edition: null` filter would find nothing and throw. Nothing in this
+      // file reads optionId for it (the one test that names it checks the GET
+      // response body's own `name` field, not this map) — the edition-scoped
+      // Paladin describe block below loads it explicitly where it's needed.
     ].map(loadOption));
-  });
-
-  afterAll(async () => {
-    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+    await Promise.all([
+      loadEditionOption("Channel Divinity: Turn the Unholy", "EDITION_2014"),
+      loadEditionOption("Channel Divinity: Abjure Enemy", "EDITION_2014"),
+      loadEditionOption("Channel Divinity: Divine Sense", "EDITION_2024"),
+      loadEditionOption("Abjure Foes", "EDITION_2024"),
+    ]);
   });
 
   beforeEach(async () => {
@@ -199,10 +231,12 @@ describe("Channel Divinity cast endpoint", () => {
       {
         category: "resources",
         type: "spendResource",
-        summary: "Spent 1 Channel Divinity — 0/1 remaining",
+        // #1225: a level-2 2024 Cleric's pool is 2, not 1 (SRD 5.2's own
+        // progression) — one spend leaves 1/2, not 0/1.
+        summary: "Spent 1 Channel Divinity — 1/2 remaining",
         before: noResourcesUsed,
         after: { resources: { ...noResourcesUsed.resources, used: { channelDivinity: 1 } } },
-        data: { key: "channelDivinity", amount: 1, remaining: 0, roll: null },
+        data: { key: "channelDivinity", amount: 1, remaining: 1, roll: null },
       },
     ]);
   });
@@ -310,7 +344,10 @@ describe("Channel Divinity cast endpoint", () => {
     const initialPool = (initial.body.resources.pools as { key: string; total: number }[]).find(
       (p) => p.key === "channelDivinity",
     );
-    expect(initialPool?.total).toBe(2); // max(cleric@6→2, paladin@4→1)
+    // #1225: Cleric's 2024 pool is the real SRD 5.2 progression (3 at L6,
+    // not the pre-retab edition-blind 2) — Paladin's own pool stays a flat 1
+    // from L3 on (paladin.ts, not yet retabbed).
+    expect(initialPool?.total).toBe(3); // max(cleric@6→3, paladin@4→1)
 
     const turnUndead = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
     expect(turnUndead.status).toBe(200);
@@ -321,14 +358,23 @@ describe("Channel Divinity cast endpoint", () => {
     expect(cdUsed(sacredWeapon.body)).toBe(2); // same pool — both classes' options spent from it
 
     const third = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
-    expect(third.status).toBe(400);
-    expect(third.body.error).toMatch(/only 0 remaining/);
+    expect(third.status).toBe(200);
+    expect(cdUsed(third.body)).toBe(3);
+
+    const fourth = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
+    expect(fourth.status).toBe(400);
+    expect(fourth.body.error).toMatch(/only 0 remaining/);
   });
 
   // ── GET picker ──────────────────────────────────────────────────────────────
 
-  it("GET /channel-divinity returns only the entitled options with DCs", async () => {
-    await createCharacter(XP_L3, "paladin", "oath of vengeance");
+  // #1229: "Channel Divinity: Abjure Enemy" is EDITION_2014-only now (its
+  // 2024 role is the base class's own Abjure Foes) — pinned to EDITION_2014
+  // explicitly so this test still exercises what it always meant to (a 2014
+  // Vengeance paladin's own option list), rather than silently start
+  // asserting against an edition the row no longer serves.
+  it("GET /channel-divinity returns only the entitled options with DCs (2014 Vengeance Paladin)", async () => {
+    await createCharacter(XP_L3, "paladin", "oath of vengeance", "EDITION_2014");
     const res = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
     expect(res.status).toBe(200);
     const names = (res.body as { name: string }[]).map((o) => o.name);
@@ -341,6 +387,65 @@ describe("Channel Divinity cast endpoint", () => {
     )!;
     // Charisma-based DC: 8 + prof(2) + chaMod(+3) = 13.
     expect(abjure).toMatchObject({ kind: "announce", saveDc: 13 });
+  });
+
+  // ── #1229: Paladin edition fork — both directions ──────────────────────────
+
+  describe("Paladin edition fork (#1229)", () => {
+    it("2014 Paladin 3 (Devotion) can cast Turn the Unholy", async () => {
+      await createCharacter(XP_L3, "paladin", "oath of devotion", "EDITION_2014");
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn the Unholy::EDITION_2014"] }]);
+      expect(res.status).toBe(200);
+      expect(cdUsed(res.body)).toBe(1);
+    });
+
+    it("a 2024 Paladin 3 (Devotion) is rejected casting Turn the Unholy (cross-edition) and never sees it in GET", async () => {
+      await createCharacter(XP_L3, "paladin", "oath of devotion", "EDITION_2024");
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn the Unholy::EDITION_2014"] }]);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/2014 rules/);
+
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const names = (get.body as { name: string }[]).map((o) => o.name);
+      expect(names).not.toContain("Channel Divinity: Turn the Unholy");
+    });
+
+    it("a 2024 Paladin 3 sees and can cast Channel Divinity: Divine Sense", async () => {
+      await createCharacter(XP_L3, "paladin", "oath of devotion", "EDITION_2024");
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const names = (get.body as { name: string }[]).map((o) => o.name);
+      expect(names).toContain("Channel Divinity: Divine Sense");
+
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Divine Sense::EDITION_2024"] }]);
+      expect(res.status).toBe(200);
+      expect(cdUsed(res.body)).toBe(1);
+    });
+
+    it("a 2024 Paladin 9 sees Abjure Foes with a Wisdom save and the Charisma-derived DC", async () => {
+      await createCharacter(XP_L9, "paladin", "oath of devotion", "EDITION_2024");
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const abjureFoes = (get.body as { name: string; saveAbility: string | null; saveDc: number | null }[]).find(
+        (o) => o.name === "Abjure Foes",
+      )!;
+      expect(abjureFoes).toBeDefined();
+      // Wisdom save (not Charisma — the issue's own draft says Cha); the DC
+      // itself IS Charisma-derived: 8 + prof(4) + chaMod(+3) = 15.
+      expect(abjureFoes).toMatchObject({ saveAbility: "wisdom", saveDc: 15 });
+
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Abjure Foes::EDITION_2024"] }]);
+      expect(res.status).toBe(200);
+    });
+
+    it("a 2024 Paladin 8 does not yet see Abjure Foes (grant is L9)", async () => {
+      await createCharacter(XP_L8, "paladin", "oath of devotion", "EDITION_2024");
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const names = (get.body as { name: string }[]).map((o) => o.name);
+      expect(names).not.toContain("Abjure Foes");
+    });
   });
 
   // #1412: the route derives the edition from the character row (editionOf), so

@@ -8,7 +8,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -16,7 +16,6 @@ import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-arcane-recovery";
 let COOKIE: string;
-const app = createApp();
 
 const XP_LVL_8 = 34000; // level 8 → L1:4, L2:3, L3:3, L4:2 slots; cap = 4 slot-levels
 
@@ -60,6 +59,27 @@ beforeEach(async () => {
     update: {},
   });
   wizardClassId = wiz.id;
+  // #1234 commit 3: Arcane Recovery's pool moved off wizard.ts's resourceFn
+  // onto its ClassFeature row (wizard-features.ts) — this bespoke test class
+  // (a fixed id distinct from the real seeded Wizard) needs its OWN row now,
+  // or resolveArcaneRecoveryContext's poolsFromRows read finds nothing and
+  // every op below 400s with "Arcane Recovery is not available for this
+  // character" (the exact regression this migration's plan flagged to check).
+  await prisma.classFeature.deleteMany({ where: { classId: wizardClassId, name: "Arcane Recovery" } });
+  await prisma.classFeature.createMany({
+    data: (["EDITION_2014", "EDITION_2024"] as const).map((edition) => ({
+      classId: wizardClassId,
+      subclassId: null,
+      name: "Arcane Recovery",
+      level: 1,
+      edition,
+      description: "Arcane Recovery test fixture row.",
+      resourceKey: "arcaneRecovery",
+      resourceLabel: "Arcane Recovery",
+      resourceRecharge: "longRest",
+      resourceTotals: [{ minLevel: 1, total: 1 }],
+    })),
+  });
   const fig = await prisma.characterClass.upsert({
     where: { name: FIGHTER_CATALOG_NAME },
     create: { name: FIGHTER_CATALOG_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"], skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false },

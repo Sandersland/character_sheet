@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { ABILITY_REGISTRY } from "@/lib/classes/ability-registry.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -40,7 +40,7 @@ const FIXTURE_BASE = {
 };
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 const abilityUrl = (characterId: string, key: string) =>
   `/api/characters/${characterId}/abilities/${key}/transactions`;
@@ -93,7 +93,7 @@ describe("POST /api/characters/:id/abilities/:abilityKey/transactions", () => {
   });
 
   it("401s without a session (the endpoint sits behind the /api requireAuth gate)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest(app)
       .post(abilityUrl(FIXTURE_ID, "sneak-attack"))
       .send({ operations: [] });
     expect(res.status).toBe(401);

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -15,8 +15,6 @@ let COOKIE: string;
 // XP thresholds from the 5e table (levelForExperience).
 const XP_LVL_1 = 0;
 const XP_LVL_3 = 900;
-
-const app = createApp();
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);

@@ -26,20 +26,41 @@ describe("deriveClassFeatureView", () => {
   it("synthesizes a single roster entry when classes[] is absent", () => {
     const view = deriveClassFeatureView(makeChar({ subclass: "Champion" }), [fighterDef]);
     expect(view.rosterEntries).toEqual([
-      { id: "primary", name: "Fighter", level: 5, subclass: "Champion" },
+      { id: "primary", name: "Fighter", level: 5, subclass: "Champion", needsSubclass: false, subclassUnavailable: false },
     ]);
   });
 
   it("uses serialized classes[] when present", () => {
-    const classes = [{ id: "c1", name: "Fighter", level: 5 }] as unknown as Character["classes"];
+    const classes = [
+      { id: "c1", name: "Fighter", level: 5, needsSubclass: false, subclassUnavailable: false },
+    ] as unknown as Character["classes"];
     const view = deriveClassFeatureView(makeChar({ classes }), [fighterDef]);
     expect(view.rosterEntries).toBe(classes);
   });
 
-  it("flags needsSubclass only when eligible and unchosen", () => {
-    expect(deriveClassFeatureView(makeChar({ level: 5, subclass: undefined }), [fighterDef]).needsSubclass).toBe(true);
-    expect(deriveClassFeatureView(makeChar({ level: 5, subclass: "Champion" }), [fighterDef]).needsSubclass).toBe(false);
-    expect(deriveClassFeatureView(makeChar({ level: 2, subclass: undefined }), [fighterDef]).needsSubclass).toBe(false);
+  // #1598: needsSubclass/subclassUnavailable are backend-computed
+  // (buildClassesView) and read off classes[0] — deriveClassFeatureView must
+  // NOT re-derive them from character.level/classDef.subclassGateLevel (that
+  // mirror is what stranded a character on a cross-edition subclass row with
+  // no way out, since a held subclass name made the old client-side
+  // `!character.subclass` half of the check false).
+  it("reads needsSubclass/subclassUnavailable off classes[0] rather than re-deriving them", () => {
+    function withEntry(needsSubclass: boolean, subclassUnavailable = false) {
+      const classes = [
+        { id: "c1", name: "Fighter", level: 5, needsSubclass, subclassUnavailable },
+      ] as unknown as Character["classes"];
+      return deriveClassFeatureView(makeChar({ classes }), [fighterDef]);
+    }
+    expect(withEntry(true).needsSubclass).toBe(true);
+    expect(withEntry(false).needsSubclass).toBe(false);
+    expect(withEntry(true, true).subclassUnavailable).toBe(true);
+    expect(withEntry(true, false).subclassUnavailable).toBe(false);
+  });
+
+  it("defaults needsSubclass/subclassUnavailable to false when classes[] hasn't loaded yet (never computed from level)", () => {
+    const view = deriveClassFeatureView(makeChar({ level: 5, subclass: undefined }), [fighterDef]);
+    expect(view.needsSubclass).toBe(false);
+    expect(view.subclassUnavailable).toBe(false);
     expect(deriveClassFeatureView(makeChar({ level: 5 }), []).needsSubclass).toBe(false);
   });
 
@@ -129,7 +150,10 @@ describe("deriveClassFeatureView", () => {
   });
 
   it("isEmpty stays false when a subclass is still needed", () => {
-    const view = deriveClassFeatureView(makeChar({ level: 5, subclass: undefined }), [fighterDef]);
+    const classes = [
+      { id: "c1", name: "Fighter", level: 5, needsSubclass: true, subclassUnavailable: false },
+    ] as unknown as Character["classes"];
+    const view = deriveClassFeatureView(makeChar({ classes, subclass: undefined }), [fighterDef]);
     expect(view.isEmpty).toBe(false);
   });
 });

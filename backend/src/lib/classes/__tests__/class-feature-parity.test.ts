@@ -26,7 +26,6 @@ import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
-import { rogue } from "@/lib/classes/rogue.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
@@ -34,18 +33,23 @@ import { wizard } from "@/lib/classes/wizard.js";
 import { CLASS_SUBCLASSES, LITERAL_ROW_CLASSES } from "./class-subclasses.fixture.js";
 import { loadDbFeatureRows } from "./db-feature-rows.fixture.js";
 
-// Fighter and Barbarian deliberately absent (#1227/#1532, #1223):
-// `lib/classes/fighter.ts` and `lib/classes/barbarian.ts` no longer exist at
-// all (features moved to literal seed data, fighter-features.ts/
-// barbarian-features.ts), so `oldDeriveFeatures`'s TS-derived "OLD" side has
-// no ClassDefinition left to read `classDef?.features` from — comparing that
-// against the real rows-fed "NEW" side would fail on content this migration
-// deliberately changed, not a regression. See LITERAL_ROW_CLASSES' comment
-// for why this header's own reminder ("MUST be replaced once the TS arrays
-// are finally retired") is now true for both; the other ten classes still
-// need it.
+// Fighter, Barbarian and Rogue deliberately absent (#1227/#1532, #1223,
+// #1231): `lib/classes/fighter.ts`, `lib/classes/barbarian.ts` and
+// `lib/classes/rogue.ts` no longer exist at all (features moved to literal
+// seed data, fighter-features.ts/barbarian-features.ts/rogue-features.ts),
+// so `oldDeriveFeatures`'s TS-derived "OLD" side has no ClassDefinition left
+// to read `classDef?.features` from — comparing that against the real
+// rows-fed "NEW" side would fail on content this migration deliberately
+// changed, not a regression. See LITERAL_ROW_CLASSES' comment for why this
+// header's own reminder ("MUST be replaced once the TS arrays are finally
+// retired") is now true for all three; the other eight classes still need
+// it. Ranger STAYS in this map despite ranger-features.ts (#1230) moving its
+// `.features` to literal rows too — its `resourceFn`/`choices` catalog are
+// still TS-authored, so REFERENCE_CLASSES still needs `ranger` as a value —
+// LITERAL_ROW_CLASSES' `continue` below is what actually exempts it from
+// this suite's own comparison loop, same as warlock/wizard.
 const REFERENCE_CLASSES: Record<string, ClassDefinition> = {
-  bard, cleric, druid, monk, paladin, ranger, rogue, sorcerer, warlock, wizard,
+  bard, cleric, druid, monk, paladin, ranger, sorcerer, warlock, wizard,
 };
 
 const ABILITY_SCORES = {

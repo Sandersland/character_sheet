@@ -9,7 +9,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -41,7 +41,7 @@ const FIXTURE_BASE = {
 };
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 const resourcesUrl = `/api/characters/${FIXTURE_ID}/resources/transactions`;
 const maneuversUrl = `/api/characters/${FIXTURE_ID}/abilities/maneuvers/transactions`;
@@ -318,12 +318,12 @@ describe("castManeuver — Dex-primary Battle Master (Dex > Str), the max(Str,De
   });
 
   it("announces DC 14 (8 + prof 2 + Dex mod 4), not 10 (Str mod 0) — proves max(), not min() or a Str/Dex swap", async () => {
-    const learnRes = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const learnRes = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${DEX_FIXTURE_ID}/resources/transactions`)
       .send({ operations: [{ type: "learnManeuver", maneuverId: dexTripId }] });
     const entry = learnRes.body.resources.maneuversKnown.at(-1);
 
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${DEX_FIXTURE_ID}/abilities/maneuvers/transactions`)
       .send({ operations: [{ type: "castManeuver", entryId: entry.id }] });
     expect(res.status).toBe(200);

@@ -91,11 +91,30 @@ async function upsertGrantedSpell(
 ) {
   const classId = classIds.get(g.className);
   if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
-  // Every seeded subclass is edition: null (shared) today (#1306) — no granted
-  // spell yet targets an edition-forked subclass. findFirst, not findUnique:
-  // the compound-key shorthand can't express a null edition (upsertEditionRow).
+  // SubclassGrantedSpellSeed carries no `edition` of its own (unlike
+  // SubclassSeed) — it was authored back when every seeded subclass was
+  // edition: null (shared, #1306). #1233 is the first row to break that:
+  // The Archfey/The Great Old One are now tagged EDITION_2014 (their PHB'24
+  // reworks are non-SRD, so they're offered to 2014 characters only), and
+  // this lookup's old hardcoded `edition: null` filter would no longer find
+  // them. Resolving by (classId, name) ALONE — not `resolveEditionRow`, which
+  // needs a character's edition to pick between candidates — is correct as
+  // long as at most one Subclass row exists per name, which the schema's
+  // `@@unique([classId, name, edition])` only guarantees once this data model
+  // itself gains an edition column of its own (not needed today: no name
+  // here has ever forked into two rows). findFirst, not findUnique: the
+  // compound-key shorthand can't express a null edition (upsertEditionRow).
+  //
+  // `orderBy` is load-bearing DESPITE that one-row-per-name invariant: Postgres
+  // LIMIT 1 without ORDER BY is implementation-defined, so the day a name DOES
+  // fork into two rows — and Archfey/GOO are expected to, once their PHB'24
+  // content is authored — this would silently bind whichever row the planner
+  // returned first. It stays deterministic instead, which turns that future
+  // change into a visibly wrong grant rather than a flaky one. Whoever adds the
+  // second row must replace this with a real edition filter, not re-sort it.
   const subclass = await prisma.subclass.findFirst({
-    where: { classId, name: g.subclassName, edition: null },
+    where: { classId, name: g.subclassName },
+    orderBy: { id: "asc" },
     select: { id: true },
   });
   if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
@@ -271,6 +290,28 @@ async function seedChannelDivinities(prisma: PrismaClient) {
     };
     await upsertEditionRow(prisma.grantedAbility, { name: cd.name, edition }, data, data);
   }
+  // #1229: NEW prune — this seeder had none before (unlike seedShadowArts'/
+  // seedFeats' own stale-row drops). Retagging "Channel Divinity: Turn the
+  // Unholy"/"Turn the Faithless"/"Abjure Enemy" from `edition: null` to
+  // `EDITION_2014` (see channel-divinity.ts's own per-row comments) CREATES a
+  // new EDITION_2014 row via upsertEditionRow's findFirst-by-(name,edition)
+  // and ORPHANS the pre-existing NULL-edition row — without this prune, that
+  // orphan is never deleted, and withEditionOrShared's null-is-shared
+  // fallback keeps serving it to a 2024 Paladin forever on any database that
+  // was seeded before this change. Same edition-partitioned shape as
+  // seedShadowArts' own prune (#1306): each row's OWN edition goes into the
+  // seeded list, not a flat null, so a genuinely-forked name (Nature's
+  // Wrath) doesn't get its OTHER edition's row swept by the same call.
+  const staleWhere = staleCatalogRowsWhere(
+    "name",
+    CHANNEL_DIVINITIES.map((cd) => ({ identity: cd.name, edition: cd.edition ?? null })),
+    { source: "channelDivinity" },
+  );
+  const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedChannelDivinities: dropping stale catalog rows: ${stale.map((c) => `${c.name} (${c.edition ?? "shared"})`).join(", ")}`);
+  }
+  await prisma.grantedAbility.deleteMany({ where: staleWhere });
 }
 
 // Seed feat catalog — upsert by (name, edition), then drop stale rows. Taken

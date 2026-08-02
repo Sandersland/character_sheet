@@ -16,7 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -26,7 +26,7 @@ const OWNER_ID = "owner-cd-multiclass-1340";
 let COOKIE: string;
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 
 const BASE = {
@@ -104,12 +104,16 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(res.status).toBe(200);
     });
 
-    it("has exactly one channelDivinity pool with total 1 (max(cleric@2→1, paladin@3→1))", async () => {
+    // #1225: Cleric's 2024 pool is the real SRD 5.2 progression (2 at L2, not
+    // the pre-retab edition-blind 1). #1229: Paladin's own pool is now ALSO
+    // its real SRD 5.2 progression (2 at L3, not the pre-retab flat 1) — the
+    // two now tie at 2, so the merged max is unchanged.
+    it("has exactly one channelDivinity pool with total 2 (max(cleric@2→2, paladin@3→2))", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
       expect(pools).toHaveLength(1);
-      expect(pools[0].total).toBe(1);
+      expect(pools[0].total).toBe(2);
     });
   });
 
@@ -142,12 +146,16 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       await prisma.character.deleteMany({ where: { id: CHAR_ID } });
     });
 
-    it("has exactly one channelDivinity pool with total 2 — the max (cleric@6→2), NOT the sum 3", async () => {
+    // #1225: Cleric's 2024 pool is 3 at L6 (not the pre-retab 2). #1229:
+    // Paladin's own pool at L4 is now 2 (not the pre-retab flat 1), so the
+    // sum this guards against is 5 (3+2), not the old 4 (3+1) — the max (3)
+    // is unaffected either way.
+    it("has exactly one channelDivinity pool with total 3 — the max (cleric@6→3), NOT the sum 5", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
       expect(pools).toHaveLength(1);
-      expect(pools[0].total).toBe(2);
+      expect(pools[0].total).toBe(3);
     });
 
     // #1340 Chunk 2: the merged DERIVED_ACTIONS row must surface as exactly one
@@ -163,13 +171,17 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(cards[0]).toMatchObject({ key: "channelDivinity", cost: "action", enabled: true });
     });
 
+    // #1225: cleric@6's pool is 3 (not the pre-retab 2), and cleric@2's is 2
+    // (not 1) — the level-down still crosses a real total change (3 -> 2,
+    // since paladin@4's own 2, #1229, still doesn't beat cleric@2's 2), so
+    // the clamp itself stays a meaningful assertion, just at new numbers.
     it("persisted used clamps to the current total after a level-down (cleric 6→2, no reconciler needed)", async () => {
-      // Spend both uses at the current (total 2) state.
+      // Spend all uses at the current (total 3) state.
       await prisma.character.update({
         where: { id: CHAR_ID },
         data: {
           resources: {
-            used: { channelDivinity: 2 },
+            used: { channelDivinity: 3 },
             maneuversKnown: [],
             toolProficienciesKnown: [],
             choicesKnown: {},
@@ -178,10 +190,10 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
         },
       });
       const before = await agent().get(`/api/characters/${CHAR_ID}`);
-      expect(cdPools(before.body)[0]).toMatchObject({ total: 2, used: 2, remaining: 0 });
+      expect(cdPools(before.body)[0]).toMatchObject({ total: 3, used: 3, remaining: 0 });
 
-      // Drop the cleric entry to level 2 and the XP to match (max(cleric@2→1, paladin@4→1) = 1,
-      // down from 2). Clamp-on-read (buildResourcesPayload) must cap `used` to the
+      // Drop the cleric entry to level 2 and the XP to match (max(cleric@2→2, paladin@4→1) = 2,
+      // down from 3). Clamp-on-read (buildResourcesPayload) must cap `used` to the
       // new total without any LEVEL_GATED_RECONCILERS entry (CLAUDE.md: derive, don't persist).
       await prisma.characterClassEntry.updateMany({
         where: { characterId: CHAR_ID, name: "cleric" },
@@ -191,7 +203,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
 
       const after = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(after.status).toBe(200);
-      expect(cdPools(after.body)[0]).toMatchObject({ total: 1, used: 1, remaining: 0 });
+      expect(cdPools(after.body)[0]).toMatchObject({ total: 2, used: 2, remaining: 0 });
     });
 
     it("a long rest restores the single merged pool to full (rest.ts's collectEntryScopedPools call site)", async () => {
@@ -211,7 +223,8 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
       expect(pools).toHaveLength(1);
-      expect(pools[0].remaining).toBe(2);
+      // #1225: full is now 3 (cleric@6's real 2024 total), not the pre-retab 2.
+      expect(pools[0].remaining).toBe(3);
     });
   });
 
@@ -244,12 +257,12 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       await prisma.character.deleteMany({ where: { id: CHAR_ID } });
     });
 
-    it("still exactly one pool at total 2 — the max comes from the non-primary entry", async () => {
+    it("still exactly one pool at total 3 — the max comes from the non-primary entry", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
       expect(pools).toHaveLength(1);
-      expect(pools[0].total).toBe(2);
+      expect(pools[0].total).toBe(3);
     });
   });
 
@@ -277,12 +290,12 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       await prisma.character.deleteMany({ where: { id: CHAR_ID } });
     });
 
-    it("has exactly one channelDivinity pool at total 2, same as before entry-scoping (#1315)", async () => {
+    it("has exactly one channelDivinity pool at total 3, same as before entry-scoping (#1315)", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
       expect(pools).toHaveLength(1);
-      expect(pools[0].total).toBe(2);
+      expect(pools[0].total).toBe(3);
     });
   });
 });

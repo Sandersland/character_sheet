@@ -12,7 +12,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -20,7 +20,6 @@ import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-granted-domains";
 let COOKIE: string;
-const app = createApp();
 const CHAR_ID = "test-granted-domains-1";
 
 // XP thresholds (levelForExperience): L1=0, L5=6500.

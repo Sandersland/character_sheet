@@ -200,7 +200,13 @@ describe("deriveEntryScopedResources", () => {
   // merge is ever moved to buildResourcesPayload instead of staying inside
   // collectEntryScopedPools — see the PR's placement-risk note.
   describe("channelDivinity — the one sanctioned shared pool key (#1340, PHB'14 p.164)", () => {
-    it("cleric 2 / paladin 3 (total 5): one pool, total 1 (only cleric-2 and paladin-3 each grant 1)", () => {
+    // #1225: Cleric's 2024 pool is the real SRD 5.2 progression (2/3/4 at
+    // L2/6/18), not the pre-retab edition-blind 1/2/3. #1229: Paladin's own
+    // pool is now ALSO its real SRD 5.2 progression (2/3 at L3/L11), not the
+    // pre-retab flat 1 — cleric-2's 2 and paladin-3's 2 now agree, so the
+    // merged max is unchanged at 2, just no longer a coincidence of one side
+    // being stale.
+    it("cleric 2 / paladin 3 (total 5): one pool, total 2 (cleric-2's 2 ties paladin-3's 2)", () => {
       const entries = [
         { name: "cleric", subclass: "life domain", level: 2 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
@@ -208,27 +214,30 @@ describe("deriveEntryScopedResources", () => {
       const { derived } = deriveEntryScopedResources(entries, 5, ABILITY_SCORES, proficiencyBonusForLevel(5), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pools = derived?.resources.filter((r) => r.key === "channelDivinity") ?? [];
       expect(pools).toHaveLength(1);
-      expect(pools[0].total).toBe(1);
+      expect(pools[0].total).toBe(2);
     });
 
-    it("cleric 6 / paladin 4 (total 10): total is 2 (cleric-6's max), not the sum 3", () => {
+    // #1229: paladin@4's own pool is now 2 (not the pre-retab flat 1), so the
+    // sum this asserts against is 5 (3+2), not the old 4 (3+1) — the max (3)
+    // is unaffected either way.
+    it("cleric 6 / paladin 4 (total 10): total is 3 (cleric-6's max), not the sum 5", () => {
       const entries = [
         { name: "cleric", subclass: "life domain", level: 6 },
         { name: "paladin", subclass: "oath of devotion", level: 4 },
       ];
       const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pool = derived?.resources.find((r) => r.key === "channelDivinity");
-      expect(pool?.total).toBe(2);
+      expect(pool?.total).toBe(3);
     });
 
-    it("paladin 4 (primary) / cleric 6 (secondary): total is still 2 — order-independent", () => {
+    it("paladin 4 (primary) / cleric 6 (secondary): total is still 3 — order-independent", () => {
       const entries = [
         { name: "paladin", subclass: "oath of devotion", level: 4 },
         { name: "cleric", subclass: "life domain", level: 6 },
       ];
       const { derived } = deriveEntryScopedResources(entries, 10, ABILITY_SCORES, proficiencyBonusForLevel(10), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pool = derived?.resources.find((r) => r.key === "channelDivinity");
-      expect(pool?.total).toBe(2);
+      expect(pool?.total).toBe(3);
     });
 
     it("non-total fields come from the PRIMARY entry (cleric-primary keeps the cleric's own label/recharge/description)", () => {
@@ -263,7 +272,10 @@ describe("deriveEntryScopedResources", () => {
       expect(merged?.description).toBe(paladinPool?.description);
     });
 
-    it("cleric 1 / paladin 3: one pool, total 1 (only paladin contributes — cleric hasn't reached L2 yet)", () => {
+    // #1229: paladin@3's own pool is now 2 (not the pre-retab flat 1) — only
+    // paladin contributes (cleric hasn't reached L2), so the merged total is
+    // paladin's own 2, not the retired 1.
+    it("cleric 1 / paladin 3: one pool, total 2 (only paladin contributes — cleric hasn't reached L2 yet)", () => {
       const entries = [
         { name: "cleric", subclass: "life domain", level: 1 },
         { name: "paladin", subclass: "oath of devotion", level: 3 },
@@ -271,7 +283,7 @@ describe("deriveEntryScopedResources", () => {
       const { derived } = deriveEntryScopedResources(entries, 4, ABILITY_SCORES, proficiencyBonusForLevel(4), "EDITION_2024", (e) => testFeatureRowsFor(e.name, e.subclass));
       const pools = derived?.resources.filter((r) => r.key === "channelDivinity") ?? [];
       expect(pools).toHaveLength(1);
-      expect(pools[0].total).toBe(1);
+      expect(pools[0].total).toBe(2);
     });
 
     it("single-class parity: cleric 6 alone is byte-identical to a bare deriveResources call", () => {

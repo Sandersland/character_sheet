@@ -316,9 +316,11 @@ const EDITIONS: readonly SeedEdition[] = ["EDITION_2014", "EDITION_2024"];
 // Below this, a (class, edition) pair reads as a half-written partition, not
 // real content — e.g. a migration that landed a class's base-layer rows but
 // not a subclass's, or a retab commit that stopped partway through. Today's
-// smallest FULLY authored pair is Sorcerer's 15 (both editions, no
-// subclasses) — ten leaves five rows of slack, tight enough that a bare
-// `>= 1` (which a half-write sails straight past) can't hide behind it.
+// smallest FULLY authored pair is Warlock's EDITION_2024 at 12 (#1233 — a
+// retab shrinks the 2024 half when PHB'24 drops features, so this tracks the
+// most-retabbed class rather than the smallest one) — ten leaves two rows of
+// slack, tight enough that a bare `>= 1` (which a half-write sails straight
+// past) can't hide behind it.
 const MIN_ROWS_PER_PAIR = 10;
 
 // Every class whose EDITION_2024 rows are STILL an unverified verbatim copy
@@ -363,17 +365,149 @@ const MIN_ROWS_PER_PAIR = 10;
 // Strike/Improved Brutal Strike effect menu, Frenzy's bonus dice,
 // Intimidating Presence's announced save DC, Epic Boon's feat grant — #1223
 // research finding 6).
+//
+// "Rogue" removed here (#1231, same diff as the content that makes its rows
+// genuinely diverge: base 11->16 EDITION_2024 rows — Blindsense drops out,
+// six new 2024-only features join (Weapon Mastery, Steady Aim, Cunning
+// Strike, Improved Cunning Strike, Devious Strikes, Epic Boon), while Arcane
+// Trickster/Assassin/Thief each keep 5/5 (Assassin's own count is unchanged
+// despite Bonus Proficiencies -> Assassin's Tools being a rename and
+// Impostor's mechanics folding into Infiltration Expertise's fork) — so the
+// two editions land at 26 (2014) vs 31 (2024) total rows, genuinely
+// unequal. This removal is NOT "all of Rogue's 2024 content is real" — the
+// Cunning Strike effect catalog (dice-spend + enemy-targeted save effects)
+// is TEXT ONLY with no mechanics behind it yet, same disclosed gap as
+// Barbarian's Brutal Strike menu (#1231 research, mirrors #1223's own
+// finding 6).
+//
+// "Wizard" removed here (#1234, same diff as the content that makes its rows
+// genuinely diverge: base 4->8 EDITION_2024 rows, Evocation/Abjuration/
+// Illusion each retab their level-2 features to level 3 and rework several
+// mechanics — Improved Abjuration/Malleable Illusions/Improved Minor Illusion
+// have no like-named 2024 successor, replaced by Spell Breaker/Phantasmal
+// Creatures/Improved Illusions respectively). This removal is NOT "all of
+// Wizard's 2024 content is real" — several residuals stay undisclosed nowhere
+// else but here: Scholar's Expertise mechanic, Epic Boon's feat grant, Ritual
+// Adept's ritual path, Memorize Spell's swap, and Spell Breaker's/Phantasmal
+// Creatures' always-prepared spells are all TEXT ONLY (the always-prepared
+// grants can't be SubclassGrantedSpell rows — that model has no `edition`
+// column and Subclass rows are edition-shared, a schema gap, not a scope
+// choice, #1234 research). Illusory Self's 2024 slot-expend restore is also
+// text-only (a player-initiated cost, not a rest regain — no descriptor
+// column exists for it).
+// "Warlock" removed here (#1233, same diff as the content that makes its
+// rows genuinely diverge: base 5->7 EDITION_2024 rows — Pact Boon drops out,
+// Magical Cunning/Contact Patron/Epic Boon join — and The Fiend's own 5
+// EDITION_2024 rows rework in place, one renamed ("Expanded Spell List" ->
+// "Fiend Spells"); The Archfey and The Great Old One author ZERO EDITION_2024
+// rows at all, following Totem Warrior's own precedent, so total counts land
+// at 20 (2014) vs 12 (2024) — genuinely unequal, unlike the identical-both-
+// editions shape this list exists to flag). This removal is NOT "all of
+// Warlock's 2024 content is real" — two residuals stay undisclosed nowhere
+// else but here: The Archfey/The Great Old One's PHB'24 reworks were never
+// even attempted (non-SRD, no licensed source — #1233 research; a 2024
+// character can still pick either and gets zero subclass features, same gap
+// as Totem Warrior), and the Eldritch Invocation catalog itself (which
+// invocations exist, their prerequisites, Pact Boon folding into it) is
+// text-only — no mechanics behind it yet, tracked as a follow-up.
+//
+// "Ranger" removed here (#1230, same diff as the content that makes its rows
+// genuinely diverge: base 11->15 EDITION_2024 rows — Natural Explorer/
+// Primeval Awareness/Land's Stride/Hide in Plain Sight/Vanish drop out, nine
+// new 2024-only features join, four rework in place (Spellcasting level-
+// shifts 2->1, Favored Enemy/Feral Senses/Foe Slayer all full rewrites);
+// Hunter goes 4->5 (Giant Killer/Steel Will/Multiattack drop out, Hunter's
+// Lore joins, Superior Hunter's Prey fills Multiattack's old L11 slot); Beast
+// Master stays 4->4 but Ranger's Companion RENAMES to Primal Companion — so
+// the two editions land at 19 (2014) vs 24 (2024) total rows, genuinely
+// unequal). This removal is NOT "all of Ranger's 2024 content is real" —
+// several residuals stay undisclosed nowhere else but here: Roving's Climb/
+// Swim-Speed and +10-ft grants, Deft Explorer's/L9 Expertise's Expertise
+// grants, and Hunter's Prey/Defensive Tactics' 2024 rest-swap are all TEXT
+// ONLY (#1230 research C6/C7, #1353); Favored Enemy's always-prepared
+// Hunter's Mark has no force-prepare mechanism at all (no ClassGrantedSpell
+// model exists — #1234's Wizard disclosure, same gap); and Beast Master's
+// three companion stat blocks are deliberately never transcribed (mirror-
+// sourced content, owner decision, PR body has the two-independent-mirror
+// discipline this content was held to).
+//
+// "Sorcerer" removed here (#1232, same diff as the content that makes its
+// rows genuinely diverge: base 5->9 EDITION_2024 rows — Sorcerous Origin
+// renames to Sorcerer Subclass, Innate Sorcery/Sorcery Incarnate/Epic Boon/
+// Arcane Apotheosis join — Draconic Bloodline's own 5 EDITION_2024 rows
+// rework in place, two renamed (Dragon Ancestor folds into Draconic Spells,
+// Draconic Presence -> Dragon Companion), and Wild Magic's own 5
+// EDITION_2024 rows are mirror-sourced (SRD 5.2 ships only Draconic Sorcery
+// for this class — Wild Magic Sorcery isn't in it at all — so these five are
+// verified against two independently-agreeing mirrors instead, cited on
+// their own rows, sorcerer-features.ts), one renamed (Spell Bombardment ->
+// Tamed Surge), so total counts land at 15 (2014) vs 19 (2024) — genuinely
+// unequal). This removal is NOT "all of Sorcerer's 2024 content is real" —
+// two residuals stay undisclosed nowhere else but here: Draconic Resilience's
+// unarmored AC change has no lib/srd/armor-class.ts branch for Sorcerer in
+// EITHER edition (#1232 follow-up 1), and Font of Magic's 2024 Min. Sorcerer
+// Level gating is text-only — sorceryPointCostForSlot enforces cost and cap
+// but not minimum level (#1232 follow-up 2).
+//
+// "Cleric" removed here (#1225, same diff as the content that makes its rows
+// genuinely diverge: base 5->11 EDITION_2024 rows — Destroy Undead and Divine
+// Intervention Improvement each get a new-named 2024 successor instead of an
+// in-place edit — while Life Domain stays 7/5 and Trickery Domain 6/5, for
+// 18 (2014) vs 21 (2024) total rows, genuinely unequal). This removal is NOT
+// "all of Cleric's 2024 content is real" — several residuals stay undisclosed
+// nowhere else but here: Divine Order's Protector/Thaumaturge choice, Blessed
+// Strikes'/Improved Blessed Strikes' Divine Strike/Potent Spellcasting
+// choice, Divine Spark's heal-or-damage Channel Divinity option, Epic Boon's
+// feat grant, and Divine Intervention's cast-without-a-slot behavior are all
+// TEXT ONLY (#1225 research, same disclosed shape as every prior retab
+// wave). Life/Trickery Domain Spells are ALSO text only and can't become
+// SubclassGrantedSpell rows — that model has no `edition` column and
+// Subclass rows are edition-shared, the schema gap Wizard's #1234 disclosed
+// first, not a scope choice made here. Trickery Domain's own 2024 text is
+// mirror-sourced (owner decision) rather than transcribed from SRD 5.2 —
+// Trickery isn't in the SRD — see cleric-features.ts's own header for the
+// two independent, non-scraper sources used and the one number
+// (Invoke Duplicity's move-range cap) neither confirmed and is therefore
+// omitted rather than carried over from 2014.
+// "Bard" removed here (#1224, same diff as the content that makes its rows
+// genuinely diverge: base 9->10 EDITION_2024 rows — Song of Rest drops out,
+// Epic Boon/Words of Creation join, and Expertise/Jack of All Trades/Font of
+// Inspiration/Countercharm/Magical Secrets/Superior Inspiration all rework in
+// place — while both colleges stay 4->4 with one rename each (Additional
+// Magical Secrets -> Magical Discoveries, College of Valor's Bonus
+// Proficiencies -> Martial Training), for 17 (2014) vs 18 (2024) total rows,
+// genuinely unequal). This removal is NOT "all of Bard's 2024 content is
+// real" — several residuals stay undisclosed nowhere else but here: Magical
+// Discoveries'/Words of Creation's always-prepared spell grants have no
+// SubclassGrantedSpell-equivalent mechanism (that model has no `edition`
+// column and Subclass rows are edition-shared, the schema gap Wizard's #1234
+// disclosed first), Epic Boon's feat grant is text only, Martial Training's
+// weapon-as-Spellcasting-Focus clause has no mechanism, Combat Inspiration's
+// Defense/Offense options are text only, and Peerless Skill's
+// non-expenditure-on-failure clause is text only (Bardic Inspiration dice are
+// spent by a player-initiated op, not auto-tracked per use). College of Valor
+// is mirror-sourced (owner decision, #1224) rather than transcribed from SRD
+// 5.2 — Valor isn't in the SRD — see bard-features.ts's own header for the
+// three independent, non-scraper sources used.
+//
+// "Paladin" removed here (#1229, same diff as the content that makes its rows
+// genuinely diverge: base 12->15 EDITION_2024 rows — Divine Sense and Divine
+// Health are cut, Faithful Steed/Abjure Foes/Aura Expansion/Epic Boon join,
+// Divine Smite/Improved Divine Smite/Cleansing Touch each rename to Paladin's
+// Smite/Radiant Strikes/Restoring Touch — while Devotion/Ancients/Vengeance
+// each go 6->5 EDITION_2024 rows, one Channel Divinity option retired per
+// oath in favor of the base class's own Abjure Foes). This removal is NOT
+// "all of Paladin's 2024 content is real" — two residuals stay undisclosed
+// nowhere else but here: Blessed Warrior's/Paladin's Smite's/Faithful Steed's
+// mechanics are TEXT ONLY (no cantrip-swap wiring, no free-cast wiring, no
+// always-prepared spell grant — the last of these can't become a
+// SubclassGrantedSpell row either, the schema gap Wizard's #1234 disclosed
+// first), and Oath of the Ancients/Oath of Vengeance's own 2024 text is
+// mirror-sourced (owner decision, not in SRD 5.2) with two values (Vow of
+// Enmity's action cost, Avenging Angel's duration) deliberately unverified
+// against a licensed source — see paladin-features.ts's own header.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
-  "Bard",
-  "Cleric",
-  "Druid",
   "Monk",
-  "Paladin",
-  "Ranger",
-  "Rogue",
-  "Sorcerer",
-  "Warlock",
-  "Wizard",
 ]);
 
 export interface ClassEditionPopulationSummary {

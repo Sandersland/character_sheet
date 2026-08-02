@@ -25,19 +25,28 @@ export interface ClassFeatureView extends ClassFeatureFlags {
   classDef: ClassOption | undefined;
   rosterEntries: ClassEntry[];
   needsSubclass: boolean;
+  /** #1598: the primary entry's held subclass row is edition-tagged for a
+   *  different edition than the character's own — SubclassSection renders an
+   *  explanation alongside the re-pick, rather than hiding the stranded name. */
+  subclassUnavailable: boolean;
   maneuverKnownIds: string[];
   isEmpty: boolean;
 }
 
 // Serialized roster, or a synthesized single entry before classes[] loads.
+// needsSubclass/subclassUnavailable default false in the synthesized stub —
+// never computed here (that would be the exact rule-mirror #1598 retired);
+// the real values only ever come from the backend-emitted classes[] entry.
 function deriveRoster(character: Character): ClassEntry[] {
   if (character.classes && character.classes.length > 0) return character.classes;
-  return [{ id: "primary", name: character.class, level: character.level, subclass: character.subclass }];
-}
-
-function deriveNeedsSubclass(character: Character, classDef: ClassOption | undefined): boolean {
-  if (!classDef) return false;
-  return character.level >= classDef.subclassGateLevel && !character.subclass;
+  return [{
+    id: "primary",
+    name: character.class,
+    level: character.level,
+    subclass: character.subclass,
+    needsSubclass: false,
+    subclassUnavailable: false,
+  }];
 }
 
 function deriveManeuverIds(resources: CharacterResources | undefined): string[] {
@@ -113,13 +122,20 @@ export function deriveClassFeatureView(
   referenceClasses: ClassOption[],
 ): ClassFeatureView {
   const classDef = referenceClasses.find((c) => c.name === character.class);
-  const needsSubclass = deriveNeedsSubclass(character, classDef);
+  const roster = deriveRoster(character);
+  // ClassFeaturesSection/SubclassSection render only the primary entry
+  // (roster[0]) today, same scope the retired deriveNeedsSubclass covered —
+  // this reads its backend-computed flags rather than re-deriving them.
+  const primaryEntry = roster[0];
+  const needsSubclass = primaryEntry?.needsSubclass ?? false;
+  const subclassUnavailable = primaryEntry?.subclassUnavailable ?? false;
   const flags = deriveFlags(character);
 
   return {
     classDef,
-    rosterEntries: deriveRoster(character),
+    rosterEntries: roster,
     needsSubclass,
+    subclassUnavailable,
     maneuverKnownIds: deriveManeuverIds(character.resources),
     ...flags,
     isEmpty: isFeatureViewEmpty(flags, Boolean(character.subclass), needsSubclass),

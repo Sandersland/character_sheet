@@ -135,11 +135,15 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
   });
 });
 
-// #1325: needsSubclass must follow subclassGateLevel — the value /api/reference
-// already resolved for the character's edition — never a raw catalog column.
-// A level-1 Cleric only needs the prompt+picker under a 2014-resolved def
-// (gate 1); the SAME character with a 2024-resolved def (gate 3) shows neither.
-describe("ClassFeaturesSection — subclass gate per edition (#1325)", () => {
+// #1598: needsSubclass is now read off the backend-emitted classes[0] entry,
+// never re-derived from character.level/classDef.subclassGateLevel (that
+// mirror — #1325's own fix — is exactly what stranded a character on a
+// cross-edition subclass row with no way out: a held subclass NAME made the
+// old `!character.subclass` half of the check false, so the picker never
+// rendered). classDef here supplies only display data (the gate-level
+// wording, the subclasses list) — the gate decision itself comes from
+// classes[0].needsSubclass.
+describe("ClassFeaturesSection — subclass gate is backend-computed (#1598)", () => {
   function clericDef(subclassGateLevel: number): ClassOption {
     return {
       id: "class-cleric",
@@ -161,28 +165,32 @@ describe("ClassFeaturesSection — subclass gate per edition (#1325)", () => {
     };
   }
 
-  function level1Cleric(): Character {
+  function clericWithEntry(needsSubclass: boolean, subclass?: string): Character {
     return {
       id: "char-1",
       class: "Cleric",
       level: 1,
-      subclass: undefined,
+      subclass,
+      classes: [{ id: "c1", name: "Cleric", level: 1, subclass, needsSubclass, subclassUnavailable: false }],
       resources: { features: [], pools: [], maneuversKnown: [], toolProficienciesKnown: [] },
     } as unknown as Character;
   }
 
-  function renderWithReference(referenceClasses: ClassOption[]) {
-    return renderWithCharacter(<ClassFeaturesSection referenceClasses={referenceClasses} />, level1Cleric());
+  function renderWithReference(referenceClasses: ClassOption[], character: Character) {
+    return renderWithCharacter(<ClassFeaturesSection referenceClasses={referenceClasses} />, character);
   }
 
-  it("a 2014-resolved def (gate 1) offers the subclass prompt + picker at level 1", () => {
-    renderWithReference([clericDef(1)]);
-    expect(screen.getByText(/You have reached level 1 — choose a subclass/)).toBeInTheDocument();
+  it("offers the subclass prompt + picker when the wire entry says needsSubclass, regardless of the LOCAL classDef gate number", () => {
+    // gate 3 in the local classDef would have failed the old client-side
+    // `level >= subclassGateLevel` check at level 1 — proving the component
+    // no longer looks at that number to decide whether to show the picker.
+    renderWithReference([clericDef(3)], clericWithEntry(true));
+    expect(screen.getByText(/You have reached level 3 — choose a subclass/)).toBeInTheDocument();
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
 
-  it("a 2024-resolved def (gate 3) offers neither at level 1", () => {
-    renderWithReference([clericDef(3)]);
+  it("offers neither when the wire entry says needsSubclass is false", () => {
+    renderWithReference([clericDef(1)], clericWithEntry(false));
     expect(screen.queryByText(/choose a subclass/)).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });

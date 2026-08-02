@@ -1,16 +1,39 @@
 // Classes whose CLASS_FEATURES rows are literal seed data (#1227,
 // backend/prisma/seed/fighter-features.ts; #1223,
-// backend/prisma/seed/barbarian-features.ts), keyed lowercase to match this
+// backend/prisma/seed/barbarian-features.ts; #1230,
+// backend/prisma/seed/ranger-features.ts; #1231,
+// backend/prisma/seed/rogue-features.ts; #1233,
+// backend/prisma/seed/warlock-features.ts; #1234,
+// backend/prisma/seed/wizard-features.ts; #1232,
+// backend/prisma/seed/sorcerer-features.ts; #1225,
+// backend/prisma/seed/cleric-features.ts; #1224,
+// backend/prisma/seed/bard-features.ts; #1226,
+// backend/prisma/seed/druid-features.ts; #1229,
+// backend/prisma/seed/paladin-features.ts), keyed lowercase to match this
 // file's own registry convention — the sibling of prisma/seed/class-
-// features.ts's LITERAL_ROW_CLASSES (Title Case, "Fighter", "Barbarian"). Kept
-// as a SECOND constant rather than importing the prisma-side one directly:
-// backend/tsconfig.json's `rootDir: "src"` makes any src file importing
-// something under prisma/ a compile error (TS6059, verified empirically) —
-// there is no single set both sides can share. Both must be updated together
-// when a class's rows go literal; class-feature-parity.test.ts and feature-
-// edition.test.ts key off THIS one so there is still only one hand-maintained
-// list per side, never one per test.
-export const LITERAL_ROW_CLASSES = new Set(["fighter", "barbarian"]);
+// features.ts's LITERAL_ROW_CLASSES (Title Case, "Fighter", "Barbarian",
+// "Bard", "Cleric", "Druid", "Paladin", "Ranger", "Rogue", "Sorcerer",
+// "Warlock", "Wizard"). Kept as a SECOND constant rather than importing the
+// prisma-side
+// one directly: backend/tsconfig.json's `rootDir: "src"` makes any src file
+// importing something under prisma/ a compile error (TS6059, verified
+// empirically) — there is no single set both sides can share. Both must be
+// updated together when a class's rows go literal; class-feature-parity.test.ts
+// and feature-edition.test.ts key off THIS one so there is still only one
+// hand-maintained list per side, never one per test.
+export const LITERAL_ROW_CLASSES = new Set([
+  "fighter",
+  "barbarian",
+  "bard",
+  "cleric",
+  "ranger",
+  "rogue",
+  "sorcerer",
+  "warlock",
+  "wizard",
+  "druid",
+  "paladin",
+]);
 
 // Every class/subclass pair, shared by class-features-snapshot.test.ts and
 // feature-edition.test.ts (#1374) — a plain (non-.test.ts) module so importing

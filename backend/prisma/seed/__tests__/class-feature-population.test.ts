@@ -17,15 +17,16 @@ import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/core/prisma.js";
 
 import { assertEveryClassEditionPopulated, seedClassFeatures } from "../seed-class-features.js";
+import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
 describe("assertEveryClassEditionPopulated — anti-vacuity floors (#1525)", () => {
   afterEach(async () => {
     await seedClassFeatures(prisma);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   // Literals measured directly against this tree's real seeded catalog (12
-  // classes, 522 rows, Sorcerer the smallest pair at 15/15, Monk the largest
-  // at 37/37) — never re-derived from CLASS_FEATURES.length or any other
+  // classes, 532 rows, Warlock's EDITION_2024 the smallest pair at 12, Monk
+  // the largest at 37/37) — never re-derived from CLASS_FEATURES.length or any other
   // value the guard itself could also get wrong, which is the whole point of
   // an anti-vacuity check (the #1499 `triplesVisited >= 158` shape).
   it("a clean seed reports summary counts at or above today's measured floors", async () => {
@@ -38,14 +39,17 @@ describe("assertEveryClassEditionPopulated — anti-vacuity floors (#1525)", () 
     expect(summary.pairsChecked).toBeGreaterThanOrEqual(24);
     expect(summary.pairsChecked).toBe(summary.classRowCount * 2);
 
-    // Today's real minimum is Sorcerer at 15 (both editions) — five rows of
-    // slack below that catches a half-written partition, which a bare
-    // `>= 1` sails straight past.
+    // Today's real minimum is Warlock's EDITION_2024 at 12 — a retab SHRINKS
+    // the smaller partition when 2024 drops features (Warlock's 2014 half is
+    // 20), so this floor tracks the most-retabbed class, not the smallest
+    // class. Two rows of slack below it still catches a half-written
+    // partition, which a bare `>= 1` sails straight past.
     expect(summary.minPairCount).toBeGreaterThanOrEqual(10);
 
-    // 522 today (256 untagged features x2 editions + 10 pre-forked rows).
-    // ~8% slack for wave-2's net churn — tune this DOWNWARD only, and record
-    // the reason here when it moves.
+    // 532 today. Grew from 522 when #1231/#1233/#1234 authored Rogue's,
+    // Warlock's and Wizard's real 2024 content; wave 2's remaining six
+    // classes will grow it further. Tune this DOWNWARD only, and record the
+    // reason here when it moves.
     expect(summary.rowsCounted).toBeGreaterThanOrEqual(480);
   });
 });
@@ -55,7 +59,7 @@ describe("assertEveryClassEditionPopulated — mutation proof (#1525)", () => {
     // Restores whatever a test deleted — belt-and-suspenders alongside each
     // test's own explicit restore step below.
     await seedClassFeatures(prisma);
-  });
+  }, RESEED_TIMEOUT_MS);
 
   it("deleting Sorcerer's EDITION_2024 rows at the DB level fails the guard, naming class and edition; reseeding restores it", async () => {
     const sorcerer = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Sorcerer" } });
@@ -74,5 +78,5 @@ describe("assertEveryClassEditionPopulated — mutation proof (#1525)", () => {
     await expect(assertEveryClassEditionPopulated(prisma)).resolves.toBeDefined();
     const after = await prisma.classFeature.count({ where: { classId: sorcerer.id, edition: "EDITION_2024" } });
     expect(after).toBe(before);
-  });
+  }, RESEED_TIMEOUT_MS);
 });

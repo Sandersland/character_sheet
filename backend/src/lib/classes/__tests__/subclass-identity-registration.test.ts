@@ -26,7 +26,6 @@ import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
-import { rogue } from "@/lib/classes/rogue.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
@@ -157,7 +156,6 @@ const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
   monk,
   paladin,
   ranger,
-  rogue,
   sorcerer,
   warlock,
   wizard,
@@ -183,10 +181,10 @@ describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () 
   // but not here would leave its subclasses unchecked by the test above, and
   // nothing else would notice. CLASS_SUBCLASSES is maintained by two other
   // suites, so tying to it means the omission fails HERE rather than silently
-  // shrinking coverage. Fighter (#1532) and Barbarian (#1223) are the two
-  // classes with no TS module at all — their subclasses are identity-only by
-  // design.
-  it("covers every class in CLASS_SUBCLASSES except Fighter and Barbarian, which have no TS module", () => {
-    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian"])).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
+  // shrinking coverage. Fighter (#1532), Barbarian (#1223) and Rogue (#1231)
+  // are the three classes with no TS module at all — their subclasses are
+  // identity-only by design.
+  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian and Rogue, which have no TS module", () => {
+    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue"])).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
   });
 });

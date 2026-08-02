@@ -274,6 +274,24 @@ export interface ClassEntry {
   subclass?: string;
   subclassId?: string;
   classId?: string;
+  /**
+   * Backend-computed (buildClassesView, #1598): true once this entry's
+   * subclass-gate level has passed AND (no subclass chosen yet, or the held
+   * one is `subclassUnavailable`). The frontend reads this rather than
+   * re-deriving `level >= subclassGateLevel` (CLAUDE.md: rules logic is
+   * backend-owned) — deriveNeedsSubclass, the mirror this replaced, also read
+   * TOTAL character level against the PRIMARY entry's subclass, wrong for
+   * multiclass.
+   */
+  needsSubclass: boolean;
+  /**
+   * True when this entry holds a subclass row edition-tagged for a DIFFERENT
+   * edition than the character's own (a catalog retag landing after the pick
+   * — fresh cross-edition picks are already blocked by crossEditionRejection,
+   * #1598). The name still renders (`subclass` above), but subclass features
+   * derive to zero, so the sheet must explain the split rather than hide it.
+   */
+  subclassUnavailable: boolean;
 }
 
 /**
