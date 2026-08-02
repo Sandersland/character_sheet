@@ -583,9 +583,12 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["druid", "circle of the moon", "Circle Forms"],
   // Paladin's 32 new triples (#1229): the 6 base names that genuinely fork
   // (Lay on Hands, Fighting Style, Spellcasting, Channel Divinity, Aura of
-  // Protection, Aura of Courage — Extra Attack stays ONE untagged row,
-  // byte-identical text both editions, same #1223/#1230 precedent as
-  // Barbarian's/Ranger's own Extra Attack) show up under EVERY subclass
+  // Protection, Aura of Courage — Extra Attack is absent because its two rows
+  // carry IDENTICAL text, NOT because it is one shared row: Paladin follows
+  // cleric-features.ts's EDITION RULE and tags both rows explicitly, unlike
+  // Barbarian's/Ranger's one-untagged-row shape. collectTaggedFeatureKeys
+  // surfaces only names whose 2014/2024 descriptions DIFFER) show up under
+  // EVERY subclass
   // context Paladin has (undefined/oath of devotion/oath of the ancients/oath
   // of vengeance — collectTaggedFeatureKeys combines classRows, always ALL of
   // them, with each context's own subclassRows) — 4 contexts x 6 base names =

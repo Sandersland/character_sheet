@@ -168,8 +168,15 @@ export function describeChannelDivinity(
     // #1229: Abjure Foes' default-branch reminder ("or are turned/affected")
     // is generic; this arm states the real effect (Frightened) and the
     // Charisma-modifier target count instead.
+    //
+    // This case label is the row's name VERBATIM, and Abjure Foes is the only
+    // CHANNEL_DIVINITIES row without the "Channel Divinity: " prefix. If you
+    // ever normalise that name, change this label in the same edit — otherwise
+    // this arm silently falls through to `default:` and the reminder loses the
+    // target count. (Display is unaffected either way: the picker strips the
+    // prefix with an anchored regex, so a bare name passes through unchanged.)
     case "Abjure Foes":
-      reminder = `Up to ${chaModifierFloor1(ctx.abilityScores)} creature(s) within 60 ft make a ${row.saveAbility ?? "wisdom"} save (DC ${saveDc}) or are Frightened for 1 minute or until damaged.`;
+      reminder = `Up to ${chaModifierFloor1(ctx.abilityScores)} creature(s) within 60 ft make a ${row.saveAbility} save (DC ${saveDc}) or are Frightened for 1 minute or until damaged.`;
       break;
     default:
       reminder = saveDc !== null && row.saveAbility

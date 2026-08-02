@@ -449,7 +449,6 @@ describe("deriveResources — Paladin base pools", () => {
 
     const result2024 = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
     expect(result2024!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(2);
-    expect(result2024!.resources.find((r) => r.key === "channelDivinity")?.total).not.toBe(1);
   });
 
   it("channelDivinity's 2024 total rises to 3 at level 11, not before", () => {
