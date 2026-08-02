@@ -499,6 +499,51 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["sorcerer", "wild magic", "Tides of Chaos"],
   ["sorcerer", "wild magic", "Bend Luck"],
   ["sorcerer", "wild magic", "Controlled Chaos"],
+  // Bard's 30 new triples (#1224), derived from the test's own failure diff
+  // (not hand-guessed, same discipline as Rogue's #1231): the 8 base names
+  // that genuinely fork (Spellcasting, Bardic Inspiration, Jack of All
+  // Trades, Expertise, Font of Inspiration, Countercharm, Magical Secrets,
+  // Superior Inspiration — Song of Rest has no 2024 row at all, Epic Boon/
+  // Words of Creation are 2024-only) show up under EVERY subclass context
+  // Bard has (undefined/college of lore/college of valor — collectTagged
+  // FeatureKeys combines classRows, always ALL of them, with each context's
+  // own subclassRows) — 3 contexts x 8 base names = 24, plus College of
+  // Lore's own 3 forked subclass names (Bonus Proficiencies, Cutting Words,
+  // Peerless Skill — Additional Magical Secrets is renamed away to Magical
+  // Discoveries, a 2024-only name, so never tagged) and College of Valor's
+  // own 3 (Combat Inspiration, Extra Attack, Battle Magic — Bonus
+  // Proficiencies is renamed away to Martial Training, a 2024-only name) =
+  // 24 + 3 + 3 = 30.
+  ["bard", "undefined", "Spellcasting"],
+  ["bard", "undefined", "Bardic Inspiration"],
+  ["bard", "undefined", "Jack of All Trades"],
+  ["bard", "undefined", "Expertise"],
+  ["bard", "undefined", "Font of Inspiration"],
+  ["bard", "undefined", "Countercharm"],
+  ["bard", "undefined", "Magical Secrets"],
+  ["bard", "undefined", "Superior Inspiration"],
+  ["bard", "college of lore", "Spellcasting"],
+  ["bard", "college of lore", "Bardic Inspiration"],
+  ["bard", "college of lore", "Jack of All Trades"],
+  ["bard", "college of lore", "Expertise"],
+  ["bard", "college of lore", "Font of Inspiration"],
+  ["bard", "college of lore", "Countercharm"],
+  ["bard", "college of lore", "Magical Secrets"],
+  ["bard", "college of lore", "Superior Inspiration"],
+  ["bard", "college of lore", "Bonus Proficiencies"],
+  ["bard", "college of lore", "Cutting Words"],
+  ["bard", "college of lore", "Peerless Skill"],
+  ["bard", "college of valor", "Spellcasting"],
+  ["bard", "college of valor", "Bardic Inspiration"],
+  ["bard", "college of valor", "Jack of All Trades"],
+  ["bard", "college of valor", "Expertise"],
+  ["bard", "college of valor", "Font of Inspiration"],
+  ["bard", "college of valor", "Countercharm"],
+  ["bard", "college of valor", "Magical Secrets"],
+  ["bard", "college of valor", "Superior Inspiration"],
+  ["bard", "college of valor", "Combat Inspiration"],
+  ["bard", "college of valor", "Extra Attack"],
+  ["bard", "college of valor", "Battle Magic"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

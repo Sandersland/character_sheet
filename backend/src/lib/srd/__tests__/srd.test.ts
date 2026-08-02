@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { bard } from "@/lib/classes/bard.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
@@ -221,6 +222,14 @@ describe("deriveResources — Bard Bardic Inspiration", () => {
     const lowCha = { ...ABILITY_SCORES, charisma: 8 }; // -1 modifier
     const result = deriveResources("bard", undefined, 3, lowCha, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.total).toBe(1);
+  });
+
+  // #1224: the pool is verified edition-invariant against both SRDs — pins
+  // that nobody later adds an `edition` parameter to special-case one of them.
+  // Exact arity, not an upper bound: dropping `abilityScores` would break the
+  // Cha-modifier total that is the whole reason this module still exists.
+  it("resourceFn declares no edition parameter (edition-invariant pool)", () => {
+    expect(bard.resourceFn!.length).toBe(2);
   });
 });
 

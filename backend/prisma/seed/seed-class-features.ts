@@ -469,8 +469,27 @@ const MIN_ROWS_PER_PAIR = 10;
 // two independent, non-scraper sources used and the one number
 // (Invoke Duplicity's move-range cap) neither confirmed and is therefore
 // omitted rather than carried over from 2014.
+// "Bard" removed here (#1224, same diff as the content that makes its rows
+// genuinely diverge: base 9->10 EDITION_2024 rows — Song of Rest drops out,
+// Epic Boon/Words of Creation join, and Expertise/Jack of All Trades/Font of
+// Inspiration/Countercharm/Magical Secrets/Superior Inspiration all rework in
+// place — while both colleges stay 4->4 with one rename each (Additional
+// Magical Secrets -> Magical Discoveries, College of Valor's Bonus
+// Proficiencies -> Martial Training), for 17 (2014) vs 18 (2024) total rows,
+// genuinely unequal). This removal is NOT "all of Bard's 2024 content is
+// real" — several residuals stay undisclosed nowhere else but here: Magical
+// Discoveries'/Words of Creation's always-prepared spell grants have no
+// SubclassGrantedSpell-equivalent mechanism (that model has no `edition`
+// column and Subclass rows are edition-shared, the schema gap Wizard's #1234
+// disclosed first), Epic Boon's feat grant is text only, Martial Training's
+// weapon-as-Spellcasting-Focus clause has no mechanism, Combat Inspiration's
+// Defense/Offense options are text only, and Peerless Skill's
+// non-expenditure-on-failure clause is text only (Bardic Inspiration dice are
+// spent by a player-initiated op, not auto-tracked per use). College of Valor
+// is mirror-sourced (owner decision, #1224) rather than transcribed from SRD
+// 5.2 — Valor isn't in the SRD — see bard-features.ts's own header for the
+// three independent, non-scraper sources used.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
-  "Bard",
   "Druid",
   "Monk",
   "Paladin",

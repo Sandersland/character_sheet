@@ -759,7 +759,11 @@ model ClassFeature {
   // Resource block — replaces the pool this feature declares in resourceFn.
   // A row may set resourceKey and leave the totals NULL: a formula-computed
   // pool (Bardic Inspiration = Cha mod, Lay on Hands = level x 5) keeps
-  // resourceFn until #416's C3 evaluator exists.
+  // resourceFn until #416's C3 evaluator exists. `resourceRecharge` is also a
+  // single scalar, not a tier array — Bardic Inspiration's recharge changes
+  // mid-progression (longRest below level 5, short-or-long from level 5), a
+  // second independent reason no row can carry this pool even with a fixed
+  // total (#1224).
   resourceKey      String?
   resourceLabel    String?
   resourceRecharge String?  // RechargeOn
