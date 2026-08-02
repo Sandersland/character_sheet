@@ -831,7 +831,7 @@ model ClassFeature {
   // other class's DC stays prose in its row's own `description` until
   // deriveAnnouncedSaveDC is generalised to base-class rows and
   // ClassExtras.maneuverSaveDC is renamed to something non-Fighter-specific
-  // (follow-up, not yet filed as its own issue). Deliberately NOT layered
+  // (#1589). Deliberately NOT layered
   // onto derivedStat/derivedStatTiers: the DC is per-character ability math,
   // not a level tier, and Combat Superiority's own derivedStat slot is
   // already claimed by maneuverChoiceCount's tiers on the SAME row — one
