@@ -8,8 +8,10 @@
 // guard and returns null where it used to return a valid info object — DROPPING
 // any subclass deriveExtras/choices contribution, since those were computed
 // AFTER that guard in the original #1524 scope. Ranger/Hunter is the real,
-// live example: Ranger has no resourceFn at all, so at level 7 (Hunter's Prey +
-// Defensive Tactics both granted) the ENTIRE contribution used to be features +
+// live example: Ranger has no resourceFn below level 10 under EDITION_2024
+// (Tireless's own grant level, #1230 commit 3), and none at all under
+// EDITION_2014, so at level 7 (Hunter's Prey + Defensive Tactics both
+// granted, under either edition) the ENTIRE contribution used to be features +
 // subclassChoices — with no carrier, features is empty, and pre-fix this
 // function returned null, silently losing subclassChoices too.
 import { describe, expect, it } from "vitest";

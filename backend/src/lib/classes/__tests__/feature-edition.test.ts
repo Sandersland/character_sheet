@@ -38,24 +38,33 @@ function feature(overrides: Partial<DerivedFeature> & Pick<DerivedFeature, "edit
 
 // Replaces the old featureAppliesToEdition truth table: proves the SAME
 // property (a fork resolves to exactly one edition's text, never both, never
-// neither) end-to-end against a REAL seeded fork — Cleric/Life Domain's
-// Domain Spells, also ledgered below. featuresFromRows' pure truth table
-// (untagged/level-gate/dedup) lives in class-feature-rows.test.ts.
+// neither) end-to-end against a REAL seeded fork. featuresFromRows' pure
+// truth table (untagged/level-gate/dedup) lives in class-feature-rows.test.ts.
+//
+// #1225 RETARGET: this used to pin Cleric/Life Domain's "Domain Spells" as a
+// same-name fork — that 2024 row was FABRICATED (the PHB'14 list with its
+// first tier relabelled) and #1225 replaced it with a DIFFERENTLY-NAMED real
+// SRD 5.2 row ("Life Domain Spells"), so the property this test proves (a
+// fork resolves to exactly one edition, never both, never neither) now needs
+// a genuine same-name fork elsewhere in the seed — Warlock/The Fiend's own
+// "Dark One's Blessing" (#1233) is that fork, level-shifted 1->3 same as
+// Disciple of Life was, and is unrelated to any class this suite otherwise
+// exercises.
 describe("a real seeded edition fork resolves through deriveResources (#1374, retired from featureAppliesToEdition)", () => {
-  it("Cleric/Life Domain's Domain Spells: 2014 gets the 2014-worded row, 2024 gets the 2024-worded row, never both", async () => {
-    const featureRows = await loadDbFeatureRows("cleric", "life domain");
+  it("Warlock/The Fiend's Dark One's Blessing: 2014 gets the 2014-worded row, 2024 gets the 2024-worded row, never both", async () => {
+    const featureRows = await loadDbFeatureRows("warlock", "the fiend");
     const profBonus = proficiencyBonusForLevel(1);
 
-    const at2014 = deriveResources("cleric", "life domain", 1, ABILITY_SCORES, profBonus, featureRows, "EDITION_2014");
-    const at2024 = deriveResources("cleric", "life domain", 3, ABILITY_SCORES, proficiencyBonusForLevel(3), featureRows, "EDITION_2024");
+    const at2014 = deriveResources("warlock", "the fiend", 1, ABILITY_SCORES, profBonus, featureRows, "EDITION_2014");
+    const at2024 = deriveResources("warlock", "the fiend", 3, ABILITY_SCORES, proficiencyBonusForLevel(3), featureRows, "EDITION_2024");
 
-    const domainSpells2014 = (at2014?.features ?? []).filter((f) => f.name === "Domain Spells");
-    const domainSpells2024 = (at2024?.features ?? []).filter((f) => f.name === "Domain Spells");
-    expect(domainSpells2014).toHaveLength(1);
-    expect(domainSpells2024).toHaveLength(1);
-    expect(domainSpells2014[0].description).not.toBe(domainSpells2024[0].description);
-    expect(domainSpells2014[0].edition).toBe("EDITION_2014");
-    expect(domainSpells2024[0].edition).toBe("EDITION_2024");
+    const blessing2014 = (at2014?.features ?? []).filter((f) => f.name === "Dark One's Blessing");
+    const blessing2024 = (at2024?.features ?? []).filter((f) => f.name === "Dark One's Blessing");
+    expect(blessing2014).toHaveLength(1);
+    expect(blessing2024).toHaveLength(1);
+    expect(blessing2014[0].description).not.toBe(blessing2024[0].description);
+    expect(blessing2014[0].edition).toBe("EDITION_2014");
+    expect(blessing2024[0].edition).toBe("EDITION_2024");
   });
 
   it("mutation proof: deleting a class's EDITION_2024 rows fails on ABSENCE, not a 2014 fallback (ClassFeature.edition is non-nullable — resolveEditionRow's shared-row fallback is unreachable by type for this model)", async () => {
@@ -202,9 +211,41 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 // too. Pact Boon (2014-only)/Magical Cunning/Contact Patron/Epic Boon
 // (2024-only) are the same "one description under this name" shape, so none
 // of those are tagged either.
+// Cleric's 16 triples (#1225), replacing the 2 Domain Spells entries above
+// (that name is no longer tagged at all — both domains' 2024 rows renamed to
+// "Life Domain Spells"/"Trickery Domain Spells", different names from the
+// 2014-only "Domain Spells", same "renamed, not tagged" shape as Warlock's
+// own Expanded Spell List -> Fiend Spells below). The 3 base-class names that
+// genuinely fork (Spellcasting, Channel Divinity: Turn Undead, Divine
+// Intervention — Destroy Undead/Divine Intervention Improvement are each
+// replaced outright by a differently-named 2024 successor, so neither is
+// tagged) show up under EVERY subclass context Cleric has (undefined/life
+// domain/trickery domain), same reason Fighter's/Barbarian's/Warlock's own
+// base names show up under all of THEIR contexts — 3 x 3 = 9, plus Life
+// Domain's own 4 (Disciple of Life, Channel Divinity: Preserve Life, Blessed
+// Healer, Supreme Healing — Bonus Proficiency/Divine Strike have no 2024 row
+// at all, Domain Spells is renamed away) and Trickery Domain's own 3
+// (Blessing of the Trickster, Channel Divinity: Invoke Duplicity, Improved
+// Duplicity — Cloak of Shadows/Divine Strike have no 2024 row, Domain Spells
+// is renamed away, Trickster's Transposition is 2024-only) = 9 + 4 + 3 = 16.
+// Net +14 over the 2 entries removed.
 const EXPECTED_EDITION_TAGGED_FEATURES = [
-  ["cleric", "life domain", "Domain Spells"],
-  ["cleric", "trickery domain", "Domain Spells"],
+  ["cleric", "undefined", "Spellcasting"],
+  ["cleric", "undefined", "Channel Divinity: Turn Undead"],
+  ["cleric", "undefined", "Divine Intervention"],
+  ["cleric", "life domain", "Spellcasting"],
+  ["cleric", "life domain", "Channel Divinity: Turn Undead"],
+  ["cleric", "life domain", "Divine Intervention"],
+  ["cleric", "life domain", "Disciple of Life"],
+  ["cleric", "life domain", "Channel Divinity: Preserve Life"],
+  ["cleric", "life domain", "Blessed Healer"],
+  ["cleric", "life domain", "Supreme Healing"],
+  ["cleric", "trickery domain", "Spellcasting"],
+  ["cleric", "trickery domain", "Channel Divinity: Turn Undead"],
+  ["cleric", "trickery domain", "Divine Intervention"],
+  ["cleric", "trickery domain", "Blessing of the Trickster"],
+  ["cleric", "trickery domain", "Channel Divinity: Invoke Duplicity"],
+  ["cleric", "trickery domain", "Improved Duplicity"],
   ["warlock", "undefined", "Pact Magic"],
   ["warlock", "undefined", "Eldritch Invocations"],
   ["warlock", "undefined", "Mystic Arcanum"],
@@ -383,6 +424,81 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["wizard", "school of illusion", "Illusion Savant"],
   ["wizard", "school of illusion", "Illusory Self"],
   ["wizard", "school of illusion", "Illusory Reality"],
+  // Ranger's 21 new triples (#1230): the 5 base names that genuinely fork
+  // (Favored Enemy, Spellcasting, Fighting Style, Feral Senses, Foe Slayer)
+  // show up under EVERY subclass context Ranger has (undefined/hunter/beast
+  // master — collectTaggedFeatureKeys combines classRows, always ALL of
+  // them, with each context's own subclassRows) — 3 contexts x 5 base names
+  // = 15, plus Hunter's own 3 forked subclass names (Hunter's Prey,
+  // Defensive Tactics, Superior Hunter's Defense) and Beast Master's own 3
+  // (Exceptional Training, Bestial Fury, Share Spells) = 21. Extra Attack is
+  // NOT here (one untagged row, edition-invariant). Neither are 2024-only
+  // names (Weapon Mastery, Deft Explorer, Roving, Expertise, Tireless,
+  // Relentless Hunter, Nature's Veil, Precise Hunter, Epic Boon, Hunter's
+  // Lore, Superior Hunter's Prey, Primal Companion), nor 2014-only names
+  // (Natural Explorer, Primeval Awareness, Land's Stride, Hide in Plain
+  // Sight, Vanish, Giant Killer/Steel Will/Multiattack's parent rows,
+  // Ranger's Companion) — each has exactly one description under its name,
+  // not two. Ranger's Companion / Primal Companion is a RENAME (a different
+  // name each edition), not a fork, same shape as Warlock's "Expanded Spell
+  // List" -> "Fiend Spells".
+  ["ranger", "undefined", "Favored Enemy"],
+  ["ranger", "undefined", "Spellcasting"],
+  ["ranger", "undefined", "Fighting Style"],
+  ["ranger", "undefined", "Feral Senses"],
+  ["ranger", "undefined", "Foe Slayer"],
+  ["ranger", "hunter", "Favored Enemy"],
+  ["ranger", "hunter", "Spellcasting"],
+  ["ranger", "hunter", "Fighting Style"],
+  ["ranger", "hunter", "Feral Senses"],
+  ["ranger", "hunter", "Foe Slayer"],
+  ["ranger", "hunter", "Hunter's Prey"],
+  ["ranger", "hunter", "Defensive Tactics"],
+  ["ranger", "hunter", "Superior Hunter's Defense"],
+  ["ranger", "beast master", "Favored Enemy"],
+  ["ranger", "beast master", "Spellcasting"],
+  ["ranger", "beast master", "Fighting Style"],
+  ["ranger", "beast master", "Feral Senses"],
+  ["ranger", "beast master", "Foe Slayer"],
+  ["ranger", "beast master", "Exceptional Training"],
+  ["ranger", "beast master", "Bestial Fury"],
+  ["ranger", "beast master", "Share Spells"],
+  // Sorcerer's 19 new triples (#1232): the 4 base names that genuinely fork
+  // (Spellcasting, Font of Magic, Metamagic, Sorcerous Restoration —
+  // Sorcerous Origin -> Sorcerer Subclass is a RENAME, not a same-named fork,
+  // so it never counts here) show up under EVERY subclass context Sorcerer
+  // has (undefined/draconic bloodline/wild magic), same reason Wizard's 4
+  // base names show up under all 4 of ITS contexts (collectTaggedFeatureKeys
+  // combines classRows with EVERY subclass's own rows) — 4 x 3 = 12, plus
+  // Draconic Bloodline's own 3 (Draconic Resilience, Elemental Affinity,
+  // Dragon Wings — Dragon Ancestor/Draconic Spells and Draconic
+  // Presence/Dragon Companion share no name, so neither of those RENAMED
+  // pairs counts), plus Wild Magic's own 4 (Wild Magic Surge, Tides of
+  // Chaos, Bend Luck, Controlled Chaos — Spell Bombardment/Tamed Surge share
+  // no name, so that RENAMED pair doesn't count either) = 12 + 3 + 4 = 19.
+  // Innate Sorcery/Sorcery Incarnate/Epic Boon/Arcane Apotheosis (base) and
+  // Draconic Spells/Dragon Companion (Draconic Bloodline) and Tamed Surge
+  // (Wild Magic) are NOT tagged — each is 2024-only, no 2014 twin to diverge
+  // from.
+  ["sorcerer", "undefined", "Spellcasting"],
+  ["sorcerer", "undefined", "Font of Magic"],
+  ["sorcerer", "undefined", "Metamagic"],
+  ["sorcerer", "undefined", "Sorcerous Restoration"],
+  ["sorcerer", "draconic bloodline", "Spellcasting"],
+  ["sorcerer", "draconic bloodline", "Font of Magic"],
+  ["sorcerer", "draconic bloodline", "Metamagic"],
+  ["sorcerer", "draconic bloodline", "Sorcerous Restoration"],
+  ["sorcerer", "draconic bloodline", "Draconic Resilience"],
+  ["sorcerer", "draconic bloodline", "Elemental Affinity"],
+  ["sorcerer", "draconic bloodline", "Dragon Wings"],
+  ["sorcerer", "wild magic", "Spellcasting"],
+  ["sorcerer", "wild magic", "Font of Magic"],
+  ["sorcerer", "wild magic", "Metamagic"],
+  ["sorcerer", "wild magic", "Sorcerous Restoration"],
+  ["sorcerer", "wild magic", "Wild Magic Surge"],
+  ["sorcerer", "wild magic", "Tides of Chaos"],
+  ["sorcerer", "wild magic", "Bend Luck"],
+  ["sorcerer", "wild magic", "Controlled Chaos"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

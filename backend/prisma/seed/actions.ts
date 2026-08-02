@@ -580,6 +580,9 @@ export const ACTIONS: ActionSeed[] = [
   },
 
   // ── Class: Sorcerer ─────────────────────────────────────────────────────
+  // SRD 5.2 grants Metamagic at level 2, not PHB'14's level 3 (#1232 commit
+  // 2b) — a same-key edition fork, mirroring the universal rows' own
+  // per-edition split above.
   {
     key: "metamagic",
     name: "Metamagic",
@@ -588,8 +591,21 @@ export const ACTIONS: ActionSeed[] = [
     grantLevel: 3,
     resourceKey: "sorceryPoints",
     resourceAmount: 1,
+    edition: "EDITION_2014",
     description:
       "Apply a Metamagic option to a spell you cast (Subtle, Quickened, Twinned, etc.). Costs vary by option.",
+  },
+  {
+    key: "metamagic",
+    name: "Metamagic",
+    cost: "free",
+    grantClass: "sorcerer",
+    grantLevel: 2,
+    resourceKey: "sorceryPoints",
+    resourceAmount: 1,
+    edition: "EDITION_2024",
+    description:
+      "Apply a Metamagic option to a spell you cast (Careful, Distant, Empowered, Extended, Heightened, Quickened, Seeking, Subtle, Transmuted, Twinned). Costs vary by option.",
   },
 
   // ── Class: Warlock ──────────────────────────────────────────────────────
