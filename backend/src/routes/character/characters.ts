@@ -27,7 +27,7 @@ charactersRouter.get("/characters", async (req, res) => {
       name: true,
       ownerId: true,
       campaignId: true,
-      portraitUrl: true,
+      portraitKey: true,
       experiencePoints: true,
       raceSelection: { select: { name: true } },
       classEntries: { select: { name: true, level: true }, orderBy: { position: "asc" } },
