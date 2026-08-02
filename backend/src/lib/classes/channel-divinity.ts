@@ -47,6 +47,16 @@ interface ChannelDivinityGate {
 
 // Gate + kind per option, keyed by the catalog row name. Rows themselves carry
 // description/cost/save ability; this table owns the class/subclass/level gate.
+//
+// #1229: "Turn the Unholy"/"Turn the Faithless"/"Abjure Enemy" gates STAY —
+// the issue's own instruction to delete them outright would break a 2014
+// Paladin. Their catalog rows retag to EDITION_2014 instead (channel-
+// divinity.ts, the seed) — a 2024 character never sees them because
+// resolveEditionCatalog (routes/character/channel-divinity.ts) already
+// narrows the candidate list to that character's edition before this gate is
+// ever consulted, so the (now dead-for-2024, live-for-2014) gate entry is
+// correct as-is. "Divine Sense" and "Abjure Foes" are NEW base-class options
+// (no `subclass` — every 2024 Paladin regardless of oath), added below.
 export const CHANNEL_DIVINITY_OPTIONS: Record<string, ChannelDivinityGate> = {
   "Channel Divinity: Turn Undead": { className: "cleric", minLevel: 2, kind: "announce" },
   // SRD 5.2: domain Channel Divinity options unlock with the level-3 subclass grant (#1128).
@@ -59,6 +69,15 @@ export const CHANNEL_DIVINITY_OPTIONS: Record<string, ChannelDivinityGate> = {
   "Channel Divinity: Turn the Faithless": { className: "paladin", subclass: "oath of the ancients", minLevel: 3, kind: "announce" },
   "Channel Divinity: Abjure Enemy": { className: "paladin", subclass: "oath of vengeance", minLevel: 3, kind: "announce" },
   "Channel Divinity: Vow of Enmity": { className: "paladin", subclass: "oath of vengeance", minLevel: 3, kind: "advantage" },
+  // SRD 5.2, #1229: Divine Sense is the base Channel Divinity option every
+  // Paladin starts with (no subclass), gated at L3 (the level Channel
+  // Divinity itself is granted at in 2024, not L1 as in 2014).
+  "Channel Divinity: Divine Sense": { className: "paladin", minLevel: 3, kind: "reminder" },
+  // SRD 5.2, #1229: Abjure Foes is a base Channel Divinity option (no
+  // subclass) granted at L9. The DC is Charisma-derived (channelDivinitySaveDC
+  // below); the save ABILITY the target rolls is Wisdom (the catalog row's
+  // own saveAbility column, prisma/seed/channel-divinity.ts).
+  "Abjure Foes": { className: "paladin", minLevel: 9, kind: "announce" },
 };
 
 /** One class entry as needed for gating (name + subclass + optional explicit level). */
@@ -127,7 +146,7 @@ export function describeChannelDivinity(
       reminder = `Restores ${preserveLifeHpPool(ctx.classLevel)} HP total among creatures within 30 ft (max half HP each).`;
       break;
     case "Channel Divinity: Sacred Weapon": {
-      const bonus = sacredWeaponBonus(ctx.abilityScores);
+      const bonus = chaModifierFloor1(ctx.abilityScores);
       reminder = `+${bonus} to attack rolls with one weapon for 1 minute; sheds bright light.`;
       break;
     }
@@ -139,6 +158,18 @@ export function describeChannelDivinity(
       break;
     case "Channel Divinity: Invoke Duplicity":
       reminder = "Illusory duplicate for 1 minute (concentration); advantage vs creatures within 5 ft of it.";
+      break;
+    // #1229 follow-on 2: without its own arm, this reminder-kind row (no
+    // saveAbility) would fall to the default branch's `saveDc !== null &&
+    // row.saveAbility` check and yield "" — a silent empty reminder.
+    case "Channel Divinity: Divine Sense":
+      reminder = "Sense celestials, fiends, and undead within 60 ft for 10 minutes or until Incapacitated; also reveals consecrated/desecrated places (as Hallow).";
+      break;
+    // #1229: Abjure Foes' default-branch reminder ("or are turned/affected")
+    // is generic; this arm states the real effect (Frightened) and the
+    // Charisma-modifier target count instead.
+    case "Abjure Foes":
+      reminder = `Up to ${chaModifierFloor1(ctx.abilityScores)} creature(s) within 60 ft make a ${row.saveAbility ?? "wisdom"} save (DC ${saveDc}) or are Frightened for 1 minute or until damaged.`;
       break;
     default:
       reminder = saveDc !== null && row.saveAbility
@@ -156,8 +187,10 @@ export function describeChannelDivinity(
   };
 }
 
-// Sacred Weapon adds Charisma modifier (minimum +1) to attack rolls.
-function sacredWeaponBonus(abilityScores: Record<string, number>): number {
+// Charisma modifier, floored at 1 — Sacred Weapon's attack-roll bonus AND
+// Abjure Foes' target count share this exact SRD formula ("minimum +1" /
+// "minimum of one creature"), so one function serves both call sites (#1229).
+function chaModifierFloor1(abilityScores: Record<string, number>): number {
   return Math.max(1, abilityModifier(abilityScores.charisma ?? 10));
 }
 
@@ -247,7 +280,7 @@ async function applyChannelDivinitySideEffect(
       {
         key: catalog.id,
         target: catalog.buffTarget ?? "attackRoll",
-        modifier: sacredWeaponBonus(abilityScores),
+        modifier: chaModifierFloor1(abilityScores),
         source: catalog.name,
         sourceEntryId: catalog.id,
         duration: "while-active",

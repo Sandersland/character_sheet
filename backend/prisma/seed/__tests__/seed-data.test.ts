@@ -109,8 +109,17 @@ describe("per-domain business-key uniqueness", () => {
   // text still needs to name the right level per edition, and the ONE
   // exception is a set, mirroring TWENTY_FOUR_ONLY_ACTION_KEYS's shape, not a
   // loosened predicate that could hide a future accidental class-row fork.
-  it("every universal ACTION carries an edition; every class action stays shared, except the sanctioned metamagic fork", () => {
-    const SANCTIONED_CLASS_FORKS = new Set(["metamagic"]);
+  //
+  // "divineSense"/"layOnHands" join it (#1229): divineSense is EDITION_2014-
+  // only (2024 removed it as its own resource pool/action — its job moves to
+  // the "Channel Divinity: Divine Sense" catalog option, cast through the
+  // abilities endpoint, not this actions dispatch), and layOnHands' cost
+  // forks to a Bonus Action in 2024 (SRD 5.2) with a reworded description
+  // (drops the disease clause). Same non-route-consumed reasoning as
+  // metamagic — the real gate is DERIVED_ACTIONS' own twin rows
+  // (lib/classes/actions.ts).
+  it("every universal ACTION carries an edition; every class action stays shared, except the sanctioned metamagic/divineSense/layOnHands forks", () => {
+    const SANCTIONED_CLASS_FORKS = new Set(["metamagic", "divineSense", "layOnHands"]);
     expect(ACTIONS.filter((a) => a.universal && !a.edition).map((a) => a.key)).toEqual([]);
     expect(ACTIONS.filter((a) => !a.universal && a.edition && !SANCTIONED_CLASS_FORKS.has(a.key)).map((a) => a.key)).toEqual([]);
   });
@@ -158,8 +167,13 @@ describe("per-domain business-key uniqueness", () => {
     expect(duplicates(SHADOW_ARTS.map((s) => s.name))).toEqual([]);
   });
 
-  it("CHANNEL_DIVINITIES have unique names", () => {
-    expect(duplicates(CHANNEL_DIVINITIES.map((c) => c.name))).toEqual([]);
+  // Keyed on (name, edition) rather than name alone (#1229): Nature's Wrath
+  // legitimately repeats its name once per edition (a genuine mechanical
+  // fork — saveAbility dexterity vs strength) — only a same-name/same-edition
+  // collision would collapse in the DB's upsert. Mirrors FEATS' own
+  // (name, edition) key below.
+  it("CHANNEL_DIVINITIES have unique (name, edition) pairs", () => {
+    expect(duplicates(CHANNEL_DIVINITIES.map((c) => `${c.name}::${c.edition ?? "shared"}`))).toEqual([]);
   });
 
   // Keyed on (name, edition) rather than name alone: a feat that genuinely
@@ -501,18 +515,21 @@ describe("SRD 5.2 catalog values — CHUNK 4 additions (#1132)", () => {
 });
 
 describe("global GrantedAbility name-uniqueness", () => {
-  // All these sources upsert into GrantedAbility, whose `name` is globally
-  // unique — a cross-source collision would make one row silently overwrite
-  // another. This is the same invariant the seed.ts guard throws on.
-  it("no name collides across maneuvers/shadow-arts/channel-divinity", () => {
-    const names = [
-      ...MANEUVERS.map((m) => m.name),
-      ...SHADOW_ARTS.map((s) => s.name),
-      ...CHANNEL_DIVINITIES.map((c) => c.name),
+  // All these sources upsert into GrantedAbility, whose business key is
+  // (name, edition) — #1415 widened it from name alone precisely so a
+  // same-name fork (Nature's Wrath, #1229) can exist without colliding. Keyed
+  // the same way here as assertUniqueGrantedAbilityNames (guards.ts) itself —
+  // a bare name-only key would misreport that legitimate fork as a
+  // cross-source collision.
+  it("no (name, edition) pair collides across maneuvers/shadow-arts/channel-divinity", () => {
+    const keys = [
+      ...MANEUVERS.map((m) => `${m.name}::${m.edition ?? "shared"}`),
+      ...SHADOW_ARTS.map((s) => `${s.name}::${s.edition ?? "shared"}`),
+      ...CHANNEL_DIVINITIES.map((c) => `${c.name}::${c.edition ?? "shared"}`),
     ];
     expect(
-      duplicates(names),
-      "GrantedAbility name collision across the seed sources",
+      duplicates(keys),
+      "GrantedAbility (name, edition) collision across the seed sources",
     ).toEqual([]);
   });
 });
