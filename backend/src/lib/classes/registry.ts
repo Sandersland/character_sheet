@@ -60,7 +60,9 @@ const CLASSES: Record<string, ClassDefinition> = {
 // whenever the caller's select carries the class relation. Their TS overlay
 // (the second pass below) is now only the FALLBACK for a narrow-select caller
 // that carries no such relation — which is what makes deleting those five
-// modules safe, and is the whole point of that issue. This is what lets deriveSubclassLayer resolve a subclass's
+// modules safe, and is the whole point of that issue.
+//
+// The identity-only seed is what lets deriveSubclassLayer resolve a subclass's
 // seeded ClassFeature rows (poolsFromRows/featuresFromRows) even when no
 // ClassDefinition registers it in TS at all (Fighter's three since fighter.ts
 // was deleted, #1532; Barbarian's two since barbarian.ts was, #1223) —
