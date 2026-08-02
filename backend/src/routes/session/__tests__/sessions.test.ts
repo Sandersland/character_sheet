@@ -1,6 +1,6 @@
 /**
  * Campaign-level session lifecycle + combat/roll + summary route tests (#245).
- * Real Postgres in beforeEach, supertest against createApp(). A shared session
+ * Real Postgres in beforeEach, supertest against the shared `app`. A shared session
  * belongs to a campaign; party members join/leave it. Fixtures build a campaign
  * with an OWNER + a PLAYER, each owning one character attached to the campaign.
  */

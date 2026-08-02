@@ -1,5 +1,5 @@
 /**
- * PATCH /api/preferences (#1178). Real Postgres, supertest against createApp()
+ * PATCH /api/preferences (#1178). Real Postgres, supertest against the shared `app`
  * — same authCookie + ensureTestOwner harness pattern used by other route tests.
  */
 

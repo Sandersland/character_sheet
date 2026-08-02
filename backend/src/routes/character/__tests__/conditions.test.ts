@@ -1,7 +1,7 @@
 /**
  * Conditions route integration tests.
  * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest against
- * createApp(). The fixture is a minimal level-1 Fighter (conditions are not
+ * the shared `app`. The fixture is a minimal level-1 Fighter (conditions are not
  * level- or class-derived, so a plain character suffices).
  */
 

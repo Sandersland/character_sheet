@@ -16,7 +16,7 @@
  *     ≠ refund — endRage's op list is clearBuff only)
  *   - LIFO revert of the activation restores the pool AND removes the buff together
  *
- * Real Postgres in each test; supertest against createApp().
+ * Real Postgres in each test; supertest against the shared `app`.
  *
  * #1223 UPDATE: Rage's resource pool moved off lib/classes/barbarian.ts's
  * resourceFn (which resolved purely off the classEntry NAME, "barbarian",

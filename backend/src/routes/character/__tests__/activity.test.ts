@@ -6,7 +6,7 @@
  * is core safety infrastructure and was previously untested.
  *
  * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest against
- * createApp(). Uses UNIQUELY-NAMED catalog fixtures (per testing.md) so the
+ * the shared `app`. Uses UNIQUELY-NAMED catalog fixtures (per testing.md) so the
  * afterAll cleanup never touches seeded rows.
  *
  * What's exercised:

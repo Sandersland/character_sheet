@@ -1,6 +1,6 @@
 /**
  * Campaign-scoped character preferences (#537). Real Postgres, supertest against
- * createApp(). Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER
+ * the shared `app`. Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER
  * owns CHAR attached to the campaign and OUTSIDER_CHAR in no campaign.
  */
 

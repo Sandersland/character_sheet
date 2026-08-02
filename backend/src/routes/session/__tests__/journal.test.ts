@@ -4,7 +4,7 @@
  * journal entries surfaced under `character.journal` (newest-first).
  *
  * Mirrors sessions.test.ts: real Postgres in beforeEach, supertest against
- * createApp(). JournalEntry rows cascade-delete with the character, so
+ * the shared `app`. JournalEntry rows cascade-delete with the character, so
  * afterEach only deletes the character row.
  */
 

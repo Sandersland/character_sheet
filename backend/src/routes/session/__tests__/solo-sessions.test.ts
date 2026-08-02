@@ -2,7 +2,7 @@
  * Solo (character-scoped) session lifecycle tests (#1080). A solo session is a
  * first-class Session row with campaignId null, owned by exactly one character.
  * Mirrors sessions.test.ts: real Postgres in beforeEach, supertest against
- * createApp(), plus direct lib calls to startSoloSession.
+ * the shared `app`, plus direct lib calls to startSoloSession.
  */
 
 import { randomUUID } from "node:crypto";

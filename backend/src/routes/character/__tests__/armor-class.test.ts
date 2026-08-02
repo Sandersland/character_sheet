@@ -1,7 +1,7 @@
 /**
  * AC-derivation route tests (#361). armorClass is derived at read time from the
  * equipped body armor + effective Dex (per category) + shield, never persisted.
- * Real Postgres in beforeEach, supertest against createApp(). Custom armor is
+ * Real Postgres in beforeEach, supertest against the shared `app`. Custom armor is
  * acquired equipped so no catalog seeding is needed.
  */
 

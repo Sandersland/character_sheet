@@ -1,7 +1,7 @@
 /**
  * Spellcasting route integration tests.
  * Mirrors inventory.test.ts: real Postgres in beforeEach, supertest against
- * createApp(). The fixture is a level-1 Wizard (2× L1 slots, INT 16).
+ * the shared `app`. The fixture is a level-1 Wizard (2× L1 slots, INT 16).
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";

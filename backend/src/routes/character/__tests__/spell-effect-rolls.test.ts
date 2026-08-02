@@ -2,7 +2,7 @@
  * #1381: spell rows serve a resolved `effect` (EffectSpec) and `effectRolls`
  * (one resolved roll per castable slot level) instead of the client re-deriving
  * cantrip scaling / upcast dice / heal-modifier from the raw catalog columns.
- * Harness mirrors spellcasting.test.ts (real Postgres, supertest + createApp()).
+ * Harness mirrors spellcasting.test.ts (real Postgres, supertest + the shared `app`).
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

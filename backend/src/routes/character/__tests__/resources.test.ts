@@ -1,7 +1,7 @@
 /**
  * Resources route characterization tests (issue #289).
  * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest against
- * createApp(). The fixture is a level-3 Battle Master Fighter (Str 16) so the
+ * the shared `app`. The fixture is a level-3 Battle Master Fighter (Str 16) so the
  * superiority-die pool, maneuver choice count (3), and Student-of-War tool
  * choice count (1) are all deterministic. Locks the CURRENT behavior of
  * applyResourceOperations across all six op branches before any refactor.

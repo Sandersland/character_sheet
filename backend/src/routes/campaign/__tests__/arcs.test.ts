@@ -8,7 +8,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
 // Campaign arcs (#863): owner-gated CRUD + session assignment + SetNull-on-delete.
-// Real Postgres, supertest against createApp(). File-prefixed fixture ids keep it
+// Real Postgres, supertest against the shared `app`. File-prefixed fixture ids keep it
 // parallel-safe on the shared dev DB.
 
 const OWNER = "owner-arcs-owner";

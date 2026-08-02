@@ -15,7 +15,7 @@
  *     same row-driven path but with no effectKind
  *   - unknown action key → 400
  *
- * Real Postgres in beforeEach; supertest against createApp(). Uniquely-named
+ * Real Postgres in beforeEach; supertest against the shared `app`. Uniquely-named
  * catalog fixtures per testing.md so afterAll cleanup never touches seeded
  * rows — fighterResourceRowsData seeds this fixture's OWN ClassFeature rows
  * (#1528: Second Wind/Action Surge are tied to a specific classId now, not

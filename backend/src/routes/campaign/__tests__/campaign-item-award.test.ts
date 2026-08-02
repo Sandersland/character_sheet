@@ -1,5 +1,5 @@
 /**
- * DM item award/revoke (#381). Real Postgres, supertest against createApp().
+ * DM item award/revoke (#381). Real Postgres, supertest against the shared `app`.
  * Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER owns a
  * character attached to the campaign, plus an OUTSIDER character in no campaign.
  */

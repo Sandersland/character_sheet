@@ -1,5 +1,5 @@
 /**
- * Party-target healing (#462). Real Postgres, supertest against createApp().
+ * Party-target healing (#462). Real Postgres, supertest against the shared `app`.
  * Fixtures: a campaign owned by DM (who also plays a healer character) with
  * PLAYER joined; PLAYER owns TARGET (opted in) and TARGET_OPTOUT (not opted in),
  * both attached to the campaign. The healer casts Cure Wounds at an ally's sheet.

@@ -8,7 +8,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
 // Chronicle read model + participant-editable session titles (#863). Real
-// Postgres, supertest against createApp(). Sessions are created directly via
+// Postgres, supertest against the shared `app`. Sessions are created directly via
 // prisma with explicit startedAt so the derived sessionNumber is deterministic.
 
 const OWNER = "owner-chronicle-owner";
