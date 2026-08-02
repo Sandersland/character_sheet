@@ -39,7 +39,7 @@ import type {
 } from "./spell-state.js";
 import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
-import { FEATURE_ROWS_ORDER_BY, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
+import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import {
   normalizeResourcesMutable,
@@ -913,7 +913,7 @@ const SPELLCASTING_SELECT = {
       class: {
         select: {
           subclassLevel: true,
-          features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+          features: FEATURE_ROWS_CLASS_FEATURES,
         },
       },
       // Subclass-granted spells (#898) injected into the working view below.
@@ -925,7 +925,7 @@ const SPELLCASTING_SELECT = {
         select: {
           name: true,
           grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } },
-          features: { orderBy: FEATURE_ROWS_ORDER_BY },
+          features: FEATURE_ROWS_SUBCLASS_FEATURES,
         },
       },
     },
