@@ -103,6 +103,55 @@ export async function assertNoCharactersReferenceStaleSubclasses(
 // OWN slug is still seeded, under an edition no longer wanted for it. A slug
 // the seed has stopped emitting altogether is untouched and left for its own
 // deliberate fix (the three orphaned monk-way-of-* rows, #1559 disclosure).
+// Re-points live characters off a stale row onto the retained row for the SAME
+// SLUG, so a retag stops wedging deploys (`railway.json`'s preDeployCommand is
+// `prisma migrate deploy && prisma db seed`, so the guard below aborting the
+// seed fails the whole deploy — and its "remap, then re-run" advice is a manual
+// runbook step no deploy can perform). #1233's Archfey/Great Old One retag hit
+// exactly this against a populated staging database.
+//
+// This does NOT weaken #1559's guard, because it cannot cause the harm that
+// guard exists to prevent. A slug IS a subclass's immutable identity (#1277) —
+// the stale row and the retained row are the same subclass differing only in
+// edition tag — so re-pointing the FK preserves the character's subclass
+// exactly, where `onDelete: SetNull` would have erased it. And by construction
+// a retained row exists for every row this prune can reach: pruneStaleSubclasses
+// scopes itself to slugs the seed still emits (see its own comment), so a slug
+// retired outright is never a candidate here.
+//
+// Deliberately ONLY the unambiguous case. Two or more retained rows for one
+// slug (a same-slug fork seeded under BOTH editions) is a genuine choice
+// between them, not a mechanical repoint, so those are left untouched for the
+// guard to reject — automating the safe half must not quietly guess at the
+// unsafe half.
+async function remapCharactersOffStaleSubclasses(
+  prisma: PrismaClient,
+  stale: readonly StaleSubclassRow[],
+): Promise<void> {
+  for (const row of stale) {
+    const retained = await prisma.subclass.findMany({
+      where: { slug: row.slug, id: { not: row.id } },
+      select: { id: true, edition: true },
+    });
+    if (retained.length !== 1) continue;
+
+    const { count } = await prisma.characterClassEntry.updateMany({
+      where: { subclassId: row.id },
+      data: { subclassId: retained[0].id },
+    });
+    if (count > 0) {
+      // Loud, not silent: a deploy that moves live character rows should say so
+      // in its log, and the edition it moved them ONTO is the detail someone
+      // debugging a cross-edition sheet later will want.
+      console.log(
+        `seedSubclasses: remapped ${count} CharacterClassEntry row(s) from stale ${row.slug} ` +
+          `(${row.edition ?? "shared"}) onto the retained ${row.edition ?? "shared"} -> ` +
+          `${retained[0].edition ?? "shared"} row before pruning (#1559)`,
+      );
+    }
+  }
+}
+
 export async function pruneStaleSubclasses(
   prisma: PrismaClient,
   seeded: readonly { slug: string; edition: SeedEdition | null }[],
@@ -116,6 +165,10 @@ export async function pruneStaleSubclasses(
   const stale = await prisma.subclass.findMany({ where: staleWhere, select: { id: true, slug: true, edition: true } });
   const staleRows: StaleSubclassRow[] = stale.map((s) => ({ id: s.id, slug: s.slug, edition: s.edition as SeedEdition | null }));
 
+  // Remap FIRST, then assert: the guard is the backstop for whatever the remap
+  // could not resolve safely (an ambiguous same-slug fork), not the first line
+  // of defence any more.
+  await remapCharactersOffStaleSubclasses(prisma, staleRows);
   await assertNoCharactersReferenceStaleSubclasses(prisma, staleRows);
 
   if (stale.length) {

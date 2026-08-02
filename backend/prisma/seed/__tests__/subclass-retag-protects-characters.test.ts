@@ -102,23 +102,67 @@ afterAll(async () => {
 });
 
 describe("assertNoCharactersReferenceStaleSubclasses / pruneStaleSubclasses (#1559)", () => {
-  it("refuses to prune a retagged row's old id while a CharacterClassEntry still references it, naming the slug/edition/count", async () => {
-    const { oldRow } = await seedRetagFixture();
+  // This case used to assert the prune REFUSED here. It no longer does, and the
+  // change is deliberate: #1233's Archfey/Great Old One retag hit this against
+  // a populated staging database and wedged every Railway deploy, because
+  // railway.json runs `prisma db seed` as its preDeployCommand and the guard's
+  // "remap the rows, then re-run" advice is a manual step no deploy can take.
+  //
+  // The guard's PURPOSE is intact. It exists to stop `onDelete: SetNull`
+  // silently ERASING a live character's subclass; remapping onto the retained
+  // row for the same slug preserves that subclass exactly, because a slug is a
+  // subclass's immutable identity (#1277) and the two rows differ only in
+  // edition tag. What follows is the assertion that matters: the character
+  // still has its subclass afterwards.
+  it("remaps a live character onto the retained row instead of refusing, preserving its subclass", async () => {
+    const { oldRow, newRow } = await seedRetagFixture();
 
     // seeded = [{ slug: SLUG, edition: "EDITION_2014" }] is exactly the shape
     // seedSubclasses passes: the seed now wants EDITION_2014 for this slug, so
-    // the OLD (shared) row is stale — but a live character still points at it.
-    await expect(pruneStaleSubclasses(prisma, [{ slug: SLUG, edition: "EDITION_2014" }])).rejects.toThrow(
-      new RegExp(`${SLUG} \\(shared\\): 1 referencing CharacterClassEntry row\\(s\\)`),
-    );
+    // the OLD (shared) row is stale — and a live character still points at it.
+    await expect(pruneStaleSubclasses(prisma, [{ slug: SLUG, edition: "EDITION_2014" }])).resolves.toBeUndefined();
+
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // NOT null — the failure mode this whole file exists to close — and not
+    // left dangling on the deleted row either.
+    expect(entry.subclassId).toBe(newRow.id);
+    expect(entry.subclassId).not.toBe(oldRow.id);
+    expect(entry.subclass).toBe("Fixture Subclass");
+
+    expect(await prisma.subclass.findUnique({ where: { id: oldRow.id } })).toBeNull();
+  });
+
+  // The half that is still refused. Two retained rows under one slug is a
+  // genuine choice between them, not a mechanical repoint, so the remap
+  // declines and the guard throws exactly as before — automating the safe case
+  // must not quietly guess at the unsafe one.
+  it("still refuses when the slug has MORE than one retained row, naming slug/edition/count", async () => {
+    const { oldRow } = await seedRetagFixture();
+    const classId = await ensureFixtureClass();
+    // A second retained row for the same slug — now "the retained row" is
+    // ambiguous, so nothing may be remapped automatically.
+    await prisma.subclass.create({
+      data: {
+        classId,
+        name: "Fixture Subclass",
+        description: "2024-only",
+        slug: SLUG,
+        edition: "EDITION_2024",
+      },
+    });
+
+    await expect(
+      pruneStaleSubclasses(prisma, [
+        { slug: SLUG, edition: "EDITION_2014" },
+        { slug: SLUG, edition: "EDITION_2024" },
+      ]),
+    ).rejects.toThrow(new RegExp(`${SLUG} \\(shared\\): 1 referencing CharacterClassEntry row\\(s\\)`));
 
     // Refusing to prune means refusing to mutate — the entry's subclassId
     // must be EXACTLY what it was, not nulled and not repointed.
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
     expect(entry.subclassId).toBe(oldRow.id);
-
-    const stillThere = await prisma.subclass.findUnique({ where: { id: oldRow.id } });
-    expect(stillThere).not.toBeNull();
+    expect(await prisma.subclass.findUnique({ where: { id: oldRow.id } })).not.toBeNull();
   });
 
   it("prunes cleanly once no CharacterClassEntry references the old row", async () => {
