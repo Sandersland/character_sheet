@@ -907,7 +907,15 @@ const SPELLCASTING_SELECT = {
       // besides a resourceFn is row-driven (poolsFromRows) — this featureRows
       // carrier is what lets Wizard's arcaneRecovery pool resolve now that its
       // resourceFn is deleted and the pool lives on the row instead.
-      class: { select: { features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } } },
+      // `subclassLevel` (#1576): featureRowsOf carries it into isSubclassActive
+      // so a 2014 subclass gates at its PHB'14 level here too, independent of
+      // whether its lib/classes/<class>.ts module still exists.
+      class: {
+        select: {
+          subclassLevel: true,
+          features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+        },
+      },
       // Subclass-granted spells (#898) injected into the working view below.
       // Switched from `include` to `select` (#1528) to add `features` without
       // widening the fetched columns further — `name` is kept explicitly since

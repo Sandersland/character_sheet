@@ -74,7 +74,15 @@ export interface ClassEntryRow {
   // select widens its EXISTING `class`/adds its own `subclassRef` rather than
   // spreading the shared fragment in.
   // `extraAsiLevels` (#1529): characterAdvancementSlots' featSlotCap read below.
-  class: { hitDie: string; extraAsiLevels: number[]; features: ClassFeatureRow[] } | null;
+  // `subclassLevel` (#1576): the seeded PHB'14 subclass grant level, fed into
+  // deriveRestPools' ClassFeatureRowsCarrier so isSubclassActive no longer
+  // depends on a lib/classes/<class>.ts module being present.
+  class: {
+    hitDie: string;
+    extraAsiLevels: number[];
+    subclassLevel: number;
+    features: ClassFeatureRow[];
+  } | null;
   subclassRef: { features: ClassFeatureRow[] } | null;
 }
 
@@ -135,10 +143,14 @@ export async function buildHpOpContext(
           // read that cannot share the fragment, so it is where drift hides
           // (#1545). `extraAsiLevels` (#1529): the featSlotCap read below
           // (characterAdvancementSlots).
+          // `subclassLevel` (#1576): deriveRestPools' carrier needs it so a
+          // 2014 Cleric/Sorcerer/Warlock/Druid/Wizard's subclass pools still
+          // gate at their PHB'14 level once the class module is gone.
           class: {
             select: {
               hitDie: true,
               extraAsiLevels: true,
+              subclassLevel: true,
               features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
             },
           },

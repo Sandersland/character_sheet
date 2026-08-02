@@ -137,6 +137,22 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
 export interface ClassFeatureRowsCarrier {
   classRows: ClassFeatureRow[];
   subclassRows: ClassFeatureRow[];
+
+  // The seeded CharacterClass.subclassLevel — this class's PHB'14 subclass
+  // grant level (Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, the rest 3), the
+  // catalog column subclassGateLevel already resolves for buildClassesView,
+  // character creation and the level-up ceremony. It rides HERE rather than as
+  // a new deriveResources parameter because this carrier is already the
+  // channel seeded class data travels on, and `edition` stays last by the
+  // subclassGateLevel/#1499 convention (#1576).
+  //
+  // Undefined for the narrow-select callers that carry no class relation, in
+  // which case isSubclassActive falls back to the TS module's own grantLevel —
+  // so a class whose module still exists behaves identically either way. That
+  // fallback is what makes deleting the module SAFE: without this field, doing
+  // so silently moved five classes' 2014 gate to 3 (subclassGateLevel's
+  // `?? 3`), leaving a character its subclass NAME and none of its FEATURES.
+  subclassLevel?: number;
 }
 
 /**
