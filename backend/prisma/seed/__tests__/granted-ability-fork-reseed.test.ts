@@ -114,3 +114,51 @@ describe("the converse: an undeclared fork is pruned (#1313's remaining work)", 
     expect(surviving.sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
   });
 });
+
+// #1229: seedChannelDivinities had NO prune at all before this issue —
+// retagging "Channel Divinity: Turn the Unholy" (and its two siblings) from
+// `edition: null` to `EDITION_2014` creates a NEW row via upsertEditionRow's
+// findFirst-by-(name,edition) and ORPHANS the pre-existing NULL row unless
+// something deletes it. Converse of the shadowArts case above: proves (a) the
+// new prune drops the orphaned NULL row on reseed and (b) the freshly-tagged
+// EDITION_2014 row survives the SAME prune call.
+const CD_NAME = "Zzz Fork Reseed Channel Divinity (#1229)";
+describe("seedChannelDivinities' new prune (#1229) drops an orphaned shared row left behind by an edition retag", () => {
+  afterEach(async () => {
+    await prisma.grantedAbility.deleteMany({ where: { name: CD_NAME } });
+  });
+
+  it("retagging a previously-shared option to EDITION_2014 orphans the NULL row, and the new prune drops only that orphan", async () => {
+    // Simulates the pre-#1229 database state: a shared (edition: null) row,
+    // as every CHANNEL_DIVINITIES entry was before this issue.
+    const orphan = await prisma.grantedAbility.create({
+      data: { name: CD_NAME, source: "channelDivinity", description: "pre-retag shared text", edition: null },
+    });
+
+    // The retag itself: upsertEditionRow with the NEW (name, EDITION_2014)
+    // key can't find the NULL row (different key), so it creates a sibling —
+    // exactly what seedChannelDivinities' main loop does today.
+    const retagged = await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: CD_NAME, edition: "EDITION_2014" },
+      { name: CD_NAME, source: "channelDivinity", description: "retagged 2014 text", edition: "EDITION_2014" },
+      { description: "retagged 2014 text" },
+    );
+
+    // What seedChannelDivinities now passes: each row's OWN edition, never a
+    // flat null — the shape this issue's prune adds.
+    const seededAsRetagged = [{ identity: CD_NAME, edition: "EDITION_2014" as const }];
+    await prisma.grantedAbility.deleteMany({
+      where: staleCatalogRowsWhere("name", seededAsRetagged, { source: "channelDivinity" }),
+    });
+
+    const surviving = await prisma.grantedAbility.findMany({ where: { name: CD_NAME } });
+    expect(surviving).toHaveLength(1);
+    expect(surviving[0].id).toBe(retagged.id);
+    expect(surviving[0].edition).toBe("EDITION_2014");
+    // The orphaned NULL row (which withEditionOrShared's null-is-shared
+    // fallback would otherwise keep serving to a 2024 Paladin forever) is
+    // gone.
+    expect(surviving.some((r) => r.id === orphan.id)).toBe(false);
+  });
+});

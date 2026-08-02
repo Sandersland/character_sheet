@@ -18,13 +18,15 @@
 // was the false statement the drift hid behind.
 //
 // FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
-// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233) and WIZARD
-// (#1234) all author their ClassFeature rows as literal seed data
+// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233), WIZARD (#1234),
+// BARD (#1224), DRUID (#1226) and PALADIN (#1229) all author their
+// ClassFeature rows as literal seed data
 // (prisma/seed/<class>-features.ts), which this src-side fixture can't
 // import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
-// anything under prisma/ a compile error (TS6059). Their rows therefore come
-// from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps below,
-// mirroring each seed file's RESOURCE columns.
+// anything under prisma/ a compile error (TS6059). Every one but Bard's rows
+// therefore come from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS
+// maps below, mirroring each seed file's RESOURCE columns — Bard needs no
+// mirror at all (Rogue's own exemption, see below).
 //
 // class-features-snapshot.test.ts records
 // `withoutFeatures(deriveResources(...))`, stripping `.features` before
@@ -36,20 +38,23 @@
 // a class whose rows a real test exercises that way cannot skip the mirror
 // even where `.features` content itself is never asserted (#1225).
 // class-feature-parity.test.ts is the suite that DOES assert on `.features`
-// content, and it skips all eight classes for the same underlying reason (its
+// content, and it skips all nine classes for the same underlying reason (its
 // own file's LITERAL_ROW_CLASSES check).
 //
 // Three different end states sit behind that one list. `lib/classes/
 // fighter.ts`, `barbarian.ts` and `rogue.ts` are deleted outright.
-// `warlock.ts`, `wizard.ts`, `sorcerer.ts` and `cleric.ts` survive because each
-// carries a subclass `grantLevel` (1 for Warlock's patrons, Sorcerer's origins
-// and Cleric's Divine Domain; 2 for Wizard's schools) that no seeded row can
-// express while subclassGateLevel's undefined fallback is 3, so deleting any
-// would silently move that class's 2014 subclass gate (#1576). `ranger.ts`
-// survives for a DIFFERENT reason still (its own header names it: Hunter's
-// `choices` catalog, #899/#1353) — its `grantLevel: 3` already equals the
-// fallback, so unlike the others that isn't why it stays. None of them still
-// exports a base-class `features` array, which is what matters here.
+// `warlock.ts`, `wizard.ts`, `sorcerer.ts`, `cleric.ts` and `druid.ts` survive
+// because each carries a subclass `grantLevel` (1 for Warlock's patrons,
+// Sorcerer's origins and Cleric's Divine Domain; 2 for Wizard's schools and
+// Druid's Circles) that no seeded row can express while subclassGateLevel's
+// undefined fallback is 3, so deleting any would silently move that class's
+// 2014 subclass gate (#1576). `ranger.ts` and `bard.ts` survive for a DIFFERENT
+// reason still — each own header names it: Ranger's Hunter `choices` catalog
+// (#899/#1353) and its EDITION_2024 Wisdom-modifier resourceFn; Bard's
+// Cha-modifier/level-tiered-recharge resourceFn (#1224) — both subclasses'
+// `grantLevel: 3` already equal the fallback, so unlike the first five that
+// isn't why either module stays. None of them still exports a base-class
+// `features` array, which is what matters here.
 //
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
 // stand-in: neither declares a resourceKey/derivedStat in barbarian-features.ts,
@@ -77,9 +82,18 @@
 // nothing any surviving test can see. Ranger does NOT get this exemption — see
 // RANGER_BASE_ROWS' own comment for why its base class needs a mirror where
 // Rogue's doesn't.
-import { bard } from "@/lib/classes/bard.js";
+//
+// BARD (#1224) IS THE SECOND CLASS TAKING ROGUE'S EXEMPTION: neither the base
+// class nor either college (bard-features.ts) declares a resourceKey — Bardic
+// Inspiration's pool stays wholly in bard.ts's resourceFn, called directly by
+// registry.ts independent of this fixture — and College of Valor's Extra
+// Attack is the only derivedStat row, which srd.test.ts/subclass-grant-level
+// tests never probe through a null-vs-object check the way Cleric's domains
+// are. So `bard` is dropped from TEST_CLASSES below entirely (not merely left
+// featureless): `testFeatureRowsFor("bard", …)` falls through to
+// `toRows(undefined?.features ?? [])` -> `[]` for both classRows and
+// subclassRows, identical to Rogue's own shape.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
-import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
@@ -87,7 +101,7 @@ import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 import { wizard } from "@/lib/classes/wizard.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  bard, druid, monk, paladin, ranger, sorcerer, wizard,
+  monk, paladin, ranger, sorcerer, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
@@ -1766,6 +1780,310 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+// DRUID's base-class + both circles' rows (#1226): lib/classes/druid.ts's
+// `.features`/subclass `.features` arrays moved to literal seed data
+// (prisma/seed/druid-features.ts) — the same rootDir boundary
+// FIGHTER_BASE_ROWS' comment explains (druid.ts itself still exists — see
+// its own header for why it isn't deletable — but none of its three
+// `.features` arrays survive). REQUIRED for all three (base + both circles),
+// unlike Barbarian's/Ranger's subclasses which need no mirror at all:
+// srd.test.ts's Circle of the Moon feature-presence checks and
+// subclass-grant-level.test.ts's domain-gate-shaped checks call
+// testFeatureRowsFor with a Druid circle and assert directly on
+// null-ness/`.length` — the same CLERIC'S TWO DOMAINS counterexample this
+// file's own header names. Hand-built per edition (not a shared flatMap over
+// identical text, same reason RANGER_BASE_ROWS gives) because every Druid
+// feature genuinely diverges by #1226's own tagging rule (druid-features.ts's
+// header) — mirrors that file's real content AND resource-pool columns
+// exactly: the EDITION_2024 Wild Shape row's resourceTotals (#1226 commit 3),
+// and Moonlight Step's resourceKey with resourceTotals deliberately OMITTED
+// (a Wisdom-modifier formula — the REAL total comes from
+// lib/classes/druid.ts's Circle of the Moon resourceFn, exercised here via
+// testFeatureRowsFor's TEST_CLASSES import... except Druid is no longer in
+// TEST_CLASSES (dropped at #1226 commit 1, same as Fighter/Barbarian/Rogue),
+// so this fixture alone cannot exercise that resourceFn — DB-backed suites
+// (druid-wildshape-pool.test.ts) prove the end-to-end pool instead).
+export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Druidic",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "You know Druidic, the secret language of druids. You can speak it and leave hidden messages in natural surroundings.",
+  },
+  {
+    name: "Druidic",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You know Druidic, the secret language of druids, and you can leave hidden messages that others can discover only with a successful DC 15 Intelligence (Investigation) check. You always have the Speak with Animals spell prepared, and you can cast it without expending a spell slot.",
+  },
+  {
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "You cast spells using Wisdom. Full-caster progression. You prepare a number of druid spells equal to your Wisdom modifier + your druid level (minimum 1).",
+  },
+  {
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You cast spells using Wisdom (spell save DC = 8 + your Proficiency Bonus + your Wisdom modifier). You know 2 Druid cantrips of your choice from the Druid spell list (3 at level 4, 4 at level 10), and you can replace one of them with another Druid cantrip whenever you finish a Long Rest. You prepare a number of Druid spells equal to the number shown on the Druid Features table for your level (4 at level 1, growing to 22 by level 20) after finishing a Long Rest, and you regain all expended spell slots when you finish a Long Rest. You can use a Druidic Focus as a spellcasting focus for your Druid spells.",
+  },
+  {
+    name: "Wild Shape",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
+  },
+  {
+    name: "Wild Shape",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
+    resourceKey: "wildShape",
+    resourceLabel: "Wild Shape",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 2, total: 2, shortRestRegain: 1 },
+      { minLevel: 6, total: 3, shortRestRegain: 1 },
+      { minLevel: 17, total: 4, shortRestRegain: 1 },
+    ],
+  },
+  {
+    name: "Primal Order",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You have dedicated yourself to one of the following two ways of being a Druid, granting you a benefit; choose Magician or Warden. Magician: you learn one extra cantrip from the Druid spell list, and you gain a bonus to your Intelligence (Arcana or Nature) checks equal to your Wisdom modifier (minimum bonus of +1). Warden: you gain proficiency with Martial weapons and training with Medium armor.",
+  },
+  {
+    name: "Wild Companion",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You can expend a spell slot or a use of your Wild Shape to cast the Find Familiar spell, without Material components; if you spend a spell slot, you cast it as a Magic action instead of its normal casting time. When you cast the spell in either way, the familiar is Fey instead of its usual type, and it disappears when you finish your next Long Rest.",
+  },
+  {
+    name: "Wild Resurgence",
+    level: 5,
+    edition: "EDITION_2024",
+    description:
+      "Once on each of your turns when you have no expended uses of Wild Shape, you can expend a spell slot (no action required) to regain one expended use of it. In addition, once per Long Rest, you can expend one use of your Wild Shape (no action required) to regain a level 1 spell slot.",
+  },
+  {
+    name: "Elemental Fury",
+    level: 7,
+    edition: "EDITION_2024",
+    description:
+      "You've learned to channel primal magic through your spells and your Wild Shape attacks; choose Potent Spellcasting or Primal Strike. Potent Spellcasting: you add your Wisdom modifier to the damage you deal with any Druid cantrip. Primal Strike: once on each of your turns when you hit a target with an attack using a weapon or a Wild Shape Beast form's attack, you can deal an extra 1d8 damage of the following type of your choice: Cold, Fire, Lightning, or Thunder.",
+  },
+  {
+    name: "Improved Elemental Fury",
+    level: 15,
+    edition: "EDITION_2024",
+    description:
+      "Your Elemental Fury improves. Your Potent Spellcasting's cantrips with a range of 10 feet or greater have their range increased by 300 feet, and your Primal Strike's extra damage increases to 2d8.",
+  },
+  {
+    name: "Timeless Body",
+    level: 18,
+    edition: "EDITION_2014",
+    description:
+      "The primal magic you wield causes you to age more slowly. For every 10 years that pass, your body ages only 1 year.",
+  },
+  {
+    name: "Beast Spells",
+    level: 18,
+    edition: "EDITION_2014",
+    description:
+      "You can cast many druid spells in any shape you assume using Wild Shape. You can perform the somatic and verbal components of a druid spell while in beast form.",
+  },
+  {
+    name: "Beast Spells",
+    level: 18,
+    edition: "EDITION_2024",
+    description:
+      "You can cast many Druid spells in Wild Shape form. You can perform a spell's somatic and verbal components while transformed, but you can't provide a Material component unless that component has no listed cost and isn't consumed by the spell.",
+  },
+  {
+    name: "Epic Boon",
+    level: 19,
+    edition: "EDITION_2024",
+    description: "You gain an Epic Boon feat of your choice (Boon of Fortitude recommended). You can take this feat only once.",
+  },
+  {
+    name: "Archdruid",
+    level: 20,
+    edition: "EDITION_2014",
+    description:
+      "You can use your Wild Shape an unlimited number of times. Additionally, you can ignore the verbal and somatic components of your druid spells, as well as any material components lacking a cost.",
+  },
+  {
+    name: "Archdruid",
+    level: 20,
+    edition: "EDITION_2024",
+    description:
+      "You gain the following three benefits. Evergreen Wild Shape: when you roll Initiative and have no uses of Wild Shape remaining, you regain one expended use. Nature Magician: as a Bonus Action, you can convert any number of your unexpended Wild Shape uses into one spell slot; the slot's level equals half the number of uses you convert, rounded down (minimum 1st level). You can do this once, and you regain the ability to do so when you finish a Long Rest. Longevity: the primal magic you wield causes you to age more slowly — for every 10 years that pass, your body ages only 1 year.",
+  },
+];
+
+export const CIRCLE_OF_THE_LAND_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Bonus Cantrip",
+    level: 2,
+    edition: "EDITION_2014",
+    description: "You learn one additional druid cantrip of your choice.",
+  },
+  {
+    name: "Natural Recovery",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "Once per long rest during a short rest, choose expended spell slots to recover. The total levels of slots recovered can be up to half your druid level (rounded up, max 5th level).",
+  },
+  {
+    name: "Circle Spells",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "You gain access to additional spells based on your chosen terrain (arctic, coast, desert, forest, grassland, mountain, swamp, or Underdark). These spells are always prepared for you and don't count against your prepared spells.",
+  },
+  {
+    name: "Circle of the Land Spells",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "You always have certain spells prepared, based on a land type you choose from the Circle of the Land Spells table each time you finish a Long Rest — arid, polar, temperate, or tropical. These spells don't count against the number of Druid spells you can prepare. Arid: Blur, Burning Hands, Fire Bolt, Fireball, Blight, Wall of Stone. Polar: Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Ice Storm, Cone of Cold. Temperate: Misty Step, Shocking Grasp, Sleep, Lightning Bolt, Freedom of Movement, Tree Stride. Tropical: Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague.",
+  },
+  {
+    name: "Land's Aid",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "As a Magic action, you expend a use of your Wild Shape to conjure spectral vines and vermin in a 10-foot-radius Sphere centered on a point you can see within 60 feet. Each creature of your choice in that area must make a Constitution saving throw against your spell save DC, taking 2d6 Necrotic damage on a failed save or half as much on a success. You can also choose one creature you can see in the area to regain 2d6 Hit Points. The damage and healing both increase to 3d6 when you reach level 10 and to 4d6 when you reach level 14.",
+  },
+  {
+    name: "Land's Stride",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "Moving through nonmagical difficult terrain costs no extra movement, and you can pass through nonmagical plants without being slowed. Advantage on saves against magically created or manipulated plants.",
+  },
+  {
+    name: "Natural Recovery",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "When you finish a Short Rest, you can choose expended spell slots to recover; the combined level of the slots can't exceed half your Druid level (round up), and none of them can be level 6 or higher. You can use this feature only once, and you regain the ability to do so when you finish a Long Rest. In addition, when you finish a Long Rest, you can cast one of your prepared Circle of the Land spells of level 1 or higher without expending a spell slot, provided the spell doesn't require a Material component with a cost.",
+  },
+  {
+    name: "Nature's Ward",
+    level: 10,
+    edition: "EDITION_2014",
+    description: "Immune to poison and disease. Elementals and fey can't charm or frighten you.",
+  },
+  {
+    name: "Nature's Ward",
+    level: 10,
+    edition: "EDITION_2024",
+    description:
+      "You are immune to the Poisoned condition, and you have Resistance to a damage type based on your Druid Circle land: Fire if your land is arid, Cold if it's polar, Lightning if it's temperate, or Poison if it's tropical.",
+  },
+  {
+    name: "Nature's Sanctuary",
+    level: 14,
+    edition: "EDITION_2014",
+    description:
+      "When a beast or plant attacks you, it must make a Wisdom saving throw (DC 8 + proficiency + Wisdom modifier) or choose a different target. On a success, it is immune to this feature for 24 hours.",
+  },
+  {
+    name: "Nature's Sanctuary",
+    level: 14,
+    edition: "EDITION_2024",
+    description:
+      "As a Magic action, you conjure a protective terrain in a 15-foot Cube on ground you can see within 120 feet, lasting for 1 minute or until you die or have the Incapacitated condition. While within the Cube, you and your allies have Half Cover and the Resistance granted by your Nature's Ward feature, even if you don't currently have one active. As a Bonus Action, you can move the Cube up to 60 feet to a new spot on the ground you can see.",
+  },
+];
+
+export const CIRCLE_OF_THE_MOON_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Combat Wild Shape",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "You can use Wild Shape as a bonus action. While transformed, you can expend a spell slot as a bonus action to regain 1d8 HP per level of the slot expended.",
+  },
+  {
+    name: "Circle Forms",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "You can use Wild Shape to transform into beasts with a challenge rating as high as 1 (instead of the base druid table). Starting at level 6, the max CR equals your druid level divided by 3 (rounded down, minimum 1).",
+  },
+  {
+    name: "Circle Forms",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Beginning at level 3, you can transform into a Beast with a challenge rating as high as your Druid level divided by 3, rounded down (minimum challenge rating 1). While transformed, if your Armor Class would be lower than 13 plus your Wisdom modifier, you use 13 plus your Wisdom modifier instead. When you transform, you gain Temporary Hit Points equal to three times your Druid level, in place of the Temporary Hit Points your Wild Shape feature would otherwise grant.",
+  },
+  {
+    name: "Circle of the Moon Spells",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "You always have certain spells prepared, and you can cast them while transformed by Wild Shape: Cure Wounds, Moonbeam, and Starry Wisp starting at level 3; Conjure Animals at level 5; Fount of Moonlight at level 7; and Mass Cure Wounds at level 9. These spells don't count against the number of Druid spells you can prepare.",
+  },
+  {
+    name: "Primal Strike",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "Your attacks while in beast form count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks.",
+  },
+  {
+    name: "Improved Circle Forms",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "Your Circle Forms improve, granting you two benefits. Lunar Radiance: immediately after you hit a target with an attack while transformed by Wild Shape, you can change the attack's damage type to Radiant. Increased Toughness: you add your Wisdom modifier to any Constitution saving throws you make to maintain Concentration.",
+  },
+  {
+    name: "Elemental Wild Shape",
+    level: 10,
+    edition: "EDITION_2014",
+    description: "Expend two uses of Wild Shape to transform into an air, earth, fire, or water elemental.",
+  },
+  {
+    name: "Moonlight Step",
+    level: 10,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+    resourceKey: "moonlightStep",
+    resourceLabel: "Moonlight Step",
+    resourceRecharge: "longRest",
+  },
+  {
+    name: "Thousand Forms",
+    level: 14,
+    edition: "EDITION_2014",
+    description: "You can cast the Alter Self spell at will without expending a spell slot.",
+  },
+  {
+    name: "Lunar Form",
+    level: 14,
+    edition: "EDITION_2024",
+    description:
+      "Your connection to the moon grants you two benefits. Improved Lunar Radiance: once on each of your turns when you deal damage with an attack while transformed by Wild Shape, you can also deal an extra 2d10 Radiant damage. Shared Moonlight: when you use your Moonlight Step feature, you can bring along one willing creature within 10 feet of you, teleporting it to a space within 5 feet of your destination.",
+  },
+];
+
 // Per-class/per-subclass literal-row overrides (#1233): replaces the former
 // isFighter/isBarbarian/isBattleMaster boolean chain with two lookup maps, one
 // keyed by class name and one by subclass name — a fourth `isWarlock` boolean
@@ -1779,6 +2097,218 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
 // and #1232's corrected Draconic descriptions shipped here stale through a
 // fully green suite. That guard lives prisma-side because only that direction
 // can import both halves (`rootDir: "src"`, TS6059).
+// DELIBERATELY absent from LITERAL_SUBCLASS_ROWS below: none declares a
+// resourceKey/derivedStat, and unlike Cleric's two domains (the
+// counterexample this file's own header names), no surviving test observes a
+// null-vs-object distinction against a Paladin oath's subclassRows — Paladin's
+// base layer alone (divineSense/layOnHands/channelDivinity, always active from
+// L1/L1/L3) already guarantees deriveResources returns a non-null object
+// regardless of whether the active oath contributes any rows of its own, so
+// srd.test.ts's Channel-Divinity-pool-merge suite and the entry-scoped
+// resources/actions suites all pass with an empty subclassRows fallback
+// (`toRows(subDef?.features ?? [])` -> `[]`, since paladin.ts's three
+// SubclassDefinition entries carry no `features` array) — checked directly,
+// not assumed.
+export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Divine Sense",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
+  },
+  {
+    name: "Lay on Hands",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "Touch to restore HP from a pool of 5 × your paladin level. Alternatively, spend 5 HP from the pool to cure one disease or neutralize one poison. The pool replenishes on a long rest.",
+  },
+  {
+    name: "Lay on Hands",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
+  },
+  {
+    name: "Fighting Style",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "Choose a fighting style specialty: Defense (+1 AC in armor), Dueling (+2 melee damage with one weapon), Great Weapon Fighting (reroll 1s and 2s on damage), or Protection (impose disadvantage on attacks against adjacent allies).",
+  },
+  {
+    name: "Fighting Style",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You gain a Fighting Style feat of your choice. Blessed Warrior is available only to you: learn two Cleric cantrips of your choice, treated as Paladin spells for you, using Charisma as your spellcasting ability for them; you can replace one of them whenever you gain a Paladin level.",
+  },
+  {
+    name: "Spellcasting",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "You cast spells using Charisma starting at level 2. Half-caster progression (you gain spell slots more slowly than full casters). You prepare a number of paladin spells equal to your Charisma modifier + half your paladin level (rounded down).",
+  },
+  {
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You cast spells using Charisma as your spellcasting ability. You are a Half-Caster: consult the Paladin Features table for your spell slots, which you gain starting at 1st level. You prepare a growing list of Paladin spells (2 at level 1, rising to 15 by level 20, per the Paladin Features table), regain all expended spell slots on a Long Rest, and can change your prepared list whenever you finish one. A Holy Symbol serves as your Spellcasting Focus.",
+  },
+  {
+    name: "Divine Smite",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "When you hit with a melee weapon attack, expend one spell slot to deal +2d8 radiant damage (+1d8 per slot level above 1st, max +5d8). Undead and fiends take an additional 1d8 radiant damage.",
+  },
+  {
+    name: "Paladin's Smite",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You always have the Divine Smite spell prepared. In addition, you can cast it without expending a spell slot, but you must finish a Long Rest before you can cast it in this way again.",
+  },
+  {
+    name: "Divine Health",
+    level: 3,
+    edition: "EDITION_2014",
+    description: "The divine magic flowing through you makes you immune to disease.",
+  },
+  {
+    name: "Channel Divinity",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "You can channel divine energy through your sacred oath to fuel magical effects. You have 1 use, regained on a short or long rest. The specific options depend on your oath (see subclass features).",
+    resourceKey: "channelDivinity",
+    resourceLabel: "Channel Divinity",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 3, total: 1 }],
+  },
+  {
+    name: "Channel Divinity",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "You can channel divine energy to fuel magical effects. You start with one option, Divine Sense, and your Oath grants you more. When you use your Channel Divinity, choose one of its options; unless it says otherwise, no action is required. You can use your Channel Divinity twice between rests, and you gain a third use at Paladin level 11. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Any saving throw associated with a Channel Divinity option uses your spell save DC.",
+    resourceKey: "channelDivinity",
+    resourceLabel: "Channel Divinity",
+    resourceRecharge: "longRest",
+    resourceTotals: [
+      { minLevel: 3, total: 2, shortRestRegain: 1 },
+      { minLevel: 11, total: 3, shortRestRegain: 1 },
+    ],
+  },
+  {
+    name: "Channel Divinity: Divine Sense",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, expend a use of your Channel Divinity to open your awareness to the presence of celestials, fiends, and undead within 60 feet of yourself that aren't behind total cover. For 10 minutes or until you have the Incapacitated condition, you know the location of any creature of those types in that radius and, for any creature you can see, whether it is one of those creature types. You also learn the creature type of any place or object in the area consecrated or desecrated as with the Hallow spell.",
+  },
+  {
+    name: "Extra Attack",
+    level: 5,
+    edition: "EDITION_2014",
+    description: "You can attack twice whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
+  },
+  {
+    name: "Extra Attack",
+    level: 5,
+    edition: "EDITION_2024",
+    description: "You can attack twice whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
+  },
+  {
+    name: "Faithful Steed",
+    level: 5,
+    edition: "EDITION_2024",
+    description:
+      "You always have the Find Steed spell prepared, and you can cast it once without a spell slot, doing so again only after you finish a Long Rest.",
+  },
+  {
+    name: "Aura of Protection",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "Friendly creatures within 10 ft add your Charisma modifier (minimum +1) to saving throws while you are conscious. Aura extends to 30 ft at level 18.",
+  },
+  {
+    name: "Aura of Protection",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "You and friendly creatures within your 10-foot Emanation add your Charisma modifier (minimum +1) to saving throws, an effect that is inactive while you have the Incapacitated condition. If another Paladin is within the Emanation, a creature can benefit from only one Aura of Protection at a time; that creature chooses which aura applies.",
+  },
+  {
+    name: "Abjure Foes",
+    level: 9,
+    edition: "EDITION_2024",
+    description:
+      "As a Magic action, expend a use of your Channel Divinity to overwhelm creatures with divine awe. Choose a number of creatures you can see within 60 feet of yourself, up to your Charisma modifier (minimum of one creature). Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened, a target can do only one of the following on its turn: move, take an action, or take a bonus action.",
+  },
+  {
+    name: "Aura of Courage",
+    level: 10,
+    edition: "EDITION_2014",
+    description: "Friendly creatures within 10 ft can't be frightened while you are conscious. Aura extends to 30 ft at level 18.",
+  },
+  {
+    name: "Aura of Courage",
+    level: 10,
+    edition: "EDITION_2024",
+    description: "You and friendly creatures within your Aura of Protection have Immunity to the Frightened condition while you don't have the Incapacitated condition.",
+  },
+  {
+    name: "Improved Divine Smite",
+    level: 11,
+    edition: "EDITION_2014",
+    description:
+      "Whenever you hit with a melee weapon, you deal an extra 1d8 radiant damage in addition to any other Divine Smite dice.",
+  },
+  {
+    name: "Radiant Strikes",
+    level: 11,
+    edition: "EDITION_2024",
+    description:
+      "Your strikes now carry supernatural power. When you hit a creature with an attack using a Melee weapon or an Unarmed Strike, the target takes an extra 1d8 Radiant damage.",
+  },
+  {
+    name: "Cleansing Touch",
+    level: 14,
+    edition: "EDITION_2014",
+    description:
+      "As an action, end one spell on yourself or one willing creature within reach. Uses = Charisma modifier per long rest (minimum 1).",
+  },
+  {
+    name: "Restoring Touch",
+    level: 14,
+    edition: "EDITION_2024",
+    description:
+      "You can use your Lay on Hands to remove the Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned condition from a creature: for each condition removed, use 5 Hit Points from your Lay on Hands pool, in addition to any Hit Points used to restore Hit Points.",
+  },
+  {
+    name: "Aura Expansion",
+    level: 18,
+    edition: "EDITION_2024",
+    description: "Your Aura of Protection is now a 30-foot Emanation.",
+  },
+  {
+    name: "Epic Boon",
+    level: 19,
+    edition: "EDITION_2024",
+    description: "You gain an Epic Boon feat of your choice (Boon of Fate recommended). You can take this feat only once.",
+  },
+];
+
 export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
@@ -1787,10 +2317,14 @@ export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   wizard: WIZARD_BASE_ROWS,
   sorcerer: SORCERER_BASE_ROWS,
   cleric: CLERIC_BASE_ROWS,
+  druid: DRUID_BASE_ROWS,
+  paladin: PALADIN_BASE_ROWS,
 };
 
 export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "battle master": BATTLE_MASTER_ROWS,
+  "circle of the land": CIRCLE_OF_THE_LAND_ROWS,
+  "circle of the moon": CIRCLE_OF_THE_MOON_ROWS,
   "school of evocation": WIZARD_EVOCATION_ROWS,
   "school of abjuration": WIZARD_ABJURATION_ROWS,
   "school of illusion": WIZARD_ILLUSION_ROWS,

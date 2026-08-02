@@ -10,6 +10,13 @@
 // spells gate at levels 3/5/9/13/17 (CHA), Cleric domain + Warlock expanded
 // lists at 3/3/5/7/9 (Cleric WIS, Warlock CHA) — the 2024 subclass grant is 3
 // (#1128), so the former level-1 rows now fire at 3 pending the content resweep (#1133).
+//
+// SCHEMA GAP (disclosed by Wizard's #1234, hit a third time by Paladin's
+// #1229): this model has no `edition` column, and Subclass rows are
+// edition-shared, so a 2024 Devotion Paladin is still GRANTED Sanctuary and
+// Lesser Restoration here even though paladin-features.ts's own 2024 feature
+// text now says Shield of Faith and Aid. Not fixed in this issue — follow-up
+// filed.
 import { z } from "zod";
 
 export interface SubclassGrantedSpellSeed {

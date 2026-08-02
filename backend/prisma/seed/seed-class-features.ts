@@ -469,11 +469,45 @@ const MIN_ROWS_PER_PAIR = 10;
 // two independent, non-scraper sources used and the one number
 // (Invoke Duplicity's move-range cap) neither confirmed and is therefore
 // omitted rather than carried over from 2014.
+// "Bard" removed here (#1224, same diff as the content that makes its rows
+// genuinely diverge: base 9->10 EDITION_2024 rows — Song of Rest drops out,
+// Epic Boon/Words of Creation join, and Expertise/Jack of All Trades/Font of
+// Inspiration/Countercharm/Magical Secrets/Superior Inspiration all rework in
+// place — while both colleges stay 4->4 with one rename each (Additional
+// Magical Secrets -> Magical Discoveries, College of Valor's Bonus
+// Proficiencies -> Martial Training), for 17 (2014) vs 18 (2024) total rows,
+// genuinely unequal). This removal is NOT "all of Bard's 2024 content is
+// real" — several residuals stay undisclosed nowhere else but here: Magical
+// Discoveries'/Words of Creation's always-prepared spell grants have no
+// SubclassGrantedSpell-equivalent mechanism (that model has no `edition`
+// column and Subclass rows are edition-shared, the schema gap Wizard's #1234
+// disclosed first), Epic Boon's feat grant is text only, Martial Training's
+// weapon-as-Spellcasting-Focus clause has no mechanism, Combat Inspiration's
+// Defense/Offense options are text only, and Peerless Skill's
+// non-expenditure-on-failure clause is text only (Bardic Inspiration dice are
+// spent by a player-initiated op, not auto-tracked per use). College of Valor
+// is mirror-sourced (owner decision, #1224) rather than transcribed from SRD
+// 5.2 — Valor isn't in the SRD — see bard-features.ts's own header for the
+// three independent, non-scraper sources used.
+//
+// "Paladin" removed here (#1229, same diff as the content that makes its rows
+// genuinely diverge: base 12->15 EDITION_2024 rows — Divine Sense and Divine
+// Health are cut, Faithful Steed/Abjure Foes/Aura Expansion/Epic Boon join,
+// Divine Smite/Improved Divine Smite/Cleansing Touch each rename to Paladin's
+// Smite/Radiant Strikes/Restoring Touch — while Devotion/Ancients/Vengeance
+// each go 6->5 EDITION_2024 rows, one Channel Divinity option retired per
+// oath in favor of the base class's own Abjure Foes). This removal is NOT
+// "all of Paladin's 2024 content is real" — two residuals stay undisclosed
+// nowhere else but here: Blessed Warrior's/Paladin's Smite's/Faithful Steed's
+// mechanics are TEXT ONLY (no cantrip-swap wiring, no free-cast wiring, no
+// always-prepared spell grant — the last of these can't become a
+// SubclassGrantedSpell row either, the schema gap Wizard's #1234 disclosed
+// first), and Oath of the Ancients/Oath of Vengeance's own 2024 text is
+// mirror-sourced (owner decision, not in SRD 5.2) with two values (Vow of
+// Enmity's action cost, Avenging Angel's duration) deliberately unverified
+// against a licensed source — see paladin-features.ts's own header.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
-  "Bard",
-  "Druid",
   "Monk",
-  "Paladin",
 ]);
 
 export interface ClassEditionPopulationSummary {

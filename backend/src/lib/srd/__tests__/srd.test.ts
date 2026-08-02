@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { bard } from "@/lib/classes/bard.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
@@ -86,17 +87,23 @@ describe("deriveResources — Battle Master subclass gating", () => {
 });
 
 // ── Druid — Wild Shape base pool ──────────────────────────────────────────────
+// #1226 retarget: these cases used to pass "EDITION_2024" while asserting SRD
+// 5.1 values (flat 2, then a >10 "unlimited" sentinel at level 20) — the
+// stale-copy state #1226 exists to fix. Retargeted to EDITION_2014 verbatim
+// (now the 2014 regression guard, druid.ts's resourceFn untouched); the
+// EDITION_2024 sibling below asserts the real 2/3/4 SRD 5.2 tier table,
+// authored onto the Wild Shape row itself (#1226 commit 3).
 
-describe("deriveResources — Druid Wild Shape", () => {
+describe("deriveResources — Druid Wild Shape, EDITION_2014", () => {
   it("returns no wildShape pool below level 2", () => {
-    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     expect(result).not.toBeNull();
     const poolKeys = result!.resources.map((r) => r.key);
     expect(poolKeys).not.toContain("wildShape");
   });
 
   it("returns 2 wildShape uses at level 2", () => {
-    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     const ws = result!.resources.find((r) => r.key === "wildShape");
     expect(ws).toBeDefined();
     expect(ws!.total).toBe(2);
@@ -104,27 +111,79 @@ describe("deriveResources — Druid Wild Shape", () => {
   });
 
   it("returns 2 wildShape uses through level 19", () => {
-    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     expect(result!.resources.find((r) => r.key === "wildShape")!.total).toBe(2);
   });
 
   it("returns sentinel value at level 20 (Archdruid)", () => {
-    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     const ws = result!.resources.find((r) => r.key === "wildShape");
     expect(ws!.total).toBeGreaterThan(10); // unlimited sentinel
   });
 
   it("Circle of the Moon shares the base wildShape pool (no duplicate)", () => {
-    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const wsPools = result!.resources.filter((r) => r.key === "wildShape");
     expect(wsPools.length).toBe(1); // exactly one — no duplicate from subclass
   });
 
-  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) at its level-3 grant (#1128)", () => {
-    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+  // Level 3 is above the gate, not at it: EDITION_2014's Circle of the Moon
+  // grants at 2 (druid.ts's grantLevel, PHB'14 p.66). druid-wildshape-cr.test.ts
+  // owns the level-2 boundary itself.
+  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) above its level-2 grant (#1128)", () => {
+    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const featureNames = result!.features.map((f) => f.name);
     expect(featureNames).toContain("Combat Wild Shape");
     expect(featureNames).toContain("Circle Forms");
+  });
+});
+
+describe("deriveResources — Druid Wild Shape, EDITION_2024 (#1226): 2/3/4 tiers, longRest recharge, no unlimited sentinel", () => {
+  it("returns no wildShape pool below level 2", () => {
+    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    expect(result).not.toBeNull();
+    expect(result!.resources.map((r) => r.key)).not.toContain("wildShape");
+  });
+
+  it("returns 2 wildShape uses at level 2, recharge longRest", () => {
+    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const ws = result!.resources.find((r) => r.key === "wildShape");
+    expect(ws).toBeDefined();
+    expect(ws!.total).toBe(2);
+    expect(ws!.recharge).toBe("longRest");
+    expect(ws!.shortRestRegain).toBe(1);
+  });
+
+  it("returns 3 wildShape uses at level 6, through level 16", () => {
+    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    expect(result!.resources.find((r) => r.key === "wildShape")!.total).toBe(3);
+  });
+
+  it("returns 4 wildShape uses at level 20 — no unlimited sentinel", () => {
+    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const ws = result!.resources.find((r) => r.key === "wildShape");
+    expect(ws!.total).toBe(4);
+  });
+
+  it("Circle of the Moon shares the base wildShape pool (no duplicate)", () => {
+    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const wsPools = result!.resources.filter((r) => r.key === "wildShape");
+    expect(wsPools.length).toBe(1);
+  });
+
+  it("Circle of the Moon contributes features (Circle Forms, Circle of the Moon Spells) at its level-3 grant", () => {
+    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const featureNames = result!.features.map((f) => f.name);
+    expect(featureNames).toContain("Circle Forms");
+    expect(featureNames).toContain("Circle of the Moon Spells");
+    expect(featureNames).not.toContain("Combat Wild Shape");
+  });
+
+  it("Moonlight Step's pool appears only at level 10+, absent below", () => {
+    const below = deriveResources("druid", "circle of the moon", 9, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const at10 = deriveResources("druid", "circle of the moon", 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    expect(below!.resources.map((r) => r.key)).not.toContain("moonlightStep");
+    expect(at10!.resources.map((r) => r.key)).toContain("moonlightStep");
   });
 });
 
@@ -221,6 +280,14 @@ describe("deriveResources — Bard Bardic Inspiration", () => {
     const lowCha = { ...ABILITY_SCORES, charisma: 8 }; // -1 modifier
     const result = deriveResources("bard", undefined, 3, lowCha, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.total).toBe(1);
+  });
+
+  // #1224: the pool is verified edition-invariant against both SRDs — pins
+  // that nobody later adds an `edition` parameter to special-case one of them.
+  // Exact arity, not an upper bound: dropping `abilityScores` would break the
+  // Cha-modifier total that is the whole reason this module still exists.
+  it("resourceFn declares no edition parameter (edition-invariant pool)", () => {
+    expect(bard.resourceFn!.length).toBe(2);
   });
 });
 
@@ -347,33 +414,58 @@ describe("deriveResources — Warrior of Shadow", () => {
 describe("deriveResources — Paladin base pools", () => {
   const CHA_16 = { ...ABILITY_SCORES, charisma: 16 }; // +3 modifier
 
-  it("layOnHands total = 5 × level", () => {
-    for (const level of [1, 5, 10, 20]) {
-      const result = deriveResources("paladin", undefined, level, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
-      expect(result!.resources.find((r) => r.key === "layOnHands")!.total).toBe(level * 5);
+  it("layOnHands total = 5 × level, both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      for (const level of [1, 5, 10, 20]) {
+        const result = deriveResources("paladin", undefined, level, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), edition);
+        expect(result!.resources.find((r) => r.key === "layOnHands")!.total).toBe(level * 5);
+      }
     }
   });
 
-  it("divineSense total = 1 + Cha modifier", () => {
-    const result = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024"); // +3 Cha
-    expect(result!.resources.find((r) => r.key === "divineSense")!.total).toBe(4); // 1+3
+  // #1229: 2024 removed Divine Sense as its own resource pool (its job moves
+  // to the "Channel Divinity: Divine Sense" catalog option, spending the
+  // channelDivinity pool instead) — a 2014 Paladin still has it.
+  it("divineSense total = 1 + Cha modifier, EDITION_2014 only", () => {
+    const result2014 = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2014"); // +3 Cha
+    expect(result2014!.resources.find((r) => r.key === "divineSense")!.total).toBe(4); // 1+3
   });
 
-  it("no channelDivinity before level 3", () => {
-    const result = deriveResources("paladin", undefined, 2, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
-    expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeUndefined();
+  it("divineSense is absent for EDITION_2024", () => {
+    const result2024 = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(result2024!.resources.find((r) => r.key === "divineSense")).toBeUndefined();
   });
 
-  it("channelDivinity appears at level 3", () => {
-    const result = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
-    expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeDefined();
+  it("no channelDivinity before level 3, both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      const result = deriveResources("paladin", undefined, 2, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), edition);
+      expect(result!.resources.find((r) => r.key === "channelDivinity")).toBeUndefined();
+    }
   });
 
-  it("oaths share base channelDivinity pool — exactly one channelDivinity pool", () => {
-    for (const oath of ["oath of devotion", "oath of the ancients", "oath of vengeance"]) {
-      const result = deriveResources("paladin", oath, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", oath), "EDITION_2024");
-      const cdPools = result!.resources.filter((r) => r.key === "channelDivinity");
-      expect(cdPools.length).toBe(1);
+  it("channelDivinity appears at level 3: total 1 (EDITION_2014) vs total 2 (EDITION_2024, SRD 5.2)", () => {
+    const result2014 = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2014");
+    expect(result2014!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(1);
+
+    const result2024 = deriveResources("paladin", undefined, 3, CHA_16, PROF_2, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(result2024!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(2);
+  });
+
+  it("channelDivinity's 2024 total rises to 3 at level 11, not before", () => {
+    const at10 = deriveResources("paladin", undefined, 10, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(at10!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(2);
+
+    const at11 = deriveResources("paladin", undefined, 11, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2024");
+    expect(at11!.resources.find((r) => r.key === "channelDivinity")?.total).toBe(3);
+  });
+
+  it("oaths share base channelDivinity pool — exactly one channelDivinity pool, both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      for (const oath of ["oath of devotion", "oath of the ancients", "oath of vengeance"]) {
+        const result = deriveResources("paladin", oath, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", oath), edition);
+        const cdPools = result!.resources.filter((r) => r.key === "channelDivinity");
+        expect(cdPools.length).toBe(1);
+      }
     }
   });
 });

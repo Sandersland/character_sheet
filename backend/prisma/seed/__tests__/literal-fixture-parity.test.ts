@@ -121,23 +121,32 @@ const SANCTIONED_ORPHANS: ReadonlySet<string> = new Set([
 
 describe("literal-row fixture parity (#1593)", () => {
   // Anti-vacuity: if the fixture maps were empty (or the join produced nothing)
-  // every assertion below would pass by iterating nothing. Eight classes are
-  // literal as of wave B, and the fixture mirrors seven of them — Rogue is
-  // deliberately absent entirely, since none of its rows declares a
-  // resourceKey/derivedStat and no surviving test asserts a null-vs-object
-  // distinction against it (see the fixture's own header).
+  // every assertion below would pass by iterating nothing. Eleven classes are
+  // literal as of wave C (#1224/#1226/#1229), and the fixture mirrors nine of
+  // them — Rogue and Bard are deliberately absent entirely, since neither
+  // declares a resourceKey/derivedStat the fixture must carry and no surviving
+  // test asserts a null-vs-object distinction against either (see the
+  // fixture's own header).
   //
-  // Measured against this tree: 203 rows (88 class-level + 115 subclass-level)
-  // across 7 classes and 11 subclasses. The floors sit just under those, not an
-  // order of magnitude under — a loose floor passes a bad merge that drops most
-  // of the fixture, which would defeat every assertion below while staying
-  // green. Tune these UPWARD as classes go literal; only ever tune one DOWNWARD
-  // with the reason recorded here (the class-feature-population.test.ts idiom).
+  // RE-MEASURED on the merged wave-C tree, never carried over from a branch.
+  // #1226 measured 241 rows / 8 classes / 13 subclasses and #1229 measured
+  // 230 / 8 / 11, each correct for its own branch ALONE — taking the incoming
+  // side would have LOWERED the row floor 238 -> 220 and the subclass floor
+  // 13 -> 11, the exact silent weakening this comment exists to warn about.
+  // Paladin's base-class rows join LITERAL_CLASS_ROWS; its three Oaths are
+  // deliberately absent from LITERAL_SUBCLASS_ROWS, the same exemption shape as
+  // Barbarian's two subclasses (see PALADIN_BASE_ROWS' own comment in
+  // test-feature-rows.fixture.ts). The floors sit just under the real merged
+  // count, not an order of magnitude under — a loose floor passes a bad merge
+  // that drops most of the fixture, which would defeat every assertion below
+  // while staying green. Tune these UPWARD as classes go literal; only ever
+  // tune one DOWNWARD with the reason recorded here (the
+  // class-feature-population.test.ts idiom).
   it("the fixture actually mirrors something — non-vacuity floor", () => {
     const rows = collectFixtureRows();
-    expect(rows.length).toBeGreaterThanOrEqual(180);
-    expect(Object.keys(LITERAL_CLASS_ROWS).length).toBeGreaterThanOrEqual(7);
-    expect(Object.keys(LITERAL_SUBCLASS_ROWS).length).toBeGreaterThanOrEqual(11);
+    expect(rows.length).toBeGreaterThanOrEqual(265);
+    expect(Object.keys(LITERAL_CLASS_ROWS).length).toBeGreaterThanOrEqual(9);
+    expect(Object.keys(LITERAL_SUBCLASS_ROWS).length).toBeGreaterThanOrEqual(13);
     expect(SEED_BY_KEY.size).toBe(CLASS_FEATURES.length);
   });
 

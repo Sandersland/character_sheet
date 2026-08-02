@@ -486,9 +486,38 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
   },
 
-  // Paladin
-  { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
-  { key: "layOnHands", name: "Lay on Hands", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "layOnHands", resourceAmount: 5 },
+  // Paladin — divineSense is EDITION_2014-only (#1229): 2024 removed Divine
+  // Sense as its own resource pool/action (see paladin.ts's resourceFn); its
+  // job moves to the "Channel Divinity: Divine Sense" catalog option
+  // (channel-divinity.ts), which spends the channelDivinity pool through the
+  // ability-cast path, not this actions dispatch. Untagging this row would
+  // leave it permanently `enabled: false` on every 2024 Paladin's sheet
+  // ("No divineSense remaining") since the pool it checks no longer exists.
+  { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1, edition: "EDITION_2014" },
+  // Lay on Hands' cost forks to a Bonus Action in 2024 (SRD 5.2) — same-key
+  // edition fork, mirroring Metamagic's/Flurry of Blows' own shape above.
+  {
+    key: "layOnHands",
+    name: "Lay on Hands",
+    cost: "action",
+    grantClass: "paladin",
+    grantLevel: 1,
+    resourceKey: "layOnHands",
+    resourceAmount: 5,
+    edition: "EDITION_2014",
+    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to cure one disease or neutralize one poison.",
+  },
+  {
+    key: "layOnHands",
+    name: "Lay on Hands",
+    cost: "bonusAction",
+    grantClass: "paladin",
+    grantLevel: 1,
+    resourceKey: "layOnHands",
+    resourceAmount: 5,
+    edition: "EDITION_2024",
+    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to remove the Poisoned condition instead of healing.",
+  },
   // Channel Divinity is a single cross-class row — see channelDivinity above (PHB'14 p.164).
 
   // Rogue

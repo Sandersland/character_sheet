@@ -23,10 +23,12 @@ let COOKIE: string;
 
 const FIXTURE_ID = "test-cd-cast-1";
 
-// XP thresholds → level: L2=300, L3=900, L6=14000, L10=64000.
+// XP thresholds → level: L2=300, L3=900, L6=14000, L8=34000, L9=48000, L10=64000.
 const XP_L2 = 300;
 const XP_L3 = 900;
 const XP_L6 = 14000;
+const XP_L8 = 34000;
+const XP_L9 = 48000;
 const XP_L10 = 64000;
 
 const url = `/api/characters/${FIXTURE_ID}/abilities/channel-divinity/transactions`;
@@ -75,6 +77,14 @@ const optionId: Record<string, string> = {};
 // reading optionId would silently pick whichever row Postgres returned first.
 async function loadOption(name: string) {
   optionId[name] = (await prisma.grantedAbility.findFirst({ where: { name, edition: null } }))!.id;
+}
+
+// #1229: Turn the Unholy/Turn the Faithless/Abjure Enemy retagged
+// EDITION_2014 (no longer shared), and Divine Sense/Abjure Foes are NEW
+// EDITION_2024-only rows — `loadOption`'s `edition: null` filter finds
+// neither, so this edition-aware sibling loads them explicitly instead.
+async function loadEditionOption(name: string, edition: "EDITION_2014" | "EDITION_2024") {
+  optionId[`${name}::${edition}`] = (await prisma.grantedAbility.findFirst({ where: { name, edition } }))!.id;
 }
 
 // #1225: classEntries.classId used to point at one shared test-only
@@ -151,8 +161,19 @@ describe("Channel Divinity cast endpoint", () => {
       "Channel Divinity: Sacred Weapon",
       "Channel Divinity: Cloak of Shadows",
       "Channel Divinity: Vow of Enmity",
-      "Channel Divinity: Abjure Enemy",
+      // "Channel Divinity: Abjure Enemy" removed (#1229): no longer a shared
+      // (edition: null) row — it retagged EDITION_2014, so loadOption's
+      // `edition: null` filter would find nothing and throw. Nothing in this
+      // file reads optionId for it (the one test that names it checks the GET
+      // response body's own `name` field, not this map) — the edition-scoped
+      // Paladin describe block below loads it explicitly where it's needed.
     ].map(loadOption));
+    await Promise.all([
+      loadEditionOption("Channel Divinity: Turn the Unholy", "EDITION_2014"),
+      loadEditionOption("Channel Divinity: Abjure Enemy", "EDITION_2014"),
+      loadEditionOption("Channel Divinity: Divine Sense", "EDITION_2024"),
+      loadEditionOption("Abjure Foes", "EDITION_2024"),
+    ]);
   });
 
   beforeEach(async () => {
@@ -347,8 +368,13 @@ describe("Channel Divinity cast endpoint", () => {
 
   // ── GET picker ──────────────────────────────────────────────────────────────
 
-  it("GET /channel-divinity returns only the entitled options with DCs", async () => {
-    await createCharacter(XP_L3, "paladin", "oath of vengeance");
+  // #1229: "Channel Divinity: Abjure Enemy" is EDITION_2014-only now (its
+  // 2024 role is the base class's own Abjure Foes) — pinned to EDITION_2014
+  // explicitly so this test still exercises what it always meant to (a 2014
+  // Vengeance paladin's own option list), rather than silently start
+  // asserting against an edition the row no longer serves.
+  it("GET /channel-divinity returns only the entitled options with DCs (2014 Vengeance Paladin)", async () => {
+    await createCharacter(XP_L3, "paladin", "oath of vengeance", "EDITION_2014");
     const res = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
     expect(res.status).toBe(200);
     const names = (res.body as { name: string }[]).map((o) => o.name);
@@ -361,6 +387,65 @@ describe("Channel Divinity cast endpoint", () => {
     )!;
     // Charisma-based DC: 8 + prof(2) + chaMod(+3) = 13.
     expect(abjure).toMatchObject({ kind: "announce", saveDc: 13 });
+  });
+
+  // ── #1229: Paladin edition fork — both directions ──────────────────────────
+
+  describe("Paladin edition fork (#1229)", () => {
+    it("2014 Paladin 3 (Devotion) can cast Turn the Unholy", async () => {
+      await createCharacter(XP_L3, "paladin", "oath of devotion", "EDITION_2014");
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn the Unholy::EDITION_2014"] }]);
+      expect(res.status).toBe(200);
+      expect(cdUsed(res.body)).toBe(1);
+    });
+
+    it("a 2024 Paladin 3 (Devotion) is rejected casting Turn the Unholy (cross-edition) and never sees it in GET", async () => {
+      await createCharacter(XP_L3, "paladin", "oath of devotion", "EDITION_2024");
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn the Unholy::EDITION_2014"] }]);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/2014 rules/);
+
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const names = (get.body as { name: string }[]).map((o) => o.name);
+      expect(names).not.toContain("Channel Divinity: Turn the Unholy");
+    });
+
+    it("a 2024 Paladin 3 sees and can cast Channel Divinity: Divine Sense", async () => {
+      await createCharacter(XP_L3, "paladin", "oath of devotion", "EDITION_2024");
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const names = (get.body as { name: string }[]).map((o) => o.name);
+      expect(names).toContain("Channel Divinity: Divine Sense");
+
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Divine Sense::EDITION_2024"] }]);
+      expect(res.status).toBe(200);
+      expect(cdUsed(res.body)).toBe(1);
+    });
+
+    it("a 2024 Paladin 9 sees Abjure Foes with a Wisdom save and the Charisma-derived DC", async () => {
+      await createCharacter(XP_L9, "paladin", "oath of devotion", "EDITION_2024");
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const abjureFoes = (get.body as { name: string; saveAbility: string | null; saveDc: number | null }[]).find(
+        (o) => o.name === "Abjure Foes",
+      )!;
+      expect(abjureFoes).toBeDefined();
+      // Wisdom save (not Charisma — the issue's own draft says Cha); the DC
+      // itself IS Charisma-derived: 8 + prof(4) + chaMod(+3) = 15.
+      expect(abjureFoes).toMatchObject({ saveAbility: "wisdom", saveDc: 15 });
+
+      const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Abjure Foes::EDITION_2024"] }]);
+      expect(res.status).toBe(200);
+    });
+
+    it("a 2024 Paladin 8 does not yet see Abjure Foes (grant is L9)", async () => {
+      await createCharacter(XP_L8, "paladin", "oath of devotion", "EDITION_2024");
+      const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+      expect(get.status).toBe(200);
+      const names = (get.body as { name: string }[]).map((o) => o.name);
+      expect(names).not.toContain("Abjure Foes");
+    });
   });
 
   // #1412: the route derives the edition from the character row (editionOf), so

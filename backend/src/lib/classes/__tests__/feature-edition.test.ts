@@ -499,6 +499,144 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["sorcerer", "wild magic", "Tides of Chaos"],
   ["sorcerer", "wild magic", "Bend Luck"],
   ["sorcerer", "wild magic", "Controlled Chaos"],
+  // Bard's 30 new triples (#1224), derived from the test's own failure diff
+  // (not hand-guessed, same discipline as Rogue's #1231): the 8 base names
+  // that genuinely fork (Spellcasting, Bardic Inspiration, Jack of All
+  // Trades, Expertise, Font of Inspiration, Countercharm, Magical Secrets,
+  // Superior Inspiration — Song of Rest has no 2024 row at all, Epic Boon/
+  // Words of Creation are 2024-only) show up under EVERY subclass context
+  // Bard has (undefined/college of lore/college of valor — collectTagged
+  // FeatureKeys combines classRows, always ALL of them, with each context's
+  // own subclassRows) — 3 contexts x 8 base names = 24, plus College of
+  // Lore's own 3 forked subclass names (Bonus Proficiencies, Cutting Words,
+  // Peerless Skill — Additional Magical Secrets is renamed away to Magical
+  // Discoveries, a 2024-only name, so never tagged) and College of Valor's
+  // own 3 (Combat Inspiration, Extra Attack, Battle Magic — Bonus
+  // Proficiencies is renamed away to Martial Training, a 2024-only name) =
+  // 24 + 3 + 3 = 30.
+  ["bard", "undefined", "Spellcasting"],
+  ["bard", "undefined", "Bardic Inspiration"],
+  ["bard", "undefined", "Jack of All Trades"],
+  ["bard", "undefined", "Expertise"],
+  ["bard", "undefined", "Font of Inspiration"],
+  ["bard", "undefined", "Countercharm"],
+  ["bard", "undefined", "Magical Secrets"],
+  ["bard", "undefined", "Superior Inspiration"],
+  ["bard", "college of lore", "Spellcasting"],
+  ["bard", "college of lore", "Bardic Inspiration"],
+  ["bard", "college of lore", "Jack of All Trades"],
+  ["bard", "college of lore", "Expertise"],
+  ["bard", "college of lore", "Font of Inspiration"],
+  ["bard", "college of lore", "Countercharm"],
+  ["bard", "college of lore", "Magical Secrets"],
+  ["bard", "college of lore", "Superior Inspiration"],
+  ["bard", "college of lore", "Bonus Proficiencies"],
+  ["bard", "college of lore", "Cutting Words"],
+  ["bard", "college of lore", "Peerless Skill"],
+  ["bard", "college of valor", "Spellcasting"],
+  ["bard", "college of valor", "Bardic Inspiration"],
+  ["bard", "college of valor", "Jack of All Trades"],
+  ["bard", "college of valor", "Expertise"],
+  ["bard", "college of valor", "Font of Inspiration"],
+  ["bard", "college of valor", "Countercharm"],
+  ["bard", "college of valor", "Magical Secrets"],
+  ["bard", "college of valor", "Superior Inspiration"],
+  ["bard", "college of valor", "Combat Inspiration"],
+  ["bard", "college of valor", "Extra Attack"],
+  ["bard", "college of valor", "Battle Magic"],
+  // Druid's 19 new triples (#1226): the 5 base names that genuinely fork
+  // (Druidic, Spellcasting, Wild Shape, Beast Spells, Archdruid) show up
+  // under EVERY subclass context Druid has (undefined/circle of the land/
+  // circle of the moon — collectTaggedFeatureKeys combines classRows, always
+  // ALL of them, with each context's own subclassRows) — 3 contexts x 5 base
+  // names = 15, plus Circle of the Land's own 3 forked subclass names
+  // (Natural Recovery, Nature's Ward, Nature's Sanctuary) and Circle of the
+  // Moon's own 1 (Circle Forms) = 15 + 3 + 1 = 19. Timeless Body/Primal
+  // Order/Wild Companion/Wild Resurgence/Elemental Fury/Improved Elemental
+  // Fury/Epic Boon (base), Bonus Cantrip/Circle Spells (renamed away, see
+  // below)/Land's Aid/Land's Stride (Land), and Combat Wild Shape/Primal
+  // Strike/Circle of the Moon Spells/Improved Circle Forms/Elemental Wild
+  // Shape/Moonlight Step/Thousand Forms/Lunar Form (Moon) are NOT tagged —
+  // each has exactly one description under its name, either 2014-only or
+  // 2024-only, never two. "Circle Spells" -> "Circle of the Land Spells" is a
+  // RENAME, not a fork (Cleric's Domain Spells -> Life/Trickery Domain Spells
+  // precedent, #1225) — neither name ever carries two descriptions, so
+  // neither appears here.
+  ["druid", "undefined", "Druidic"],
+  ["druid", "undefined", "Spellcasting"],
+  ["druid", "undefined", "Wild Shape"],
+  ["druid", "undefined", "Beast Spells"],
+  ["druid", "undefined", "Archdruid"],
+  ["druid", "circle of the land", "Druidic"],
+  ["druid", "circle of the land", "Spellcasting"],
+  ["druid", "circle of the land", "Wild Shape"],
+  ["druid", "circle of the land", "Beast Spells"],
+  ["druid", "circle of the land", "Archdruid"],
+  ["druid", "circle of the land", "Natural Recovery"],
+  ["druid", "circle of the land", "Nature's Ward"],
+  ["druid", "circle of the land", "Nature's Sanctuary"],
+  ["druid", "circle of the moon", "Druidic"],
+  ["druid", "circle of the moon", "Spellcasting"],
+  ["druid", "circle of the moon", "Wild Shape"],
+  ["druid", "circle of the moon", "Beast Spells"],
+  ["druid", "circle of the moon", "Archdruid"],
+  ["druid", "circle of the moon", "Circle Forms"],
+  // Paladin's 32 new triples (#1229): the 6 base names that genuinely fork
+  // (Lay on Hands, Fighting Style, Spellcasting, Channel Divinity, Aura of
+  // Protection, Aura of Courage — Extra Attack is absent because its two rows
+  // carry IDENTICAL text, NOT because it is one shared row: Paladin follows
+  // cleric-features.ts's EDITION RULE and tags both rows explicitly, unlike
+  // Barbarian's/Ranger's one-untagged-row shape. collectTaggedFeatureKeys
+  // surfaces only names whose 2014/2024 descriptions DIFFER) show up under
+  // EVERY subclass
+  // context Paladin has (undefined/oath of devotion/oath of the ancients/oath
+  // of vengeance — collectTaggedFeatureKeys combines classRows, always ALL of
+  // them, with each context's own subclassRows) — 4 contexts x 6 base names =
+  // 24, plus Oath of Devotion's own 2 (Aura of Devotion, Holy Nimbus — Oath
+  // Spells/Sacred Weapon/Turn the Unholy/Purity of Spirit each RENAME to a
+  // different 2024 name, so none of those four is a same-name fork), Oath of
+  // the Ancients' own 3 (Aura of Warding, Undying Sentinel, Elder Champion —
+  // Oath Spells/Nature's Wrath/Turn the Faithless are the same renamed shape),
+  // and Oath of Vengeance's own 3 (Relentless Avenger, Soul of Vengeance,
+  // Avenging Angel — Oath Spells/Vow of Enmity/Abjure Enemy are the same
+  // renamed shape) = 24 + 2 + 3 + 3 = 32. Divine Sense/Divine Health/Divine
+  // Smite/Improved Divine Smite/Cleansing Touch (base) and every oath's own
+  // "Channel Divinity: X" 2014-only name are NOT here (no 2024 row at all,
+  // one description under the name, not two); Faithful Steed/Abjure Foes/Aura
+  // Expansion/Epic Boon (base) and "Channel Divinity: Divine Sense" are the
+  // same "2024-only, no 2014 twin" shape.
+  ["paladin", "undefined", "Lay on Hands"],
+  ["paladin", "undefined", "Fighting Style"],
+  ["paladin", "undefined", "Spellcasting"],
+  ["paladin", "undefined", "Channel Divinity"],
+  ["paladin", "undefined", "Aura of Protection"],
+  ["paladin", "undefined", "Aura of Courage"],
+  ["paladin", "oath of devotion", "Lay on Hands"],
+  ["paladin", "oath of devotion", "Fighting Style"],
+  ["paladin", "oath of devotion", "Spellcasting"],
+  ["paladin", "oath of devotion", "Channel Divinity"],
+  ["paladin", "oath of devotion", "Aura of Protection"],
+  ["paladin", "oath of devotion", "Aura of Courage"],
+  ["paladin", "oath of devotion", "Aura of Devotion"],
+  ["paladin", "oath of devotion", "Holy Nimbus"],
+  ["paladin", "oath of the ancients", "Lay on Hands"],
+  ["paladin", "oath of the ancients", "Fighting Style"],
+  ["paladin", "oath of the ancients", "Spellcasting"],
+  ["paladin", "oath of the ancients", "Channel Divinity"],
+  ["paladin", "oath of the ancients", "Aura of Protection"],
+  ["paladin", "oath of the ancients", "Aura of Courage"],
+  ["paladin", "oath of the ancients", "Aura of Warding"],
+  ["paladin", "oath of the ancients", "Undying Sentinel"],
+  ["paladin", "oath of the ancients", "Elder Champion"],
+  ["paladin", "oath of vengeance", "Lay on Hands"],
+  ["paladin", "oath of vengeance", "Fighting Style"],
+  ["paladin", "oath of vengeance", "Spellcasting"],
+  ["paladin", "oath of vengeance", "Channel Divinity"],
+  ["paladin", "oath of vengeance", "Aura of Protection"],
+  ["paladin", "oath of vengeance", "Aura of Courage"],
+  ["paladin", "oath of vengeance", "Relentless Avenger"],
+  ["paladin", "oath of vengeance", "Soul of Vengeance"],
+  ["paladin", "oath of vengeance", "Avenging Angel"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

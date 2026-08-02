@@ -6,11 +6,15 @@
 // backend/prisma/seed/warlock-features.ts; #1234,
 // backend/prisma/seed/wizard-features.ts; #1232,
 // backend/prisma/seed/sorcerer-features.ts; #1225,
-// backend/prisma/seed/cleric-features.ts), keyed lowercase to match this
+// backend/prisma/seed/cleric-features.ts; #1224,
+// backend/prisma/seed/bard-features.ts; #1226,
+// backend/prisma/seed/druid-features.ts; #1229,
+// backend/prisma/seed/paladin-features.ts), keyed lowercase to match this
 // file's own registry convention — the sibling of prisma/seed/class-
 // features.ts's LITERAL_ROW_CLASSES (Title Case, "Fighter", "Barbarian",
-// "Cleric", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"). Kept as a
-// SECOND constant rather than importing the prisma-side
+// "Bard", "Cleric", "Druid", "Paladin", "Ranger", "Rogue", "Sorcerer",
+// "Warlock", "Wizard"). Kept as a SECOND constant rather than importing the
+// prisma-side
 // one directly: backend/tsconfig.json's `rootDir: "src"` makes any src file
 // importing something under prisma/ a compile error (TS6059, verified
 // empirically) — there is no single set both sides can share. Both must be
@@ -20,12 +24,15 @@
 export const LITERAL_ROW_CLASSES = new Set([
   "fighter",
   "barbarian",
+  "bard",
   "cleric",
   "ranger",
   "rogue",
   "sorcerer",
   "warlock",
   "wizard",
+  "druid",
+  "paladin",
 ]);
 
 // Every class/subclass pair, shared by class-features-snapshot.test.ts and
