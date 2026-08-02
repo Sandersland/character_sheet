@@ -223,7 +223,6 @@ function isPopulatedWarlockRow(row: { className: string; subclassSlug: string | 
   return POPULATED_WARLOCK_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
-<<<<<<< HEAD
 // #1230: Ranger's three Wisdom-tier-or-formula pools. Keyed on the 4-tuple
 // INCLUDING edition (unlike POPULATED_WARLOCK_ROW_KEYS' 3-tuple) because
 // Favored Enemy is the asymmetric case the RowKey comment below names: its

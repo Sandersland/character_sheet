@@ -411,7 +411,6 @@ const MIN_ROWS_PER_PAIR = 10;
 // invocations exist, their prerequisites, Pact Boon folding into it) is
 // text-only — no mechanics behind it yet, tracked as a follow-up.
 //
-<<<<<<< HEAD
 // "Ranger" removed here (#1230, same diff as the content that makes its rows
 // genuinely diverge: base 11->15 EDITION_2024 rows — Natural Explorer/
 // Primeval Awareness/Land's Stride/Hide in Plain Sight/Vanish drop out, nine
