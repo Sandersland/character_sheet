@@ -9,41 +9,49 @@
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
 //
-// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), ROGUE (#1231), WARLOCK
-// (#1233) and WIZARD (#1234) all author their ClassFeature rows as literal seed
-// data (prisma/seed/<class>-features.ts), which this src-side fixture can't
-// import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
-// anything under prisma/ a compile error (TS6059). Their rows therefore come
-// from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps below,
-// mirroring each seed file's RESOURCE columns. class-features-snapshot.test.ts
-// records `withoutFeatures(deriveResources(...))`, stripping `.features` before
+// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), RANGER (#1230), ROGUE
+// (#1231), WARLOCK (#1233) and WIZARD (#1234) all author their ClassFeature
+// rows as literal seed data (prisma/seed/<class>-features.ts), which this
+// src-side fixture can't import — backend/tsconfig.json's `rootDir: "src"`
+// makes a src file importing anything under prisma/ a compile error
+// (TS6059). Their rows therefore come from the hardcoded
+// LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps below, mirroring each seed
+// file's RESOURCE columns. class-features-snapshot.test.ts records
+// `withoutFeatures(deriveResources(...))`, stripping `.features` before
 // snapshotting, so the row TEXT matters only for readability here, never for a
 // passing assertion; class-feature-parity.test.ts is the suite that DOES assert
-// on `.features` content, and it skips all five classes for the same underlying
+// on `.features` content, and it skips all six classes for the same underlying
 // reason (its own file's LITERAL_ROW_CLASSES check).
 //
-// Two different end states sit behind that one list. `lib/classes/fighter.ts`,
-// `barbarian.ts` and `rogue.ts` are deleted outright. `warlock.ts` and
-// `wizard.ts` survive — each carries a subclass `grantLevel` (1 for Warlock's
-// patrons, 2 for Wizard's schools) that no seeded row can express while
-// subclassGateLevel's undefined fallback is 3, so deleting either would
-// silently move that class's 2014 subclass gate (#1576). Neither still exports
-// a `features` array, which is what matters here.
+// Three different end states sit behind that one list. `lib/classes/
+// fighter.ts`, `barbarian.ts` and `rogue.ts` are deleted outright. `warlock.ts`
+// and `wizard.ts` survive because each carries a subclass `grantLevel` (1 for
+// Warlock's patrons, 2 for Wizard's schools) that no seeded row can express
+// while subclassGateLevel's undefined fallback is 3, so deleting either would
+// silently move that class's 2014 subclass gate (#1576). `ranger.ts` survives
+// for a DIFFERENT reason still (its own header names it: Hunter's `choices`
+// catalog, #899/#1353) — its `grantLevel: 3` already equals the fallback, so
+// unlike Warlock/Wizard that isn't why it stays. None of the three still
+// exports a base-class `features` array, which is what matters here.
 //
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
 // stand-in: neither declares a resourceKey/derivedStat in barbarian-features.ts,
 // so falling through to `toRows(subDef?.features ?? [])` -> `[]`
 // (TEST_SUBCLASSES has no entry for either, same as Champion/Eldritch Knight)
-// loses nothing a `.resources`-observing test could see.
+// loses nothing a `.resources`-observing test could see. Ranger's two
+// subclasses (Hunter, Beast Master) are the same shape — see RANGER_BASE_ROWS'
+// own comment below.
 //
-// ROGUE NEEDS NO MIRROR AT ALL, unlike the other four: its rows declare no
+// ROGUE NEEDS NO MIRROR AT ALL, unlike the other five: its rows declare no
 // resourceKey/derivedStat/saveDcAbilities anywhere (Sneak Attack's Nd6 is a
 // computed rule function, never a persisted pool — see sneakAttackSpec), so
 // falling out of both maps entirely — the same `toRows(undefined?.features ??
 // [])` -> `[]` fallthrough — loses nothing a `.resources`-observing test could
 // see. rogue-thief.test.ts (which used to call `testFeatureRowsFor("rogue",
 // "thief")`) is rewritten onto `loadDbFeatureRows` instead, same shape as
-// fighter-unregistered.test.ts.
+// fighter-unregistered.test.ts. Ranger does NOT get this exemption — see
+// RANGER_BASE_ROWS' own comment for why its base class needs a mirror where
+// Rogue's doesn't.
 import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { cleric } from "@/lib/classes/cleric.js";
@@ -716,6 +724,105 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+// RANGER's base-class rows (#1230): `lib/classes/ranger.ts`'s base-class
+// `.features` moved to literal seed data (prisma/seed/ranger-features.ts) —
+// the same rootDir boundary FIGHTER_BASE_ROWS'/BARBARIAN_BASE_ROWS' comments
+// explain (ranger.ts itself still exists — see its own header for why it
+// isn't deletable — but its base `.features` are gone). REQUIRED, unlike
+// Rogue (which needs no mirror at all): Ranger's base class always grants at
+// least one feature from level 1 (Favored Enemy), so an empty carrier would
+// flip "ranger / (no subclass)"'s snapshot from a real (if empty-resources)
+// object to `null` at every level — exactly the regression this mirror
+// exists to prevent. Extra Attack's derivedStat/derivedStatTiers ride this
+// array (unlike `toRows`, which drops those two fields) for the same reason
+// FIGHTER_BASE_ROWS hand-builds rather than calling `toRows`. Hunter's/Beast
+// Master's own subclass rows need NO mirror (same reasoning as Rogue's
+// module-wide exemption): neither declares a resourceKey/derivedStat
+// anywhere in ranger-features.ts, so the `toRows(subDef?.features ?? [])` ->
+// `[]` fallthrough (TEST_SUBCLASSES has no entry for either) loses nothing a
+// `.resources`-observing test could see — their `choices` catalog (Hunter)
+// keeps contributing `subclassChoices` independent of any row carrier.
+export const RANGER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Favored Enemy",
+    level: 1,
+    edition,
+    description:
+      "Choose a type of favored enemy (beasts, fey, humanoids of a specific type, etc.). You have advantage on Survival checks to track them and on Intelligence checks to recall information about them. You learn one language spoken by your favored enemy. Additional enemy at L6 and L14.",
+  },
+  {
+    name: "Natural Explorer",
+    level: 1,
+    edition,
+    description:
+      "Choose a favored terrain type. When traveling in it: ignore difficult terrain, can't be surprised if alert, advantage on Initiative rolls, initiative even if surprised once per turn, move at normal pace while stealthing. Additional terrain at L6 and L10.",
+  },
+  {
+    name: "Fighting Style",
+    level: 2,
+    edition,
+    description:
+      "Choose: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage with one weapon), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
+  },
+  {
+    name: "Spellcasting",
+    level: 2,
+    edition,
+    description:
+      "You cast spells using Wisdom. Half-caster progression (first slots at level 2, one level behind full casters). You prepare a number of ranger spells equal to half your ranger level + Wisdom modifier (minimum 1).",
+  },
+  {
+    name: "Primeval Awareness",
+    level: 3,
+    edition,
+    description:
+      "Expend one spell slot to focus your awareness for 1 minute per slot level. You sense whether certain types of creatures are within 1 mile (or 6 miles in your favored terrain).",
+  },
+  {
+    name: "Extra Attack",
+    level: 5,
+    edition,
+    description: "You can attack twice whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
+  },
+  {
+    name: "Land's Stride",
+    level: 8,
+    edition,
+    description:
+      "Moving through nonmagical difficult terrain costs no extra movement. You can pass through nonmagical plants without being slowed or taking damage. Advantage on saves against magically created or manipulated plants.",
+  },
+  {
+    name: "Hide in Plain Sight",
+    level: 10,
+    edition,
+    description:
+      "Spend 1 minute camouflaging yourself: gain +10 to Dexterity (Stealth) checks while you remain motionless. The bonus is lost when you move, take an action, or take a reaction.",
+  },
+  {
+    name: "Vanish",
+    level: 14,
+    edition,
+    description:
+      "You can use the Hide action as a bonus action on your turn. Also, you can't be tracked by nonmagical means unless you choose to leave a trail.",
+  },
+  {
+    name: "Feral Senses",
+    level: 18,
+    edition,
+    description:
+      "When not blinded or deafened, you are aware of invisible creatures within 30 ft even if they are hidden. In combat, no disadvantage on attacks against invisible creatures within 30 ft.",
+  },
+  {
+    name: "Foe Slayer",
+    level: 20,
+    edition,
+    description:
+      "Once per turn when you hit a favored enemy with a weapon, you may add your Wisdom modifier to the attack roll or the damage roll.",
+  },
+]);
+
 // THE FIEND (#1233): mirrors warlock-features.ts's real SRD 5.2 content and
 // resource-pool columns exactly — Dark One's Own Luck's 2024 row deliberately
 // OMITS resourceTotals (a Charisma-modifier formula, still resourceFn-derived;
@@ -940,6 +1047,7 @@ export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDIT
 const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
+  ranger: RANGER_BASE_ROWS,
   warlock: WARLOCK_BASE_ROWS,
   wizard: WIZARD_BASE_ROWS,
 };
