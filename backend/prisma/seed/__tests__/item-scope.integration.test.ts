@@ -19,7 +19,23 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 
 const OWNER_ID = "item-scope-owner";
 const MADE: string[] = [];
+// Every campaign this file creates, so one that outlives a mid-test failure
+// still gets swept — the cascade test deletes its own as an assertion.
+const MADE_CAMPAIGNS: string[] = [];
 let campaignId: string;
+
+async function makeCampaign(name: string) {
+  const campaign = await prisma.campaign.create({
+    data: {
+      name,
+      ownerId: OWNER_ID,
+      inviteCode: randomUUID(),
+      members: { create: { userId: OWNER_ID, role: "OWNER" } },
+    },
+  });
+  MADE_CAMPAIGNS.push(campaign.id);
+  return campaign;
+}
 
 async function makeGlobalItem(name: string) {
   const row = await prisma.item.create({
@@ -45,15 +61,7 @@ async function makeCampaignItem(name: string, forCampaignId = campaignId) {
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
-  const campaign = await prisma.campaign.create({
-    data: {
-      name: "Item Scope Campaign",
-      ownerId: OWNER_ID,
-      inviteCode: randomUUID(),
-      members: { create: { userId: OWNER_ID, role: "OWNER" } },
-    },
-  });
-  campaignId = campaign.id;
+  campaignId = (await makeCampaign("Item Scope Campaign")).id;
 });
 
 afterEach(async () => {
@@ -61,7 +69,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await prisma.campaign.delete({ where: { id: campaignId } });
+  await prisma.campaign.deleteMany({ where: { id: { in: MADE_CAMPAIGNS.splice(0) } } });
 });
 
 describe("Item scope discriminator (#1645)", () => {
@@ -117,14 +125,7 @@ describe("Item scope discriminator (#1645)", () => {
   });
 
   it("cascades campaign-scoped rows when the campaign is deleted", async () => {
-    const doomed = await prisma.campaign.create({
-      data: {
-        name: "Item Scope Doomed Campaign",
-        ownerId: OWNER_ID,
-        inviteCode: randomUUID(),
-        members: { create: { userId: OWNER_ID, role: "OWNER" } },
-      },
-    });
+    const doomed = await makeCampaign("Item Scope Doomed Campaign");
     const item = await makeCampaignItem("Scope Fixture Doomed", doomed.id);
 
     await prisma.campaign.delete({ where: { id: doomed.id } });

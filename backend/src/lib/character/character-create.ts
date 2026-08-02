@@ -118,7 +118,10 @@ async function resolveFixedItems(
 
   const names = [...new Set(expanded.map((r) => r.catalogName))];
   const items = await prisma.item.findMany({
-    where: { name: { in: names } },
+    // Pinned to the GLOBAL catalog (#1645), same rule as validateOpenPick.
+    // itemByName below collapses this on name, so an unpinned read would let a
+    // campaign row OVERWRITE the catalog one and grant the wrong item entirely.
+    where: { scopeKey: "global", name: { in: names } },
     include: catalogItemDetailInclude,
   });
   const itemByName = new Map(items.map((i) => [i.name, i]));

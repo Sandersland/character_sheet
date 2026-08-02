@@ -8,9 +8,18 @@
 //
 // DELETE THIS FILE in #1646, which drops CampaignItemCapability: at that point
 // the parity it checks no longer has two sides and this suite goes red.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
+
+const CASCADE_FIXTURE_NAME = "Capability Parity Fixture";
+
+// The cascade test deletes its own row as the assertion. If an earlier expect
+// throws, that delete never runs and the NEXT run dies on P2002 — a test that
+// poisons itself. Cleanup belongs here, where a failure cannot skip it.
+afterEach(async () => {
+  await prisma.item.deleteMany({ where: { name: CASCADE_FIXTURE_NAME } });
+});
 
 type Column = { column_name: string; data_type: string; udt_name: string; is_nullable: string };
 
@@ -37,7 +46,7 @@ describe("ItemCapability mirrors CampaignItemCapability (#1645)", () => {
   it("parents to Item and cascades on delete", async () => {
     const item = await prisma.item.create({
       data: {
-        name: "Capability Parity Fixture",
+        name: CASCADE_FIXTURE_NAME,
         category: "gear",
         scope: "GLOBAL",
         scopeKey: "global",

@@ -1088,8 +1088,9 @@ enum ItemCategory {
 
 // Who authored an Item row (#1645, epic #1644). GLOBAL rows are seeded catalog
 // content with exactly one writer; CAMPAIGN rows are DM-authored and merged in
-// from CampaignItem by #1646. A USER member is a data change, not a redesign —
-// see Item.scopeKey for why.
+// from CampaignItem by #1646. Adding USER needs no redesign (see Item.scopeKey)
+// but is NOT free: Item_scope_key_agreement_check enumerates the scopes, so a
+// new member without a matching CHECK branch rejects every insert.
 enum ItemScope {
   GLOBAL
   CAMPAIGN
