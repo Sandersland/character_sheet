@@ -102,6 +102,25 @@ describe("SubclassSection — stranded on a cross-edition subclass (#1598)", () 
   });
 });
 
+// A homebrew subclass is a NAME with no catalog row (characterInclude's
+// subclassRef comment, #911): `entry.subclass` set, `entry.subclassId` null.
+// buildClassesView reports needsSubclass=true for it (its `!entry.subclassId`
+// half), so the picker must NOT key off needsSubclass alone — that would start
+// prompting homebrew characters to replace a subclass they deliberately hold.
+// This pins the divergence so it stays deliberate rather than looking like the
+// oversight it resembles.
+describe("SubclassSection — a homebrew subclass (name, no catalog row)", () => {
+  it("shows the name with no picker, even though the backend reports needsSubclass", () => {
+    renderWithCharacter(
+      <SubclassSection classDef={classDef} needsSubclass subclassUnavailable={false} busy={false} onChoose={vi.fn()} />,
+      makeCharacter({ subclass: "Pact of the Wandering Star", subclassId: undefined }),
+    );
+    expect(screen.getByText("Pact of the Wandering Star")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/isn't part of/)).not.toBeInTheDocument();
+  });
+});
+
 // ClassPanel passes `reference?.classes ?? []`, so `classDef` is undefined for
 // the whole window before the reference query resolves. That used to be
 // unreachable with the picker open: the retired deriveNeedsSubclass began

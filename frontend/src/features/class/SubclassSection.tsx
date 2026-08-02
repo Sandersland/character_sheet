@@ -63,6 +63,13 @@ export default function SubclassSection({ classDef, needsSubclass, subclassUnava
   // unconditionally, #1598) — this additionally opens the picker for it,
   // rather than only for "never picked", so the player has a way out.
   //
+  // Deliberately NOT `needsSubclass`, though that is the backend's own answer
+  // to a near-identical question. The two diverge on a homebrew subclass — a
+  // name with no catalog row (#911) — where `needsSubclass` is true (its
+  // `!entry.subclassId` half) but the player holds a subclass on purpose and
+  // must not be prompted to replace it. Whether homebrew deserves the same
+  // explain-and-re-pick treatment is a real question, and a separate one.
+  //
   // `classDef` is required because the option list comes from it, and it is
   // genuinely absent for a beat: ClassPanel passes `reference?.classes ?? []`
   // while the reference query resolves. The retired deriveNeedsSubclass used

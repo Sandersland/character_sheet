@@ -62,7 +62,7 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { name: { startsWith: "1598 Stranded" } } });
 });
 
-async function createCharacter(name: string, className: string) {
+async function createCharacter(name: string, className: string, experiencePoints = 900) {
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
@@ -78,7 +78,7 @@ async function createCharacter(name: string, className: string) {
       // gain their subclass at 3 in 2024 (subclassGateLevel returns 3
       // unconditionally for EDITION_2024), so the level gate has passed and
       // needsSubclass's non-gate half is what this test isolates.
-      experiencePoints: 900,
+      experiencePoints,
     });
   expect(res.status).toBe(201);
   return res.body.id as string;
@@ -151,6 +151,30 @@ describe("a 2024 character stranded on a 2014-only subclass row (#1598)", () => 
     expect(res.status).toBe(200);
     const entry = (res.body.classes as { name: string; subclassUnavailable: boolean; needsSubclass: boolean }[])
       .find((c) => c.name === healthyRow.class.name);
+    expect(entry!.subclassUnavailable).toBe(false);
+    expect(entry!.needsSubclass).toBe(false);
+  });
+
+  // A level-down leaves subclassId in place and relies on the clamp-on-read to
+  // hide it (issue #125), so "stranded" and "below the gate" genuinely co-occur.
+  // The flag must follow the clamp: `character.subclass` (character-serialize.ts)
+  // reads the RAW entry column and is NOT level-gated, so an ungated flag would
+  // sail past SubclassSection's `!character.subclass && !needsSubclass` early
+  // return and invite a re-pick of a subclass the character has not yet earned.
+  it("does NOT mark a stranded entry that is below its subclass gate — the flag follows the clamp-on-read", async () => {
+    const fixture = fixtures[0];
+    // XP 0 = level 1, below every 2024 subclass gate (subclassGateLevel is 3).
+    const id = await createCharacter(`1598 Stranded BelowGate ${fixture.subclassName}`, fixture.className, 0);
+    await strandOnSubclass(id, fixture.className, fixture);
+
+    const res = await get(id);
+    expect(res.status).toBe(200);
+    const entry = (res.body.classes as { name: string; subclass?: string; needsSubclass: boolean; subclassUnavailable: boolean }[])
+      .find((c) => c.name === fixture.className);
+
+    // The clamp already hides the name; the flags must agree rather than
+    // advertise a stranded pick the sheet is deliberately not showing.
+    expect(entry!.subclass).toBeUndefined();
     expect(entry!.subclassUnavailable).toBe(false);
     expect(entry!.needsSubclass).toBe(false);
   });

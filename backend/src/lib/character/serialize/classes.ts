@@ -256,8 +256,18 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
     // CHARACTER's edition (class-feature-rows.ts), so a stranded entry derives
     // zero subclass features while `subclass` above still renders the name;
     // the frontend uses this flag to explain that split rather than hide it.
+    //
+    // Gated on `subclassVisible` for the same reason `subclass`/`subclassId`
+    // below are: a level-down leaves the subclassId in place and relies on the
+    // clamp-on-read to hide it, so an ungated flag would report a stranded pick
+    // the sheet is deliberately not showing. That is not merely inconsistent —
+    // `character.subclass` (character-serialize.ts) reads the RAW entry column
+    // and is NOT level-gated, so SubclassSection's early return would not fire
+    // and a below-gate character would be shown the explanation and invited to
+    // re-pick a subclass it has not yet earned.
     const subclassRowEdition = entry.subclassRef?.edition ?? null;
-    const subclassUnavailable = Boolean(entry.subclassId) && subclassRowEdition !== null && subclassRowEdition !== edition;
+    const subclassUnavailable =
+      subclassVisible && Boolean(entry.subclassId) && subclassRowEdition !== null && subclassRowEdition !== edition;
     out.push({
       id: entry.id,
       name: entry.name,
