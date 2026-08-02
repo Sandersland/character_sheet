@@ -37,7 +37,7 @@ export const bard: ClassDefinition = {
         total,
         die,
         recharge,
-        description: `Bonus action: grant one creature within 60 ft a Bardic Inspiration ${die}. They add it to one roll within 10 minutes. Regain all uses on ${level >= 5 ? "a short or long rest" : "a long rest"}.`,
+        description: `Bonus action: grant one creature within 60 ft a Bardic Inspiration ${die}. They add it to one roll. Regain all uses on ${level >= 5 ? "a short or long rest" : "a long rest"}.`,
       },
     ];
   },
