@@ -2,18 +2,17 @@
 // Commit 1 of 3 (mirrors Barbarian's #1223, Warlock's #1233, Wizard's #1234)
 // moved these rows off lib/classes/sorcerer.ts's AuthoredFeature[] arrays
 // into literal seed data, byte-identical to the old TS-derived text (pinned
-// by sorcerer-2014-snapshot.test.ts). Commit 2 (this one) authors Sorcerer's
-// REAL SRD 5.2 (2024) content for the base class and both subclasses — SRD
-// 5.2 itself only ships Draconic Sorcery (its own L3 text: "The Draconic
-// Sorcery subclass is detailed after this class's description", singular),
-// so Wild Magic Sorcery's 2024 text is mirror-sourced (two
-// independently-agreeing mirrors, cited on its own rows below) rather than
-// SRD-verified — see this file's WILD MAGIC section header for the
-// provenance discipline. Commit 3 moves every movable resource pool onto its
-// row (see that commit's RESOURCE POOL block) and shrinks
-// lib/classes/sorcerer.ts to its irreducible residue — see that file's own
-// header for why it survives (it is NOT deletable, unlike
-// fighter.ts/barbarian.ts).
+// by sorcerer-2014-snapshot.test.ts). Commit 2 authored Sorcerer's REAL SRD
+// 5.2 (2024) content for the base class and both subclasses — SRD 5.2 itself
+// only ships Draconic Sorcery (its own L3 text: "The Draconic Sorcery
+// subclass is detailed after this class's description", singular), so Wild
+// Magic Sorcery's 2024 text is mirror-sourced (two independently-agreeing
+// mirrors, cited on its own rows below) rather than SRD-verified — see this
+// file's WILD MAGIC section header for the provenance discipline. Commit 3
+// (this one) moves every movable resource pool onto its row (see the
+// RESOURCE POOL block below) and shrinks lib/classes/sorcerer.ts to its
+// irreducible residue — see that file's own header for why it survives (it
+// is NOT deletable, unlike fighter.ts/barbarian.ts).
 // class-features.ts concatenates SORCERER_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a
@@ -52,6 +51,27 @@
 // pinned (sorcerer-2014-snapshot.test.ts) — this commit only ever ADDS an
 // `edition: "EDITION_2024"` tag alongside new 2024 text; it never edits a
 // 2014 row's own name/level/description.
+//
+// RESOURCE POOL (commit 3 of 3, mirrors Warlock's/Wizard's own two-step):
+// six rows carry a pool — Innate Sorcery (2024, flat 2 from L1), Sorcerous
+// Restoration (2024, flat 1 from L5), Tides of Chaos (BOTH editions — flat 1
+// from L1 in 2014, flat 1 from L3 in 2024, each row's own level replacing
+// the old `if (level >= N)` gate), Dragon Wings (2024, flat 1 from L14), and
+// Tamed Surge (2024, flat 1 from L18) — owner decision (#1232): pool every
+// once-per-rest activated ability, matching Warlock's #1233 precedent, not
+// just the two the issue itself named. `sorceryPoints` STAYS in
+// lib/classes/sorcerer.ts's resourceFn (see that file's own header for why);
+// this commit only edition-branches its DESCRIPTION, never its total, so
+// Font of Magic's row text and the fn's pool description can agree on the
+// Min. Sorcerer Level clause without a second hand-written string drifting
+// from it (mirrors Warlock's Dark One's Own Luck residue). The wild-magic
+// subclass resourceFn (tidesOfChaos) is DELETED in this same commit —
+// mergePoolSources (registry.ts) has a resourceFn pool WIN over a row pool
+// of the same key, so leaving the fn in place would make the new row column
+// inert. #1528's "no-second-string" rule (poolFromRow reads the row's own
+// `description`, never a second hand-written pool string) means the retired
+// wild-magic resourceFn's own description text is simply gone from the
+// wire — an accepted, intended consequence of the move, not a regression.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -136,6 +156,10 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     // — the first pool a 2024 Sorcerer has, before level 2's Sorcery Points.
     description:
       "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "innateSorcery",
+    resourceLabel: "Innate Sorcery",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 2 }],
   },
   {
     subclassSlug: null,
@@ -224,6 +248,10 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     // pool tracks here (mirrors Warlock's Magical Cunning shape).
     description:
       "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+    resourceKey: "sorcerousRestoration",
+    resourceLabel: "Sorcerous Restoration",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 5, total: 1 }],
   },
   {
     subclassSlug: null,
@@ -354,6 +382,10 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     // longRest, from level 14).
     description:
       "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+    resourceKey: "dragonWings",
+    resourceLabel: "Dragon Wings",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
   {
     subclassSlug: DRACONIC_BLOODLINE_SLUG,
@@ -439,6 +471,10 @@ const WILD_MAGIC_RAW: RawSorcererFeature[] = [
     edition: "EDITION_2014",
     description:
       "Gain advantage on one attack roll, ability check, or saving throw. Once used, the DM can force a Wild Magic Surge before you can use this feature again. Alternatively, regain use after a long rest.",
+    resourceKey: "tidesOfChaos",
+    resourceLabel: "Tides of Chaos",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
   },
   {
     subclassSlug: WILD_MAGIC_SLUG,
@@ -455,6 +491,10 @@ const WILD_MAGIC_RAW: RawSorcererFeature[] = [
     // longRest, from level 3) — the 2014 row keeps its own pool at level 1.
     description:
       "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
+    resourceKey: "tidesOfChaos",
+    resourceLabel: "Tides of Chaos",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 3, total: 1 }],
   },
   {
     subclassSlug: WILD_MAGIC_SLUG,
@@ -510,6 +550,10 @@ const WILD_MAGIC_RAW: RawSorcererFeature[] = [
     // (flat total 1, longRest, from level 18).
     description:
       "Once per Long Rest, whenever you roll on the Wild Magic Surge table, you can replace the triggered effect with a Wild Magic Surge effect of your choice from the table, other than its final effect.",
+    resourceKey: "tamedSurge",
+    resourceLabel: "Tamed Surge",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 18, total: 1 }],
   },
 ];
 

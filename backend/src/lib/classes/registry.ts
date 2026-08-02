@@ -127,14 +127,16 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
 // Fighter (#1528), Barbarian's Rage (#1223), Wizard's Arcane Recovery/Illusory
 // Self (#1234), Warlock's Magical Cunning/Dark One's Own Luck (2014
 // only)/Hurl Through Hell/Fey Presence/Misty Escape/Dark Delirium/Entropic
-// Ward (#1233) and Ranger's Favored Enemy/Tireless (2024 only)/Nature's Veil
-// (2024 only) (#1230) — every other class's rows carry no resourceKey, so
-// this is a no-op for them until their own wave-2 retab (#1134) populates
-// theirs. Rogue is the exception that stays a no-op even AFTER its retab
-// (#1231): Sneak Attack's Nd6 is a computed rule function off the class
-// entry's own level, never a persisted pool. No `=== "fighter"` /
-// `=== "barbarian"` / `=== "rogue"` / `=== "warlock"` / `=== "wizard"` /
-// `=== "ranger"` check anywhere (CLAUDE.md).
+// Ward (#1233), Ranger's Favored Enemy/Tireless (2024 only)/Nature's Veil
+// (2024 only) (#1230), and Sorcerer's Innate Sorcery/Sorcerous Restoration/
+// Dragon Wings/Tamed Surge (2024 only)/Tides of Chaos (both editions)
+// (#1232) — every other class's rows carry no resourceKey, so this is a no-op
+// for them until their own wave-2 retab (#1134) populates theirs. Rogue is the
+// exception that stays a no-op even AFTER its retab (#1231): Sneak Attack's
+// Nd6 is a computed rule function off the class entry's own level, never a
+// persisted pool. No `=== "fighter"` / `=== "barbarian"` / `=== "rogue"` /
+// `=== "warlock"` / `=== "wizard"` / `=== "ranger"` / `=== "sorcerer"` check
+// anywhere (CLAUDE.md).
 function deriveBaseLayer(
   classDef: ClassDefinition | undefined,
   level: number,

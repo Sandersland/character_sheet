@@ -1170,8 +1170,9 @@ export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDIT
 // AuthoredFeature[] arrays onto literal seed data
 // (prisma/seed/sorcerer-features.ts) — the same rootDir boundary
 // FIGHTER_BASE_ROWS'/WARLOCK_BASE_ROWS' comments explain. Mirrors that file's
-// real SRD 5.2/PHB'24 (2024) content exactly (commit 2 of 3) — every row
-// below now sets its own `edition`, per that file's tagging rule.
+// real SRD 5.2/PHB'24 (2024) content exactly, including its RESOURCE POOL
+// columns (commit 3 of 3) — every row below now sets its own `edition`, per
+// that file's tagging rule.
 export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Spellcasting",
@@ -1193,6 +1194,10 @@ export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "innateSorcery",
+    resourceLabel: "Innate Sorcery",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 2 }],
   },
   {
     name: "Font of Magic",
@@ -1248,6 +1253,10 @@ export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+    resourceKey: "sorcerousRestoration",
+    resourceLabel: "Sorcerous Restoration",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 5, total: 1 }],
   },
   {
     name: "Sorcery Incarnate",
@@ -1326,6 +1335,10 @@ export const DRACONIC_BLOODLINE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+    resourceKey: "dragonWings",
+    resourceLabel: "Dragon Wings",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
   },
   {
     name: "Draconic Presence",
@@ -1364,6 +1377,10 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "Gain advantage on one attack roll, ability check, or saving throw. Once used, the DM can force a Wild Magic Surge before you can use this feature again. Alternatively, regain use after a long rest.",
+    resourceKey: "tidesOfChaos",
+    resourceLabel: "Tides of Chaos",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
   },
   {
     name: "Tides of Chaos",
@@ -1371,6 +1388,10 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
+    resourceKey: "tidesOfChaos",
+    resourceLabel: "Tides of Chaos",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 3, total: 1 }],
   },
   {
     name: "Bend Luck",
@@ -1411,6 +1432,10 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "Once per Long Rest, whenever you roll on the Wild Magic Surge table, you can replace the triggered effect with a Wild Magic Surge effect of your choice from the table, other than its final effect.",
+    resourceKey: "tamedSurge",
+    resourceLabel: "Tamed Surge",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 18, total: 1 }],
   },
 ];
 

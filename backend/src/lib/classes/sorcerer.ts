@@ -1,9 +1,10 @@
 import type { ClassDefinition } from "./types.js";
 
 // #1232: Sorcerer's feature TEXT moved to literal seed data
-// (prisma/seed/sorcerer-features.ts, commits 1-2). This module is NOT
-// deletable, unlike fighter.ts/barbarian.ts, for THREE reasons — see this
-// file's own header, updated per commit, for the running inventory:
+// (prisma/seed/sorcerer-features.ts, commits 1-2) and every movable resource
+// pool moved onto its row (commit 3, this one — see that file's own header
+// for the pool-by-pool inventory). This module is NOT deletable, unlike
+// fighter.ts/barbarian.ts, for THREE reasons that all survive this commit:
 //
 // (1) `grantLevel: 1` on both subclasses below is PHB'14 p.99's real
 // Sorcerous Origin gate, not the 3 every SUBCLASS_IDENTITY-seeded,
@@ -16,10 +17,22 @@ import type { ClassDefinition } from "./types.js";
 // not a level-tiered total ClassFeature.resourceTotals' tier-array schema
 // can express (that column's own schema.prisma comment names exactly this
 // case, alongside Bardic Inspiration/Lay on Hands, as the "stays in
-// resourceFn" shape).
+// resourceFn" shape). Only its DESCRIPTION is edition-branched below — the
+// 2024 Font of Magic ClassFeature row now also carries its own feature text
+// (sorcerer-features.ts), and the two editions' Font of Magic text genuinely
+// differs (SRD 5.2's Creating Spell Slots table adds a Min. Sorcerer Level
+// column) — pinned agreeing with that row's own text by
+// sorcerer-resource-pools.test.ts, mirroring warlock.ts's Dark One's Own
+// Luck residue.
 //
 // (3) FONT_OF_MAGIC_MAX_SLOT_LEVEL/sorceryPointCostForSlot have a real
 // consumer in lib/spellcasting/spellcasting.ts.
+//
+// The wild-magic subclass's OWN resourceFn (tidesOfChaos) is DELETED here,
+// not merely emptied — its flat, level-gated total moved onto both editions'
+// Tides of Chaos rows (sorcerer-features.ts). mergePoolSources (registry.ts)
+// lets a resourceFn pool WIN over a row pool of the same key, so leaving this
+// fn in place would have made the new row columns permanently inert.
 
 // Font of Magic "Creating Spell Slots" cost table (PHB p.101): slot level → SP cost.
 // Sorcerers can create spell slots no higher than 5th level. Unchanged in
@@ -36,7 +49,7 @@ export function sorceryPointCostForSlot(slotLevel: number): number | null {
 }
 
 export const sorcerer: ClassDefinition = {
-  resourceFn: (level) => {
+  resourceFn: (level, _abilityScores, _profBonus, _subclassKey, edition) => {
     if (level < 2) return [];
     return [
       {
@@ -44,7 +57,12 @@ export const sorcerer: ClassDefinition = {
         label: "Sorcery Points",
         total: level,
         recharge: "longRest",
-        description: "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+        // Total stays edition-invariant (`level`, both editions) — only the
+        // description branches, per this file's own header comment above.
+        description:
+          edition === "EDITION_2024"
+            ? "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest."
+            : "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
       },
     ];
   },
@@ -57,15 +75,6 @@ export const sorcerer: ClassDefinition = {
     "wild magic": {
       slug: "sorcerer-wild-magic",
       grantLevel: 1,
-      resourceFn: () => [
-        {
-          key: "tidesOfChaos",
-          label: "Tides of Chaos",
-          total: 1,
-          recharge: "longRest",
-          description: "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
-        },
-      ],
     },
   },
 };
