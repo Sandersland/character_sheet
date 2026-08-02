@@ -9,29 +9,38 @@
 // the seeded rows agree; if they ever diverge, that test — not this one —
 // is what catches it.
 //
-// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), RANGER (#1230), ROGUE
-// (#1231), WARLOCK (#1233) and WIZARD (#1234) all author their ClassFeature
-// rows as literal seed data (prisma/seed/<class>-features.ts), which this
-// src-side fixture can't import — backend/tsconfig.json's `rootDir: "src"`
-// makes a src file importing anything under prisma/ a compile error
-// (TS6059). Their rows therefore come from the hardcoded
-// LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps below, mirroring each seed
-// file's RESOURCE columns. class-features-snapshot.test.ts records
+// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
+// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233) and WIZARD
+// (#1234) all author their ClassFeature rows as literal seed data
+// (prisma/seed/<class>-features.ts), which this src-side fixture can't
+// import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
+// anything under prisma/ a compile error (TS6059). Their rows therefore come
+// from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps below,
+// mirroring each seed file's RESOURCE columns.
+//
+// class-features-snapshot.test.ts records
 // `withoutFeatures(deriveResources(...))`, stripping `.features` before
-// snapshotting, so the row TEXT matters only for readability here, never for a
-// passing assertion; class-feature-parity.test.ts is the suite that DOES assert
-// on `.features` content, and it skips all six classes for the same underlying
-// reason (its own file's LITERAL_ROW_CLASSES check).
+// snapshotting, so the row TEXT matters only for readability for THAT suite —
+// but `.features` being non-empty still decides whether `deriveResources`
+// returns `null` or an object at all (registry.ts's `resources.length === 0 &&
+// features.length === 0` check), which several OTHER suites (srd.test.ts's
+// Channel Divinity tests, subclass-grant-level.test.ts) assert on directly. So
+// a class whose rows a real test exercises that way cannot skip the mirror
+// even where `.features` content itself is never asserted (#1225).
+// class-feature-parity.test.ts is the suite that DOES assert on `.features`
+// content, and it skips all eight classes for the same underlying reason (its
+// own file's LITERAL_ROW_CLASSES check).
 //
 // Three different end states sit behind that one list. `lib/classes/
-// fighter.ts`, `barbarian.ts` and `rogue.ts` are deleted outright. `warlock.ts`
-// and `wizard.ts` survive because each carries a subclass `grantLevel` (1 for
-// Warlock's patrons, 2 for Wizard's schools) that no seeded row can express
-// while subclassGateLevel's undefined fallback is 3, so deleting either would
-// silently move that class's 2014 subclass gate (#1576). `ranger.ts` survives
-// for a DIFFERENT reason still (its own header names it: Hunter's `choices`
-// catalog, #899/#1353) — its `grantLevel: 3` already equals the fallback, so
-// unlike Warlock/Wizard that isn't why it stays. None of the three still
+// fighter.ts`, `barbarian.ts` and `rogue.ts` are deleted outright.
+// `warlock.ts`, `wizard.ts`, `sorcerer.ts` and `cleric.ts` survive because each
+// carries a subclass `grantLevel` (1 for Warlock's patrons, Sorcerer's origins
+// and Cleric's Divine Domain; 2 for Wizard's schools) that no seeded row can
+// express while subclassGateLevel's undefined fallback is 3, so deleting any
+// would silently move that class's 2014 subclass gate (#1576). `ranger.ts`
+// survives for a DIFFERENT reason still (its own header names it: Hunter's
+// `choices` catalog, #899/#1353) — its `grantLevel: 3` already equals the
+// fallback, so unlike the others that isn't why it stays. None of them still
 // exports a base-class `features` array, which is what matters here.
 //
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
@@ -42,19 +51,26 @@
 // subclasses (Hunter, Beast Master) are the same shape — see RANGER_BASE_ROWS'
 // own comment below.
 //
-// ROGUE NEEDS NO MIRROR AT ALL, unlike the other five: its rows declare no
+// CLERIC'S TWO DOMAINS ARE THE COUNTEREXAMPLE (#1225): neither Life Domain nor
+// Trickery Domain declares a resourceKey/derivedStat either, but srd.test.ts's
+// Channel Divinity suite and subclass-grant-level.test.ts's domain-gate checks
+// both call testFeatureRowsFor with a cleric domain and assert directly on
+// null-ness/`.length`, which the null-vs-object distinction above DOES change —
+// so both domains need a mirror despite carrying no resource descriptor,
+// unlike Barbarian's two.
+//
+// ROGUE NEEDS NO MIRROR AT ALL: its rows declare no
 // resourceKey/derivedStat/saveDcAbilities anywhere (Sneak Attack's Nd6 is a
-// computed rule function, never a persisted pool — see sneakAttackSpec), so
-// falling out of both maps entirely — the same `toRows(undefined?.features ??
-// [])` -> `[]` fallthrough — loses nothing a `.resources`-observing test could
-// see. rogue-thief.test.ts (which used to call `testFeatureRowsFor("rogue",
-// "thief")`) is rewritten onto `loadDbFeatureRows` instead, same shape as
-// fighter-unregistered.test.ts. Ranger does NOT get this exemption — see
+// computed rule function, never a persisted pool — see sneakAttackSpec), and no
+// surviving test asserts a null-vs-object distinction against it either
+// (rogue-thief.test.ts, which used to call `testFeatureRowsFor("rogue",
+// "thief")`, is rewritten onto `loadDbFeatureRows` instead, same shape as
+// fighter-unregistered.test.ts) — so falling out of both maps entirely loses
+// nothing any surviving test can see. Ranger does NOT get this exemption — see
 // RANGER_BASE_ROWS' own comment for why its base class needs a mirror where
 // Rogue's doesn't.
 import { bard } from "@/lib/classes/bard.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
-import { cleric } from "@/lib/classes/cleric.js";
 import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
@@ -62,9 +78,8 @@ import { ranger } from "@/lib/classes/ranger.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 import { wizard } from "@/lib/classes/wizard.js";
-
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  bard, cleric, druid, monk, paladin, ranger, sorcerer, wizard,
+  bard, druid, monk, paladin, ranger, sorcerer, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
@@ -1438,6 +1453,164 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
     resourceTotals: [{ minLevel: 18, total: 1 }],
   },
 ];
+// CLERIC's base class + both domains (#1225): mirrors cleric-features.ts's
+// commit-1 byte-identical content exactly — the SAME rootDir boundary
+// FIGHTER_BASE_ROWS'/WARLOCK_BASE_ROWS' comments explain. Unlike those two,
+// this fixture is added in commit 1 (not held back for the pool move in
+// commit 3): the plan for #1225 originally assumed `withoutFeatures`
+// stripping `.features` before snapshotting meant no fixture change was
+// needed here until the pool landed, but removing cleric.ts's AuthoredFeature
+// arrays with NO literal-row override made deriveResources return `null`
+// instead of `{resources: [], features: []}` at levels where both layers are
+// empty (e.g. cleric level 1) — a real behavioural difference several unit
+// tests observe directly (srd.test.ts's Channel Divinity suite,
+// subclass-grant-level.test.ts's domain-gate checks), not something
+// `withoutFeatures` erases. So this fixture — and both domains' below —
+// lands in the same commit as cleric.ts's arrays being removed, exactly
+// mirroring what class-features.ts's production seed does. Commit 3 only
+// ADDS resourceKey/resourceLabel/resourceRecharge/resourceTotals to the two
+// Channel Divinity carrier rows within these arrays; it does not create them.
+export const CLERIC_BASE_ROWS: ClassFeatureRow[] = toRows([
+  {
+    name: "Spellcasting",
+    level: 1,
+    source: "class",
+    description:
+      "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
+  },
+  {
+    name: "Channel Divinity: Turn Undead",
+    level: 2,
+    source: "class",
+    description:
+      "As an action, each undead within 30 ft that can see or hear you must make a Wisdom save (DC 8 + proficiency + Wisdom modifier) or be turned for 1 minute. Turned undead flee you.",
+  },
+  {
+    name: "Destroy Undead",
+    level: 5,
+    source: "class",
+    description:
+      "When you turn an undead, any with CR 1/2 or lower are instantly destroyed (CR 1 at L8; CR 2 at L11; CR 3 at L14; CR 4 at L17).",
+  },
+  {
+    name: "Divine Intervention",
+    level: 10,
+    source: "class",
+    description:
+      "Call on your deity for aid. Roll percentile dice — on a result ≤ your cleric level, your deity intervenes. On a success, you can't use this feature again for 7 days. At level 20 it automatically succeeds.",
+  },
+  {
+    name: "Divine Intervention Improvement",
+    level: 20,
+    source: "class",
+    description: "Your Divine Intervention call automatically succeeds (no roll required).",
+  },
+]);
+
+export const CLERIC_LIFE_DOMAIN_ROWS: ClassFeatureRow[] = toRows([
+  {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+  },
+  {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+  },
+  { name: "Bonus Proficiency", level: 1, source: "subclass", description: "You gain proficiency with heavy armor." },
+  {
+    name: "Disciple of Life",
+    level: 1,
+    source: "subclass",
+    description:
+      "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
+  },
+  {
+    name: "Channel Divinity: Preserve Life",
+    level: 2,
+    source: "subclass",
+    description:
+      "As an action, evoke healing energy that restores a total of 5× your cleric level HP, divided among creatures within 30 ft (up to half their maximum HP each). Uses the Channel Divinity pool.",
+  },
+  {
+    name: "Blessed Healer",
+    level: 6,
+    source: "subclass",
+    description:
+      "When you cast a healing spell of 1st level or higher that restores HP to another creature, you regain HP equal to 2 + the spell's level.",
+  },
+  {
+    name: "Divine Strike",
+    level: 8,
+    source: "subclass",
+    description: "Once per turn when you hit with a weapon, deal an extra 1d8 radiant damage (+2d8 at level 14).",
+  },
+  {
+    name: "Supreme Healing",
+    level: 17,
+    source: "subclass",
+    description: "When you would normally roll dice to restore HP with a spell, use the highest number possible instead of rolling.",
+  },
+]);
+
+export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = toRows([
+  {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2024",
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+  },
+  {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    edition: "EDITION_2014",
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+  },
+  {
+    name: "Blessing of the Trickster",
+    level: 1,
+    source: "subclass",
+    description:
+      "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
+  },
+  {
+    name: "Channel Divinity: Invoke Duplicity",
+    level: 2,
+    source: "subclass",
+    description:
+      "As an action, create an illusory duplicate of yourself within 30 ft that lasts for 1 minute (concentration). You can attack with advantage against a creature within 5 ft of the duplicate, and can cast spells as if from the duplicate's space. Uses the Channel Divinity pool.",
+  },
+  {
+    name: "Channel Divinity: Cloak of Shadows",
+    level: 6,
+    source: "subclass",
+    description: "As an action, become invisible until the end of your next turn. Uses the Channel Divinity pool.",
+  },
+  {
+    name: "Divine Strike",
+    level: 8,
+    source: "subclass",
+    description: "Once per turn when you hit with a weapon, deal an extra 1d8 poison damage (+2d8 at level 14).",
+  },
+  {
+    name: "Improved Duplicity",
+    level: 17,
+    source: "subclass",
+    description:
+      "When you use Invoke Duplicity, you can create up to four duplicates instead of one. As a bonus action on your turn, move any number of them up to 30 ft (no more than 120 ft away from you).",
+  },
+]);
 
 // Per-class/per-subclass literal-row overrides (#1233): replaces the former
 // isFighter/isBarbarian/isBattleMaster boolean chain with two lookup maps, one
@@ -1453,6 +1626,7 @@ const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   warlock: WARLOCK_BASE_ROWS,
   wizard: WIZARD_BASE_ROWS,
   sorcerer: SORCERER_BASE_ROWS,
+  cleric: CLERIC_BASE_ROWS,
 };
 
 const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
@@ -1465,6 +1639,8 @@ const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "the great old one": THE_GREAT_OLD_ONE_ROWS,
   "draconic bloodline": DRACONIC_BLOODLINE_ROWS,
   "wild magic": WILD_MAGIC_ROWS,
+  "life domain": CLERIC_LIFE_DOMAIN_ROWS,
+  "trickery domain": CLERIC_TRICKERY_DOMAIN_ROWS,
 };
 
 /** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */

@@ -54,20 +54,17 @@ describe("ClassFeature migration — row count (#1523)", () => {
   });
 });
 
-// The 2 already-forked names among the DERIVED (non-LITERAL_ROW_CLASSES) half
-// are Cleric's "Domain Spells" — the ONLY name whose EDITION_2014/EDITION_2024
-// pair is SUPPOSED to differ there — asserted separately (and by name) in the
-// "already-forked pairs" describe block below. "Expanded Spell List" is
-// deliberately ABSENT here: Warlock is a LITERAL_ROW_CLASSES member (#1233)
-// now, so its rows never reach this test's loop at all (excluded by the
-// `LITERAL_ROW_CLASSES.has(row.className)` `continue` below, which runs
-// FIRST) — leaving it listed would be an unreachable, misleading entry, not a
-// second guard. Excluding "Domain Spells" here, by construction every
-// remaining (className, subclassSlug, name, level) group of exactly 2 rows in
-// CLASS_FEATURES must be an untagged feature's 2014/2024 expansion, so its two
-// descriptions must be equal — this needs no separate access to the raw,
-// pre-expansion feature list (which class-features.ts keeps internal).
-const KNOWN_FORKED_NAMES = new Set(["Domain Spells"]);
+// The derived half now has ZERO pre-forked names: Cleric's "Domain Spells"
+// (#1225) was the last one, following Warlock's "Expanded Spell List"
+// (#1233) off this path onto its own literal seed data
+// (cleric-features.ts/warlock-features.ts) — both classes are now
+// LITERAL_ROW_CLASSES members, so their rows never reach this test's loop at
+// all (excluded by the `LITERAL_ROW_CLASSES.has(row.className)` `continue`
+// below). By construction every remaining (className, subclassSlug, name,
+// level) group of exactly 2 rows in CLASS_FEATURES must be an untagged
+// feature's 2014/2024 expansion, so its two descriptions must be equal — this
+// needs no separate access to the raw, pre-expansion feature list (which
+// class-features.ts keeps internal).
 
 // This suite reads in-memory CLASS_FEATURES, not the DB — both editions of an
 // untagged row come from the SAME expandFeatureRow spread (class-features.ts),
@@ -87,18 +84,16 @@ const KNOWN_FORKED_NAMES = new Set(["Domain Spells"]);
 // (Fighter's, fighter-features.ts) never pass through expandFeatureRow at
 // all — they arrive in CLASS_FEATURES already split one-row-per-edition, by
 // hand, and several same-name/same-level pairs (Second Wind, Action Surge,
-// Indomitable, Improved Critical, ...) are DELIBERATELY divergent text
-// without being in KNOWN_FORKED_NAMES (which is keyed on name alone and
-// would otherwise have to list all seven, defeating its own point — this
-// suite guards expandFeatureRow, not Fighter's authored content). Excluding
-// LITERAL_ROW_CLASSES rows here is the correct fix, not widening the
-// allow-list.
+// Indomitable, Improved Critical, ...) are DELIBERATELY divergent text — this
+// suite guards expandFeatureRow, not each LITERAL class's authored content.
+// Excluding LITERAL_ROW_CLASSES rows here is the correct fix, not a second
+// name-keyed allow-list (KNOWN_FORKED_NAMES, deleted #1225 — Cleric's
+// "Domain Spells" was its last member).
 describe("ClassFeature migration — expandFeatureRow's untagged branch keeps both editions byte-identical (#1523)", () => {
   it("every untagged feature's EDITION_2014/EDITION_2024 pair has equal level and description", async () => {
     const byKey = new Map<string, typeof CLASS_FEATURES>();
     for (const row of CLASS_FEATURES) {
       if (LITERAL_ROW_CLASSES.has(row.className)) continue;
-      if (KNOWN_FORKED_NAMES.has(row.name)) continue;
       const key = `${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.level}`;
       const group = byKey.get(key) ?? [];
       group.push(row);
