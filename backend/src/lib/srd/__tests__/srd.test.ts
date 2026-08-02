@@ -439,8 +439,20 @@ describe("deriveResources — Cleric Channel Divinity", () => {
 // by rogue-unregistered.test.ts's own resource-pool-emptiness check.
 
 describe("deriveResources — features-only classes", () => {
-  it("Ranger has features but no resource pools", () => {
+  // #1230: the base class gained a real pool (Favored Enemy, L1) once its
+  // 2024 content and resource columns were authored — this class is no
+  // longer "features-only" at level 5 EDITION_2024 (or any level >= 1 under
+  // 2024). EDITION_2014 stays features-only — Favored Enemy's 2014 row
+  // carries no resourceKey at all.
+  it("Ranger has features and the Favored Enemy pool from level 1 (#1230)", () => {
     const result = deriveResources("ranger", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("ranger", undefined), "EDITION_2024");
+    expect(result).not.toBeNull();
+    expect(result!.resources.map((r) => r.key)).toEqual(["favoredEnemy"]);
+    expect(result!.features.length).toBeGreaterThan(0);
+  });
+
+  it("Ranger EDITION_2014 stays features-only — no resourceKey on its 2014 rows", () => {
+    const result = deriveResources("ranger", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("ranger", undefined), "EDITION_2014");
     expect(result).not.toBeNull();
     expect(result!.resources).toHaveLength(0);
     expect(result!.features.length).toBeGreaterThan(0);

@@ -42,7 +42,12 @@ import { loadDbFeatureRows } from "./db-feature-rows.fixture.js";
 // rows-fed "NEW" side would fail on content this migration deliberately
 // changed, not a regression. See LITERAL_ROW_CLASSES' comment for why this
 // header's own reminder ("MUST be replaced once the TS arrays are finally
-// retired") is now true for all three; the other nine classes still need it.
+// retired") is now true for all three; the other eight classes still need
+// it. Ranger STAYS in this map despite ranger-features.ts (#1230) moving its
+// `.features` to literal rows too — its `resourceFn`/`choices` catalog are
+// still TS-authored, so REFERENCE_CLASSES still needs `ranger` as a value —
+// LITERAL_ROW_CLASSES' `continue` below is what actually exempts it from
+// this suite's own comparison loop, same as warlock/wizard.
 const REFERENCE_CLASSES: Record<string, ClassDefinition> = {
   bard, cleric, druid, monk, paladin, ranger, sorcerer, warlock, wizard,
 };
