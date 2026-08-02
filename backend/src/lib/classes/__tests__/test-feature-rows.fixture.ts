@@ -18,13 +18,14 @@
 // was the false statement the drift hid behind.
 //
 // FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
-// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233) and WIZARD
-// (#1234) all author their ClassFeature rows as literal seed data
+// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233), WIZARD (#1234)
+// and BARD (#1224) all author their ClassFeature rows as literal seed data
 // (prisma/seed/<class>-features.ts), which this src-side fixture can't
 // import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
-// anything under prisma/ a compile error (TS6059). Their rows therefore come
-// from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps below,
-// mirroring each seed file's RESOURCE columns.
+// anything under prisma/ a compile error (TS6059). Every one but Bard's rows
+// therefore come from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS
+// maps below, mirroring each seed file's RESOURCE columns — Bard needs no
+// mirror at all (Rogue's own exemption, see below).
 //
 // class-features-snapshot.test.ts records
 // `withoutFeatures(deriveResources(...))`, stripping `.features` before
@@ -36,7 +37,7 @@
 // a class whose rows a real test exercises that way cannot skip the mirror
 // even where `.features` content itself is never asserted (#1225).
 // class-feature-parity.test.ts is the suite that DOES assert on `.features`
-// content, and it skips all eight classes for the same underlying reason (its
+// content, and it skips all nine classes for the same underlying reason (its
 // own file's LITERAL_ROW_CLASSES check).
 //
 // Three different end states sit behind that one list. `lib/classes/
@@ -45,11 +46,14 @@
 // carries a subclass `grantLevel` (1 for Warlock's patrons, Sorcerer's origins
 // and Cleric's Divine Domain; 2 for Wizard's schools) that no seeded row can
 // express while subclassGateLevel's undefined fallback is 3, so deleting any
-// would silently move that class's 2014 subclass gate (#1576). `ranger.ts`
-// survives for a DIFFERENT reason still (its own header names it: Hunter's
-// `choices` catalog, #899/#1353) — its `grantLevel: 3` already equals the
-// fallback, so unlike the others that isn't why it stays. None of them still
-// exports a base-class `features` array, which is what matters here.
+// would silently move that class's 2014 subclass gate (#1576). `ranger.ts` and
+// `bard.ts` survive for a DIFFERENT reason still — each own header names it:
+// Ranger's Hunter `choices` catalog (#899/#1353) and its EDITION_2024
+// Wisdom-modifier resourceFn; Bard's Cha-modifier/level-tiered-recharge
+// resourceFn (#1224) — both subclasses' `grantLevel: 3` already equal the
+// fallback, so unlike the first four that isn't why either module stays. None
+// of them still exports a base-class `features` array, which is what matters
+// here.
 //
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
 // stand-in: neither declares a resourceKey/derivedStat in barbarian-features.ts,
@@ -77,7 +81,17 @@
 // nothing any surviving test can see. Ranger does NOT get this exemption — see
 // RANGER_BASE_ROWS' own comment for why its base class needs a mirror where
 // Rogue's doesn't.
-import { bard } from "@/lib/classes/bard.js";
+//
+// BARD (#1224) IS THE SECOND CLASS TAKING ROGUE'S EXEMPTION: neither the base
+// class nor either college (bard-features.ts) declares a resourceKey — Bardic
+// Inspiration's pool stays wholly in bard.ts's resourceFn, called directly by
+// registry.ts independent of this fixture — and College of Valor's Extra
+// Attack is the only derivedStat row, which srd.test.ts/subclass-grant-level
+// tests never probe through a null-vs-object check the way Cleric's domains
+// are. So `bard` is dropped from TEST_CLASSES below entirely (not merely left
+// featureless): `testFeatureRowsFor("bard", …)` falls through to
+// `toRows(undefined?.features ?? [])` -> `[]` for both classRows and
+// subclassRows, identical to Rogue's own shape.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
@@ -87,7 +101,7 @@ import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 import { wizard } from "@/lib/classes/wizard.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  bard, druid, monk, paladin, ranger, sorcerer, wizard,
+  druid, monk, paladin, ranger, sorcerer, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring

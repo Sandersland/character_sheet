@@ -4,15 +4,16 @@
 // content changes here, a mechanical move with a checkable row count. Reading
 // these rows (retiring featureAppliesToEdition) is #1524's job, not this
 // file's; #1530 is the first descriptor column this file's own expandFeatureRow
-// populates (derivedStat/derivedStatTiers, off Bard/Monk/Paladin's
-// AuthoredFeature entries — Barbarian's own Extra Attack tier moved to
-// barbarian-features.ts's literal rows, #1223, and Ranger's to
-// ranger-features.ts's, #1230) — every other descriptor column below still
-// resolves to DESCRIPTOR_RESET, populated nowhere yet (#1528+).
+// populates (derivedStat/derivedStatTiers, off Monk/Paladin's AuthoredFeature
+// entries — Barbarian's own Extra Attack tier moved to barbarian-features.ts's
+// literal rows, #1223, Ranger's to ranger-features.ts's, #1230, and Bard's
+// College of Valor tier to bard-features.ts's, #1224) — every other
+// descriptor column below still resolves to DESCRIPTOR_RESET, populated
+// nowhere yet (#1528+).
 //
-// Rows are DERIVED from the four remaining TS-authored class modules (plus
-// Fighter's, Barbarian's, Cleric's, Ranger's, Rogue's, Sorcerer's, Warlock's
-// and Wizard's own literal rows, concatenated in below), not hand-transcribed:
+// Rows are DERIVED from the three remaining TS-authored class modules (plus
+// Fighter's, Barbarian's, Bard's, Cleric's, Ranger's, Rogue's, Sorcerer's,
+// Warlock's and Wizard's own literal rows, concatenated in below), not hand-transcribed:
 // this guarantees byte-identical `description`/`level` text for the derived
 // half (the migration's own acceptance criterion) and means that half's row
 // count is a property of the registry, never a literal to keep in sync by
@@ -32,11 +33,11 @@ import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclas
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
 import type { SeedEdition } from "./edition.js";
 
-import { bard } from "../../src/lib/classes/bard.js";
 import { druid } from "../../src/lib/classes/druid.js";
 import { monk } from "../../src/lib/classes/monk.js";
 import { paladin } from "../../src/lib/classes/paladin.js";
 import { BARBARIAN_FEATURES } from "./barbarian-features.js";
+import { BARD_FEATURES } from "./bard-features.js";
 import { CLERIC_FEATURES } from "./cleric-features.js";
 import { FIGHTER_FEATURES } from "./fighter-features.js";
 import { RANGER_FEATURES } from "./ranger-features.js";
@@ -47,10 +48,10 @@ import { WIZARD_FEATURES } from "./wizard-features.js";
 
 // className must match a CharacterClass.name seed row (catalog-data.ts) —
 // title case, not the lowercase registry.ts dispatch key. Fighter, Barbarian,
-// Ranger, Rogue, Sorcerer, Warlock, Wizard and Cleric are deliberately ABSENT
-// (#1227, #1223, #1225, #1230, #1231, #1232, #1233, #1234): their rows are
-// literal data (fighter-features.ts, barbarian-features.ts,
-// cleric-features.ts, ranger-features.ts, rogue-features.ts,
+// Bard, Ranger, Rogue, Sorcerer, Warlock, Wizard and Cleric are deliberately
+// ABSENT (#1227, #1223, #1224, #1225, #1230, #1231, #1232, #1233, #1234):
+// their rows are literal data (fighter-features.ts, barbarian-features.ts,
+// bard-features.ts, cleric-features.ts, ranger-features.ts, rogue-features.ts,
 // sorcerer-features.ts, warlock-features.ts, wizard-features.ts), not derived
 // from a ClassDefinition.features array — see LITERAL_ROW_CLASSES below.
 //
@@ -64,26 +65,28 @@ import { WIZARD_FEATURES } from "./wizard-features.js";
 // Wizard's schools (PHB'14 p.114) — while subclassGateLevel's
 // undefined-grantLevel fallback is 3, so deleting any of them would silently
 // move that class's 2014 subclass gate (see each file's own header and #1576).
-// Ranger (#1230) is the THIRD state: its module also stays registered, but for
-// reasons that have nothing to do with the gate — its `grantLevel: 3` already
-// equals the fallback. See ranger.ts's own header for the two that do apply
-// (Hunter's `choices` catalog, #899, owned by #1353; and its EDITION_2024
-// Wisdom-modifier `resourceFn`, #1230 commit 3). All eight are absent from
+// Ranger (#1230) and Bard (#1224) are the THIRD state: each module also stays
+// registered, but for reasons that have nothing to do with the gate — both
+// subclasses' `grantLevel: 3` already equal the fallback. See ranger.ts's own
+// header for the two that apply to it (Hunter's `choices` catalog, #899,
+// owned by #1353; and its EDITION_2024 Wisdom-modifier `resourceFn`, #1230
+// commit 3) and bard.ts's own header for the one that applies to it (Bardic
+// Inspiration's resourceFn — a Cha-modifier formula AND a level-tiered
+// recharge, neither expressible as a row). All nine are absent from
 // CLASS_MODULES here only because their FEATURE TEXT has moved to seed data.
-// `features` stays optional on ClassDefinition/SubclassDefinition for the four
-// classes still on the TS-authoring path, not because these eight ever needed
-// it to be.
+// `features` stays optional on ClassDefinition/SubclassDefinition for the
+// three classes still on the TS-authoring path, not because these nine ever
+// needed it to be.
 const CLASS_MODULES: Record<string, ClassDefinition> = {
-  Bard: bard,
   Druid: druid,
   Monk: monk,
   Paladin: paladin,
 };
 
 // Classes whose CLASS_FEATURES rows are authored as LITERAL seed data
-// (fighter-features.ts, barbarian-features.ts, rogue-features.ts,
-// warlock-features.ts, wizard-features.ts, sorcerer-features.ts,
-// cleric-features.ts) rather than
+// (fighter-features.ts, barbarian-features.ts, bard-features.ts,
+// rogue-features.ts, warlock-features.ts, wizard-features.ts,
+// sorcerer-features.ts, cleric-features.ts) rather than
 // derived from a lib/classes/<class>.ts module's AuthoredFeature[] arrays via
 // collectRawFeatures/expandFeatureRow below. Exported so every test that needs
 // to skip/scope around these classes (class-feature-migration.test.ts's
@@ -95,6 +98,7 @@ const CLASS_MODULES: Record<string, ClassDefinition> = {
 export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set([
   "Fighter",
   "Barbarian",
+  "Bard",
   "Ranger",
   "Rogue",
   "Warlock",
@@ -248,18 +252,20 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
 }
 
 // The full seed family: every derived-class row (re-derived from the
-// four-class registry by class-feature-migration.test.ts, never hardcoded
-// there either) PLUS Fighter's, Barbarian's, Cleric's, Ranger's, Rogue's,
-// Sorcerer's, Warlock's and Wizard's literal rows (fighter-features.ts #1227,
-// barbarian-features.ts #1223, cleric-features.ts #1225, ranger-features.ts
-// #1230, rogue-features.ts #1231, sorcerer-features.ts #1232,
-// warlock-features.ts #1233, wizard-features.ts #1234) — concatenated, not
-// merged through expandFeatureRow, since those eight arrays are already in
-// final ClassFeatureSeedRow[] shape.
+// three-class registry by class-feature-migration.test.ts, never hardcoded
+// there either) PLUS Fighter's, Barbarian's, Bard's, Cleric's, Ranger's,
+// Rogue's, Sorcerer's, Warlock's and Wizard's literal rows
+// (fighter-features.ts #1227, barbarian-features.ts #1223, bard-features.ts
+// #1224, cleric-features.ts #1225, ranger-features.ts #1230, rogue-features.ts
+// #1231, sorcerer-features.ts #1232, warlock-features.ts #1233,
+// wizard-features.ts #1234) — concatenated, not merged through
+// expandFeatureRow, since those nine arrays are already in final
+// ClassFeatureSeedRow[] shape.
 export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
   ...collectRawFeatures().flatMap(expandFeatureRow),
   ...FIGHTER_FEATURES,
   ...BARBARIAN_FEATURES,
+  ...BARD_FEATURES,
   ...RANGER_FEATURES,
   ...ROGUE_FEATURES,
   ...WARLOCK_FEATURES,
@@ -285,14 +291,14 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 
 // Authored for #1528/#1530 to reuse when they first populate
 // resourceTotals/resourceDieTiers/derivedStatTiers. #1530 has landed:
-// expandFeatureRow above now sets derivedStatTiers on three classes' own rows
-// here (Bard/Monk/Paladin's Extra Attack — Barbarian's and Ranger's were on
-// this list until #1223 and #1230 made their rows literal, and Druid declares
-// none) and each literal seed file sets it directly on its own — so
+// expandFeatureRow above now sets derivedStatTiers on two classes' own rows
+// here (Monk/Paladin's Extra Attack — Barbarian's, Ranger's and Bard's were on
+// this list until #1223, #1230 and #1224 made their rows literal, and Druid
+// declares none) and each literal seed file sets it directly on its own — so
 // derivedStatTiersSchema is load-bearing today. resourceTotals/
 // resourceDieTiers stay unset by any row THIS FILE derives — they're populated
 // only on the literal seed files' rows (concatenated in below, not derived
-// here) — until wave 2 (#1134) reaches one of the four classes still on this
+// here) — until wave 2 (#1134) reaches one of the three classes still on this
 // file's TS-authoring path.
 // Not exported:
 // classFeatureSeedSchema (below) is the surface anything outside this file —
