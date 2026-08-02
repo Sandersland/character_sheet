@@ -411,6 +411,7 @@ const MIN_ROWS_PER_PAIR = 10;
 // invocations exist, their prerequisites, Pact Boon folding into it) is
 // text-only — no mechanics behind it yet, tracked as a follow-up.
 //
+<<<<<<< HEAD
 // "Ranger" removed here (#1230, same diff as the content that makes its rows
 // genuinely diverge: base 11->15 EDITION_2024 rows — Natural Explorer/
 // Primeval Awareness/Land's Stride/Hide in Plain Sight/Vanish drop out, nine
@@ -430,13 +431,30 @@ const MIN_ROWS_PER_PAIR = 10;
 // three companion stat blocks are deliberately never transcribed (mirror-
 // sourced content, owner decision, PR body has the two-independent-mirror
 // discipline this content was held to).
+//
+// "Sorcerer" removed here (#1232, same diff as the content that makes its
+// rows genuinely diverge: base 5->9 EDITION_2024 rows — Sorcerous Origin
+// renames to Sorcerer Subclass, Innate Sorcery/Sorcery Incarnate/Epic Boon/
+// Arcane Apotheosis join — Draconic Bloodline's own 5 EDITION_2024 rows
+// rework in place, two renamed (Dragon Ancestor folds into Draconic Spells,
+// Draconic Presence -> Dragon Companion), and Wild Magic's own 5
+// EDITION_2024 rows are mirror-sourced (SRD 5.2 ships only Draconic Sorcery
+// for this class — Wild Magic Sorcery isn't in it at all — so these five are
+// verified against two independently-agreeing mirrors instead, cited on
+// their own rows, sorcerer-features.ts), one renamed (Spell Bombardment ->
+// Tamed Surge), so total counts land at 15 (2014) vs 19 (2024) — genuinely
+// unequal). This removal is NOT "all of Sorcerer's 2024 content is real" —
+// two residuals stay undisclosed nowhere else but here: Draconic Resilience's
+// unarmored AC change has no lib/srd/armor-class.ts branch for Sorcerer in
+// EITHER edition (#1232 follow-up 1), and Font of Magic's 2024 Min. Sorcerer
+// Level gating is text-only — sorceryPointCostForSlot enforces cost and cap
+// but not minimum level (#1232 follow-up 2).
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
   "Bard",
   "Cleric",
   "Druid",
   "Monk",
   "Paladin",
-  "Sorcerer",
 ]);
 
 export interface ClassEditionPopulationSummary {
