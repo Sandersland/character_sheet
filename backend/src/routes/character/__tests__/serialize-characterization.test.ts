@@ -327,8 +327,8 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     expect(b.spellcasting.preparedSpellLimit).toBe(9);
     expect(b.spellcasting.preparedSpellCount).toBe(0);
 
-    // Single class, no subclass.
-    expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5 }]);
+    // Single class, no subclass — gate passed (L5) and unchosen, so needsSubclass (#1598).
+    expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5, needsSubclass: true, subclassUnavailable: false }]);
     expect(b.conditions).toEqual({ active: [], exhaustion: 0 });
   });
 
