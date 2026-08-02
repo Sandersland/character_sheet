@@ -12731,7 +12731,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 [
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 1,
   },
@@ -12739,9 +12747,16 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
           "recharge": "longRest",
           "total": 2,
         },
@@ -12753,11 +12768,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -12767,11 +12789,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -12781,11 +12810,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 5,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12795,11 +12838,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 6,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12809,11 +12866,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 7,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12823,11 +12894,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 8,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12837,11 +12922,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 9,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12851,11 +12950,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 10,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12865,11 +12978,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 11,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12879,11 +13006,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 12,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12893,11 +13034,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 13,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12907,11 +13062,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 14,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12921,11 +13090,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 15,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12935,11 +13118,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 16,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12949,11 +13146,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 17,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12963,11 +13174,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 18,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12977,11 +13202,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 19,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -12991,11 +13230,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 20,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13008,7 +13261,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 [
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 1,
   },
@@ -13016,9 +13277,16 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
           "recharge": "longRest",
           "total": 2,
         },
@@ -13030,11 +13298,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 3,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13044,11 +13319,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
         },
       ],
     },
@@ -13058,11 +13340,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 5,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13072,11 +13368,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 6,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13086,11 +13396,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 7,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13100,11 +13424,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 8,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13114,11 +13452,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 9,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13128,11 +13480,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 10,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13142,11 +13508,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 11,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13156,11 +13536,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 12,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13170,11 +13564,25 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 13,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13184,11 +13592,32 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 14,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+          "key": "dragonWings",
+          "label": "Dragon Wings",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13198,11 +13627,32 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 15,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+          "key": "dragonWings",
+          "label": "Dragon Wings",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13212,11 +13662,32 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 16,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+          "key": "dragonWings",
+          "label": "Dragon Wings",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13226,11 +13697,32 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 17,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+          "key": "dragonWings",
+          "label": "Dragon Wings",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13240,11 +13732,32 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 18,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+          "key": "dragonWings",
+          "label": "Dragon Wings",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13254,11 +13767,32 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 19,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+          "key": "dragonWings",
+          "label": "Dragon Wings",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13268,11 +13802,32 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 20,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+          "key": "dragonWings",
+          "label": "Dragon Wings",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -13285,7 +13840,15 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 [
   {
     "info": {
-      "resources": [],
+      "resources": [
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+      ],
     },
     "level": 1,
   },
@@ -13293,9 +13856,16 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
           "recharge": "longRest",
           "total": 2,
         },
@@ -13307,14 +13877,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 3,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13328,14 +13905,21 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 4,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13349,14 +13933,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 5,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13370,14 +13968,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 6,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13391,14 +14003,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 7,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13412,14 +14038,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 8,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13433,14 +14073,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 9,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13454,14 +14108,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 10,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13475,14 +14143,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 11,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13496,14 +14178,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 12,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13517,14 +14213,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 13,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13538,14 +14248,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 14,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13559,14 +14283,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 15,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13580,14 +14318,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 16,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13601,14 +14353,28 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 17,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
           "recharge": "longRest",
@@ -13622,16 +14388,37 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 18,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Once per Long Rest, whenever you roll on the Wild Magic Surge table, you can replace the triggered effect with a Wild Magic Surge effect of your choice from the table, other than its final effect.",
+          "key": "tamedSurge",
+          "label": "Tamed Surge",
           "recharge": "longRest",
           "total": 1,
         },
@@ -13643,16 +14430,37 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 19,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Once per Long Rest, whenever you roll on the Wild Magic Surge table, you can replace the triggered effect with a Wild Magic Surge effect of your choice from the table, other than its final effect.",
+          "key": "tamedSurge",
+          "label": "Tamed Surge",
           "recharge": "longRest",
           "total": 1,
         },
@@ -13664,16 +14472,37 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.",
+          "description": "Font of Magic: spend Sorcery Points to create spell slots — 2 SP for a level 1 slot (minimum Sorcerer level 2) up to 7 SP for a level 5 slot (minimum level 9) — or expend a spell slot to gain Sorcery Points equal to its level. A slot created this way vanishes on a Long Rest; regain all Sorcery Points on a Long Rest.",
           "key": "sorceryPoints",
           "label": "Sorcery Points",
           "recharge": "longRest",
           "total": 20,
         },
         {
-          "description": "Gain advantage on one attack roll, ability check, or saving throw. Regain use on a long rest (DM may trigger a Wild Magic Surge to restore it early).",
+          "description": "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+          "key": "innateSorcery",
+          "label": "Innate Sorcery",
+          "recharge": "longRest",
+          "total": 2,
+        },
+        {
+          "description": "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+          "key": "sorcerousRestoration",
+          "label": "Sorcerous Restoration",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
           "key": "tidesOfChaos",
           "label": "Tides of Chaos",
+          "recharge": "longRest",
+          "total": 1,
+        },
+        {
+          "description": "Once per Long Rest, whenever you roll on the Wild Magic Surge table, you can replace the triggered effect with a Wild Magic Surge effect of your choice from the table, other than its final effect.",
+          "key": "tamedSurge",
+          "label": "Tamed Surge",
           "recharge": "longRest",
           "total": 1,
         },

@@ -422,6 +422,42 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["ranger", "beast master", "Exceptional Training"],
   ["ranger", "beast master", "Bestial Fury"],
   ["ranger", "beast master", "Share Spells"],
+  // Sorcerer's 19 new triples (#1232): the 4 base names that genuinely fork
+  // (Spellcasting, Font of Magic, Metamagic, Sorcerous Restoration —
+  // Sorcerous Origin -> Sorcerer Subclass is a RENAME, not a same-named fork,
+  // so it never counts here) show up under EVERY subclass context Sorcerer
+  // has (undefined/draconic bloodline/wild magic), same reason Wizard's 4
+  // base names show up under all 4 of ITS contexts (collectTaggedFeatureKeys
+  // combines classRows with EVERY subclass's own rows) — 4 x 3 = 12, plus
+  // Draconic Bloodline's own 3 (Draconic Resilience, Elemental Affinity,
+  // Dragon Wings — Dragon Ancestor/Draconic Spells and Draconic
+  // Presence/Dragon Companion share no name, so neither of those RENAMED
+  // pairs counts), plus Wild Magic's own 4 (Wild Magic Surge, Tides of
+  // Chaos, Bend Luck, Controlled Chaos — Spell Bombardment/Tamed Surge share
+  // no name, so that RENAMED pair doesn't count either) = 12 + 3 + 4 = 19.
+  // Innate Sorcery/Sorcery Incarnate/Epic Boon/Arcane Apotheosis (base) and
+  // Draconic Spells/Dragon Companion (Draconic Bloodline) and Tamed Surge
+  // (Wild Magic) are NOT tagged — each is 2024-only, no 2014 twin to diverge
+  // from.
+  ["sorcerer", "undefined", "Spellcasting"],
+  ["sorcerer", "undefined", "Font of Magic"],
+  ["sorcerer", "undefined", "Metamagic"],
+  ["sorcerer", "undefined", "Sorcerous Restoration"],
+  ["sorcerer", "draconic bloodline", "Spellcasting"],
+  ["sorcerer", "draconic bloodline", "Font of Magic"],
+  ["sorcerer", "draconic bloodline", "Metamagic"],
+  ["sorcerer", "draconic bloodline", "Sorcerous Restoration"],
+  ["sorcerer", "draconic bloodline", "Draconic Resilience"],
+  ["sorcerer", "draconic bloodline", "Elemental Affinity"],
+  ["sorcerer", "draconic bloodline", "Dragon Wings"],
+  ["sorcerer", "wild magic", "Spellcasting"],
+  ["sorcerer", "wild magic", "Font of Magic"],
+  ["sorcerer", "wild magic", "Metamagic"],
+  ["sorcerer", "wild magic", "Sorcerous Restoration"],
+  ["sorcerer", "wild magic", "Wild Magic Surge"],
+  ["sorcerer", "wild magic", "Tides of Chaos"],
+  ["sorcerer", "wild magic", "Bend Luck"],
+  ["sorcerer", "wild magic", "Controlled Chaos"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

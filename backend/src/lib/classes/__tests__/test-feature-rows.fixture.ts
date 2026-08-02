@@ -1165,6 +1165,280 @@ export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDIT
   },
 ]);
 
+// SORCERER's base class + subclass rows (#1232): moved off sorcerer.ts's
+// SORCERER_FEATURES/DRACONIC_BLOODLINE_FEATURES/WILD_MAGIC_FEATURES
+// AuthoredFeature[] arrays onto literal seed data
+// (prisma/seed/sorcerer-features.ts) — the same rootDir boundary
+// FIGHTER_BASE_ROWS'/WARLOCK_BASE_ROWS' comments explain. Mirrors that file's
+// real SRD 5.2/PHB'24 (2024) content exactly, including its RESOURCE POOL
+// columns (commit 3 of 3) — every row below now sets its own `edition`, per
+// that file's tagging rule.
+export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "You cast spells using Charisma. Full-caster progression. You know a limited number of sorcerer spells (not prepared — always available).",
+  },
+  {
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "You cast spells using Charisma. Full-caster progression. You know 4 Sorcerer cantrips (5 at level 4, 6 at level 10) and prepare a growing list of Sorcerer spells — you choose which spells are prepared whenever you finish a Long Rest. An Arcane Focus serves as your Spellcasting Focus.",
+  },
+  {
+    name: "Innate Sorcery",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, unleash the wellspring of magic within you: for 1 minute, you gain a +1 bonus to your spell save DC and spell attack bonus, and you have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses when you finish a Long Rest.",
+    resourceKey: "innateSorcery",
+    resourceLabel: "Innate Sorcery",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 2 }],
+  },
+  {
+    name: "Font of Magic",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
+  },
+  {
+    name: "Font of Magic",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You have a pool of Sorcery Points equal to your Sorcerer level. As a Bonus Action, expend a spell slot to gain Sorcery Points equal to the slot's level, or spend Sorcery Points to create a spell slot (no action required): 2 SP for a level 1 slot (minimum Sorcerer level 2), 3 SP for level 2 (minimum level 3), 5 SP for level 3 (minimum level 5), 6 SP for level 4 (minimum level 7), 7 SP for level 5 (minimum level 9) — never above level 5. A slot created this way vanishes when you finish a Long Rest. You regain all expended Sorcery Points when you finish a Long Rest.",
+  },
+  {
+    name: "Metamagic",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Choose 2 Metamagic options (3 at L10, 4 at L17) to twist your spells: Careful (protect allies in AoE), Distant (double range), Empowered (reroll damage dice), Extended (double duration), Heightened (impose disadvantage on target's first save), Quickened (cast as bonus action), Subtle (no verbal/somatic), or Twinned (target two creatures).",
+  },
+  {
+    name: "Metamagic",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You gain 2 Metamagic options of your choice (2 more at level 10, 2 more at level 17), letting you twist your spells by spending Sorcery Points: Careful Spell (1 SP, protect chosen creatures from your own area spell), Distant Spell (1 SP, double range or make a touch spell reach 30 feet), Empowered Spell (1 SP, reroll damage dice up to your Charisma modifier), Extended Spell (1 SP, double a non-instantaneous duration), Heightened Spell (2 SP, Disadvantage on one target's first save against the spell), Quickened Spell (2 SP, cast an action spell as a Bonus Action), Seeking Spell (1 SP, reroll a missed spell attack roll), Subtle Spell (1 SP, cast without Verbal or Somatic components), Transmuted Spell (1 SP, change a spell's damage type to another type it can deal), or Twinned Spell (SP cost equal to the spell's level, minimum 1, target a second creature).",
+  },
+  {
+    name: "Sorcerous Origin",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "Your innate magic comes from a specific origin (subclass). Your origin grants you features at levels 1, 6, 14, and 18.",
+  },
+  {
+    name: "Sorcerer Subclass",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Your innate magic comes from a Sorcerer Subclass of your choice, which grants you features at levels 3, 6, 14, and 18.",
+  },
+  {
+    name: "Sorcerous Restoration",
+    level: 20,
+    edition: "EDITION_2014",
+    description: "You regain 4 expended Sorcery Points whenever you finish a short rest.",
+  },
+  {
+    name: "Sorcerous Restoration",
+    level: 5,
+    edition: "EDITION_2024",
+    description:
+      "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
+    resourceKey: "sorcerousRestoration",
+    resourceLabel: "Sorcerous Restoration",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 5, total: 1 }],
+  },
+  {
+    name: "Sorcery Incarnate",
+    level: 7,
+    edition: "EDITION_2024",
+    description:
+      "You can spend 2 Sorcery Points to use your Innate Sorcery even if you have no uses of it left. While your Innate Sorcery is active, you can apply two Metamagic options to a spell you cast instead of one, paying their combined Sorcery Point cost.",
+  },
+  {
+    name: "Epic Boon",
+    level: 19,
+    edition: "EDITION_2024",
+    description: "You gain an Epic Boon feat of your choice (Boon of Dimensional Travel recommended). You can take this feat only once.",
+  },
+  {
+    name: "Arcane Apotheosis",
+    level: 20,
+    edition: "EDITION_2024",
+    description:
+      "While your Innate Sorcery is active, you can apply one Metamagic option to a spell you cast without spending any Sorcery Points, once per turn.",
+  },
+];
+
+export const DRACONIC_BLOODLINE_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Dragon Ancestor",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "Choose a dragon type (black, blue, brass, bronze, copper, gold, green, red, silver, or white). You gain the ability to speak, read, and write Draconic, and have advantage on Charisma checks when interacting with dragons of that type.",
+  },
+  {
+    name: "Draconic Resilience",
+    level: 1,
+    edition: "EDITION_2014",
+    description: "Your HP maximum increases by 1 per sorcerer level. While not wearing armor, your AC equals 13 + your Dexterity modifier.",
+  },
+  {
+    name: "Draconic Resilience",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Your Hit Point maximum increases by 3, and it increases by 1 again whenever you gain a Sorcerer level. While you aren't wearing armor, your base Armor Class equals 10 plus your Dexterity and Charisma modifiers.",
+  },
+  {
+    name: "Draconic Spells",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "You always have certain spells prepared; they don't count against the number of spells you can prepare with Spellcasting: Alter Self, Chromatic Orb, Command, Dragon's Breath (level 3); Fear, Fly (level 5); Arcane Eye, Charm Monster (level 7); Legend Lore, Summon Dragon (level 9).",
+  },
+  {
+    name: "Elemental Affinity",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "When you cast a spell that deals the damage type associated with your dragon ancestor, add your Charisma modifier to one damage roll. Also spend 1 Sorcery Point to gain resistance to that damage type for 1 hour.",
+  },
+  {
+    name: "Elemental Affinity",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "Your draconic magic has an affinity with a damage type associated with dragons. Choose one of those types: Acid, Cold, Fire, Lightning, or Poison. You have Resistance to that damage type, and when you cast a spell that deals damage of that type, you can add your Charisma modifier to one damage roll of that spell.",
+  },
+  {
+    name: "Dragon Wings",
+    level: 14,
+    edition: "EDITION_2014",
+    description:
+      "Sprout draconic wings as a bonus action, gaining a flying speed equal to your current speed. The wings last until you dismiss them (no action required).",
+  },
+  {
+    name: "Dragon Wings",
+    level: 14,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, you sprout draconic wings, which last for 1 hour or until you dismiss them (no action required); while they persist, you have a Fly Speed of 60 feet. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it.",
+    resourceKey: "dragonWings",
+    resourceLabel: "Dragon Wings",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: 1 }],
+  },
+  {
+    name: "Draconic Presence",
+    level: 18,
+    edition: "EDITION_2014",
+    description:
+      "As an action, spend 5 Sorcery Points to channel draconic majesty for 1 minute (concentration). Each hostile creature within 60 ft that can see you must succeed on a Wisdom save (spell save DC) or be charmed (awed) or frightened (your choice) for the duration.",
+  },
+  {
+    name: "Dragon Companion",
+    level: 18,
+    edition: "EDITION_2024",
+    description:
+      "You can cast Summon Dragon without expending a spell slot, a number of times equal to your Proficiency Bonus, regaining all expended uses when you finish a Long Rest. When you cast it this way, roll the die to randomly determine the dragon's type rather than choosing.",
+  },
+];
+
+export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Wild Magic Surge",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "After casting a sorcerer spell of 1st level or higher, the DM may ask you to roll a d20. On a 1, roll a d100 and consult the Wild Magic Surge table for a random magical effect.",
+  },
+  {
+    name: "Wild Magic Surge",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Once per turn, you can roll 1d20 immediately after you cast a Sorcerer spell with a spell slot. If you roll a 20, roll on the Wild Magic Surge table for a random magical effect. A spell that triggers a surge this way is immune to your Metamagic.",
+  },
+  {
+    name: "Tides of Chaos",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "Gain advantage on one attack roll, ability check, or saving throw. Once used, the DM can force a Wild Magic Surge before you can use this feature again. Alternatively, regain use after a long rest.",
+    resourceKey: "tidesOfChaos",
+    resourceLabel: "Tides of Chaos",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: 1 }],
+  },
+  {
+    name: "Tides of Chaos",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
+    resourceKey: "tidesOfChaos",
+    resourceLabel: "Tides of Chaos",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 3, total: 1 }],
+  },
+  {
+    name: "Bend Luck",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "Spend 2 Sorcery Points as a reaction to add or subtract 1d4 from an attack roll, ability check, or saving throw made by a creature you can see.",
+  },
+  {
+    name: "Bend Luck",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "When another creature you can see makes an attack roll, an ability check, or a saving throw, you can take a Reaction and spend 1 Sorcery Point to roll 1d4 and apply it as a bonus or penalty (your choice) to that creature's roll.",
+  },
+  {
+    name: "Controlled Chaos",
+    level: 14,
+    edition: "EDITION_2014",
+    description: "When rolling on the Wild Magic Surge table, roll twice and use either result.",
+  },
+  {
+    name: "Controlled Chaos",
+    level: 14,
+    edition: "EDITION_2024",
+    description: "Whenever you roll on the Wild Magic Surge table, you can roll twice and use either result.",
+  },
+  {
+    name: "Spell Bombardment",
+    level: 18,
+    edition: "EDITION_2014",
+    description:
+      "Once per turn when you roll damage for a spell and any die shows the highest possible result, choose one die, roll it again, and add the result to the damage.",
+  },
+  {
+    name: "Tamed Surge",
+    level: 18,
+    edition: "EDITION_2024",
+    description:
+      "Once per Long Rest, whenever you roll on the Wild Magic Surge table, you can replace the triggered effect with a Wild Magic Surge effect of your choice from the table, other than its final effect.",
+    resourceKey: "tamedSurge",
+    resourceLabel: "Tamed Surge",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 18, total: 1 }],
+  },
+];
+
 // Per-class/per-subclass literal-row overrides (#1233): replaces the former
 // isFighter/isBarbarian/isBattleMaster boolean chain with two lookup maps, one
 // keyed by class name and one by subclass name — a fourth `isWarlock` boolean
@@ -1178,6 +1452,7 @@ const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   ranger: RANGER_BASE_ROWS,
   warlock: WARLOCK_BASE_ROWS,
   wizard: WIZARD_BASE_ROWS,
+  sorcerer: SORCERER_BASE_ROWS,
 };
 
 const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
@@ -1188,6 +1463,8 @@ const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "the fiend": THE_FIEND_ROWS,
   "the archfey": THE_ARCHFEY_ROWS,
   "the great old one": THE_GREAT_OLD_ONE_ROWS,
+  "draconic bloodline": DRACONIC_BLOODLINE_ROWS,
+  "wild magic": WILD_MAGIC_ROWS,
 };
 
 /** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */

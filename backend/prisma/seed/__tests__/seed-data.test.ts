@@ -100,9 +100,19 @@ describe("per-domain business-key uniqueness", () => {
 
   // No universal row may stay edition-NULL: resolveEditionCatalog would then
   // fall back to it for BOTH editions and the fork would be invisible.
-  it("every universal ACTION carries an edition; every class action stays shared", () => {
+  //
+  // "metamagic" is the one sanctioned class-row exception (#1232 commit 2b):
+  // SRD 5.2 grants Metamagic at Sorcerer level 2, PHB'14 at level 3, so this
+  // row forks the same way a universal row does. This catalog's class rows
+  // aren't consumed by any route (lib/classes/actions.ts's own header) — the
+  // real gate is DERIVED_ACTIONS' own metamagic fork — but the description
+  // text still needs to name the right level per edition, and the ONE
+  // exception is a set, mirroring TWENTY_FOUR_ONLY_ACTION_KEYS's shape, not a
+  // loosened predicate that could hide a future accidental class-row fork.
+  it("every universal ACTION carries an edition; every class action stays shared, except the sanctioned metamagic fork", () => {
+    const SANCTIONED_CLASS_FORKS = new Set(["metamagic"]);
     expect(ACTIONS.filter((a) => a.universal && !a.edition).map((a) => a.key)).toEqual([]);
-    expect(ACTIONS.filter((a) => !a.universal && a.edition).map((a) => a.key)).toEqual([]);
+    expect(ACTIONS.filter((a) => !a.universal && a.edition && !SANCTIONED_CLASS_FORKS.has(a.key)).map((a) => a.key)).toEqual([]);
   });
 
   // The two editions must offer the same universal affordances apart from the

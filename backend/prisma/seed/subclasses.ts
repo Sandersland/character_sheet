@@ -235,18 +235,24 @@ export const SUBCLASSES: SubclassSeed[] = [
     slug: "ranger-beast-master",
   },
   // ── Sorcerer ─────────────────────────────────────────────────────────────
+  // #1232: both descriptions below are edition-neutral — no armor class
+  // formula, feature name, or other numeric/mechanical detail that differs
+  // between PHB'14 and SRD 5.2/PHB'24 (2014's "13 + Dex modifier" AC, e.g., is
+  // NOT the 2024 value, #1232 §1.5) — a Subclass row is edition-SHARED
+  // (`edition` stays unset on both), served identically to 2014 and 2024
+  // creation dropdowns, so its prose can't privilege either edition's numbers.
   {
     className: "Sorcerer",
     name: "Draconic Bloodline",
     description:
-      "Magic runs in your veins as the blood of a dragon ancestor. You gain natural armor (AC 13 + Dex modifier without armor), resistance to your dragon type's damage, bonus damage on spells of that type, and eventually sprout wings and radiate a draconic presence that can frighten or charm creatures around you.",
+      "Magic runs in your veins as the blood of a dragon ancestor. You gain resilience and resistance tied to your dragon type, bonus damage on spells of that type, and eventually sprout wings and command a measure of true draconic power.",
     slug: "sorcerer-draconic-bloodline",
   },
   {
     className: "Sorcerer",
     name: "Wild Magic",
     description:
-      "Your innate magic stems from an untamed, chaotic source. Every time you cast a 1st level or higher spell there is a chance of a Wild Magic Surge — a random magical effect. Tides of Chaos grants advantage on one attack roll, ability check, or saving throw. Controlled Chaos and Spell Bombardment appear at higher levels.",
+      "Your innate magic stems from an untamed, chaotic source. Casting spells risks triggering a Wild Magic Surge — a random magical effect — and Tides of Chaos lets you court that chaos deliberately for advantage on a roll. Your control over the chaos grows at higher levels.",
     slug: "sorcerer-wild-magic",
   },
   // ── Warlock ───────────────────────────────────────────────────────────────

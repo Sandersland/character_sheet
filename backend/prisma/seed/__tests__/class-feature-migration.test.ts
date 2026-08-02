@@ -240,8 +240,27 @@ const POPULATED_RANGER_ROW_KEYS = new Set([
   "Ranger::null::Nature's Veil::EDITION_2024",
 ]);
 
-function isPopulatedRangerRow(row: { className: string; subclassSlug: string | null; name: string; edition: string }): boolean {
+function isPopulatedRangerRow(row: RowKey): boolean {
   return POPULATED_RANGER_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
+}
+
+// #1232: every Sorcerer pool that moved onto its row — Innate Sorcery/
+// Sorcerous Restoration (base), Tides of Chaos (Wild Magic, BOTH editions —
+// keyed with `edition` since the 2014 and 2024 rows are two DIFFERENT rows
+// sharing one name), Dragon Wings (Draconic Bloodline)/Tamed Surge (Wild
+// Magic). `sorceryPoints` stays in lib/classes/sorcerer.ts's resourceFn (a
+// formula, not a tier table) so it is deliberately absent from this set.
+const POPULATED_SORCERER_ROW_KEYS = new Set([
+  "Sorcerer::null::Innate Sorcery::EDITION_2024",
+  "Sorcerer::null::Sorcerous Restoration::EDITION_2024",
+  "Sorcerer::sorcerer-wild-magic::Tides of Chaos::EDITION_2014",
+  "Sorcerer::sorcerer-wild-magic::Tides of Chaos::EDITION_2024",
+  "Sorcerer::sorcerer-draconic-bloodline::Dragon Wings::EDITION_2024",
+  "Sorcerer::sorcerer-wild-magic::Tamed Surge::EDITION_2024",
+]);
+
+function isPopulatedSorcererRow(row: RowKey): boolean {
+  return POPULATED_SORCERER_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
 // What the descriptor predicates below key on. `edition` is part of the key
@@ -272,7 +291,8 @@ function isSaveDcRow(row: RowKey): boolean {
 // were merged into this one at integration, because two aggregators each
 // naming a DIFFERENT subset is precisely how a row silently escapes the
 // descriptor sweep. Every new populated-row predicate goes here, once —
-// #1230's isPopulatedRangerRow included, per this file's own house rule.
+// wave b's isPopulatedRangerRow (#1230) and isPopulatedSorcererRow (#1232)
+// included, both added to this SAME aggregator rather than sibling ones.
 function isPopulatedRow(row: RowKey): boolean {
   return (
     isPopulatedFighterRow(row) ||
@@ -281,7 +301,8 @@ function isPopulatedRow(row: RowKey): boolean {
     isPopulatedWarlockRow(row) ||
     isPopulatedWizardRow(row) ||
     isPopulatedIllusorySelfRow(row) ||
-    isPopulatedRangerRow(row)
+    isPopulatedRangerRow(row) ||
+    isPopulatedSorcererRow(row)
   );
 }
 
@@ -463,14 +484,23 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // Entropic Ward x1) PLUS #1230's ONE Ranger row: Favored Enemy's 2024 row
   // only (its 2014 row carries no resourceKey at all; Tireless's/Nature's
   // Veil's 2024 rows set resourceKey but deliberately OMIT resourceTotals, a
-  // Wisdom-modifier formula, same shape as Dark One's Own Luck's 2024 row);
+  // Wisdom-modifier formula, same shape as Dark One's Own Luck's 2024 row)
+  // PLUS #1232's six Sorcerer rows (Innate Sorcery x1, Sorcerous Restoration
+  // x1, Tides of Chaos x2 — one per edition, both real rows sharing a name —
+  // Dragon Wings x1, Tamed Surge x1);
   // derivedStatTiers excludes #1530's twelve populated Extra
   // Attack rows PLUS #1546's Combat Superiority/Student of War x2 editions each
   // (DERIVED_STAT_ROW_KEYS x2 editions each, computed below); resourceDieTiers
   // excludes only Combat Superiority x2 (the only row with a die-size tier).
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
-    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock + 1 Ranger.
-    const populatedResourceTotalsCount = 23;
+    // This total is SUMMED across wave-b branches, never taken from one of
+    // them: #1230 raised 22 -> 23 and #1232 raised 22 -> 28 independently, so
+    // the merged value is 22 + 1 + 6. Picking either branch's number here
+    // would silently exempt the other class's rows from the sweep — the wave-A
+    // near-miss this file's aggregator comment already records, in its other
+    // half.
+    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock + 1 Ranger + 6 Sorcerer.
+    const populatedResourceTotalsCount = 29;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {

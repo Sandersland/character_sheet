@@ -119,6 +119,16 @@ describe("deriveActions — class gates", () => {
     expect(result).not.toContain("recklessAttack");
     expect(result).not.toContain("flurryOfBlows");
   });
+
+  // #1232 commit 2b: SRD 5.2 grants Metamagic at Sorcerer level 2, not
+  // PHB'14's level 3 — DERIVED_ACTIONS' metamagic row forks its grantLevel
+  // per edition (matchesActionGate filters on edition before the class/level
+  // gate; ActionSeed.edition's comment sanctions same-key forks).
+  it("Metamagic level fork (#1232): 2024 grants at L2, 2014 still grants at L3", () => {
+    expect(keys(at("sorcerer", undefined, 2, [], true, "EDITION_2024"))).toContain("metamagic");
+    expect(keys(at("sorcerer", undefined, 2, [], true, "EDITION_2014"))).not.toContain("metamagic");
+    expect(keys(at("sorcerer", undefined, 3, [], true, "EDITION_2014"))).toContain("metamagic");
+  });
 });
 
 describe("deriveActions — universal actions excluded", () => {
