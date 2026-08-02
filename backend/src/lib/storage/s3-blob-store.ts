@@ -19,6 +19,7 @@ export interface S3BlobStoreOptions {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
+  forcePathStyle?: boolean;
 }
 
 // GetObject reports a missing key as NoSuchKey, HeadObject as NotFound, and
@@ -40,9 +41,11 @@ export function createS3BlobStore(options: S3BlobStoreOptions): BlobStore {
     endpoint: options.endpoint,
     region: options.region,
     // Path-style addressing (bucket in the path, not the hostname) — required
-    // by MinIO and harmless on R2/S3, whereas virtual-hosted style needs
-    // per-bucket DNS that local MinIO doesn't have.
-    forcePathStyle: true,
+    // by MinIO and harmless on R2, whereas virtual-hosted style needs
+    // per-bucket DNS that local MinIO doesn't have. Defaults on because the
+    // primary targets (R2, MinIO) want it; a real-AWS target opts out, since
+    // AWS is deprecating path-style addressing.
+    forcePathStyle: options.forcePathStyle ?? true,
     credentials: {
       accessKeyId: options.accessKeyId,
       secretAccessKey: options.secretAccessKey,

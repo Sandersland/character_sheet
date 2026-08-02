@@ -1,9 +1,10 @@
-import { mkdtemp, readdir } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { BlobKeyError, BlobNotFoundError } from "../blob-store.js";
 import { createFsBlobStore } from "../fs-blob-store.js";
 import { runBlobStoreContract } from "./blob-store-contract.js";
 
@@ -22,10 +23,10 @@ describe("createFsBlobStore", () => {
     async (key) => {
       const store = createFsBlobStore(await tempDir());
 
-      await expect(store.put(key, body, options)).rejects.toThrow(/blob key/i);
-      await expect(store.get(key)).rejects.toThrow(/blob key/i);
-      await expect(store.delete(key)).rejects.toThrow(/blob key/i);
-      await expect(store.exists(key)).rejects.toThrow(/blob key/i);
+      await expect(store.put(key, body, options)).rejects.toBeInstanceOf(BlobKeyError);
+      await expect(store.get(key)).rejects.toBeInstanceOf(BlobKeyError);
+      await expect(store.delete(key)).rejects.toBeInstanceOf(BlobKeyError);
+      await expect(store.exists(key)).rejects.toBeInstanceOf(BlobKeyError);
     },
   );
 
@@ -44,6 +45,18 @@ describe("createFsBlobStore", () => {
 
     expect(await store.exists("portrait.meta.json")).toBe(false);
     expect(await store.exists("meta/portrait.json")).toBe(false);
+  });
+
+  it("treats a mid-delete crash state (data without meta) as not found", async () => {
+    const dir = await tempDir();
+    const store = createFsBlobStore(dir);
+    await store.put("crashed", body, options);
+
+    // Simulate a crash after delete's first rm: meta is gone, data survives.
+    await rm(path.join(dir, "meta", "crashed.json"));
+
+    expect(await store.exists("crashed")).toBe(false);
+    await expect(store.get("crashed")).rejects.toBeInstanceOf(BlobNotFoundError);
   });
 
   it("leaves no temp files behind after overwrite", async () => {

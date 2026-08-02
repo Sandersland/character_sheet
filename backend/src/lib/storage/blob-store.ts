@@ -43,6 +43,13 @@ export class BlobStoreConfigError extends Error {
   }
 }
 
+export class BlobKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BlobKeyError";
+  }
+}
+
 // S3 would happily treat "../x" or "/x" as an opaque key, but the fs driver
 // maps keys onto real paths — so the PORT defines the stricter rule and every
 // driver enforces it, or the drivers would diverge on which keys are legal.
@@ -56,7 +63,7 @@ export function assertValidKey(key: string): void {
       (segment) => segment !== "" && segment !== "." && segment !== "..",
     );
   if (!valid) {
-    throw new Error(
+    throw new BlobKeyError(
       `Invalid blob key "${key}": keys are non-empty /-separated segments, with no ".", "..", empty, or backslash segments`,
     );
   }

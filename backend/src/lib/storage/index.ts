@@ -11,8 +11,8 @@ import { createS3BlobStore } from "./s3-blob-store.js";
 // internal so no call site can couple to one (#1614).
 // fallow-ignore-next-line unused-type -- BlobObject/PutOptions are the port's wire shapes; first consumer is the portrait route (#1615)
 export type { BlobObject, BlobStore, PutOptions } from "./blob-store.js";
-// fallow-ignore-next-line unused-export -- BlobNotFoundError's first consumer is the portrait route's 404 mapping (#1615)
-export { BlobNotFoundError, BlobStoreConfigError } from "./blob-store.js";
+// fallow-ignore-next-line unused-export -- BlobNotFoundError/BlobKeyError's first consumer is the portrait route's error mapping (#1615)
+export { BlobKeyError, BlobNotFoundError, BlobStoreConfigError } from "./blob-store.js";
 
 function readEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();

@@ -60,8 +60,13 @@ export function createFsBlobStore(dir: string): BlobStore {
 
     async delete(key: string): Promise<void> {
       assertValidKey(key);
-      await rm(dataPath(key), { force: true });
+      // Meta first — its presence defines existence, so the object is gone to
+      // callers the moment the first rm lands. A crash between the two rms
+      // then leaves only an orphaned, invisible data file; the reverse order
+      // would leave meta-without-data, where exists reports true and get
+      // rejects with a raw ENOENT instead of BlobNotFoundError.
       await rm(metaPath(key), { force: true });
+      await rm(dataPath(key), { force: true });
     },
 
     async exists(key: string): Promise<boolean> {
