@@ -523,8 +523,11 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand or Thieves' Tools.",
   },
 
-  // Sorcerer
-  { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 3, resourceKey: "sorceryPoints", resourceAmount: 1 },
+  // Sorcerer — SRD 5.2 grants Metamagic at level 2, not PHB'14's level 3
+  // (#1232 commit 2b), so this is a same-key edition fork (ActionSeed's own
+  // comment sanctions the shape) rather than one row.
+  { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 3, resourceKey: "sorceryPoints", resourceAmount: 1, edition: "EDITION_2014" },
+  { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 2, resourceKey: "sorceryPoints", resourceAmount: 1, edition: "EDITION_2024" },
 ];
 
 // Class/subclass/level gate for one DERIVED_ACTIONS row — no pool/enabled state.
