@@ -45,7 +45,7 @@ describe("the shared test server binds exactly once (#1600)", () => {
     expect(app.listening).toBe(true);
   });
 
-  it("no test file hands supertest a freshly-constructed app", () => {
+  it("no test file constructs its own app, in any shape", () => {
     const root = path.resolve(import.meta.dirname, "../..");
 
     function walk(dir: string): string[] {
@@ -67,14 +67,25 @@ describe("the shared test server binds exactly once (#1600)", () => {
         })
         .join("\n");
 
-    // `supertest(createApp())` and `supertest.agent(createApp())` — the two
-    // shapes that reintroduce the per-request bind.
-    const offenders = walk(root).filter((file) =>
-      /supertest(\.agent)?\(\s*createApp\(\)/.test(codeOnly(readFileSync(file, "utf8"))),
-    );
+    // Banning the SYMBOL, not the `supertest(createApp())` call shape. Matching
+    // the call shape misses every indirection — most concretely the thunk
+    // `const makeApp = () => createApp(); supertest(makeApp())`, which is not
+    // hypothetical: it is one of the four shapes this migration found in the
+    // tree. A test file that cannot reach createApp cannot rebuild an app in
+    // any shape, so this is the one check that can't be routed around.
+    const ALLOWED = new Set([
+      // Really does need its own app per test — it builds one under mutated
+      // CORS_ORIGIN, which is the thing it asserts.
+      "routes/platform/__tests__/cors.test.ts",
+    ]);
+
+    const offenders = walk(root)
+      .filter((file) => /\bcreateApp\b/.test(codeOnly(readFileSync(file, "utf8"))))
+      .map((file) => path.relative(root, file))
+      .filter((file) => !ALLOWED.has(file));
 
     expect(
-      offenders.map((f) => path.relative(root, f)),
+      offenders,
       "import { app } from '@/test-support/app-server.js' instead — see #1600",
     ).toEqual([]);
   });
