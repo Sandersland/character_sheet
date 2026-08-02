@@ -4,10 +4,18 @@
 // seed's AUTHORING input even though production now reads seeded rows instead
 // (#1524's Fact 1). Lets every unit test that asserts on `.features` keep
 // calling deriveResources with a bare class/subclass name (no DB round-trip)
-// while still exercising the real read path (featuresFromRows). The DB-backed
-// parity test (class-feature-parity.test.ts) is the proof this fixture and
-// the seeded rows agree; if they ever diverge, that test — not this one —
-// is what catches it.
+// while still exercising the real read path (featuresFromRows).
+//
+// TWO different suites prove this fixture agrees with the seed, and which one
+// applies depends on the class. class-feature-parity.test.ts is the DB-backed
+// proof for classes still authored in TS — but it `continue`s on
+// LITERAL_ROW_CLASSES by design, so for the literal classes mirrored in
+// LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS below it proves nothing. That gap
+// is what let #1232's corrected Draconic descriptions ship stale here through
+// a fully green suite; literal-fixture-parity.test.ts (#1593, prisma-side
+// because only that direction can import both halves) closes it. This header
+// previously claimed class-feature-parity was the proof for everything, which
+// was the false statement the drift hid behind.
 //
 // FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
 // (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233) and WIZARD
@@ -1765,7 +1773,13 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
 // testFeatureRowsFor's own branching harder to read with every future
 // LITERAL_ROW_CLASSES addition than a table lookup is. Both maps are keyed
 // lowercase, matching this file's own registry convention.
-const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
+//
+// Exported for literal-fixture-parity.test.ts (#1593), which asserts these two
+// maps agree with the seed files they mirror — until it existed, nothing did,
+// and #1232's corrected Draconic descriptions shipped here stale through a
+// fully green suite. That guard lives prisma-side because only that direction
+// can import both halves (`rootDir: "src"`, TS6059).
+export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
   ranger: RANGER_BASE_ROWS,
@@ -1775,7 +1789,7 @@ const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   cleric: CLERIC_BASE_ROWS,
 };
 
-const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
+export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "battle master": BATTLE_MASTER_ROWS,
   "school of evocation": WIZARD_EVOCATION_ROWS,
   "school of abjuration": WIZARD_ABJURATION_ROWS,
