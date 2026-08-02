@@ -16,11 +16,17 @@
  * separate question, resolved server-side by `deriveOffHandDamage` and served on
  * the off-hand `AttackRow` — this function only answers availability.
  *
- * The **Two-Weapon Fighting fighting style** (#1137: now a feat, its
- * "offhandAbilityDamage" improvement) removes the light restriction, so when
- * `canOffhandAbilityDamage` is true any two equipped weapons qualify. (The
- * paper-doll already prevents equipping a two-handed weapon alongside an
- * off-hand, so we don't re-check that here.)
+ * The Light requirement holds in BOTH editions and the **Two-Weapon Fighting**
+ * style never waives it (#1496). SRD 5.1 / PHB'14 p. 72 grants the style only "add
+ * your ability modifier to the damage of the second attack"; SRD 5.2 / PHB'24 says
+ * the opposite of a waiver outright — the benefit applies only "while wielding a
+ * weapon that has the Light property in each hand". The editions agree, so there is
+ * one rule and no `edition` parameter. The feature that WOULD lift the
+ * requirement is the **Dual Wielder** feat, which is not seeded in this app, so do
+ * not reintroduce a style short-circuit here: the style's entire effect is the
+ * ability modifier on off-hand DAMAGE, resolved by `deriveOffHandDamage`, and it
+ * never touches eligibility. (The paper-doll already prevents equipping a two-handed
+ * weapon alongside an off-hand, so we don't re-check that here.)
  *
  * The existing `offHandBusy` field on the serialized character covers the
  * versatile-grip calculation but is a boolean that conflates "shield equipped"
@@ -29,14 +35,10 @@
  */
 export function canTwoWeaponFight(
   inventory: Array<{ equipped: boolean; category: string; weapon?: { light: boolean } | null }>,
-  canOffhandAbilityDamage = false,
 ): boolean {
   const equippedWeapons = inventory.filter(
     (i) => i.equipped && i.category === "weapon" && i.weapon,
   );
   if (equippedWeapons.length < 2) return false;
-  // The Two-Weapon Fighting style removes the light-weapon restriction.
-  if (canOffhandAbilityDamage) return true;
-  // Baseline: both held weapons must have the light property.
   return equippedWeapons.slice(0, 2).every((i) => i.weapon?.light === true);
 }
