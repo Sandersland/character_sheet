@@ -18,6 +18,7 @@ describe("createBlobStore", () => {
       "S3_REGION",
       "S3_ACCESS_KEY_ID",
       "S3_SECRET_ACCESS_KEY",
+      "S3_FORCE_PATH_STYLE",
     ]) {
       vi.stubEnv(name, "");
     }

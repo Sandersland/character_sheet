@@ -58,7 +58,7 @@ export function createBlobStore(): BlobStore {
       secretAccessKey: readEnv("S3_SECRET_ACCESS_KEY") as string,
       // Path-style stays the default (R2/MinIO); only "false" opts a real-AWS
       // target into virtual-hosted addressing.
-      forcePathStyle: readEnv("S3_FORCE_PATH_STYLE") !== "false",
+      forcePathStyle: readEnv("S3_FORCE_PATH_STYLE")?.toLowerCase() !== "false",
     });
   }
   throw new BlobStoreConfigError(
