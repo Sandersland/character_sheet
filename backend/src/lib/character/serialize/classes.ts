@@ -235,7 +235,10 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
     subclass?: string;
     subclassId?: string;
     classId?: string;
+    needsSubclass: boolean;
+    subclassUnavailable: boolean;
   }[] = [];
+  const edition = editionOf(row);
   for (const entry of row.classEntries) {
     if (remaining <= 0) break;
     const level = Math.min(entry.level, remaining);
@@ -243,7 +246,28 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
     // Per-entry subclass clamp-on-read (issue #125): hide a subclass whose
     // grant level exceeds this entry's effective level. Mirrors reconcileSubclass.
     const effectiveLevel = effectiveEntryLevel(level, row.classEntries.length, totalLevel);
-    const subclassVisible = subclassActiveAt(effectiveLevel, entry.class?.subclassLevel, editionOf(row));
+    const subclassVisible = subclassActiveAt(effectiveLevel, entry.class?.subclassLevel, edition);
+    // Stranded-subclass determination (#1598): a held row edition-tagged for a
+    // DIFFERENT edition than the character's own. This can only arise from a
+    // catalog retag landing AFTER the pick — crossEditionRejection
+    // (applySetSubclass) already blocks the pick itself at creation/level-up/
+    // setSubclass — so it is a legacy-state check, not a rule the write path
+    // also needs. featuresFromRows filters subclass features by the
+    // CHARACTER's edition (class-feature-rows.ts), so a stranded entry derives
+    // zero subclass features while `subclass` above still renders the name;
+    // the frontend uses this flag to explain that split rather than hide it.
+    //
+    // Gated on `subclassVisible` for the same reason `subclass`/`subclassId`
+    // below are: a level-down leaves the subclassId in place and relies on the
+    // clamp-on-read to hide it, so an ungated flag would report a stranded pick
+    // the sheet is deliberately not showing. That is not merely inconsistent —
+    // `character.subclass` (character-serialize.ts) reads the RAW entry column
+    // and is NOT level-gated, so SubclassSection's early return would not fire
+    // and a below-gate character would be shown the explanation and invited to
+    // re-pick a subclass it has not yet earned.
+    const subclassRowEdition = entry.subclassRef?.edition ?? null;
+    const subclassUnavailable =
+      subclassVisible && Boolean(entry.subclassId) && subclassRowEdition !== null && subclassRowEdition !== edition;
     out.push({
       id: entry.id,
       name: entry.name,
@@ -251,6 +275,13 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
       subclass: subclassVisible ? (entry.subclass ?? undefined) : undefined,
       subclassId: subclassVisible ? (entry.subclassId ?? undefined) : undefined,
       classId: entry.classId ?? undefined,
+      // Gate passed AND (nothing picked yet OR the pick is stranded) — the
+      // frontend reads this instead of re-deriving level >= subclassGateLevel
+      // (CLAUDE.md: rules logic is backend-owned). Per-entry, unlike the old
+      // frontend mirror that compared TOTAL character level against the
+      // PRIMARY entry's subclass (wrong for multiclass).
+      needsSubclass: subclassVisible && (!entry.subclassId || subclassUnavailable),
+      subclassUnavailable,
     });
   }
   return out;

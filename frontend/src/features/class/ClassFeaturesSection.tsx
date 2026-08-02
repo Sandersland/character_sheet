@@ -35,6 +35,7 @@ export default function ClassFeaturesSection({ referenceClasses }: Props) {
       <SubclassSection
         classDef={view.classDef}
         needsSubclass={view.needsSubclass}
+        subclassUnavailable={view.subclassUnavailable}
         busy={busy}
         onChoose={(subclassId) => run(() => applyClassTransactions(character.id, [{ type: "setSubclass", subclassId }]))}
       />

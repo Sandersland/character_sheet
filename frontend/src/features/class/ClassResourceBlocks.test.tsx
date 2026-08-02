@@ -33,6 +33,7 @@ function makeView(overrides: Partial<ClassFeatureView> = {}): ClassFeatureView {
     classDef: undefined,
     rosterEntries: [],
     needsSubclass: false,
+    subclassUnavailable: false,
     maneuverKnownIds: [],
     isEmpty: false,
     hasPools: false,
