@@ -4,16 +4,17 @@
 // content changes here, a mechanical move with a checkable row count. Reading
 // these rows (retiring featureAppliesToEdition) is #1524's job, not this
 // file's; #1530 is the first descriptor column this file's own expandFeatureRow
-// populates (derivedStat/derivedStatTiers, off Monk/Paladin's AuthoredFeature
-// entries — Barbarian's own Extra Attack tier moved to barbarian-features.ts's
-// literal rows, #1223, Ranger's to ranger-features.ts's, #1230, and Bard's
-// College of Valor tier to bard-features.ts's, #1224) — every other
-// descriptor column below still resolves to DESCRIPTOR_RESET, populated
-// nowhere yet (#1528+).
+// populates (derivedStat/derivedStatTiers, off Monk's AuthoredFeature entries
+// — Barbarian's own Extra Attack tier moved to barbarian-features.ts's literal
+// rows, #1223, Ranger's to ranger-features.ts's, #1230, Bard's College of
+// Valor tier to bard-features.ts's, #1224, and Paladin's to
+// paladin-features.ts's, #1229) — every other descriptor column below still
+// resolves to DESCRIPTOR_RESET, populated nowhere yet (#1528+).
 //
-// Rows are DERIVED from the three remaining TS-authored class modules (plus
-// Fighter's, Barbarian's, Bard's, Cleric's, Ranger's, Rogue's, Sorcerer's,
-// Warlock's and Wizard's own literal rows, concatenated in below), not hand-transcribed:
+// Rows are DERIVED from the one remaining TS-authored class module (plus
+// Fighter's, Barbarian's, Bard's, Cleric's, Druid's, Paladin's, Ranger's,
+// Rogue's, Sorcerer's, Warlock's and Wizard's own literal rows, concatenated
+// in below), not hand-transcribed:
 // this guarantees byte-identical `description`/`level` text for the derived
 // half (the migration's own acceptance criterion) and means that half's row
 // count is a property of the registry, never a literal to keep in sync by
@@ -260,7 +261,7 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
 }
 
 // The full seed family: every derived-class row (re-derived from the
-// three-class registry by class-feature-migration.test.ts, never hardcoded
+// one-class registry by class-feature-migration.test.ts, never hardcoded
 // there either) PLUS Fighter's, Barbarian's, Bard's, Cleric's, Druid's,
 // Paladin's, Ranger's, Rogue's, Sorcerer's, Warlock's and Wizard's literal
 // rows (fighter-features.ts #1227, barbarian-features.ts #1223,
@@ -310,8 +311,9 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 // derivedStatTiersSchema is load-bearing today. resourceTotals/
 // resourceDieTiers stay unset by any row THIS FILE derives — they're populated
 // only on the literal seed files' rows (concatenated in below, not derived
-// here) — until wave 2 (#1134) reaches one of the three classes still on this
-// file's TS-authoring path.
+// here) — until #1134 reaches Monk, the one class still on this file's
+// TS-authoring path. When it does, this whole derived branch has a single
+// consumer left and is worth retiring rather than extending.
 // Not exported:
 // classFeatureSeedSchema (below) is the surface anything outside this file —
 // including class-feature-tier-schema.test.ts — should validate against,

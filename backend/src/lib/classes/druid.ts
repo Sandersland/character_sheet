@@ -82,8 +82,14 @@ export const druid: ClassDefinition = {
   },
 };
 
-// Circle of the Moon's Circle Forms raise the Wild Shape CR cap: CR 1 at its L3
-// grant, then level÷3 (min 1) from L6. Other circles use the base druid table.
+// Circle of the Moon's Circle Forms raise the Wild Shape CR cap: CR 1 from its
+// L2 grant (PHB'14 p.66, the `grantLevel: 2` above — NOT 3, which is only
+// subclassGateLevel's fallback for a subclass that declares none), then
+// level÷3 (min 1) from L6. Other circles use the base druid table.
+//
+// EDITION_2014 only: resourceFn returns early for EDITION_2024, whose CR cap
+// is prose on the Circle Forms row instead. Do not "simplify" this to the 2024
+// level÷3 rule — it encodes SRD 5.1 and every 2014 Moon druid reads it (#1226).
 function wildShapeCrCap(level: number, subclassKey: string | undefined): string {
   if (subclassKey === "circle of the moon") {
     return String(level >= 6 ? Math.max(1, Math.floor(level / 3)) : 1);
