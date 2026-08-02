@@ -11,7 +11,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 
@@ -73,7 +73,7 @@ describe("resolveStartingGold rejects a NULL-dice package (#1564)", () => {
 
   it("mode: gold 400s with a clear message instead of computing a range from null dice", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({
@@ -102,7 +102,7 @@ describe("resolveStartingGold rejects a NULL-dice package (#1564)", () => {
 
   it("mode: package still works for the same class (per-option gold, commit 2)", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send({

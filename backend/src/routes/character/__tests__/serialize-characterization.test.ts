@@ -15,7 +15,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -25,7 +25,6 @@ import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-ro
 
 const OWNER_ID = "owner-serialize-char";
 let COOKIE: string;
-const app = createApp();
 
 const FIGHTER_CLASS_NAME = "Test Fighter (Serialize Suite)";
 const BM_SUBCLASS_NAME = "battle master";

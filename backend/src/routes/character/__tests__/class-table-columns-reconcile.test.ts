@@ -9,7 +9,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -19,7 +19,6 @@ const OWNER_ID = "owner-class-columns-reconcile";
 const CHAR_ID = "test-1529-overcap-fighter";
 const XP_LVL_14 = 140000; // Fighter cap: base (4,8,12) + extra (6,14) = 5
 
-const app = createApp();
 let COOKIE: string;
 let fighterClassId: string;
 

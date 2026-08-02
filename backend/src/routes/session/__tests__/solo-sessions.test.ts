@@ -2,7 +2,7 @@
  * Solo (character-scoped) session lifecycle tests (#1080). A solo session is a
  * first-class Session row with campaignId null, owned by exactly one character.
  * Mirrors sessions.test.ts: real Postgres in beforeEach, supertest against
- * createApp(), plus direct lib calls to startSoloSession.
+ * the shared `app`, plus direct lib calls to startSoloSession.
  */
 
 import { randomUUID } from "node:crypto";
@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { SessionError, startCampaignSession, startSoloSession } from "@/lib/session/sessions.js";
@@ -25,7 +25,6 @@ const CHAR_CAMPAIGN = "test-solo-char-campaigner";
 let cookie: string;
 let cookieOutsider: string;
 
-const app = createApp();
 const agent = () => supertest.agent(app).set("Cookie", cookie);
 const outsider = () => supertest.agent(app).set("Cookie", cookieOutsider);
 

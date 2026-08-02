@@ -8,7 +8,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -21,8 +21,6 @@ let COOKIE: string;
 // XP thresholds
 const XP_LVL_4 = 2700; // level 4 — 1 ASI slot (first unlock)
 const XP_LVL_19 = 305000; // level 19 — Epic Boon unlock (sync with XP_THRESHOLDS)
-
-const app = createApp();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

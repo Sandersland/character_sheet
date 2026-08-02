@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import supertest from "supertest";
 import type { Router } from "express";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { routeManifest } from "@/routes/manifest.js";
 import { abilitiesRouter } from "@/routes/character/abilities.js";
 import { actionsRouter } from "@/routes/character/actions.js";
@@ -180,7 +180,6 @@ function namedEntries(scope: "public" | "authed") {
 }
 
 describe("route manifest auth boundary", () => {
-  const app = createApp();
 
   it.each(["public", "authed"] as const)(
     "has a named ROUTER_ENTRIES row for every %s manifest entry",

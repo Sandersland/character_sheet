@@ -23,14 +23,13 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-1598-stranded-subclass";
 let COOKIE: string;
-const app = createApp();
 
 const BASE_ABILITY_SCORES = {
   strength: 10, dexterity: 12, constitution: 14, intelligence: 15, wisdom: 14, charisma: 12,

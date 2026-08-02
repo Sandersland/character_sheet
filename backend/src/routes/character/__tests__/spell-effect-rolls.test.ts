@@ -2,13 +2,13 @@
  * #1381: spell rows serve a resolved `effect` (EffectSpec) and `effectRolls`
  * (one resolved roll per castable slot level) instead of the client re-deriving
  * cantrip scaling / upcast dice / heal-modifier from the raw catalog columns.
- * Harness mirrors spellcasting.test.ts (real Postgres, supertest + createApp()).
+ * Harness mirrors spellcasting.test.ts (real Postgres, supertest + the shared `app`).
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -25,7 +25,7 @@ interface SpellRow {
 }
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 
 function spells(res: { body: { spellcasting: { spells: SpellRow[] } } }): SpellRow[] {

@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const FIXTURE_2014 = JSON.parse(
@@ -39,7 +39,7 @@ function startingEquipmentByName(body: { classes: { name: string; startingEquipm
 describe("GET /api/reference — startingEquipment (#1534)", () => {
   it("EDITION_2014 deep-equals the captured fixture for all twelve classes", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_2014");
 
@@ -56,7 +56,7 @@ describe("GET /api/reference — startingEquipment (#1534)", () => {
   // wrong transcription just as readily as a correct one.
   it("EDITION_2024 deep-equals the SRD 5.2 fixture for all twelve classes", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_2024");
 

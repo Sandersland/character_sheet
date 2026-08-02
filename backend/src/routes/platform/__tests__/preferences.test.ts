@@ -1,12 +1,12 @@
 /**
- * PATCH /api/preferences (#1178). Real Postgres, supertest against createApp()
+ * PATCH /api/preferences (#1178). Real Postgres, supertest against the shared `app`
  * — same authCookie + ensureTestOwner harness pattern used by other route tests.
  */
 
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -14,7 +14,6 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 
 const OWNER = "prefs-route-owner";
 
-const app = createApp();
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
 let cookie: string;

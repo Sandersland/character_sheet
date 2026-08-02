@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -105,7 +105,7 @@ describe("buff cast → apply / serialize / replace / clear / undo", () => {
 
   it("surfaces the buff as a tempModifier + breakdown on the affected skill", async () => {
     await castBuff("spell-a", "Enhance Ability", "athletics", 4);
-    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
     const athletics = (res.body.skills as Array<{ name: string; tempModifier?: number; tempModifierSources?: Array<{ label: string; value: number }> }>)
       .find((s) => s.name === "athletics");

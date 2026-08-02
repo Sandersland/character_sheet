@@ -16,7 +16,7 @@
  *     ≠ refund — endRage's op list is clearBuff only)
  *   - LIFO revert of the activation restores the pool AND removes the buff together
  *
- * Real Postgres in each test; supertest against createApp().
+ * Real Postgres in each test; supertest against the shared `app`.
  *
  * #1223 UPDATE: Rage's resource pool moved off lib/classes/barbarian.ts's
  * resourceFn (which resolved purely off the classEntry NAME, "barbarian",
@@ -36,12 +36,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
-
-const app = () => createApp();
 
 const OWNER_ID = "owner-actions-rage";
 let COOKIE: string;
@@ -96,7 +94,7 @@ async function createBarbarian({ xp, level }: { xp: number; level: number }) {
 }
 
 async function activity(): Promise<ActivityEvent[]> {
-  const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${BARB_ID}/activity`);
+  const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${BARB_ID}/activity`);
   expect(res.status).toBe(200);
   return res.body as ActivityEvent[];
 }
@@ -110,7 +108,7 @@ async function latestBatchId(): Promise<string> {
 
 function executeAction(actionKey: string) {
   return supertest
-    .agent(app())
+    .agent(app)
     .set("Cookie", COOKIE)
     .post(`/api/characters/${BARB_ID}/actions/transactions`)
     .send({ operations: [{ type: "executeAction", actionKey }] });
@@ -118,7 +116,7 @@ function executeAction(actionKey: string) {
 
 function damage(amount: number, damageType: string) {
   return supertest
-    .agent(app())
+    .agent(app)
     .set("Cookie", COOKIE)
     .post(`/api/characters/${BARB_ID}/hp`)
     .send({ operations: [{ type: "damage", amount, damageType }] });
@@ -222,7 +220,7 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
     const batchId = await latestBatchId();
 
     const revert = await supertest
-      .agent(app())
+      .agent(app)
       .set("Cookie", COOKIE)
       .post(`/api/characters/${BARB_ID}/events/${batchId}/revert`);
     expect(revert.status).toBe(200);

@@ -1,6 +1,6 @@
 /**
  * Campaign-level session lifecycle + combat/roll + summary route tests (#245).
- * Real Postgres in beforeEach, supertest against createApp(). A shared session
+ * Real Postgres in beforeEach, supertest against the shared `app`. A shared session
  * belongs to a campaign; party members join/leave it. Fixtures build a campaign
  * with an OWNER + a PLAYER, each owning one character attached to the campaign.
  */
@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -24,7 +24,6 @@ let cookieOwner: string;
 let cookiePlayer: string;
 let cookieOutsider: string;
 
-const app = createApp();
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
 const BASE_CHAR = {

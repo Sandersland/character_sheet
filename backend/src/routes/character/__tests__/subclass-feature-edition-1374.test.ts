@@ -11,7 +11,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -21,7 +21,6 @@ import { loadDbFeatureRows } from "@/lib/classes/__tests__/db-feature-rows.fixtu
 
 const OWNER_ID = "owner-1374-subclass-feature-edition";
 let COOKIE: string;
-const app = createApp();
 
 const XP_LVL_3 = 900;
 

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -47,22 +47,22 @@ describe("auth gate (requireAuth)", () => {
   });
 
   it("401s an unauthenticated request to a protected route", async () => {
-    const res = await supertest(createApp()).get("/api/characters");
+    const res = await supertest(app).get("/api/characters");
     expect(res.status).toBe(401);
   });
 
   it("allows an authenticated request through the gate", async () => {
-    const res = await supertest(createApp()).get("/api/characters").set("Cookie", cookie);
+    const res = await supertest(app).get("/api/characters").set("Cookie", cookie);
     expect(res.status).toBe(200);
   });
 
   it("keeps GET /api/health public", async () => {
-    const res = await supertest(createApp()).get("/api/health");
+    const res = await supertest(app).get("/api/health");
     expect(res.status).toBe(200);
   });
 
   it("keeps GET /api/auth/providers public", async () => {
-    const res = await supertest(createApp()).get("/api/auth/providers");
+    const res = await supertest(app).get("/api/auth/providers");
     expect(res.status).toBe(200);
   });
 });
@@ -88,23 +88,23 @@ describe("character ownership (#101)", () => {
   });
 
   it("GET /api/characters returns only the caller's characters", async () => {
-    const res = await supertest(createApp()).get("/api/characters").set("Cookie", cookieA);
+    const res = await supertest(app).get("/api/characters").set("Cookie", cookieA);
     expect(res.status).toBe(200);
     expect((res.body as { id: string }[]).map((c) => c.id)).toEqual([CHAR_A]);
   });
 
   it("lets the owner read their own character", async () => {
-    const res = await supertest(createApp()).get(`/api/characters/${CHAR_A}`).set("Cookie", cookieA);
+    const res = await supertest(app).get(`/api/characters/${CHAR_A}`).set("Cookie", cookieA);
     expect(res.status).toBe(200);
   });
 
   it("403s reading a character owned by someone else", async () => {
-    const res = await supertest(createApp()).get(`/api/characters/${CHAR_B}`).set("Cookie", cookieA);
+    const res = await supertest(app).get(`/api/characters/${CHAR_B}`).set("Cookie", cookieA);
     expect(res.status).toBe(403);
   });
 
   it("403s PATCHing a character owned by someone else", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest(app)
       .patch(`/api/characters/${CHAR_B}`)
       .set("Cookie", cookieA)
       .send({ name: "Hijacked" });
@@ -112,7 +112,7 @@ describe("character ownership (#101)", () => {
   });
 
   it("403s DELETing a character owned by someone else", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest(app)
       .delete(`/api/characters/${CHAR_B}`)
       .set("Cookie", cookieA);
     expect(res.status).toBe(403);
@@ -122,7 +122,7 @@ describe("character ownership (#101)", () => {
   });
 
   it("404s for a missing character (owner authenticated)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest(app)
       .get("/api/characters/does-not-exist")
       .set("Cookie", cookieA);
     expect(res.status).toBe(404);
@@ -166,7 +166,7 @@ describe("character-scoped routers reject non-owners (#101)", () => {
   });
 
   it.each(ROUTES)("403s $method $suffix for a non-owner", async ({ method, suffix }) => {
-    const req = supertest(createApp())[method](`/api/characters/${CHAR_B}${suffix}`).set("Cookie", cookieA);
+    const req = supertest(app)[method](`/api/characters/${CHAR_B}${suffix}`).set("Cookie", cookieA);
     const res = method === "post" ? await req.send({}) : await req;
     expect(res.status).toBe(403);
   });

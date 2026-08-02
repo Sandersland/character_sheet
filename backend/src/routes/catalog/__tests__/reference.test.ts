@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
 import { prisma } from "@/lib/core/prisma.js";
 
@@ -15,7 +15,7 @@ beforeAll(async () => {
 describe("GET /api/reference", () => {
   it("returns the catalog lists and alignment set used to drive character creation", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_2024");
 
@@ -69,7 +69,7 @@ describe("GET /api/reference", () => {
   // non-caster) so the frontend never re-encodes the SRD 5.2 tables.
   it("ships level1SpellPicks per class (cantrips + spells, null for non-casters)", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_2024");
     const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
@@ -94,7 +94,7 @@ describe("GET /api/reference", () => {
   // creation ability panel can flag recommended rows without re-encoding the rules.
   it("ships primaryAbility per class", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_2024");
     const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
@@ -108,7 +108,6 @@ describe("GET /api/reference", () => {
   // each class's real PHB'14 gate (Cleric/Sorcerer/Warlock 1, Druid/Wizard 2,
   // rest 3); 2024 flattens every class to 3 (SRD 5.2).
   it("resolves subclassGateLevel for the requested edition (2014 per-class gate vs 2024's flat 3)", async () => {
-    const app = createApp();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
     const byName = (body: any, name: string) => body.classes.find((c: { name: string }) => c.name === name);
 
@@ -133,7 +132,7 @@ describe("GET /api/reference", () => {
 
   it("400s on an unrecognized edition", async () => {
     const response = await supertest
-      .agent(createApp())
+      .agent(app)
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_1974");
     expect(response.status).toBe(400);
@@ -144,7 +143,7 @@ describe("GET /api/reference", () => {
   // default IS the hardcode this issue removes, so a caller that forgets it
   // gets a 400, not a silent 2024 fallback.
   it("400s when edition is omitted", async () => {
-    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
+    const response = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference");
     expect(response.status).toBe(400);
     expect(response.body.error).toContain("edition");
   });
@@ -155,7 +154,6 @@ describe("GET /api/reference", () => {
   // buildOriginEntry actually grants a 2014 character. Alert is the only
   // origin feat with textually distinct 2014/2024 rows.
   it("resolves a background's origin feat for the requested edition (#1348 cross-link)", async () => {
-    const app = createApp();
     const criminal2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const criminal2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
@@ -187,7 +185,6 @@ describe("GET /api/reference", () => {
   // aware — catalog content identical for every character of an edition, so it
   // rides /reference rather than the character payload.
   it("ships conditions resolved for the requested edition (#1322)", async () => {
-    const app = createApp();
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     expect(res2014.status).toBe(200);
@@ -224,7 +221,6 @@ describe("GET /api/reference", () => {
   // copy in turnRules.ts until this slice, so these assertions are what stops it
   // regressing to one edition's text for both.
   it("ships universal actions resolved for the requested edition (#1430)", async () => {
-    const app = createApp();
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     expect(res2014.status).toBe(200);
@@ -279,7 +275,6 @@ describe("GET /api/reference", () => {
   // conditions above this is edition-INVARIANT, so the last assertion is a latch:
   // it fails the day someone routes ITEM_RARITIES through resolveEditionCatalog.
   it("ships the item rarity tiers, identically for both editions (#1437)", async () => {
-    const app = createApp();
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     expect(res2014.status).toBe(200);
@@ -419,7 +414,6 @@ describe("GET /api/reference", () => {
     });
 
     async function fetchBoth() {
-      const app = createApp();
       const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
       const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
@@ -528,7 +522,7 @@ describe("GET /api/reference", () => {
   describe("background starting-equipment (#1565)", () => {
     it("each EDITION_2024 background carries its own option-A GP and a null package-level gold", async () => {
       const response = await supertest
-        .agent(createApp())
+        .agent(app)
         .set("Cookie", COOKIE)
         .get("/api/reference?edition=EDITION_2024");
       const byName = (name: string) =>
@@ -559,7 +553,7 @@ describe("GET /api/reference", () => {
 
     it("EDITION_2014 Acolyte and Folk Hero carry their fixed one-option lists; every other background is null", async () => {
       const response = await supertest
-        .agent(createApp())
+        .agent(app)
         .set("Cookie", COOKIE)
         .get("/api/reference?edition=EDITION_2014");
       const byName = (name: string) =>
@@ -619,7 +613,6 @@ describe("GET /api/reference", () => {
   // same shape as this file's itemRarities latch (edition-invariant, not
   // edition-resolved).
   it("classes (apart from subclassGateLevel/subclasses/startingEquipment) and races are identical between editions (#1308/#1535)", async () => {
-    const app = createApp();
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
 
@@ -643,7 +636,6 @@ describe("GET /api/reference", () => {
   // rather than retabbing it. A 2024 Barbarian must no longer be offered a
   // subclass with zero features in its own edition.
   it("no longer offers the real Path of the Totem Warrior to a 2024 Barbarian, but still offers it to a 2014 one (#1559)", async () => {
-    const app = createApp();
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers

@@ -9,14 +9,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-exhaustion-edition";
 let COOKIE: string;
-const app = createApp();
 
 // Hill Dwarf (speed 25, seeded catalog) keeps the Speed math simple and
 // matches the fixture already used by rules-edition.test.ts / rules-edition-seam.test.ts.

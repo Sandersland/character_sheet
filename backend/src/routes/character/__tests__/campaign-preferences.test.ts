@@ -1,13 +1,13 @@
 /**
  * Campaign-scoped character preferences (#537). Real Postgres, supertest against
- * createApp(). Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER
+ * the shared `app`. Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER
  * owns CHAR attached to the campaign and OUTSIDER_CHAR in no campaign.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -18,7 +18,6 @@ const PLAYER = "prefs-player";
 const CHAR = "test-prefs-char";
 const OUTSIDER_CHAR = "test-prefs-outsider-char";
 
-const app = createApp();
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
 const BASE_CHAR = {

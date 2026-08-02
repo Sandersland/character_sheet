@@ -12,7 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -21,7 +21,6 @@ import { authCookie } from "@/test-support/auth.js";
 const OWNER_ID = "owner-encumbrance-served";
 const CHARACTER_ID = "encumbrance-served-character";
 let COOKIE: string;
-const app = createApp();
 
 // STR 14 → capacity 210. 100 coins → 2 lb.
 const FIXTURE = {

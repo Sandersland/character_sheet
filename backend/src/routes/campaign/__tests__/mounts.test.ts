@@ -12,7 +12,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-mounts";
@@ -24,7 +24,7 @@ beforeAll(async () => {
 });
 
 function agent() {
-  return supertest.agent(createApp()).set("Cookie", COOKIE);
+  return supertest.agent(app).set("Cookie", COOKIE);
 }
 
 describe("catalog routers stay top-level", () => {

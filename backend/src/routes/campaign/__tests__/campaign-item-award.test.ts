@@ -1,5 +1,5 @@
 /**
- * DM item award/revoke (#381). Real Postgres, supertest against createApp().
+ * DM item award/revoke (#381). Real Postgres, supertest against the shared `app`.
  * Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER owns a
  * character attached to the campaign, plus an OUTSIDER character in no campaign.
  */
@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
+import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -18,7 +18,6 @@ const PLAYER = "owner-award-player";
 const CHAR = "test-award-char";
 const OUTSIDER_CHAR = "test-award-outsider-char";
 
-const app = createApp();
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
 const BASE_CHAR = {
