@@ -29,5 +29,34 @@ export default tseslint.config(
         { terms: ["todo", "fixme", "xxx"], location: "anywhere" },
       ],
     },
+  },
+  {
+    // The blob-store port (#1614) exists so nothing above createBlobStore
+    // knows the storage vendor: an @aws-sdk import outside the storage domain
+    // is exactly the SDK-type leak the port prevents. Applied repo-wide under
+    // src/ (failure-closed: a new directory is covered by default) —
+    // src/lib/storage/** is exempted below, by name, not by omission.
+    files: ["src/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@aws-sdk/*"],
+              message:
+                "Import the BlobStore port (createBlobStore) instead of @aws-sdk — provider SDKs are fenced inside the storage domain so call sites stay vendor-agnostic (#1614).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The storage domain itself: the s3 driver and its tests legitimately use
+    // the SDK. Flat config is last-match-wins per rule, so this later "off"
+    // overrides the block above.
+    files: ["src/lib/storage/**/*.ts"],
+    rules: { "no-restricted-imports": "off" },
   }
 );

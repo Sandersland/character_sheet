@@ -18,6 +18,7 @@
     "backfill:combat-round": "tsx scripts/backfill-session-combat-round.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
     "@character-sheet/contracts": "*",
     "@character-sheet/shared-types": "*",
     "@prisma/adapter-pg": "^7.8.0",
