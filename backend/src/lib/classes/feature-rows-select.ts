@@ -49,6 +49,33 @@ import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-r
 // coincide today; an edition declared out of alphabetical order would not.
 export const FEATURE_ROWS_ORDER_BY = [{ level: "asc" }, { name: "asc" }, { edition: "asc" }] satisfies Prisma.ClassFeatureOrderByWithRelationInput[];
 
+/**
+ * The `class.features` relation argument, for the six selects that reach a
+ * class's OWN feature rows. `subclassId: null` is load-bearing:
+ * ClassFeature.classId is required on subclass rows too, so an unfiltered
+ * `class.features` returns every subclass under this class (a Fighter would
+ * list Champion + Battle Master + Eldritch Knight together).
+ *
+ * Relation-level rather than folded into FEATURE_ROWS_ENTRY_SELECT because
+ * three call sites cannot spread the entry-level fragment at all — they
+ * declare their own differently-shaped `class` (see ClassEntryRow) and TS's
+ * weak-type check rejects the assignment. Spreading the outer `class` key is
+ * what collides; naming the inner relation argument is not, so this is the one
+ * shape all twelve sites CAN share (#1545).
+ */
+export const FEATURE_ROWS_CLASS_FEATURES = {
+  where: { subclassId: null },
+  orderBy: FEATURE_ROWS_ORDER_BY,
+} satisfies Prisma.CharacterClass$featuresArgs;
+
+/**
+ * The `subclassRef.features` twin — already scoped by the Subclass.features
+ * back-relation, so it needs the order but no filter.
+ */
+export const FEATURE_ROWS_SUBCLASS_FEATURES = {
+  orderBy: FEATURE_ROWS_ORDER_BY,
+} satisfies Prisma.Subclass$featuresArgs;
+
 export const FEATURE_ROWS_ENTRY_SELECT = {
   // subclassLevel rides along because this select already reaches the class
   // relation: it is the seeded PHB'14 subclass grant level isSubclassActive
@@ -56,9 +83,9 @@ export const FEATURE_ROWS_ENTRY_SELECT = {
   // adding it here means every caller already spreading this fragment gets it
   // without editing its own select.
   class: {
-    select: { subclassLevel: true, features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } },
+    select: { subclassLevel: true, features: FEATURE_ROWS_CLASS_FEATURES },
   },
-  subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
+  subclassRef: { select: { features: FEATURE_ROWS_SUBCLASS_FEATURES } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 export type FeatureRowsEntry = Prisma.CharacterClassEntryGetPayload<{ select: typeof FEATURE_ROWS_ENTRY_SELECT }>;

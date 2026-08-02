@@ -40,7 +40,7 @@ import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { subclassGateLevel } from "./effective-levels.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
-import { FEATURE_ROWS_ORDER_BY } from "@/lib/classes/feature-rows-select.js";
+import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "@/lib/classes/feature-rows-select.js";
 
 // A validated step, mapped to the seam that applies it. Each domain re-reads its
 // own state via `tx`, so a later op sees the earlier op's write (e.g. the maneuver
@@ -80,18 +80,14 @@ const TARGET_ENTRY_SELECT = {
       // #1380: the advancing class's catalog hit die, the same shape
       // buildHpOpContext selects for the commit path.
       hitDie: true,
-      // #1546 Part B-i: the class's OWN feature rows — never a subclass's —
-      // `subclassId: null` is load-bearing, mirroring characterInclude's
-      // identical comment (character-include.ts) on why an unfiltered
-      // `class.features` would return every subclass under this class too.
-      features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+      // #1546 Part B-i: the class's OWN feature rows — see
+      // FEATURE_ROWS_CLASS_FEATURES for why the filter is load-bearing.
+      features: FEATURE_ROWS_CLASS_FEATURES,
     },
   },
-  // #1546 Part B-i: the PERSISTED subclass's own feature rows, mirroring
-  // characterInclude's subclassRef.features — already subclass-scoped by the
-  // back-relation, no further filter needed. Absent (relation null) when no
-  // subclass is set yet.
-  subclassRef: { select: { features: { orderBy: FEATURE_ROWS_ORDER_BY } } },
+  // #1546 Part B-i: the PERSISTED subclass's own feature rows. Absent
+  // (relation null) when no subclass is set yet.
+  subclassRef: { select: { features: FEATURE_ROWS_SUBCLASS_FEATURES } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 // Fetch the target class's catalog subclassLevel/extraAsiLevels/
@@ -171,7 +167,7 @@ function resolveExistingTargetEntry(
 async function resolveNewTargetEntry(target: Extract<LevelUpTarget, { kind: "new" }>): Promise<ResolvedTargetEntry> {
   const catalog = await prisma.characterClass.findUnique({
     where: { id: target.classId },
-    select: { name: true, hitDie: true, features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY } },
+    select: { name: true, hitDie: true, features: FEATURE_ROWS_CLASS_FEATURES },
   });
   if (!catalog) throw new InvalidLevelUpError(`Class not found: ${target.classId}`);
   return {
@@ -220,7 +216,7 @@ async function resolvePickedSubclass(
   // lookup, no new query.
   const sub = await prisma.subclass.findUnique({
     where: { id: subclassId },
-    select: { name: true, edition: true, features: { orderBy: FEATURE_ROWS_ORDER_BY } },
+    select: { name: true, edition: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
   });
   if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
   const mismatch = crossEditionRejection(sub, `Subclass "${sub.name}"`, edition);

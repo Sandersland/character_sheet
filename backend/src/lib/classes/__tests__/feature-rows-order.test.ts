@@ -28,7 +28,12 @@ import type { RulesEdition } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 
-import { FEATURE_ROWS_ENTRY_SELECT, FEATURE_ROWS_ORDER_BY } from "../feature-rows-select.js";
+import {
+  FEATURE_ROWS_CLASS_FEATURES,
+  FEATURE_ROWS_ENTRY_SELECT,
+  FEATURE_ROWS_ORDER_BY,
+  FEATURE_ROWS_SUBCLASS_FEATURES,
+} from "../feature-rows-select.js";
 
 const CLASS_NAME = "Order Probe Class";
 const SUBCLASS_NAME = "Order Probe Subclass";
@@ -170,22 +175,25 @@ describe("FEATURE_ROWS_ORDER_BY is a total order over the raw, pre-filter result
 });
 
 describe("every feature-relation read carries FEATURE_ROWS_ORDER_BY (#1545)", () => {
-  it("the shared fragment and characterInclude reference the same array object", () => {
+  it("every relation argument in reach is the shared fragment object itself", () => {
     // `toBe`, not `toEqual`: a hand-written structural copy is exactly the
     // drift this guards, and a copy would silently pass a deep-equality check
     // while diverging on the next key added.
-    expect(FEATURE_ROWS_ENTRY_SELECT.class.select.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
-    expect(FEATURE_ROWS_ENTRY_SELECT.subclassRef.select.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
-    expect(characterInclude.classEntries.include.class.select.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
-    expect(characterInclude.classEntries.include.subclassRef.include.features.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
+    expect(FEATURE_ROWS_CLASS_FEATURES.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
+    expect(FEATURE_ROWS_SUBCLASS_FEATURES.orderBy).toBe(FEATURE_ROWS_ORDER_BY);
+    expect(FEATURE_ROWS_ENTRY_SELECT.class.select.features).toBe(FEATURE_ROWS_CLASS_FEATURES);
+    expect(FEATURE_ROWS_ENTRY_SELECT.subclassRef.select.features).toBe(FEATURE_ROWS_SUBCLASS_FEATURES);
+    expect(characterInclude.classEntries.include.class.select.features).toBe(FEATURE_ROWS_CLASS_FEATURES);
+    expect(characterInclude.classEntries.include.subclassRef.include.features).toBe(FEATURE_ROWS_SUBCLASS_FEATURES);
   });
 
   it("no source line selects the features relation without it", () => {
-    // Reference identity above can only reach the two EXPORTED fragments. Three
+    // Reference identity above can only reach the EXPORTED fragments. Four
     // call sites hand-roll an inline, non-exported select that no import-based
     // test can see (hp-context.ts, spellcasting.ts, and level-up-transaction.ts
-    // twice) — a source sweep is the only check that covers them. #1528 shipped
-    // red-7-of-8 flake precisely because one such site was missed.
+    // twice) — they now name the relation-level fragments, but only a source
+    // sweep can prove a NEW one does too. #1528 shipped red-7-of-8 flake
+    // precisely because one such site was missed.
     //
     // Scoped to the RELATION select deliberately. loadDbFeatureRows reads the
     // same rows through a top-level `classFeature.findMany` with no orderBy and
@@ -215,7 +223,7 @@ describe("every feature-relation read carries FEATURE_ROWS_ORDER_BY (#1545)", ()
 
     expect(
       offenders,
-      "spread FEATURE_ROWS_ENTRY_SELECT, or add `orderBy: FEATURE_ROWS_ORDER_BY` — see #1545",
+      "name FEATURE_ROWS_CLASS_FEATURES / FEATURE_ROWS_SUBCLASS_FEATURES instead of an inline select — see #1545",
     ).toEqual([]);
   });
 });

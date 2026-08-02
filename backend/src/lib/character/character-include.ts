@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client.js";
 
-import { FEATURE_ROWS_ORDER_BY } from "@/lib/classes/feature-rows-select.js";
+import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "@/lib/classes/feature-rows-select.js";
 
 // Shared `include` for fetching a full character with its race/background/
 // class selections. classEntries is ordered so index 0 is always the
@@ -14,14 +14,11 @@ export const characterInclude = {
   classEntries: {
     orderBy: { position: "asc" },
     include: {
-      // `features` (#1522/#1523/#1524): the class's OWN feature rows, never a
-      // subclass's — `subclassId: null` is load-bearing. ClassFeature.classId
-      // is required on subclass rows too, so an unfiltered `class.features`
-      // would return every subclass under this class (a Fighter would list
-      // Champion + Battle Master + Eldritch Knight together). Both editions
-      // load (this `include` is a module-level const with no access to the
-      // character's rulesEdition); featuresFromRows (lib/classes/
-      // class-feature-rows.ts) does the in-memory per-edition filter.
+      // `features` (#1522/#1523/#1524): the class's OWN feature rows — see
+      // FEATURE_ROWS_CLASS_FEATURES for why the filter is load-bearing. Both
+      // editions load (this `include` is a module-level const with no access to
+      // the character's rulesEdition); featuresFromRows does the in-memory
+      // per-edition filter.
       // armorProficiencies/weaponProficiencies/extraAsiLevels/
       // fightingStyleFeatLevel (#1529): the class-table content
       // characterAdvancementSlots/characterFightingStyleFeatSlots/
@@ -34,18 +31,17 @@ export const characterInclude = {
           weaponProficiencies: true,
           extraAsiLevels: true,
           fightingStyleFeatLevel: true,
-          features: { where: { subclassId: null }, orderBy: FEATURE_ROWS_ORDER_BY },
+          features: FEATURE_ROWS_CLASS_FEATURES,
         },
       },
       // Subclass-granted spells (#898), resolved live at serialize time from the
       // catalog rows this join loads (never snapshotted). Null when no subclass or
       // a homebrew subclass without a catalog row (#911).
-      // `features` (#1524): this subclass's own rows — already scoped by the
-      // Subclass.features back-relation, no further filter needed.
+      // `features` (#1524): this subclass's own rows.
       subclassRef: {
         include: {
           grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } },
-          features: { orderBy: FEATURE_ROWS_ORDER_BY },
+          features: FEATURE_ROWS_SUBCLASS_FEATURES,
         },
       },
     },
