@@ -5,7 +5,9 @@
  * the payload field and the phrase applyAttune rejects with must be one string:
  * the equality test below reads the expected message out of the GET payload
  * rather than a literal, so a future edit to describeAttunementPrereq can't drift
- * the two apart silently.
+ * the two apart silently. A vowel-initial value exercises the same pair (#1485),
+ * because the article agreement is the edit most likely to be applied to one tier
+ * and forgotten on the other.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -114,5 +116,27 @@ describe("GET /api/characters/:id — attunementPrereqText (#1382)", () => {
 
     expect(attune.status).toBe(400);
     expect(attune.body.error).toBe(`Holy Avenger requires attunement by ${servedText}`);
+  });
+
+  it("serves the same vowel-agreed text to both tiers (#1485)", async () => {
+    // The fixture has no raceSelection, so a species prerequisite is unmet and the
+    // attune lands on the 400 prerequisite path rather than the 409 attunement cap.
+    const item = await makeItem("Elven Chain", {
+      requiresAttunement: true,
+      attunementPrereqKind: "species",
+      attunementPrereqValue: "Elf",
+    });
+
+    const body = (await supertest(app).get(`/api/characters/${CHARACTER_ID}`).set("Cookie", COOKIE)).body;
+    const servedText = inventoryRow(body, "Elven Chain").attunementPrereqText;
+    expect(servedText).toBe("an Elf");
+
+    const attune = await supertest(app)
+      .post(`/api/characters/${CHARACTER_ID}/inventory/transactions`)
+      .set("Cookie", COOKIE)
+      .send({ operations: [{ type: "attune", inventoryItemId: item.id }] });
+
+    expect(attune.status).toBe(400);
+    expect(attune.body.error).toBe(`Elven Chain requires attunement by ${servedText}`);
   });
 });

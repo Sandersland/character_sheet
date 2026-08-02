@@ -84,7 +84,7 @@ export default function RollResultSeal() {
       // pointer-down (not click) so the dismissing tap can't also activate
       // whatever control sits under the finger once the scrim unmounts.
       onPointerDown={() => setEntry(null)}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink-900/20 p-6 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-backdrop/50 p-6 backdrop-blur-[1px]"
     >
       <div
         className={`relative flex max-w-xs flex-col items-center gap-2 rounded-card border bg-parchment-50 px-7 pb-6 pt-8 text-center ${SLIP_VARIANT[outcome]}`}

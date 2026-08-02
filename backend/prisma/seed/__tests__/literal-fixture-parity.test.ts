@@ -92,33 +92,6 @@ function collectFixtureRows(): FixtureRow[] {
   return out;
 }
 
-// The ten EDITION_2024 rows this guard finds that the real seed does NOT have,
-// sanctioned deliberately rather than silently tolerated. #1233 tagged The
-// Archfey and The Great Old One EDITION_2014 and authored zero 2024 rows (no
-// licensed source could verify their PHB'24 reworks), so a 2024 character
-// cannot pick either patron at all. THE_ARCHFEY_ROWS/THE_GREAT_OLD_ONE_ROWS
-// nevertheless build both editions from one flatMap template, because several
-// subclass-grant-level.test.ts cases (#1128) derive these two patrons at
-// EDITION_2024 explicitly and would otherwise go red.
-//
-// That makes those cases assert a state production forbids, which is a
-// test-design problem in subclass-grant-level.test.ts, NOT drift in the
-// fixture — so fixing it is #1595, not this issue. Listed row-by-row rather
-// than pattern-matched so the list cannot quietly absorb a genuine orphan, and
-// so deleting it is a one-line change once #1595 lands.
-const SANCTIONED_ORPHANS: ReadonlySet<string> = new Set([
-  "warlock::warlock-the-archfey::Expanded Spell List::EDITION_2024",
-  "warlock::warlock-the-archfey::Fey Presence::EDITION_2024",
-  "warlock::warlock-the-archfey::Misty Escape::EDITION_2024",
-  "warlock::warlock-the-archfey::Beguiling Defenses::EDITION_2024",
-  "warlock::warlock-the-archfey::Dark Delirium::EDITION_2024",
-  "warlock::warlock-the-great-old-one::Expanded Spell List::EDITION_2024",
-  "warlock::warlock-the-great-old-one::Awakened Mind::EDITION_2024",
-  "warlock::warlock-the-great-old-one::Entropic Ward::EDITION_2024",
-  "warlock::warlock-the-great-old-one::Thought Shield::EDITION_2024",
-  "warlock::warlock-the-great-old-one::Create Thrall::EDITION_2024",
-]);
-
 describe("literal-row fixture parity (#1593)", () => {
   // Anti-vacuity: if the fixture maps were empty (or the join produced nothing)
   // every assertion below would pass by iterating nothing. Eleven classes are
@@ -142,9 +115,15 @@ describe("literal-row fixture parity (#1593)", () => {
   // while staying green. Tune these UPWARD as classes go literal; only ever
   // tune one DOWNWARD with the reason recorded here (the
   // class-feature-population.test.ts idiom).
+  //
+  // Tuned DOWN 265 -> 255 by #1595: THE_ARCHFEY_ROWS/THE_GREAT_OLD_ONE_ROWS
+  // stopped fabricating an EDITION_2024 partition the real seed never had, so
+  // the fixture went 268 -> 258 rows. A NARROWING toward the seed, not a loss —
+  // no mirrored seed row went away, and the class/subclass floors are unmoved
+  // because both maps keep every key.
   it("the fixture actually mirrors something — non-vacuity floor", () => {
     const rows = collectFixtureRows();
-    expect(rows.length).toBeGreaterThanOrEqual(265);
+    expect(rows.length).toBeGreaterThanOrEqual(255);
     expect(Object.keys(LITERAL_CLASS_ROWS).length).toBeGreaterThanOrEqual(9);
     expect(Object.keys(LITERAL_SUBCLASS_ROWS).length).toBeGreaterThanOrEqual(13);
     expect(SEED_BY_KEY.size).toBe(CLASS_FEATURES.length);
@@ -195,21 +174,9 @@ describe("literal-row fixture parity — orphans (#1593)", () => {
   // this, a mirror can rot indefinitely while every other suite stays green.
   it("no fixture row is an orphan — every one resolves to a seed row", () => {
     const orphans = collectFixtureRows()
-      .filter((row) => !SEED_BY_KEY.has(row.key) && !SANCTIONED_ORPHANS.has(row.key))
+      .filter((row) => !SEED_BY_KEY.has(row.key))
       .map((row) => `${row.label} -> no seed row at ${row.key}`);
 
     expect(orphans, `orphaned fixture rows:\n  ${orphans.join("\n  ")}`).toEqual([]);
-  });
-
-  // Keeps SANCTIONED_ORPHANS honest in both directions: every entry must STILL
-  // be a real orphan. Once #1595 retargets those cases to EDITION_2014 and the
-  // fabricated rows go, this fails and the set must be emptied — the allowlist
-  // cannot outlive the deviation it documents.
-  it("every sanctioned orphan is still genuinely absent from the seed", () => {
-    const stale = [...SANCTIONED_ORPHANS].filter((key) => SEED_BY_KEY.has(key));
-    expect(
-      stale,
-      `SANCTIONED_ORPHANS entries the seed now HAS — delete them from the set (#1595):\n  ${stale.join("\n  ")}`,
-    ).toEqual([]);
   });
 });
