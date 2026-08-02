@@ -86,23 +86,6 @@ export async function assertNoCharactersReferenceStaleSubclasses(
   if (messages.length > 0) throwStaleSubclassReferencedError(messages);
 }
 
-// Prune the row a subclass's edition tag CHANGE strands (Totem Warrior null
-// -> EDITION_2014, #1559): see assertNoCharactersReferenceStaleSubclasses's
-// own comment for why upsertEditionRow's create-not-update-in-place behavior
-// makes this necessary, and why the character guard above must run BEFORE
-// any delete. Same "prune wiring lands in the SAME deploy as the fork"
-// requirement as seedActions' #1430 (see its own stale-row comment).
-//
-// `seeded` (never a bare read of the module-level SUBCLASSES) restricts this
-// to slugs the CALLER still emits — deliberately NOT the bare
-// staleCatalogRowsWhere("slug", seeded) every other caller uses (which owns
-// its ENTIRE table). Subclass can hold rows from a lineage retired entirely
-// (a rename that dropped a slug outright, not just re-tagged its edition)
-// that a live character's nullable subclassId FK still references; a blanket
-// sweep would delete those too — this prune only ever removes a row whose
-// OWN slug is still seeded, under an edition no longer wanted for it. A slug
-// the seed has stopped emitting altogether is untouched and left for its own
-// deliberate fix (the three orphaned monk-way-of-* rows, #1559 disclosure).
 // Re-points live characters off a stale row onto the retained row for the SAME
 // SLUG, so a retag stops wedging deploys (`railway.json`'s preDeployCommand is
 // `prisma migrate deploy && prisma db seed`, so the guard below aborting the
@@ -144,13 +127,31 @@ async function remapCharactersOffStaleSubclasses(
       // in its log, and the edition it moved them ONTO is the detail someone
       // debugging a cross-edition sheet later will want.
       console.log(
-        `seedSubclasses: remapped ${count} CharacterClassEntry row(s) from stale ${row.slug} ` +
-          `(${row.edition ?? "shared"}) onto the retained ${row.edition ?? "shared"} -> ` +
-          `${retained[0].edition ?? "shared"} row before pruning (#1559)`,
+        `seedSubclasses: remapped ${count} CharacterClassEntry row(s) for ${row.slug} ` +
+          `from the stale (${row.edition ?? "shared"}) row onto the retained ` +
+          `(${retained[0].edition ?? "shared"}) row before pruning (#1559)`,
       );
     }
   }
 }
+
+// Prune the row a subclass's edition tag CHANGE strands (Totem Warrior null
+// -> EDITION_2014, #1559): see assertNoCharactersReferenceStaleSubclasses's
+// own comment for why upsertEditionRow's create-not-update-in-place behavior
+// makes this necessary, and why the character guard above must run BEFORE
+// any delete. Same "prune wiring lands in the SAME deploy as the fork"
+// requirement as seedActions' #1430 (see its own stale-row comment).
+//
+// `seeded` (never a bare read of the module-level SUBCLASSES) restricts this
+// to slugs the CALLER still emits — deliberately NOT the bare
+// staleCatalogRowsWhere("slug", seeded) every other caller uses (which owns
+// its ENTIRE table). Subclass can hold rows from a lineage retired entirely
+// (a rename that dropped a slug outright, not just re-tagged its edition)
+// that a live character's nullable subclassId FK still references; a blanket
+// sweep would delete those too — this prune only ever removes a row whose
+// OWN slug is still seeded, under an edition no longer wanted for it. A slug
+// the seed has stopped emitting altogether is untouched and left for its own
+// deliberate fix (the three orphaned monk-way-of-* rows, #1559 disclosure).
 
 export async function pruneStaleSubclasses(
   prisma: PrismaClient,
