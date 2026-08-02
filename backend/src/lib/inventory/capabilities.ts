@@ -752,17 +752,29 @@ export interface AttunementSubject {
   alignment: string | null;
 }
 
+// Picks the indefinite article from the initial LETTER, not the initial sound (#1485).
+// Correct for every value this catalog carries — species and class names and
+// alignments — but wrong for a consonant-sounding vowel initial ("an Unicorn Rider")
+// and for a silent h ("a Hour"). Both are reachable: the DM authoring form takes
+// attunementPrereqValue as free text, so widen this to a lookup if such a value ships.
+function withArticle(noun: string): string {
+  return `${/^[aeiou]/i.test(noun) ? "an" : "a"} ${noun}`;
+}
+
 // Human phrasing for a failed prerequisite (5e "requires attunement by a …").
+// Every arm routes through withArticle so a future AttunementPrereqKind cannot
+// reintroduce a hardcoded article.
 export function describeAttunementPrereq(prereq: AttunementPrereq): string {
   switch (prereq.kind) {
     case "spellcaster":
-      return "a spellcaster";
+      return withArticle("spellcaster");
     case "class":
-      return `a ${prereq.value ?? "specific class"}`;
+      return withArticle(prereq.value ?? "specific class");
     case "species":
-      return `a ${prereq.value ?? "specific species"}`;
+      return withArticle(prereq.value ?? "specific species");
     case "alignment":
-      return `a ${prereq.value ?? "specific alignment"} creature`;
+      // The article agrees with the interposed alignment, never with "creature".
+      return `${withArticle(prereq.value ?? "specific alignment")} creature`;
   }
 }
 

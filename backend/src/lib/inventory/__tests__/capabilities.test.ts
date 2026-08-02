@@ -530,10 +530,17 @@ describe("attunement prerequisites", () => {
   it("describes the prerequisite for the error message", () => {
     expect(describeAttunementPrereq({ kind: "spellcaster", value: null })).toBe("a spellcaster");
     expect(describeAttunementPrereq({ kind: "class", value: "Wizard" })).toBe("a Wizard");
-    // "a Elf" is deliberate, not a typo: no a/an agreement, matching what the
-    // deleted client-side copy produced and what applyAttune already rejects with.
-    expect(describeAttunementPrereq({ kind: "species", value: "Elf" })).toBe("a Elf");
+    expect(describeAttunementPrereq({ kind: "species", value: "Elf" })).toBe("an Elf");
     expect(describeAttunementPrereq({ kind: "alignment", value: "Lawful Good" })).toBe("a Lawful Good creature");
+  });
+
+  it("agrees the article with the value's initial letter (#1485)", () => {
+    expect(describeAttunementPrereq({ kind: "class", value: "Artificer" })).toBe("an Artificer");
+    // The article agrees with the interposed value, never with the trailing noun.
+    expect(describeAttunementPrereq({ kind: "alignment", value: "Evil" })).toBe("an Evil creature");
+    // Pinned as current behaviour, not as correct English: the heuristic reads the
+    // initial letter, so a consonant-sounding vowel initial comes out wrong.
+    expect(describeAttunementPrereq({ kind: "class", value: "Unicorn Rider" })).toBe("an Unicorn Rider");
   });
 
   it("degrades to a generic phrase when the kind carries no value", () => {
