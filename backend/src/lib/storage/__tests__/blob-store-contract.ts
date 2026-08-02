@@ -3,7 +3,7 @@ import type { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import type { BlobStore } from "../blob-store.js";
-import { BlobNotFoundError } from "../blob-store.js";
+import { BlobKeyError, BlobNotFoundError } from "../blob-store.js";
 
 async function collect(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -98,6 +98,21 @@ export function runBlobStoreContract(
         BlobNotFoundError,
       );
     });
+
+    // In the contract, not per driver: S3 would accept "../escape" as an opaque
+    // key, so only a shared assertion proves both drivers enforce one key space.
+    it.each(["../escape", "a/../../escape", "/etc/passwd", "a//b", "", "a/./b"])(
+      "rejects the traversal-capable key %j on every method",
+      async (k) => {
+        const store = await makeStore();
+        const body = Buffer.from("x");
+
+        await expect(store.put(k, body, { contentType: "text/plain" })).rejects.toBeInstanceOf(BlobKeyError);
+        await expect(store.get(k)).rejects.toBeInstanceOf(BlobKeyError);
+        await expect(store.delete(k)).rejects.toBeInstanceOf(BlobKeyError);
+        await expect(store.exists(k)).rejects.toBeInstanceOf(BlobKeyError);
+      },
+    );
 
     it("supports nested multi-segment keys", async () => {
       const store = await makeStore();

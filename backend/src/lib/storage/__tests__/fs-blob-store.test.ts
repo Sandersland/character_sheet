@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { BlobKeyError, BlobNotFoundError } from "../blob-store.js";
+import { BlobNotFoundError } from "../blob-store.js";
 import { createFsBlobStore } from "../fs-blob-store.js";
 import { runBlobStoreContract } from "./blob-store-contract.js";
 
@@ -17,18 +17,6 @@ runBlobStoreContract("fs driver", async () => createFsBlobStore(await tempDir())
 describe("createFsBlobStore", () => {
   const body = Buffer.from("payload");
   const options = { contentType: "text/plain" } as const;
-
-  it.each(["../escape", "a/../../escape", "/etc/passwd", "a//b", "", "a/./b"])(
-    "rejects the traversal-capable key %j on every method",
-    async (key) => {
-      const store = createFsBlobStore(await tempDir());
-
-      await expect(store.put(key, body, options)).rejects.toBeInstanceOf(BlobKeyError);
-      await expect(store.get(key)).rejects.toBeInstanceOf(BlobKeyError);
-      await expect(store.delete(key)).rejects.toBeInstanceOf(BlobKeyError);
-      await expect(store.exists(key)).rejects.toBeInstanceOf(BlobKeyError);
-    },
-  );
 
   it("creates its target directory on first put", async () => {
     const dir = path.join(await tempDir(), "not", "yet", "created");
