@@ -1306,7 +1306,7 @@ export const DRACONIC_BLOODLINE_ROWS: ClassFeatureRow[] = [
     level: 3,
     edition: "EDITION_2024",
     description:
-      "You always have certain spells prepared, keyed to the dragon type you choose for your Draconic Bloodline; they don't count against the number of spells you can prepare with Spellcasting: Alter Self, Chromatic Orb, Command, Dragon's Breath (level 3); Fear, Fly (level 5); Arcane Eye, Charm Monster (level 7); Legend Lore, Summon Dragon (level 9).",
+      "You always have certain spells prepared; they don't count against the number of spells you can prepare with Spellcasting: Alter Self, Chromatic Orb, Command, Dragon's Breath (level 3); Fear, Fly (level 5); Arcane Eye, Charm Monster (level 7); Legend Lore, Summon Dragon (level 9).",
   },
   {
     name: "Elemental Affinity",
@@ -1320,7 +1320,7 @@ export const DRACONIC_BLOODLINE_ROWS: ClassFeatureRow[] = [
     level: 6,
     edition: "EDITION_2024",
     description:
-      "You have Resistance to the damage type associated with your dragon ancestor. Whenever you cast a spell that deals damage of that type, you can add your Charisma modifier to one damage roll of that spell.",
+      "Your draconic magic has an affinity with a damage type associated with dragons. Choose one of those types: Acid, Cold, Fire, Lightning, or Poison. You have Resistance to that damage type, and when you cast a spell that deals damage of that type, you can add your Charisma modifier to one damage roll of that spell.",
   },
   {
     name: "Dragon Wings",
