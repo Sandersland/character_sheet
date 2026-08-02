@@ -101,3 +101,32 @@ describe("SubclassSection — stranded on a cross-edition subclass (#1598)", () 
     expect(screen.getByRole("combobox")).toBeDisabled();
   });
 });
+
+// ClassPanel passes `reference?.classes ?? []`, so `classDef` is undefined for
+// the whole window before the reference query resolves. That used to be
+// unreachable with the picker open: the retired deriveNeedsSubclass began
+// `if (!classDef) return false`, so needsSubclass implied classDef. Moving the
+// determination onto the wire (#1598) removed that coupling — the backend
+// cannot know whether the client's reference catalog has loaded — which makes
+// classDef's absence reachable while the picker renders.
+describe("SubclassSection — reference catalog not loaded yet", () => {
+  it("renders no picker instead of crashing when a needed subclass has no classDef", () => {
+    renderWithCharacter(
+      <SubclassSection classDef={undefined} needsSubclass subclassUnavailable={false} busy={false} onChoose={vi.fn()} />,
+      makeCharacter({ subclass: undefined }),
+    );
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("still explains a stranded pick without a classDef, and omits only the picker", () => {
+    renderWithCharacter(
+      <SubclassSection classDef={undefined} needsSubclass subclassUnavailable busy={false} onChoose={vi.fn()} />,
+      makeCharacter({ subclass: "The Archfey" }),
+    );
+    // The name and the reason need no catalog — only the option list does, so
+    // losing the picker must not also silence the explanation.
+    expect(screen.getByText("The Archfey")).toBeInTheDocument();
+    expect(screen.getByText(/The Archfey isn't part of 2024 rules/)).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+});
