@@ -544,6 +544,43 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["bard", "college of valor", "Combat Inspiration"],
   ["bard", "college of valor", "Extra Attack"],
   ["bard", "college of valor", "Battle Magic"],
+  // Druid's 19 new triples (#1226): the 5 base names that genuinely fork
+  // (Druidic, Spellcasting, Wild Shape, Beast Spells, Archdruid) show up
+  // under EVERY subclass context Druid has (undefined/circle of the land/
+  // circle of the moon — collectTaggedFeatureKeys combines classRows, always
+  // ALL of them, with each context's own subclassRows) — 3 contexts x 5 base
+  // names = 15, plus Circle of the Land's own 3 forked subclass names
+  // (Natural Recovery, Nature's Ward, Nature's Sanctuary) and Circle of the
+  // Moon's own 1 (Circle Forms) = 15 + 3 + 1 = 19. Timeless Body/Primal
+  // Order/Wild Companion/Wild Resurgence/Elemental Fury/Improved Elemental
+  // Fury/Epic Boon (base), Bonus Cantrip/Circle Spells (renamed away, see
+  // below)/Land's Aid/Land's Stride (Land), and Combat Wild Shape/Primal
+  // Strike/Circle of the Moon Spells/Improved Circle Forms/Elemental Wild
+  // Shape/Moonlight Step/Thousand Forms/Lunar Form (Moon) are NOT tagged —
+  // each has exactly one description under its name, either 2014-only or
+  // 2024-only, never two. "Circle Spells" -> "Circle of the Land Spells" is a
+  // RENAME, not a fork (Cleric's Domain Spells -> Life/Trickery Domain Spells
+  // precedent, #1225) — neither name ever carries two descriptions, so
+  // neither appears here.
+  ["druid", "undefined", "Druidic"],
+  ["druid", "undefined", "Spellcasting"],
+  ["druid", "undefined", "Wild Shape"],
+  ["druid", "undefined", "Beast Spells"],
+  ["druid", "undefined", "Archdruid"],
+  ["druid", "circle of the land", "Druidic"],
+  ["druid", "circle of the land", "Spellcasting"],
+  ["druid", "circle of the land", "Wild Shape"],
+  ["druid", "circle of the land", "Beast Spells"],
+  ["druid", "circle of the land", "Archdruid"],
+  ["druid", "circle of the land", "Natural Recovery"],
+  ["druid", "circle of the land", "Nature's Ward"],
+  ["druid", "circle of the land", "Nature's Sanctuary"],
+  ["druid", "circle of the moon", "Druidic"],
+  ["druid", "circle of the moon", "Spellcasting"],
+  ["druid", "circle of the moon", "Wild Shape"],
+  ["druid", "circle of the moon", "Beast Spells"],
+  ["druid", "circle of the moon", "Archdruid"],
+  ["druid", "circle of the moon", "Circle Forms"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

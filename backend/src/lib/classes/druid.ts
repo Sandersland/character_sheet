@@ -1,150 +1,42 @@
-import type { AuthoredFeature, ClassDefinition } from "./types.js";
+import { abilityModifier } from "@/lib/srd/srd.js";
 
-const DRUID_FEATURES: AuthoredFeature[] = [
-  {
-    name: "Druidic",
-    level: 1,
-    source: "class",
-    description:
-      "You know Druidic, the secret language of druids. You can speak it and leave hidden messages in natural surroundings.",
-  },
-  {
-    name: "Spellcasting",
-    level: 1,
-    source: "class",
-    description:
-      "You cast spells using Wisdom. Full-caster progression. You prepare a number of druid spells equal to your Wisdom modifier + your druid level (minimum 1).",
-  },
-  {
-    name: "Wild Shape",
-    level: 2,
-    source: "class",
-    description:
-      "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
-  },
-  {
-    name: "Timeless Body",
-    level: 18,
-    source: "class",
-    description:
-      "The primal magic you wield causes you to age more slowly. For every 10 years that pass, your body ages only 1 year.",
-  },
-  {
-    name: "Beast Spells",
-    level: 18,
-    source: "class",
-    description:
-      "You can cast many druid spells in any shape you assume using Wild Shape. You can perform the somatic and verbal components of a druid spell while in beast form.",
-  },
-  {
-    name: "Archdruid",
-    level: 20,
-    source: "class",
-    description:
-      "You can use your Wild Shape an unlimited number of times. Additionally, you can ignore the verbal and somatic components of your druid spells, as well as any material components lacking a cost.",
-  },
-];
+import type { ClassDefinition } from "./types.js";
 
-const CIRCLE_OF_THE_LAND_FEATURES: AuthoredFeature[] = [
-  {
-    name: "Bonus Cantrip",
-    level: 2,
-    source: "subclass",
-    description:
-      "You learn one additional druid cantrip of your choice.",
-  },
-  {
-    name: "Natural Recovery",
-    level: 2,
-    source: "subclass",
-    description:
-      "Once per long rest during a short rest, choose expended spell slots to recover. The total levels of slots recovered can be up to half your druid level (rounded up, max 5th level).",
-  },
-  {
-    name: "Circle Spells",
-    level: 3,
-    source: "subclass",
-    description:
-      "You gain access to additional spells based on your chosen terrain (arctic, coast, desert, forest, grassland, mountain, swamp, or Underdark). These spells are always prepared for you and don't count against your prepared spells.",
-  },
-  {
-    name: "Land's Stride",
-    level: 6,
-    source: "subclass",
-    description:
-      "Moving through nonmagical difficult terrain costs no extra movement, and you can pass through nonmagical plants without being slowed. Advantage on saves against magically created or manipulated plants.",
-  },
-  {
-    name: "Nature's Ward",
-    level: 10,
-    source: "subclass",
-    description:
-      "Immune to poison and disease. Elementals and fey can't charm or frighten you.",
-  },
-  {
-    name: "Nature's Sanctuary",
-    level: 14,
-    source: "subclass",
-    description:
-      "When a beast or plant attacks you, it must make a Wisdom saving throw (DC 8 + proficiency + Wisdom modifier) or choose a different target. On a success, it is immune to this feature for 24 hours.",
-  },
-];
-
-const CIRCLE_OF_THE_MOON_FEATURES: AuthoredFeature[] = [
-  {
-    name: "Combat Wild Shape",
-    level: 2,
-    source: "subclass",
-    description:
-      "You can use Wild Shape as a bonus action. While transformed, you can expend a spell slot as a bonus action to regain 1d8 HP per level of the slot expended.",
-  },
-  {
-    name: "Circle Forms",
-    level: 2,
-    source: "subclass",
-    description:
-      "You can use Wild Shape to transform into beasts with a challenge rating as high as 1 (instead of the base druid table). Starting at level 6, the max CR equals your druid level divided by 3 (rounded down, minimum 1).",
-  },
-  {
-    name: "Primal Strike",
-    level: 6,
-    source: "subclass",
-    description:
-      "Your attacks while in beast form count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks.",
-  },
-  {
-    name: "Elemental Wild Shape",
-    level: 10,
-    source: "subclass",
-    description:
-      "Expend two uses of Wild Shape to transform into an air, earth, fire, or water elemental.",
-  },
-  {
-    name: "Thousand Forms",
-    level: 14,
-    source: "subclass",
-    description:
-      "You can cast the Alter Self spell at will without expending a spell slot.",
-  },
-];
-
-// Circle of the Moon's Circle Forms raise the Wild Shape CR cap: CR 1 at its L3
-// grant, then level÷3 (min 1) from L6. Other circles use the base druid table.
-function wildShapeCrCap(level: number, subclassKey: string | undefined): string {
-  if (subclassKey === "circle of the moon") {
-    return String(level >= 6 ? Math.max(1, Math.floor(level / 3)) : 1);
-  }
-  return level >= 8 ? "1" : level >= 4 ? "1/2" : "1/4";
-}
-
-// Base Wild Shape speed restrictions lift with level, regardless of subclass.
-function wildShapeSpeedNote(level: number): string {
-  return level >= 8 ? "" : level >= 4 ? " (no flying speed)" : " (no flying or swimming speed)";
-}
-
+// #1226 (mirrors Barbarian's #1223 / Ranger's #1230 pilots): Druid's feature
+// TEXT moved to literal seed data (prisma/seed/druid-features.ts, commits
+// 1-2). This module is NOT deletable — for THREE independent reasons, unlike
+// Ranger's two:
+//
+// (1) `grantLevel: 2` on both subclasses below (PHB'14 p.66) — the binding
+// reason, identical in shape to Wizard's own module survival (#1234): even a
+// fully row-driven `wildShape` could not delete this file while
+// subclassGateLevel's undefined-grantLevel fallback is 3, because deleting it
+// would silently move Druid's 2014 subclass gate from 2 to 3 (#1576).
+//
+// (2) The EDITION_2014 Wild Shape pool below (wildShapeCrCap +
+// wildShapeSpeedNote), UNTOUCHED by commit 3: the CR cap is a function of
+// level AND `subclassKey`, and the duration interpolates `level / 2` INSIDE
+// the description — #1528's no-second-string rule means `poolFromRow` reads a
+// row's own `description` verbatim, so a row can't express either axis. SRD
+// 5.2 restructures Wild Shape enough to drop both — the computed CR moves to
+// Circle of the Moon's own Circle Forms row as a flat `level / 3` formula
+// stated in PROSE (druid-features.ts), and the static three-tier CR table + a
+// flat "half your Druid level" duration clause both fit directly in the
+// EDITION_2024 Wild Shape row's text — so the 2024 pool DOES qualify for
+// `resourceTotals` and moves there (commit 3, below): `edition ===
+// "EDITION_2024"` short-circuits to `[]` before any of this function's
+// per-subclass logic runs, and mergePoolSources (registry.ts) has nothing to
+// arbitrate since the 2024 row declares no resourceFn-colliding key. 2014
+// keeps the unchanged SRD 5.1 rule (including the `level >= 20 ? 99`
+// Archdruid branch and its "Unlimited uses (Archdruid)" sentence) exactly as
+// it was before this issue.
+//
+// (3) Circle of the Moon's own Moonlight Step resourceFn (2024, below): a
+// Wisdom-modifier formula resourceTotals can't express, mirroring Ranger's
+// Tireless/Nature's Veil (#1230) and Warlock's Dark One's Own Luck residue.
 export const druid: ClassDefinition = {
-  features: DRUID_FEATURES,
-  resourceFn: (level, _abilityScores, _profBonus, subclassKey) => {
+  resourceFn: (level, _abilityScores, _profBonus, subclassKey, edition) => {
+    if (edition === "EDITION_2024") return [];
     if (level < 2) return [];
     const crCap = `${wildShapeCrCap(level, subclassKey)}${wildShapeSpeedNote(level)}`;
     return [
@@ -159,7 +51,47 @@ export const druid: ClassDefinition = {
   },
   // PHB'14 p.66: Druid Circle (Druid's subclass) is chosen at 2nd level.
   subclasses: {
-    "circle of the land": { slug: "druid-circle-of-the-land", grantLevel: 2, features: CIRCLE_OF_THE_LAND_FEATURES },
-    "circle of the moon": { slug: "druid-circle-of-the-moon", grantLevel: 2, features: CIRCLE_OF_THE_MOON_FEATURES },
+    "circle of the land": { slug: "druid-circle-of-the-land", grantLevel: 2 },
+    "circle of the moon": {
+      slug: "druid-circle-of-the-moon",
+      grantLevel: 2,
+      // Moonlight Step (SRD 5.2, mirror-sourced — see druid-features.ts's own
+      // header): "a number of times equal to your Wisdom modifier (minimum of
+      // once)", regained on a Long Rest — a formula no `resourceTotals` tier
+      // array can express (reason (3) above). Absent under EDITION_2014
+      // (Moonlight Step doesn't exist in SRD 5.1) and below its own L10 grant.
+      resourceFn: (level, abilityScores, _profBonus, _subclassKey, edition) => {
+        if (edition !== "EDITION_2024" || level < 10) return [];
+        const wisMod = Math.max(1, abilityModifier(abilityScores.wisdom ?? 10));
+        return [
+          {
+            key: "moonlightStep",
+            label: "Moonlight Step",
+            total: wisMod,
+            recharge: "longRest",
+            // #1528 no-second-string rule: this description MUST agree with
+            // the EDITION_2024 Moonlight Step row's own text
+            // (druid-features.ts) — both mention "Bonus Action", "30 feet"
+            // and "Wisdom modifier".
+            description:
+              "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
+          },
+        ];
+      },
+    },
   },
 };
+
+// Circle of the Moon's Circle Forms raise the Wild Shape CR cap: CR 1 at its L3
+// grant, then level÷3 (min 1) from L6. Other circles use the base druid table.
+function wildShapeCrCap(level: number, subclassKey: string | undefined): string {
+  if (subclassKey === "circle of the moon") {
+    return String(level >= 6 ? Math.max(1, Math.floor(level / 3)) : 1);
+  }
+  return level >= 8 ? "1" : level >= 4 ? "1/2" : "1/4";
+}
+
+// Base Wild Shape speed restrictions lift with level, regardless of subclass.
+function wildShapeSpeedNote(level: number): string {
+  return level >= 8 ? "" : level >= 4 ? " (no flying speed)" : " (no flying or swimming speed)";
+}

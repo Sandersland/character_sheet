@@ -490,7 +490,6 @@ const MIN_ROWS_PER_PAIR = 10;
 // 5.2 — Valor isn't in the SRD — see bard-features.ts's own header for the
 // three independent, non-scraper sources used.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([
-  "Druid",
   "Monk",
   "Paladin",
 ]);

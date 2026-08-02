@@ -279,6 +279,22 @@ function isPopulatedClericRow(row: RowKey): boolean {
   );
 }
 
+// #1226: Druid's Wild Shape pool moved onto its EDITION_2024 row only (the
+// EDITION_2014 row's pool stays in lib/classes/druid.ts's resourceFn — see
+// druid-features.ts's own RESOURCE POOL header for the split verdict); Circle
+// of the Moon's Moonlight Step (2024) row also declares resourceKey, but
+// deliberately OMITS resourceTotals (a Wisdom-modifier formula, supplied by
+// druid.ts's subclass resourceFn) — it's still "populated" for this sweep's
+// purposes since resourceKey/resourceLabel/resourceRecharge are non-default.
+const POPULATED_DRUID_ROW_KEYS = new Set([
+  "Druid::null::Wild Shape::EDITION_2024",
+  "Druid::druid-circle-of-the-moon::Moonlight Step::EDITION_2024",
+]);
+
+function isPopulatedDruidRow(row: RowKey): boolean {
+  return POPULATED_DRUID_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
+}
+
 // What the descriptor predicates below key on. `edition` is part of the key
 // because a class can populate a descriptor column on ONE edition's row and
 // not the other's, under the same (class, subclass, name): Ranger's Favored
@@ -309,18 +325,31 @@ function isSaveDcRow(row: RowKey): boolean {
 // descriptor sweep. Every new populated-row predicate goes here, once —
 // wave b's isPopulatedRangerRow (#1230) and isPopulatedSorcererRow (#1232)
 // included, both added to this SAME aggregator rather than sibling ones.
+// Wave 2's isPopulatedDruidRow (#1226) follows the same rule — Paladin's
+// agent is adding its own predicate to this SAME aggregator in parallel.
+//
+// An array + `.some()` rather than an `||` chain (#1226): each `||` is its
+// own branch under the cyclomatic-complexity count, and prisma/seed/** carries
+// no coverage instrumentation so CRAP floors at CC^2+CC regardless of real
+// coverage (see baseFeatureRows' comment, class-features.ts) — a tenth
+// disjunct pushed the old chain over the ratchet. `.some()` iterating a fixed
+// array keeps this function's own CC at 1; every predicate's OWN complexity
+// is unchanged and still counted where it's defined.
+const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
+  isPopulatedFighterRow,
+  isPopulatedBattleMasterPoolRow,
+  isPopulatedBarbarianRow,
+  isPopulatedWarlockRow,
+  isPopulatedWizardRow,
+  isPopulatedIllusorySelfRow,
+  isPopulatedRangerRow,
+  isPopulatedSorcererRow,
+  isPopulatedClericRow,
+  isPopulatedDruidRow,
+];
+
 function isPopulatedRow(row: RowKey): boolean {
-  return (
-    isPopulatedFighterRow(row) ||
-    isPopulatedBattleMasterPoolRow(row) ||
-    isPopulatedBarbarianRow(row) ||
-    isPopulatedWarlockRow(row) ||
-    isPopulatedWizardRow(row) ||
-    isPopulatedIllusorySelfRow(row) ||
-    isPopulatedRangerRow(row) ||
-    isPopulatedSorcererRow(row) ||
-    isPopulatedClericRow(row)
-  );
+  return POPULATED_ROW_PREDICATES.some((predicate) => predicate(row));
 }
 
 // #1530: Extra Attack's derivedStat/derivedStatTiers columns are populated on
@@ -511,12 +540,15 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // This total is SUMMED across wave-b branches, never taken from one of
     // them: #1230 raised 22 -> 23, #1232 -> 28 and #1225 -> 24, each
     // independently and each correct for its own branch alone. The merged
-    // value is 22 + 1 + 6 + 2. Picking any one branch's number would silently
-    // exempt the other classes' rows from the sweep — the wave-A near-miss
-    // this file's aggregator comment already records, in its other half.
+    // value is 22 + 1 + 6 + 2, then #1226 adds Druid's own +1 (Wild Shape's
+    // EDITION_2024 row only — Moonlight Step declares resourceKey but
+    // deliberately omits resourceTotals, so it does NOT count here). Picking
+    // any one branch's number would silently exempt the other classes' rows
+    // from the sweep — the wave-A near-miss this file's aggregator comment
+    // already records, in its other half.
     // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock
-    // + 1 Ranger + 6 Sorcerer + 2 Cleric.
-    const populatedResourceTotalsCount = 31;
+    // + 1 Ranger + 6 Sorcerer + 2 Cleric + 1 Druid.
+    const populatedResourceTotalsCount = 32;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {

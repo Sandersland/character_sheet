@@ -87,17 +87,23 @@ describe("deriveResources — Battle Master subclass gating", () => {
 });
 
 // ── Druid — Wild Shape base pool ──────────────────────────────────────────────
+// #1226 retarget: these cases used to pass "EDITION_2024" while asserting SRD
+// 5.1 values (flat 2, then a >10 "unlimited" sentinel at level 20) — the
+// stale-copy state #1226 exists to fix. Retargeted to EDITION_2014 verbatim
+// (now the 2014 regression guard, druid.ts's resourceFn untouched); the
+// EDITION_2024 sibling below asserts the real 2/3/4 SRD 5.2 tier table,
+// authored onto the Wild Shape row itself (#1226 commit 3).
 
-describe("deriveResources — Druid Wild Shape", () => {
+describe("deriveResources — Druid Wild Shape, EDITION_2014", () => {
   it("returns no wildShape pool below level 2", () => {
-    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     expect(result).not.toBeNull();
     const poolKeys = result!.resources.map((r) => r.key);
     expect(poolKeys).not.toContain("wildShape");
   });
 
   it("returns 2 wildShape uses at level 2", () => {
-    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     const ws = result!.resources.find((r) => r.key === "wildShape");
     expect(ws).toBeDefined();
     expect(ws!.total).toBe(2);
@@ -105,27 +111,79 @@ describe("deriveResources — Druid Wild Shape", () => {
   });
 
   it("returns 2 wildShape uses through level 19", () => {
-    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     expect(result!.resources.find((r) => r.key === "wildShape")!.total).toBe(2);
   });
 
   it("returns sentinel value at level 20 (Archdruid)", () => {
-    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     const ws = result!.resources.find((r) => r.key === "wildShape");
     expect(ws!.total).toBeGreaterThan(10); // unlimited sentinel
   });
 
   it("Circle of the Moon shares the base wildShape pool (no duplicate)", () => {
-    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const wsPools = result!.resources.filter((r) => r.key === "wildShape");
     expect(wsPools.length).toBe(1); // exactly one — no duplicate from subclass
   });
 
-  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) at its level-3 grant (#1128)", () => {
-    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+  // Level 3 is above the gate, not at it: EDITION_2014's Circle of the Moon
+  // grants at 2 (druid.ts's grantLevel, PHB'14 p.66). druid-wildshape-cr.test.ts
+  // owns the level-2 boundary itself.
+  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) above its level-2 grant (#1128)", () => {
+    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const featureNames = result!.features.map((f) => f.name);
     expect(featureNames).toContain("Combat Wild Shape");
     expect(featureNames).toContain("Circle Forms");
+  });
+});
+
+describe("deriveResources — Druid Wild Shape, EDITION_2024 (#1226): 2/3/4 tiers, longRest recharge, no unlimited sentinel", () => {
+  it("returns no wildShape pool below level 2", () => {
+    const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    expect(result).not.toBeNull();
+    expect(result!.resources.map((r) => r.key)).not.toContain("wildShape");
+  });
+
+  it("returns 2 wildShape uses at level 2, recharge longRest", () => {
+    const result = deriveResources("druid", undefined, 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const ws = result!.resources.find((r) => r.key === "wildShape");
+    expect(ws).toBeDefined();
+    expect(ws!.total).toBe(2);
+    expect(ws!.recharge).toBe("longRest");
+    expect(ws!.shortRestRegain).toBe(1);
+  });
+
+  it("returns 3 wildShape uses at level 6, through level 16", () => {
+    const result = deriveResources("druid", undefined, 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    expect(result!.resources.find((r) => r.key === "wildShape")!.total).toBe(3);
+  });
+
+  it("returns 4 wildShape uses at level 20 — no unlimited sentinel", () => {
+    const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2024");
+    const ws = result!.resources.find((r) => r.key === "wildShape");
+    expect(ws!.total).toBe(4);
+  });
+
+  it("Circle of the Moon shares the base wildShape pool (no duplicate)", () => {
+    const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const wsPools = result!.resources.filter((r) => r.key === "wildShape");
+    expect(wsPools.length).toBe(1);
+  });
+
+  it("Circle of the Moon contributes features (Circle Forms, Circle of the Moon Spells) at its level-3 grant", () => {
+    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const featureNames = result!.features.map((f) => f.name);
+    expect(featureNames).toContain("Circle Forms");
+    expect(featureNames).toContain("Circle of the Moon Spells");
+    expect(featureNames).not.toContain("Combat Wild Shape");
+  });
+
+  it("Moonlight Step's pool appears only at level 10+, absent below", () => {
+    const below = deriveResources("druid", "circle of the moon", 9, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    const at10 = deriveResources("druid", "circle of the moon", 10, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2024");
+    expect(below!.resources.map((r) => r.key)).not.toContain("moonlightStep");
+    expect(at10!.resources.map((r) => r.key)).toContain("moonlightStep");
   });
 });
 
