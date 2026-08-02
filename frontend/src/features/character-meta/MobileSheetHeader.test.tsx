@@ -92,8 +92,8 @@ describe("MobileSheetHeader", () => {
         level: 8,
         subclass: "Champion",
         classes: [
-          { id: "cls-1", name: "Fighter", level: 5 },
-          { id: "cls-2", name: "Rogue", level: 3 },
+          { id: "cls-1", name: "Fighter", level: 5, needsSubclass: false, subclassUnavailable: false },
+          { id: "cls-2", name: "Rogue", level: 3, needsSubclass: false, subclassUnavailable: false },
         ],
       }),
     );
