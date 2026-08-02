@@ -1,13 +1,19 @@
 // --- Cleric ClassFeature rows, authored as LITERAL data (#1225) ------------
 // Commit 1 of 3 (mirrors Barbarian's #1223 / Warlock's #1233 / Wizard's #1234)
-// moves these rows off lib/classes/cleric.ts's AuthoredFeature[] arrays into
+// moved these rows off lib/classes/cleric.ts's AuthoredFeature[] arrays into
 // literal seed data, byte-identical to the old TS-derived text (pinned by
-// cleric-2014-snapshot.test.ts). Commit 2 will author Cleric's REAL SRD 5.2
-// (2024) content for the base class and Life Domain, plus Trickery Domain's
-// PHB'24 content (mirror-sourced per an owner decision — Trickery is not in
-// SRD 5.2 — see this file's own commit-2 citations once landed). Commit 3
-// will move the Channel Divinity resource pool onto its two carrier rows and
-// shrink lib/classes/cleric.ts to its irreducible residue.
+// cleric-2014-snapshot.test.ts). Commit 2 (this one) authors Cleric's REAL
+// SRD 5.2 (2024) content: the base class and Life Domain are transcribed
+// directly from the official SRD 5.2 CC-BY PDF (Cleric pp. 36-40) — never a
+// wiki. Trickery Domain is NOT in SRD 5.2 (owner decision, #1225): its 2024
+// text is mirror-sourced from two independent, non-scraper secondary sources
+// (aidedd.org's Cleric 2024 reference and dungeonmister.com's Trickery Domain
+// guide) that agree on every mechanic below — see the TRICKERY DOMAIN section
+// further down for the one number (Invoke Duplicity's move-range cap) neither
+// source confirmed and that is therefore omitted rather than carried over
+// from the 2014 text. Commit 3 will move the Channel Divinity resource pool
+// onto its two carrier rows and shrink lib/classes/cleric.ts to its
+// irreducible residue.
 // class-features.ts concatenates CLERIC_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a
@@ -20,11 +26,41 @@
 // EDITION RULE (mirrors fighter-features.ts/barbarian-features.ts/
 // warlock-features.ts): `edition` omitted -> expand() seeds ONE row per
 // edition with IDENTICAL text — reserved for a feature genuinely
-// edition-invariant in both mechanics AND wording. `edition` set -> exactly
-// the one row named. Every EDITION_2014 row below stays byte-identical to
-// what this commit pins (cleric-2014-snapshot.test.ts) — later commits only
-// ever ADD an `edition: "EDITION_2024"` tag alongside new 2024 text; they
-// never edit a 2014 row's own name/level/description.
+// edition-invariant in both mechanics AND wording (none of Cleric's rows
+// qualify, CLAUDE.md's ACTIONS precedent: even where a 2024 row's mechanics
+// match 2014's, the text is transcribed from a different document, so every
+// row below is explicitly tagged). `edition` set -> exactly the one row
+// named. A "no 2024 successor" feature (Destroy Undead, Divine Intervention
+// Improvement, Life/Trickery Domain's Bonus Proficiency/Divine Strike,
+// Trickery's Cloak of Shadows) means NOT authoring a 2024 row for that name,
+// never deleting the 2014 row. A rename ("Domain Spells" -> "Life Domain
+// Spells" / "Trickery Domain Spells", "Destroy Undead" -> "Sear Undead",
+// "Divine Intervention Improvement" -> "Greater Divine Intervention") is a
+// DIFFERENT name at the same or a shifted level, so the old 2024 row (where
+// one existed) simply disappears from the seed (pruneStalePartitions retires
+// the DB row) rather than being edited in place — this is also how the two
+// FABRICATED 2024 "Domain Spells" rows this commit removes actually leave the
+// table (see the plan's correction 13: those rows were the PHB'14 lists with
+// the first tier relabelled L1->L3, not real SRD 5.2/PHB'24 content). Every
+// EDITION_2014 row below stays byte-identical to what commit 1 pinned
+// (cleric-2014-snapshot.test.ts) — this commit only ever ADDS an
+// `edition: "EDITION_2024"` tag alongside new 2024 text; it never edits a
+// 2014 row's own name/level/description.
+//
+// NO resourceKey/resourceLabel/resourceRecharge/resourceTotals yet — commit 3
+// moves the Channel Divinity pool onto its two carrier rows (the 2014 "Channel
+// Divinity: Turn Undead" row and the new 2024 "Channel Divinity" row).
+//
+// TEXT-ONLY (mechanics not wired up, same disclosed shape as every prior
+// retab wave — see EDITIONS_STILL_IDENTICAL's removal comment in
+// seed-class-features.ts for the precedent): Divine Order's Protector/
+// Thaumaturge choice, Blessed Strikes'/Improved Blessed Strikes' Divine
+// Strike/Potent Spellcasting choice, Divine Spark's heal-or-damage Channel
+// Divinity option, Epic Boon's feat grant, Divine Intervention's cast-
+// without-a-slot behavior, and both domains' always-prepared spell grants
+// (Life/Trickery Domain Spells) — the latter can't be SubclassGrantedSpell
+// rows, since that model has no `edition` column and Subclass rows are
+// edition-shared (the schema gap Wizard's #1234 disclosed first).
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -43,8 +79,7 @@ interface RawClericFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions (see file header). */
-  edition?: SeedEdition;
+  edition: SeedEdition;
   // Resource-pool descriptor columns (#1225 commit 3) — populated on Cleric's
   // two Channel Divinity carrier rows only once commit 3 lands.
   resourceKey?: string;
@@ -54,184 +89,459 @@ interface RawClericFeature {
 }
 
 function expand(raw: RawClericFeature): ClassFeatureSeedRow[] {
-  const base: Omit<ClassFeatureSeedRow, "edition"> = {
-    className: "Cleric",
-    subclassSlug: raw.subclassSlug,
-    name: raw.name,
-    level: raw.level,
-    description: raw.description,
-    resourceKey: raw.resourceKey,
-    resourceLabel: raw.resourceLabel,
-    resourceRecharge: raw.resourceRecharge,
-    resourceTotals: raw.resourceTotals,
-  };
-  const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
-  return editions.map((edition) => ({ ...base, edition }));
+  return [
+    {
+      className: "Cleric",
+      subclassSlug: raw.subclassSlug,
+      name: raw.name,
+      level: raw.level,
+      description: raw.description,
+      edition: raw.edition,
+      resourceKey: raw.resourceKey,
+      resourceLabel: raw.resourceLabel,
+      resourceRecharge: raw.resourceRecharge,
+      resourceTotals: raw.resourceTotals,
+    },
+  ];
 }
 
-// ---- Base class — PHB'14 p.57ff (2014) -------------------------------------
-// 2014: 5 rows (byte-identical to the pre-migration tree /
-// cleric-2014-snapshot.test.ts).
+// ---- Base class — PHB'14 p.57ff (2014) / SRD 5.2 pp. 36-38 (2024) ---------
+// 2014: 5 rows (byte-identical to commit 1 / cleric-2014-snapshot.test.ts).
+// 2024: 11 rows — Destroy Undead and Divine Intervention Improvement each get
+// a NEW-NAMED 2024 successor (Sear Undead, Greater Divine Intervention) so
+// neither old name gets its own 2024 row; Divine Order/Channel Divinity/
+// Channel Divinity: Divine Spark/Blessed Strikes/Improved Blessed
+// Strikes/Epic Boon join as wholly new 2024 features.
 const CLERIC_BASE_RAW: RawClericFeature[] = [
   {
     subclassSlug: null,
     name: "Spellcasting",
     level: 1,
+    edition: "EDITION_2014",
     description:
       "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
   },
   {
     subclassSlug: null,
+    name: "Spellcasting",
+    level: 1,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.36-37: the 2024 rules replace 2014's Wisdom-modifier formula
+    // with a flat, level-only Prepared Spells table (4 at L1, rising to 22 at
+    // L20) — verified directly against the table, not assumed to carry the
+    // 2014 formula forward.
+    description:
+      "You cast spells using Wisdom. You know three cantrips of your choice from the Cleric spell list, replacing one whenever you gain a Cleric level; you learn an additional cantrip at levels 4 and 10. You prepare a growing list of Cleric spells (4 at level 1, rising to 22 by level 20, per the Cleric Features table), regain all expended spell slots on a Long Rest, and can change your prepared list whenever you finish one. A Holy Symbol serves as your Spellcasting Focus.",
+  },
+  {
+    subclassSlug: null,
+    name: "Divine Order",
+    level: 1,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.37. NEW in 2024 — no 2014 counterpart.
+    description:
+      "Choose a sacred role: Protector — proficiency with Martial weapons and training with Heavy armor — or Thaumaturge — learn one extra Cleric cantrip, and add your Wisdom modifier (minimum +1) to Arcana or Religion checks.",
+  },
+  {
+    subclassSlug: null,
+    name: "Channel Divinity",
+    level: 2,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.37. NEW NAME in 2024 — the pool itself (2014: "Channel
+    // Divinity: Turn Undead" row) now has its own named feature separate from
+    // its options. Uses 2/3/4 at L2/6/18 (Cleric Features table); recharge
+    // verified verbatim: "You regain one of its expended uses when you finish
+    // a Short Rest, and you regain all expended uses when you finish a Long
+    // Rest."
+    description:
+      "You channel divine energy from the Outer Planes to fuel magical effects — Divine Spark and Turn Undead at 2nd level, more at higher levels. Each time you use it, choose which effect to create. You have 2 uses (3 at level 6, 4 at level 18). You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
+  },
+  {
+    subclassSlug: null,
+    name: "Channel Divinity: Divine Spark",
+    level: 2,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.37. NEW in 2024 — no 2014 counterpart.
+    description:
+      "As a Magic action, point your Holy Symbol at a creature you can see within 30 ft and roll 1d8 plus your Wisdom modifier: either restore that many Hit Points to the creature, or force it to make a Constitution saving throw — on a failure it takes Necrotic or Radiant damage (your choice) equal to that total, half as much (round down) on a success. Roll an additional d8 at Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8).",
+  },
+  {
+    subclassSlug: null,
     name: "Channel Divinity: Turn Undead",
     level: 2,
+    edition: "EDITION_2014",
     description:
       "As an action, each undead within 30 ft that can see or hear you must make a Wisdom save (DC 8 + proficiency + Wisdom modifier) or be turned for 1 minute. Turned undead flee you.",
   },
   {
     subclassSlug: null,
+    name: "Channel Divinity: Turn Undead",
+    level: 2,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.37: targeting changes to "each Undead of your choice" (not
+    // merely those that can see/hear you), grants Frightened AND
+    // Incapacitated (not a flee-only "turned" state), and adds a real early-
+    // end clause the 2014 row never had — transcribed verbatim: "This effect
+    // ends early on the creature if it takes any damage, if you have the
+    // Incapacitated condition, or if you die."
+    description:
+      "As a Magic action, present your Holy Symbol; each Undead of your choice within 30 ft must succeed on a Wisdom saving throw or gain the Frightened and Incapacitated conditions for 1 minute, trying to move as far from you as it can on its turns. This effect ends early on the creature if it takes any damage, if you have the Incapacitated condition, or if you die.",
+  },
+  {
+    subclassSlug: null,
     name: "Destroy Undead",
     level: 5,
+    edition: "EDITION_2014",
     description:
       "When you turn an undead, any with CR 1/2 or lower are instantly destroyed (CR 1 at L8; CR 2 at L11; CR 3 at L14; CR 4 at L17).",
+  },
+  // Destroy Undead has NO EDITION_2024 row — replaced outright by Sear Undead
+  // below (a different name and a wholly different mechanic: Radiant damage
+  // rather than instant destruction by CR). "No 2024 successor" means not
+  // authoring a 2024 row for this name, never deleting the 2014 row above.
+  {
+    subclassSlug: null,
+    name: "Sear Undead",
+    level: 5,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.37, verbatim mechanic: roll a number of d8s equal to your
+    // Wisdom modifier (not a cleric-level tier table, unlike Divine Spark) —
+    // "This damage doesn't end the turn effect" is the load-bearing sentence
+    // that keeps this row consistent with Turn Undead's own "ends early on
+    // damage" clause above.
+    description:
+      "Whenever you use Turn Undead, roll a number of d8s equal to your Wisdom modifier (minimum 1d8) and add them together. Each Undead that fails its save against that use of Turn Undead takes Radiant damage equal to the total. This damage doesn't end the turn effect.",
+  },
+  {
+    subclassSlug: null,
+    name: "Blessed Strikes",
+    level: 7,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.38. NEW in 2024 — no 2014 counterpart.
+    description:
+      "Choose Divine Strike — once on each of your turns when you hit with a weapon, deal an extra 1d8 Necrotic or Radiant damage (your choice) — or Potent Spellcasting — add your Wisdom modifier to the damage of any Cleric cantrip. (If you already have an option of this name from an older-book subclass, use only the option you choose here.)",
   },
   {
     subclassSlug: null,
     name: "Divine Intervention",
     level: 10,
+    edition: "EDITION_2014",
     description:
       "Call on your deity for aid. Roll percentile dice — on a result ≤ your cleric level, your deity intervenes. On a success, you can't use this feature again for 7 days. At level 20 it automatically succeeds.",
   },
   {
     subclassSlug: null,
+    name: "Divine Intervention",
+    level: 10,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.38: guaranteed (no percentile roll), restricted to a spell
+    // "that doesn't require a Reaction to cast", and waives Material
+    // components specifically — verbatim: "you cast that spell without
+    // expending a spell slot or needing Material components."
+    description:
+      "As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast, and cast it as part of the same action without expending a spell slot or needing Material components. Usable once per Long Rest.",
+  },
+  {
+    subclassSlug: null,
+    name: "Improved Blessed Strikes",
+    level: 14,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.38. NEW in 2024 — no 2014 counterpart.
+    description:
+      "Your Blessed Strikes option grows stronger: Divine Strike's extra damage increases to 2d8; Potent Spellcasting lets you grant temporary Hit Points equal to twice your Wisdom modifier to yourself or another creature within 60 ft whenever a Cleric cantrip of yours deals damage.",
+  },
+  {
+    subclassSlug: null,
     name: "Divine Intervention Improvement",
     level: 20,
+    edition: "EDITION_2014",
     description: "Your Divine Intervention call automatically succeeds (no roll required).",
+  },
+  // Divine Intervention Improvement has NO EDITION_2024 row — replaced
+  // outright by Greater Divine Intervention below (a different name; 2024's
+  // Divine Intervention was already guaranteed at L10, so this feature's
+  // JOB changes entirely, to a Wish upgrade).
+  {
+    subclassSlug: null,
+    name: "Epic Boon",
+    level: 19,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.38, verbatim recommendation. NEW in 2024 — no 2014
+    // counterpart (2014 keeps a plain ASI at 19 instead, already covered by
+    // the edition-invariant ASI-level table, not a ClassFeature row). Text
+    // only — the feat system itself is deferred (owner decision, mirrors
+    // Fighter/Barbarian/Warlock/Wizard's own Epic Boon rows).
+    description: "You gain an Epic Boon feat of your choice (Boon of Fate recommended). You can take this feat only once.",
+  },
+  {
+    subclassSlug: null,
+    name: "Greater Divine Intervention",
+    level: 20,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.38, verbatim on the rest count — the PDF's two-column
+    // extraction can make "2d4 Long Rests" look fabricated; it isn't.
+    description:
+      "When you use Divine Intervention, you can choose Wish as the spell. If you do, you can't use Divine Intervention again until you finish 2d4 Long Rests.",
   },
 ];
 
-// ---- Life Domain — PHB'14 p.59 (2014) --------------------------------------
-// 2014: 7 rows (byte-identical to the pre-migration tree). The pre-existing
-// #1374 fork (Domain Spells' lowest tier: L1 in 2014, L3 in 2024) survives
-// this commit unedited — its 2024 row is retired in commit 2, once the real
-// SRD 5.2 Life Domain Spells table replaces this placeholder text.
+// ---- Life Domain — PHB'14 p.59 (2014) / SRD 5.2 pp. 39-40 (2024) ----------
+// 2014: 7 rows (byte-identical to commit 1). 2024: 5 rows — Bonus
+// Proficiency and Divine Strike get NO 2024 successor (heavy-armor training
+// folds into Divine Order's Protector option; Divine Strike folds into the
+// base class's own Blessed Strikes at L7).
 const LIFE_DOMAIN_SLUG = slug("cleric-life-domain");
 const LIFE_DOMAIN_RAW: RawClericFeature[] = [
   {
     subclassSlug: LIFE_DOMAIN_SLUG,
     name: "Domain Spells",
     level: 1,
-    edition: "EDITION_2024",
-    description:
-      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
-  },
-  {
-    subclassSlug: LIFE_DOMAIN_SLUG,
-    name: "Domain Spells",
-    level: 1,
     edition: "EDITION_2014",
-    // SRD 5.1, "Life Domain" (Life Domain Spells table) — openly licensed,
-    // independently verifiable. Identical to the row above but for the first
-    // tier's label (L3 -> L1), matching PHB'14's actual gate.
     description:
       "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+  },
+  // The pre-#1225 EDITION_2024 "Domain Spells" row (the PHB'14 list with its
+  // first tier relabelled L1->L3) is FABRICATED — never SRD 5.2/PHB'24
+  // content — and is retired here (renamed, not edited in place) in favor of
+  // Life Domain Spells below, transcribed verbatim from SRD 5.2 p.40's own
+  // Life Domain Spells table.
+  {
+    subclassSlug: LIFE_DOMAIN_SLUG,
+    name: "Life Domain Spells",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Aid, Bless, Cure Wounds, Lesser Restoration (L3); Mass Healing Word, Revivify (L5); Aura of Life, Death Ward (L7); Greater Restoration, Mass Cure Wounds (L9).",
   },
   {
     subclassSlug: LIFE_DOMAIN_SLUG,
     name: "Bonus Proficiency",
     level: 1,
+    edition: "EDITION_2014",
     description: "You gain proficiency with heavy armor.",
   },
+  // Bonus Proficiency has NO EDITION_2024 row — Heavy armor training is now
+  // Divine Order's Protector option (base class, any Cleric), not a Life
+  // Domain grant.
   {
     subclassSlug: LIFE_DOMAIN_SLUG,
     name: "Disciple of Life",
     level: 1,
+    edition: "EDITION_2014",
     description:
       "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
   },
   {
     subclassSlug: LIFE_DOMAIN_SLUG,
+    name: "Disciple of Life",
+    level: 3,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.40: level-shifts 1 -> 3 (Cleric Subclass now grants at L3)
+    // and keys the bonus off the SPELL SLOT's level, not the spell's own
+    // level — a real, if subtle, wording change verified against the PDF.
+    description:
+      "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast it, equal to 2 plus the spell slot's level.",
+  },
+  {
+    subclassSlug: LIFE_DOMAIN_SLUG,
     name: "Channel Divinity: Preserve Life",
     level: 2,
+    edition: "EDITION_2014",
     description:
       "As an action, evoke healing energy that restores a total of 5× your cleric level HP, divided among creatures within 30 ft (up to half their maximum HP each). Uses the Channel Divinity pool.",
   },
   {
     subclassSlug: LIFE_DOMAIN_SLUG,
+    name: "Channel Divinity: Preserve Life",
+    level: 3,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.40: level-shifts 2 -> 3, becomes a Magic action, and
+    // restricts targets to Bloodied creatures (a real targeting change, not
+    // merely a wording refresh) — verbatim on the restriction: "Choose
+    // Bloodied creatures within 30 feet of yourself (which can include you)".
+    description:
+      "As a Magic action, expend a use of Channel Divinity to evoke healing energy: restore a total of 5× your cleric level HP, divided among Bloodied creatures within 30 ft (which can include you), up to half each creature's HP maximum.",
+  },
+  {
+    subclassSlug: LIFE_DOMAIN_SLUG,
     name: "Blessed Healer",
     level: 6,
+    edition: "EDITION_2014",
     description:
       "When you cast a healing spell of 1st level or higher that restores HP to another creature, you regain HP equal to 2 + the spell's level.",
   },
   {
     subclassSlug: LIFE_DOMAIN_SLUG,
+    name: "Blessed Healer",
+    level: 6,
+    edition: "EDITION_2024",
+    // SRD 5.2 p.40: same level and same shape, keyed off the SPELL SLOT's
+    // level (matching Disciple of Life's own wording shift above), and
+    // requires the healing come from a spell cast WITH a spell slot.
+    description:
+      "Immediately after you cast a spell with a spell slot that restores Hit Points to one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level.",
+  },
+  {
+    subclassSlug: LIFE_DOMAIN_SLUG,
     name: "Divine Strike",
     level: 8,
+    edition: "EDITION_2014",
     description: "Once per turn when you hit with a weapon, deal an extra 1d8 radiant damage (+2d8 at level 14).",
+  },
+  // Divine Strike has NO EDITION_2024 row — folded into the base class's own
+  // Blessed Strikes (L7) / Improved Blessed Strikes (L14), which cover every
+  // Cleric, not just Life Domain.
+  {
+    subclassSlug: LIFE_DOMAIN_SLUG,
+    name: "Supreme Healing",
+    level: 17,
+    edition: "EDITION_2014",
+    description: "When you would normally roll dice to restore HP with a spell, use the highest number possible instead of rolling.",
   },
   {
     subclassSlug: LIFE_DOMAIN_SLUG,
     name: "Supreme Healing",
     level: 17,
-    description: "When you would normally roll dice to restore HP with a spell, use the highest number possible instead of rolling.",
+    edition: "EDITION_2024",
+    // SRD 5.2 p.40: widens from "a spell" to "a spell or Channel Divinity" —
+    // now also covers Preserve Life's healing.
+    description:
+      "When you would normally roll dice to restore Hit Points with a spell or Channel Divinity, use the highest number possible for each die instead of rolling.",
   },
 ];
 
-// ---- Trickery Domain — PHB'14 p.63 (2014) ----------------------------------
-// 2014: 6 rows (byte-identical to the pre-migration tree). Same #1374 Domain
-// Spells fork as Life Domain above.
+// ---- Trickery Domain — PHB'14 p.63 (2014) / PHB'24 pp. 75-76 (2024, ------
+// mirror-sourced) --------------------------------------------------------
+// Trickery Domain is NOT in SRD 5.2 (owner decision, #1225): text below is
+// authored only where aidedd.org's Cleric 2024 reference
+// (https://www.aidedd.org/en/cleric-2024/) and dungeonmister.com's Trickery
+// Domain guide (https://dungeonmister.com/guides/classes-in-dungeons-dragons/trickery-domain-cleric-dnd-2024/)
+// — two independently-run, non-scraper sites (neither cites the other or a
+// common wiki as its source; checked against the provenance trap the plan
+// itself flags for dnd2024.wikidot.com/ASNaeem's scraper) — agree word-for-
+// mechanic. One number neither source confirmed for 2024 specifically
+// (Invoke Duplicity's illusion move-range CAP, "no more than 120 ft away
+// from you" in the 2014 text) is deliberately OMITTED below rather than
+// carried over from 2014 — see that row's own comment.
+// 2014: 6 rows (byte-identical to commit 1). 2024: 5 rows — Divine Strike
+// gets no 2024 successor (folds into the base class's Blessed Strikes, same
+// as Life Domain's), and Channel Divinity: Cloak of Shadows gets no 2024
+// successor either (replaced outright by the NEW Trickster's Transposition).
 const TRICKERY_DOMAIN_SLUG = slug("cleric-trickery-domain");
 const TRICKERY_DOMAIN_RAW: RawClericFeature[] = [
   {
     subclassSlug: TRICKERY_DOMAIN_SLUG,
     name: "Domain Spells",
     level: 1,
-    edition: "EDITION_2024",
-    description:
-      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
-  },
-  {
-    subclassSlug: TRICKERY_DOMAIN_SLUG,
-    name: "Domain Spells",
-    level: 1,
     edition: "EDITION_2014",
-    // PHB'14, "Trickery Domain" — Trickery Domain Spells. Page number
-    // deliberately omitted — could not be verified from a licensed source
-    // (see PR description).
     description:
       "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+  },
+  // Same fabrication-retirement as Life Domain's own "Domain Spells" ->
+  // renamed row above — the pre-#1225 EDITION_2024 row here was also the
+  // PHB'14 list with its first tier relabelled, never real PHB'24 content.
+  {
+    subclassSlug: TRICKERY_DOMAIN_SLUG,
+    name: "Trickery Domain Spells",
+    level: 3,
+    edition: "EDITION_2024",
+    // Mirror-sourced (see file section header): both sources agree on every
+    // spell and tier.
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self, Invisibility, Pass without Trace (L3); Hypnotic Pattern, Nondetection (L5); Confusion, Dimension Door (L7); Dominate Person, Modify Memory (L9).",
   },
   {
     subclassSlug: TRICKERY_DOMAIN_SLUG,
     name: "Blessing of the Trickster",
     level: 1,
+    edition: "EDITION_2014",
     description:
       "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
   },
   {
     subclassSlug: TRICKERY_DOMAIN_SLUG,
+    name: "Blessing of the Trickster",
+    level: 3,
+    edition: "EDITION_2024",
+    // Mirror-sourced: level-shifts 1 -> 3, becomes a Magic action, extends
+    // its range to 30 ft and no longer requires touch, and its duration
+    // extends to "until you finish a Long Rest or you use this feature
+    // again" (both sources agree, word for mechanic).
+    description:
+      "As a Magic action, give yourself or a willing creature within 30 ft advantage on Dexterity (Stealth) checks. Lasts until you finish a Long Rest or you use this feature again.",
+  },
+  {
+    subclassSlug: TRICKERY_DOMAIN_SLUG,
     name: "Channel Divinity: Invoke Duplicity",
     level: 2,
+    edition: "EDITION_2014",
     description:
       "As an action, create an illusory duplicate of yourself within 30 ft that lasts for 1 minute (concentration). You can attack with advantage against a creature within 5 ft of the duplicate, and can cast spells as if from the duplicate's space. Uses the Channel Divinity pool.",
   },
   {
     subclassSlug: TRICKERY_DOMAIN_SLUG,
+    name: "Channel Divinity: Invoke Duplicity",
+    level: 3,
+    edition: "EDITION_2024",
+    // Mirror-sourced: level-shifts 2 -> 3, becomes a Bonus Action, and DROPS
+    // Concentration entirely (both sources agree explicitly on this point) —
+    // the plan's owner-flagged headline mechanical change. The move-range cap
+    // ("no more than 120 ft away from you" in the 2014 text) is deliberately
+    // OMITTED: neither source confirmed it still applies at this specific
+    // number in 2024, and the plan's own rule is to author only the
+    // uncontested part rather than carry a 2014 number forward unverified.
+    description:
+      "As a Bonus Action, expend a use of Channel Divinity to create an illusory duplicate of yourself in an unoccupied space within 30 ft, lasting 1 minute (no Concentration required). You can cast spells as if from the duplicate's space, gain advantage on attack rolls against a creature within 5 ft of it, and use a Bonus Action to move it up to 30 ft.",
+  },
+  {
+    subclassSlug: TRICKERY_DOMAIN_SLUG,
     name: "Channel Divinity: Cloak of Shadows",
     level: 6,
+    edition: "EDITION_2014",
     description: "As an action, become invisible until the end of your next turn. Uses the Channel Divinity pool.",
+  },
+  // Channel Divinity: Cloak of Shadows has NO EDITION_2024 row — replaced
+  // outright by Trickster's Transposition below (a different name and a
+  // different mechanic: a teleport swap, not invisibility).
+  {
+    subclassSlug: TRICKERY_DOMAIN_SLUG,
+    name: "Trickster's Transposition",
+    level: 6,
+    edition: "EDITION_2024",
+    // Mirror-sourced (both sources agree): a NEW L6 feature, no 2014
+    // counterpart — Cloak of Shadows' 2024 replacement.
+    description: "Whenever you use a Bonus Action to create or move your Invoke Duplicity illusion, you can teleport, swapping places with it.",
   },
   {
     subclassSlug: TRICKERY_DOMAIN_SLUG,
     name: "Divine Strike",
     level: 8,
+    edition: "EDITION_2014",
     description: "Once per turn when you hit with a weapon, deal an extra 1d8 poison damage (+2d8 at level 14).",
+  },
+  // Divine Strike has NO EDITION_2024 row — same fold-into-Blessed-Strikes
+  // reasoning as Life Domain's own Divine Strike above.
+  {
+    subclassSlug: TRICKERY_DOMAIN_SLUG,
+    name: "Improved Duplicity",
+    level: 17,
+    edition: "EDITION_2014",
+    description:
+      "When you use Invoke Duplicity, you can create up to four duplicates instead of one. As a bonus action on your turn, move any number of them up to 30 ft (no more than 120 ft away from you).",
   },
   {
     subclassSlug: TRICKERY_DOMAIN_SLUG,
     name: "Improved Duplicity",
     level: 17,
+    edition: "EDITION_2024",
+    // Mirror-sourced: the 2024 rework is NOT "up to four duplicates" (both
+    // sources explicitly confirm this changed) — it gains two named benefits
+    // on its ONE existing illusion instead: Shared Distraction (advantage for
+    // you AND your allies, both sources agree) and Healing Illusion (Hit
+    // Points equal to your Cleric level, not temporary HP — the plan's own
+    // correction to the issue's draft).
     description:
-      "When you use Invoke Duplicity, you can create up to four duplicates instead of one. As a bonus action on your turn, move any number of them up to 30 ft (no more than 120 ft away from you).",
+      "Your Invoke Duplicity illusion gains two benefits: Shared Distraction — you and your allies have advantage on attack rolls against a creature within 5 ft of the illusion; Healing Illusion — when the illusion ends, you or a creature of your choice within 5 ft of it regains Hit Points equal to your Cleric level.",
   },
 ];
 

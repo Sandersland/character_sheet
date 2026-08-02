@@ -92,7 +92,7 @@ function get(id: string) {
   return supertest(app).get(`/api/characters/${id}`).set("Cookie", COOKIE);
 }
 
-describe("2014 Cleric renders 2014 Domain Spells text; 2024 Cleric text is unchanged (#1374)", () => {
+describe("2014 Cleric renders 2014 Domain Spells text; 2024 Cleric renders the real SRD 5.2 Life Domain Spells (#1374, retargeted #1225)", () => {
   it("a level-1 2014 Cleric's Domain Spells description labels the lowest tier (L1), not (L3)", async () => {
     const id = await createCharacter("1374 Feature Ed Cleric 2014", "Cleric", "EDITION_2014");
     await setSubclass(id, "Life Domain", lifeDomainId);
@@ -106,19 +106,26 @@ describe("2014 Cleric renders 2014 Domain Spells text; 2024 Cleric text is uncha
     expect(domainSpells?.description).not.toContain("Bless, Cure Wounds (L3)");
   });
 
-  it("a level-3 2024 Cleric's Domain Spells description is byte-identical to today (reverse-regression latch)", async () => {
+  // #1225 RETARGET: the pre-#1225 "Domain Spells" 2024 row this latch used to
+  // pin byte-for-byte was FABRICATED (the PHB'14 list with its first tier
+  // relabelled L1->L3, never real SRD 5.2 content) — pinning it byte-for-byte
+  // was pinning a bug. The real SRD 5.2 row is a DIFFERENT NAME ("Life Domain
+  // Spells", transcribed from SRD 5.2 p.40) at a DIFFERENT LEVEL (L3, not L1)
+  // — retargeted here rather than left asserting fabricated text forever.
+  it("a level-3 2024 Cleric's Life Domain Spells description is the real SRD 5.2 table (reverse-regression latch)", async () => {
     const id = await createCharacter("1374 Feature Ed Cleric 2024", "Cleric", "EDITION_2024");
     await setSubclass(id, "Life Domain", lifeDomainId);
     await prisma.character.update({ where: { id }, data: { experiencePoints: XP_LVL_3 } });
 
     const res = await get(id);
     expect(res.status).toBe(200);
-    const domainSpells = (res.body.resources.features as { name: string; description: string }[]).find(
-      (f) => f.name === "Domain Spells",
-    );
+    const features = res.body.resources.features as { name: string; description: string }[];
+    const domainSpells = features.find((f) => f.name === "Life Domain Spells");
     expect(domainSpells?.description).toBe(
-      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+      "Always-prepared domain spells (they don't count against your prepared total): Aid, Bless, Cure Wounds, Lesser Restoration (L3); Mass Healing Word, Revivify (L5); Aura of Life, Death Ward (L7); Greater Restoration, Mass Cure Wounds (L9).",
     );
+    // The stale name must not survive alongside the real one.
+    expect(features.some((f) => f.name === "Domain Spells")).toBe(false);
   });
 
   it("no feature on the wire carries an edition tag", async () => {
@@ -138,12 +145,15 @@ describe("2014 Cleric renders 2014 Domain Spells text; 2024 Cleric text is uncha
     // === "EDITION_2014"` alone no longer isolates a GENUINE fork from an
     // untagged feature merely resolved at 2014. Confirm the real property
     // instead: deriveResources' 2014 row is the 2014-WORDED text (byte
-    // distinct from the 2024 row) — proving the fork resolved, not merely tagged.
+    // distinct from the 2024 row) — proving the fork resolved, not merely
+    // tagged. #1225: the 2014/2024 rows are two DIFFERENT NAMES now (a rename,
+    // not a same-name fork), so this reads each side by its own name rather
+    // than a shared "Domain Spells" lookup.
     const featureRows = await loadDbFeatureRows("cleric", "life domain");
     const info2014 = deriveResources("cleric", "life domain", 1, BASE_ABILITY_SCORES, proficiencyBonusForLevel(1), featureRows, "EDITION_2014");
     const info2024 = deriveResources("cleric", "life domain", 3, BASE_ABILITY_SCORES, proficiencyBonusForLevel(3), featureRows, "EDITION_2024");
     const domainSpells2014 = (info2014?.features ?? []).find((f) => f.name === "Domain Spells");
-    const domainSpells2024 = (info2024?.features ?? []).find((f) => f.name === "Domain Spells");
+    const domainSpells2024 = (info2024?.features ?? []).find((f) => f.name === "Life Domain Spells");
     expect(domainSpells2014?.edition).toBe("EDITION_2014");
     expect(domainSpells2014?.description).not.toBe(domainSpells2024?.description);
   });

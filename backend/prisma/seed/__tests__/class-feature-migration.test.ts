@@ -111,22 +111,27 @@ describe("ClassFeature migration — expandFeatureRow's untagged branch keeps bo
   });
 });
 
-describe("ClassFeature migration — the 2 already-forked pairs were not duplicated (#1523)", () => {
-  it("Cleric Domain Spells: exactly one row per (subclass, edition), descriptions differ between editions", async () => {
+describe("ClassFeature migration — the already-forked pairs were not duplicated (#1523)", () => {
+  // #1225: Cleric's "Domain Spells" is NO LONGER a forked pair either — both
+  // domains' 2024 rows renamed ("Life Domain Spells" / "Trickery Domain
+  // Spells", different names from the 2014-only "Domain Spells"), so
+  // pruneStalePartitions retired the old (FABRICATED — a PHB'14 list with its
+  // first tier relabelled, never real SRD 5.2/PHB'24 content) 2024 "Domain
+  // Spells" rows outright. Every "Domain Spells" row left is a single
+  // EDITION_2014 row per domain — asserted here as exactly that, not a fork,
+  // the same replacement Warlock's "Expanded Spell List" test below models.
+  it("Cleric Domain Spells: exactly one EDITION_2014 row per domain, no EDITION_2024 row anywhere", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { name: "Domain Spells", class: { name: "Cleric" } },
       select: { level: true, edition: true, description: true, subclass: { select: { name: true } } },
     });
-    expect(rows).toHaveLength(4); // Life Domain + Trickery Domain, x2 editions each
+    expect(rows).toHaveLength(2); // Life Domain + Trickery Domain, EDITION_2014 only
 
     for (const subclassName of ["Life Domain", "Trickery Domain"]) {
       const pair = rows.filter((r) => r.subclass?.name === subclassName);
-      expect(pair).toHaveLength(1 * 2);
-      expect(pair.every((r) => r.level === 1)).toBe(true);
-      const [r2014, r2024] = [pair.find((r) => r.edition === "EDITION_2014"), pair.find((r) => r.edition === "EDITION_2024")];
-      expect(r2014).toBeDefined();
-      expect(r2024).toBeDefined();
-      expect(r2014!.description).not.toBe(r2024!.description);
+      expect(pair).toHaveLength(1);
+      expect(pair[0].level).toBe(1);
+      expect(pair[0].edition).toBe("EDITION_2014");
     }
   });
 

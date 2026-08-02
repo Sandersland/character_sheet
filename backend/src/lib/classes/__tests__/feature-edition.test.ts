@@ -38,24 +38,33 @@ function feature(overrides: Partial<DerivedFeature> & Pick<DerivedFeature, "edit
 
 // Replaces the old featureAppliesToEdition truth table: proves the SAME
 // property (a fork resolves to exactly one edition's text, never both, never
-// neither) end-to-end against a REAL seeded fork — Cleric/Life Domain's
-// Domain Spells, also ledgered below. featuresFromRows' pure truth table
-// (untagged/level-gate/dedup) lives in class-feature-rows.test.ts.
+// neither) end-to-end against a REAL seeded fork. featuresFromRows' pure
+// truth table (untagged/level-gate/dedup) lives in class-feature-rows.test.ts.
+//
+// #1225 RETARGET: this used to pin Cleric/Life Domain's "Domain Spells" as a
+// same-name fork — that 2024 row was FABRICATED (the PHB'14 list with its
+// first tier relabelled) and #1225 replaced it with a DIFFERENTLY-NAMED real
+// SRD 5.2 row ("Life Domain Spells"), so the property this test proves (a
+// fork resolves to exactly one edition, never both, never neither) now needs
+// a genuine same-name fork elsewhere in the seed — Warlock/The Fiend's own
+// "Dark One's Blessing" (#1233) is that fork, level-shifted 1->3 same as
+// Disciple of Life was, and is unrelated to any class this suite otherwise
+// exercises.
 describe("a real seeded edition fork resolves through deriveResources (#1374, retired from featureAppliesToEdition)", () => {
-  it("Cleric/Life Domain's Domain Spells: 2014 gets the 2014-worded row, 2024 gets the 2024-worded row, never both", async () => {
-    const featureRows = await loadDbFeatureRows("cleric", "life domain");
+  it("Warlock/The Fiend's Dark One's Blessing: 2014 gets the 2014-worded row, 2024 gets the 2024-worded row, never both", async () => {
+    const featureRows = await loadDbFeatureRows("warlock", "the fiend");
     const profBonus = proficiencyBonusForLevel(1);
 
-    const at2014 = deriveResources("cleric", "life domain", 1, ABILITY_SCORES, profBonus, featureRows, "EDITION_2014");
-    const at2024 = deriveResources("cleric", "life domain", 3, ABILITY_SCORES, proficiencyBonusForLevel(3), featureRows, "EDITION_2024");
+    const at2014 = deriveResources("warlock", "the fiend", 1, ABILITY_SCORES, profBonus, featureRows, "EDITION_2014");
+    const at2024 = deriveResources("warlock", "the fiend", 3, ABILITY_SCORES, proficiencyBonusForLevel(3), featureRows, "EDITION_2024");
 
-    const domainSpells2014 = (at2014?.features ?? []).filter((f) => f.name === "Domain Spells");
-    const domainSpells2024 = (at2024?.features ?? []).filter((f) => f.name === "Domain Spells");
-    expect(domainSpells2014).toHaveLength(1);
-    expect(domainSpells2024).toHaveLength(1);
-    expect(domainSpells2014[0].description).not.toBe(domainSpells2024[0].description);
-    expect(domainSpells2014[0].edition).toBe("EDITION_2014");
-    expect(domainSpells2024[0].edition).toBe("EDITION_2024");
+    const blessing2014 = (at2014?.features ?? []).filter((f) => f.name === "Dark One's Blessing");
+    const blessing2024 = (at2024?.features ?? []).filter((f) => f.name === "Dark One's Blessing");
+    expect(blessing2014).toHaveLength(1);
+    expect(blessing2024).toHaveLength(1);
+    expect(blessing2014[0].description).not.toBe(blessing2024[0].description);
+    expect(blessing2014[0].edition).toBe("EDITION_2014");
+    expect(blessing2024[0].edition).toBe("EDITION_2024");
   });
 
   it("mutation proof: deleting a class's EDITION_2024 rows fails on ABSENCE, not a 2014 fallback (ClassFeature.edition is non-nullable — resolveEditionRow's shared-row fallback is unreachable by type for this model)", async () => {
@@ -202,9 +211,41 @@ describe("toWireFeatures strips DerivedFeature.edition at the wire boundary (#13
 // too. Pact Boon (2014-only)/Magical Cunning/Contact Patron/Epic Boon
 // (2024-only) are the same "one description under this name" shape, so none
 // of those are tagged either.
+// Cleric's 16 triples (#1225), replacing the 2 Domain Spells entries above
+// (that name is no longer tagged at all — both domains' 2024 rows renamed to
+// "Life Domain Spells"/"Trickery Domain Spells", different names from the
+// 2014-only "Domain Spells", same "renamed, not tagged" shape as Warlock's
+// own Expanded Spell List -> Fiend Spells below). The 3 base-class names that
+// genuinely fork (Spellcasting, Channel Divinity: Turn Undead, Divine
+// Intervention — Destroy Undead/Divine Intervention Improvement are each
+// replaced outright by a differently-named 2024 successor, so neither is
+// tagged) show up under EVERY subclass context Cleric has (undefined/life
+// domain/trickery domain), same reason Fighter's/Barbarian's/Warlock's own
+// base names show up under all of THEIR contexts — 3 x 3 = 9, plus Life
+// Domain's own 4 (Disciple of Life, Channel Divinity: Preserve Life, Blessed
+// Healer, Supreme Healing — Bonus Proficiency/Divine Strike have no 2024 row
+// at all, Domain Spells is renamed away) and Trickery Domain's own 3
+// (Blessing of the Trickster, Channel Divinity: Invoke Duplicity, Improved
+// Duplicity — Cloak of Shadows/Divine Strike have no 2024 row, Domain Spells
+// is renamed away, Trickster's Transposition is 2024-only) = 9 + 4 + 3 = 16.
+// Net +14 over the 2 entries removed.
 const EXPECTED_EDITION_TAGGED_FEATURES = [
-  ["cleric", "life domain", "Domain Spells"],
-  ["cleric", "trickery domain", "Domain Spells"],
+  ["cleric", "undefined", "Spellcasting"],
+  ["cleric", "undefined", "Channel Divinity: Turn Undead"],
+  ["cleric", "undefined", "Divine Intervention"],
+  ["cleric", "life domain", "Spellcasting"],
+  ["cleric", "life domain", "Channel Divinity: Turn Undead"],
+  ["cleric", "life domain", "Divine Intervention"],
+  ["cleric", "life domain", "Disciple of Life"],
+  ["cleric", "life domain", "Channel Divinity: Preserve Life"],
+  ["cleric", "life domain", "Blessed Healer"],
+  ["cleric", "life domain", "Supreme Healing"],
+  ["cleric", "trickery domain", "Spellcasting"],
+  ["cleric", "trickery domain", "Channel Divinity: Turn Undead"],
+  ["cleric", "trickery domain", "Divine Intervention"],
+  ["cleric", "trickery domain", "Blessing of the Trickster"],
+  ["cleric", "trickery domain", "Channel Divinity: Invoke Duplicity"],
+  ["cleric", "trickery domain", "Improved Duplicity"],
   ["warlock", "undefined", "Pact Magic"],
   ["warlock", "undefined", "Eldritch Invocations"],
   ["warlock", "undefined", "Mystic Arcanum"],
