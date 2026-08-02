@@ -34,6 +34,15 @@ export class BlobNotFoundError extends Error {
   }
 }
 
+// Deliberately no `status` field on either error: a missing blob is not
+// inherently an HTTP 404 — the route consuming the store maps it (#1615).
+export class BlobStoreConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BlobStoreConfigError";
+  }
+}
+
 // S3 would happily treat "../x" or "/x" as an opaque key, but the fs driver
 // maps keys onto real paths — so the PORT defines the stricter rule and every
 // driver enforces it, or the drivers would diverge on which keys are legal.

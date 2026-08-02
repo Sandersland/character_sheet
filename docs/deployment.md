@@ -27,6 +27,9 @@ CI builds this image on every PR (#1454), so a stage rename or a broken `COPY` f
 | `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. |
 | `ALLOW_DEV_LOGIN` | Enables `POST /api/auth/dev-login`. Hard-forced off when `NODE_ENV=production`, which is why `.env.example` ships it on for local dev. |
 | `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_CREATE_MAX`, `RATE_LIMIT_DISABLED` | Logging + rate-limit knobs; limiter auto-off under test. |
+| `BLOB_STORE_DRIVER` | Blob storage driver, `s3` or `fs`. Defaults to `fs` outside production; required (throws at first use) in production. |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | S3-compatible target when driver is `s3` (R2/S3/MinIO/B2/Spaces). Bucket + both creds required; endpoint required by every provider except AWS; region defaults to `auto`. |
+| `BLOB_FS_DIR` | `fs` driver directory; defaults to a path under the OS tmpdir, outside the repo tree. |
 | `VITE_API_URL` | Frontend build/dev: `/api` for single-origin, absolute API URL for split. |
 | `VITE_PROXY_TARGET` | Vite dev proxy target; defaults to `http://localhost:4000`. A worktree slot's `frontend/.env` points it at that slot's backend port. |
 
