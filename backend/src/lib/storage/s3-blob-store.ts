@@ -78,6 +78,8 @@ export function createS3BlobStore(options: S3BlobStoreOptions): BlobStore {
           // from escaping this file into the BlobStore port.
           body: output.Body as Readable,
           contentType: output.ContentType ?? "application/octet-stream",
+          // ContentLength can be absent (e.g. SSE-KMS objects on some AWS SDK
+          // versions); 0 is a known approximation there. R2/MinIO always send it.
           size: output.ContentLength ?? 0,
         };
       } catch (error) {

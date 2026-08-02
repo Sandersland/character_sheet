@@ -50,7 +50,16 @@ export function createFsBlobStore(dir: string): BlobStore {
       const meta = await readMeta(key);
       if (!meta) throw new BlobNotFoundError(key);
       const file = dataPath(key);
-      const { size } = await stat(file);
+      let size: number;
+      try {
+        ({ size } = await stat(file));
+      } catch (error) {
+        // A concurrent delete can land between readMeta and stat (meta-first
+        // delete order); the contract promises BlobNotFoundError, not ENOENT.
+        if ((error as NodeJS.ErrnoException).code === "ENOENT")
+          throw new BlobNotFoundError(key);
+        throw error;
+      }
       return {
         body: createReadStream(file),
         contentType: meta.contentType,

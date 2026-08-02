@@ -59,6 +59,18 @@ describe("createFsBlobStore", () => {
     await expect(store.get("crashed")).rejects.toBeInstanceOf(BlobNotFoundError);
   });
 
+  it("maps a data file vanishing after the meta read to BlobNotFoundError", async () => {
+    const dir = await tempDir();
+    const store = createFsBlobStore(dir);
+    await store.put("racing", body, options);
+
+    // Simulate a concurrent delete landing between get's readMeta and stat:
+    // meta still present, data already gone.
+    await rm(path.join(dir, "objects", "racing"));
+
+    await expect(store.get("racing")).rejects.toBeInstanceOf(BlobNotFoundError);
+  });
+
   it("leaves no temp files behind after overwrite", async () => {
     const dir = await tempDir();
     const store = createFsBlobStore(dir);
