@@ -18,8 +18,9 @@
 // was the false statement the drift hid behind.
 //
 // FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
-// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233), WIZARD (#1234)
-// and BARD (#1224) all author their ClassFeature rows as literal seed data
+// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233), WIZARD (#1234),
+// BARD (#1224) and DRUID (#1226) all author their ClassFeature rows as
+// literal seed data
 // (prisma/seed/<class>-features.ts), which this src-side fixture can't
 // import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
 // anything under prisma/ a compile error (TS6059). Every one but Bard's rows
@@ -42,18 +43,18 @@
 //
 // Three different end states sit behind that one list. `lib/classes/
 // fighter.ts`, `barbarian.ts` and `rogue.ts` are deleted outright.
-// `warlock.ts`, `wizard.ts`, `sorcerer.ts` and `cleric.ts` survive because each
-// carries a subclass `grantLevel` (1 for Warlock's patrons, Sorcerer's origins
-// and Cleric's Divine Domain; 2 for Wizard's schools) that no seeded row can
-// express while subclassGateLevel's undefined fallback is 3, so deleting any
-// would silently move that class's 2014 subclass gate (#1576). `ranger.ts` and
-// `bard.ts` survive for a DIFFERENT reason still — each own header names it:
-// Ranger's Hunter `choices` catalog (#899/#1353) and its EDITION_2024
-// Wisdom-modifier resourceFn; Bard's Cha-modifier/level-tiered-recharge
-// resourceFn (#1224) — both subclasses' `grantLevel: 3` already equal the
-// fallback, so unlike the first four that isn't why either module stays. None
-// of them still exports a base-class `features` array, which is what matters
-// here.
+// `warlock.ts`, `wizard.ts`, `sorcerer.ts`, `cleric.ts` and `druid.ts` survive
+// because each carries a subclass `grantLevel` (1 for Warlock's patrons,
+// Sorcerer's origins and Cleric's Divine Domain; 2 for Wizard's schools and
+// Druid's Circles) that no seeded row can express while subclassGateLevel's
+// undefined fallback is 3, so deleting any would silently move that class's
+// 2014 subclass gate (#1576). `ranger.ts` and `bard.ts` survive for a DIFFERENT
+// reason still — each own header names it: Ranger's Hunter `choices` catalog
+// (#899/#1353) and its EDITION_2024 Wisdom-modifier resourceFn; Bard's
+// Cha-modifier/level-tiered-recharge resourceFn (#1224) — both subclasses'
+// `grantLevel: 3` already equal the fallback, so unlike the first five that
+// isn't why either module stays. None of them still exports a base-class
+// `features` array, which is what matters here.
 //
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
 // stand-in: neither declares a resourceKey/derivedStat in barbarian-features.ts,
@@ -93,7 +94,6 @@
 // `toRows(undefined?.features ?? [])` -> `[]` for both classRows and
 // subclassRows, identical to Rogue's own shape.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
-import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
@@ -101,7 +101,7 @@ import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 import { wizard } from "@/lib/classes/wizard.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  druid, monk, paladin, ranger, sorcerer, wizard,
+  monk, paladin, ranger, sorcerer, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
@@ -1780,6 +1780,140 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+// DRUID's base-class + both circles' rows (#1226 commit 1): lib/classes/
+// druid.ts's `.features`/subclass `.features` arrays moved to literal seed
+// data (prisma/seed/druid-features.ts) — the same rootDir boundary
+// FIGHTER_BASE_ROWS' comment explains (druid.ts itself still exists — see
+// its own header for why it isn't deletable — but none of its three
+// `.features` arrays survive). REQUIRED for all three (base + both circles),
+// unlike Barbarian's/Ranger's subclasses which need no mirror at all:
+// srd.test.ts's Circle of the Moon feature-presence checks and
+// subclass-grant-level.test.ts's domain-gate-shaped checks call
+// testFeatureRowsFor with a Druid circle and assert directly on
+// null-ness/`.length` — the same CLERIC'S TWO DOMAINS counterexample this
+// file's own header names. At commit 1 every row below is still byte-
+// identical, untagged 2014 text (pinned by druid-2014-snapshot.test.ts) —
+// commit 2 retags each `toRows` call's source array with real SRD 5.2 (2024)
+// text; commit 3 adds the split Wild Shape/Moonlight Step resource columns.
+export const DRUID_BASE_ROWS: ClassFeatureRow[] = toRows([
+  {
+    name: "Druidic",
+    level: 1,
+    source: "class",
+    description:
+      "You know Druidic, the secret language of druids. You can speak it and leave hidden messages in natural surroundings.",
+  },
+  {
+    name: "Spellcasting",
+    level: 1,
+    source: "class",
+    description:
+      "You cast spells using Wisdom. Full-caster progression. You prepare a number of druid spells equal to your Wisdom modifier + your druid level (minimum 1).",
+  },
+  {
+    name: "Wild Shape",
+    level: 2,
+    source: "class",
+    description:
+      "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
+  },
+  {
+    name: "Timeless Body",
+    level: 18,
+    source: "class",
+    description:
+      "The primal magic you wield causes you to age more slowly. For every 10 years that pass, your body ages only 1 year.",
+  },
+  {
+    name: "Beast Spells",
+    level: 18,
+    source: "class",
+    description:
+      "You can cast many druid spells in any shape you assume using Wild Shape. You can perform the somatic and verbal components of a druid spell while in beast form.",
+  },
+  {
+    name: "Archdruid",
+    level: 20,
+    source: "class",
+    description:
+      "You can use your Wild Shape an unlimited number of times. Additionally, you can ignore the verbal and somatic components of your druid spells, as well as any material components lacking a cost.",
+  },
+]);
+
+export const CIRCLE_OF_THE_LAND_ROWS: ClassFeatureRow[] = toRows([
+  { name: "Bonus Cantrip", level: 2, source: "subclass", description: "You learn one additional druid cantrip of your choice." },
+  {
+    name: "Natural Recovery",
+    level: 2,
+    source: "subclass",
+    description:
+      "Once per long rest during a short rest, choose expended spell slots to recover. The total levels of slots recovered can be up to half your druid level (rounded up, max 5th level).",
+  },
+  {
+    name: "Circle Spells",
+    level: 3,
+    source: "subclass",
+    description:
+      "You gain access to additional spells based on your chosen terrain (arctic, coast, desert, forest, grassland, mountain, swamp, or Underdark). These spells are always prepared for you and don't count against your prepared spells.",
+  },
+  {
+    name: "Land's Stride",
+    level: 6,
+    source: "subclass",
+    description:
+      "Moving through nonmagical difficult terrain costs no extra movement, and you can pass through nonmagical plants without being slowed. Advantage on saves against magically created or manipulated plants.",
+  },
+  {
+    name: "Nature's Ward",
+    level: 10,
+    source: "subclass",
+    description: "Immune to poison and disease. Elementals and fey can't charm or frighten you.",
+  },
+  {
+    name: "Nature's Sanctuary",
+    level: 14,
+    source: "subclass",
+    description:
+      "When a beast or plant attacks you, it must make a Wisdom saving throw (DC 8 + proficiency + Wisdom modifier) or choose a different target. On a success, it is immune to this feature for 24 hours.",
+  },
+]);
+
+export const CIRCLE_OF_THE_MOON_ROWS: ClassFeatureRow[] = toRows([
+  {
+    name: "Combat Wild Shape",
+    level: 2,
+    source: "subclass",
+    description:
+      "You can use Wild Shape as a bonus action. While transformed, you can expend a spell slot as a bonus action to regain 1d8 HP per level of the slot expended.",
+  },
+  {
+    name: "Circle Forms",
+    level: 2,
+    source: "subclass",
+    description:
+      "You can use Wild Shape to transform into beasts with a challenge rating as high as 1 (instead of the base druid table). Starting at level 6, the max CR equals your druid level divided by 3 (rounded down, minimum 1).",
+  },
+  {
+    name: "Primal Strike",
+    level: 6,
+    source: "subclass",
+    description:
+      "Your attacks while in beast form count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks.",
+  },
+  {
+    name: "Elemental Wild Shape",
+    level: 10,
+    source: "subclass",
+    description: "Expend two uses of Wild Shape to transform into an air, earth, fire, or water elemental.",
+  },
+  {
+    name: "Thousand Forms",
+    level: 14,
+    source: "subclass",
+    description: "You can cast the Alter Self spell at will without expending a spell slot.",
+  },
+]);
+
 // Per-class/per-subclass literal-row overrides (#1233): replaces the former
 // isFighter/isBarbarian/isBattleMaster boolean chain with two lookup maps, one
 // keyed by class name and one by subclass name — a fourth `isWarlock` boolean
@@ -1801,10 +1935,13 @@ export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   wizard: WIZARD_BASE_ROWS,
   sorcerer: SORCERER_BASE_ROWS,
   cleric: CLERIC_BASE_ROWS,
+  druid: DRUID_BASE_ROWS,
 };
 
 export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "battle master": BATTLE_MASTER_ROWS,
+  "circle of the land": CIRCLE_OF_THE_LAND_ROWS,
+  "circle of the moon": CIRCLE_OF_THE_MOON_ROWS,
   "school of evocation": WIZARD_EVOCATION_ROWS,
   "school of abjuration": WIZARD_ABJURATION_ROWS,
   "school of illusion": WIZARD_ILLUSION_ROWS,
