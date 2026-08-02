@@ -305,8 +305,10 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     description:
       "Choose a dragon type (black, blue, brass, bronze, copper, gold, green, red, silver, or white). You gain the ability to speak, read, and write Draconic, and have advantage on Charisma checks when interacting with dragons of that type.",
   },
-  // Dragon Ancestor has NO EDITION_2024 row — folded into Draconic Spells'
-  // dragon-type framing below, never authored as its own row in 2024.
+  // Dragon Ancestor has NO EDITION_2024 row and no 2024 successor: PHB'24
+  // dropped the ancestor-type concept from this subclass outright. Draconic
+  // Spells replaces its SLOT at level 3, not its mechanic — that table is
+  // fixed for every Draconic Sorcerer and references no dragon type at all.
   {
     subclassSlug: DRACONIC_BLOODLINE_SLUG,
     name: "Draconic Resilience",
@@ -334,12 +336,16 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     level: 3,
     edition: "EDITION_2024",
     // PHB'24 p.148 (SRD 5.2 primary). NEW in 2024 — no 2014 counterpart;
-    // folds Dragon Ancestor's dragon-type framing into an always-prepared
-    // spell table (#1232 §2 correction 8) — mirrors Warlock's Fiend
-    // Spells shape. Can't be SubclassGrantedSpell rows (that model has no
-    // `edition` column, #1234's disclosed gap) — text only.
+    // mirrors Warlock's Fiend Spells shape. The table is FIXED: SRD 5.2 reads
+    // "When you reach a Sorcerer level specified in the Draconic Spells table,
+    // you thereafter always have the listed spells prepared" — every Draconic
+    // Sorcerer gets the same ten spells, and no dragon type enters into it.
+    // Do not reintroduce a dragon-type clause here: 2024 has no Dragon
+    // Ancestor, and the only remaining choice on this subclass is Elemental
+    // Affinity's DAMAGE type. Can't be SubclassGrantedSpell rows (that model
+    // has no `edition` column, #1234's disclosed gap) — text only.
     description:
-      "You always have certain spells prepared, keyed to the dragon type you choose for your Draconic Bloodline; they don't count against the number of spells you can prepare with Spellcasting: Alter Self, Chromatic Orb, Command, Dragon's Breath (level 3); Fear, Fly (level 5); Arcane Eye, Charm Monster (level 7); Legend Lore, Summon Dragon (level 9).",
+      "You always have certain spells prepared; they don't count against the number of spells you can prepare with Spellcasting: Alter Self, Chromatic Orb, Command, Dragon's Breath (level 3); Fear, Fly (level 5); Arcane Eye, Charm Monster (level 7); Legend Lore, Summon Dragon (level 9).",
   },
   {
     subclassSlug: DRACONIC_BLOODLINE_SLUG,
@@ -354,11 +360,14 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     name: "Elemental Affinity",
     level: 6,
     edition: "EDITION_2024",
-    // PHB'24 p.148 (SRD 5.2 primary): the Sorcery-Point-spend resistance
-    // becomes a PERMANENT resistance to your dragon type's damage — no SP
-    // cost, no 1-hour duration.
+    // PHB'24 p.148 (SRD 5.2 primary): two changes, not one. The
+    // Sorcery-Point-spend resistance becomes PERMANENT (no SP cost, no 1-hour
+    // duration) — AND the damage type is now an explicit choice from a closed
+    // list, because 2024 deleted Dragon Ancestor, so there is no ancestor left
+    // to derive it from. 2014's "associated with your dragon ancestor" phrasing
+    // must not survive into this row.
     description:
-      "You have Resistance to the damage type associated with your dragon ancestor. Whenever you cast a spell that deals damage of that type, you can add your Charisma modifier to one damage roll of that spell.",
+      "Your draconic magic has an affinity with a damage type associated with dragons. Choose one of those types: Acid, Cold, Fire, Lightning, or Poison. You have Resistance to that damage type, and when you cast a spell that deals damage of that type, you can add your Charisma modifier to one damage roll of that spell.",
   },
   {
     subclassSlug: DRACONIC_BLOODLINE_SLUG,

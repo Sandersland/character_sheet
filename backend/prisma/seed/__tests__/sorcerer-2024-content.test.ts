@@ -110,7 +110,7 @@ describe("Draconic Resilience (#1232): unarmored AC changes from 13+Dex to 10+De
   });
 });
 
-describe("Draconic Spells (#1232): NEW in 2024, folds Dragon Ancestor's dragon-type framing into a spell table", () => {
+describe("Draconic Spells (#1232): NEW in 2024, a FIXED table with no dragon type", () => {
   it("is at level 3 and names all four tiers' spells", () => {
     const r = row(DRACONIC, "Draconic Spells", "EDITION_2024");
     expect(r.level).toBe(3);
@@ -119,9 +119,45 @@ describe("Draconic Spells (#1232): NEW in 2024, folds Dragon Ancestor's dragon-t
     }
   });
 
-  it("Dragon Ancestor has no EDITION_2024 row — folded into Draconic Spells, never authored separately", () => {
+  // The row first shipped saying the spells were "keyed to the dragon type you
+  // choose", which is invented — SRD 5.2 grants the same ten spells to every
+  // Draconic Sorcerer. It read plausibly because it is how 2014's Dragon
+  // Ancestor framed things, which is exactly the "2014 text with a coat of
+  // paint" failure this retab exists to prevent, so pin the absence.
+  it("names no dragon type — 2024 dropped Dragon Ancestor, so nothing keys off one", () => {
+    const r = row(DRACONIC, "Draconic Spells", "EDITION_2024");
+    expect(r.description).not.toMatch(/dragon type/i);
+    expect(r.description).not.toMatch(/dragon ancestor/i);
+  });
+
+  it("Dragon Ancestor has no EDITION_2024 row and no 2024 successor", () => {
     expect(hasRow(DRACONIC, "Dragon Ancestor", "EDITION_2024")).toBe(false);
     expect(row(DRACONIC, "Dragon Ancestor", "EDITION_2014").level).toBe(1);
+  });
+});
+
+describe("Elemental Affinity (#1232): 2024 makes the damage type an explicit choice, not an inherited one", () => {
+  // Same fabrication as Draconic Spells above, and the more consequential of
+  // the two: the 2024 row shipped saying "the damage type associated with your
+  // dragon ancestor", but 2024 deleted Dragon Ancestor, so SRD 5.2 has the
+  // player choose from a closed list instead. A player reading the old text had
+  // no way to know which type they had.
+  it("2024 names the closed list and no ancestor", () => {
+    const r = row(DRACONIC, "Elemental Affinity", "EDITION_2024");
+    for (const type of ["Acid", "Cold", "Fire", "Lightning", "Poison"]) {
+      expect(r.description, type).toContain(type);
+    }
+    expect(r.description).not.toMatch(/dragon ancestor/i);
+  });
+
+  it("2024 resistance is permanent — no Sorcery Point cost, no duration; 2014 keeps both", () => {
+    const r2024 = row(DRACONIC, "Elemental Affinity", "EDITION_2024");
+    expect(r2024.description).not.toMatch(/Sorcery Point/i);
+    expect(r2024.description).not.toMatch(/1 hour/i);
+
+    const r2014 = row(DRACONIC, "Elemental Affinity", "EDITION_2014");
+    expect(r2014.description).toContain("1 Sorcery Point");
+    expect(r2014.description).toContain("dragon ancestor");
   });
 });
 
