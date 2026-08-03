@@ -1,10 +1,10 @@
 # Deployment
 
-Read this when packaging the app for hosting, deploying the dev environment (Railway behind Cloudflare Access), or running backups/restores.
+Read this when packaging the app for hosting, deploying the hosted environment (Railway behind Cloudflare Access), or running backups/restores.
 
 ## Packaging model
 
-One deployable image: the root `Dockerfile`, combined single-origin — the API serves the built SPA. Railway dev and `docker-compose.prod.yml` both use it. It builds from the **repo root context**, because the npm-workspaces install must link `packages/*` (shared types, #820):
+One deployable image: the root `Dockerfile`, combined single-origin — the API serves the built SPA. Railway and `docker-compose.prod.yml` both use it. It builds from the **repo root context**, because the npm-workspaces install must link `packages/*` (shared types, #820):
 
 ```bash
 docker build -f Dockerfile .
@@ -48,15 +48,24 @@ APP_PORT=4100 docker compose -f docker-compose.prod.yml --env-file .env.producti
 
 Verify: `/` loads the SPA, `/api/health` returns ok, a deep link returns the SPA, data round-trips.
 
-## Railway dev + Cloudflare Access
+## Railway + Cloudflare Access
 
-Railway: project with a `dev` environment → Postgres plugin (`DATABASE_URL`) → service from the repo. Build and deploy settings live in `railway.json`, which **overrides the dashboard** — change them there, not in the UI. Add the custom domain and **disable the generated `*.up.railway.app` domain** (it would bypass Access).
+Two environments, and the names matter because every CLI flag takes one:
+
+| Environment | Services | State |
+|---|---|---|
+| `staging` | `character_sheet` (the app) + `Postgres-6QpG` | Live at `staging.characters.andersland.dev`, deploys from the `staging` branch |
+| `production` | `Postgres` only | Provisioned, **never migrated** — no app service yet |
+
+**`staging` is what runs, and it deploys from `staging` — not `main`.** Promoting to `main` is bookkeeping, not a release; the code is already serving before the promote.
+
+Setup per environment: Postgres plugin (`DATABASE_URL`) → service from the repo. Build and deploy settings live in `railway.json`, which **overrides the dashboard** — change them there, not in the UI. Add the custom domain and **disable the generated `*.up.railway.app` domain** (it would bypass Access).
 
 **Migrations run as a pre-deploy command, not just at boot.** Railway runs `preDeployCommand` after the build and before the new version is allowed to serve, and a non-zero exit halts the deploy. That is the difference between a bad migration being a red deploy and being the crash-loop that cost 13 hours (#1373). The container `CMD` still applies migrations too — that path is what `docker-compose.prod.yml` relies on, and the re-run is a no-op migration plus an idempotent seed.
 
 Pre-deploy runs in a **separate container** from the app and cannot touch volumes or the filesystem, so nothing filesystem-bound may move into it.
 
-Cloudflare: move DNS to Cloudflare, CNAME `dev.<domain>` → the Railway target (proxied), then Zero Trust → Access → self-hosted app on that hostname with an email Allow policy (+ One-time PIN fallback). Verify incognito hits the Access login and the Railway URL no longer serves the app.
+Cloudflare: move DNS to Cloudflare, CNAME the environment's hostname (`staging.<domain>`) → the Railway target (proxied), then Zero Trust → Access → self-hosted app on that hostname with an email Allow policy (+ One-time PIN fallback). Verify incognito hits the Access login and the Railway URL no longer serves the app.
 
 ## Backups & restore
 
@@ -75,7 +84,7 @@ docker compose exec -T db pg_restore -U character_sheet -d character_sheet \
 
 One database holds everything, so `pg_dump character_sheet` is a complete backup. After a restore, restart the backend and verify `/api/health` + `/api/characters` + an audit log. (The restore path was verified end-to-end 2026-06-26 — re-run the dry run into a throwaway DB after major schema changes.)
 
-For hosted (Railway) dev, `pg_dump "$DATABASE_URL" -Fc` works directly; automate with a cron service uploading to **off-box** object storage (a backup living in the same Railway project dies with it). Retention ~7 daily + 4 weekly via the storage provider's lifecycle rules. If automation is deferred: manual dump before every migration/deploy and at least weekly during active play.
+On Railway, `railway run -- sh -c 'pg_dump "$DATABASE_PUBLIC_URL" -Fc'` works directly — `DATABASE_URL` is the internal host and will not resolve from a laptop. Automate with a cron service uploading to **off-box** object storage (a backup living in the same Railway project dies with it). Retention ~7 daily + 4 weekly via the storage provider's lifecycle rules. If automation is deferred: manual dump before every migration/deploy and at least weekly during active play.
 
 **Prisma migrations are forward-only** — there is no rollback. A migration that drops or corrupts data is recovered by **restoring the pre-migration dump**, fixing the migration in code, and redeploying. Always take a fresh dump immediately before applying a migration to any environment with real data; develop migrations against a throwaway DB first.
 
@@ -107,7 +116,24 @@ docker compose exec -T backend npx prisma migrate resolve --rolled-back <migrati
 docker compose exec -T backend npx prisma migrate deploy
 ```
 
-Done when the step-1 query returns no unfinished row, `migrate status` reports all migrations applied, `/api/health` is ok, and an audit log renders. On Railway `dev`, run the same steps with `railway connect Postgres` for psql and `DATABASE_URL="$DATABASE_PUBLIC_URL"` for the Prisma CLI — the service's own `DATABASE_URL` is `*.railway.internal` and is not reachable from a laptop.
+Done when the step-1 query returns no unfinished row, `migrate status` reports all migrations applied, `/api/health` is ok, and an audit log renders.
+
+On Railway, run the same steps against the environment by name — the database service is **not** called `Postgres` in every environment, so `railway connect Postgres` fails on `staging`:
+
+```bash
+railway link --project character_sheet --environment staging --service Postgres-6QpG
+railway connect        # interactive psql
+
+# The Prisma CLI, against that environment — the URL is injected into the
+# subprocess, so it is never typed, echoed, or left in shell history.
+railway run -- sh -c 'cd backend && DATABASE_URL="$DATABASE_PUBLIC_URL" npx prisma migrate status'
+```
+
+**Use `DATABASE_PUBLIC_URL`, never `DATABASE_URL`** — the service's own is `*.railway.internal` and is unreachable from a laptop. `railway run` injects it into a subprocess, which is how to reach the DB from a script without ever printing the credential:
+
+```bash
+railway run -- node your-read-only-check.mjs   # reads process.env.DATABASE_PUBLIC_URL
+```
 
 ### Catalog content ships in the seed, not in migrations (#1277)
 
@@ -122,4 +148,4 @@ Preventing the enum case is a CI gate — see `docs/development.md`, "Prisma wor
 
 ## When prod comes
 
-Auth + ownership are shipped, so prod reuses the combined image in a second Railway environment (public, or behind its own Access policy). Remaining: a prod Google OAuth client + redirect URI, and `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true` for the prod origin.
+Auth + ownership are shipped, so prod reuses the combined image. The `production` environment already exists but holds **only a Postgres service, never migrated** — there is no app service and no data, so it is a reservation rather than a deployment. Remaining: the app service itself, a prod Google OAuth client + redirect URI, and `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true` for the prod origin.
