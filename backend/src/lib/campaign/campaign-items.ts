@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ARMOR_CATEGORIES, ITEM_CATEGORIES, WEAPON_CLASSES, WEAPON_RANGES } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import {
   ADVANTAGE_ON,
@@ -22,13 +24,10 @@ import { ITEM_RARITY_KEYS } from "@/lib/srd/srd.js";
 
 import type { CampaignItemHolder } from "./campaign-item-award.js";
 
-const CATEGORIES = ["weapon", "armor", "consumable", "gear"] as const;
 // The 8 worn EquipSlot values gear may declare; MAIN_HAND/OFF_HAND/BODY are derived from detail data, never authored.
+// A genuine subset of EQUIP_SLOTS, not a mirror of it — which is why this one
+// stays local while the full tuples come from contracts.
 const WORN_SLOTS = ["HEAD", "NECK", "CLOAK", "HANDS", "WRISTS", "BELT", "FEET", "RING"] as const;
-const ARMOR_CATEGORIES = ["light", "medium", "heavy", "shield"] as const;
-const WEAPON_CLASSES = ["simple", "martial"] as const;
-// fallow-ignore-next-line code-duplication -- validation literal list mirrors the catalog enum values by design
-const WEAPON_RANGES = ["melee", "ranged"] as const;
 
 const currencySchema = z
   .object({ cp: z.number().int(), sp: z.number().int(), gp: z.number().int(), pp: z.number().int() })
@@ -215,7 +214,7 @@ function refineChargesPool(caps: z.infer<typeof capabilityInputSchema>[], ctx: z
 const baseFields = {
   name: z.string().min(1),
   description: z.string().optional(),
-  category: z.enum(CATEGORIES),
+  category: z.enum(ITEM_CATEGORIES),
   slot: z.enum(WORN_SLOTS).nullable().optional(),
   rarity: z.enum(ITEM_RARITY_KEYS).nullable().optional(),
   requiresAttunement: z.boolean().optional(),

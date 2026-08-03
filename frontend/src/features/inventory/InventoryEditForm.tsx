@@ -9,7 +9,10 @@ interface InventoryEditFormProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-const ARMOR_CATEGORIES: ArmorCategory[] = ["light", "medium", "heavy", "shield"];
+// Option ORDER is the UI's, not the contract's, so this stays a literal — the
+// frontend zone cannot value-import contracts (zod would follow into the
+// bundle). The annotation is the drift guard instead (#1647).
+const ARMOR_CATEGORIES: readonly ArmorCategory[] = ["light", "medium", "heavy", "shield"];
 
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
