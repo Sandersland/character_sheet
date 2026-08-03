@@ -30,13 +30,14 @@ export {
   currencyCredit,
 } from "./inventory-currency.js";
 
-export { itemBuffKey, inventoryItemDetailInclude, catalogItemDetailInclude } from "./inventory-types.js";
+export { itemBuffKey, inventoryItemDetailInclude, catalogItemDetailInclude, resolveInventoryItem } from "./inventory-types.js";
 
 export { isHealingConsumable } from "./inventory-consumable.js";
 
 export {
   snapshotInventoryItemForUndo,
   buildInventoryCreateFromCatalog,
+  stripInventoryCreateForWrite,
   selectAutoEquip,
   autoEquipSlot,
 } from "./inventory-snapshot.js";

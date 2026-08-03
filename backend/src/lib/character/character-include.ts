@@ -1,6 +1,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "@/lib/classes/feature-rows-select.js";
+import { resolveInventoryItem, type InventoryItemWithDetails } from "@/lib/inventory/inventory-types.js";
 
 // Shared `include` for fetching a full character with its race/background/
 // class selections. classEntries is ordered so index 0 is always the
@@ -46,9 +47,13 @@ export const characterInclude = {
       },
     },
   },
+  // weaponDetail/armorDetail/consumableDetail/capabilities are reconstructed
+  // from `snapshot` by resolveCharacterInventory below (#1649) — the four
+  // Inventory* mirror relations are gone, `capabilityUses` is the only join
+  // left to fetch.
   inventoryItems: {
     orderBy: { position: "asc" },
-    include: { weaponDetail: true, armorDetail: true, consumableDetail: true, capabilities: true },
+    include: { capabilityUses: true },
   },
   // Newest-first by the user-entered calendar `date`; `loggedAt desc` then
   // `createdAt desc` are stable tiebreakers so same-date NOTE rows (which share
@@ -60,4 +65,27 @@ export const characterInclude = {
   campaignPreferences: true,
 } satisfies Prisma.CharacterInclude;
 
-export type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
+// The raw Prisma fetch shape — every route that does
+// `tx.character.findUnique({ include: characterInclude })` gets this. Its
+// `inventoryItems` carry `capabilityUses`, not weaponDetail/armorDetail/
+// consumableDetail/capabilities (#1649): resolveCharacterInventory below
+// reconstructs those before serializeCharacter (or anything it calls) reads a
+// single field off an inventory row.
+export type CharacterRow = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
+
+// The logical shape every serialize/*.ts submodule is written against —
+// identical to the pre-#1649 CharacterWithRelations, since resolveInventoryItem
+// reconstructs the same weaponDetail/armorDetail/consumableDetail/capabilities
+// fields those submodules already read.
+export type CharacterWithRelations = Omit<CharacterRow, "inventoryItems"> & {
+  inventoryItems: InventoryItemWithDetails[];
+};
+
+// The one place a raw character fetch becomes the resolved shape (#1649) —
+// called once, at the top of serializeCharacter, so every sub-builder it
+// delegates to (buildInventoryContext, buildItemGrantsView, buildTargetModifiers,
+// selectEquippedBodyArmor, …) keeps reading `.weaponDetail`/`.armorDetail`/
+// `.consumableDetail`/`.capabilities` unchanged.
+export function resolveCharacterInventory(row: CharacterRow): CharacterWithRelations {
+  return { ...row, inventoryItems: row.inventoryItems.map(resolveInventoryItem) };
+}

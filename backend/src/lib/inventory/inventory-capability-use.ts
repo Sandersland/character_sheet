@@ -1,13 +1,14 @@
-// Mirror writes to InventoryCapabilityUse.used and InventoryItem.usesRemaining
-// (#1648, epic #1644). The Inventory*/InventoryConsumableDetail tables stay
-// authoritative until #1649 flips the readers — every call site below sits
-// beside an existing atomic write to the old location, never replacing it.
+// Writes to InventoryCapabilityUse.used and InventoryItem.usesRemaining — the
+// SOLE home for this runtime state since #1649 dropped the InventoryCapability/
+// InventoryConsumableDetail tables these functions used to sit beside as a
+// dual-write mirror (#1648, epic #1644). Names kept as `mirror*` rather than
+// renamed: every call site already refers to them, and there is nothing left
+// to mirror against — read that prefix as historical, not descriptive.
 //
-// Each mirror is itself atomic (updateMany/increment), matching whatever the
-// paired old-location write already is: reading the old value and writing the
-// new one back would reintroduce the race the column layout exists to avoid.
-// capabilityKey is the source InventoryCapability row's id — the same id
-// buildInventorySnapshot writes into the snapshot entry's `key`.
+// Each write is atomic (updateMany/increment) so a concurrent spender can't
+// race a read-modify-write. capabilityKey is a capability's stable snapshot
+// key (`capabilities[].key` in buildInventorySnapshot's output) — an opaque
+// string, not tied to any live row's id.
 import type { Prisma } from "@/generated/prisma/client.js";
 
 export async function mirrorCapabilityUsedSet(

@@ -4,9 +4,11 @@
 import type { Prisma } from "@/generated/prisma/client.js";
 import {
   activatedRechargeRest,
+  capabilityColumnsFromSnapshot,
   readCapability,
   type ActivatedEffectCapability,
 } from "./capabilities.js";
+import { readInventorySnapshot } from "./inventory-snapshot-read.js";
 import { logEvent } from "@/lib/activity/events.js";
 
 // Resets activatedUsesSpent to 0 for items whose activatedEffect recharges on the
@@ -22,14 +24,18 @@ export async function resetActivatedUsesForRestInTx(
 ): Promise<void> {
   const items = await tx.inventoryItem.findMany({
     where: { characterId, activatedUsesSpent: { gt: 0 } },
-    include: { capabilities: true },
+    include: { capabilityUses: true },
   });
   const toReset: { id: string; name: string; previousSpent: number }[] = [];
   for (const item of items) {
+    const usedByKey = new Map(item.capabilityUses.map((u) => [u.capabilityKey, u.used]));
+    const capabilities = readInventorySnapshot(item).capabilities.map((c) =>
+      capabilityColumnsFromSnapshot(c, usedByKey.get(c.key) ?? 0),
+    );
     // Type-predicate filter (not a bare cast): an opaque row with kind="activatedEffect"
     // but no activation must not slip through as a malformed ActivatedEffectCapability
     // — activatedRechargeRest would read resourceKind=undefined and spuriously recharge.
-    const cap = item.capabilities
+    const cap = capabilities
       .map(readCapability)
       .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
     if (!cap) continue;

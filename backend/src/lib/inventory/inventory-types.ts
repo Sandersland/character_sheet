@@ -6,6 +6,9 @@ import type {
   ConsumableDetailInput,
 } from "./item-detail-inputs.js";
 import { type Currency, InvalidInventoryOperationError } from "./inventory-currency.js";
+import { capabilityColumnsFromSnapshot, type CapabilityColumns } from "./capabilities.js";
+import { readInventorySnapshot } from "./inventory-snapshot-read.js";
+import type { ArmorDetailFields, ConsumableDetailFields, WeaponDetailFields } from "./detail-snapshot.js";
 
 export interface CustomItemInput {
   name: string;
@@ -167,14 +170,60 @@ export interface UseResult {
   quantity: number | null;
 }
 
+// The fan-in include for every op applier's live-row read (#1649). The
+// mirror tables (InventoryWeaponDetail/InventoryArmorDetail/
+// InventoryConsumableDetail/InventoryCapability) are gone — `capabilityUses`
+// is the only relation left to join; weapon/armor/consumable/capabilities are
+// reconstructed from `snapshot` (always fetched, being a plain column) by
+// resolveInventoryItem below.
 export const inventoryItemDetailInclude = {
-  weaponDetail: true,
-  armorDetail: true,
-  consumableDetail: true,
-  capabilities: true,
+  capabilityUses: true,
 } satisfies Prisma.InventoryItemInclude;
 
-export type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
+type RawInventoryItemRow = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
+
+// The pre-#1649 shape every consumer (serializers, op appliers, the capability
+// derivations in capabilities.ts) was already written against: weaponDetail/
+// armorDetail/consumableDetail/capabilities as if they were still live-joined
+// relations. Reconstructing that exact shape from the snapshot — rather than
+// updating every one of those consumers to a new shape — is what let #1649
+// flip the read source without touching their internals.
+export type InventoryItemWithDetails = Omit<RawInventoryItemRow, "capabilityUses"> & {
+  weaponDetail: WeaponDetailFields | null;
+  armorDetail: ArmorDetailFields | null;
+  // usesRemaining is glued back on from the column: it's the runtime counter
+  // (promoted out of InventoryConsumableDetail by #1648) and was never part of
+  // the frozen snapshot, but every existing reader expects it alongside the
+  // rest of the consumable detail block.
+  consumableDetail: (ConsumableDetailFields & { usesRemaining: number | null }) | null;
+  capabilities: (CapabilityColumns & { id: string; used: number })[];
+};
+
+// Reconstructs the pre-#1649 InventoryItemWithDetails shape from a row fetched
+// with inventoryItemDetailInclude. The one place `snapshot` gets parsed and
+// `capabilityUses` gets joined onto it for every InventoryItem read path.
+//
+// The `as WeaponDetailFields`-style casts below are type-only: zod's
+// `.nullish()` types every optional snapshot field as `T | null | undefined`
+// so the schema can accept an omitted key, but buildInventorySnapshot always
+// writes an explicit value or `null` (never omits a key) — so a parsed
+// snapshot's fields are never actually `undefined` at runtime, only `T | null`
+// like the flat-column shape every existing reader already expects.
+export function resolveInventoryItem(row: RawInventoryItemRow): InventoryItemWithDetails {
+  const snapshot = readInventorySnapshot(row);
+  const usedByKey = new Map(row.capabilityUses.map((u) => [u.capabilityKey, u.used]));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude capabilityUses from `rest`, which InventoryItemWithDetails doesn't carry
+  const { capabilityUses, ...rest } = row;
+  return {
+    ...rest,
+    weaponDetail: (snapshot.weapon ?? null) as WeaponDetailFields | null,
+    armorDetail: (snapshot.armor ?? null) as ArmorDetailFields | null,
+    consumableDetail: snapshot.consumable
+      ? ({ ...snapshot.consumable, usesRemaining: row.usesRemaining } as ConsumableDetailFields)
+      : null,
+    capabilities: snapshot.capabilities.map((c) => capabilityColumnsFromSnapshot(c, usedByKey.get(c.key) ?? 0)),
+  };
+}
 
 // The Item catalog include used when fetching a catalog Item's detail rows
 // for snapshot — same shape as inventoryItemDetailInclude above but typed
@@ -203,7 +252,7 @@ export async function getOwnedInventoryItem(
   if (!item || item.characterId !== characterId) {
     throw new InvalidInventoryOperationError(`Inventory item not found on this character: ${inventoryItemId}`);
   }
-  return item;
+  return resolveInventoryItem(item);
 }
 
 export async function nextPosition(tx: Prisma.TransactionClient, characterId: string): Promise<number> {

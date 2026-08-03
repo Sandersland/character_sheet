@@ -29,6 +29,8 @@ import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { mirrorCapabilityUsedIncrement } from "@/lib/inventory/inventory-capability-use.js";
+import { capabilityColumnsFromSnapshot } from "@/lib/inventory/capabilities.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { deriveGrantedSpells, deriveItemSpells, type GrantedSpellSource } from "./granted-spells.js";
 import type { ItemSpellSourceItem } from "./granted-spells.js";
@@ -555,8 +557,8 @@ async function spendItemSpellResource(
     // WHERE re-evaluates against the committed row under its write lock, so
     // racers serialize and an overdraw loses (count 0 → whole tx rolls back)
     // instead of pushing `used` past maxCharges.
-    const spent = await ctx.tx.inventoryCapability.updateMany({
-      where: { id: meta.poolCapabilityId, used: { lte: meta.usesTotal - chargeCost } },
+    const spent = await ctx.tx.inventoryCapabilityUse.updateMany({
+      where: { capabilityKey: meta.poolCapabilityId, used: { lte: meta.usesTotal - chargeCost } },
       data: { used: { increment: chargeCost } },
     });
     if (spent.count === 0) {
@@ -564,22 +566,20 @@ async function spendItemSpellResource(
         `${entry.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${meta.itemName} has too few remaining`,
       );
     }
-    await mirrorCapabilityUsedIncrement(ctx.tx, meta.poolCapabilityId, chargeCost);
     // Re-read for the event data: under a race the pre-tx snapshot is stale.
-    const fresh = await ctx.tx.inventoryCapability.findUniqueOrThrow({
-      where: { id: meta.poolCapabilityId },
+    const fresh = await ctx.tx.inventoryCapabilityUse.findFirstOrThrow({
+      where: { capabilityKey: meta.poolCapabilityId },
       select: { used: true },
     });
     poolUsedAfter = fresh.used;
     capabilityUsedBefore = { capabilityId: meta.poolCapabilityId, used: fresh.used - chargeCost };
     capabilityUsedAfter = { capabilityId: meta.poolCapabilityId, used: fresh.used };
   } else if (meta.usesTotal !== Infinity) {
-    const updated = await ctx.tx.inventoryCapability.update({
-      where: { id: meta.capabilityId },
-      data: { used: { increment: 1 } },
+    await mirrorCapabilityUsedIncrement(ctx.tx, meta.capabilityId, 1);
+    const updated = await ctx.tx.inventoryCapabilityUse.findFirstOrThrow({
+      where: { capabilityKey: meta.capabilityId },
       select: { used: true },
     });
-    await mirrorCapabilityUsedIncrement(ctx.tx, meta.capabilityId, 1);
     capabilityUsedBefore = { capabilityId: meta.capabilityId, used: updated.used - 1 };
     capabilityUsedAfter = { capabilityId: meta.capabilityId, used: updated.used };
   }
@@ -952,8 +952,11 @@ const SPELLCASTING_SELECT = {
       },
     },
   },
+  // capabilities are reconstructed from `snapshot` + `capabilityUses` in
+  // buildSpellcastingOp below (#1649) — the four Inventory* mirror relations
+  // are gone.
   inventoryItems: {
-    select: { id: true, name: true, equippedSlot: true, attuned: true, capabilities: true },
+    select: { id: true, name: true, equippedSlot: true, attuned: true, snapshot: true, capabilityUses: true },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -1031,14 +1034,18 @@ function buildSpellcastingOp(
     state,
     row.classEntries[0]?.subclassRef,
     level,
-    row.inventoryItems.map((i) => ({
-      id: i.id,
-      name: i.name,
-      // #565: `equipped` is derived from equippedSlot (no persisted boolean).
-      equipped: i.equippedSlot != null,
-      attuned: i.attuned,
-      capabilities: i.capabilities,
-    })),
+    row.inventoryItems.map((i) => {
+      const snapshot = readInventorySnapshot(i);
+      const usedByKey = new Map(i.capabilityUses.map((u) => [u.capabilityKey, u.used]));
+      return {
+        id: i.id,
+        name: i.name,
+        // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+        equipped: i.equippedSlot != null,
+        attuned: i.attuned,
+        capabilities: snapshot.capabilities.map((c) => capabilityColumnsFromSnapshot(c, usedByKey.get(c.key) ?? 0)),
+      };
+    }),
     editionOf(row),
   );
 

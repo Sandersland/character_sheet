@@ -20,7 +20,7 @@ import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
 import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
 import { portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
 import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
-import type { CharacterWithRelations } from "./character-include.js";
+import { resolveCharacterInventory, type CharacterRow, type CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
   buildMergedArmorProficiencies,
@@ -240,7 +240,11 @@ function buildCampaignPreferencesView(row: CharacterWithRelations) {
   };
 }
 
-export function serializeCharacter(row: CharacterWithRelations) {
+export function serializeCharacter(rawRow: CharacterRow) {
+  // Reconstructs weaponDetail/armorDetail/consumableDetail/capabilities from
+  // `snapshot` (#1649) — every builder below is unchanged from before the
+  // mirror tables were dropped, because this is the only place the shape shifts.
+  const row = resolveCharacterInventory(rawRow);
   // Derivation order below: later steps read earlier outputs; do not reorder.
   // 1. XP → level + proficiency bonus (derive-don't-persist; docs/leveling.md).
   const progress = experienceProgress(row.experiencePoints);

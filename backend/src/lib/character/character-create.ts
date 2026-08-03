@@ -7,6 +7,7 @@ import {
   buildInventoryCreateFromCatalog,
   catalogItemDetailInclude,
   selectAutoEquip,
+  stripInventoryCreateForWrite,
 } from "@/lib/inventory/inventory.js";
 import {
   ALIGNMENTS,
@@ -1043,7 +1044,7 @@ async function persistCreatedCharacter(
         ],
       },
       ...(inventoryItemCreates.length > 0
-        ? { inventoryItems: { create: inventoryItemCreates } }
+        ? { inventoryItems: { create: inventoryItemCreates.map(stripInventoryCreateForWrite) } }
         : {}),
     },
     select: { id: true },

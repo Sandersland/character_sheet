@@ -8,16 +8,19 @@ import {
   setCharacterCurrency,
   currencyCredit,
   formatCurrencyForSummary,
+  asCurrency,
 } from "./inventory-currency.js";
 import {
   type AdjustQuantityOperation,
   type UpdateOperation,
   type RemoveOperation,
   type SellOperation,
+  type InventoryItemWithDetails,
   getOwnedInventoryItem,
   itemBuffKey,
 } from "./inventory-types.js";
 import { snapshotInventoryItemForUndo } from "./inventory-snapshot.js";
+import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 
 /**
  * Exported so the actions orchestrator (actionsRouter) can include
@@ -70,6 +73,44 @@ export async function applyAdjustQuantity(
   }
 }
 
+// Shallow-merges a partial detail override onto the item's current detail
+// block — correct because every detail block is flat (no nested objects of
+// its own) and op.weapon/armor/consumable only ever carries keys the DM
+// actually typed: an absent key is omitted by zod, never
+// present-with-value-undefined, so the spread can't accidentally wipe a field
+// the caller didn't touch. Absent `override` or `current` (item has no such
+// detail, or the op didn't touch it) passes `current` through unchanged.
+function mergedDetail<T extends object>(current: T | null, override: Partial<T> | undefined): T | null {
+  return override && current ? { ...current, ...override } : current;
+}
+
+// The weapon/armor/consumable partial overrides ("Club +1": bump just
+// weapon.damageModifier) used to nest a Prisma `update` onto the matching
+// detail table; #1649 deleted those tables, so the merged result is instead
+// re-validated through buildInventorySnapshot and written back to `snapshot`
+// whole.
+function mergedSnapshotSource(item: InventoryItemWithDetails, op: UpdateOperation) {
+  return {
+    name: op.name ?? item.name,
+    category: item.category,
+    weight: (op.weight ?? item.weight) ?? null,
+    cost: (op.cost ?? asCurrency(item.cost)) ?? null,
+    description: (op.description ?? item.description) ?? null,
+    slot: item.slot,
+    rarity: item.rarity,
+    requiresAttunement: item.requiresAttunement,
+    attunementPrereqKind: item.attunementPrereqKind,
+    attunementPrereqValue: item.attunementPrereqValue,
+    weaponDetail: mergedDetail(item.weaponDetail, op.weapon),
+    armorDetail: mergedDetail(item.armorDetail, op.armor),
+    consumableDetail: mergedDetail(item.consumableDetail, op.consumable),
+    // Untouched by `update` (it never edits capabilities) — round-tripping
+    // through readCapability inside buildInventorySnapshot reproduces the
+    // same union values capabilityColumnsFromSnapshot derived them from.
+    capabilities: item.capabilities,
+  };
+}
+
 export async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op: UpdateOperation) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
 
@@ -91,10 +132,7 @@ export async function applyUpdate(tx: Prisma.TransactionClient, characterId: str
       weight: op.weight,
       cost: op.cost !== undefined ? toJsonInput(op.cost) : undefined,
       description: op.description,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma nested-update input type gap forces the cast on weaponDetail
-      weaponDetail: op.weapon ? { update: op.weapon as any } : undefined,
-      armorDetail: op.armor ? { update: op.armor } : undefined,
-      consumableDetail: op.consumable ? { update: op.consumable } : undefined,
+      snapshot: buildInventorySnapshot(mergedSnapshotSource(item, op)) as unknown as Prisma.InputJsonValue,
     },
   });
 }
