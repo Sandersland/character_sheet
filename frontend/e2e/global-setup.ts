@@ -96,10 +96,11 @@ const ROSTER: Persona[] = [
     background: "Sage",
     className: "Wizard",
     experiencePoints: LEVEL_5_XP,
-    // Wizard level-1 loadout: 3 cantrips + 4 spells (SRD 5.2).
+    // Wizard level-1 loadout: 3 cantrips + a full 6-spell spellbook (#1513 —
+    // the spellbook figure is edition-invariant, not a 2024-only 4).
     spells: {
       cantripNames: ["Fire Bolt", "Mage Hand", "Light"],
-      spellNames: ["Magic Missile", "Shield", "Mage Armor", "Burning Hands"],
+      spellNames: ["Magic Missile", "Shield", "Mage Armor", "Burning Hands", "Detect Magic", "Sleep"],
     },
   },
   {

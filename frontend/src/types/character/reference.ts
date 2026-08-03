@@ -75,8 +75,13 @@ export interface ClassOption {
    *  answer (a 2014 Cleric/Druid prepares from the full class list — there is
    *  no creation-time list to pick from). `maxSpellLevel` (#1377) is the
    *  highest level a creation pick may be, served so the picker sends it as
-   *  `?maxLevel=` rather than a hardcoded 1; it is 0 for a cantrips-only step. */
-  level1SpellPicks: { cantrips: number; spells: number; maxSpellLevel: number } | null;
+   *  `?maxLevel=` rather than a hardcoded 1; it is 0 for a cantrips-only step.
+   *  `spellbookSize` (#1513): present, and equal to `spells`, ONLY for the
+   *  Wizard — it marks that this class's creation pick count is a spellbook
+   *  size, distinct from its (smaller) prepared cap, which is never served
+   *  here — `creationLeveledPickCap` in `lib/creationSpells.ts` is the one
+   *  place that reads it. Absent for every other class. */
+  level1SpellPicks: { cantrips: number; spells: number; maxSpellLevel: number; spellbookSize?: number } | null;
   /** #1161: PHB'24 primary ability/abilities the creation panel recommends; [] for homebrew. */
   primaryAbility: AbilityName[];
 }

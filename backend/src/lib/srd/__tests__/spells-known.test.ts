@@ -11,21 +11,25 @@ import {
   preparedSpellCountAt,
   maxSpellLevelForClass,
   magicalSecretsSpellLists,
+  level1SpellPicksFor,
 } from "@/lib/srd/spellcasting-tables.js";
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
-  it("Wizard scribes 4 at level 1 (its prepared count), then a flat 2 per level (#1131)", () => {
-    expect(levelUpSpellPicks("wizard", 1)).toBe(4);
+  it("Wizard scribes 6 at level 1 — its spellbook size, not its prepared count (#1513) — then a flat 2 per level", () => {
+    expect(levelUpSpellPicks("wizard", 1)).toBe(6);
     expect(levelUpSpellPicks("wizard", 2)).toBe(2);
     expect(levelUpSpellPicks("Wizard", 8)).toBe(2);
     expect(levelUpSpellPicks("wizard", 20)).toBe(2);
   });
 
-  it("level-1 picks equal the class's prepared count for every caster; 0 for non-casters (#1131)", () => {
-    for (const cls of ["wizard", "cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]) {
+  it("level-1 picks equal the class's prepared count for every caster except Wizard (its spellbook, #1513); 0 for non-casters", () => {
+    for (const cls of ["cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]) {
       expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024"));
     }
-    expect(levelUpSpellPicks("wizard", 1)).toBe(4);
+    // Mutation guard: Wizard's level-1 pick (6, the spellbook) must stay distinct
+    // from its prepared count (4) — the conflation this issue fixes.
+    expect(levelUpSpellPicks("wizard", 1)).toBe(6);
+    expect(preparedSpellCountAt("wizard", 1, null, {}, "EDITION_2024")).toBe(4);
     expect(levelUpSpellPicks("cleric", 1)).toBe(4);
     expect(levelUpSpellPicks("paladin", 1)).toBe(2);
     expect(levelUpSpellPicks("fighter", 1)).toBe(0);
@@ -69,6 +73,20 @@ describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
     expect(levelUpSpellPicks("fighter", 3, "Eldritch Knight")).toBe(3); // first prepared: 0 → 3
     expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight")).toBe(1); // 3 → 4
     expect(levelUpSpellPicks("rogue", 12, "Arcane Trickster")).toBe(0); // 8 → 8
+  });
+});
+
+describe("level1SpellPicksFor — spellbookSize marks the Wizard's spellbook/prepared split (#1513)", () => {
+  it("is 6 for Wizard in BOTH editions; every other caster omits the field", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      expect(level1SpellPicksFor("wizard", null, edition)?.spellbookSize).toBe(6);
+      expect(level1SpellPicksFor("wizard", null, edition)?.spells).toBe(6);
+    }
+    for (const cls of ["bard", "cleric", "sorcerer", "warlock", "paladin", "ranger"]) {
+      expect(level1SpellPicksFor(cls, null, "EDITION_2024")?.spellbookSize).toBeUndefined();
+    }
+    expect(level1SpellPicksFor("fighter", "Eldritch Knight", "EDITION_2024")?.spellbookSize).toBeUndefined();
+    expect(level1SpellPicksFor("rogue", "Arcane Trickster", "EDITION_2024")?.spellbookSize).toBeUndefined();
   });
 });
 

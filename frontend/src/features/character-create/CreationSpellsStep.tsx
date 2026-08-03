@@ -5,8 +5,58 @@
 import Spinner from "@/components/ui/Spinner";
 import SpellPicker, { type SpellPickerGroup } from "@/features/spells/SpellPicker";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
-import { splitCreationCatalog, toggleCreationPick, type CreationSpellCounts } from "@/lib/creationSpells";
+import {
+  creationLeveledPickCap,
+  splitCreationCatalog,
+  toggleCreationPick,
+  type CreationSpellCounts,
+} from "@/lib/creationSpells";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
+
+// #1513: shown only for the Wizard (counts.spellbookSize present) — the
+// prepared number is deliberately unstated: it's ability-score-dependent
+// (2014's INT-mod formula) and not on ClassOption, so the sheet is the source
+// of truth for it after creation.
+function spellbookNote(spellbookSize: number): string {
+  return `All ${spellbookSize} spells you choose are scribed into your spellbook, but only some can be prepared for casting at a time. After creation, your sheet marks which are prepared — you can swap them when you rest.`;
+}
+
+// Builds the two SpellPicker groups (cantrips, then leveled spells) from the
+// served counts + already-split catalog. Split out of the component so its
+// branching doesn't count against the component's own complexity gate; the
+// #1513 spellbook relabel/note only touches the leveled-spells branch.
+function buildSpellGroups(
+  counts: CreationSpellCounts,
+  options: ReturnType<typeof splitCreationCatalog>,
+  cantripIds: string[],
+  spellIds: string[],
+  onChange: (patch: Partial<CharacterDraft>) => void,
+): SpellPickerGroup[] {
+  const groups: SpellPickerGroup[] = [];
+  if (counts.cantrips > 0) {
+    groups.push({
+      key: "cantrips",
+      label: "Cantrips",
+      options: options.cantrips,
+      selectedIds: cantripIds,
+      cap: counts.cantrips,
+      onToggle: (id) => onChange({ cantripIds: toggleCreationPick(cantripIds, id, counts.cantrips) }),
+    });
+  }
+  if (counts.spells > 0) {
+    const cap = creationLeveledPickCap(counts);
+    groups.push({
+      key: "spells",
+      label: counts.spellbookSize != null ? "Spellbook" : "Spells",
+      options: options.spells,
+      selectedIds: spellIds,
+      cap,
+      onToggle: (id) => onChange({ spellIds: toggleCreationPick(spellIds, id, cap) }),
+      ...(counts.spellbookSize != null ? { note: spellbookNote(counts.spellbookSize) } : {}),
+    });
+  }
+  return groups;
+}
 
 export default function CreationSpellsStep({
   className,
@@ -24,28 +74,7 @@ export default function CreationSpellsStep({
   const { catalog, error, showSpinner } = useSpellCatalog({ className, maxLevel: counts.maxSpellLevel });
 
   const options = splitCreationCatalog(catalog);
-
-  const groups: SpellPickerGroup[] = [];
-  if (counts.cantrips > 0) {
-    groups.push({
-      key: "cantrips",
-      label: "Cantrips",
-      options: options.cantrips,
-      selectedIds: cantripIds,
-      cap: counts.cantrips,
-      onToggle: (id) => onChange({ cantripIds: toggleCreationPick(cantripIds, id, counts.cantrips) }),
-    });
-  }
-  if (counts.spells > 0) {
-    groups.push({
-      key: "spells",
-      label: "Spells",
-      options: options.spells,
-      selectedIds: spellIds,
-      cap: counts.spells,
-      onToggle: (id) => onChange({ spellIds: toggleCreationPick(spellIds, id, counts.spells) }),
-    });
-  }
+  const groups = buildSpellGroups(counts, options, cantripIds, spellIds, onChange);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

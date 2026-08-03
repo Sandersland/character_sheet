@@ -360,7 +360,15 @@ describe("buildCreatePayload", () => {
 });
 
 describe("creation spells (#1131)", () => {
-  const caster = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4, maxSpellLevel: 1 } });
+  // #1513: spellbookSize marks the Wizard's spellbook (6) as distinct from its
+  // prepared cap (4, never served on ClassOption) — buildCreatePayload just
+  // passes the draft's picks through, so this fixture change is documentation,
+  // not a behavior assertion (see creationSpells.test.ts / creationSteps.test.ts
+  // for the count-cap assertions).
+  const caster = makeClass({
+    name: "Wizard",
+    level1SpellPicks: { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 },
+  });
   const casterSelections = { race: undefined, class: caster, background: undefined };
 
   it("buildCreatePayload includes spells for a caster", () => {

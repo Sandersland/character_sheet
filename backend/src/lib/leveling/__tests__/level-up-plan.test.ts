@@ -283,8 +283,11 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     expect(freshL1("paladin")?.meta?.canSwap).toBeUndefined();
   });
 
-  it("a fresh level-1 Wizard offers 4 spells + 3 cantrips, no swap (#1131)", () => {
-    expect(freshL1("wizard")).toMatchObject({ count: 4, meta: { cantrips: 3 } });
+  // #1513: a fresh level-1 Wizard entry (multiclass-add) fills the spellbook
+  // (6), not the prepared count (4) — levelUpSpellPicks's level<=1 branch
+  // reads WIZARD_LEVEL1_SPELLBOOK_SIZE, same as creation.
+  it("a fresh level-1 Wizard offers 6 spells (its spellbook, #1513) + 3 cantrips, no swap", () => {
+    expect(freshL1("wizard")).toMatchObject({ count: 6, meta: { cantrips: 3 } });
     expect(freshL1("wizard")?.meta?.canSwap).toBeUndefined();
   });
 

@@ -84,7 +84,12 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
 }
 
 const rogue = makeClass();
-const wizard = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4, maxSpellLevel: 1 } });
+// #1513: spellbookSize marks the Wizard's split — its 6-spell spellbook (spells)
+// differs from its 4-spell prepared cap (never served on ClassOption).
+const wizard = makeClass({
+  name: "Wizard",
+  level1SpellPicks: { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 },
+});
 // #1510 AC-7: a 2014 Ranger IS spellcasting-flagged (unlike rogue above) but
 // has no Spellcasting feature until level 2, so the served level1SpellPicks is
 // null for a different reason — the step must still be omitted either way.
@@ -241,7 +246,7 @@ describe("creationStepMissing", () => {
     const draft = makeDraft({ className: "Wizard", cantripIds: ["c1"], spellIds: [] });
     expect(creationStepMissing("spells", draft, sel({ class: wizard }))).toEqual([
       "Cantrips: choose 3",
-      "Spells: choose 4",
+      "Spells: choose 6",
     ]);
   });
 
@@ -336,9 +341,14 @@ describe("creationMissing", () => {
   it("blocks an incomplete caster's spell picks and passes a complete one (#1131)", () => {
     const caster = { name: "Mo", alignment: "Neutral Good", race: "Elf", className: "Wizard", background: "Sage" };
     const incomplete = makeDraft({ ...caster, cantripIds: ["c1"], spellIds: [] });
-    expect(creationMissing(incomplete, sel({ class: wizard }))).toEqual(["Cantrips: choose 3", "Spells: choose 4"]);
+    expect(creationMissing(incomplete, sel({ class: wizard }))).toEqual(["Cantrips: choose 3", "Spells: choose 6"]);
 
-    const complete = makeDraft({ ...caster, cantripIds: ["c1", "c2", "c3"], spellIds: ["s1", "s2", "s3", "s4"] });
+    // #1513: a complete Wizard book needs 6 leveled picks, not 4.
+    const complete = makeDraft({
+      ...caster,
+      cantripIds: ["c1", "c2", "c3"],
+      spellIds: ["s1", "s2", "s3", "s4", "s5", "s6"],
+    });
     expect(creationMissing(complete, sel({ class: wizard }))).toEqual([]);
   });
 

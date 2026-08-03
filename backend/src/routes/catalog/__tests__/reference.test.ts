@@ -76,7 +76,9 @@ describe("GET /api/reference", () => {
 
     expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
     expect(byName("Paladin").level1SpellPicks).toEqual({ cantrips: 0, spells: 2, maxSpellLevel: 1 });
-    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 4, maxSpellLevel: 1 });
+    // Wizard is the one class where the served `spells` count is the spellbook
+    // size (6), not the prepared count (4) — #1513, spellbookSize marks the split.
+    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 });
     expect(byName("Fighter").level1SpellPicks).toBeNull();
 
     // #1377: maxSpellLevel replaces the client's hardcoded 1. It resolves to 1 for
@@ -106,7 +108,9 @@ describe("GET /api/reference", () => {
     expect(byName("Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
     expect(byName("Sorcerer").level1SpellPicks).toEqual({ cantrips: 4, spells: 2, maxSpellLevel: 1 });
     expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
-    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1 });
+    // #1513: spellbookSize marks the Wizard's spellbook (6) as distinct from its
+    // prepared count (4) — both editions serve the same six-spell spellbook.
+    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 });
     // Cleric/Druid: no creation-time list exists in SRD 5.1 (prepared from the
     // full class list, capped by WIS mod + level on the sheet) — 0 spells,
     // cantrips only, and maxSpellLevel 0 alongside it (#1510's micro-decision).
@@ -114,6 +118,31 @@ describe("GET /api/reference", () => {
     expect(byName("Druid").level1SpellPicks).toEqual({ cantrips: 2, spells: 0, maxSpellLevel: 0 });
     expect(byName("Paladin").level1SpellPicks).toBeNull();
     expect(byName("Ranger").level1SpellPicks).toBeNull();
+  });
+
+  // #1513 AC: spellbookSize asserted for both editions from one test, plus
+  // byte-identity for a known caster (Bard), another prepared caster (Cleric),
+  // and a non-caster (Fighter) — the wire proof that only Wizard changed.
+  it("spellbookSize is 6 for Wizard in both editions; Bard/Cleric/Fighter are byte-identical (#1513)", async () => {
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const byName = (body: any, name: string) => body.classes.find((c: { name: string }) => c.name === name);
+
+    expect(byName(res2024.body, "Wizard").level1SpellPicks).toEqual({
+      cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6,
+    });
+    expect(byName(res2014.body, "Wizard").level1SpellPicks).toEqual({
+      cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6,
+    });
+
+    expect(byName(res2024.body, "Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
+    expect(byName(res2024.body, "Cleric").level1SpellPicks).toEqual({ cantrips: 3, spells: 4, maxSpellLevel: 1 });
+    expect(byName(res2024.body, "Fighter").level1SpellPicks).toBeNull();
+
+    expect(byName(res2014.body, "Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
+    expect(byName(res2014.body, "Cleric").level1SpellPicks).toEqual({ cantrips: 3, spells: 0, maxSpellLevel: 0 });
+    expect(byName(res2014.body, "Fighter").level1SpellPicks).toBeNull();
   });
 
   // #1161: each class carries its PHB'24 primary ability/abilities so the
