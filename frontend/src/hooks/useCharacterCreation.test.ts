@@ -12,11 +12,13 @@ const fetchReference = vi.fn();
 const fetchItems = vi.fn();
 const createCharacter = vi.fn();
 const addCharacterToCampaign = vi.fn();
+const uploadCharacterPortrait = vi.fn();
 vi.mock("@/api/client", () => ({
   fetchReference: (...args: unknown[]) => fetchReference(...args),
   fetchItems: (...args: unknown[]) => fetchItems(...args),
   createCharacter: (...args: unknown[]) => createCharacter(...args),
   addCharacterToCampaign: (...args: unknown[]) => addCharacterToCampaign(...args),
+  uploadCharacterPortrait: (...args: unknown[]) => uploadCharacterPortrait(...args),
 }));
 
 const DRAFT_KEY = "character-draft:new";
@@ -74,7 +76,6 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     className: "",
     subclass: "",
     subclassId: "",
-    portraitUrl: "",
     background: "",
     useCustomBackground: false,
     customBackground: "",
@@ -138,6 +139,7 @@ beforeEach(() => {
   fetchItems.mockReset().mockResolvedValue([]);
   createCharacter.mockReset().mockResolvedValue({ id: "char-99" });
   addCharacterToCampaign.mockReset().mockResolvedValue({});
+  uploadCharacterPortrait.mockReset().mockResolvedValue({ id: "char-99" });
 });
 
 afterEach(() => {
@@ -256,6 +258,90 @@ describe("useCharacterCreation", () => {
     expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
     expect(result.current.submitError).toBeNull();
     expect(addCharacterToCampaign).not.toHaveBeenCalled();
+    // #1616: no staged portrait means no upload call at all.
+    expect(uploadCharacterPortrait).not.toHaveBeenCalled();
+  });
+
+  // #1616: the create payload no longer carries any portrait field — portraits
+  // are uploaded blobs, never client-supplied URLs.
+  it("sends no portraitUrl in the create payload", async () => {
+    seedDraft(validDraft());
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect("portraitUrl" in createCharacter.mock.calls[0][0]).toBe(false);
+  });
+
+  // #1616: a staged portrait file is uploaded AFTER the character exists (and
+  // after the campaign attach), against the created id.
+  it("uploads the staged portrait after create and attach, then navigates", async () => {
+    seedDraft({ ...validDraft(), campaignId: "camp-1" });
+    const { result } = await mount();
+    const file = new File(["png"], "hero.png", { type: "image/png" });
+
+    act(() => result.current.setPortraitFile(file));
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(uploadCharacterPortrait).toHaveBeenCalledWith("char-99", file);
+    // Sequencing: the upload ran after both create and attach.
+    expect(uploadCharacterPortrait.mock.invocationCallOrder[0]).toBeGreaterThan(
+      createCharacter.mock.invocationCallOrder[0],
+    );
+    expect(uploadCharacterPortrait.mock.invocationCallOrder[0]).toBeGreaterThan(
+      addCharacterToCampaign.mock.invocationCallOrder[0],
+    );
+    expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
+    expect(result.current.submitError).toBeNull();
+  });
+
+  // The character exists by the time the upload can fail — the message must say
+  // so, and a retry must not re-create.
+  it("an upload failure keeps the created character, surfaces a retryable error, and does not navigate", async () => {
+    uploadCharacterPortrait
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce({ id: "char-99" });
+    seedDraft(validDraft());
+    const { result } = await mount();
+
+    act(() => result.current.setPortraitFile(new File(["png"], "hero.png", { type: "image/png" })));
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+    expect(result.current.submitError).toMatch(/portrait/i);
+    expect(result.current.submitError).toMatch(/network down/);
+    expect(navigate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.save();
+    });
+    // Retry reuses the created id: no second create, one more upload.
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+    expect(uploadCharacterPortrait).toHaveBeenCalledTimes(2);
+    expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
+  });
+
+  it("Start Over (clear) drops the staged portrait file", async () => {
+    seedDraft(validDraft());
+    const { result } = await mount();
+
+    act(() => result.current.setPortraitFile(new File(["png"], "hero.png", { type: "image/png" })));
+    expect(result.current.portraitFile).not.toBeNull();
+
+    act(() => result.current.clear());
+    expect(result.current.portraitFile).toBeNull();
+
+    act(() => result.current.update(validDraft()));
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(uploadCharacterPortrait).not.toHaveBeenCalled();
   });
 
   it("does not submit an invalid draft", async () => {

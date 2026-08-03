@@ -503,23 +503,15 @@ describe("characters routes", () => {
       createdCharacterIds = createdCharacterIds.filter((existingId) => existingId !== id);
     });
 
-    // Accepted-and-ignored until #1616 deletes the field from the create UI:
-    // the pre-upload create page still sends portraitUrl unconditionally and
-    // the schema is .strict(), so dropping it here would 400 every creation.
-    it("accepts portraitUrl but never persists or serializes it (#1615)", async () => {
+    // #1616 closed #1615's interim accepted-and-ignored state: the create UI
+    // stages a file and uploads via portraitRouter after create, so a client-
+    // supplied URL is rejected by .strict() like every other unknown field.
+    it("rejects portraitUrl in the create payload with 400 (#1616)", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
         .send({ ...createBody, portraitUrl: "https://example.com/p.jpg" });
 
-      expect(response.status).toBe(201);
-      createdCharacterIds.push(response.body.id);
-      expect(response.body.portraitUrl).toBeUndefined();
-
-      const row = await prisma.character.findUnique({
-        where: { id: response.body.id },
-        select: { portraitKey: true },
-      });
-      expect(row?.portraitKey).toBeNull();
+      expect(response.status).toBe(400);
     });
 
     it("allows a homebrew background with no catalog match", async () => {

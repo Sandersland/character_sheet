@@ -984,10 +984,6 @@ async function persistCreatedCharacter(
       owner: { connect: { id: ownerId } },
       name: input.name,
       alignment: input.alignment,
-      // input.portraitUrl is deliberately NOT persisted (#1615): portraits are
-      // uploaded blobs (Character.portraitKey, written only by portraitRouter).
-      // The create field survives as accepted-and-ignored until #1616 removes
-      // it end to end — see its comment in createCharacterSchema.
       // The only write of rulesEdition (write-once, #1285). The `edition` local
       // that resolveSelections computed for the creation-time subclass gate
       // check isn't returned to its caller, so this re-derives it from the same

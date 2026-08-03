@@ -13,7 +13,6 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     className: "",
     subclass: "",
     subclassId: "",
-    portraitUrl: "",
     background: "",
     useCustomBackground: false,
     customBackground: "",
