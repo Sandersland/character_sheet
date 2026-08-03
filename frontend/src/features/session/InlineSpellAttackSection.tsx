@@ -126,11 +126,14 @@ export default function InlineSpellAttackSection({
     if (busyId) return;
     setBusyId(spell.id);
     const damageTotal = rollDamage(spell);
-    // Consumed once the cast's damage roll has read it, so a later damage-only
-    // replay can never pick up this consumed swing's id.
-    delete swingIdRef.current[spell.id];
     try {
       await castMutation.mutateAsync([{ type: "castSpell", entryId: spell.id, roll: damageTotal }]);
+      // Consumed only once the cast actually commits (#1360) — a rejected
+      // mutateAsync falls to the catch below and offers a retry on the same
+      // row (no re-roll), so the entry must survive to back that retry's
+      // damage roll. A failed-then-retried cast logs two damage events
+      // sharing one swingId, correctly — both belong to the one attack.
+      delete swingIdRef.current[spell.id];
       // The Attack action was already spent when the sheet opened (enterAttackMode).
       // grantExtraAction refunds that pre-commit so commitActionSpell's own
       // decrement nets to ZERO — recording the cantrip + tearing down attack mode

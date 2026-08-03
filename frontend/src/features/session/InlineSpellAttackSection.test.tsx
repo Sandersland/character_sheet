@@ -210,4 +210,33 @@ describe("InlineSpellAttackSection — swingId groups attack + damage (#1360)", 
     expect(damageEvent.swingId).toBe(attackEvent.swingId);
     expect(damageEvent).toMatchObject({ verdict: "crit", crit: true });
   });
+
+  it("keeps the swingId available for a retry after a failed cast (no re-roll)", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 → 11
+    renderSection(makeCharacter([fireBolt]));
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    const attackId = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((e) => e.kind === "attack")!.swingId;
+
+    mockCast.mockRejectedValueOnce(new Error("network blip"));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(mockCast).toHaveBeenCalledTimes(1));
+
+    vi.mocked(logRoll).mockClear();
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValueOnce(updated);
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const retryDamage = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((e) => e.kind === "damage")!;
+    expect(retryDamage.swingId).toBe(attackId);
+    expect(retryDamage.verdict).toBe("hit");
+  });
 });

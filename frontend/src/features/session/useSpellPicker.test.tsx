@@ -303,6 +303,31 @@ describe("useSpellPicker — spell attacks carry swingId (#1360)", () => {
     expect(secondAttackId).not.toBe(firstAttackId);
     expect(secondDamageId).toBe(secondAttackId);
   });
+
+  it("keeps the swingId available for a retry after a failed cast (no re-roll)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 → 11
+    const opts = makeOpts([attackSpell]);
+    const { result } = render(opts);
+
+    act(() => result.current.handleAttackRoll(attackSpell));
+    const attackId = mockLogRoll.mock.calls.map((c) => c[2]).find((e) => e.kind === "attack")!.swingId;
+
+    mockApply.mockRejectedValueOnce(new Error("network blip"));
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+    expect(result.current.rowFor(attackSpell).error).toBeTruthy();
+
+    mockLogRoll.mockClear();
+    mockApply.mockResolvedValueOnce(updatedChar);
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+
+    const retryDamage = mockLogRoll.mock.calls.map((c) => c[2]).find((e) => e.kind === "damage")!;
+    expect(retryDamage.swingId).toBe(attackId);
+    expect(retryDamage.verdict).toBe("hit");
+  });
 });
 
 // #1164: durable post-cast feedback — the result well, the log-symmetry fix
