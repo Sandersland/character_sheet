@@ -368,6 +368,9 @@ describe("campaign entities (#248)", () => {
 
     afterAll(() => {
       vi.unstubAllEnvs();
+      // A later suite in this file would otherwise inherit a store memoized
+      // on this suite's now-unstubbed tmpdir.
+      __resetBlobStoreForTests();
     });
 
     // Fixture images are generated with sharp at runtime — no binaries in-repo.
