@@ -233,7 +233,13 @@ export async function awardCampaignItem(params: {
       data: {
         itemName: created.name,
         quantityDelta: quantity,
-        campaignItemId: item.id,
+        // `itemId`, not the pre-#1646 `campaignItemId`: this is NEW blob content
+        // and the column it names is now itemId. Award events written before the
+        // merge keep the old key — the log is append-only — but nothing reads
+        // this field, so the two spellings never need reconciling.
+        // resolveSnapshotRefs reads the legacy key off the DELETED-item
+        // snapshot, which is a different blob and does still need its fallback.
+        itemId: item.id,
         recipientName: character.name,
       },
       actor: "dm",
@@ -313,6 +319,9 @@ export async function campaignItemHolders(
   });
 
   for (const row of rows) {
+    // Unreachable at runtime — the query above filters itemId to the given ids.
+    // Present because Prisma types the column `string | null`, and narrowing is
+    // cheaper to read than a non-null assertion.
     if (!row.itemId) continue;
     const list = map.get(row.itemId) ?? [];
     list.push({

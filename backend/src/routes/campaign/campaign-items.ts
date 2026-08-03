@@ -280,7 +280,9 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
  * POST /api/campaigns/:id/items/:campaignItemId/revoke
  * Owner-only counterpart: removes the provenance-matched inventory row (undoable
  * audit event on the target character). A player-modified snapshot is still
- * revocable — the match is by campaignItemId, not by field equality.
+ * revocable — the match is by the item's id, not by field equality. The URL
+ * param keeps its pre-#1646 name so existing clients keep working; the column
+ * it resolves against is InventoryItem.itemId.
  */
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (req, res) => {
   await assertCampaignOwner(
