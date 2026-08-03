@@ -109,6 +109,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
       context.targetEntry.newLevel - 1,
       picked ?? persisted,
       context.targetEntry.newLevel,
+      context.planCharacter.edition,
     );
     res.json({
       target: {

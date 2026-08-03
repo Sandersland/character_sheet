@@ -126,7 +126,7 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
 // branch in activity.ts (restores before.spellcasting) — no new EventType.
 
 async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+  const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
 
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -149,10 +149,11 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const state = normalizeSpellcastingMutable(row.spellcasting);
   if (!state.spells.some((s) => s.source === "subclass")) return; // normal case
 
-  // Grants across every class entry, symmetric with the serialize read side.
+  // Grants across every class entry, symmetric with the serialize read side —
+  // ctx.edition, the same authority the clamp-on-read resolves via editionOf.
   const validIds = new Set(
     row.classEntries
-      .flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel)))
+      .flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel), edition))
       .map((s) => s.id),
   );
 
