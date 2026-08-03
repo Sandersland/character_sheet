@@ -120,6 +120,28 @@ describe("campaign item award/revoke (#381)", () => {
     expect(await prisma.inventoryItem.findFirst({ where: { id: row!.id } })).toBeNull();
   });
 
+  // Since #1646, dmNotes lives on Item alongside seeded catalog rows — nothing
+  // about the TABLE keeps it private any more, so this pins the includeDmNotes
+  // flag as the sole guard on the two payloads a DM-list test wouldn't cover.
+  // Stringify-and-search is deliberately blunt: it catches the field at ANY
+  // nesting depth, including inside an inventory snapshot, which a keyed
+  // assertion on the top-level object would miss.
+  it("never carries dmNotes on the award response or the character sheet", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Secret Sword", dmNotes: "only the DM should see this" });
+
+    const awardResponse = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR, quantity: 1 });
+    expect(awardResponse.status).toBe(200);
+    expect(JSON.stringify(awardResponse.body)).not.toContain("dmNotes");
+
+    const sheet = await agent(cookiePlayer).get(`/api/characters/${CHAR}`);
+    expect(sheet.status).toBe(200);
+    expect(JSON.stringify(sheet.body)).not.toContain("dmNotes");
+
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
+  });
+
   it("PL-1: awarding a slotted gear item snapshots slot onto the InventoryItem", async () => {
     const { id } = await createItem({ name: "Amulet of Health", category: "gear", slot: "NECK" });
     await agent(cookieOwner)
