@@ -11,13 +11,14 @@
 // lists at 3/3/5/7/9 (Cleric WIS, Warlock CHA) — the 2024 subclass grant is 3
 // (#1128), so the former level-1 rows now fire at 3 pending the content resweep (#1133).
 //
-// SCHEMA GAP (disclosed by Wizard's #1234, hit a third time by Paladin's
-// #1229): this model has no `edition` column, and Subclass rows are
-// edition-shared, so a 2024 Devotion Paladin is still GRANTED Sanctuary and
-// Lesser Restoration here even though paladin-features.ts's own 2024 feature
-// text now says Shield of Faith and Aid. Not fixed in this issue — follow-up
-// filed.
+// Per-row `edition` (#1625): omitted = shared (NULL column, served to both
+// editions); a list that diverges forks into one row per edition. The Paladin
+// oath / Cleric domain / Warlock patron lists below are still the 2014 texts
+// on shared rows — re-authoring the four diverging 2024 lists is #1626's
+// content pass, deliberately not this mechanism change.
 import { z } from "zod";
+
+import type { SeedEdition } from "./edition.js";
 
 export interface SubclassGrantedSpellSeed {
   /** Must match a CLASSES entry name. */
@@ -36,6 +37,10 @@ export interface SubclassGrantedSpellSeed {
     | "intelligence"
     | "wisdom"
     | "charisma";
+  // Omitted = shared (NULL column, granted in both editions, #1625). Only a
+  // grant that exists in one edition (or diverges) sets this — same convention
+  // as SubclassSeed/FeatSeed.
+  edition?: SeedEdition;
 }
 
 // Validated at seed time (prisma/seed/validate.ts) — #1247's Elementalism bug
@@ -50,26 +55,33 @@ export const subclassGrantedSpellSeedSchema = z.object({
   spellName: z.string().min(1),
   gateLevel: z.number().int().positive(),
   castingAbility: z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]),
+  edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
 });
 
 export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   // Warrior of Shadow (Monk) — Minor Illusion, migrated from the former in-code
   // MINOR_ILLUSION snapshot in lib/spellcasting/granted-spells.ts (#898).
+  // EDITION_2024: the Warrior of * subclasses are the PHB'24/SRD 5.2 reworks
+  // on shared Subclass rows, so without the tag this grant would leak to 2014
+  // Monks once #1313/#1372 seed the 2014 Way of * content (#1625).
   {
     className: "Monk",
     subclassName: "Warrior of Shadow",
     spellName: "Minor Illusion",
     gateLevel: 3,
     castingAbility: "wisdom",
+    edition: "EDITION_2024",
   },
   // Warrior of the Elements (Monk) — Manipulate Elements (L3) grants the
-  // Elementalism cantrip (#1247, SRD 5.2 / PHB'24).
+  // Elementalism cantrip (#1247, SRD 5.2 / PHB'24). EDITION_2024 for the same
+  // reason as Warrior of Shadow above.
   {
     className: "Monk",
     subclassName: "Warrior of the Elements",
     spellName: "Elementalism",
     gateLevel: 3,
     castingAbility: "wisdom",
+    edition: "EDITION_2024",
   },
 
   // Oath of Devotion (Paladin) — CHA, gated 3/5/9/13/17.

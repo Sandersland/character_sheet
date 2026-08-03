@@ -62,6 +62,39 @@ describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
     expect(grant!.gateLevel).toBe(3);
     expect(grant!.castingAbility).toBe("wisdom");
   });
+
+  // #1625: the two Monk grants are PHB'24/SRD 5.2-native content on shared
+  // Subclass rows — untagged, they would leak to 2014 Monks once #1313/#1372
+  // seed the 2014 Way of * content. Pins the tag so a content resweep can't
+  // silently drop it.
+  it("the two Monk grants are tagged EDITION_2024 (2024-native content, #1625)", () => {
+    const monkGrants = SUBCLASS_GRANTED_SPELLS.filter((g) => g.className === "Monk");
+    expect(monkGrants.map((g) => `${g.subclassName}::${g.spellName}::${g.edition}`).sort()).toEqual([
+      "Warrior of Shadow::Minor Illusion::EDITION_2024",
+      "Warrior of the Elements::Elementalism::EDITION_2024",
+    ]);
+  });
+
+  // #1625: the widened DB unique still ADMITS a shared (NULL) row alongside a
+  // tagged twin for the same (subclass, spell) — deriveGrantedSpells' set
+  // filter would then serve BOTH rows to one character. Structurally forbidden
+  // here at authoring time instead: per (subclass, spell), either one shared
+  // row XOR per-edition rows, never a mix, and never a duplicate edition.
+  it("per (subclass, spell): one shared row XOR per-edition rows, no duplicate edition (#1625)", () => {
+    const editionsByPair = new Map<string, (string | null)[]>();
+    for (const g of SUBCLASS_GRANTED_SPELLS) {
+      const key = `${g.className}::${g.subclassName}::${g.spellName}`;
+      const editions = editionsByPair.get(key) ?? [];
+      editions.push(g.edition ?? null);
+      editionsByPair.set(key, editions);
+    }
+    for (const [key, editions] of editionsByPair) {
+      if (editions.includes(null)) {
+        expect(editions, `${key}: a shared (untagged) row must be the pair's ONLY row`).toHaveLength(1);
+      }
+      expect(new Set(editions).size, `${key}: duplicate rows for one edition`).toBe(editions.length);
+    }
+  });
 });
 
 // #1308: CLASSES.subclassLevel holds the PHB'14 gate (subclassGateLevel ignores
