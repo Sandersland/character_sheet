@@ -46,12 +46,10 @@ export const createCharacterSchema = z
   .object({
     name: z.string().min(1),
     alignment: z.string().min(1),
-    // Accepted and IGNORED (#1615): portraits are uploaded blobs keyed by
-    // Character.portraitKey, never client-supplied URLs. The field stays
-    // parseable only because the pre-#1616 create UI still sends it
-    // unconditionally and this schema is .strict() — createCharacter drops it
-    // on the floor. #1616 deletes it from the create payload, then from here.
-    portraitUrl: z.string().nullable().optional(),
+    // portraitUrl is absent (#1616, closing #1615's interim): portraits are
+    // uploaded blobs keyed by Character.portraitKey, never client-supplied
+    // URLs — the create UI stages a file and uploads it via portraitRouter
+    // after create; .strict() 400s any client still sending a URL.
     experiencePoints: z.number().int().nonnegative().optional(),
     race: z.string().min(1),
     background: z.string().min(1),

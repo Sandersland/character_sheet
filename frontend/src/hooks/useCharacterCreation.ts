@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { addCharacterToCampaign, createCharacter, fetchItems } from "@/api/client";
+import { addCharacterToCampaign, createCharacter, fetchItems, uploadCharacterPortrait } from "@/api/client";
 import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import type { ToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import {
@@ -43,6 +43,12 @@ export interface CharacterCreation {
   toolChoices: ToolProficiencyChoices;
   backgroundBonuses: CreationBackgroundBonuses;
   catalog: Item[];
+  /** #1616: the staged portrait image, uploaded after create. Component state,
+   *  not draft state — a File JSON-serializes to {}, so it cannot ride the
+   *  persisted CharacterDraft; a mid-ceremony refresh loses the selection
+   *  (retryable from the sheet's Story tab after creation). */
+  portraitFile: File | null;
+  setPortraitFile: (file: File | null) => void;
   preview: CreationPreview;
   missing: string[];
   isValid: boolean;
@@ -75,6 +81,7 @@ export function useCharacterCreation(): CharacterCreation {
   const { reference, error: referenceError } = useReferenceData(draft.rulesEdition);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
   const [catalog, setCatalog] = useState<Item[]>([]);
   const showSpinner = useDelayedFlag(!reference && !referenceError);
 
@@ -135,12 +142,14 @@ export function useCharacterCreation(): CharacterCreation {
     navigate("/");
   }
 
-  // Wraps useCharacterDraft's clear so Start Over also resets submitError —
-  // clearDraft() alone already drops any pending created-but-unattached id
-  // (draft.createdId, part of the same persisted object).
+  // Wraps useCharacterDraft's clear so Start Over also resets submitError and
+  // the staged portrait file — clearDraft() alone already drops any pending
+  // created-but-unattached id (draft.createdId, part of the same persisted
+  // object), but those two live in component state beside the draft.
   function clear() {
     clearDraft();
     setSubmitError(null);
+    setPortraitFile(null);
   }
 
   async function save() {
@@ -152,6 +161,9 @@ export function useCharacterCreation(): CharacterCreation {
     // refresh (CharacterDraft is persisted; component state is not), silently
     // reopening the orphan-and-duplicate bug this field exists to close.
     let id = draft.createdId;
+    // Which of the three sequential calls below failed — the character exists
+    // once "create" is behind us, and the error copy must say so.
+    let step: "create" | "attach" | "upload" = "create";
     try {
       if (!id) {
         const payload = buildCreatePayload(
@@ -171,16 +183,26 @@ export function useCharacterCreation(): CharacterCreation {
       // never hits the join's edition-mismatch guard. Re-attaching the same
       // campaign is an idempotent no-op server-side, so a retry is safe.
       if (draft.campaignId) {
+        step = "attach";
         await addCharacterToCampaign(id, draft.campaignId);
+      }
+      // #1616: the portrait upload rides the same retry template as the attach —
+      // on failure, save() re-runs with draft.createdId set, skipping the
+      // non-idempotent create and re-running the idempotent steps.
+      if (portraitFile) {
+        step = "upload";
+        await uploadCharacterPortrait(id, portraitFile);
       }
       clear();
       // Replace (not push) so the now-stale empty form doesn't linger in history.
       navigate(`/characters/${id}`, { replace: true });
     } catch (err) {
       setSubmitError(
-        id
+        step === "attach"
           ? `Character created, but couldn't join the campaign — ${errorMessage(err, "try again")}`
-          : errorMessage(err, "Couldn't save. Try again."),
+          : step === "upload"
+            ? `Character created, but the portrait upload failed — ${errorMessage(err, "try again")}. Save again to retry, or finish and add it from the sheet's Story tab.`
+            : errorMessage(err, "Couldn't save. Try again."),
       );
     } finally {
       setSubmitting(false);
@@ -199,6 +221,8 @@ export function useCharacterCreation(): CharacterCreation {
     toolChoices,
     backgroundBonuses,
     catalog,
+    portraitFile,
+    setPortraitFile,
     preview: derivePreview(draft, selections),
     missing,
     isValid: missing.length === 0,

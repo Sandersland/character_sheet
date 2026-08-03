@@ -83,7 +83,6 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     className: "",
     subclass: "",
     subclassId: "",
-    portraitUrl: "",
     background: "",
     useCustomBackground: false,
     customBackground: "",
@@ -326,7 +325,8 @@ describe("buildCreatePayload", () => {
     expect(payload.classes).toEqual([{ name: "Rogue", subclass: null, subclassId: undefined }]);
     expect(payload.skillProficiencies).toEqual(["perception", "stealth"]);
     expect(payload.toolChoices).toBeUndefined();
-    expect(payload.portraitUrl).toBeNull();
+    // #1616: portraits are uploaded blobs — the create payload never carries a URL.
+    expect("portraitUrl" in payload).toBe(false);
     expect(payload.startingEquipment).toBeUndefined();
     expect(payload.backgroundStartingEquipment).toBeUndefined();
   });
