@@ -5,9 +5,11 @@
 // helpful refusal.
 export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 
+// No "image/jpg" here, unlike the backend whitelist: File.type is browser-set
+// and browsers always report "image/jpeg", so the alias could never match a
+// picked file. The backend keeps it for programmatic clients.
 export const ACCEPTED_IMAGE_TYPES: readonly string[] = [
   "image/jpeg",
-  "image/jpg",
   "image/png",
   "image/webp",
   "image/gif",

@@ -44,8 +44,16 @@ export default function PortraitCard() {
         imageUrl={character.portraitUrl ?? null}
         pending={upload.isPending || remove.isPending}
         error={upload.error ?? remove.error}
-        onSelect={upload.mutate}
-        onRemove={() => remove.mutate()}
+        // Cross-reset the sibling mutation so a stale error from the previous
+        // action can't outlive (or shadow) the outcome of this one.
+        onSelect={(file) => {
+          remove.reset();
+          upload.mutate(file);
+        }}
+        onRemove={() => {
+          upload.reset();
+          remove.mutate();
+        }}
         label="Portrait"
       />
     </Card>

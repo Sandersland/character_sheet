@@ -191,6 +191,7 @@ export function useCharacterCreation(): CharacterCreation {
       // non-idempotent create and re-running the idempotent steps.
       if (portraitFile) {
         step = "upload";
+        // Result discarded — navigate() triggers a fresh character fetch on the sheet.
         await uploadCharacterPortrait(id, portraitFile);
       }
       clear();

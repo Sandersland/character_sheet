@@ -21,8 +21,10 @@ export class PortraitImageError extends Error {
 // Input whitelist: raster formats only. SVG is deliberately absent — sharp can
 // sniff and even rasterize it, but as a document format it's the classic
 // stored-XSS/script-smuggling carrier. Values are the declared Content-Types
-// accepted for each sniffed format ("image/jpg" is a common non-IANA alias
-// browsers still emit for drag-dropped files).
+// accepted for each sniffed format ("image/jpg" is a common non-IANA alias:
+// browsers always send "image/jpeg", but a programmatic client declaring the
+// alias over honest JPEG bytes shouldn't 400 — which is also why the frontend
+// guard's ACCEPTED_IMAGE_TYPES omits it).
 const ACCEPTED_MIME_BY_FORMAT: Readonly<Record<string, readonly string[]>> = {
   jpeg: ["image/jpeg", "image/jpg"],
   png: ["image/png"],

@@ -89,6 +89,33 @@ describe("PortraitCard", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Portrait exceeds the 5 MB limit");
   });
 
+  // The two mutations cross-reset: without it, an earlier upload failure would
+  // keep shadowing the alert after a later remove fails (error = upload ?? remove).
+  it("sequential failures show only the LATEST action's error", async () => {
+    vi.mocked(client.uploadCharacterPortrait).mockRejectedValue(new Error("upload boom"));
+    vi.mocked(client.deleteCharacterPortrait).mockRejectedValue(new Error("remove boom"));
+    renderWithCharacter(
+      <PortraitCard />,
+      makeCharacter({ portraitUrl: "/api/characters/char-1/portrait?v=v1" }),
+    );
+
+    await userEvent.upload(screen.getByLabelText("Portrait"), png());
+    expect(await screen.findByRole("alert")).toHaveTextContent("upload boom");
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("remove boom"),
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent("upload boom");
+
+    // And back the other way: a new select clears the stale remove error.
+    vi.mocked(client.uploadCharacterPortrait).mockResolvedValue(
+      makeCharacter({ portraitUrl: "/api/characters/char-1/portrait?v=v2" }),
+    );
+    await userEvent.upload(screen.getByLabelText("Portrait"), png());
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
   it("disables the actions while a write is in flight", async () => {
     let resolveUpload: (c: Character) => void = () => {};
     vi.mocked(client.uploadCharacterPortrait).mockImplementation(
