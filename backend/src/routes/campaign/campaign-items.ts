@@ -34,6 +34,16 @@ import { prisma } from "@/lib/core/prisma.js";
 
 export const campaignItemsRouter = Router();
 
+// Shared by PATCH and DELETE: findFirst with the full predicate, not
+// findUnique(id) + an in-code campaign check — the latter leaks existence
+// through timing and is easy to forget on a new endpoint (#1646).
+function findOwnedCampaignItem(itemId: string, campaignId: string) {
+  return prisma.item.findFirst({
+    where: { id: itemId, scope: "CAMPAIGN", campaignId },
+    include: { link: true },
+  });
+}
+
 /**
  * GET /api/campaigns/:id/items
  * Owner-only full list (Manage tab) — includes dmNotes. Players get 403.
@@ -146,13 +156,7 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   const data = parseBodyOr400(updateItemSchema, req.body, res);
   if (data === undefined) return;
 
-  // findFirst with the full predicate, not findUnique(id) + an in-code campaign
-  // check: the latter leaks existence through timing and is easy to forget on a
-  // new endpoint (#1646).
-  const existing = await prisma.item.findFirst({
-    where: { id: req.params.itemId, scope: "CAMPAIGN", campaignId: req.params.id },
-    include: { link: true },
-  });
+  const existing = await findOwnedCampaignItem(req.params.itemId, req.params.id);
   if (!existing) {
     res.status(404).json({ error: "Item not found" });
     return;
@@ -224,10 +228,7 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
     "Only the campaign owner may manage campaign items",
   );
 
-  const existing = await prisma.item.findFirst({
-    where: { id: req.params.itemId, scope: "CAMPAIGN", campaignId: req.params.id },
-    include: { link: true },
-  });
+  const existing = await findOwnedCampaignItem(req.params.itemId, req.params.id);
   if (!existing) {
     res.status(404).json({ error: "Item not found" });
     return;
