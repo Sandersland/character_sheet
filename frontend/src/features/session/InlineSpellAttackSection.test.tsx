@@ -163,3 +163,51 @@ describe("InlineSpellAttackSection — nat-20 auto-crit (#766)", () => {
     expect(damageCall!.faces).toHaveLength(2);
   });
 });
+
+// #1360: the attack d20 and the cast's damage roll must group as one swing,
+// mirroring useAttackRolls' swingId/verdict pattern.
+describe("InlineSpellAttackSection — swingId groups attack + damage (#1360)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shares one swingId between the attack roll and the cast's damage roll on a normal hit", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 → 11 (neither nat20 nor nat1)
+    renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const calls = vi.mocked(logRoll).mock.calls.map((c) => c[2]);
+    const attackEvent = calls.find((e) => e.kind === "attack")!;
+    const damageEvent = calls.find((e) => e.kind === "damage")!;
+    expect(typeof attackEvent.swingId).toBe("string");
+    expect(attackEvent.verdict).toBeUndefined();
+    expect(damageEvent.swingId).toBe(attackEvent.swingId);
+    expect(damageEvent.verdict).toBe("hit");
+    expect(damageEvent.crit).toBe(false);
+  });
+
+  it("nat-20 attack carries verdict='crit', and the cast's damage event shares the id with crit:true", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0.95); // d20 → nat 20
+    renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const calls = vi.mocked(logRoll).mock.calls.map((c) => c[2]);
+    const attackEvent = calls.find((e) => e.kind === "attack")!;
+    const damageEvent = calls.find((e) => e.kind === "damage")!;
+    expect(attackEvent).toMatchObject({ nat20: true, nat1: false, crit: true, verdict: "crit" });
+    expect(damageEvent.swingId).toBe(attackEvent.swingId);
+    expect(damageEvent).toMatchObject({ verdict: "crit", crit: true });
+  });
+});

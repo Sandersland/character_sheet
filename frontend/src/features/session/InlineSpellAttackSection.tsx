@@ -11,12 +11,14 @@
  * (Sacred Flame) stay in the normal spell picker — filtered out here.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
-import { formatRollSpec, isNaturalTwenty } from "@/lib/dice";
+import { autoVerdict } from "@/lib/attackTallySummary";
+import { formatRollSpec, isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
+import { randomId } from "@/lib/ids";
 import { computeCastSpec } from "@/lib/spellCast";
 import { isAttackCantrip } from "@/lib/spellMeta";
 import { useRollLogger } from "@/features/session/useRollLogger";
@@ -54,6 +56,13 @@ export default function InlineSpellAttackSection({
   const [lastAttack, setLastAttack] = useState<Record<string, RollResult | null>>({});
   const [lastDamage, setLastDamage] = useState<Record<string, RollResult | null>>({});
 
+  // swingId correlates this cantrip's attack roll with its cast's damage roll
+  // as one swing (#1235/#1360), mirroring useAttackRolls' swingIdRef — a ref
+  // (not state) so it survives from handleAttack to the later handleCast click
+  // without a re-render, regenerated per attack so a re-roll never reuses a
+  // stale id.
+  const swingIdRef = useRef<Record<string, string>>({});
+
   const castMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: Parameters<typeof applySpellcastingTransactions>[1]) =>
@@ -70,7 +79,22 @@ export default function InlineSpellAttackSection({
   function handleAttack(spell: Spell) {
     const spec = { count: 1, faces: 20, modifier: attackBonus };
     const result = roll(spec, `${spell.name} spell attack`);
-    logRollSafe("attack", spell.name, result, spec);
+    const attack = {
+      total: result.total,
+      keptFace: keptD20(result)?.value ?? null,
+      nat20: isNaturalTwenty(result),
+      nat1: isNaturalOne(result),
+    };
+    // Fresh id per attack (#1235/#1360) — rollDamage reads it back via spell.id.
+    const swingId = randomId();
+    swingIdRef.current[spell.id] = swingId;
+    logRollSafe("attack", spell.name, result, spec, undefined, {
+      swingId,
+      verdict: autoVerdict(attack),
+      nat20: attack.nat20,
+      nat1: attack.nat1,
+      crit: attack.nat20,
+    });
     setLastAttack((prev) => ({ ...prev, [spell.id]: result }));
     setAttackRolled((prev) => ({ ...prev, [spell.id]: true }));
     // Lock in the commitment: mark an attack made this turn so the sheet's
@@ -84,9 +108,16 @@ export default function InlineSpellAttackSection({
   function rollDamage(spell: Spell): number {
     const base = computeCastSpec(spell, 0);
     if (!base) return 0;
-    const spec = isNaturalTwenty(lastAttack[spell.id]) ? { ...base, crit: true } : base;
+    const crit = isNaturalTwenty(lastAttack[spell.id]);
+    const spec = crit ? { ...base, crit: true } : base;
     const result = roll(spec, `${spell.name} — damage`);
-    logRollSafe("damage", spell.name, result, spec, spell.damageType ?? undefined);
+    // Shares the attack's swingId (#1360) — rolling damage is an implicit hit
+    // call (same rule useAttackRolls.handleDamage documents) unless it's a crit.
+    logRollSafe("damage", spell.name, result, spec, spell.damageType ?? undefined, {
+      swingId: swingIdRef.current[spell.id],
+      verdict: crit ? "crit" : "hit",
+      crit,
+    });
     setLastDamage((prev) => ({ ...prev, [spell.id]: result }));
     return result.total;
   }
@@ -95,6 +126,9 @@ export default function InlineSpellAttackSection({
     if (busyId) return;
     setBusyId(spell.id);
     const damageTotal = rollDamage(spell);
+    // Consumed once the cast's damage roll has read it, so a later damage-only
+    // replay can never pick up this consumed swing's id.
+    delete swingIdRef.current[spell.id];
     try {
       await castMutation.mutateAsync([{ type: "castSpell", entryId: spell.id, roll: damageTotal }]);
       // The Attack action was already spent when the sheet opened (enterAttackMode).

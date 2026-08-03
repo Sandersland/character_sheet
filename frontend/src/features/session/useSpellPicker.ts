@@ -6,8 +6,11 @@
  * (and its sub-components) presentational.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { autoVerdict } from "@/lib/attackTallySummary";
+import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
+import { randomId } from "@/lib/ids";
 import { useRoll } from "@/features/dice/RollContext";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { applySpellcastingTransactions } from "@/api/client";
@@ -149,6 +152,14 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
   const [rowStates, setRowStates] = useState<Record<string, SpellRowState>>({});
   const [lastCast, setLastCast] = useState<CastSettleView | null>(null);
 
+  // swingId correlates a spell attack's d20 with its cast's damage roll as one
+  // swing (#1235/#1360), mirroring useAttackRolls' swingIdRef — a ref (not
+  // state) because it must survive from handleAttackRoll to a LATER handleCast
+  // click without a re-render, and is replaced on every attack roll so a
+  // re-roll never reuses a stale id. Consumed (deleted) once rollAndLogCast
+  // reads it, so a later damage-only cast can't pick up a stale swing.
+  const spellAttackRef = useRef<Record<string, { swingId: string; nat20: boolean; nat1: boolean }>>({});
+
   function getRow(spellId: string, spell: Spell, initialSlot: number | undefined): SpellRowState {
     return rowStates[spellId] ?? {
       slotLevel: initialSlot,
@@ -242,7 +253,21 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     if (!castSpec) return { total: 0, keptDice: [] };
     const kindLabel = spell.effectKind === "heal" ? "healing" : "damage";
     const result = roll(castSpec, `${spell.name} — ${kindLabel}${targetNote}`);
-    logRollSafe("damage", spell.name, result, castSpec, spell.damageType ?? undefined);
+    // An attack spell's cast follows its own d20 (handleAttackRoll) — share that
+    // swing's id and verdict so the two events group as one swing (#1360). A
+    // save/no-attack cast has no ref entry, so it logs exactly as before.
+    // Rolling damage is an implicit hit call (same rule useAttackRolls.handleDamage
+    // documents) unless the attack roll was already a crit.
+    const attack = spellAttackRef.current[spell.id];
+    delete spellAttackRef.current[spell.id];
+    logRollSafe(
+      "damage",
+      spell.name,
+      result,
+      castSpec,
+      spell.damageType ?? undefined,
+      attack ? { swingId: attack.swingId, verdict: attack.nat20 ? "crit" : "hit", crit: attack.nat20 } : undefined,
+    );
     return { total: result.total, keptDice: result.dice.filter((d) => !d.dropped).map((d) => d.value) };
   }
 
@@ -322,7 +347,24 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     onCommitSlot(spell.level);
     const attackSpec = { count: 1, faces: 20, modifier: spellAttackBonus ?? 0 };
     const result = roll(attackSpec, `${spell.name} spell attack`);
-    logRollSafe("attack", spell.name, result, attackSpec);
+    const attack = {
+      total: result.total,
+      keptFace: keptD20(result)?.value ?? null,
+      nat20: isNaturalTwenty(result),
+      nat1: isNaturalOne(result),
+    };
+    // Fresh id per attack roll (#1235/#1360) — rollAndLogCast reads it back
+    // via spell.id when the cast follows. Note: no crit-doubling here — the
+    // picker still doesn't double dice for a leveled attack spell's nat-20.
+    const swingId = randomId();
+    spellAttackRef.current[spell.id] = { swingId, nat20: attack.nat20, nat1: attack.nat1 };
+    logRollSafe("attack", spell.name, result, attackSpec, undefined, {
+      swingId,
+      verdict: autoVerdict(attack),
+      nat20: attack.nat20,
+      nat1: attack.nat1,
+      crit: attack.nat20,
+    });
     patchRow(spell.id, { attackRolled: true });
   }
 

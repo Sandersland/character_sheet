@@ -231,6 +231,80 @@ describe("useSpellPicker", () => {
   });
 });
 
+// #1360: a spell attack's d20 and the cast's damage roll must group as one
+// swing in the combat log, mirroring useAttackRolls' swingId/verdict pattern.
+describe("useSpellPicker — spell attacks carry swingId (#1360)", () => {
+  it("shares one swingId between the attack roll and the cast's damage roll, verdict='crit' on a nat-20", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.95); // d20 → 20 (nat20)
+    const opts = makeOpts([attackSpell]);
+    const { result } = render(opts);
+
+    act(() => result.current.handleAttackRoll(attackSpell));
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+
+    const calls = mockLogRoll.mock.calls.map((c) => c[2]);
+    const attackEvent = calls.find((e) => e.kind === "attack")!;
+    const damageEvent = calls.find((e) => e.kind === "damage")!;
+    expect(attackEvent).toMatchObject({ nat20: true, nat1: false, crit: true, verdict: "crit" });
+    expect(typeof attackEvent.swingId).toBe("string");
+    expect(damageEvent).toMatchObject({ swingId: attackEvent.swingId, verdict: "crit", crit: true });
+  });
+
+  it("leaves verdict undefined on the attack event for a middling roll (not nat20/nat1)", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 → 11
+    const opts = makeOpts([attackSpell]);
+    const { result } = render(opts);
+
+    act(() => result.current.handleAttackRoll(attackSpell));
+
+    const attackEvent = mockLogRoll.mock.calls.map((c) => c[2]).find((e) => e.kind === "attack")!;
+    expect(attackEvent.nat20).toBe(false);
+    expect(attackEvent.nat1).toBe(false);
+    expect(attackEvent.verdict).toBeUndefined();
+  });
+
+  it("logs a save/no-attack cast's damage with no swingId and no verdict (unaffected path)", async () => {
+    const opts = makeOpts([cantrip]);
+    const { result } = render(opts);
+
+    await act(async () => {
+      await result.current.handleCast(cantrip);
+    });
+
+    const damageEvent = mockLogRoll.mock.calls.map((c) => c[2]).find((e) => e.kind === "damage")!;
+    expect(damageEvent.swingId).toBeUndefined();
+    expect(damageEvent.verdict).toBeUndefined();
+  });
+
+  it("mints a fresh swingId per attack+cast cycle — a second cycle never reuses the first's id", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 → 11 (neither nat20 nor nat1)
+    const opts = makeOpts([attackSpell]);
+    const { result } = render(opts);
+
+    act(() => result.current.handleAttackRoll(attackSpell));
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+    const firstAttackId = mockLogRoll.mock.calls
+      .map((c) => c[2])
+      .find((e) => e.kind === "attack")!.swingId;
+
+    mockLogRoll.mockClear();
+    act(() => result.current.handleAttackRoll(attackSpell));
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+    const calls = mockLogRoll.mock.calls.map((c) => c[2]);
+    const secondAttackId = calls.find((e) => e.kind === "attack")!.swingId;
+    const secondDamageId = calls.find((e) => e.kind === "damage")!.swingId;
+
+    expect(secondAttackId).not.toBe(firstAttackId);
+    expect(secondDamageId).toBe(secondAttackId);
+  });
+});
+
 // #1164: durable post-cast feedback — the result well, the log-symmetry fix
 // (spell damage rolls now log like weapon rolls), and the turn-card tally hook.
 describe("useSpellPicker — post-cast feedback (#1164)", () => {
