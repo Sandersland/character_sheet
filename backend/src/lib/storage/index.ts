@@ -65,3 +65,23 @@ export function createBlobStore(): BlobStore {
     `Unknown BLOB_STORE_DRIVER "${driver}" (expected "s3" or "fs")`,
   );
 }
+
+let _store: BlobStore | undefined;
+
+/**
+ * The process-wide store: production call sites go through here rather than
+ * createBlobStore so the s3 driver's S3Client — and its pooled TCP/TLS
+ * connections — is constructed once per process instead of per request
+ * (#1657). Lazy on purpose: the memo fills on first call, preserving
+ * createBlobStore's nothing-at-import-time invariant.
+ */
+export function getBlobStore(): BlobStore {
+  return (_store ??= createBlobStore());
+}
+
+// Route tests stub BLOB_FS_DIR per test/suite; without a reset the memo would
+// pin the first tmpdir for the rest of the process (same idiom as
+// __setQueryClientForTests).
+export function __resetBlobStoreForTests(): void {
+  _store = undefined;
+}

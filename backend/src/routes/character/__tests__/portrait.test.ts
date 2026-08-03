@@ -10,7 +10,7 @@ import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
-import { createBlobStore } from "@/lib/storage/index.js";
+import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
 import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
 
 const OWNER = { id: "portrait-owner", email: "portrait-owner@test.local" };
@@ -62,11 +62,13 @@ async function storedKey(): Promise<string | null> {
 
 describe("portrait endpoints (#1615)", () => {
   beforeEach(async () => {
-    // Fresh fs blob root per test: createBlobStore reads LIVE env per call, so
-    // stubbing here isolates every test's blobs (and the suite from any
-    // ambient BLOB_* configuration).
+    // Fresh fs blob root per test: the routes go through getBlobStore's memo,
+    // so the reset makes the next call re-read the stubbed env — without it
+    // every test would keep writing into the first test's tmpdir. Stubbing
+    // also isolates the suite from any ambient BLOB_* configuration.
     vi.stubEnv("BLOB_STORE_DRIVER", "fs");
     vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "portrait-route-test-")));
+    __resetBlobStoreForTests();
 
     for (const user of [OWNER, INTRUDER]) {
       await prisma.user.upsert({ where: { id: user.id }, create: user, update: user });
@@ -108,6 +110,7 @@ describe("portrait endpoints (#1615)", () => {
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: CHARACTER_ID } });
     vi.unstubAllEnvs();
+    __resetBlobStoreForTests();
   });
 
   afterAll(async () => {

@@ -1,4 +1,4 @@
-import { createBlobStore } from "./index.js";
+import { getBlobStore } from "./index.js";
 
 // The key's uuid filename segment, used as the wire URL's ?v= version by both
 // portrait serializers (derivePortraitUrl, toWireEntity). A fresh uuid per
@@ -17,7 +17,7 @@ export function portraitKeyVersion(key: string): string {
 export async function deletePortraitBlobBestEffort(key: string | null): Promise<void> {
   if (!key) return;
   try {
-    await createBlobStore().delete(key);
+    await getBlobStore().delete(key);
   } catch {
     /* orphaned blob accepted */
   }

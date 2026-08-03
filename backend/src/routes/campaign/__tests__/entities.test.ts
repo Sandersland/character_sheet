@@ -11,7 +11,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
-import { createBlobStore } from "@/lib/storage/index.js";
+import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
 import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).
@@ -358,14 +358,19 @@ describe("campaign entities (#248)", () => {
     const UUID_RE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
     beforeAll(async () => {
-      // fs blob root isolated per run: createBlobStore reads LIVE env per call,
-      // so stubbing here scopes every portrait test's blobs to a tmpdir.
+      // fs blob root isolated per run: the routes go through getBlobStore's
+      // memo, so the reset after stubbing makes its first fill read this
+      // tmpdir instead of any store memoized before the stubs applied.
       vi.stubEnv("BLOB_STORE_DRIVER", "fs");
       vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "entity-portrait-test-")));
+      __resetBlobStoreForTests();
     });
 
     afterAll(() => {
       vi.unstubAllEnvs();
+      // A later suite in this file would otherwise inherit a store memoized
+      // on this suite's now-unstubbed tmpdir.
+      __resetBlobStoreForTests();
     });
 
     // Fixture images are generated with sharp at runtime — no binaries in-repo.
