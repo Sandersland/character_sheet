@@ -59,6 +59,16 @@ function ArticleBody({
         <EntityEditForm
           form={detail.form}
           busy={detail.busy}
+          // Portrait writes are OWNER-only (#1617); no prop means no control.
+          portrait={
+            detail.role === "OWNER"
+              ? {
+                  imageUrl: entity.portraitUrl ?? null,
+                  onSelect: detail.handleUploadPortrait,
+                  onRemove: detail.handleRemovePortrait,
+                }
+              : undefined
+          }
           onSave={detail.handleSave}
           onCancel={detail.cancelEdit}
         />

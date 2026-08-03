@@ -29,7 +29,13 @@ model Character {
   id          String  @id @default(uuid())
   name        String
   alignment   String
-  portraitUrl String?
+
+  // Uploaded-portrait blob key (#1615) — persisted content state, like
+  // CampaignEntity.portraitKey, not derivable. The key itself NEVER goes on the
+  // wire: serializeCharacter/serializeCharacterSummary derive the wire
+  // `portraitUrl` (a relative /api/characters/:id/portrait path) from it at
+  // read time, and it's mutated only by the portrait upload/delete endpoints.
+  portraitKey String?
 
   // Owning user. Legitimately persisted (NOT derived) — ownership is identity
   // state, not a function of any other column, so it's exempt from the
@@ -259,8 +265,11 @@ model CampaignEntity {
   name       String
   aliases    String[]         @default([])
   notes      String?
-  // Content state like Character.portraitUrl (#844): persisted, not derivable.
-  portraitUrl String?
+  // Uploaded-portrait blob key (#1617), like Character.portraitKey: the key
+  // itself NEVER goes on the wire — toWireEntity derives the wire portraitUrl
+  // (a relative /api/campaigns/:id/entities/:entityId/portrait path) at read
+  // time, and it's mutated only by the entity portrait upload/delete endpoints.
+  portraitKey String?
   visibility EntityVisibility @default(REVEALED)
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt

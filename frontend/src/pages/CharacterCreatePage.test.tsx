@@ -222,7 +222,6 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
       },
       skillProficiencies: ["history", "acrobatics", "arcana"],
       toolChoices: ["Lute", "Drum"],
-      portraitUrl: null,
       startingEquipment: undefined,
       spells: { cantripIds: ["sp-mockery"], spellIds: ["sp-charm"] },
       rulesEdition: "EDITION_2024",

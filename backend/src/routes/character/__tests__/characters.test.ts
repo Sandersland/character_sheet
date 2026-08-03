@@ -39,7 +39,6 @@ const FIXTURE = {
   id: "test-character-1",
   name: "Test Fixture",
   alignment: "Lawful Good",
-  portraitUrl: null,
   experiencePoints: 1000,
   initiativeBonus: 1,
   speed: 30,
@@ -377,6 +376,46 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
+  // The portrait wire seam (#1615): portraitUrl left PATCH when portraits
+  // became uploaded blobs — a client-supplied URL was the IDOR the upload
+  // pipeline closes. The wire field survives read-only, derived from
+  // Character.portraitKey.
+  describe("portrait wire seam (#1615)", () => {
+    it.each([
+      ["set", "https://example.com/p.jpg"],
+      ["clear", null],
+    ])("PATCH rejects portraitUrl (%s) via .strict() with 400", async (_label, portraitUrl) => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .patch(`/api/characters/${FIXTURE.id}`)
+        .send({ portraitUrl });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("derives portraitUrl from the stored key on both detail and summary, never exposing the key", async () => {
+      const version = "0f8fad5b-d9cb-469f-a165-70867728950e";
+      const key = `portraits/characters/${FIXTURE.id}/${version}.webp`;
+      await prisma.character.update({ where: { id: FIXTURE.id }, data: { portraitKey: key } });
+
+      const expectedUrl = `/api/characters/${FIXTURE.id}/portrait?v=${version}`;
+      const detail = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
+      expect(detail.status).toBe(200);
+      expect(detail.body.portraitUrl).toBe(expectedUrl);
+      expect(JSON.stringify(detail.body)).not.toContain(key);
+
+      const list = await supertest.agent(app).set("Cookie", COOKIE).get("/api/characters");
+      expect(list.status).toBe(200);
+      expect(list.body[0].portraitUrl).toBe(expectedUrl);
+      expect(JSON.stringify(list.body)).not.toContain(key);
+    });
+
+    it("omits portraitUrl when no portrait is stored", async () => {
+      const detail = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
+      expect(detail.status).toBe(200);
+      expect(detail.body.portraitUrl).toBeUndefined();
+    });
+  });
+
   it("PATCH 404s for unknown id", async () => {
     // experiencePoints was removed from PATCH — use currency which is still patchable
     const response = await supertest.agent(app).set("Cookie", COOKIE)
@@ -463,6 +502,17 @@ describe("characters routes", () => {
       await expect(prisma.characterClassEntry.findMany({ where: { characterId: id } })).resolves.toHaveLength(0);
 
       createdCharacterIds = createdCharacterIds.filter((existingId) => existingId !== id);
+    });
+
+    // #1616 closed #1615's interim accepted-and-ignored state: the create UI
+    // stages a file and uploads via portraitRouter after create, so a client-
+    // supplied URL is rejected by .strict() like every other unknown field.
+    it("rejects portraitUrl in the create payload with 400 (#1616)", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .post("/api/characters")
+        .send({ ...createBody, portraitUrl: "https://example.com/p.jpg" });
+
+      expect(response.status).toBe(400);
     });
 
     it("allows a homebrew background with no catalog match", async () => {

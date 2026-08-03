@@ -991,7 +991,6 @@ async function persistCreatedCharacter(
       owner: { connect: { id: ownerId } },
       name: input.name,
       alignment: input.alignment,
-      portraitUrl: input.portraitUrl ?? null,
       // The only write of rulesEdition (write-once, #1285). The `edition` local
       // that resolveSelections computed for the creation-time subclass gate
       // check isn't returned to its caller, so this re-derives it from the same

@@ -187,7 +187,6 @@ export type StartingEquipmentInput =
 export interface CreateCharacterInput {
   name: string;
   alignment: string;
-  portraitUrl?: string | null;
   experiencePoints?: number;
   race: string;
   background: string;

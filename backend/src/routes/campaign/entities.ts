@@ -1,7 +1,10 @@
-import { Router } from "express";
+import { randomUUID } from "node:crypto";
+
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
+import { NotFoundError } from "@/lib/auth/errors.js";
 import { matchEntityQuery } from "@/lib/activity/entity-stats.js";
 import {
   buildEntityActivityFeed,
@@ -16,11 +19,16 @@ import {
 } from "@/lib/campaign/entities.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { createBlobStore } from "@/lib/storage/index.js";
+import { deletePortraitBlobBestEffort, portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
+import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
+import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
 
 // Campaign entity registry (#248): the shared wiki of NPCs/locations/factions/
 // items/PCs a table tags from journal notes. Plain-REST (like campaigns.ts):
 // no audit log, no transaction-op pattern. Every route gates on
-// assertCampaignMembership; DELETE and visibility changes require the OWNER role.
+// assertCampaignMembership; DELETE, visibility changes, and portrait writes
+// (#1617) require the OWNER role.
 // Visibility (#379): non-owners only ever see REVEALED entities (list, detail via
 // list, backlinks); HIDDEN entities are the owner's private prep.
 
@@ -36,7 +44,6 @@ const createEntitySchema = z
     name: z.string().min(1),
     aliases: z.array(z.string()).optional(),
     notes: z.string().optional(),
-    portraitUrl: z.url().nullable().optional(),
     // Owner-only (#379): a non-owner supplying this is rejected at the route.
     visibility: z.enum(VISIBILITIES).optional(),
   })
@@ -48,12 +55,27 @@ const updateEntitySchema = z
     name: z.string().min(1),
     aliases: z.array(z.string()),
     notes: z.string().nullable(),
-    portraitUrl: z.url().nullable(),
     // Owner-only (#379); presence in a non-owner PATCH is rejected at the route.
     visibility: z.enum(VISIBILITIES),
   })
   .partial()
   .strict();
+
+// Wire serializer (#1617): strips the storage key — server-internal, never on
+// the wire — and derives the versioned portrait URL from it, mirroring
+// derivePortraitUrl for characters. `null` (not undefined) when unset, the
+// pre-#1617 wire shape every read site already consumes.
+function toWireEntity<T extends { id: string; campaignId: string; portraitKey: string | null }>({
+  portraitKey,
+  ...entity
+}: T) {
+  return {
+    ...entity,
+    portraitUrl: portraitKey
+      ? `/api/campaigns/${entity.campaignId}/entities/${entity.id}/portrait?v=${portraitKeyVersion(portraitKey)}`
+      : null,
+  };
+}
 
 function parseLimit(raw: unknown, fallback: number): number {
   const n = Number(raw);
@@ -93,7 +115,7 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
   });
   // Flatten the PC link (#842): characterId, never the nested relation object.
   const entities = rows.map(({ characterLink, ...e }) => ({
-    ...e,
+    ...toWireEntity(e),
     characterId: characterLink?.characterId ?? null,
   }));
 
@@ -150,12 +172,11 @@ entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
       name: data.name,
       aliases: data.aliases ?? [],
       notes: data.notes ?? null,
-      portraitUrl: data.portraitUrl ?? null,
       visibility: data.visibility ?? "REVEALED",
     },
   });
 
-  res.status(201).json(entity);
+  res.status(201).json(toWireEntity(entity));
 });
 
 const prepareMergeSchema = z
@@ -201,40 +222,38 @@ entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
   res.status(201).json(result.merge);
 });
 
-// POST execute — OWNER only.
-entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (req, res) => {
-  await assertCampaignOwner(
-    prisma,
-    req.user!.id,
-    req.params.id,
-    "edit",
-    "Only the campaign owner may execute a merge",
-  );
-
-  const result = await executeMerge(prisma, req.params.id, req.params.mergeId);
+// OWNER-gated merge-lifecycle step shared by execute and unmerge: assert the
+// role, run the op, unwrap the { ok: false } error shape. Returns the ok
+// result, or undefined when the error response was already written.
+async function runOwnerMergeOp<T extends { ok: true } | { ok: false; status: number; error: string }>(
+  req: Request<{ id: string; mergeId: string }>,
+  res: Response,
+  forbiddenMessage: string,
+  op: (campaignId: string, mergeId: string) => Promise<T>,
+): Promise<Extract<T, { ok: true }> | undefined> {
+  await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", forbiddenMessage);
+  const result = await op(req.params.id, req.params.mergeId);
   if (!result.ok) {
     res.status(result.status).json({ error: result.error });
-    return;
+    return undefined;
   }
-  res.json(result.merge);
+  return result as Extract<T, { ok: true }>;
+}
+
+// POST execute — OWNER only.
+entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (req, res) => {
+  const result = await runOwnerMergeOp(req, res, "Only the campaign owner may execute a merge", (cid, mid) =>
+    executeMerge(prisma, cid, mid),
+  );
+  if (result) res.json(result.merge);
 });
 
 // DELETE unmerge — OWNER only.
 entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res) => {
-  await assertCampaignOwner(
-    prisma,
-    req.user!.id,
-    req.params.id,
-    "edit",
-    "Only the campaign owner may unmerge entities",
+  const result = await runOwnerMergeOp(req, res, "Only the campaign owner may unmerge entities", (cid, mid) =>
+    deleteMerge(prisma, cid, mid),
   );
-
-  const result = await deleteMerge(prisma, req.params.id, req.params.mergeId);
-  if (!result.ok) {
-    res.status(result.status).json({ error: result.error });
-    return;
-  }
-  res.status(204).end();
+  if (result) res.status(204).end();
 });
 
 /**
@@ -272,7 +291,7 @@ entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
     data,
   });
 
-  res.json(entity);
+  res.json(toWireEntity(entity));
 });
 
 /**
@@ -290,7 +309,7 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
 
   const existing = await prisma.campaignEntity.findUnique({
     where: { id: req.params.entityId },
-    select: { id: true, campaignId: true },
+    select: { id: true, campaignId: true, portraitKey: true },
   });
   if (!existing || existing.campaignId !== req.params.id) {
     res.status(404).json({ error: "Entity not found" });
@@ -298,7 +317,110 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
   }
 
   await prisma.campaignEntity.delete({ where: { id: req.params.entityId } });
+  await deletePortraitBlobBestEffort(existing.portraitKey);
   res.status(204).end();
+});
+
+// Entity portraits (#1617): the same pipeline as the character portraitRouter
+// — multipart re-encode → blob store → portraitKey swap, streamed back under
+// the immutable cache contract. Writes are OWNER-only ("entity owner" means
+// the campaign OWNER role; CampaignEntity has no creator column), which
+// deliberately narrows #844's any-member portrait writes. Reads are
+// member-level, but a HIDDEN entity 404s for non-owners via findViewableEntity
+// so this endpoint can't leak the existence (or image) of DM prep.
+
+async function storedEntityPortraitKey(entityId: string): Promise<string | null> {
+  const { portraitKey } = await prisma.campaignEntity.findUniqueOrThrow({
+    where: { id: entityId },
+    select: { portraitKey: true },
+  });
+  return portraitKey;
+}
+
+// Key swap + superseded-blob cleanup + wire response, shared by the portrait
+// POST (fresh key) and DELETE (null). The previous key is read before the
+// swap so the old blob can be best-effort deleted after the write commits —
+// a crash between steps leaves at worst an orphaned blob, never a dangling key.
+async function swapEntityPortraitKey(
+  res: Response,
+  entityId: string,
+  key: string | null,
+): Promise<void> {
+  const previousKey = await storedEntityPortraitKey(entityId);
+  const updated = await prisma.campaignEntity.update({
+    where: { id: entityId },
+    data: { portraitKey: key },
+  });
+  await deletePortraitBlobBestEffort(previousKey);
+  res.json(toWireEntity(updated));
+}
+
+// Owner gate + entity-in-campaign 404 run BEFORE portraitMultipart, so an
+// unauthorized caller never makes the server buffer a multi-megabyte body.
+async function assertOwnedEntityForPortraitWrite(
+  userId: string,
+  campaignId: string,
+  entityId: string,
+  forbiddenMessage: string,
+): Promise<void> {
+  await assertCampaignOwner(prisma, userId, campaignId, "edit", forbiddenMessage);
+  const existing = await prisma.campaignEntity.findUnique({
+    where: { id: entityId },
+    select: { campaignId: true },
+  });
+  if (!existing || existing.campaignId !== campaignId) {
+    throw new NotFoundError("Entity not found");
+  }
+}
+
+entitiesRouter.post(
+  "/campaigns/:id/entities/:entityId/portrait",
+  async (req, _res, next) => {
+    await assertOwnedEntityForPortraitWrite(
+      req.user!.id,
+      req.params.id,
+      req.params.entityId,
+      "Only the campaign owner may set entity portraits",
+    );
+    next();
+  },
+  portraitMultipart,
+  async (req, res) => {
+    if (!req.file) {
+      res.status(400).json({ error: `Missing multipart file field "${PORTRAIT_FIELD}"` });
+      return;
+    }
+
+    const entityId = req.params.entityId;
+    const webp = await reencodePortrait(req.file.buffer, req.file.mimetype);
+    // A fresh uuid per upload is what versions the wire URL (toWireEntity
+    // reads it back as ?v=), making the immutable cache header safe.
+    const key = `portraits/entities/${entityId}/${randomUUID()}.webp`;
+    await createBlobStore().put(key, webp, { contentType: PORTRAIT_CONTENT_TYPE });
+    await swapEntityPortraitKey(res, entityId, key);
+  },
+);
+
+entitiesRouter.get("/campaigns/:id/entities/:entityId/portrait", async (req, res) => {
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+
+  const entity = await findViewableEntity(prisma, req.params.entityId, req.params.id, role === "OWNER");
+  if (!entity) throw new NotFoundError("Entity not found");
+
+  await sendStoredPortrait(res, await storedEntityPortraitKey(entity.id));
+});
+
+// Idempotent: removing an absent portrait is a no-op 200 — the response is
+// the serialized wire entity either way, like every other entity mutation.
+entitiesRouter.delete("/campaigns/:id/entities/:entityId/portrait", async (req, res) => {
+  await assertOwnedEntityForPortraitWrite(
+    req.user!.id,
+    req.params.id,
+    req.params.entityId,
+    "Only the campaign owner may remove entity portraits",
+  );
+
+  await swapEntityPortraitKey(res, req.params.entityId, null);
 });
 
 /**

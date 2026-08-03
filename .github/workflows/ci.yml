@@ -344,10 +344,33 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
+      # MinIO backs the s3 blob-store contract leg (#1614): the S3_TEST_* env
+      # below un-skips it, so "same contract suite passes against both drivers"
+      # is CI-enforced and createS3BlobStore has real coverage for the fallow
+      # CRAP gate. A `services:` block can't override an image's command, and
+      # minio/minio requires `server /data` — hence docker run, not a service.
+      - name: Start MinIO (s3 blob-store contract leg)
+        run: docker run --rm -d --name minio -p 9000:9000 minio/minio server /data
+
+      - name: Wait for MinIO
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live >/dev/null; then
+              echo "minio ready after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "minio failed to start"; docker logs minio; exit 1
+
       # Backend runs WITH coverage so the fallow job can gate real CRAP (#717);
       # test:coverage IS the backend `vitest run` plus Istanbul instrumentation
       # (no double run). Frontend keeps its plain test run.
       - name: Backend tests (with coverage for the fallow CRAP gate)
+        env:
+          S3_TEST_ENDPOINT: http://localhost:9000
+          S3_TEST_BUCKET: test-bucket
+          S3_TEST_ACCESS_KEY_ID: minioadmin
+          S3_TEST_SECRET_ACCESS_KEY: minioadmin
         run: npm run test:coverage --workspace backend
 
       - name: Frontend tests

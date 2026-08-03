@@ -21,6 +21,8 @@ vi.mock("@/api/client", () => ({
   fetchEntityConnections: vi.fn(),
   updateEntity: vi.fn(),
   deleteEntity: vi.fn(),
+  uploadEntityPortrait: vi.fn(),
+  deleteEntityPortrait: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCampaignEntities", () => ({
@@ -390,47 +392,73 @@ describe("EntityDetailPage (#248)", () => {
     expect(screen.getByLabelText(/Name/)).toHaveValue("Goblin Chief");
   });
 
-  it("saves a trimmed portraitUrl from the edit form (#844)", async () => {
+  it("saves a PATCH that carries no portraitUrl — the portrait rides its own endpoints (#1617)", async () => {
     const user = userEvent.setup();
-    const url = "https://example.com/goblin.png";
     vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
-    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, portraitUrl: url });
+    vi.mocked(client.updateEntity).mockResolvedValue(ENTITY);
 
     renderPage();
     await user.click(await screen.findByRole("button", { name: "Edit entry" }));
-    await user.type(screen.getByLabelText(/Portrait URL/), `  ${url}  `);
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
+    await waitFor(() => expect(vi.mocked(client.updateEntity)).toHaveBeenCalled());
+    expect(vi.mocked(client.updateEntity).mock.calls[0][2]).not.toHaveProperty("portraitUrl");
+  });
+
+  it("uploads a picked file from the edit form and merges the response into the shared cache (#1617)", async () => {
+    const user = userEvent.setup();
+    const url = `/api/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}/portrait?v=uuid-1`;
+    const file = new File([new Uint8Array(8)], "goblin.png", { type: "image/png" });
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(client.uploadEntityPortrait).mockResolvedValue({ ...ENTITY, portraitUrl: url });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit entry" }));
+    await user.upload(screen.getByLabelText("Portrait"), file);
+
     await waitFor(() =>
-      expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(
+      expect(vi.mocked(client.uploadEntityPortrait)).toHaveBeenCalledWith(
         CAMPAIGN_ID,
         ENTITY_ID,
-        expect.objectContaining({ portraitUrl: url }),
+        file,
       ),
+    );
+    expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
+      CAMPAIGN_ID,
+      expect.arrayContaining([expect.objectContaining({ id: ENTITY_ID, portraitUrl: url })]),
     );
   });
 
-  it("clears the portrait by saving an emptied field as null (#844)", async () => {
+  it("removes the portrait from the edit form via deleteEntityPortrait (#1617)", async () => {
     const user = userEvent.setup();
-    const withPortrait: CampaignEntity = { ...ENTITY, portraitUrl: "https://example.com/old.png" };
+    const withPortrait: CampaignEntity = {
+      ...ENTITY,
+      portraitUrl: `/api/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}/portrait?v=uuid-1`,
+    };
     vi.mocked(client.fetchEntities).mockResolvedValue([withPortrait]);
     vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
-    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, portraitUrl: null });
+    vi.mocked(client.deleteEntityPortrait).mockResolvedValue({ ...ENTITY, portraitUrl: null });
 
     renderPage();
     await user.click(await screen.findByRole("button", { name: "Edit entry" }));
-    const field = screen.getByLabelText(/Portrait URL/);
-    expect(field).toHaveValue("https://example.com/old.png");
-    await user.clear(field);
-    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() =>
-      expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(
-        CAMPAIGN_ID,
-        ENTITY_ID,
-        expect.objectContaining({ portraitUrl: null }),
-      ),
+      expect(vi.mocked(client.deleteEntityPortrait)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID),
     );
+    expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
+      CAMPAIGN_ID,
+      expect.arrayContaining([expect.objectContaining({ id: ENTITY_ID, portraitUrl: null })]),
+    );
+  });
+
+  it("hides the upload control from a PLAYER in the edit form — portrait writes are owner-only (#1617)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /add to this entry/i }));
+    expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Portrait")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /choose image/i })).not.toBeInTheDocument();
   });
 
   it("shows the owner an Add-a-portrait affordance that opens the edit form (#844)", async () => {
@@ -438,7 +466,7 @@ describe("EntityDetailPage (#248)", () => {
     vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
     renderPage();
     await user.click(await screen.findByRole("button", { name: /add a portrait/i }));
-    expect(screen.getByLabelText(/Portrait URL/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /choose image/i })).toBeInTheDocument();
   });
 
   it("hides the Add-a-portrait affordance from a PLAYER (#844)", async () => {

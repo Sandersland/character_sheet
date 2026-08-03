@@ -127,6 +127,31 @@ export async function fetchActivity(
   );
 }
 
+// Uploads a portrait image as a multipart body under the `portrait` field
+// (#1615's contract). No Content-Type header on purpose: the browser must
+// generate the multipart boundary itself — setting one manually breaks the
+// upload. Returns the full serialized Character, whose `portraitUrl` carries a
+// fresh ?v= version so a cached <img> naturally refetches.
+export async function uploadCharacterPortrait(id: string, file: File): Promise<Character> {
+  const form = new FormData();
+  form.append("portrait", file);
+  return request<Character>(
+    `/characters/${id}/portrait`,
+    { method: "POST", body: form },
+    "Failed to upload the portrait",
+  );
+}
+
+// Removes the character's portrait (idempotent server-side) and returns the
+// full serialized Character, `portraitUrl` now absent.
+export async function deleteCharacterPortrait(id: string): Promise<Character> {
+  return request<Character>(
+    `/characters/${id}/portrait`,
+    { method: "DELETE" },
+    "Failed to remove the portrait",
+  );
+}
+
 // Applies a batch of resource operations atomically (spend/restore resource
 // pools, learn/forget maneuvers). Full updated Character returned on success.
 export async function applyResourceTransactions(

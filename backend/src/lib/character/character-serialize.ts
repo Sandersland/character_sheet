@@ -18,6 +18,7 @@ import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
 import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
+import { portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
 import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
@@ -152,12 +153,25 @@ function buildRiderView(
   };
 }
 
+// Wire portraitUrl (#1615), derived at read time from the persisted blob key
+// (derive-don't-persist — the key itself never leaves the server). The path is
+// RELATIVE, so it stays same-origin in dev (Vite proxies /api) and prod
+// (single-origin static mode) and is covered by the CSP's imgSrc 'self' with
+// no securityHeaders change. `?v=` is the key's uuid filename segment: a
+// re-upload mints a new uuid, so the URL changes per upload, which is what
+// lets the GET endpoint serve Cache-Control: immutable. Exposing the uuid
+// grants nothing — access is enforced by the route, not by URL secrecy.
+function derivePortraitUrl(row: { id: string; portraitKey: string | null }): string | undefined {
+  if (!row.portraitKey) return undefined;
+  return `/api/characters/${row.id}/portrait?v=${portraitKeyVersion(row.portraitKey)}`;
+}
+
 export function serializeCharacterSummary(row: {
   id: string;
   name: string;
   ownerId: string;
   campaignId: string | null;
-  portraitUrl: string | null;
+  portraitKey: string | null;
   experiencePoints: number;
   raceSelection: { name: string } | null;
   classEntries: { name: string; level: number }[];
@@ -181,7 +195,7 @@ export function serializeCharacterSummary(row: {
     // multiclass line ("Wizard 5 / Cleric 3"); `class` above stays the primary.
     classes: row.classEntries.map((e) => ({ name: e.name, level: e.level })),
     level: levelForExperience(row.experiencePoints),
-    portraitUrl: row.portraitUrl ?? undefined,
+    portraitUrl: derivePortraitUrl(row),
   };
 }
 
@@ -350,7 +364,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     level: progress.level,
     background: row.backgroundSelection?.name ?? "",
     alignment: row.alignment,
-    portraitUrl: row.portraitUrl ?? undefined,
+    portraitUrl: derivePortraitUrl(row),
     // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
     rulesEdition: row.rulesEdition,
