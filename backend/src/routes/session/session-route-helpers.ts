@@ -16,6 +16,8 @@ export interface RollInput {
   specLabel: string | undefined;
   damageType: string | undefined;
   faces: number[] | undefined;
+  /** Non-kept d20 face(s) of an advantage/disadvantage roll (#1359) — same shape/validation as `faces`. */
+  droppedFaces: number[] | undefined;
   ability: string | undefined;
   skill: string | undefined;
   dc: number | undefined;
@@ -88,6 +90,7 @@ interface RollBody {
   specLabel?: unknown;
   damageType?: unknown;
   faces?: unknown;
+  droppedFaces?: unknown;
   ability?: unknown;
   skill?: unknown;
   dc?: unknown;
@@ -118,6 +121,10 @@ const ROLL_CHECKS: { ok: (b: RollBody) => boolean; error: string }[] = [
     error: "total must be a finite number",
   },
   { ok: (b) => areValidFaces(b.faces), error: "faces must be an array of positive integers" },
+  {
+    ok: (b) => areValidFaces(b.droppedFaces),
+    error: "droppedFaces must be an array of positive integers",
+  },
   {
     ok: (b) => b.dc === undefined || (typeof b.dc === "number" && Number.isFinite(b.dc)),
     error: "dc must be a finite number",
@@ -188,6 +195,7 @@ export function parseRollInput(req: Request, res: Response): RollInput | null {
     specLabel: typeof b.specLabel === "string" ? b.specLabel : undefined,
     damageType: typeof b.damageType === "string" ? b.damageType : undefined,
     faces: b.faces as number[] | undefined,
+    droppedFaces: b.droppedFaces as number[] | undefined,
     ability: typeof b.ability === "string" ? b.ability : undefined,
     skill: typeof b.skill === "string" ? b.skill : undefined,
     dc: typeof b.dc === "number" ? b.dc : undefined,
@@ -208,6 +216,7 @@ export function parseRollInput(req: Request, res: Response): RollInput | null {
 }
 
 // Optional faces array must contain only positive integers when present.
+// Shared by both `faces` and `droppedFaces` (#1359) — same shape, same rule.
 function areValidFaces(faces: unknown): boolean {
   if (faces === undefined) return true;
   return (
