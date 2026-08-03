@@ -3,6 +3,7 @@ import {
   deriveSpellcasting,
   deriveMulticlassSpellcasting,
   derivePreparedSpellLimit,
+  casterModelForEntries,
 } from "@/lib/srd/srd.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
@@ -226,9 +227,11 @@ export function buildSpellcastingView(
 ): object | undefined {
   const view = buildSpellcastingViewBase(row, primaryClass, level, abilityScores, proficiencyBonus);
   if (view === undefined) return undefined;
+  const edition = editionOf(row);
+  const limitEntries = preparedLimitEntries(row, primaryClass, level);
   // Clamp-on-read (#1127): trim any over-cap prepared spells to the derived limit
   // (the reconciler is the write-side; this is the non-destructive read fallback).
-  const limit = derivePreparedSpellLimit(preparedLimitEntries(row, primaryClass, level));
+  const limit = derivePreparedSpellLimit(limitEntries, abilityScores, edition);
   const raw = (view as { spells?: unknown }).spells;
   const clamped = clampPreparedToLimit(Array.isArray(raw) ? (raw as SpellEntry[]) : [], limit).spells;
   // #1381: `abilityScores` here is the same raw row.abilityScores that
@@ -240,7 +243,16 @@ export function buildSpellcastingView(
   const abilityMod = abilityModifier(abilityScores[castableView.ability ?? ""] ?? 10);
   const decorated = decorateSpellEffects(clamped, castableView, level, abilityMod);
   const clampedView = { ...view, spells: decorated };
-  return { ...clampedView, ...derivePreparedFields(clampedView, limit) };
+  // #1507/#1511: whether this character's chosen spells are immediately
+  // castable ("known") or must be prepared from a wider list ("prepared") —
+  // omitted (not `null`) for a non-caster, matching preparedSpellLimit's own
+  // granted-only/non-caster omission shape below.
+  const casterModel = casterModelForEntries(limitEntries, edition);
+  return {
+    ...clampedView,
+    ...derivePreparedFields(clampedView, limit),
+    ...(casterModel != null ? { casterModel } : {}),
+  };
 }
 
 // Class entries feeding the prepared-cap sum: single-class uses the XP-derived
@@ -308,6 +320,7 @@ function buildSingleClassSpellcastingView(
     abilityScores,
     proficiencyBonus,
     primaryClass?.subclass ?? undefined,
+    editionOf(row),
   );
   const granted = deriveGrantedSpells(primaryClass?.subclassRef, level, editionOf(row));
   const itemSpells = deriveItemSpellsFor(row); // #528: surfaced for any holder, caster or not.
@@ -333,6 +346,7 @@ function buildMulticlassSpellcastingView(
     row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass })),
     abilityScores,
     proficiencyBonus,
+    editionOf(row),
   );
 
   // Subclass-granted spells across every class entry (each gated by its own level).

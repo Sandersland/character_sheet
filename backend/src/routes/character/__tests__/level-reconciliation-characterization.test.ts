@@ -388,3 +388,83 @@ describe("prepared-spell reconciliation (#1127)", () => {
     expect(res.body.spellcasting.preparedSpellCount).toBe(6);
   });
 });
+
+// #1507: the level-down pair proof — reconcilePreparedSpells (write-side) and
+// buildSpellcastingView's clamp-on-read (read-side) both resolve through the
+// ONE derivePreparedSpellLimit, so a 2014 Bard's cap agrees on both sides by
+// construction. Bard 5 (2014) = 8 known spells (SPELLS_KNOWN_BY_CLASS_2014);
+// Bard 4 = 7.
+function eightKnownBardSpells() {
+  return Array.from({ length: 8 }, (_, i) => ({
+    id: `bard-spell-${i + 1}`,
+    name: `Bard Spell ${i + 1}`,
+    level: 1,
+    school: "enchantment",
+    prepared: true,
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Placeholder.",
+  }));
+}
+
+describe("prepared-spell reconciliation — 2014 known caster (#1507)", () => {
+  const XP_LVL_4 = 2700;
+  let bardClassId: string;
+
+  beforeAll(async () => {
+    bardClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Bard" } })).id;
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "ReconBard2014" } } });
+  });
+
+  async function createBard2014(id: string, level: 4 | 5) {
+    return prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id,
+        name: `ReconBard2014 ${id}`,
+        rulesEdition: "EDITION_2014",
+        experiencePoints: level === 5 ? XP_LVL_5 : XP_LVL_4,
+        hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: level, die: "d8", spent: 0 },
+        abilityScores: { ...BASE_ABILITY_SCORES, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, concentratingOn: null, spells: eightKnownBardSpells() },
+        classEntries: { create: [{ name: "bard", classId: bardClassId, position: 0, level }] },
+      },
+    });
+  }
+
+  it("write-side: reconcilePreparedSpells trims 8 prepared -> 7 on Bard 5->4, one unprepareSpell event naming the new cap", async () => {
+    await createBard2014("recon-bard-write", 5);
+    const res = await postXp("recon-bard-write", { operations: [{ type: "set", value: XP_LVL_4 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(7);
+    expect(res.body.spellcasting.preparedSpellCount).toBe(7);
+
+    const [ev] = await eventsByType("recon-bard-write", "unprepareSpell" as ReconEventType);
+    expect(ev.category).toBe("spellcasting");
+    expect(ev.summary).toBe("1 prepared spell unprepared — level cap reduced to 7");
+    expect(ev.data).toMatchObject({ trimmedCount: 1, limit: 7 });
+    const before = ev.before as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
+    const after = ev.after as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
+    expect(before.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(8);
+    expect(after.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(7);
+  });
+
+  it("read-side: buildSpellcastingView clamps an over-cap blob written directly (no XP op, reconciler never runs) to the same 7", async () => {
+    // Already-Bard-4 character with an 8-prepared blob written straight via
+    // Prisma — the reconciler only runs on an XP-crossing op, so this proves
+    // the clamp-on-read half of the pair agrees with the write-side test above
+    // by construction (both call derivePreparedSpellLimit).
+    await createBard2014("recon-bard-read", 4);
+    const res = await supertest(app).get("/api/characters/recon-bard-read").set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(7);
+    expect(res.body.spellcasting.preparedSpellCount).toBe(7);
+    expect(await eventsByType("recon-bard-read", "unprepareSpell" as ReconEventType)).toHaveLength(0);
+  });
+});

@@ -3,14 +3,14 @@ import { describe, it, expect } from "vitest";
 import { derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 
 const single = (name: string, level: number, subclass?: string) =>
-  derivePreparedSpellLimit([{ name, level, subclass }]);
+  derivePreparedSpellLimit([{ name, level, subclass }], {}, "EDITION_2024");
 
 // SRD 5.2 (2024): the prepared count is a per-class table column, no longer
 // ability mod + level — so it no longer depends on ability scores.
 describe("derivePreparedSpellLimit (2024 table sum)", () => {
   it("Cleric 8 → 12 regardless of WIS", () => {
     expect(single("cleric", 8)).toBe(12);
-    expect(derivePreparedSpellLimit([{ name: "cleric", level: 8, subclass: null }])).toBe(12);
+    expect(derivePreparedSpellLimit([{ name: "cleric", level: 8, subclass: null }], {}, "EDITION_2024")).toBe(12);
     expect(single("druid", 8)).toBe(12);
   });
 
@@ -42,13 +42,13 @@ describe("derivePreparedSpellLimit (2024 table sum)", () => {
       derivePreparedSpellLimit([
         { name: "wizard", level: 5, subclass: null },
         { name: "paladin", level: 1, subclass: null },
-      ]),
+      ], {}, "EDITION_2024"),
     ).toBe(11); // wizard 9 + paladin 2
     expect(
       derivePreparedSpellLimit([
         { name: "wizard", level: 8, subclass: null },
         { name: "cleric", level: 4, subclass: null },
-      ]),
+      ], {}, "EDITION_2024"),
     ).toBe(19); // wizard 12 + cleric 7
   });
 
@@ -59,7 +59,27 @@ describe("derivePreparedSpellLimit (2024 table sum)", () => {
       derivePreparedSpellLimit([
         { name: "fighter", level: 5, subclass: null },
         { name: "barbarian", level: 3, subclass: null },
-      ]),
+      ], {}, "EDITION_2024"),
     ).toBeNull();
+  });
+});
+
+// #1507: the reconciler/clamp-on-read latch — one function serves both editions.
+describe("derivePreparedSpellLimit (2014 known/formula sum)", () => {
+  it("2014 Bard 3 / Cleric 2 sums a known-caster count and a formula count", () => {
+    expect(
+      derivePreparedSpellLimit(
+        [
+          { name: "bard", level: 3, subclass: null },
+          { name: "cleric", level: 2, subclass: null },
+        ],
+        { wisdom: 14 },
+        "EDITION_2014",
+      ),
+    ).toBe(10); // bard known 6 + cleric (mod +2 + level 2 = 4)
+  });
+
+  it("2014 Paladin 1 has no spellcasting at all yet (level-1 gate)", () => {
+    expect(derivePreparedSpellLimit([{ name: "paladin", level: 1, subclass: null }], { charisma: 14 }, "EDITION_2014")).toBeNull();
   });
 });

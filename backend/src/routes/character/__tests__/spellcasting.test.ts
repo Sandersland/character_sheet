@@ -1195,3 +1195,92 @@ describe("prepared-spell cap enforcement (#883)", () => {
     expect(get.body.spellcasting.preparedSpellLimit).toBe(11);
   });
 });
+
+// #1507: a 2014 Bard reads the SRD 5.1 Spells Known table (a "known" caster,
+// D5) where a 2024 Bard reads the SRD 5.2 Prepared Spells table ("prepared").
+// GET AC from the issue: 2014 Bard 5 -> preparedSpellLimit 8, casterModel
+// "known"; 2024 Bard 5 -> 9, "prepared".
+describe("GET /api/characters/:id — casterModel + edition-forked preparedSpellLimit (#1507)", () => {
+  const BARD_CATALOG_NAME = "Spellcasting Route Test Bard";
+  const BARD_2014_ID = "test-spellcasting-bard-2014";
+  const BARD_2024_ID = "test-spellcasting-bard-2024";
+  let bardClassId: string;
+
+  const bardFixture = (id: string, rulesEdition: "EDITION_2014" | "EDITION_2024") => ({
+    id,
+    name: `Spellcasting Test Bard (${rulesEdition})`,
+    alignment: "Neutral Good",
+    rulesEdition,
+    experiencePoints: 6500, // level 5
+    initiativeBonus: 1,
+    speed: 30,
+    hitPoints: { current: 30, max: 30, temp: 0 },
+    hitDice: { total: 5, die: "d8" },
+    abilityScores: {
+      strength: 8,
+      dexterity: 12,
+      constitution: 12,
+      intelligence: 10,
+      wisdom: 10,
+      charisma: 16,
+    },
+    savingThrowProficiencies: ["dexterity", "charisma"],
+    skills: [],
+    toolProficiencies: [],
+    currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
+    ownerId: OWNER_ID,
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: BARD_CATALOG_NAME },
+      create: {
+        name: BARD_CATALOG_NAME,
+        hitDie: "d8",
+        savingThrows: ["dexterity", "charisma"],
+        skillChoiceCount: 3,
+        skillChoices: ["performance", "persuasion", "deception"],
+        isSpellcaster: true,
+      },
+      update: {},
+    });
+    bardClassId = cls.id;
+
+    await prisma.character.create({
+      data: {
+        ...bardFixture(BARD_2014_ID, "EDITION_2014"),
+        classEntries: { create: [{ name: "bard", classId: bardClassId, position: 0, level: 5 }] },
+      },
+    });
+    await prisma.character.create({
+      data: {
+        ...bardFixture(BARD_2024_ID, "EDITION_2024"),
+        classEntries: { create: [{ name: "bard", classId: bardClassId, position: 0, level: 5 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: { in: [BARD_2014_ID, BARD_2024_ID] } } });
+  });
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: BARD_CATALOG_NAME } });
+  });
+
+  it("2014 Bard 5 serves preparedSpellLimit 8 and casterModel known", async () => {
+    const res = await supertest(app).get(`/api/characters/${BARD_2014_ID}`).set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(8);
+    expect(res.body.spellcasting.casterModel).toBe("known");
+  });
+
+  it("2024 Bard 5 serves preparedSpellLimit 9 and casterModel prepared", async () => {
+    const res = await supertest(app).get(`/api/characters/${BARD_2024_ID}`).set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(9);
+    expect(res.body.spellcasting.casterModel).toBe("prepared");
+  });
+});

@@ -115,6 +115,14 @@ export interface Character {
     preparedSpellLimit?: number | null;
     preparedSpellCount?: number;
     /**
+     * Whether this character's chosen spells are immediately castable ("known",
+     * SRD 5.1 Bard/Sorcerer/Warlock/Ranger/EK/AT) or must be prepared from a
+     * wider list ("prepared", every SRD 5.2 caster). Absent for a non-caster.
+     * Served by buildSpellcastingView (#1507); consumed by #1511 — no
+     * component reads it yet.
+     */
+    casterModel?: "known" | "prepared";
+    /**
      * The spell the character is currently concentrating on (5e: only one at a
      * time), or null. `entryId` matches a `Spell.id` in `spells`.
      */

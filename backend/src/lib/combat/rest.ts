@@ -296,7 +296,7 @@ function restoreWarlockPactSlots(row: HpOpContext["row"]): {
   } else {
     const abilityScores = row.abilityScores as Record<string, number>;
     const profBonus = proficiencyBonusForLevel(levelForExperience(row.experiencePoints));
-    const pactSlotLevel = deriveMulticlassSpellcasting(row.classEntries, abilityScores, profBonus).pact?.slotLevel;
+    const pactSlotLevel = deriveMulticlassSpellcasting(row.classEntries, abilityScores, profBonus, editionOf(row)).pact?.slotLevel;
     if (pactSlotLevel === undefined) return null;
     const key = String(pactSlotLevel);
     slotsRestored = spellState.slotsUsed[key] ?? 0;

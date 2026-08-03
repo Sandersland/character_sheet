@@ -229,10 +229,10 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
 function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
   const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass);
   const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
-  const canSwap = swapCadenceFor(target.name, target.subclass) === "onLevelUp" && target.newLevel >= 2;
+  const canSwap = swapCadenceFor(target.name, target.subclass, edition) === "onLevelUp" && target.newLevel >= 2;
   if (count <= 0 && cantrips <= 0 && !canSwap) return null;
   const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
-  const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass);
+  const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass, edition);
   const lists = magicalSecretsSpellLists(target.name, target.newLevel, target.subclass, edition);
   return {
     kind: "newSpells",

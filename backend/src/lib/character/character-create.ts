@@ -82,6 +82,11 @@ type ResolvedSelections = {
   subclassName: string | null;
   skillProficiencies: string[];
   creationToolProfs: CreationToolProf[];
+  // #1507: threaded through to resolveCreationSpells' preparedSpellCountAt/
+  // maxSpellLevelForClass calls. Recomputed here (not re-derived from
+  // input.rulesEdition ?? DEFAULT_RULES_EDITION a second time) since
+  // resolveSelections already resolved it for the creation-time subclass gate.
+  edition: RulesEdition;
 };
 
 type MaterializedEquipment = {
@@ -356,6 +361,7 @@ async function resolveSelections(
     subclassName: subclass.subclassName,
     skillProficiencies: proficiencies.skillProficiencies,
     creationToolProfs: proficiencies.creationToolProfs,
+    edition,
   };
 }
 
@@ -884,14 +890,22 @@ function creationPickError(
 type CreationSpells = NonNullable<CreateCharacterBody["spells"]>;
 
 // Precondition + count checks for creation picks: the class must cast at level 1,
-// the two lists must match the SRD 5.2 level-1 counts, and no id may repeat.
+// the two lists must match the level-1 counts (per edition), and no id may repeat.
 function creationSpellCountError(
   spells: CreationSpells,
   className: string,
   classDisplay: string,
   subclass: string | null,
+  abilityScores: Record<string, number>,
+  edition: RulesEdition,
 ): Fail | null {
-  const spellCount = preparedSpellCountAt(className, 1, subclass);
+  // #1508 carried AC: this is `null` (not 0) for a 2014 Paladin/Ranger at level
+  // 1 — spellcastingStartLevel gates them out via preparedSpellCountAt, so the
+  // "does not cast spells at level 1" 400 below is the correct, intentional
+  // response rather than a silently-accepted 2 picks. The 2014 creation NUMBERS
+  // themselves (this function's count/list validation once a class does cast)
+  // are #1510's job — this thread-through only fixes the level-1 non-caster gate.
+  const spellCount = preparedSpellCountAt(className, 1, subclass, abilityScores, edition);
   if (spellCount == null) {
     return { ok: false, status: 400, error: `${classDisplay} does not cast spells at level 1` };
   }
@@ -911,11 +925,14 @@ function creationSpellCountError(
 
 // Phase 2b — creation spell picks (#1131). A level-1 caster's chosen cantrips +
 // prepared spells become prepared SpellEntry snapshots; every count/list/level is
-// validated against the SRD 5.2 tables via one catalog read. Omitting `spells`
-// yields a null book (back-compat); a non-caster sending `spells` is a 400.
+// validated against the class's per-edition tables via one catalog read.
+// Omitting `spells` yields a null book (back-compat); a non-caster sending
+// `spells` is a 400. `abilityScores` is the background-adjusted effective score
+// set (#1507: needed for the 2014 Cleric/Druid/Wizard/Paladin ability-mod formula).
 async function resolveCreationSpells(
   input: CreateCharacterBody,
   selections: ResolvedSelections,
+  abilityScores: Record<string, number>,
 ): Promise<PhaseResult<{ spellEntries: SpellEntry[] | null }>> {
   const { spells } = input;
   if (!spells) return { ok: true, spellEntries: null };
@@ -923,13 +940,14 @@ async function resolveCreationSpells(
   const classDisplay = selections.characterClass.name;
   const className = classDisplay.toLowerCase();
   const subclass = selections.subclassName;
-  const countError = creationSpellCountError(spells, className, classDisplay, subclass);
+  const { edition } = selections;
+  const countError = creationSpellCountError(spells, className, classDisplay, subclass, abilityScores, edition);
   if (countError) return countError;
 
   const allIds = [...spells.cantripIds, ...spells.spellIds];
   const rows = allIds.length ? await prisma.spell.findMany({ where: { id: { in: allIds } } }) : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
-  const maxLevel = maxSpellLevelForClass(className, 1, subclass);
+  const maxLevel = maxSpellLevelForClass(className, 1, subclass, edition);
 
   const entries: SpellEntry[] = [];
   for (const [ids, kind] of [[spells.cantripIds, "cantrip"], [spells.spellIds, "spell"]] as const) {
@@ -1068,7 +1086,7 @@ export async function createCharacter(
   );
   if (!equipment.ok) return equipment;
 
-  const spells = await resolveCreationSpells(input, selections);
+  const spells = await resolveCreationSpells(input, selections, grants.effectiveScores);
   if (!spells.ok) return spells;
 
   const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spells.spellEntries, grants);
