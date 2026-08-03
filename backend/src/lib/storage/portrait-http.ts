@@ -3,7 +3,7 @@ import multer from "multer";
 
 import { NotFoundError } from "@/lib/auth/errors.js";
 import { BlobNotFoundError, type BlobObject } from "./blob-store.js";
-import { createBlobStore } from "./index.js";
+import { getBlobStore } from "./index.js";
 import { PORTRAIT_MAX_UPLOAD_BYTES } from "./portrait-image.js";
 
 // The multipart field name — the cross-plan contract pinned with the upload UI
@@ -67,7 +67,7 @@ export async function sendStoredPortrait(res: Response, portraitKey: string | nu
   if (!portraitKey) throw new NotFoundError("Portrait not found");
   let blob: BlobObject;
   try {
-    blob = await createBlobStore().get(portraitKey);
+    blob = await getBlobStore().get(portraitKey);
   } catch (error) {
     if (error instanceof BlobNotFoundError) throw new NotFoundError("Portrait not found");
     throw error;

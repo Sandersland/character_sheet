@@ -4,7 +4,12 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BlobStoreConfigError, createBlobStore } from "../index.js";
+import {
+  __resetBlobStoreForTests,
+  BlobStoreConfigError,
+  createBlobStore,
+  getBlobStore,
+} from "../index.js";
 
 describe("createBlobStore", () => {
   beforeEach(() => {
@@ -84,5 +89,47 @@ describe("createBlobStore", () => {
 
     const store = createBlobStore();
     expect(typeof store.put).toBe("function");
+  });
+});
+
+describe("getBlobStore", () => {
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("BLOB_STORE_DRIVER", "fs");
+    __resetBlobStoreForTests();
+  });
+
+  afterEach(() => {
+    __resetBlobStoreForTests();
+    vi.unstubAllEnvs();
+  });
+
+  it("memoizes: every call returns the same instance, even after env changes", async () => {
+    vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "blob-memo-test-")));
+
+    const first = getBlobStore();
+    expect(getBlobStore()).toBe(first);
+
+    // The memo pins the first store; a later env change alone must not
+    // rebuild it — that is exactly why __resetBlobStoreForTests exists.
+    vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "blob-memo-test-")));
+    expect(getBlobStore()).toBe(first);
+  });
+
+  it("after a reset, the next call builds a store honoring the new env", async () => {
+    const dirA = await mkdtemp(path.join(os.tmpdir(), "blob-memo-test-a-"));
+    vi.stubEnv("BLOB_FS_DIR", dirA);
+    const first = getBlobStore();
+    await first.put("a.txt", Buffer.from("a"), { contentType: "text/plain" });
+    await expect(access(path.join(dirA, "objects", "a.txt"))).resolves.toBeUndefined();
+
+    __resetBlobStoreForTests();
+    const dirB = await mkdtemp(path.join(os.tmpdir(), "blob-memo-test-b-"));
+    vi.stubEnv("BLOB_FS_DIR", dirB);
+
+    const second = getBlobStore();
+    expect(second).not.toBe(first);
+    await second.put("b.txt", Buffer.from("b"), { contentType: "text/plain" });
+    await expect(access(path.join(dirB, "objects", "b.txt"))).resolves.toBeUndefined();
   });
 });

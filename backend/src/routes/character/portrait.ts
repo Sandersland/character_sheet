@@ -7,7 +7,7 @@ import { characterInclude } from "@/lib/character/character-include.js";
 import { storedPortraitKey } from "@/lib/character/character-portrait.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { createBlobStore } from "@/lib/storage/index.js";
+import { getBlobStore } from "@/lib/storage/index.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
@@ -43,7 +43,7 @@ portraitRouter.post<{ id: string }>(
     // A fresh uuid per upload is what versions the wire URL (derivePortraitUrl
     // reads it back as ?v=), making the immutable cache header safe.
     const key = `portraits/characters/${characterId}/${randomUUID()}.webp`;
-    await createBlobStore().put(key, webp, { contentType: PORTRAIT_CONTENT_TYPE });
+    await getBlobStore().put(key, webp, { contentType: PORTRAIT_CONTENT_TYPE });
 
     // Blob first, then the key swap, then old-blob cleanup: a crash between
     // steps leaves at worst an orphaned blob, never a key pointing nowhere.

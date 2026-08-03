@@ -19,7 +19,7 @@ import {
 } from "@/lib/campaign/entities.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { createBlobStore } from "@/lib/storage/index.js";
+import { getBlobStore } from "@/lib/storage/index.js";
 import { deletePortraitBlobBestEffort, portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
 import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
@@ -396,7 +396,7 @@ entitiesRouter.post(
     // A fresh uuid per upload is what versions the wire URL (toWireEntity
     // reads it back as ?v=), making the immutable cache header safe.
     const key = `portraits/entities/${entityId}/${randomUUID()}.webp`;
-    await createBlobStore().put(key, webp, { contentType: PORTRAIT_CONTENT_TYPE });
+    await getBlobStore().put(key, webp, { contentType: PORTRAIT_CONTENT_TYPE });
     await swapEntityPortraitKey(res, entityId, key);
   },
 );
