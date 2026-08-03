@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -6,6 +8,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-serialize-item-cast";
 
@@ -52,6 +55,7 @@ function itemSpells(view: Awaited<ReturnType<typeof serialize>>): SpellEntry[] {
 describe("serialize surfaces item-granted spells (#528)", () => {
   let characterId: string;
   let itemId: string;
+  let capId: string;
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -66,16 +70,16 @@ describe("serialize surfaces item-granted spells (#528)", () => {
     });
     characterId = character.id;
 
+    capId = randomUUID();
     const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Wand of Witch Bolt",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
         attuned: false,
-        capabilities: { create: [CAST_WITCH_BOLT] },
-      },
+        capabilities: [{ ...CAST_WITCH_BOLT, id: capId }],
+      }),
     });
     itemId = item.id;
   });
@@ -113,7 +117,7 @@ describe("serialize surfaces item-granted spells (#528)", () => {
 
   it("reflects a spent use in usesRemaining", async () => {
     await prisma.inventoryItem.update({ where: { id: itemId }, data: { attuned: true } });
-    await prisma.inventoryCapability.updateMany({ where: { inventoryItemId: itemId }, data: { used: 1 } });
+    await prisma.inventoryCapabilityUse.updateMany({ where: { capabilityKey: capId }, data: { used: 1 } });
     const [spell] = itemSpells(await serialize(characterId));
     expect(spell.item?.usesRemaining).toBe(0);
     expect(spell.item?.usesTotal).toBe(1);

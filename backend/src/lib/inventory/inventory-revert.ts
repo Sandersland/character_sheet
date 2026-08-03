@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { Prisma, type EquipSlot } from "@/generated/prisma/client.js";
 import {
   type Currency,
@@ -10,9 +8,6 @@ import {
   toJsonInput,
 } from "./inventory-currency.js";
 import type { DeletedInventoryItemSnapshot } from "./inventory-snapshot.js";
-import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
-import type { ArmorDetailFields, ConsumableDetailFields, WeaponDetailFields } from "./detail-snapshot.js";
-import { mirrorCapabilityUsedSet } from "./inventory-capability-use.js";
 
 // Undo / revert.
 //
@@ -71,62 +66,12 @@ async function resolveSnapshotRefs(
   return { itemId: existing ? candidate : null };
 }
 
-// A recreate mints a FRESH id per capability (#1648) rather than reusing the
-// deleted row's — deletedItem.capabilities never carried one anyway (a
-// delete/undo-delete cycle already recreated capabilities with new ids before
-// this issue). The new id keys both the recreated InventoryCapability row and
-// its InventoryCapabilityUse mirror, and feeds buildInventorySnapshot's
-// capabilities[].key.
-function recreateCapabilityCreates(deletedItem: DeletedInventoryItemSnapshot) {
-  return (deletedItem.capabilities ?? []).map((c) => ({ ...c, id: randomUUID() }));
-}
-
-// The nested detail-block create payload for a recreated row (weapon/armor/
-// consumable/capabilities), each present only when the snapshot carried it.
-function snapshotDetailNestedCreate(
-  deletedItem: DeletedInventoryItemSnapshot,
-  capabilityCreates: ReturnType<typeof recreateCapabilityCreates>,
-) {
-  return {
-    weaponDetail: deletedItem.weaponDetail ? { create: deletedItem.weaponDetail } : undefined,
-    armorDetail: deletedItem.armorDetail ? { create: deletedItem.armorDetail } : undefined,
-    consumableDetail: deletedItem.consumableDetail ? { create: deletedItem.consumableDetail } : undefined,
-    capabilities: capabilityCreates.length > 0 ? { create: capabilityCreates } : undefined,
-  };
-}
-
-// The frozen-half snapshot for a recreated row (#1648) — split out of
-// recreateDeletedItem purely to keep that function's cyclomatic complexity
-// low (this is where the object literal's ?? defaulting lives).
-function recreateSnapshot(
-  deletedItem: DeletedInventoryItemSnapshot,
-  capabilityCreates: ReturnType<typeof recreateCapabilityCreates>,
-): Prisma.InputJsonValue {
-  return buildInventorySnapshot({
-    name: deletedItem.name,
-    category: deletedItem.category,
-    weight: deletedItem.weight ?? null,
-    cost: deletedItem.cost ?? null,
-    description: deletedItem.description ?? null,
-    slot: deletedItem.slot,
-    rarity: deletedItem.rarity,
-    requiresAttunement: deletedItem.requiresAttunement,
-    attunementPrereqKind: deletedItem.attunementPrereqKind,
-    attunementPrereqValue: deletedItem.attunementPrereqValue,
-    // Cast, not a widened SnapshotSourceRow type: deletedItem's fields are
-    // typed as Prisma's *CreateWithoutInventoryItemInput (defaulted columns
-    // optional), but every real value here came from weaponDetailFields/
-    // armorDetailFields/consumableDetailFields on a genuine row
-    // (snapshotInventoryItemForUndo), so every field is concretely present.
-    weaponDetail: (deletedItem.weaponDetail as WeaponDetailFields | null) ?? null,
-    armorDetail: (deletedItem.armorDetail as ArmorDetailFields | null) ?? null,
-    consumableDetail: (deletedItem.consumableDetail as ConsumableDetailFields | null) ?? null,
-    capabilities: capabilityCreates,
-  }) as unknown as Prisma.InputJsonValue;
-}
-
 // Recreates a deleted row from its undo snapshot, reusing the original id so
-// soft-reference entityIds on other events stay valid.
+// soft-reference entityIds on other events stay valid. #1649 simplified this:
+// the frozen half is the already-persisted `snapshot` blob, written back
+// verbatim — no per-capability id re-minting (a capability's `key` is just an
+// opaque string carried inside that blob, not tied to a live row anymore) and
+// no nested weapon/armor/consumable/capability creates (those tables are gone).
 async function recreateDeletedItem(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -134,11 +79,6 @@ async function recreateDeletedItem(
   deletedItem: DeletedInventoryItemSnapshot,
 ) {
   const { itemId } = await resolveSnapshotRefs(tx, deletedItem);
-  // Ids generated up front (#1648), same reasoning as awardCampaignItem: one
-  // create() call nests capabilities + their capabilityUses mirror, and the
-  // snapshot's capabilities[].key matches the id that actually lands.
-  const capabilityCreates = recreateCapabilityCreates(deletedItem);
-  const capabilityUseCreates = capabilityCreates.map((c) => ({ capabilityKey: c.id, used: c.used ?? 0 }));
   await tx.inventoryItem.create({
     data: {
       id: entityId,
@@ -159,13 +99,9 @@ async function recreateDeletedItem(
       attunementPrereqValue: deletedItem.attunementPrereqValue,
       notes: deletedItem.notes ?? undefined,
       position: deletedItem.position,
-      // Promoted out of InventoryConsumableDetail (#1648) — restored verbatim,
-      // same as the nested consumableDetail create below (this is an undo, not
-      // a fresh copy, so no freshCopy top-up).
-      usesRemaining: deletedItem.consumableDetail?.usesRemaining ?? null,
-      snapshot: recreateSnapshot(deletedItem, capabilityCreates),
-      capabilityUses: capabilityUseCreates.length > 0 ? { create: capabilityUseCreates } : undefined,
-      ...snapshotDetailNestedCreate(deletedItem, capabilityCreates),
+      usesRemaining: deletedItem.usesRemaining,
+      snapshot: deletedItem.snapshot,
+      capabilityUses: deletedItem.capabilityUses.length > 0 ? { create: deletedItem.capabilityUses } : undefined,
     },
   });
 }
@@ -191,28 +127,21 @@ async function restoreScalars(
   if (before.equippedSlot !== undefined) updateData.equippedSlot = before.equippedSlot;
   if (before.attuned !== undefined) updateData.attuned = before.attuned;
   if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
-  // Promoted out of InventoryConsumableDetail (#1648) — restored in the SAME
-  // InventoryItem update as the other scalars above, mirroring the value the
-  // detail-row restore below writes.
+  // Promoted out of InventoryConsumableDetail (#1648) — a plain InventoryItem
+  // column, so restoring it is just another field in this same update.
   if (before.usesRemaining !== undefined) updateData.usesRemaining = before.usesRemaining;
   if (Object.keys(updateData).length > 0) {
     await tx.inventoryItem.update({ where: { id: entityId }, data: updateData });
   }
-  // usesRemaining lives on the detail row, so restore it separately.
-  if (before.usesRemaining !== undefined) {
-    await tx.inventoryConsumableDetail.update({
-      where: { inventoryItemId: entityId },
-      data: { usesRemaining: before.usesRemaining },
-    });
-  }
-  // updateMany (not update) so a vanished row is a no-op — a delete/undo-delete
-  // cycle recreates capabilities with NEW ids, so the old id may be gone.
+  // updateMany (not update) so a vanished row is a no-op — capabilityId is
+  // event-blob field naming, historical from when it named an InventoryCapability
+  // row's id; the value it carries is the same capabilityKey InventoryCapabilityUse
+  // is keyed by.
   if (before.capabilityUsed !== undefined) {
-    await tx.inventoryCapability.updateMany({
-      where: { id: before.capabilityUsed.capabilityId },
+    await tx.inventoryCapabilityUse.updateMany({
+      where: { capabilityKey: before.capabilityUsed.capabilityId },
       data: { used: before.capabilityUsed.used },
     });
-    await mirrorCapabilityUsedSet(tx, before.capabilityUsed.capabilityId, before.capabilityUsed.used);
   }
 }
 

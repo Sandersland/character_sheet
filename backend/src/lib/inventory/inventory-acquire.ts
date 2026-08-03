@@ -185,7 +185,6 @@ export async function applyAcquire(
         consumableDetail: source.detail.consumableDetail?.create ?? null,
         capabilities: [],
       }) as unknown as Prisma.InputJsonValue,
-      ...source.detail,
     },
   });
 

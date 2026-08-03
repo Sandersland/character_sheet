@@ -4,6 +4,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { applyHitPointOperations, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-hp-item-resist";
 
@@ -43,16 +44,13 @@ describe("item-granted resistance halves damage via #456 flow (#529)", () => {
     });
     characterId = character.id;
     const ring = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Ring of Fire Resistance",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
-        capabilities: {
-          create: [{ kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" }],
-        },
-      },
+        capabilities: [{ kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" }],
+      }),
     });
     ringId = ring.id;
   });
@@ -87,17 +85,14 @@ describe("item-granted resistance halves damage via #456 flow (#529)", () => {
 
   it("zeroes matching damage from an active damage-immunity grant (#529)", async () => {
     const amulet = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Amulet of Poison Immunity",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
         attuned: true,
-        capabilities: {
-          create: [{ kind: "grant", grantType: "immunity", grantValueKind: "damageType", grantValue: "poison" }],
-        },
-      },
+        capabilities: [{ kind: "grant", grantType: "immunity", grantValueKind: "damageType", grantValue: "poison" }],
+      }),
     });
     await applyHitPointOperations(characterId, [{ type: "damage", amount: 10, damageType: "poison" }]);
     expect(await current(characterId)).toBe(30);

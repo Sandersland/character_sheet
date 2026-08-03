@@ -15,6 +15,7 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-ac-spells";
 
@@ -58,20 +59,17 @@ async function learnAndCast(spellName: string, cast = true): Promise<string> {
 
 async function makeBodyArmor(over: { name?: string; armorCategory?: "light" | "medium" | "heavy"; baseArmorClass?: number; dexModifierMax?: number } = {}) {
   return prisma.inventoryItem.create({
-    data: {
-      character: { connect: { id: characterId } },
+    data: inventoryItemFixtureData({
+      characterId,
       name: over.name ?? "Leather Armor",
       category: "armor",
-      quantity: 1,
-      armorDetail: {
-        create: {
-          armorCategory: over.armorCategory ?? "light",
-          baseArmorClass: over.baseArmorClass ?? 11,
-          dexModifierApplies: (over.armorCategory ?? "light") !== "heavy",
-          ...(over.dexModifierMax != null ? { dexModifierMax: over.dexModifierMax } : {}),
-        },
+      armor: {
+        armorCategory: over.armorCategory ?? "light",
+        baseArmorClass: over.baseArmorClass ?? 11,
+        dexModifierApplies: (over.armorCategory ?? "light") !== "heavy",
+        ...(over.dexModifierMax != null ? { dexModifierMax: over.dexModifierMax } : {}),
       },
-    },
+    }),
   });
 }
 

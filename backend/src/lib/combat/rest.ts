@@ -34,6 +34,7 @@ import {
   mirrorCapabilityUsedSet,
   mirrorUsesRemaining,
 } from "@/lib/inventory/inventory-capability-use.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 import { InvalidHitPointOperationError, hitDieHeal, type HitDice } from "./hp-core.js";
 import type { HpOpContext, HpOpResult } from "./hp-context.js";
 
@@ -76,7 +77,6 @@ async function resetItemSpellUsesOnRest(
     ids.push(...caps.ids);
   }
   if (ids.length > 0) {
-    await ctx.tx.inventoryCapability.updateMany({ where: { id: { in: ids } }, data: { used: 0 } });
     await mirrorCapabilityUsedResetMany(ctx.tx, ids);
   }
   return restored;
@@ -122,7 +122,6 @@ async function rechargeOneChargePool(
   const regained = computeChargePoolRegain(cap, used);
   const nextUsed = Math.max(0, used - regained);
   if (nextUsed === used) return null;
-  await tx.inventoryCapability.update({ where: { id: col.id }, data: { used: nextUsed } });
   await mirrorCapabilityUsedSet(tx, col.id, nextUsed);
   return {
     before: { capabilityId: col.id, itemName, used },
@@ -452,22 +451,23 @@ async function rechargeConsumables(
   before: { inventoryItemId: string; usesRemaining: number | null }[];
   after: { inventoryItemId: string; usesRemaining: number | null }[];
 }> {
-  const chargedRows = await tx.inventoryConsumableDetail.findMany({
-    where: { inventoryItem: { characterId }, maxUses: { not: null } },
-    select: { inventoryItemId: true, usesRemaining: true, maxUses: true },
+  // maxUses now lives only in the snapshot (#1649), but a charged item's
+  // usesRemaining column is non-null iff maxUses is set (buildInventorySnapshot's
+  // narrowConsumable pairing — see InventoryItem.usesRemaining's own comment), so
+  // filtering on the column here is equivalent to the old maxUses-not-null filter.
+  const chargedRows = await tx.inventoryItem.findMany({
+    where: { characterId, usesRemaining: { not: null } },
+    select: { id: true, usesRemaining: true, snapshot: true },
   });
   const before: { inventoryItemId: string; usesRemaining: number | null }[] = [];
   const after: { inventoryItemId: string; usesRemaining: number | null }[] = [];
   let consumablesRecharged = 0;
-  for (const c of chargedRows) {
-    if (c.usesRemaining !== c.maxUses) {
-      before.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.usesRemaining });
-      after.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.maxUses });
-      await tx.inventoryConsumableDetail.update({
-        where: { inventoryItemId: c.inventoryItemId },
-        data: { usesRemaining: c.maxUses },
-      });
-      await mirrorUsesRemaining(tx, c.inventoryItemId, c.maxUses);
+  for (const row of chargedRows) {
+    const maxUses = readInventorySnapshot(row).consumable?.maxUses ?? null;
+    if (row.usesRemaining !== maxUses) {
+      before.push({ inventoryItemId: row.id, usesRemaining: row.usesRemaining });
+      after.push({ inventoryItemId: row.id, usesRemaining: maxUses });
+      await mirrorUsesRemaining(tx, row.id, maxUses);
       consumablesRecharged += 1;
     }
   }

@@ -16,6 +16,8 @@
  *  - the follow-on ordering: main hitPoints event THEN concentration event.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -26,6 +28,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-hp-char";
 let COOKIE: string;
@@ -457,13 +460,12 @@ describe("rest/level-up branch pins (#684)", () => {
   it("longRest recharges limited-use consumables (#121)", async () => {
     await createPlain("hp684-cons");
     const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp684-cons" } },
+      data: inventoryItemFixtureData({
+        characterId: "hp684-cons",
         name: "Test Potion Bandolier (HP684)",
         category: "consumable",
-        quantity: 1,
-        consumableDetail: { create: { maxUses: 3, usesRemaining: 1 } },
-      },
+        consumable: { maxUses: 3, usesRemaining: 1 },
+      }),
     });
     const res = await postHp("hp684-cons", { operations: [{ type: "longRest" }] });
     expect(res.status).toBe(200);
@@ -481,25 +483,21 @@ describe("rest/level-up branch pins (#684)", () => {
       { inventoryItemId: item.id, usesRemaining: 3 },
     ]);
 
-    const detail = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: item.id } });
-    expect(detail.usesRemaining).toBe(3);
+    const row = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+    expect(row.usesRemaining).toBe(3);
   });
 
   it("shortRest recharges a fixed-bonus charge pool (#555), lifted into before/after", async () => {
     await createPlain("hp684-pool");
-    const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp684-pool" } },
+    const capId = randomUUID();
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: "hp684-pool",
         name: "Test Wand (HP684)",
         category: "gear",
-        quantity: 1,
-        capabilities: {
-          create: [{ kind: "charges", maxCharges: 7, rechargeTrigger: "short", rechargeBonus: 2, used: 4 }],
-        },
-      },
-      include: { capabilities: true },
+        capabilities: [{ id: capId, kind: "charges", maxCharges: 7, rechargeTrigger: "short", rechargeBonus: 2, used: 4 }],
+      }),
     });
-    const capId = item.capabilities[0].id;
     const res = await postHp("hp684-pool", { operations: [{ type: "shortRest", rolls: [6] }] });
     expect(res.status).toBe(200);
 
@@ -517,8 +515,8 @@ describe("rest/level-up branch pins (#684)", () => {
       { capabilityId: capId, itemName: "Test Wand (HP684)", used: 2 },
     ]);
 
-    const cap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
-    expect(cap.used).toBe(2);
+    const use = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capId } });
+    expect(use.used).toBe(2);
   });
 
   it("longRest recharges a dawn-trigger charge pool (#555), lifted into before/after", async () => {
@@ -527,19 +525,15 @@ describe("rest/level-up branch pins (#684)", () => {
     // "long" but NOT on "short"), so a long rest recharges it through the full
     // transaction path.
     await createPlain("hp684-dawn");
-    const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp684-dawn" } },
+    const capId = randomUUID();
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: "hp684-dawn",
         name: "Test Staff (HP684)",
         category: "gear",
-        quantity: 1,
-        capabilities: {
-          create: [{ kind: "charges", maxCharges: 7, rechargeTrigger: "dawn", rechargeBonus: 2, used: 4 }],
-        },
-      },
-      include: { capabilities: true },
+        capabilities: [{ id: capId, kind: "charges", maxCharges: 7, rechargeTrigger: "dawn", rechargeBonus: 2, used: 4 }],
+      }),
     });
-    const capId = item.capabilities[0].id;
     const res = await postHp("hp684-dawn", { operations: [{ type: "longRest" }] });
     expect(res.status).toBe(200);
 
@@ -556,8 +550,8 @@ describe("rest/level-up branch pins (#684)", () => {
       { capabilityId: capId, itemName: "Test Staff (HP684)", used: 2 },
     ]);
 
-    const cap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
-    expect(cap.used).toBe(2);
+    const use = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capId } });
+    expect(use.used).toBe(2);
   });
 
   it("shortRest resets attuned item castSpell uses (#528) but not unattuned+unequipped ones", async () => {
@@ -572,27 +566,25 @@ describe("rest/level-up branch pins (#684)", () => {
       castUses: 2,
       used: 2,
     };
-    const attuned = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp684-zap" } },
+    const attunedCapId = randomUUID();
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: "hp684-zap",
         name: "Test Ring of Zapping (HP684)",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
         attuned: true,
-        capabilities: { create: [castCap] },
-      },
-      include: { capabilities: true },
+        capabilities: [{ id: attunedCapId, ...castCap }],
+      }),
     });
-    const stowed = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp684-zap" } },
+    const stowedCapId = randomUUID();
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: "hp684-zap",
         name: "Test Stowed Rod (HP684)",
         category: "gear",
-        quantity: 1,
-        capabilities: { create: [castCap] },
-      },
-      include: { capabilities: true },
+        capabilities: [{ id: stowedCapId, ...castCap }],
+      }),
     });
 
     const res = await postHp("hp684-zap", { operations: [{ type: "shortRest", rolls: [6] }] });
@@ -605,11 +597,11 @@ describe("rest/level-up branch pins (#684)", () => {
       resourcesRestored: 0, slotsRestored: 0, itemSpellsRestored: 2,
     });
 
-    const attunedCap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: attuned.capabilities[0].id } });
-    expect(attunedCap.used).toBe(0);
+    const attunedUse = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: attunedCapId } });
+    expect(attunedUse.used).toBe(0);
     // Neither equipped nor attuned → the gate skips it.
-    const stowedCap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: stowed.capabilities[0].id } });
-    expect(stowedCap.used).toBe(2);
+    const stowedUse = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: stowedCapId } });
+    expect(stowedUse.used).toBe(2);
   });
 
   it("levelUp with an existing-class target: exact payload, chosen entry's die", async () => {
@@ -744,17 +736,15 @@ describe("revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706
 
   it("shortRest recharges a full-refill charge pool (no rechargeDice/rechargeBonus) to 0", async () => {
     await createPlain("hp706-full");
-    const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp706-full" } },
+    const capId = randomUUID();
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: "hp706-full",
         name: "Test Baton (HP706)",
         category: "gear",
-        quantity: 1,
-        capabilities: { create: [{ kind: "charges", maxCharges: 5, rechargeTrigger: "short", used: 3 }] },
-      },
-      include: { capabilities: true },
+        capabilities: [{ id: capId, kind: "charges", maxCharges: 5, rechargeTrigger: "short", used: 3 }],
+      }),
     });
-    const capId = item.capabilities[0].id;
     const res = await postHp("hp706-full", { operations: [{ type: "shortRest", rolls: [6] }] });
     expect(res.status).toBe(200);
 
@@ -767,59 +757,56 @@ describe("revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706
       { capabilityId: capId, itemName: "Test Baton (HP706)", used: 0 },
     ]);
 
-    const cap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
-    expect(cap.used).toBe(0);
+    const use = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capId } });
+    expect(use.used).toBe(0);
   });
 
   it("revert of a rest that recharged a charge pool re-expends it (revertHitPointsEvent chargePools branch)", async () => {
     await createPlain("hp706-revert-pool");
-    const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp706-revert-pool" } },
+    const capId = randomUUID();
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: "hp706-revert-pool",
         name: "Test Rod (HP706 Revert)",
         category: "gear",
-        quantity: 1,
-        capabilities: { create: [{ kind: "charges", maxCharges: 7, rechargeTrigger: "short", rechargeBonus: 2, used: 4 }] },
-      },
-      include: { capabilities: true },
+        capabilities: [{ id: capId, kind: "charges", maxCharges: 7, rechargeTrigger: "short", rechargeBonus: 2, used: 4 }],
+      }),
     });
-    const capId = item.capabilities[0].id;
     const res = await postHp("hp706-revert-pool", { operations: [{ type: "shortRest", rolls: [6] }] });
     expect(res.status).toBe(200);
 
-    const afterRest = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
+    const afterRest = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capId } });
     expect(afterRest.used).toBe(2); // 4 - 2 (fixed bonus)
 
     const [ev] = await events("hp706-revert-pool");
     const rev = await revertBatch("hp706-revert-pool", ev.batchId!);
     expect(rev.status).toBe(200);
 
-    const afterRevert = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
+    const afterRevert = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capId } });
     expect(afterRevert.used).toBe(4); // re-expended to the pre-rest value
   });
 
   it("revert of a longRest that recharged consumables re-expends them (revertHitPointsEvent consumableCharges branch)", async () => {
     await createPlain("hp706-revert-cons");
     const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: "hp706-revert-cons" } },
+      data: inventoryItemFixtureData({
+        characterId: "hp706-revert-cons",
         name: "Test Potion Flask (HP706 Revert)",
         category: "consumable",
-        quantity: 1,
-        consumableDetail: { create: { maxUses: 3, usesRemaining: 1 } },
-      },
+        consumable: { maxUses: 3, usesRemaining: 1 },
+      }),
     });
     const res = await postHp("hp706-revert-cons", { operations: [{ type: "longRest" }] });
     expect(res.status).toBe(200);
 
-    const afterRest = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: item.id } });
+    const afterRest = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
     expect(afterRest.usesRemaining).toBe(3);
 
     const [ev] = await events("hp706-revert-cons");
     const rev = await revertBatch("hp706-revert-cons", ev.batchId!);
     expect(rev.status).toBe(200);
 
-    const afterRevert = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: item.id } });
+    const afterRevert = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
     expect(afterRevert.usesRemaining).toBe(1); // re-expended to the pre-rest value
   });
 });

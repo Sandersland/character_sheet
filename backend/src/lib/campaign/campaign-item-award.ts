@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { capabilityColumnFields } from "@/lib/inventory/capabilities.js";
-import { consumableDetailFields, snapshotDetailCreate } from "@/lib/inventory/detail-snapshot.js";
+import { consumableDetailFields } from "@/lib/inventory/detail-snapshot.js";
 import { logEvent } from "@/lib/activity/events.js";
-import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "@/lib/inventory/inventory.js";
+import { snapshotInventoryItemForUndo, inventoryItemDetailInclude, resolveInventoryItem } from "@/lib/inventory/inventory.js";
 import { asCurrency } from "@/lib/inventory/inventory-currency.js";
 import { buildInventorySnapshot } from "@/lib/inventory/inventory-snapshot-build.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -55,21 +55,6 @@ function toJsonInput(value: Prisma.JsonValue | null): Prisma.InputJsonValue | Pr
 // capabilities[].key, all from one create() call.
 function snapshotCampaignItemCapabilityCreates(item: CampaignItemWithDetails) {
   return item.capabilities.map((c) => ({ id: randomUUID(), ...capabilityColumnFields(c) }));
-}
-
-// Builds the InventoryItem nested detail-create block from a CAMPAIGN-scoped
-// Item's already-included detail rows — the Item*Detail tables share the
-// exact shape of the Inventory*Detail tables, so this is a straight field copy.
-// The snapshot is self-contained, so a later edit/revoke of the source leaves
-// these intact.
-function snapshotCampaignItemDetail(
-  item: CampaignItemWithDetails,
-  capabilityCreates: ReturnType<typeof snapshotCampaignItemCapabilityCreates>,
-) {
-  return {
-    ...snapshotDetailCreate(item),
-    capabilities: capabilityCreates.length > 0 ? { create: capabilityCreates } : undefined,
-  };
 }
 
 // Resolves the sessionId a loot event threads onto (#382). With no explicit
@@ -203,7 +188,6 @@ export async function awardCampaignItem(params: {
           capabilities: capabilityCreates,
         }) as unknown as Prisma.InputJsonValue,
         capabilityUses: capabilityUseCreates.length > 0 ? { create: capabilityUseCreates } : undefined,
-        ...snapshotCampaignItemDetail(item, capabilityCreates),
       },
     });
 
@@ -256,14 +240,15 @@ export async function revokeCampaignItem(params: {
     params.characterId,
   );
 
-  const row = await prisma.inventoryItem.findFirst({
+  const rawRow = await prisma.inventoryItem.findFirst({
     where: { characterId: character.id, itemId: item.id },
     orderBy: { position: "desc" },
     include: inventoryItemDetailInclude,
   });
-  if (!row) {
+  if (!rawRow) {
     throw new CampaignItemAwardError(404, `${character.name} does not hold ${item.name}`);
   }
+  const row = resolveInventoryItem(rawRow);
 
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(character.id);

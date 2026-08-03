@@ -6,7 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { awardCampaignItem } from "@/lib/campaign/campaign-item-award.js";
-import { inventoryItemDetailInclude } from "@/lib/inventory/inventory.js";
+import { inventoryItemDetailInclude, resolveInventoryItem } from "@/lib/inventory/inventory.js";
 
 const OWNER_ID = "owner-cap-award-lib";
 
@@ -71,10 +71,12 @@ describe("capability snapshot on award (#545)", () => {
   it("snapshots capabilities + attunement prereq onto the awarded InventoryItem", async () => {
     await awardCampaignItem({ campaignId, campaignItemId, characterId, quantity: 1 });
 
-    const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId, itemId: campaignItemId },
-      include: inventoryItemDetailInclude,
-    });
+    const row = resolveInventoryItem(
+      await prisma.inventoryItem.findFirstOrThrow({
+        where: { characterId, itemId: campaignItemId },
+        include: inventoryItemDetailInclude,
+      }),
+    );
 
     expect(row.requiresAttunement).toBe(true);
     expect(row.attunementPrereqKind).toBe("species");
@@ -125,10 +127,12 @@ describe("capability snapshot on award (#545)", () => {
 
     await awardCampaignItem({ campaignId, campaignItemId: wand.id, characterId, quantity: 1 });
 
-    const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId, itemId: wand.id },
-      include: inventoryItemDetailInclude,
-    });
+    const row = resolveInventoryItem(
+      await prisma.inventoryItem.findFirstOrThrow({
+        where: { characterId, itemId: wand.id },
+        include: inventoryItemDetailInclude,
+      }),
+    );
     const pool = row.capabilities.find((c) => c.kind === "charges")!;
     expect(pool).toMatchObject({
       maxCharges: 7,
@@ -146,10 +150,12 @@ describe("capability snapshot on award (#545)", () => {
     await awardCampaignItem({ campaignId, campaignItemId, characterId, quantity: 1 });
     await prisma.item.delete({ where: { id: campaignItemId } });
 
-    const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId },
-      include: inventoryItemDetailInclude,
-    });
+    const row = resolveInventoryItem(
+      await prisma.inventoryItem.findFirstOrThrow({
+        where: { characterId },
+        include: inventoryItemDetailInclude,
+      }),
+    );
     // Provenance FK nulled by SetNull, but the snapshotted capabilities survive.
     expect(row.itemId).toBeNull();
     expect(row.capabilities).toHaveLength(2);

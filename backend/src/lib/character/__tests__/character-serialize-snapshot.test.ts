@@ -23,6 +23,8 @@
 // become byte-identical copies with a forked exhaustion string bolted on,
 // diluting this file's signal for no new information.
 
+import { randomUUID } from "node:crypto";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -31,6 +33,8 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { buildInventorySnapshot } from "@/lib/inventory/inventory-snapshot-build.js";
+import { normalizeArmorDetail, normalizeConsumableDetail, normalizeWeaponDetail } from "@/lib/inventory/inventory-snapshot.js";
 
 const OWNER_ID = "owner-serialize-snapshot";
 const FIGHTER_CLASS_NAME = "Test Fighter (Snapshot Suite)";
@@ -225,62 +229,101 @@ async function createMulticlassCaster() {
       },
       inventoryItems: {
         create: [
-          {
-            id: "inv-sword",
-            name: "Snapshot Longsword",
-            category: "weapon",
-            quantity: 1,
-            position: 0,
-            equippedSlot: "MAIN_HAND",
-            weaponDetail: {
-              create: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", versatileDiceCount: 1, versatileDiceFaces: 10, weaponClass: "martial", weaponRange: "melee" },
-            },
-          },
-          {
-            id: "inv-shield",
-            name: "Snapshot Shield",
-            category: "armor",
-            quantity: 1,
-            position: 1,
-            equippedSlot: "OFF_HAND",
-            armorDetail: { create: { armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false } },
-          },
-          {
-            id: "inv-armor",
-            name: "Snapshot Leather",
-            category: "armor",
-            quantity: 1,
-            position: 2,
-            equippedSlot: "BODY",
-            armorDetail: { create: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true } },
-          },
-          {
-            id: "inv-charm",
-            name: "Charm of the Snapshot",
-            category: "gear",
-            quantity: 1,
-            position: 3,
-            slot: "NECK",
-            equippedSlot: "NECK",
-            rarity: "RARE",
-            activatedUsesSpent: 1,
-            capabilities: {
-              create: [
-                { kind: "passiveBonus", target: "skill", targetKey: "athletics", op: "add", value: 1 },
-                { kind: "activatedEffect", activation: "bonus", target: "speed", op: "add", value: 10, activatedDuration: "untilRest", resourceKind: "perRest", resourcePeriod: "long", resourceCharges: 1, durationText: "10 minutes" },
-              ],
-            },
-          },
-          {
-            id: "inv-potion",
-            name: "Potion of Snapshots",
-            category: "consumable",
-            quantity: 2,
-            position: 4,
-            consumableDetail: {
-              create: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 2, effectDescription: "Heals 2d4+2.", maxUses: 1, usesRemaining: 1 },
-            },
-          },
+          (() => {
+            const weapon = normalizeWeaponDetail({
+              damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing",
+              versatileDiceCount: 1, versatileDiceFaces: 10, weaponClass: "martial", weaponRange: "melee",
+            });
+            return {
+              id: "inv-sword",
+              name: "Snapshot Longsword",
+              category: "weapon" as const,
+              quantity: 1,
+              position: 0,
+              equippedSlot: "MAIN_HAND" as const,
+              snapshot: buildInventorySnapshot({
+                name: "Snapshot Longsword", category: "weapon", weight: null, cost: null, description: null,
+                slot: null, rarity: null, requiresAttunement: false, attunementPrereqKind: null, attunementPrereqValue: null,
+                weaponDetail: weapon, armorDetail: null, consumableDetail: null, capabilities: [],
+              }) as unknown as Prisma.InputJsonValue,
+            };
+          })(),
+          (() => {
+            const armor = normalizeArmorDetail({ armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false });
+            return {
+              id: "inv-shield",
+              name: "Snapshot Shield",
+              category: "armor" as const,
+              quantity: 1,
+              position: 1,
+              equippedSlot: "OFF_HAND" as const,
+              snapshot: buildInventorySnapshot({
+                name: "Snapshot Shield", category: "armor", weight: null, cost: null, description: null,
+                slot: null, rarity: null, requiresAttunement: false, attunementPrereqKind: null, attunementPrereqValue: null,
+                weaponDetail: null, armorDetail: armor, consumableDetail: null, capabilities: [],
+              }) as unknown as Prisma.InputJsonValue,
+            };
+          })(),
+          (() => {
+            const armor = normalizeArmorDetail({ armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true });
+            return {
+              id: "inv-armor",
+              name: "Snapshot Leather",
+              category: "armor" as const,
+              quantity: 1,
+              position: 2,
+              equippedSlot: "BODY" as const,
+              snapshot: buildInventorySnapshot({
+                name: "Snapshot Leather", category: "armor", weight: null, cost: null, description: null,
+                slot: null, rarity: null, requiresAttunement: false, attunementPrereqKind: null, attunementPrereqValue: null,
+                weaponDetail: null, armorDetail: armor, consumableDetail: null, capabilities: [],
+              }) as unknown as Prisma.InputJsonValue,
+            };
+          })(),
+          (() => {
+            const caps = [
+              { id: randomUUID(), kind: "passiveBonus" as const, target: "skill" as const, targetKey: "athletics", op: "add" as const, value: 1 },
+              { id: randomUUID(), kind: "activatedEffect" as const, activation: "bonus" as const, target: "speed" as const, op: "add" as const, value: 10, activatedDuration: "untilRest" as const, resourceKind: "perRest" as const, resourcePeriod: "long" as const, resourceCharges: 1, durationText: "10 minutes" },
+            ];
+            return {
+              id: "inv-charm",
+              name: "Charm of the Snapshot",
+              category: "gear" as const,
+              quantity: 1,
+              position: 3,
+              slot: "NECK" as const,
+              equippedSlot: "NECK" as const,
+              rarity: "RARE" as const,
+              activatedUsesSpent: 1,
+              capabilityUses: { create: caps.map((c) => ({ capabilityKey: c.id, used: 0 })) },
+              snapshot: buildInventorySnapshot({
+                name: "Charm of the Snapshot", category: "gear", weight: null, cost: null, description: null,
+                slot: "NECK", rarity: "RARE", requiresAttunement: false, attunementPrereqKind: null, attunementPrereqValue: null,
+                weaponDetail: null, armorDetail: null, consumableDetail: null, capabilities: caps,
+              }) as unknown as Prisma.InputJsonValue,
+            };
+          })(),
+          (() => {
+            const consumable = normalizeConsumableDetail({
+              effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 2, effectDescription: "Heals 2d4+2.", maxUses: 1, usesRemaining: 1,
+            });
+            return {
+              id: "inv-potion",
+              name: "Potion of Snapshots",
+              category: "consumable" as const,
+              quantity: 2,
+              position: 4,
+              // Promoted out of InventoryConsumableDetail (#1648) — must be set
+              // on the column too, or the resolver's glued-on usesRemaining
+              // reads null and the wire regresses.
+              usesRemaining: consumable.usesRemaining,
+              snapshot: buildInventorySnapshot({
+                name: "Potion of Snapshots", category: "consumable", weight: null, cost: null, description: null,
+                slot: null, rarity: null, requiresAttunement: false, attunementPrereqKind: null, attunementPrereqValue: null,
+                weaponDetail: null, armorDetail: null, consumableDetail: consumable, capabilities: [],
+              }) as unknown as Prisma.InputJsonValue,
+            };
+          })(),
         ],
       },
       journalEntries: {

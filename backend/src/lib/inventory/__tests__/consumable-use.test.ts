@@ -5,6 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { applyInventoryOperations, revertInventoryEvent, isHealingConsumable } from "@/lib/inventory/inventory.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 
 const OWNER_ID = "owner-consumable-use";
 
@@ -22,8 +23,14 @@ const BASE_CHARACTER = {
   toolProficiencies: [],
 };
 
+// consumableDetail's maxUses is a frozen snapshot field; usesRemaining is the
+// runtime counter and is a plain InventoryItem column (#1649) — this reads
+// both off the one InventoryItem row so call sites keep their `?.usesRemaining`
+// / `?.maxUses` shape unchanged.
 async function getConsumableDetail(inventoryItemId: string) {
-  return prisma.inventoryConsumableDetail.findUnique({ where: { inventoryItemId } });
+  const item = await prisma.inventoryItem.findUnique({ where: { id: inventoryItemId } });
+  if (!item) return null;
+  return { usesRemaining: item.usesRemaining, maxUses: readInventorySnapshot(item).consumable?.maxUses ?? null };
 }
 
 async function firstInventoryItem(characterId: string) {

@@ -3,7 +3,7 @@
 // kind-discriminated Capability. All five kinds are materialized: passiveBonus,
 // castSpell (#528), grant (#529), activatedEffect (#543), charges (#555).
 
-import { PROFICIENCY_KINDS } from "@character-sheet/contracts";
+import { PROFICIENCY_KINDS, type SnapshotCapability } from "@character-sheet/contracts";
 
 import { casterFractionFor } from "@/lib/srd/srd.js";
 import type {
@@ -358,6 +358,105 @@ export function readCapability(row: CapabilityColumns): Capability {
   return (
     CAPABILITY_READERS[row.kind]?.(row) ?? { kind: row.kind as OpaqueCapability["kind"], description: row.description ?? null }
   );
+}
+
+// Per-kind flatteners for capabilityColumnsFromSnapshot below — mirrors
+// readCastSpellRow/readChargesRow/etc.'s per-kind-reader shape (a dispatch
+// table of small functions keeps each one's own complexity low, matching
+// this file's established pattern for the reverse direction).
+function passiveBonusColumns(cap: Extract<SnapshotCapability, { kind: "passiveBonus" }>) {
+  return {
+    target: cap.target,
+    op: cap.op,
+    value: cap.value,
+    targetKey: cap.targetKey ?? null,
+    condition: cap.condition ?? null,
+    valueDiceCount: cap.dice?.count ?? null,
+    valueDiceFaces: cap.dice?.faces ?? null,
+    valueDamageType: cap.dice?.damageType ?? null,
+  };
+}
+
+function castSpellColumns(cap: Extract<SnapshotCapability, { kind: "castSpell" }>) {
+  return {
+    spellId: cap.spellId,
+    spellName: cap.spellName,
+    spellLevel: cap.spellLevel,
+    castLevel: cap.castLevel,
+    castResource: cap.resource,
+    castUses: cap.uses,
+    castConcentration: cap.concentration,
+    dcMode: cap.dcMode,
+    dcValue: cap.dcValue ?? null,
+    attackMode: cap.attackMode,
+    attackValue: cap.attackValue ?? null,
+    chargeCost: cap.chargeCost,
+  };
+}
+
+function activatedEffectColumns(cap: Extract<SnapshotCapability, { kind: "activatedEffect" }>) {
+  return {
+    activation: cap.activation,
+    target: cap.target,
+    op: cap.op,
+    value: cap.value,
+    targetKey: cap.targetKey ?? null,
+    activatedDuration: cap.duration,
+    resourceKind: cap.resourceKind,
+    resourcePeriod: cap.resourcePeriod ?? null,
+    resourceCharges: cap.resourceCharges,
+    chargeCost: cap.chargeCost,
+    durationText: cap.durationText ?? null,
+  };
+}
+
+function grantColumns(cap: Extract<SnapshotCapability, { kind: "grant" }>) {
+  return {
+    grantType: cap.grantType,
+    grantOn: cap.grantOn ?? null,
+    grantValueKind: cap.grantValueKind ?? null,
+    grantValue: cap.grantValue ?? null,
+    cantBeSurprised: cap.cantBeSurprised,
+  };
+}
+
+function chargesColumns(cap: Extract<SnapshotCapability, { kind: "charges" }>) {
+  return {
+    maxCharges: cap.maxCharges,
+    rechargeDiceCount: cap.rechargeDice?.count ?? null,
+    rechargeDiceFaces: cap.rechargeDice?.faces ?? null,
+    rechargeBonus: cap.rechargeBonus ?? null,
+    rechargeTrigger: cap.rechargeTrigger,
+  };
+}
+
+// The inverse of readCapability, for the InventoryItem side (#1649). The
+// snapshot stores a capability as the already-typed union (SnapshotCapability),
+// but every capability consumer in this codebase — chargePoolOf, readCapability
+// itself, deriveItemGrants/deriveItemPassiveBonuses, serializeCapability — is
+// written against the flat CapabilityColumns row shape that used to come off
+// the InventoryCapability table. Rather than rewrite every one of those
+// consumers to a second, parallel code path, this maps a snapshot capability
+// (+ its InventoryCapabilityUse `used` counter) back onto that same flat shape,
+// keyed by `key` (the old InventoryCapability row's id, preserved verbatim in
+// the snapshot) so every existing reader keeps working unchanged.
+export function capabilityColumnsFromSnapshot(
+  cap: SnapshotCapability,
+  used: number,
+): CapabilityColumns & { id: string; used: number } {
+  const base = { id: cap.key, used, kind: cap.kind, description: cap.description ?? null };
+  switch (cap.kind) {
+    case "passiveBonus":
+      return { ...base, ...passiveBonusColumns(cap) };
+    case "castSpell":
+      return { ...base, ...castSpellColumns(cap) };
+    case "activatedEffect":
+      return { ...base, ...activatedEffectColumns(cap) };
+    case "grant":
+      return { ...base, ...grantColumns(cap) };
+    case "charges":
+      return { ...base, ...chargesColumns(cap) };
+  }
 }
 
 // Every CapabilityColumns field except the runtime `used` counter — named
