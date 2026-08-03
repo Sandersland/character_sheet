@@ -562,8 +562,19 @@ model SubclassGrantedSpell {
   // Ability the granted spells use for save DC / attack bonus (lowercase, e.g.
   // "wisdom" | "charisma"). Uniform per subclass in 5e; stored per-row for simplicity.
   castingAbility String
+  // NULL = granted in both editions (#1625); a list that diverges forks into
+  // one row per edition (same NULL-as-shared convention as Subclass above).
+  // A granted-spell list is a SET, so the read path is a set filter in
+  // deriveGrantedSpells (edition-or-NULL admission), NOT resolveEditionRow's
+  // pick-one fallback. The widened unique below still ADMITS a (subclass,
+  // spell, NULL) row alongside a tagged twin — that mix is forbidden at
+  // authoring time by seed-data.test.ts's shared-XOR-forked guard, since the
+  // set filter would serve both rows to one character. NULLS NOT DISTINCT
+  // lives in the migration (Prisma's DSL can't express it), same as
+  // 20260726111922_catalog_edition_tagging's indexes.
+  edition        RulesEdition?
 
-  @@unique([subclassId, spellId])
+  @@unique([subclassId, spellId, edition])
   @@index([subclassId])
 }
 

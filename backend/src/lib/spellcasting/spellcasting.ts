@@ -59,6 +59,7 @@ import type {
   LearnSpellOperation,
   PrepareSpellOperation,
   RestoreSlotOperation,
+  RulesEdition,
   SpellcastingOperation,
   UnprepareSpellOperation,
 } from "@character-sheet/shared-types";
@@ -733,8 +734,9 @@ function injectDerivedSpells(
   subclassRef: GrantedSpellSource | null | undefined,
   level: number,
   itemSources: ItemSpellSourceItem[],
+  edition: RulesEdition,
 ): void {
-  const granted = deriveGrantedSpells(subclassRef, level);
+  const granted = deriveGrantedSpells(subclassRef, level, edition);
   if (granted.length > 0) {
     const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
     for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
@@ -1008,6 +1010,7 @@ function buildSpellcastingOp(
       attuned: i.attuned,
       capabilities: i.capabilities,
     })),
+    editionOf(row),
   );
 
   const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit, arcaneRecovery);

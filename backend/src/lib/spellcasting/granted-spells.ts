@@ -8,6 +8,8 @@
 // disjoint id space cast/undo/concentration key on. A homebrew subclass (no
 // catalog Subclass row yet, #911) resolves to null here and grants nothing.
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import {
   castUsesTotal,
   chargePoolOf,
@@ -47,12 +49,29 @@ export interface GrantedSpellCatalogSpell extends EffectColumns {
 export interface GrantedSpellRow {
   gateLevel: number;
   castingAbility: string;
+  /** NULL = granted in both editions (#1625) — see admittedGrants. */
+  edition: RulesEdition | null;
   spell: GrantedSpellCatalogSpell;
 }
 export interface GrantedSpellSource {
   /** Subclass name — builds the stable `granted:<subclass>:<spell>` derived id. */
   name: string;
   grantedSpells: GrantedSpellRow[];
+}
+
+// THE single edition-filter site for subclass grants (#1625). The loaded
+// grantedSpells rows span every edition: characterInclude is a module-level
+// const with no access to the character's rulesEdition (see its `features`
+// comment for the in-memory-filter precedent), and Prisma can't express
+// `edition IN (x, NULL)` anyway (withEditionOrShared's comment) — so every
+// consumer filters here, never at an include/select, and a second copy is how
+// the two would diverge. A granted-spell list is a SET, so this is
+// crossEditionRejection's admission comparison applied set-wise (NOT
+// resolveEditionRow's pick-one fallback): a row is served when shared (NULL)
+// or tagged with exactly the character's edition — which also keeps exactly
+// one row of a per-edition gateLevel fork of the same spell.
+function admittedGrants(source: GrantedSpellSource, edition: RulesEdition): GrantedSpellRow[] {
+  return source.grantedSpells.filter((g) => g.edition === null || g.edition === edition);
 }
 
 // "Warrior of Shadow" -> "warrior-of-shadow": the stable derived-id key.
@@ -92,15 +111,17 @@ function optionalSpellFields(s: GrantedSpellCatalogSpell): Partial<SpellEntry> {
 }
 
 // The spells a subclass grants for free at this character level, resolved live
-// from the loaded catalog rows. Below a grant's gate level it is omitted; a null
-// source (no subclass, or homebrew without a catalog row) grants nothing. Never
-// persisted — re-derived on every read.
+// from the loaded catalog rows. Below a grant's gate level it is omitted; a
+// cross-edition row is omitted (admittedGrants); a null source (no subclass,
+// or homebrew without a catalog row) grants nothing. Never persisted —
+// re-derived on every read.
 export function deriveGrantedSpells(
   source: GrantedSpellSource | null | undefined,
   level: number,
+  edition: RulesEdition,
 ): SpellEntry[] {
   if (!source) return [];
-  return source.grantedSpells
+  return admittedGrants(source, edition)
     .filter((g) => level >= g.gateLevel)
     .map((g) => ({
       id: `granted:${slug(source.name)}:${slug(g.spell.name)}`,
@@ -126,11 +147,12 @@ export function grantedSpellsGained(
   prevLevel: number,
   nextSource: GrantedSpellSource | null | undefined,
   nextLevel: number,
+  edition: RulesEdition,
 ): SpellEntry[] {
   if (!nextSource) return [];
-  const next = deriveGrantedSpells(nextSource, nextLevel);
+  const next = deriveGrantedSpells(nextSource, nextLevel, edition);
   if (!prevSource) return next;
-  const had = new Set(deriveGrantedSpells(prevSource, prevLevel).map((s) => s.id));
+  const had = new Set(deriveGrantedSpells(prevSource, prevLevel, edition).map((s) => s.id));
   return next.filter((s) => !had.has(s.id));
 }
 
@@ -143,14 +165,16 @@ const ABILITY_NAMES = new Set<string>([
   "charisma",
 ]);
 
-// The ability a subclass's granted spells use for save DC / attack bonus. The
-// column is a plain `string`, so validate it against the six lowercase ability
-// names — a mis-cased/unknown value falls back to Wisdom rather than silently
-// producing a NaN modifier / wrong save DC.
+// The ability a subclass's granted spells use for save DC / attack bonus, read
+// off the first ADMITTED grant (a cross-edition row must not set the stat for
+// a character it never grants to). The column is a plain `string`, so validate
+// it against the six lowercase ability names — a mis-cased/unknown value falls
+// back to Wisdom rather than silently producing a NaN modifier / wrong save DC.
 export function deriveGrantedCastingAbility(
   source: GrantedSpellSource | null | undefined,
+  edition: RulesEdition,
 ): keyof AbilityScores {
-  const raw = source?.grantedSpells[0]?.castingAbility;
+  const raw = source ? admittedGrants(source, edition)[0]?.castingAbility : undefined;
   return (raw && ABILITY_NAMES.has(raw) ? raw : "wisdom") as keyof AbilityScores;
 }
 
