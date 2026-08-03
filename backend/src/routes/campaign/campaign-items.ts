@@ -47,8 +47,10 @@ campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
     "Only the campaign owner may manage campaign items",
   );
 
-  const items = await prisma.campaignItem.findMany({
-    where: { campaignId: req.params.id },
+  const items = await prisma.item.findMany({
+    // Campaign items only: a GLOBAL catalog row has no campaignId, but filtering
+    // on scope states the intent rather than relying on that (#1646).
+    where: { scope: "CAMPAIGN", campaignId: req.params.id },
     include: itemInclude,
     orderBy: { name: "asc" },
   });
@@ -69,7 +71,7 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
     where: { campaignEntityId: req.params.entityId },
     include: {
       campaignEntity: { select: { campaignId: true, visibility: true } },
-      campaignItem: { include: itemInclude },
+      item: { include: itemInclude },
     },
   });
   // Hidden-from-non-owner, foreign-campaign, or missing all 404 identically.
@@ -82,8 +84,8 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
     return;
   }
 
-  const holders = await campaignItemHolders([link.campaignItem.id]);
-  res.json(serializeCampaignItem(link.campaignItem, isOwner, holders.get(link.campaignItem.id) ?? []));
+  const holders = await campaignItemHolders([link.item.id]);
+  res.json(serializeCampaignItem(link.item, isOwner, holders.get(link.item.id) ?? []));
 });
 
 /**
@@ -112,7 +114,7 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
     const entity = await tx.campaignEntity.create({
       data: { campaignId, type: "ITEM", name: data.name, visibility: "HIDDEN" },
     });
-    return tx.campaignItem.create({
+    return tx.item.create({
       data: {
         ...createItemColumns(campaignId, data),
         ...detailCreate(data),
@@ -144,11 +146,14 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   const data = parseBodyOr400(updateItemSchema, req.body, res);
   if (data === undefined) return;
 
-  const existing = await prisma.campaignItem.findUnique({
-    where: { id: req.params.itemId },
+  // findFirst with the full predicate, not findUnique(id) + an in-code campaign
+  // check: the latter leaks existence through timing and is easy to forget on a
+  // new endpoint (#1646).
+  const existing = await prisma.item.findFirst({
+    where: { id: req.params.itemId, scope: "CAMPAIGN", campaignId: req.params.id },
     include: { link: true },
   });
-  if (!existing || existing.campaignId !== req.params.id) {
+  if (!existing) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
@@ -180,7 +185,7 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
 
   const updated = await prisma.$transaction(async (tx) => {
     await syncLinkedEntityName(tx, existing, data.name);
-    return tx.campaignItem.update({
+    return tx.item.update({
       where: { id: existing.id },
       data: {
         ...pickDefined(data, [
@@ -219,17 +224,17 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
     "Only the campaign owner may manage campaign items",
   );
 
-  const existing = await prisma.campaignItem.findUnique({
-    where: { id: req.params.itemId },
+  const existing = await prisma.item.findFirst({
+    where: { id: req.params.itemId, scope: "CAMPAIGN", campaignId: req.params.id },
     include: { link: true },
   });
-  if (!existing || existing.campaignId !== req.params.id) {
+  if (!existing) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.campaignItem.delete({ where: { id: existing.id } });
+    await tx.item.delete({ where: { id: existing.id } });
     if (existing.link) {
       await tx.campaignEntity.delete({ where: { id: existing.link.campaignEntityId } });
     }

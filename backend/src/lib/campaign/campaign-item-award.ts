@@ -7,12 +7,13 @@ import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "@/lib/
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 
-// DM item award/revoke (#381). A campaign owner grants a DM-authored
-// CampaignItem into a member character's inventory: the mechanical fields +
-// matching detail row are snapshotted into a new InventoryItem tagged with a
-// campaignItemId provenance FK, the fronting entity is revealed, and an audit
-// event is written on the TARGET character so the grant is LIFO-undoable via
-// the shared inventory revert (category "inventory", shape-driven).
+// DM item award/revoke (#381). A campaign owner grants a CAMPAIGN-scoped Item
+// (#1646; DM-authored, formerly a separate CampaignItem table) into a member
+// character's inventory: the mechanical fields + matching detail row are
+// snapshotted into a new InventoryItem tagged with an itemId provenance FK,
+// the fronting entity is revealed, and an audit event is written on the
+// TARGET character so the grant is LIFO-undoable via the shared inventory
+// revert (category "inventory", shape-driven).
 
 class CampaignItemAwardError extends Error {
   status: number;
@@ -28,9 +29,9 @@ const campaignItemInclude = {
   consumableDetail: true,
   capabilities: true,
   link: { select: { campaignEntityId: true } },
-} satisfies Prisma.CampaignItemInclude;
+} satisfies Prisma.ItemInclude;
 
-type CampaignItemWithDetails = Prisma.CampaignItemGetPayload<{ include: typeof campaignItemInclude }>;
+type CampaignItemWithDetails = Prisma.ItemGetPayload<{ include: typeof campaignItemInclude }>;
 
 export interface CampaignItemHolder {
   characterId: string;
@@ -42,9 +43,9 @@ function toJsonInput(value: Prisma.JsonValue | null): Prisma.InputJsonValue | Pr
   return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
 }
 
-// Builds the InventoryItem nested detail-create block from a CampaignItem's
-// already-included detail rows — the CampaignItem*Detail tables share the exact
-// shape of the Inventory*Detail tables, so this is a straight field copy.
+// Builds the InventoryItem nested detail-create block from a CAMPAIGN-scoped
+// Item's already-included detail rows — the Item*Detail tables share the
+// exact shape of the Inventory*Detail tables, so this is a straight field copy.
 function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
   return {
     ...snapshotDetailCreate(item),
@@ -131,13 +132,15 @@ async function resolveAwardSessionId(
 }
 
 // Loads the item + target character and enforces the shared guards: item lives
-// in this campaign (404), character is a member of it (400).
+// in this campaign (404), character is a member of it (400). findFirst with the
+// full predicate, not findUnique(id) + an in-code campaign check — the latter
+// leaks existence through timing (#1646).
 async function loadAwardContext(campaignId: string, campaignItemId: string, characterId: string) {
-  const item = await prisma.campaignItem.findUnique({
-    where: { id: campaignItemId },
+  const item = await prisma.item.findFirst({
+    where: { id: campaignItemId, scope: "CAMPAIGN", campaignId },
     include: campaignItemInclude,
   });
-  if (!item || item.campaignId !== campaignId) {
+  if (!item) {
     throw new CampaignItemAwardError(404, "Campaign item not found");
   }
   const character = await prisma.character.findUnique({
@@ -174,7 +177,7 @@ export async function awardCampaignItem(params: {
     // concurrent award can't slip between an outside-the-tx check and the write.
     if (item.isUnique) {
       const held = await tx.inventoryItem.findFirst({
-        where: { campaignItemId: item.id },
+        where: { itemId: item.id },
         select: { character: { select: { name: true } } },
       });
       if (held) {
@@ -189,7 +192,7 @@ export async function awardCampaignItem(params: {
     const created = await tx.inventoryItem.create({
       data: {
         characterId: character.id,
-        campaignItemId: item.id,
+        itemId: item.id,
         name: item.name,
         category: item.category,
         weight: item.weight ?? undefined,
@@ -253,7 +256,7 @@ export async function revokeCampaignItem(params: {
   );
 
   const row = await prisma.inventoryItem.findFirst({
-    where: { characterId: character.id, campaignItemId: item.id },
+    where: { characterId: character.id, itemId: item.id },
     orderBy: { position: "desc" },
     include: inventoryItemDetailInclude,
   });
@@ -289,7 +292,10 @@ export async function revokeCampaignItem(params: {
 }
 
 // Current holders of each campaign item, derived from live InventoryItem rows.
-// Returns a map keyed by campaignItemId; items with no holders are absent.
+// Returns a map keyed by itemId; items with no holders are absent. Matching on
+// itemId is exact even though catalog acquisitions also populate it (#1646):
+// the caller only ever passes CAMPAIGN-scoped Item ids, and a catalog-acquired
+// row's itemId is a GLOBAL id, so the two sets cannot overlap.
 export async function campaignItemHolders(
   campaignItemIds: string[],
 ): Promise<Map<string, CampaignItemHolder[]>> {
@@ -297,9 +303,9 @@ export async function campaignItemHolders(
   if (campaignItemIds.length === 0) return map;
 
   const rows = await prisma.inventoryItem.findMany({
-    where: { campaignItemId: { in: campaignItemIds } },
+    where: { itemId: { in: campaignItemIds } },
     select: {
-      campaignItemId: true,
+      itemId: true,
       characterId: true,
       quantity: true,
       character: { select: { name: true } },
@@ -307,14 +313,14 @@ export async function campaignItemHolders(
   });
 
   for (const row of rows) {
-    if (!row.campaignItemId) continue;
-    const list = map.get(row.campaignItemId) ?? [];
+    if (!row.itemId) continue;
+    const list = map.get(row.itemId) ?? [];
     list.push({
       characterId: row.characterId,
       characterName: row.character.name,
       quantity: row.quantity,
     });
-    map.set(row.campaignItemId, list);
+    map.set(row.itemId, list);
   }
   return map;
 }

@@ -366,9 +366,9 @@ export const itemInclude = {
   consumableDetail: true,
   capabilities: true,
   link: { include: { campaignEntity: { select: { id: true, name: true, visibility: true } } } },
-} satisfies Prisma.CampaignItemInclude;
+} satisfies Prisma.ItemInclude;
 
-type ItemWithDetails = Prisma.CampaignItemGetPayload<{ include: typeof itemInclude }>;
+type ItemWithDetails = Prisma.ItemGetPayload<{ include: typeof itemInclude }>;
 
 // The scalar columns, null → undefined so unset fields vanish from the wire.
 function serializeItemBase(row: ItemWithDetails) {
@@ -399,7 +399,9 @@ function serializeItemDetails(row: ItemWithDetails) {
 }
 
 // Serialize for the wire. dmNotes is included ONLY when includeDmNotes is true —
-// the single guard behind "dmNotes never reaches a player-facing payload".
+// the single guard behind "dmNotes never reaches a player-facing payload". Since
+// #1646 the column lives on Item alongside seeded catalog rows, so nothing about
+// the TABLE makes it private any more — this flag is the whole protection.
 // holders (derived from live InventoryItem rows) is player-safe: just who holds
 // how many, so it appears on both the owner list and the revealed Codex card.
 export function serializeCampaignItem(
@@ -439,6 +441,10 @@ export function detailCreate(data: z.infer<typeof createItemSchema>) {
 export function createItemColumns(campaignId: string, data: z.infer<typeof createItemSchema>) {
   return {
     campaignId,
+    // The scope triple is written together because Item_scope_key_agreement_check
+    // rejects any row where they disagree (#1645).
+    scope: "CAMPAIGN" as const,
+    scopeKey: `campaign:${campaignId}`,
     name: data.name,
     description: orElse(data.description, null),
     category: data.category,

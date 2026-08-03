@@ -376,7 +376,10 @@ model CampaignItem {
   armorDetail      CampaignItemArmorDetail?
   consumableDetail CampaignItemConsumableDetail?
   capabilities     CampaignItemCapability[]
-  link             CampaignItemLink?
+  // No `link` back-relation: #1646 (20260803125000) re-pointed CampaignItemLink
+  // at Item, since item creation now writes only there. This model is
+  // transitional history (dropped whole by 20260803130000) and no longer
+  // fronts an entity itself.
   // Awarded snapshots on player sheets (#381) — holder derivation reads these.
   awards           InventoryItem[]           @relation("CampaignItemAwards")
 
@@ -518,8 +521,10 @@ model CampaignItemLink {
   id               String         @id @default(uuid())
   campaignEntityId String         @unique
   campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
-  campaignItemId   String         @unique
-  campaignItem     CampaignItem   @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+  // Points at a CAMPAIGN-scoped Item since #1646 merged the two definition
+  // tables; the name still describes what it links, so the model keeps it.
+  itemId           String         @unique
+  item             Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
 }
 
 // --- Campaign-scoped character preferences (#537) ---------------------------
@@ -1556,6 +1561,9 @@ model Item {
 
   inventoryItems InventoryItem[]
   packContents   PackContent[]
+  // Back-relation to the fronting ITEM CampaignEntity link (#380, re-parented
+  // from CampaignItem by #1646). Only ever set on a CAMPAIGN-scoped row.
+  link           CampaignItemLink?
 
   @@unique([scopeKey, name])
   @@index([campaignId])
