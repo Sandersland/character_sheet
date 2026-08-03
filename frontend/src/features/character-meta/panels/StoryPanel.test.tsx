@@ -6,10 +6,13 @@ import StoryPanel from "@/features/character-meta/panels/StoryPanel";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
-// JournalDoorway drives useChronicle (arcs + sessions) via @/api/client; stub it.
+// JournalDoorway drives useChronicle (arcs + sessions) via @/api/client, and
+// IdentityCard's portrait region imports the portrait mutations; stub all four.
 vi.mock("@/api/client", () => ({
   fetchCampaignArcs: vi.fn().mockResolvedValue([]),
   fetchChronicleSessions: vi.fn().mockResolvedValue([]),
+  uploadCharacterPortrait: vi.fn(),
+  deleteCharacterPortrait: vi.fn(),
 }));
 
 function makeCharacter(partial: Partial<Character>): Character {
@@ -40,6 +43,14 @@ describe("StoryPanel (#927)", () => {
     expect(screen.getByText("Journal")).toBeInTheDocument();
     expect(screen.getByText("Identity")).toBeInTheDocument();
     expect(screen.getByText("Sage")).toBeInTheDocument();
+  });
+
+  // The portrait editor merged into the Identity card (#1618) — no standalone
+  // Portrait card heading, but its upload affordance renders inside Identity.
+  it("renders the portrait editor inside Identity, not as its own card", () => {
+    renderPanel(makeCharacter({ campaignId: "camp-1" }));
+    expect(screen.queryByRole("heading", { name: "Portrait" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose image" })).toBeInTheDocument();
   });
 
   // Campaign preferences moved to the header ⋮ "Campaign settings" sheet (#1087);
