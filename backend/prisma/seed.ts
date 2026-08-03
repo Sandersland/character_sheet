@@ -120,11 +120,14 @@ async function upsertGrantedSpell(
   if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
   const spell = await prisma.spell.findUnique({ where: { name: g.spellName }, select: { id: true } });
   if (!spell) throw new Error(`Seed error: granted spell "${g.spellName}" not in the Spell catalog`);
-  await prisma.subclassGrantedSpell.upsert({
-    where: { subclassId_spellId: { subclassId: subclass.id, spellId: spell.id } },
-    create: { subclassId: subclass.id, spellId: spell.id, gateLevel: g.gateLevel, castingAbility: g.castingAbility },
-    update: { gateLevel: g.gateLevel, castingAbility: g.castingAbility },
-  });
+  // upsertEditionRow, not .upsert(): the widened compound-key shorthand
+  // (#1625) can't express a null edition at runtime.
+  await upsertEditionRow(
+    prisma.subclassGrantedSpell,
+    { subclassId: subclass.id, spellId: spell.id, edition: null },
+    { subclassId: subclass.id, spellId: spell.id, gateLevel: g.gateLevel, castingAbility: g.castingAbility, edition: null },
+    { gateLevel: g.gateLevel, castingAbility: g.castingAbility },
+  );
 }
 
 // Subclass-granted spells (#898). Runs after subclasses AND spells are seeded.
