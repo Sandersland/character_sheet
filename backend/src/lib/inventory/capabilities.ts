@@ -360,6 +360,40 @@ export function readCapability(row: CapabilityColumns): Capability {
   );
 }
 
+// Every CapabilityColumns field except the runtime `used` counter — named
+// once so the two "copy one capability row's columns into a new row" sites
+// (capabilityColumnFields below) can't drift apart on which columns count as
+// "the capability" vs. runtime state.
+const CAPABILITY_COLUMN_KEYS = [
+  "kind", "description", "target", "op", "value", "targetKey", "condition",
+  "valueDiceCount", "valueDiceFaces", "valueDamageType",
+  "spellId", "spellName", "spellLevel", "castLevel", "castResource", "castUses", "castConcentration",
+  "dcMode", "dcValue", "attackMode", "attackValue",
+  "activation", "activatedDuration", "resourceKind", "resourcePeriod", "resourceCharges", "durationText",
+  "grantType", "grantOn", "grantValueKind", "grantValue", "cantBeSurprised",
+  "maxCharges", "rechargeDiceCount", "rechargeDiceFaces", "rechargeBonus", "rechargeTrigger", "chargeCost",
+] as const satisfies readonly (keyof CapabilityColumns)[];
+
+// The flat-column copy shared by every "snapshot one capability row into
+// another" call site — snapshotInventoryItemForUndo (inventory-snapshot.ts,
+// which adds `used` back: undo restores spend state verbatim) and
+// snapshotCampaignItemCapabilityCreates (campaign-item-award.ts, `used`
+// excluded: an awarded pool starts full). Generic over T so a caller passing
+// a live Prisma row keeps its literal column types (e.g. `kind: CapabilityKind`,
+// not the interface's widened `string`) — required for the result to satisfy
+// a Prisma *CreateInput shape directly.
+export function capabilityColumnFields<T extends CapabilityColumns>(
+  c: T,
+): Pick<T, (typeof CAPABILITY_COLUMN_KEYS)[number]> {
+  const out: Record<string, unknown> = {};
+  // Cast on write, not on the function's own signature: the loop's key is
+  // widened to `keyof CapabilityColumns` on each iteration, which TS can't
+  // narrow back to the exact field being assigned — the return type above is
+  // what keeps callers precise.
+  for (const key of CAPABILITY_COLUMN_KEYS) out[key] = c[key];
+  return out as Pick<T, (typeof CAPABILITY_COLUMN_KEYS)[number]>;
+}
+
 // Max uses per recharge for an activatedEffect. atWill is unlimited (null = no
 // cap); perRest/perDay allow resourceCharges uses (default 1) per period. A
 // charges-costed effect is gated by the item's shared pool, not a per-item

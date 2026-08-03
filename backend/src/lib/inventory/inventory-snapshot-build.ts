@@ -51,6 +51,18 @@ export interface SnapshotSourceRow {
   capabilities: SnapshotCapabilityRow[];
 }
 
+// A DM-authored campaign Item's cost is stored PARTIAL — campaign-items.ts's
+// currencySchema is `z.object({cp,sp,gp,pp}).partial()`, so a hand-typed
+// "5000 gp" persists as `{gp: 5000}` with no cp/sp/pp keys at all. asCurrency
+// is an unchecked cast (the column is untyped Json), so that shape reaches
+// here looking like a full Currency. snapshotCostSchema is strict and
+// requires all four, so a missing denomination must become 0 here rather than
+// surface as a parse failure on every campaign item whose cost wasn't typed
+// in every denomination.
+function narrowCost(cost: Currency): { cp: number; sp: number; gp: number; pp: number } {
+  return { cp: cost.cp ?? 0, sp: cost.sp ?? 0, gp: cost.gp ?? 0, pp: cost.pp ?? 0 };
+}
+
 // consumableDetail's maxUses is frozen; usesRemaining is the runtime counter
 // and stays a column (InventoryItem.usesRemaining) — dropped here rather than
 // left for the strict schema to reject, so a caller sees the parse succeed on
@@ -72,7 +84,7 @@ export function buildInventorySnapshot(row: SnapshotSourceRow): InventorySnapsho
     name: row.name,
     category: row.category,
     weight: row.weight,
-    cost: row.cost,
+    cost: row.cost ? narrowCost(row.cost) : null,
     description: row.description,
     slot: row.slot,
     rarity: row.rarity,
