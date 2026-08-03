@@ -866,13 +866,13 @@ export function level1SpellPicksFor(
 ): { cantrips: number; spells: number; maxSpellLevel: number } | null {
   if (spellcastingStartLevel(className, subclass, edition) > 1) return null;
 
-  const cantrips = cantripsKnownAtLevel(className, 1, subclass);
   const spells =
     edition === "EDITION_2014"
       ? (LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null)
       : preparedSpellCountAt(className, 1, subclass, {}, edition);
   if (spells == null) return null; // non-caster
 
+  const cantrips = cantripsKnownAtLevel(className, 1, subclass);
   const maxSpellLevel = spells === 0 ? 0 : maxSpellLevelForClass(className, 1, subclass, edition);
   return { cantrips, spells, maxSpellLevel };
 }

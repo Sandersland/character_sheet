@@ -210,6 +210,21 @@ describe("POST /api/characters — 2014 creation spell picks (#1510)", () => {
     expect(book.every((s) => s.level === 0)).toBe(true);
   });
 
+  it("a 2014 Druid picks 2 cantrips and 0 spells — same prepared-from-full-list shape as Cleric", async () => {
+    const picks = await picksFor("druid", 2, 0);
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells2014 Druid",
+      classes: [{ name: "Druid" }],
+      rulesEdition: "EDITION_2014",
+      spells: picks,
+    });
+    expect(res.status).toBe(201);
+    const book = res.body.spellcasting.spells as Array<{ level: number }>;
+    expect(book).toHaveLength(2);
+    expect(book.every((s) => s.level === 0)).toBe(true);
+  });
+
   it("rejects a 2014 Cleric sending 4 level-1 spells", async () => {
     const picks = await picksFor("cleric", 3, 4);
     const res = await create({
